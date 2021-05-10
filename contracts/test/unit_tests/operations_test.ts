@@ -24,13 +24,15 @@ function getDepositPriorityQueueData({ tokenId, amount, owner }) {
     ]);
 }
 
-function getFullExitPubdata({ accountId, tokenId, amount, owner }) {
+function getFullExitPubdata({ accountId, tokenId, amount, owner, nftCreatorAddress, nftContentHash }) {
     return ethers.utils.concat([
         ethers.utils.arrayify('0x06'),
         ethers.utils.arrayify(accountId),
         ethers.utils.arrayify(owner),
         ethers.utils.arrayify(tokenId),
         ethers.utils.arrayify(amount),
+        ethers.utils.arrayify(nftCreatorAddress),
+        ethers.utils.arrayify(nftContentHash),
         ethers.utils.arrayify('0x0000') // padding
     ]);
 }
@@ -41,7 +43,9 @@ function getFullExitPriorityQueueData({ accountId, tokenId, owner }) {
         ethers.utils.arrayify(accountId),
         ethers.utils.arrayify(owner),
         ethers.utils.arrayify(tokenId),
-        ethers.utils.arrayify('0x00000000000000000000000000000000') // padding
+        ethers.utils.arrayify(
+            '0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+        ) // padding
     ]);
 }
 
@@ -118,9 +122,14 @@ describe('Operations unit tests', function () {
         const tokenId = '0x01020304';
         const amount = '0x101112131415161718191a1b1c1d1e1f';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
+        const nftCreatorAddress = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
+        const nftContentHash = '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996';
 
-        const pubdata = getFullExitPubdata({ accountId, tokenId, amount, owner });
-        await testContract.testFullExitPubdata({ accountId, tokenId, amount, owner }, pubdata);
+        const pubdata = getFullExitPubdata({ accountId, tokenId, amount, owner, nftCreatorAddress, nftContentHash });
+        await testContract.testFullExitPubdata(
+            { accountId, tokenId, amount, owner, nftCreatorAddress, nftContentHash },
+            pubdata
+        );
     });
 
     it('Correctly Write FullExit data priority queue', async () => {
@@ -128,9 +137,14 @@ describe('Operations unit tests', function () {
         const tokenId = '0x01020304';
         const amount = '0x101112131415161718191a1b1c1d1e1f';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
+        const nftCreatorAddress = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
+        const nftContentHash = '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996';
 
         const priorityQueueData = getFullExitPriorityQueueData({ accountId, tokenId, owner });
-        await testContract.testFullExitPriorityQueue({ accountId, tokenId, amount, owner }, priorityQueueData);
+        await testContract.testFullExitPriorityQueue(
+            { accountId, tokenId, amount, owner, nftCreatorAddress, nftContentHash },
+            priorityQueueData
+        );
     });
 
     it('Correctly Parse Withdraw pubdata', async () => {

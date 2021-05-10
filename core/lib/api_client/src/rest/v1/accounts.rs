@@ -1,7 +1,11 @@
 //! Accounts API client implementation
 
 // Built-in uses
-use std::{collections::BTreeMap, fmt::Display, str::FromStr};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Display,
+    str::FromStr,
+};
 
 // External uses
 use serde::{Deserialize, Serialize};
@@ -17,7 +21,6 @@ use super::{
     client::{Client, ClientError},
     transactions::Receipt,
 };
-use std::collections::HashMap;
 
 // Data transfer objects
 

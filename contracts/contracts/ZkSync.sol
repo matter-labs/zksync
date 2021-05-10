@@ -116,7 +116,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
 
-        // We need initial state hash because it is used in the commitment of the next block
         StoredBlockInfo memory storedBlockZero =
             StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, 0, _genesisStateHash, bytes32(0));
 
@@ -222,14 +221,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return pendingBalances[packAddressAndTokenId(_address, tokenId)].balanceToWithdraw;
     }
 
-    /// @notice Returns amount of tokens that can be withdrawn by `address` from zkSync contract
-    /// @notice DEPRECATED: to be removed in future,  use getPendingBalance instead
-    /// @param _address Address of the tokens owner
-    /// @param _tokenId token id, 0 is used for ETH
-    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
-        return pendingBalances[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
-    }
-
     /// @notice  Withdraws tokens from zkSync contract to the owner
     /// @param _owner Address of the tokens owner
     /// @param _token Address of tokens, zero address is used for ETH
@@ -257,25 +248,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
     }
 
-    /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
-    /// @notice DEPRECATED: use withdrawPendingBalance instead
-    /// @param _token Token address
-    /// @param _amount amount to withdraw
-    function withdrawERC20(IERC20 _token, uint128 _amount) external nonReentrant {
-        uint16 tokenId = governance.validateTokenAddress(address(_token));
-        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, tokenId);
-        uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
-        uint128 withdrawnAmount = this._transferERC20(_token, msg.sender, _amount, balance);
-        registerWithdrawal(tokenId, withdrawnAmount, msg.sender);
-    }
-
-    /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
-    /// @notice DEPRECATED: use withdrawPendingBalance instead
-    /// @param _amount Ether amount to withdraw
-    function withdrawETH(uint128 _amount) external nonReentrant {
-        registerWithdrawal(0, _amount, msg.sender);
-        (bool success, ) = msg.sender.call{value: _amount}("");
-        require(success, "D"); // ETH withdraw failed
+    /// @notice  Withdraws NFT from zkSync contract to the owner
+    /// @param _tokenId Id of NFT token
+    function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
+        require(_tokenId > MAX_FUNGIBLE_TOKEN_ID, "oq"); // Withdraw only nft tokens
+        Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
+        require(_tokenId == op.tokenId, "op"); // Token does not exists
+        require(op.creator != address(0x0), "op"); // Token does not exists
+        NFTFactory _factory = governance.getNFTFactory(op.creator);
+        _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId);
+        delete pendingWithdrawnNFTs[_tokenId];
     }
 
     /// @notice Register full exit request - pack pubdata, add priority request
@@ -299,7 +281,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 accountId: _accountId,
                 owner: msg.sender,
                 tokenId: uint32(tokenId),
-                amount: 0 // unknown at this point
+                amount: 0, // unknown at this point
+                nftCreatorAddress: address(0), // unknown at this point
+                nftContentHash: bytes32(0) // unknown at this point
             });
         bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.FullExit, pubData);
@@ -310,12 +294,27 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         pendingBalances[packedBalanceKey].gasReserveValue = FILLED_GAS_RESERVE_VALUE;
     }
 
-    /// @notice Register full exit request - pack pubdata, add priority request
-    /// @notice DEPRECATED: use requestFullExit instead.
+    /// @notice Register full exit nft request - pack pubdata, add priority request
     /// @param _accountId Numerical id of the account
-    /// @param _token Token address, 0 address for ether
-    function fullExit(uint32 _accountId, address _token) external {
-        requestFullExit(_accountId, _token);
+    /// @param _tokenId NFT token id in zkSync network
+    function requestFullExitNFT(uint32 _accountId, uint32 _tokenId) public nonReentrant {
+        requireActive();
+        require(_accountId <= MAX_ACCOUNT_ID, "e");
+        require(_accountId != SPECIAL_ACCOUNT_ID, "v"); // request full exit nft for nft storage account
+        require(MAX_FUNGIBLE_TOKEN_ID < _tokenId && _tokenId < SPECIAL_NFT_TOKEN_ID, "T"); // request full exit nft for invalid token id
+
+        // Priority Queue request
+        Operations.FullExit memory op =
+            Operations.FullExit({
+                accountId: _accountId,
+                owner: msg.sender,
+                tokenId: _tokenId,
+                amount: 0, // unknown at this point
+                nftCreatorAddress: address(0), // unknown at this point
+                nftContentHash: bytes32(0) // unknown at this point
+            });
+        bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
+        addPriorityRequest(Operations.OpType.FullExit, pubData);
     }
 
     /// @dev Process one block commit using previous block StoredBlockInfo,
@@ -382,6 +381,19 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev 1. Try to send token to _recipients
     /// @dev 2. On failure: Increment _recipients balance to withdraw.
+    function withdrawOrStoreNFT(Operations.WithdrawNFT memory op) internal {
+        NFTFactory _factory = governance.getNFTFactory(op.creator);
+        try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {
+            // Save withdrawn nfts for future deposits
+            withdrawnNFTs[op.tokenId] = address(_factory);
+            emit WithdrawalNFT(op.tokenId);
+        } catch {
+            pendingWithdrawnNFTs[op.tokenId] = op;
+        }
+    }
+
+    /// @dev 1. Try to send token to _recipients
+    /// @dev 2. On failure: Increment _recipients balance to withdraw.
     function withdrawOrStore(
         uint16 _tokenId,
         address _recipient,
@@ -432,16 +444,24 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             if (opType == Operations.OpType.PartialExit) {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
                 withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
                 withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
-                withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
+                if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
+                    withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
+                } else {
+                    if (op.amount == 1) {
+                        Operations.WithdrawNFT memory nftOp =
+                            Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
+                        withdrawOrStoreNFT(nftOp);
+                    }
+                }
+            } else if (opType == Operations.OpType.WithdrawNFT) {
+                Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
+                withdrawOrStoreNFT(op);
             } else {
                 revert("l"); // unsupported op in block execution
             }
@@ -560,22 +580,42 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         StoredBlockInfo memory _storedBlockInfo,
         address _owner,
         uint32 _accountId,
-        uint16 _tokenId,
+        uint32 _tokenId,
         uint128 _amount,
+        address _nftCreatorAddress,
+        bytes32 _nftContentHash,
         uint256[] memory _proof
     ) external nonReentrant {
-        require(governance.isValidTokenId(_tokenId), "a"); // should request only available tokens
+        require(_accountId <= MAX_ACCOUNT_ID, "e");
+        require(_accountId != SPECIAL_ACCOUNT_ID, "v");
+        require(_tokenId < SPECIAL_NFT_TOKEN_ID, "T");
 
-        bytes22 packedBalanceKey = packAddressAndTokenId(_owner, _tokenId);
         require(exodusMode, "s"); // must be in exodus mode
         require(!performedExodus[_accountId][_tokenId], "t"); // already exited
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect stored block info
 
         bool proofCorrect =
-            verifier.verifyExitProof(_storedBlockInfo.stateHash, _accountId, _owner, uint32(_tokenId), _amount, _proof);
+            verifier.verifyExitProof(
+                _storedBlockInfo.stateHash,
+                _accountId,
+                _owner,
+                _tokenId,
+                _amount,
+                _nftCreatorAddress,
+                _nftContentHash,
+                _proof
+            );
         require(proofCorrect, "x");
 
-        increaseBalanceToWithdraw(packedBalanceKey, _amount);
+        if (_tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
+            bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
+            increaseBalanceToWithdraw(packedBalanceKey, _amount);
+        } else {
+            require(_amount != 0, "Z"); // Unsupported nft amount
+            Operations.WithdrawNFT memory nftOp =
+                Operations.WithdrawNFT(_nftCreatorAddress, _nftContentHash, _owner, _tokenId);
+            pendingWithdrawnNFTs[_tokenId] = nftOp;
+        }
         performedExodus[_accountId][_tokenId] = true;
     }
 
@@ -700,6 +740,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     opPubData = Bytes.slice(pubData, pubdataOffset, PARTIAL_EXIT_BYTES);
                 } else if (opType == Operations.OpType.ForcedExit) {
                     opPubData = Bytes.slice(pubData, pubdataOffset, FORCED_EXIT_BYTES);
+                } else if (opType == Operations.OpType.WithdrawNFT) {
+                    opPubData = Bytes.slice(pubData, pubdataOffset, WITHDRAW_NFT_BYTES);
                 } else if (opType == Operations.OpType.FullExit) {
                     opPubData = Bytes.slice(pubData, pubdataOffset, FULL_EXIT_BYTES);
 
@@ -904,22 +946,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         emit NewPriorityRequest(msg.sender, nextPriorityRequestId, _opType, _pubData, uint256(expirationBlock));
 
         totalOpenPriorityRequests++;
-    }
-
-    /// @notice Deletes processed priority requests
-    /// @param _number The number of requests
-    function deleteRequests(uint64 _number) internal {
-        require(_number <= totalOpenPriorityRequests, "M"); // number is higher than total priority requests number
-
-        uint64 numberOfRequestsToClear = Utils.minU64(_number, MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY);
-        uint64 startIndex = firstPriorityRequestId;
-        for (uint64 i = startIndex; i < startIndex + numberOfRequestsToClear; i++) {
-            delete priorityRequests[i];
-        }
-
-        totalOpenPriorityRequests -= _number;
-        firstPriorityRequestId += _number;
-        totalCommittedPriorityRequests -= _number;
     }
 
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {

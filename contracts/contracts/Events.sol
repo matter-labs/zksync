@@ -17,6 +17,9 @@ interface Events {
     /// @notice Event emitted when user funds are withdrawn from the zkSync contract
     event Withdrawal(uint16 indexed tokenId, uint128 amount);
 
+    /// @notice Event emitted when user NFT is withdrawn from the zkSync contract
+    event WithdrawalNFT(uint32 indexed tokenId);
+
     /// @notice Event emitted when user funds are deposited to the zkSync contract
     event Deposit(uint16 indexed tokenId, uint128 amount);
 

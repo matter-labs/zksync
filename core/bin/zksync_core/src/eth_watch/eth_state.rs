@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 // External uses
 // Workspace deps
-use zksync_types::{NewTokenEvent, PriorityOp, SerialId};
+use zksync_types::{NewTokenEvent, PriorityOp, RegisterNFTFactoryEvent, SerialId};
 // Local deps
 use super::received_ops::ReceivedPriorityOp;
 
@@ -30,6 +30,8 @@ pub struct ETHState {
     priority_queue: HashMap<u64, ReceivedPriorityOp>,
     /// List of tokens that have been added to the contract.
     new_tokens: Vec<NewTokenEvent>,
+    /// List of events denoting registered factories for NFT withdrawing
+    register_nft_factory_events: Vec<RegisterNFTFactoryEvent>,
 }
 
 impl ETHState {
@@ -38,12 +40,14 @@ impl ETHState {
         unconfirmed_queue: Vec<PriorityOp>,
         priority_queue: HashMap<SerialId, ReceivedPriorityOp>,
         new_tokens: Vec<NewTokenEvent>,
+        register_nft_factory_events: Vec<RegisterNFTFactoryEvent>,
     ) -> Self {
         Self {
             last_ethereum_block,
             unconfirmed_queue,
             priority_queue,
             new_tokens,
+            register_nft_factory_events,
         }
     }
 
@@ -57,6 +61,10 @@ impl ETHState {
 
     pub fn unconfirmed_queue(&self) -> &[PriorityOp] {
         &self.unconfirmed_queue
+    }
+
+    pub fn new_register_nft_factory_events(&self) -> &[RegisterNFTFactoryEvent] {
+        &self.register_nft_factory_events
     }
 
     pub fn new_tokens(&self) -> &[NewTokenEvent] {

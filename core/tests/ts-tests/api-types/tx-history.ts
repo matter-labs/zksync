@@ -43,13 +43,17 @@ type FullExit = {
     eth_block: number;
     pq_id: number;
     tx: {
+        type: 'FullExit';
+        serial_id: number | null;
         priority_op: {
             token: string;
             account_id: number;
             eth_address: string;
         };
+        content_hash: string | null;
+        creator_address: string | null;
         withdraw_amount: string;
-        type: 'FullExit';
+        creator_account_id: number | null;
     };
     success: boolean;
     fail_reason: string | null;

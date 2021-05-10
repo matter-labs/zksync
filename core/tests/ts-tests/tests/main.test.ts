@@ -310,12 +310,12 @@ if (process.env.TEST_TRANSPORT) {
             transport: 'HTTP',
             token: 'ETH',
             onlyBasic: true
+        },
+        {
+            transport: 'HTTP',
+            token: defaultERC20,
+            onlyBasic: false
         }
-        // {
-        //     transport: 'HTTP',
-        //     token: defaultERC20,
-        //     onlyBasic: false
-        // }
     ];
 }
 

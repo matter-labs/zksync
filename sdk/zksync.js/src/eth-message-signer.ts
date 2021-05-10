@@ -78,6 +78,7 @@ export class EthMessageSigner {
 
         return humanReadableTxInfo;
     }
+
     getWithdrawEthSignMessage(withdraw: {
         stringAmount: string;
         stringToken: string;

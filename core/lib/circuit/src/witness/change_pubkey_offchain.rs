@@ -1,22 +1,22 @@
 // External deps
 use num::ToPrimitive;
-use zksync_crypto::franklin_crypto::{
-    bellman::pairing::{
-        bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
-    },
-    rescue::RescueEngine,
-};
 // Workspace deps
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
+    franklin_crypto::{
+        bellman::pairing::{
+            bn256::{Bn256, Fr},
+            ff::Field,
+        },
+        rescue::RescueEngine,
+    },
     params::{
-        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, CONTENT_HASH_WIDTH,
-        ETH_ADDRESS_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
-        NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
+        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
     primitives::FloatConversions,
 };
@@ -26,7 +26,7 @@ use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
     witness::{
-        utils::{apply_leaf_operation, get_audits, SigDataInput},
+        utils::{apply_leaf_operation, fr_from, get_audits, SigDataInput},
         Witness,
     },
 };
@@ -67,7 +67,7 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
             new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.to_fr(),
             fee_token: *change_pubkey_offchain.tx.fee_token as u32,
             fee: change_pubkey_offchain.tx.fee.to_u128().unwrap(),
-            nonce: Fr::from_str(&change_pubkey_offchain.tx.nonce.to_string()).unwrap(),
+            nonce: fr_from(change_pubkey_offchain.tx.nonce),
             valid_from,
             valid_until,
         };
@@ -131,7 +131,7 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
             .map(|(chunk_n, pubdata_chunk)| Operation {
                 new_root: self.after_root,
                 tx_type: self.tx_type,
-                chunk: Some(Fr::from_str(&chunk_n.to_string()).unwrap()),
+                chunk: Some(fr_from(chunk_n)),
                 pubdata_chunk: Some(pubdata_chunk),
                 first_sig_msg: Some(input.first_sig_msg),
                 second_sig_msg: Some(input.second_sig_msg),
@@ -162,10 +162,10 @@ impl ChangePubkeyOffChainWitness<Bn256> {
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
-        let account_id_fe = Fr::from_str(&change_pubkey_offcahin.account_id.to_string()).unwrap();
+        let account_id_fe = fr_from(change_pubkey_offcahin.account_id);
 
-        let fee_token_fe = Fr::from_str(&change_pubkey_offcahin.fee_token.to_string()).unwrap();
-        let fee_as_field_element = Fr::from_str(&change_pubkey_offcahin.fee.to_string()).unwrap();
+        let fee_token_fe = fr_from(change_pubkey_offcahin.fee_token);
+        let fee_as_field_element = fr_from(change_pubkey_offcahin.fee);
 
         let fee_bits = FloatConversions::to_float(
             change_pubkey_offcahin.fee,
@@ -188,7 +188,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                         "change pubkey address tx mismatch"
                     );
                     acc.pub_key_hash = change_pubkey_offcahin.new_pubkey_hash;
-                    acc.nonce.add_assign(&Fr::from_str("1").unwrap());
+                    acc.nonce.add_assign(&fr_from(1));
                 },
                 |bal| {
                     bal.value.sub_assign(&fee_as_field_element);
@@ -230,29 +230,18 @@ impl ChangePubkeyOffChainWitness<Bn256> {
             },
             args: OperationArguments {
                 eth_address: Some(change_pubkey_offcahin.address),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),
                 a: Some(a),
                 b: Some(b),
                 pub_nonce: Some(change_pubkey_offcahin.nonce),
                 new_pub_key_hash: Some(change_pubkey_offcahin.new_pubkey_hash),
-                valid_from: Some(
-                    Fr::from_str(&change_pubkey_offcahin.valid_from.to_string()).unwrap(),
-                ),
-                valid_until: Some(
-                    Fr::from_str(&change_pubkey_offcahin.valid_until.to_string()).unwrap(),
-                ),
-
-                special_eth_address: Some(Fr::zero()),
-                special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
-                special_serial_id: Some(Fr::zero()),
+                valid_from: Some(fr_from(&change_pubkey_offcahin.valid_from)),
+                valid_until: Some(fr_from(&change_pubkey_offcahin.valid_until)),
+                ..Default::default()
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("7").unwrap()),
+            tx_type: Some(fr_from(ChangePubKeyOp::OP_CODE)),
         }
     }
 }

@@ -143,6 +143,10 @@ mod test {
         let op1 = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op,
             withdraw_amount: Some(BigUint::from(444u32).into()),
+            creator_account_id: None,
+            creator_address: None,
+            serial_id: None,
+            content_hash: None,
         }));
         let pub_data1 = op1.public_data();
         let op2 = get_rollup_ops_from_data(&pub_data1)
@@ -163,6 +167,10 @@ mod test {
         let op1 = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op,
             withdraw_amount: None,
+            creator_account_id: None,
+            creator_address: None,
+            serial_id: None,
+            content_hash: None,
         }));
         let pub_data1 = op1.public_data();
         let op2 = get_rollup_ops_from_data(&pub_data1)

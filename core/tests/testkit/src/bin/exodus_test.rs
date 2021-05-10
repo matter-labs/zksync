@@ -155,7 +155,7 @@ async fn check_exit_correct_proof(
         .get_balance_to_withdraw(send_account, token_address)
         .await;
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -201,7 +201,7 @@ async fn check_exit_correct_proof_second_time(
         .get_balance_to_withdraw(send_account, token_address)
         .await;
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -242,7 +242,7 @@ async fn check_exit_correct_proof_other_token(
         .get_balance_to_withdraw(send_account, token_address)
         .await;
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -283,7 +283,7 @@ async fn check_exit_correct_proof_other_amount(
         .get_balance_to_withdraw(send_account, token_address)
         .await;
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -323,7 +323,7 @@ async fn check_exit_correct_proof_incorrect_sender(
         .get_balance_to_withdraw(send_account, token_address)
         .await;
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"

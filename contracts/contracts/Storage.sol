@@ -10,6 +10,7 @@ import "./IERC20.sol";
 import "./Governance.sol";
 import "./Verifier.sol";
 import "./Operations.sol";
+import "./NFTFactory.sol";
 
 /// @title zkSync storage contract
 /// @author Matter Labs
@@ -23,10 +24,10 @@ contract Storage {
     uint256 internal upgradePreparationActivationTime;
 
     /// @dev Verifier contract. Used to verify block proof and exit proof
-    Verifier public verifier;
+    Verifier internal verifier;
 
     /// @dev Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
-    Governance public governance;
+    Governance internal governance;
 
     uint8 internal constant FILLED_GAS_RESERVE_VALUE = 0xff; // we use it to set gas revert value so slot will not be emptied with 0 balance
     struct PendingBalance {
@@ -46,7 +47,7 @@ contract Storage {
     uint32 internal firstPendingWithdrawalIndexDEPRECATED;
     uint32 internal numberOfPendingWithdrawalsDEPRECATED;
 
-    /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
+    /// @dev Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
     uint32 public totalBlocksExecuted;
 
     /// @notice Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
@@ -71,14 +72,14 @@ contract Storage {
     }
     mapping(uint32 => BlockDEPRECATED) internal blocksDEPRECATED;
 
-    /// @notice Flag indicates that a user has exited in the exodus mode certain token balance (per account id and tokenId)
-    mapping(uint32 => mapping(uint16 => bool)) public performedExodus;
+    /// @dev Flag indicates that a user has exited in the exodus mode certain token balance (per account id and tokenId)
+    mapping(uint32 => mapping(uint32 => bool)) internal performedExodus;
 
-    /// @notice Flag indicates that exodus (mass exit) mode is triggered
-    /// @notice Once it was raised, it can not be cleared again, and all users must exit
+    /// @dev Flag indicates that exodus (mass exit) mode is triggered
+    /// @dev Once it was raised, it can not be cleared again, and all users must exit
     bool public exodusMode;
 
-    /// @notice User authenticated fact hashes for some nonce.
+    /// @dev User authenticated fact hashes for some nonce.
     mapping(address => mapping(uint32 => bytes32)) public authFacts;
 
     /// @notice Old Priority Operation container
@@ -96,15 +97,15 @@ contract Storage {
     /// @dev Numbers are in order of requests receiving
     mapping(uint64 => PriorityOperationDEPRECATED) internal priorityRequestsDEPRECATED;
 
-    /// @notice First open priority request id
-    uint64 public firstPriorityRequestId;
+    /// @dev First open priority request id
+    uint64 internal firstPriorityRequestId;
 
-    /// @notice Total number of requests
-    uint64 public totalOpenPriorityRequests;
+    /// @dev Total number of requests
+    uint64 internal totalOpenPriorityRequests;
 
-    /// @notice Total number of committed requests.
+    /// @dev Total number of committed requests.
     /// @dev Used in checks: if the request matches the operation on Rollup contract and if provided number of requests is not too big
-    uint64 public totalCommittedPriorityRequests;
+    uint64 internal totalCommittedPriorityRequests;
 
     /// @notice Packs address and token id into single word to use as a key in balances mapping
     function packAddressAndTokenId(address _address, uint16 _tokenId) internal pure returns (bytes22) {
@@ -135,8 +136,8 @@ contract Storage {
     /// @dev Stored hashed StoredBlockInfo for some block number
     mapping(uint32 => bytes32) internal storedBlockHashes;
 
-    /// @notice Total blocks proven.
-    uint32 public totalBlocksProven;
+    /// @dev Total blocks proven.
+    uint32 internal totalBlocksProven;
 
     /// @notice Priority Operation container
     /// @member hashedPubData Hashed priority operation public data
@@ -156,4 +157,8 @@ contract Storage {
     /// @dev Timer for authFacts entry reset (address, nonce -> timer).
     /// @dev Used when user wants to reset `authFacts` for some nonce.
     mapping(address => mapping(uint32 => uint256)) internal authFactsResetTimer;
+
+    mapping(uint32 => address) internal withdrawnNFTs;
+
+    mapping(uint32 => Operations.WithdrawNFT) internal pendingWithdrawnNFTs;
 }

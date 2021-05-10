@@ -219,6 +219,10 @@ pub enum ChangePubKeyFeeTypeArg {
 /// Type of transaction fees that exist in the zkSync network.
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum TxFeeTypes {
+    /// Fee for the `WithdrawNFT` transaction.
+    WithdrawNFT,
+    /// Fee for the `WithdrawNFT` operation that requires fast processing.
+    FastWithdrawNFT,
     /// Fee for the `Withdraw` or `ForcedExit` transaction.
     Withdraw,
     /// Fee for the `Withdraw` operation that requires fast processing.
@@ -241,6 +245,8 @@ pub struct NFT {
     /// id for enforcing uniqueness token address
     pub serial_id: u32,
     /// id of nft creator
+    pub creator_address: Address,
+    /// id of nft creator
     pub creator_id: AccountId,
     /// L2 token address
     pub address: Address,
@@ -255,6 +261,7 @@ impl NFT {
         token_id: TokenId,
         serial_id: u32,
         creator_id: AccountId,
+        creator_address: Address,
         address: Address,
         symbol: Option<String>,
         content_hash: H256,
@@ -263,6 +270,7 @@ impl NFT {
         Self {
             id: token_id,
             serial_id,
+            creator_address,
             creator_id,
             address,
             symbol,

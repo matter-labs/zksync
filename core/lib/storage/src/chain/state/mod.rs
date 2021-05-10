@@ -157,15 +157,16 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     let token_id = token.id.0 as i32;
                     let creator_account_id = token.creator_id.0 as i32;
                     let serial_id = token.serial_id as i32;
+                    let creator_address = token.creator_address.as_bytes().to_vec();
                     let address = token.address.as_bytes().to_vec();
                     let content_hash = token.content_hash.as_bytes().to_vec();
                     let block_number = i64::from(*block_number);
                     sqlx::query!(
                         r#"
-                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id, symbol )
-                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8)
+                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, symbol )
+                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9)
                         "#,
-                        token_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id, token.symbol
+                        token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, token.symbol
                     )
                         .execute(transaction.conn())
                         .await?;
@@ -286,10 +287,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
                 sqlx::query!(
                     r#"
-                    INSERT INTO nft ( token_id, creator_account_id, serial_id, address, content_hash )
-                    VALUES ( $1, $2, $3, $4, $5)
+                    INSERT INTO nft ( token_id, creator_address, creator_account_id, serial_id, address, content_hash )
+                    VALUES ( $1, $2, $3, $4, $5, $6)
                     "#,
                     upd.token_id,
+                    upd.creator_address,
                     upd.creator_account_id,
                     upd.serial_id,
                     upd.address,
@@ -558,6 +560,15 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         .fetch_all(transaction.conn())
         .await?;
 
+        let mint_nft_diffs = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            "SELECT * FROM mint_nft_updates WHERE block_number > $1 AND block_number <= $2 ",
+            i64::from(*start_block),
+            i64::from(*end_block),
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+
         vlog::debug!(
             "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
             time_forward,
@@ -587,6 +598,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .into_iter()
                     .map(StorageAccountDiff::from),
             );
+            account_diff.extend(mint_nft_diffs.into_iter().map(StorageAccountDiff::from));
             let last_block = account_diff
                 .iter()
                 .map(|acc| acc.block_number())
@@ -649,7 +661,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             r#"
             SELECT * FROM mint_nft_updates 
             WHERE token_id = $1
-            LIMIT 1
             "#,
             *token_id as i32
         )
@@ -658,5 +669,24 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         metrics::histogram!("sql.token.get_mint_nft_update", start.elapsed());
         Ok(nft.map(|p| p.into()))
+    }
+    pub async fn load_committed_nft_tokens(
+        &mut self,
+        block_number: Option<BlockNumber>,
+    ) -> QueryResult<Vec<StorageMintNFTUpdate>> {
+        let tokens = if let Some(block_number) = block_number {
+            sqlx::query_as!(
+                StorageMintNFTUpdate,
+                "SELECT * FROM mint_nft_updates WHERE block_number <= $1",
+                block_number.0 as i64
+            )
+            .fetch_all(self.0.conn())
+            .await
+        } else {
+            sqlx::query_as!(StorageMintNFTUpdate, "SELECT * FROM mint_nft_updates")
+                .fetch_all(self.0.conn())
+                .await
+        };
+        Ok(tokens?)
     }
 }

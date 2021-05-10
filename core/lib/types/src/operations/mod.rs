@@ -17,6 +17,7 @@ mod noop_op;
 mod swap_op;
 mod transfer_op;
 mod transfer_to_new_op;
+mod withdraw_nft_op;
 mod withdraw_op;
 
 #[doc(hidden)]
@@ -24,7 +25,8 @@ pub use self::close_op::CloseOp;
 pub use self::{
     change_pubkey_op::ChangePubKeyOp, deposit_op::DepositOp, forced_exit::ForcedExitOp,
     full_exit_op::FullExitOp, mint_nft_op::MintNFTOp, noop_op::NoopOp, swap_op::SwapOp,
-    transfer_op::TransferOp, transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
+    transfer_op::TransferOp, transfer_to_new_op::TransferToNewOp, withdraw_nft_op::WithdrawNFTOp,
+    withdraw_op::WithdrawOp,
 };
 
 /// zkSync network operation.
@@ -38,6 +40,7 @@ pub enum ZkSyncOp {
     /// recipient account doesn't exist and has to be created.
     TransferToNew(Box<TransferToNewOp>),
     Withdraw(Box<WithdrawOp>),
+    WithdrawNFT(Box<WithdrawNFTOp>),
     #[doc(hidden)]
     Close(Box<CloseOp>),
     FullExit(Box<FullExitOp>),
@@ -64,6 +67,7 @@ impl ZkSyncOp {
             ZkSyncOp::ForcedExit(_) => ForcedExitOp::CHUNKS,
             ZkSyncOp::Swap(_) => SwapOp::CHUNKS,
             ZkSyncOp::MintNFTOp(_) => MintNFTOp::CHUNKS,
+            ZkSyncOp::WithdrawNFT(_) => WithdrawNFTOp::CHUNKS,
         }
     }
 
@@ -81,6 +85,7 @@ impl ZkSyncOp {
             ZkSyncOp::ForcedExit(op) => op.get_public_data(),
             ZkSyncOp::Swap(op) => op.get_public_data(),
             ZkSyncOp::MintNFTOp(op) => op.get_public_data(),
+            ZkSyncOp::WithdrawNFT(op) => op.get_public_data(),
         }
     }
 
@@ -107,6 +112,7 @@ impl ZkSyncOp {
     pub fn withdrawal_data(&self) -> Option<Vec<u8>> {
         match self {
             ZkSyncOp::Withdraw(op) => Some(op.get_withdrawal_data()),
+            ZkSyncOp::WithdrawNFT(op) => Some(op.get_withdrawal_data()),
             ZkSyncOp::FullExit(op) => Some(op.get_withdrawal_data()),
             ZkSyncOp::ForcedExit(op) => Some(op.get_withdrawal_data()),
             _ => None,
@@ -146,6 +152,9 @@ impl ZkSyncOp {
             MintNFTOp::OP_CODE => Ok(ZkSyncOp::MintNFTOp(Box::new(MintNFTOp::from_public_data(
                 &bytes,
             )?))),
+            WithdrawNFTOp::OP_CODE => Ok(ZkSyncOp::WithdrawNFT(Box::new(
+                WithdrawNFTOp::from_public_data(&bytes)?,
+            ))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -164,6 +173,7 @@ impl ZkSyncOp {
             ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
             SwapOp::OP_CODE => Ok(SwapOp::CHUNKS),
             MintNFTOp::OP_CODE => Ok(MintNFTOp::CHUNKS),
+            WithdrawNFTOp::OP_CODE => Ok(WithdrawNFTOp::CHUNKS),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
@@ -182,6 +192,7 @@ impl ZkSyncOp {
             ZkSyncOp::ForcedExit(op) => Ok(ZkSyncTx::ForcedExit(Box::new(op.tx.clone()))),
             ZkSyncOp::Swap(op) => Ok(ZkSyncTx::Swap(Box::new(op.tx.clone()))),
             ZkSyncOp::MintNFTOp(op) => Ok(ZkSyncTx::MintNFT(Box::new(op.tx.clone()))),
+            ZkSyncOp::WithdrawNFT(op) => Ok(ZkSyncTx::WithdrawNFT(Box::new(op.tx.clone()))),
             _ => Err(format_err!("Wrong tx type")),
         }
     }
@@ -209,6 +220,7 @@ impl ZkSyncOp {
             ZkSyncOp::ForcedExit(op) => op.get_updated_account_ids(),
             ZkSyncOp::Swap(op) => op.get_updated_account_ids(),
             ZkSyncOp::MintNFTOp(op) => op.get_updated_account_ids(),
+            ZkSyncOp::WithdrawNFT(op) => op.get_updated_account_ids(),
         }
     }
 
@@ -217,6 +229,7 @@ impl ZkSyncOp {
             self,
             &ZkSyncOp::Deposit(_)
                 | &ZkSyncOp::Withdraw(_)
+                | &ZkSyncOp::WithdrawNFT(_)
                 | &ZkSyncOp::FullExit(_)
                 | &ZkSyncOp::ChangePubKeyOffchain(_)
                 | &ZkSyncOp::ForcedExit(_)
@@ -226,7 +239,10 @@ impl ZkSyncOp {
     pub fn is_processable_onchain_operation(&self) -> bool {
         matches!(
             self,
-            &ZkSyncOp::Withdraw(_) | &ZkSyncOp::FullExit(_) | &ZkSyncOp::ForcedExit(_)
+            &ZkSyncOp::Withdraw(_)
+                | &ZkSyncOp::FullExit(_)
+                | &ZkSyncOp::ForcedExit(_)
+                | &ZkSyncOp::WithdrawNFT(_)
         )
     }
 
@@ -298,5 +314,11 @@ impl From<MintNFTOp> for ZkSyncOp {
 impl From<SwapOp> for ZkSyncOp {
     fn from(op: SwapOp) -> Self {
         Self::Swap(Box::new(op))
+    }
+}
+
+impl From<WithdrawNFTOp> for ZkSyncOp {
+    fn from(op: WithdrawNFTOp) -> Self {
+        Self::WithdrawNFT(Box::new(op))
     }
 }

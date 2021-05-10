@@ -46,9 +46,10 @@ contract Config {
     uint256 internal constant PARTIAL_EXIT_BYTES = 6 * CHUNK_BYTES;
     uint256 internal constant TRANSFER_BYTES = 2 * CHUNK_BYTES;
     uint256 internal constant FORCED_EXIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 internal constant WITHDRAW_NFT_BYTES = 9 * CHUNK_BYTES;
 
     /// @dev Full exit operation length
-    uint256 internal constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 internal constant FULL_EXIT_BYTES = 10 * CHUNK_BYTES;
 
     /// @dev ChangePubKey operation length
     uint256 internal constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
@@ -100,6 +101,7 @@ contract Config {
 
     uint32 internal constant SPECIAL_ACCOUNT_ID = $$((2**24) - 1);
     address internal constant SPECIAL_ACCOUNT_ADDRESS = address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF);
+    uint32 internal constant SPECIAL_NFT_TOKEN_ID = $$((2**31) - 2);
 
     uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
 }

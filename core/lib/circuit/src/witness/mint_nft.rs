@@ -1,7 +1,6 @@
 // External deps
 use num::ToPrimitive;
 
-use rescue_poseidon::rescue_hash;
 use zksync_crypto::convert::FeConvert;
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
@@ -11,6 +10,7 @@ use zksync_crypto::franklin_crypto::{
     bellman::PrimeFieldRepr,
     rescue::RescueEngine,
 };
+use zksync_crypto::rescue_poseidon::rescue_hash;
 // Workspace deps
 use zksync_crypto::{
     circuit::{
@@ -27,6 +27,7 @@ use zksync_crypto::{
 use zksync_types::operations::MintNFTOp;
 use zksync_types::H256;
 // Local deps
+use crate::witness::utils::fr_from;
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
@@ -60,8 +61,6 @@ pub struct MintNFTWitness<E: RescueEngine> {
     pub special_account_before_third_chunk: OperationBranch<E>,
     pub special_account_before_fourth_chunk: OperationBranch<E>,
     pub recipient_account_before_fifth_chunk: OperationBranch<E>,
-
-    pub content_hash: Vec<Option<E::Fr>>,
 }
 
 impl Witness for MintNFTWitness<Bn256> {
@@ -94,7 +93,7 @@ impl Witness for MintNFTWitness<Bn256> {
             &self.recipient_account_before_fifth_chunk.address.unwrap(),
             ACCOUNT_ID_BIT_WIDTH,
         );
-        for bit in &self.content_hash {
+        for bit in &self.args.special_content_hash {
             append_be_fixed_width(&mut pubdata_bits, &bit.unwrap(), 1);
         }
         append_be_fixed_width(
@@ -206,12 +205,6 @@ impl Witness for MintNFTWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> MintNFTWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        unreachable!() // no reason to keep this
-    }
-}
-
 impl MintNFTWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, mint_nft: &MintNFTData) -> Self {
         let capacity = tree.capacity();
@@ -235,7 +228,7 @@ impl MintNFTWitness<Bn256> {
         let before_first_chunk_root = tree.root_hash();
         vlog::debug!("Initial root = {}", before_first_chunk_root);
 
-        // applying first chunk: change the balance of the creator
+        // applying first chunk: take fee from creator, increment nonce
         let (audit_creator_account_before_first_chunk, audit_creator_balance_before_first_chunk) =
             get_audits(tree, mint_nft.creator_account_id, mint_nft.fee_token);
 
@@ -372,7 +365,6 @@ impl MintNFTWitness<Bn256> {
                 bal.value.add_assign(&content_to_store);
             },
         );
-        assert_eq!(special_account_content_before_fourth_chunk, Fr::zero());
 
         let (_audit_special_account_after_fourth_chunk, _audit_special_balance_after_fourth_chunk) =
             get_audits(tree, NFT_STORAGE_ACCOUNT_ID.0, new_token_id_u32);
@@ -428,7 +420,7 @@ impl MintNFTWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+            .map(|bit| Some(fr_from(&bit)))
             .collect();
 
         MintNFTWitness {
@@ -440,33 +432,28 @@ impl MintNFTWitness<Bn256> {
 
             tx_type: Some(Fr::from_str(&MintNFTOp::OP_CODE.to_string()).unwrap()),
             args: OperationArguments {
-                eth_address: Some(
-                    creator_account_witness_before_first_chunk
-                        .address
-                        .expect("creator account should not be empty"),
-                ),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
-
-                special_eth_address: Some(
-                    recipient_account_witness_before_fifth_chunk
-                        .address
-                        .expect("recipient account should not be empty"),
-                ),
-                special_tokens: vec![Some(token_fe), Some(new_token_id)],
-                special_account_ids: vec![
+                special_eth_addresses: vec![
+                    Some(
+                        recipient_account_witness_before_fifth_chunk
+                            .address
+                            .expect("recipient account should not be empty"),
+                    ),
+                    Some(Fr::zero()),
+                ],
+                special_tokens: vec![Some(token_fe), Some(new_token_id), Some(Fr::zero())],
+                special_accounts: vec![
                     Some(creator_account_id_fe),
                     Some(recipient_account_id_fe),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
                 ],
-                special_content_hash: content_hash_as_vec.clone(),
+                special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id),
+                ..Default::default()
             },
 
             creator_before_first_chunk: OperationBranch {
@@ -490,7 +477,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
             special_account_before_third_chunk: OperationBranch {
-                address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(Fr::from_str(&NFT_TOKEN_ID.0.to_string()).unwrap()),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_before_third_chunk,
@@ -500,7 +487,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
             special_account_before_fourth_chunk: OperationBranch {
-                address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(new_token_id),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_before_fourth_chunk,
@@ -519,8 +506,6 @@ impl MintNFTWitness<Bn256> {
                     balance_subtree_path: audit_recipient_balance_before_fifth_chunk,
                 },
             },
-
-            content_hash: content_hash_as_vec,
         }
     }
 }

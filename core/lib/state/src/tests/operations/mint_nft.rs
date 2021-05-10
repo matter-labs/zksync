@@ -5,8 +5,9 @@ use zksync_crypto::params::{
     MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
 };
 use zksync_types::{
-    tokens::NFT, AccountUpdate, Address, MintNFT, Nonce, SignedZkSyncTx, TokenId, Transfer,
-    ZkSyncTx, H160,
+    tokens::NFT,
+    tx::{calculate_token_address, calculate_token_data, calculate_token_hash},
+    AccountUpdate, MintNFT, Nonce, SignedZkSyncTx, TokenId, Transfer, ZkSyncTx, H160,
 };
 
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
@@ -36,22 +37,21 @@ fn mint_success() {
     )
     .unwrap();
 
-    let token_hash: Vec<u8> = vec![
-        22, 150, 31, 94, 253, 41, 54, 65, 235, 128, 255, 236, 34, 19, 209, 244, 186, 158, 170, 230,
-        95, 69, 89, 207, 183, 93, 214, 213, 45, 174, 51, 194,
-    ];
-    let token_address = Address::from_slice(&token_hash[12..]);
+    let token_hash = calculate_token_hash(creator_account_id, 0, content_hash);
+    let token_address = calculate_token_address(&token_hash);
+
     let balance = BigUint::from(MIN_NFT_TOKEN_ID);
     let nft = NFT::new(
         TokenId(MIN_NFT_TOKEN_ID),
         0,
         creator_account_id,
+        creator_account.address,
         token_address,
         None,
         content_hash,
     );
 
-    let token_data = BigUint::from_bytes_be(&token_hash[16..]);
+    let token_data = calculate_token_data(&token_hash);
     tb.test_tx_success(
         mint_nft.into(),
         &[
@@ -145,21 +145,19 @@ fn mint_success() {
     )
     .unwrap();
 
-    let token_hash: Vec<u8> = vec![
-        40, 111, 148, 133, 22, 50, 233, 206, 55, 114, 54, 47, 147, 227, 204, 20, 62, 91, 163, 18,
-        248, 69, 144, 106, 242, 0, 60, 234, 75, 178, 210, 166,
-    ];
-    let token_address = Address::from_slice(&token_hash[12..]);
+    let token_hash = calculate_token_hash(creator_account_id, 1, content_hash);
+    let token_address = calculate_token_address(&token_hash);
     let nft = NFT::new(
         TokenId(MIN_NFT_TOKEN_ID + 1),
         1,
         creator_account_id,
+        creator_account.address,
         token_address,
         None,
         content_hash,
     );
 
-    let token_data = BigUint::from_bytes_be(&token_hash[16..]);
+    let token_data = calculate_token_data(&token_hash);
     tb.test_tx_success(
         mint_nft.into(),
         &[
@@ -271,22 +269,20 @@ fn mint_token_to_new_account() {
     )
     .unwrap();
 
-    let token_hash: Vec<u8> = vec![
-        22, 150, 31, 94, 253, 41, 54, 65, 235, 128, 255, 236, 34, 19, 209, 244, 186, 158, 170, 230,
-        95, 69, 89, 207, 183, 93, 214, 213, 45, 174, 51, 194,
-    ];
-    let token_address = Address::from_slice(&token_hash[12..]);
+    let token_hash = calculate_token_hash(creator_account_id, 0, content_hash);
+    let token_address = calculate_token_address(&token_hash);
     let balance = BigUint::from(MIN_NFT_TOKEN_ID);
     let nft = NFT::new(
         TokenId(MIN_NFT_TOKEN_ID),
         0,
         creator_account_id,
+        creator_account.address,
         token_address,
         None,
         content_hash,
     );
 
-    let token_data = BigUint::from_bytes_be(&token_hash[16..]);
+    let token_data = calculate_token_data(&token_hash);
 
     let signed_zk_sync_mint = SignedZkSyncTx {
         tx: ZkSyncTx::MintNFT(Box::new(mint_nft)),

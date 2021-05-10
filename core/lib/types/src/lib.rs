@@ -50,6 +50,7 @@ pub mod network;
 pub mod operations;
 pub mod priority_ops;
 pub mod prover;
+pub mod register_factory;
 pub mod tokens;
 pub mod tx;
 mod utils;
@@ -62,12 +63,13 @@ pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::fee::{BatchFee, Fee, OutputFeeType};
 pub use self::operations::{
     ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, MintNFTOp, SwapOp, TransferOp,
-    TransferToNewOp, WithdrawOp, ZkSyncOp,
+    TransferToNewOp, WithdrawNFTOp, WithdrawOp, ZkSyncOp,
 };
 pub use self::priority_ops::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
+pub use self::register_factory::RegisterNFTFactoryEvent;
 pub use self::tokens::{NewTokenEvent, Token, TokenInfo, TokenLike, TokenPrice, TxFeeTypes, NFT};
 pub use self::tx::{
-    ForcedExit, MintNFT, Order, SignedZkSyncTx, Swap, Transfer, Withdraw, ZkSyncTx,
+    ForcedExit, MintNFT, Order, SignedZkSyncTx, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx,
 };
 
 #[doc(hidden)]

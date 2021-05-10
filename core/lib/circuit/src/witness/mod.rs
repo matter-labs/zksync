@@ -12,10 +12,12 @@ pub use self::{
     forced_exit::ForcedExitWitness,
     full_exit::FullExitWitness,
     mint_nft::MintNFTWitness,
+    swap::SwapWitness,
     transfer::TransferWitness,
     transfer_to_new::TransferToNewWitness,
     utils::{SigDataInput, WitnessBuilder},
     withdraw::WithdrawWitness,
+    withdraw_nft::WithdrawNFTWitness,
 };
 
 pub mod change_pubkey_offchain;
@@ -25,9 +27,11 @@ pub mod forced_exit;
 pub mod full_exit;
 pub mod mint_nft;
 pub mod noop;
+pub mod swap;
 pub mod transfer;
 pub mod transfer_to_new;
 pub mod withdraw;
+pub mod withdraw_nft;
 
 pub mod utils;
 

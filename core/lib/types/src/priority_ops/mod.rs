@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use zksync_basic_types::{Address, Log, H256, U256};
 use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN,
-    TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, CONTENT_HASH_WIDTH,
+    ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
 };
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
@@ -171,9 +171,24 @@ impl ZkSyncPriorityOp {
 
                 // amount
                 ensure!(
-                    pub_data_left.len() == BALANCE_BIT_WIDTH / 8,
-                    "FullExitOp parse failed: input too big: {:?}",
-                    pub_data_left
+                    pub_data_left.len() >= BALANCE_BIT_WIDTH / 8,
+                    "PubData length mismatch",
+                );
+
+                let (_, pub_data_left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
+
+                // Creator address
+                ensure!(
+                    pub_data_left.len() >= ADDRESS_WIDTH / 8,
+                    "PubData length mismatch",
+                );
+
+                let (_, pub_data_left) = pub_data_left.split_at(ADDRESS_WIDTH / 8);
+
+                // Content hash
+                ensure!(
+                    pub_data_left.len() == CONTENT_HASH_WIDTH / 8,
+                    "PubData length mismatch",
                 );
 
                 Ok(Self::FullExit(FullExit {
