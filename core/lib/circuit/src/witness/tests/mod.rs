@@ -457,7 +457,7 @@ fn corrupted_intermediate_operation() {
     let mut circuit = apply_many_ops();
 
     // Now replace the operation in the middle with incorrect operation.
-    let corrupted_op_chunk = circuit.operations.len() / 2;
+    let corrupted_op_chunk = circuit.operations.len() - 1;
     circuit.operations[corrupted_op_chunk] = circuit.operations[0].clone();
 
     // Create an error message with the exact chunk number.
