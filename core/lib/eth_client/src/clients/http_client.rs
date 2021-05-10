@@ -283,10 +283,10 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
                 metrics::histogram!("eth_client.direct.failure_reason", start.elapsed());
                 Ok(Some(FailureInfo {
-                    gas_limit,
-                    gas_used,
                     revert_code,
                     revert_reason,
+                    gas_used,
+                    gas_limit,
                 }))
             }
             _ => Ok(None),
