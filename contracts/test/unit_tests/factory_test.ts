@@ -33,6 +33,7 @@ describe('NFTFactory unit tests', function () {
         await nftFactory.mintNFT(
             address,
             address,
+            10,
             '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996',
             10
         );
@@ -47,6 +48,7 @@ describe('NFTFactory unit tests', function () {
             nftFactory.mintNFT(
                 address,
                 address,
+                10,
                 '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996',
                 10
             )
