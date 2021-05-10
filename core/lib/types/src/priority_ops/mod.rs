@@ -169,7 +169,7 @@ impl ZkSyncPriorityOp {
                 };
 
                 // amount
-                if pub_data_left.len() != BALANCE_BIT_WIDTH / 8 {
+                if pub_data_left.len() < BALANCE_BIT_WIDTH / 8 {
                     return Err(LogParseError::PubdataLengthMismatch);
                 }
 
