@@ -17,7 +17,7 @@ import {
     Swap,
     Price
 } from './types';
-import * as zks from 'zksync-crypto';
+import { rescueHashOrders } from './crypto';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -596,14 +596,14 @@ export function serializeOrder(order: Order): Uint8Array {
     ]);
 }
 
-export function serializeSwap(swap: Swap): Uint8Array {
+export async function serializeSwap(swap: Swap): Promise<Uint8Array> {
     const type = new Uint8Array([9]);
     const submitterId = serializeAccountId(swap.submitterId);
     const submitterAddress = serializeAddress(swap.submitterAddress);
     const nonceBytes = serializeNonce(swap.nonce);
     const orderA = serializeOrder(swap.orders[0]);
     const orderB = serializeOrder(swap.orders[1]);
-    const ordersHashed = zks.rescueHashOrders(ethers.utils.concat([orderA, orderB]));
+    const ordersHashed = await rescueHashOrders(ethers.utils.concat([orderA, orderB]));
     const tokenIdBytes = serializeTokenId(swap.feeToken);
     const feeBytes = serializeFeePacked(swap.fee);
     const amountABytes = serializeAmountPacked(swap.amounts[0]);
@@ -708,7 +708,7 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
  * Encodes the transaction data as the byte sequence according to the zkSync protocol.
  * @param tx A transaction to serialize.
  */
-export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | Swap): Uint8Array {
+export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
     switch (tx.type) {
         case 'Transfer':
             return serializeTransfer(tx);
@@ -718,8 +718,6 @@ export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccoun
             return serializeChangePubKey(tx);
         case 'ForcedExit':
             return serializeForcedExit(tx);
-        case 'Swap':
-            return serializeSwap(tx);
         default:
             return new Uint8Array();
     }

@@ -87,7 +87,7 @@ export class Signer {
             type: 'Swap'
         };
 
-        const msgBytes = utils.serializeSwap(tx);
+        const msgBytes = await utils.serializeSwap(tx);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
