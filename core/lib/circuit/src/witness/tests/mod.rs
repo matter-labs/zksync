@@ -42,6 +42,7 @@ mod forced_exit;
 mod full_exit;
 mod mint_nft;
 mod noop;
+mod swap;
 pub(crate) mod test_utils;
 mod transfer;
 mod transfer_to_new;
@@ -167,6 +168,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         },
         withdraw_amount: Some(BigUint::from(900u32).into()),
         creator_account_id: None,
+        creator_address: None,
         serial_id: None,
         content_hash: None,
     };

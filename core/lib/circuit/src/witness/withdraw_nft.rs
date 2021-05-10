@@ -16,14 +16,15 @@ use zksync_crypto::{
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, TOKEN_BIT_WIDTH,
-        TX_TYPE_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, SERIAL_ID_WIDTH,
+        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
     primitives::FloatConversions,
 };
 use zksync_types::operations::WithdrawNFTOp;
 use zksync_types::H256;
 // Local deps
+use crate::witness::utils::fr_from;
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
@@ -88,7 +89,13 @@ impl Witness for WithdrawNFTWitness<Bn256> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.special_account_ids[1].unwrap(),
+            &self.args.special_accounts[1].unwrap(),
+            ACCOUNT_ID_BIT_WIDTH,
+        );
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.special_accounts[0].unwrap(),
             ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
@@ -96,9 +103,15 @@ impl Witness for WithdrawNFTWitness<Bn256> {
             &self.args.special_eth_addresses[0].unwrap(),
             ETH_ADDRESS_BIT_WIDTH,
         );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.special_serial_id.unwrap(),
+            SERIAL_ID_WIDTH,
+        );
         for bit in &self.args.special_content_hash {
             append_be_fixed_width(&mut pubdata_bits, &bit.unwrap(), 1);
         }
+
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.eth_address.unwrap(),
@@ -119,6 +132,7 @@ impl Witness for WithdrawNFTWitness<Bn256> {
             &self.args.fee.unwrap(),
             FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
+
         resize_grow_only(
             &mut pubdata_bits,
             WithdrawNFTOp::CHUNKS * CHUNK_BIT_WIDTH,
@@ -217,12 +231,6 @@ impl Witness for WithdrawNFTWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> WithdrawNFTWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        unreachable!() // no reason to keep this
-    }
-}
-
 impl WithdrawNFTWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, withdraw_nft: &WithdrawNFTData) -> Self {
         let capacity = tree.capacity();
@@ -311,7 +319,6 @@ impl WithdrawNFTWitness<Bn256> {
                 bal.value.sub_assign(&Fr::from_str("1").unwrap());
             },
         );
-        assert_eq!(token_balance_before_second_chunk, Fr::one());
 
         let (
             _audit_initiator_account_after_second_chunk,
@@ -367,7 +374,7 @@ impl WithdrawNFTWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+            .map(|bit| Some(fr_from(&bit)))
             .collect();
 
         WithdrawNFTWitness {
@@ -377,28 +384,30 @@ impl WithdrawNFTWitness<Bn256> {
             tx_type: Some(Fr::from_str(&WithdrawNFTOp::OP_CODE.to_string()).unwrap()),
             args: OperationArguments {
                 eth_address: Some(withdraw_nft.to_address),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
-                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
-
-                special_eth_addresses: vec![Some(
-                    creator_account_witness_fourth_chunk
-                        .address
-                        .expect("creator account should not be empty"),
-                )],
-                special_tokens: vec![Some(fee_token_fe), Some(token_fe)],
-                special_account_ids: vec![
+                valid_from: Some(fr_from(&valid_from)),
+                valid_until: Some(fr_from(&valid_until)),
+                special_eth_addresses: vec![
+                    Some(
+                        creator_account_witness_fourth_chunk
+                            .address
+                            .expect("creator account should not be empty"),
+                    ),
+                    Some(Fr::zero()),
+                ],
+                special_tokens: vec![Some(fee_token_fe), Some(token_fe), Some(Fr::zero())],
+                special_accounts: vec![
                     Some(creator_account_id_fe),
                     Some(initiator_account_id_fe),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
                 ],
                 special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id_fe),
+                ..Default::default()
             },
 
             initiator_before_first_chunk: OperationBranch {
@@ -422,7 +431,7 @@ impl WithdrawNFTWitness<Bn256> {
                 },
             },
             special_account_third_chunk: OperationBranch {
-                address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_third_chunk,

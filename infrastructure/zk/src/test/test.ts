@@ -72,7 +72,7 @@ export async function rust() {
     await db(true);
     await rustApi(true);
     await prover();
-    await circuit(1);
+    await circuit(4);
     await rustCryptoTests();
 }
 

@@ -616,6 +616,7 @@ mod test {
             priority_op: tx6,
             withdraw_amount: Some(BigUint::from(980u32).into()),
             creator_account_id: None,
+            creator_address: None,
             serial_id: None,
             content_hash: None,
         }));
@@ -814,6 +815,7 @@ mod test {
             priority_op: tx6,
             withdraw_amount: Some(BigUint::from(980u32).into()),
             creator_account_id: None,
+            creator_address: None,
             serial_id: None,
             content_hash: None,
         }));

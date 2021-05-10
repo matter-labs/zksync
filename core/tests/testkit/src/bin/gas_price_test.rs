@@ -12,6 +12,7 @@ use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_contracts, get_test_accounts};
 use crate::zksync_account::ZkSyncAccount;
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
+use std::ops::Mul;
 use std::str::FromStr;
 use web3::transports::Http;
 use web3::types::{H256, U256};
@@ -26,8 +27,8 @@ use zksync_testkit::*;
 use zksync_types::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
     tx::ChangePubKeyCREATE2Data,
-    Address, ChangePubKeyOp, DepositOp, FullExitOp, Nonce, PubKeyHash, TokenId, TransferOp,
-    TransferToNewOp, WithdrawOp,
+    Address, ChangePubKeyOp, DepositOp, FullExitOp, MintNFTOp, Nonce, PubKeyHash, TokenId,
+    TransferOp, TransferToNewOp, WithdrawNFTOp, WithdrawOp,
 };
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
@@ -298,6 +299,13 @@ async fn gas_price_test() {
     commit_cost_of_onchain_change_pubkey(&mut test_setup, 50)
         .await
         .report(&base_cost, "onchain change pubkey", false);
+    commit_cost_of_mint_nft(&mut test_setup, 40, rng)
+        .await
+        .report(&base_cost, "Mint nft cost", false);
+
+    commit_cost_of_withdrawals_nft(&mut test_setup, 40, rng)
+        .await
+        .report(&base_cost, "withdrawals NFT", false);
 
     commit_cost_of_change_pubkey(&mut test_setup, 50)
         .await
@@ -325,6 +333,78 @@ async fn gas_price_test() {
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
+}
+
+async fn commit_cost_of_mint_nft(
+    test_setup: &mut TestSetup,
+    n_mint_nfts: usize,
+    rng: &mut impl Rng,
+) -> CostsSample {
+    let mut tranfers_fee = Vec::new();
+    let mut deposit_amount = BigUint::from(0u32);
+
+    let mut content_hashes = Vec::new();
+    let change_pk_fee = gen_packable_fee(rng);
+    deposit_amount += &change_pk_fee;
+
+    for _ in 0..n_mint_nfts {
+        let amount = gen_packable_amount(rng);
+        let fee = gen_packable_fee(rng);
+        content_hashes.push(H256::random());
+        deposit_amount += &amount + &fee;
+        tranfers_fee.push(fee);
+    }
+
+    // Prepare block with transfers
+    test_setup.start_block();
+    test_setup
+        .deposit(
+            ETHAccountId(1),
+            ZKSyncAccountId(1),
+            Token(TokenId(0)),
+            deposit_amount,
+        )
+        .await;
+    // create account 2
+    test_setup
+        .deposit(
+            ETHAccountId(2),
+            ZKSyncAccountId(2),
+            Token(TokenId(0)),
+            BigUint::from(0u32),
+        )
+        .await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(TokenId(0)), 0u32.into())
+        .await;
+    test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+
+    test_setup.start_block();
+    for i in 0..n_mint_nfts {
+        test_setup
+            .mint_nft(
+                ZKSyncAccountId(1),
+                ZKSyncAccountId(2),
+                Token(TokenId(0)),
+                content_hashes[i],
+                tranfers_fee[i].clone(),
+            )
+            .await;
+    }
+    let execute_result = test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+    assert_eq!(
+        execute_result.block_size_chunks,
+        n_mint_nfts * MintNFTOp::CHUNKS,
+        "block size mismatch"
+    );
+    execute_result.commit_result.gas_used.unwrap();
+    CostsSample::new(n_mint_nfts, U256::from(0), execute_result)
 }
 
 async fn commit_cost_of_transfers(
@@ -460,6 +540,92 @@ async fn commit_cost_of_transfers_to_new(
         "block size mismatch"
     );
     CostsSample::new(n_transfers, U256::from(0), transfer_execute_result)
+}
+
+async fn commit_cost_of_withdrawals_nft(
+    test_setup: &mut TestSetup,
+    n_withdrawals: usize,
+    rng: &mut impl Rng,
+) -> CostsSample {
+    let mut content_hashes = Vec::new();
+    let mut withdrawals_fee = Vec::new();
+    let mut deposit_amount = BigUint::from(0u32);
+
+    let change_pk_fee = gen_packable_fee(rng);
+    deposit_amount += &change_pk_fee;
+
+    for _ in 0..n_withdrawals {
+        let fee = gen_packable_fee(rng);
+        deposit_amount += &fee.clone().mul(2u32);
+        content_hashes.push(H256::random());
+        withdrawals_fee.push(fee);
+    }
+
+    test_setup.start_block();
+    test_setup
+        .deposit(
+            ETHAccountId(1),
+            ZKSyncAccountId(1),
+            Token(TokenId(0)),
+            deposit_amount.clone(),
+        )
+        .await;
+    test_setup
+        .deposit(
+            ETHAccountId(2),
+            ZKSyncAccountId(2),
+            Token(TokenId(0)),
+            deposit_amount,
+        )
+        .await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(TokenId(0)), 0u32.into())
+        .await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(2), Token(TokenId(0)), 0u32.into())
+        .await;
+    let mut current_nft = test_setup.get_last_committed_nft_id().await;
+
+    for i in 0..n_withdrawals {
+        test_setup
+            .mint_nft(
+                ZKSyncAccountId(1),
+                ZKSyncAccountId(2),
+                Token(TokenId(0)),
+                content_hashes[i],
+                withdrawals_fee[i].clone(),
+            )
+            .await;
+    }
+    test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+
+    test_setup.start_block();
+    for fee in withdrawals_fee {
+        current_nft += 1;
+        test_setup
+            .withdraw_nft(
+                ZKSyncAccountId(2),
+                Token(TokenId(current_nft)),
+                Token(TokenId(0)),
+                fee,
+                rng,
+            )
+            .await;
+    }
+
+    let withdraws_execute_result = test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+    assert_eq!(
+        withdraws_execute_result.block_size_chunks,
+        n_withdrawals * WithdrawNFTOp::CHUNKS,
+        "block size mismatch"
+    );
+    CostsSample::new(n_withdrawals, U256::from(0), withdraws_execute_result)
 }
 
 async fn commit_cost_of_withdrawals(

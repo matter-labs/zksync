@@ -23,6 +23,7 @@ use zksync_crypto::{
 };
 use zksync_types::{AccountId, TokenId, H256};
 // Local deps
+use crate::witness::utils::fr_from;
 use crate::{
     allocated_structures::*,
     circuit::{check_account_data, hash_nft_content_to_balance_type},
@@ -210,7 +211,9 @@ impl<'a, E: RescueEngine> Circuit<E> for ZkSyncExitCircuit<'a, E> {
             initial_hash_data.extend(branch.account.address.get_bits_be());
             initial_hash_data.extend(branch.token.get_bits_be());
             initial_hash_data.extend(branch.balance.get_bits_be());
+            initial_hash_data.extend(creator_account_branch.account_id.get_bits_be());
             initial_hash_data.extend(creator_account_branch.account.address.get_bits_be());
+            initial_hash_data.extend(serial_id.get_bits_be());
             initial_hash_data.extend(content_hash.iter().map(|bit| bit.get_bits_be()).flatten());
 
             let mut hash_block =
@@ -288,11 +291,18 @@ pub fn create_exit_circuit_with_public_input(
     append_be_fixed_width(&mut pubdata_commitment, &account_address, ADDRESS_WIDTH);
     append_be_fixed_width(&mut pubdata_commitment, &token_id_fe, TOKEN_BIT_WIDTH);
     append_be_fixed_width(&mut pubdata_commitment, &balance, BALANCE_BIT_WIDTH);
+
+    append_be_fixed_width(
+        &mut pubdata_commitment,
+        &creator_account_address_fe,
+        ACCOUNT_ID_BIT_WIDTH,
+    );
     let creator_address = account_tree
         .get(*nft_creator_id)
         .expect("nft creator id account should be in the tree")
         .address;
     append_be_fixed_width(&mut pubdata_commitment, &creator_address, ADDRESS_WIDTH);
+    append_be_fixed_width(&mut pubdata_commitment, &serial_id_fe, SERIAL_ID_WIDTH);
     let content_hash_as_vec: Vec<Option<Fr>> = nft_content_hash
         .as_bytes()
         .iter()
@@ -307,7 +317,7 @@ pub fn create_exit_circuit_with_public_input(
             byte_as_bits
         })
         .flatten()
-        .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+        .map(|bit| Some(fr_from(&bit)))
         .collect();
     for bit in &content_hash_as_vec {
         append_be_fixed_width(&mut pubdata_commitment, &bit.unwrap(), 1);
@@ -342,7 +352,7 @@ pub fn create_exit_circuit_with_public_input(
             },
         },
         special_account_audit_data: OperationBranch {
-            address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+            address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID)),
             token: Some(token_id_fe),
             witness: OperationBranchWitness {
                 account_witness: special_account_witness,

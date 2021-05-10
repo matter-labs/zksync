@@ -27,6 +27,7 @@ use zksync_crypto::{
 use zksync_types::operations::MintNFTOp;
 use zksync_types::H256;
 // Local deps
+use crate::witness::utils::fr_from;
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
@@ -201,12 +202,6 @@ impl Witness for MintNFTWitness<Bn256> {
             fourth_chunk,
             fifth_chunk,
         ]
-    }
-}
-
-impl<E: RescueEngine> MintNFTWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        unreachable!() // no reason to keep this
     }
 }
 
@@ -425,7 +420,7 @@ impl MintNFTWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+            .map(|bit| Some(fr_from(&bit)))
             .collect();
 
         MintNFTWitness {
@@ -437,29 +432,28 @@ impl MintNFTWitness<Bn256> {
 
             tx_type: Some(Fr::from_str(&MintNFTOp::OP_CODE.to_string()).unwrap()),
             args: OperationArguments {
-                eth_address: Some(Fr::zero()),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
-
-                special_eth_addresses: vec![Some(
-                    recipient_account_witness_before_fifth_chunk
-                        .address
-                        .expect("recipient account should not be empty"),
-                )],
-                special_tokens: vec![Some(token_fe), Some(new_token_id)],
-                special_account_ids: vec![
+                special_eth_addresses: vec![
+                    Some(
+                        recipient_account_witness_before_fifth_chunk
+                            .address
+                            .expect("recipient account should not be empty"),
+                    ),
+                    Some(Fr::zero()),
+                ],
+                special_tokens: vec![Some(token_fe), Some(new_token_id), Some(Fr::zero())],
+                special_accounts: vec![
                     Some(creator_account_id_fe),
                     Some(recipient_account_id_fe),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
                 ],
                 special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id),
+                ..Default::default()
             },
 
             creator_before_first_chunk: OperationBranch {
@@ -483,7 +477,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
             special_account_before_third_chunk: OperationBranch {
-                address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(Fr::from_str(&NFT_TOKEN_ID.0.to_string()).unwrap()),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_before_third_chunk,
@@ -493,7 +487,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
             special_account_before_fourth_chunk: OperationBranch {
-                address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(new_token_id),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_before_fourth_chunk,

@@ -181,6 +181,7 @@ impl TransactionsHistoryTestSetup {
             },
             withdraw_amount: Some(self.amount.clone().into()),
             creator_account_id: None,
+            creator_address: None,
             serial_id: None,
             content_hash: None,
         }));
