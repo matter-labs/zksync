@@ -290,7 +290,7 @@ export class Deployer {
         const numberOfNeededSignatures = +process.env.MISC_REGENESIS_NEEDED_SIGNATURES;
 
         if (partners.length < numberOfNeededSignatures) {
-            throw new Error('Number of requiored signatures for Genesis is higher than the number of partners');
+            throw new Error('Number of required signatures for Genesis is higher than the number of partners');
         }
 
         const regenesisMultisigContract = await deployContract(
