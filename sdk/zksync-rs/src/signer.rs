@@ -10,7 +10,7 @@ use zksync_types::{
         ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature,
         TimeRange, TxEthSignature,
     },
-    AccountId, Address, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, Transfer, Withdraw,
+    AccountId, Address, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, TokenId, Transfer, Withdraw,
     WithdrawNFT, H256,
 };
 // Local imports
@@ -299,7 +299,7 @@ impl<S: EthereumSigner> Signer<S> {
     pub async fn sign_withdraw_nft(
         &self,
         to: Address,
-        token: Token,
+        token: TokenId,
         fee_token: Token,
         fee: BigUint,
         nonce: Nonce,
@@ -311,7 +311,7 @@ impl<S: EthereumSigner> Signer<S> {
             account_id,
             self.address,
             to,
-            token.id,
+            token,
             fee_token.id,
             fee,
             nonce,
@@ -322,7 +322,8 @@ impl<S: EthereumSigner> Signer<S> {
 
         let eth_signature = match &self.eth_signer {
             Some(signer) => {
-                let message = withdraw_nft.get_ethereum_sign_message(&token.symbol, token.decimals);
+                let message =
+                    withdraw_nft.get_ethereum_sign_message(&fee_token.symbol, fee_token.decimals);
                 let signature = signer.sign_message(&message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {

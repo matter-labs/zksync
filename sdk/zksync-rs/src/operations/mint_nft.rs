@@ -26,7 +26,7 @@ where
     S: EthereumSigner,
     P: Provider + Clone,
 {
-    /// Initializes a transfer transaction building process.
+    /// Initializes a mint nft transaction building process.
     pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,

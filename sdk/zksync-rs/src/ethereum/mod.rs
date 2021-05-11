@@ -440,17 +440,12 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         Ok(transaction_hash)
     }
 
-    /// Performs a full exit for a certain token.
+    /// Performs a full exit for a certain nft.
     pub async fn full_exit_nft(
         &self,
-        token: impl Into<TokenLike>,
+        token: TokenId,
         account_id: AccountId,
     ) -> Result<H256, ClientError> {
-        let token = token.into();
-        let token = self
-            .tokens_cache
-            .resolve(token.clone())
-            .ok_or(ClientError::UnknownToken)?;
         let account_id = U256::from(*account_id);
 
         let options = Options {
@@ -460,7 +455,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
         let data = self
             .eth_client
-            .encode_tx_data("requestFullExitNFT", (account_id, *token.id));
+            .encode_tx_data("requestFullExitNFT", (account_id, token.0));
         let signed_tx = self
             .eth_client
             .sign_prepared_tx(data, options)

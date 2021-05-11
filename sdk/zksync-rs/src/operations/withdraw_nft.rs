@@ -1,9 +1,10 @@
 use num::BigUint;
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
     tx::{PackedEthSignature, TimeRange},
-    Address, Nonce, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, Nonce, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 use crate::{
@@ -14,7 +15,7 @@ use crate::{
 pub struct WithdrawNFTBuilder<'a, S: EthereumSigner, P: Provider> {
     wallet: &'a Wallet<S, P>,
     to: Option<Address>,
-    token: Option<Token>,
+    token: Option<TokenId>,
     fee_token: Option<Token>,
     fee: Option<BigUint>,
     nonce: Option<Nonce>,
@@ -59,7 +60,7 @@ where
                 let fee = self
                     .wallet
                     .provider
-                    .get_tx_fee(TxFeeTypes::Withdraw, to, token.id)
+                    .get_tx_fee(TxFeeTypes::WithdrawNFT, to, fee_token.id)
                     .await?;
                 fee.total_fee
             }
@@ -105,17 +106,12 @@ where
         Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
 
-    /// Sets the transaction token. Returns an error if token is not supported by zkSync.
-    pub fn token(mut self, token: impl Into<TokenLike>) -> Result<Self, ClientError> {
-        let token_like = token.into();
-        let token = self
-            .wallet
-            .tokens
-            .resolve(token_like)
-            .ok_or(ClientError::UnknownToken)?;
-
+    /// Sets the transaction token id. Returns an error if token is not supported by zkSync.
+    pub fn token(mut self, token: TokenId) -> Result<Self, ClientError> {
+        if token.0 < MIN_NFT_TOKEN_ID {
+            return Err(ClientError::UnknownToken);
+        }
         self.token = Some(token);
-
         Ok(self)
     }
 
@@ -158,7 +154,7 @@ where
         Ok(self)
     }
 
-    /// Sets the address of Ethereum wallet to withdraw funds to.
+    /// Sets the address of Ethereum wallet to withdraw nft to.
     pub fn to(mut self, to: Address) -> Self {
         self.to = Some(to);
         self
