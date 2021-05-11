@@ -47,6 +47,6 @@ export function storedBlockInfoParam(): ParamType {
         name: '_lastCommittedBlockData',
         type: 'tuple'
     };
-    
+
     return ParamType.fromObject(StoredBlockInfoAbi);
 }

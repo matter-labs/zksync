@@ -5,7 +5,6 @@ const { expect } = require('chai');
 const hardhat = require('hardhat');
 import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
 
-
 describe('Regenesis test', function () {
     this.timeout(50000);
 

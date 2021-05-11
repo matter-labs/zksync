@@ -25,21 +25,16 @@ async function main() {
 
     const provider = web3Provider();
 
-    const wallet = 
-        args.masterPrivateKey 
-            ? (new ethers.Wallet(args.masterPrivateKey)).connect(provider) 
-            : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+    const wallet = args.masterPrivateKey
+        ? new ethers.Wallet(args.masterPrivateKey).connect(provider)
+        : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
-    const contractAddress = args.contractAddress || process.env.MISC_REGENESIS_MULTISIG_ADDRESS; 
+    const contractAddress = args.contractAddress || process.env.MISC_REGENESIS_MULTISIG_ADDRESS;
 
     const rawSignatures = fs.readFileSync(args.pathToSignatures).toString();
     const signatures = JSON.parse(rawSignatures);
 
-    const contract = new ethers.Contract(
-        contractAddress,
-        testContracts.regenesisMultisig.abi,
-        wallet
-    );
+    const contract = new ethers.Contract(contractAddress, testContracts.regenesisMultisig.abi, wallet);
 
     const oldRootHash = args.oldRootHash;
     const newRootHash = args.newRootHash;
@@ -49,18 +44,13 @@ async function main() {
     console.log('OldHash: ', oldRootHash);
     console.log('NewHash: ', newRootHash);
     console.log('Signatures: ', signatures);
-    const tx = await contract.submitSignatures(
-        oldRootHash,
-        newRootHash,
-        signatures,
-        {
-            gasLimit: 500000
-        }
-    );
+    const tx = await contract.submitSignatures(oldRootHash, newRootHash, signatures, {
+        gasLimit: 500000
+    });
 
-   await tx.wait();
+    await tx.wait();
 
-   console.log('Signatures submitted successfully');
+    console.log('Signatures submitted successfully');
 }
 
 main()

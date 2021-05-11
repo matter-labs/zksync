@@ -49,6 +49,10 @@ async function main() {
         gasLimit: 6500000
     });
 
+    const newTargetGov = await deployContract(wallet, testContracts.governance, [], {
+        gasLimit: 6500000
+    });
+
     console.log('Starting upgrade');
     console.log(wallet.address);
     console.log(await upgradeGatekeeper.getMaster());
@@ -56,7 +60,7 @@ async function main() {
     //     await upgradeGatekeeper.cancelUpgrade()
     // ).wait();
     await (
-        await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetFranklin.address], {
+        await upgradeGatekeeper.startUpgrade([newTargetGov.address, constants.AddressZero, newTargetFranklin.address], {
             gasLimit: 500000
         })
     ).wait();
@@ -71,7 +75,7 @@ async function main() {
     console.log(await proxyContract.getMaster());
     console.log(upgradeGatekeeper.address);
     console.log('Finish upgrade notice period');
- //  console.log(await proxyContract.exodusMode());
+    //  console.log(await proxyContract.exodusMode());
     // finish upgrade
     await (await upgradeGatekeeper.finishUpgrade([[], [], encodedStoredBlockInfo], { gasLimit: 3000000 })).wait();
 
