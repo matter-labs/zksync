@@ -1,11 +1,13 @@
-use anyhow::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use zksync_crypto::franklin_crypto::{
-    alt_babyjubjub::{edwards, AltJubjubBn256},
-    eddsa::PublicKey,
+use thiserror::Error;
+use zksync_crypto::{
+    franklin_crypto::{
+        alt_babyjubjub::{edwards, AltJubjubBn256},
+        eddsa::PublicKey,
+    },
+    params::JUBJUB_PARAMS,
+    Engine,
 };
-use zksync_crypto::params::JUBJUB_PARAMS;
-use zksync_crypto::Engine;
 
 #[derive(Clone)]
 pub struct PackedPublicKey(pub PublicKey<Engine>);
@@ -17,14 +19,23 @@ impl PackedPublicKey {
         Ok(packed_point.to_vec())
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(bytes.len() == 32, "PublicKey size mismatch");
-
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializeError> {
+        if bytes.len() != 32 {
+            return Err(DeserializeError::IncorrectPublicKeyLength);
+        }
         Ok(PackedPublicKey(PublicKey::<Engine>(
             edwards::Point::read(&*bytes, &JUBJUB_PARAMS as &AltJubjubBn256)
-                .map_err(|e| format_err!("Failed to restore point: {}", e.to_string()))?,
+                .map_err(DeserializeError::RestoreCurvePoint)?,
         )))
     }
+}
+
+#[derive(Debug, Error)]
+pub enum DeserializeError {
+    #[error("Public key size mismatch")]
+    IncorrectPublicKeyLength,
+    #[error("Failed to restore point: {0}")]
+    RestoreCurvePoint(std::io::Error),
 }
 
 impl Serialize for PackedPublicKey {

@@ -389,3 +389,22 @@ async fn ethereum_gas_update(mut storage: StorageProcessor<'_>) -> QueryResult<(
 
     Ok(())
 }
+
+/// Check update eth parameters
+#[db_test]
+async fn test_update_eth_parameters(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    storage.ethereum_schema().initialize_eth_data().await?;
+
+    // Updates eth parameters and checks if they were really saved.
+    storage
+        .ethereum_schema()
+        .update_eth_parameters(BlockNumber(5))
+        .await?;
+
+    let stats = storage.ethereum_schema().load_stats().await?;
+    assert_eq!(stats.last_committed_block, 5);
+    assert_eq!(stats.last_verified_block, 0);
+    assert_eq!(stats.last_executed_block, 0);
+
+    Ok(())
+}

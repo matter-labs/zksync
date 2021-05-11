@@ -1,35 +1,16 @@
-use crate::{AccountId, Address, Nonce};
-use crate::{MintNFT, H256};
+use serde::{Deserialize, Serialize};
+
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, FEE_EXPONENT_BIT_WIDTH,
+        FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
+};
 
 use crate::helpers::{pack_fee_amount, unpack_fee_amount};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use zksync_basic_types::TokenId;
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, FEE_EXPONENT_BIT_WIDTH,
-    FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, TOKEN_BIT_WIDTH,
-};
-use zksync_crypto::primitives::FromBytes;
-
-#[derive(Error, Debug)]
-pub enum MintNFTParsingError {
-    #[error("Wrong number of types")]
-    WrongNumberOfBytes,
-    #[error("Cannot parse creator account id")]
-    CreatorAccountId,
-    #[error("Cannot parse token id")]
-    TokenId,
-    #[error("Cannot parse fee token id")]
-    FeeTokenId,
-    #[error("Cannot parse token account id")]
-    AccountId,
-    #[error("Cannot parse serial id")]
-    SerialId,
-    #[error("Cannot parse recipient account id")]
-    RecipientAccountId,
-    #[error("Cannot parse fee")]
-    Fee,
-}
+use crate::operations::error::MintNFTOpError;
+use crate::{AccountId, Address, MintNFT, Nonce, TokenId, H256};
 
 /// Deposit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,9 +35,9 @@ impl MintNFTOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, MintNFTParsingError> {
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, MintNFTOpError> {
         if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
-            return Err(MintNFTParsingError::WrongNumberOfBytes);
+            return Err(MintNFTOpError::WrongNumberOfBytes);
         }
 
         let creator_account_id_offset = 1;
@@ -68,13 +49,13 @@ impl MintNFTOp {
         let creator_account_id = u32::from_bytes(
             &bytes[creator_account_id_offset..creator_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
-        .ok_or(MintNFTParsingError::CreatorAccountId)?;
+        .ok_or(MintNFTOpError::CreatorAccountId)?;
 
         let recipient_account_id = u32::from_bytes(
             &bytes[recipient_account_id_offset
                 ..recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
-        .ok_or(MintNFTParsingError::RecipientAccountId)?;
+        .ok_or(MintNFTOpError::RecipientAccountId)?;
 
         let creator_address = Address::default(); // Unknown from pubdata
 
@@ -86,12 +67,12 @@ impl MintNFTOp {
 
         let fee_token_id =
             u32::from_bytes(&bytes[fee_token_offset..fee_token_offset + TOKEN_BIT_WIDTH / 8])
-                .ok_or(MintNFTParsingError::FeeTokenId)?;
+                .ok_or(MintNFTOpError::FeeTokenId)?;
 
         let fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
         )
-        .ok_or(MintNFTParsingError::Fee)?;
+        .ok_or(MintNFTOpError::Fee)?;
 
         let nonce = 0; // It is unknown from pubdata
 

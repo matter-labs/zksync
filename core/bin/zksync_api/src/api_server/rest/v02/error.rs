@@ -1,6 +1,6 @@
-use serde::export::Formatter;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
+use std::fmt::Formatter;
 
 #[derive(Serialize_repr)]
 #[repr(u8)]

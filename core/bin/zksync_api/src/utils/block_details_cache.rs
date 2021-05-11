@@ -3,14 +3,14 @@
 // External uses
 
 // Workspace uses
-use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
+use zksync_storage::{chain::block::records::StorageBlockDetails, ConnectionPool, QueryResult};
 use zksync_types::BlockNumber;
 
 // Local uses
 use super::shared_lru_cache::AsyncLruCache;
 
 #[derive(Clone, Debug)]
-pub struct BlockDetailsCache(AsyncLruCache<BlockNumber, BlockDetails>);
+pub struct BlockDetailsCache(AsyncLruCache<BlockNumber, StorageBlockDetails>);
 
 impl BlockDetailsCache {
     pub fn new(capacity: usize) -> Self {
@@ -21,7 +21,7 @@ impl BlockDetailsCache {
         &self,
         pool: &ConnectionPool,
         block_number: BlockNumber,
-    ) -> QueryResult<Option<BlockDetails>> {
+    ) -> QueryResult<Option<StorageBlockDetails>> {
         if let Some(block) = self.0.get(&block_number).await {
             return Ok(Some(block));
         }

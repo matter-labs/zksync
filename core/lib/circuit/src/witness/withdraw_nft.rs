@@ -16,8 +16,8 @@ use zksync_crypto::{
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, TOKEN_BIT_WIDTH,
-        TX_TYPE_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, SERIAL_ID_WIDTH,
+        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
     primitives::FloatConversions,
 };
@@ -92,14 +92,26 @@ impl Witness for WithdrawNFTWitness<Bn256> {
             &self.args.special_accounts[1].unwrap(),
             ACCOUNT_ID_BIT_WIDTH,
         );
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.special_accounts[0].unwrap(),
+            ACCOUNT_ID_BIT_WIDTH,
+        );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.special_eth_addresses[0].unwrap(),
             ETH_ADDRESS_BIT_WIDTH,
         );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.special_serial_id.unwrap(),
+            SERIAL_ID_WIDTH,
+        );
         for bit in &self.args.special_content_hash {
             append_be_fixed_width(&mut pubdata_bits, &bit.unwrap(), 1);
         }
+
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.eth_address.unwrap(),
@@ -120,6 +132,7 @@ impl Witness for WithdrawNFTWitness<Bn256> {
             &self.args.fee.unwrap(),
             FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
+
         resize_grow_only(
             &mut pubdata_bits,
             WithdrawNFTOp::CHUNKS * CHUNK_BIT_WIDTH,

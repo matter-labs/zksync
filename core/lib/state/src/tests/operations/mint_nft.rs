@@ -423,8 +423,5 @@ fn mint_already_created_nft() {
     )
     .unwrap();
 
-    tb.test_tx_fail(
-        mint_nft.into(),
-        format!("Token {} is already in account", nft_token_id).as_str(),
-    )
+    tb.test_tx_fail(mint_nft.into(), "NFT token is already in account")
 }

@@ -211,7 +211,9 @@ impl<'a, E: RescueEngine> Circuit<E> for ZkSyncExitCircuit<'a, E> {
             initial_hash_data.extend(branch.account.address.get_bits_be());
             initial_hash_data.extend(branch.token.get_bits_be());
             initial_hash_data.extend(branch.balance.get_bits_be());
+            initial_hash_data.extend(creator_account_branch.account_id.get_bits_be());
             initial_hash_data.extend(creator_account_branch.account.address.get_bits_be());
+            initial_hash_data.extend(serial_id.get_bits_be());
             initial_hash_data.extend(content_hash.iter().map(|bit| bit.get_bits_be()).flatten());
 
             let mut hash_block =
@@ -289,11 +291,18 @@ pub fn create_exit_circuit_with_public_input(
     append_be_fixed_width(&mut pubdata_commitment, &account_address, ADDRESS_WIDTH);
     append_be_fixed_width(&mut pubdata_commitment, &token_id_fe, TOKEN_BIT_WIDTH);
     append_be_fixed_width(&mut pubdata_commitment, &balance, BALANCE_BIT_WIDTH);
+
+    append_be_fixed_width(
+        &mut pubdata_commitment,
+        &creator_account_address_fe,
+        ACCOUNT_ID_BIT_WIDTH,
+    );
     let creator_address = account_tree
         .get(*nft_creator_id)
         .expect("nft creator id account should be in the tree")
         .address;
     append_be_fixed_width(&mut pubdata_commitment, &creator_address, ADDRESS_WIDTH);
+    append_be_fixed_width(&mut pubdata_commitment, &serial_id_fe, SERIAL_ID_WIDTH);
     let content_hash_as_vec: Vec<Option<Fr>> = nft_content_hash
         .as_bytes()
         .iter()

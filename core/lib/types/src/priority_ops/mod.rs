@@ -1,14 +1,13 @@
 //! Definition of zkSync network priority operations: operations initiated from the L1.
 
-use anyhow::{bail, ensure, format_err};
 use ethabi::{decode, ParamType};
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use zksync_basic_types::{Address, Log, H256, U256};
 use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, CONTENT_HASH_WIDTH,
-    ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CONTENT_HASH_WIDTH, ETH_ADDRESS_BIT_WIDTH,
+    FR_ADDRESS_LEN, SERIAL_ID_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
 };
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
@@ -17,8 +16,10 @@ use super::{
     utils::h256_as_vec,
     AccountId, SerialId, TokenId,
 };
+use crate::priority_ops::error::LogParseError;
 use zksync_crypto::primitives::FromBytes;
 
+mod error;
 #[cfg(test)]
 mod tests;
 
@@ -65,46 +66,50 @@ impl ZkSyncPriorityOp {
         }
     }
 
+    /// Returns the associated token number.
+    pub fn token_id(&self) -> TokenId {
+        match self {
+            ZkSyncPriorityOp::Deposit(deposit) => deposit.token,
+            ZkSyncPriorityOp::FullExit(full_exit) => full_exit.token,
+        }
+    }
+
     /// Parses priority operation from the Ethereum logs.
     pub fn parse_from_priority_queue_logs(
         pub_data: &[u8],
         op_type_id: u8,
         sender: Address,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, LogParseError> {
         // see contracts/contracts/Operations.sol
         match op_type_id {
             DepositOp::OP_CODE => {
                 let pub_data_left = pub_data;
 
-                ensure!(
-                    pub_data_left.len() >= TX_TYPE_BIT_WIDTH / 8,
-                    "PubData length mismatch"
-                );
+                if pub_data_left.len() < TX_TYPE_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
                 let (_, pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
 
                 // account_id
-                ensure!(
-                    pub_data_left.len() >= ACCOUNT_ID_BIT_WIDTH / 8,
-                    "PubData length mismatch"
-                );
+                if pub_data_left.len() < ACCOUNT_ID_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
                 let (_, pub_data_left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
 
                 // token
                 let (token, pub_data_left) = {
-                    ensure!(
-                        pub_data_left.len() >= TOKEN_BIT_WIDTH / 8,
-                        "PubData length mismatch"
-                    );
+                    if pub_data_left.len() < TOKEN_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u32::from_be_bytes(token.try_into().unwrap()), left)
                 };
 
                 // amount
                 let (amount, pub_data_left) = {
-                    ensure!(
-                        pub_data_left.len() >= BALANCE_BIT_WIDTH / 8,
-                        "PubData length mismatch"
-                    );
+                    if pub_data_left.len() < BALANCE_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
                     let (amount, left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
                     let amount = u128::from_be_bytes(amount.try_into().unwrap());
                     (BigUint::from(amount), left)
@@ -112,18 +117,16 @@ impl ZkSyncPriorityOp {
 
                 // account
                 let (account, pub_data_left) = {
-                    ensure!(
-                        pub_data_left.len() >= FR_ADDRESS_LEN,
-                        "PubData length mismatch"
-                    );
+                    if pub_data_left.len() < FR_ADDRESS_LEN {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
                     let (account, left) = pub_data_left.split_at(FR_ADDRESS_LEN);
                     (Address::from_slice(account), left)
                 };
 
-                ensure!(
-                    pub_data_left.is_empty(),
-                    "DepositOp parse failed: input too big"
-                );
+                if !pub_data_left.is_empty() {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
 
                 Ok(Self::Deposit(Deposit {
                     from: sender,
@@ -133,63 +136,54 @@ impl ZkSyncPriorityOp {
                 }))
             }
             FullExitOp::OP_CODE => {
-                ensure!(
-                    pub_data.len() >= TX_TYPE_BIT_WIDTH / 8,
-                    "PubData length mismatch"
-                );
+                if pub_data.len() < TX_TYPE_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
                 let (_, pub_data_left) = pub_data.split_at(TX_TYPE_BIT_WIDTH / 8);
 
                 // account_id
                 let (account_id, pub_data_left) = {
-                    ensure!(
-                        pub_data_left.len() >= ACCOUNT_ID_BIT_WIDTH / 8,
-                        "PubData length mismatch"
-                    );
+                    if pub_data_left.len() < ACCOUNT_ID_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
                     let (account_id, left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
                     (u32::from_bytes(account_id).unwrap(), left)
                 };
 
                 // owner
                 let (eth_address, pub_data_left) = {
-                    ensure!(
-                        pub_data_left.len() >= ETH_ADDRESS_BIT_WIDTH / 8,
-                        "PubData length mismatch"
-                    );
+                    if pub_data_left.len() < ETH_ADDRESS_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
                     let (eth_address, left) = pub_data_left.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (Address::from_slice(eth_address), left)
                 };
 
                 // token
                 let (token, pub_data_left) = {
-                    ensure!(
-                        pub_data_left.len() >= TOKEN_BIT_WIDTH / 8,
-                        "PubData length mismatch"
-                    );
+                    if pub_data_left.len() < TOKEN_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u32::from_be_bytes(token.try_into().unwrap()), left)
                 };
 
                 // amount
-                ensure!(
-                    pub_data_left.len() >= BALANCE_BIT_WIDTH / 8,
-                    "PubData length mismatch",
-                );
+                if pub_data_left.len() < BALANCE_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
 
                 let (_, pub_data_left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
 
-                // Creator address
-                ensure!(
-                    pub_data_left.len() >= ADDRESS_WIDTH / 8,
-                    "PubData length mismatch",
-                );
-
-                let (_, pub_data_left) = pub_data_left.split_at(ADDRESS_WIDTH / 8);
-
-                // Content hash
-                ensure!(
-                    pub_data_left.len() == CONTENT_HASH_WIDTH / 8,
-                    "PubData length mismatch",
-                );
+                // Creator account ID, creator address, serial id, content hash
+                if pub_data_left.len()
+                    != ACCOUNT_ID_BIT_WIDTH / 8
+                        + ETH_ADDRESS_BIT_WIDTH / 8
+                        + SERIAL_ID_WIDTH / 8
+                        + CONTENT_HASH_WIDTH / 8
+                {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
 
                 Ok(Self::FullExit(FullExit {
                     account_id: AccountId(account_id),
@@ -197,9 +191,7 @@ impl ZkSyncPriorityOp {
                     token: TokenId(token),
                 }))
             }
-            _ => {
-                bail!("Unsupported priority op type");
-            }
+            _ => Err(LogParseError::UnsupportedPriorityOpType),
         }
     }
 
@@ -251,9 +243,9 @@ pub struct PriorityOp {
 }
 
 impl TryFrom<Log> for PriorityOp {
-    type Error = anyhow::Error;
+    type Error = LogParseError;
 
-    fn try_from(event: Log) -> Result<PriorityOp, anyhow::Error> {
+    fn try_from(event: Log) -> Result<PriorityOp, LogParseError> {
         let mut dec_ev = decode(
             &[
                 ParamType::Address,
@@ -263,8 +255,7 @@ impl TryFrom<Log> for PriorityOp {
                 ParamType::Uint(256), // expir. block
             ],
             &event.data.0,
-        )
-        .map_err(|e| format_err!("Event data decode: {:?}", e))?;
+        )?;
 
         let sender = dec_ev.remove(0).to_address().unwrap();
         Ok(PriorityOp {

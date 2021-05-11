@@ -1,6 +1,6 @@
 use ethabi::ParamType;
 
-use zksync_types::{AccountId, BlockNumber, ZkSyncOp};
+use zksync_types::{AccountId, BlockNumber, ZkSyncOp, H256};
 
 use crate::rollup_ops::RollupOpsBlock;
 
@@ -43,6 +43,8 @@ pub fn rollup_ops_blocks_from_bytes(input_data: Vec<u8>) -> Result<RollupOpsBloc
             block_num: BlockNumber(block_num.as_u32()),
             ops,
             fee_account,
+            timestamp: None,
+            previous_block_root_hash: H256::default(),
         };
         Ok(block)
     } else {

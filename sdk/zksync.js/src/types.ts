@@ -12,6 +12,8 @@ export type TokenSymbol = string;
 // Token address (e.g. 0xde..ad for ERC20, or 0x00.00 for "ETH")
 export type TokenAddress = string;
 
+export type TotalFee = Map<TokenLike, BigNumber>;
+
 export type Nonce = number | 'committed';
 
 export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';

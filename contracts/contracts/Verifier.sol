@@ -59,13 +59,25 @@ contract Verifier is KeysWithPlonkVerifier, KeysWithPlonkVerifierOld, Config {
         address _owner,
         uint32 _tokenId,
         uint128 _amount,
+        uint32 _nftCreatorAccountId,
         address _nftCreatorAddress,
+        uint32 _nftSerialId,
         bytes32 _nftContentHash,
         uint256[] calldata _proof
     ) external view returns (bool) {
         bytes32 commitment =
             sha256(
-                abi.encodePacked(_rootHash, _accountId, _owner, _tokenId, _amount, _nftCreatorAddress, _nftContentHash)
+                abi.encodePacked(
+                    _rootHash,
+                    _accountId,
+                    _owner,
+                    _tokenId,
+                    _amount,
+                    _nftCreatorAccountId,
+                    _nftCreatorAddress,
+                    _nftSerialId,
+                    _nftContentHash
+                )
             );
 
         uint256[] memory inputs = new uint256[](1);

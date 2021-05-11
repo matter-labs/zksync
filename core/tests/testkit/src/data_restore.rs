@@ -18,6 +18,7 @@ pub async fn verify_restore(
     acc_state_from_test_setup: AccountMap,
     tokens: Vec<TokenId>,
     root_hash: Fr,
+    available_block_chunk_sizes: Vec<usize>,
 ) {
     let web3 = Web3::new(Http::new(web3_url).expect("http transport start"));
 
@@ -31,6 +32,7 @@ pub async fn verify_restore(
         true,
         Default::default(),
         contract,
+        available_block_chunk_sizes,
     );
 
     interactor.insert_new_account(AccountId(0), &fee_account_address);

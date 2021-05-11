@@ -306,13 +306,13 @@ impl EthereumAccount {
             self.address,
             eth_signer,
             token_contract,
-            self.main_contract_eth_client.chain_id,
-            self.main_contract_eth_client.gas_price_factor,
+            self.main_contract_eth_client.chain_id(),
+            self.main_contract_eth_client.gas_price_factor(),
         );
         let data = erc20_client.encode_tx_data(
             "approve",
             (
-                self.main_contract_eth_client.contract_addr,
+                self.main_contract_eth_client.contract_addr(),
                 big_dec_to_u256(amount.clone()),
             ),
         );
@@ -507,8 +507,8 @@ impl ETHExecResult {
 
         Self {
             success,
-            revert_reason,
             receipt,
+            revert_reason,
         }
     }
 

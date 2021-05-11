@@ -12,6 +12,13 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Fixed
 
+## Version 0.10.9 (13.04.2021)
+
+### Changed
+
+- Exported classes: `ETHOperation`, `Transaction`, `ZKSyncTxError`
+- Exported types: `TotalFee`
+
 ## Version 0.10.6 (16.03.2021)
 
 ### Added

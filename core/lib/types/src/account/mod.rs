@@ -7,8 +7,7 @@ use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
 
-use super::Fr;
-use super::{AccountId, AccountUpdates, Nonce, TokenId};
+use super::{AccountId, AccountUpdates, Fr, Nonce, TokenId};
 use zksync_basic_types::Address;
 use zksync_crypto::circuit::{
     account::{Balance, CircuitAccount},
@@ -18,6 +17,7 @@ use zksync_crypto::circuit::{
 pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
 
 mod account_update;
+pub mod error;
 mod pubkey_hash;
 
 /// zkSync network account.

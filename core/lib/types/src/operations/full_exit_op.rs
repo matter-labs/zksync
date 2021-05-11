@@ -1,6 +1,3 @@
-use crate::{AccountId, Address, TokenId};
-use crate::{FullExit, H256};
-use anyhow::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::{
@@ -9,6 +6,8 @@ use zksync_crypto::params::{
 };
 use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeWrapper;
+
+use crate::{operations::error::FullExitOpError, AccountId, Address, FullExit, TokenId, H256};
 
 /// FullExit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,7 +22,7 @@ pub struct FullExitOp {
 }
 
 impl FullExitOp {
-    pub const CHUNKS: usize = 10;
+    pub const CHUNKS: usize = 11;
     pub const OP_CODE: u8 = 0x06;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 
@@ -42,7 +41,15 @@ impl FullExitOp {
                 .unwrap()
                 .to_be_bytes(),
         );
+        data.extend_from_slice(
+            &self
+                .creator_account_id
+                .clone()
+                .unwrap_or_default()
+                .to_be_bytes(),
+        );
         data.extend_from_slice(&self.creator_address.clone().unwrap_or_default().as_bytes());
+        data.extend_from_slice(&self.serial_id.clone().unwrap_or_default().to_be_bytes());
         data.extend_from_slice(&self.content_hash.clone().unwrap_or_default().as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
@@ -71,11 +78,10 @@ impl FullExitOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(
-            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
-            "Wrong bytes length for full exit pubdata"
-        );
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, FullExitOpError> {
+        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+            return Err(FullExitOpError::PubdataSizeMismatch);
+        }
 
         let account_id_offset = 1;
         let eth_address_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
@@ -85,13 +91,13 @@ impl FullExitOp {
         let content_hash_offset = creator_address + ADDRESS_WIDTH / 8;
 
         let account_id = u32::from_bytes(&bytes[account_id_offset..eth_address_offset])
-            .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
+            .ok_or(FullExitOpError::CannotGetAccountId)?;
         let eth_address = Address::from_slice(&bytes[eth_address_offset..token_offset]);
         let token = u32::from_bytes(&bytes[token_offset..amount_offset])
-            .ok_or_else(|| format_err!("Cant get token id from full exit pubdata"))?;
+            .ok_or(FullExitOpError::CannotGetTokenId)?;
         let amount = BigUint::from_u128(
             u128::from_bytes(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get amount from full exit pubdata"))?,
+                .ok_or(FullExitOpError::CannotGetAmount)?,
         )
         .unwrap();
 

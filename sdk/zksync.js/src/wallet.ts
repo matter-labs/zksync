@@ -46,7 +46,7 @@ import {
 
 const EthersErrorCode = ErrorCode;
 
-class ZKSyncTxError extends Error {
+export class ZKSyncTxError extends Error {
     constructor(message: string, public value: PriorityOperationReceipt | TransactionReceipt) {
         super(message);
     }
@@ -1125,7 +1125,7 @@ export class Wallet {
     }
 }
 
-class ETHOperation {
+export class ETHOperation {
     state: 'Sent' | 'Mined' | 'Committed' | 'Verified' | 'Failed';
     error?: ZKSyncTxError;
     priorityOpId?: BigNumber;
@@ -1191,7 +1191,7 @@ class ETHOperation {
     }
 }
 
-class Transaction {
+export class Transaction {
     state: 'Sent' | 'Committed' | 'Verified' | 'Failed';
     error?: ZKSyncTxError;
 

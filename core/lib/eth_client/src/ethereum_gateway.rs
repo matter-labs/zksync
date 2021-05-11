@@ -68,7 +68,7 @@ impl EthereumGateway {
             let contract = zksync_contract();
             for web3_url in config.eth_client.web3_url.iter() {
                 let transport = web3::transports::Http::new(web3_url).unwrap();
-                client = client.add_client(
+                client.add_client(
                     web3_url.clone(),
                     ETHDirectClient::new(
                         transport,
@@ -87,21 +87,13 @@ impl EthereumGateway {
 }
 
 macro_rules! delegate_call {
-    ($self:ident.$method:ident($($args:ident),+)) => {
+    ($self:ident.$method:ident($($args:ident),*)) => {
         match $self {
-            Self::Direct(d) => d.$method($($args),+).await,
-            Self::Multiplexed(d) => d.$method($($args),+).await,
-            Self::Mock(d) => d.$method($($args),+).await,
-        }
-    };
-    ($self:ident.$method:ident()) => {
-        match $self {
-            Self::Direct(d) => d.$method().await,
-            Self::Multiplexed(m) => m.$method().await,
-            Self::Mock(d) => d.$method().await,
+            Self::Direct(d) => d.$method($($args),*).await,
+            Self::Multiplexed(d) => d.$method($($args),*).await,
+            Self::Mock(d) => d.$method($($args),*).await,
         }
     }
-
 }
 
 impl EthereumGateway {
@@ -189,9 +181,11 @@ impl EthereumGateway {
     ) -> Result<U256, anyhow::Error> {
         delegate_call!(self.allowance(token_address, erc20_abi))
     }
+
     pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
         delegate_call!(self.get_tx_status(hash))
     }
+
     /// Encodes the transaction data (smart contract method and its input) to the bytes
     /// without creating an actual transaction.
     pub async fn call_main_contract_function<R, A, B, P>(
@@ -263,15 +257,20 @@ impl EthereumGateway {
         delegate_call!(self.get_tx(hash))
     }
 
+    pub fn is_multiplexed(&self) -> bool {
+        matches!(self, EthereumGateway::Multiplexed(_))
+    }
+
     pub fn get_mut_mock(&mut self) -> Option<&mut MockEthereum> {
         match self {
-            EthereumGateway::Mock(m) => Some(m),
+            EthereumGateway::Mock(ref mut m) => Some(m),
             _ => None,
         }
     }
+
     pub fn get_mock(&self) -> Option<&MockEthereum> {
         match self {
-            EthereumGateway::Mock(m) => Some(m),
+            EthereumGateway::Mock(m) => Some(&m),
             _ => None,
         }
     }

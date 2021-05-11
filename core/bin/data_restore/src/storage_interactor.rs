@@ -143,5 +143,7 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> Rollu
         block_num: op_block.block_num,
         ops: op_block.ops.clone(),
         fee_account: op_block.fee_account,
+        timestamp: op_block.timestamp,
+        previous_block_root_hash: op_block.previous_block_root_hash,
     }
 }
