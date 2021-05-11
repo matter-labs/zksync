@@ -1,3 +1,4 @@
+use crate::register_factory_handler::run_register_factory_handler;
 use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
     block_proposer::run_block_proposer_task,
@@ -166,6 +167,12 @@ pub async fn run_core(
         &config,
     );
 
+    // Start token handler.
+    let register_factory_task = run_register_factory_handler(
+        connection_pool.clone(),
+        eth_watch_req_sender.clone(),
+        &config,
+    );
     // Start rejected transactions cleaner task.
     let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
 
@@ -192,6 +199,7 @@ pub async fn run_core(
         proposer_task,
         rejected_tx_cleaner_task,
         token_handler_task,
+        register_factory_task,
     ];
 
     if let Some(task) = gateway_watcher_task_opt {

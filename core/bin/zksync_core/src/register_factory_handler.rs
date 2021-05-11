@@ -90,6 +90,7 @@ impl NFTFactoryHandler {
                 )
                 .await?
         }
+        transaction.commit().await?;
         Ok(())
     }
 

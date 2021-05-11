@@ -15,6 +15,6 @@ interface NFTFactory {
         address indexed recipient,
         uint32 serialId,
         bytes32 contentHash,
-        uint256 tokenId
+        uint32 tokenId
     );
 }

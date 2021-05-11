@@ -62,7 +62,7 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
-    getMintEthEthSignMessage(mintNft: {
+    getMintNFTEthSignMessage(mintNft: {
         stringToken: string;
         stringFee: string;
         recipient: string;
@@ -176,7 +176,7 @@ export class EthMessageSigner {
         contentHash: string;
         nonce: number;
     }): Promise<TxEthSignature> {
-        const message = this.getMintEthEthSignMessage(mintNFT);
+        const message = this.getMintNFTEthSignMessage(mintNFT);
         return await this.getEthMessageSignature(message);
     }
 
