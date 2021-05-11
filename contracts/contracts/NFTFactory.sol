@@ -2,7 +2,7 @@
 pragma solidity ^0.7.0;
 
 interface NFTFactory {
-    function mintNFT(
+    function mintNFTFromZkSync(
         address creator,
         address recipient,
         uint32 serialId,
@@ -10,7 +10,7 @@ interface NFTFactory {
         uint32 tokenId
     ) external;
 
-    event MintNFT(
+    event MintNFTFromZkSync(
         address indexed creator,
         address indexed recipient,
         uint32 serialId,
