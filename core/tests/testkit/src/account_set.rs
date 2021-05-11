@@ -350,4 +350,65 @@ impl AccountSet {
             time_range,
         )))
     }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn swap(
+        &self,
+        accounts: (ZKSyncAccountId, ZKSyncAccountId),
+        recipients: (ZKSyncAccountId, ZKSyncAccountId),
+        submitter: ZKSyncAccountId,
+        tokens: (Token, Token, Token),
+        amounts: (BigUint, BigUint),
+        fee: BigUint,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        time_range: TimeRange,
+    ) -> ZkSyncTx {
+        let accounts = (
+            &self.zksync_accounts[accounts.0 .0],
+            &self.zksync_accounts[accounts.1 .0],
+            &self.zksync_accounts[recipients.0 .0],
+            &self.zksync_accounts[recipients.1 .0],
+            &self.zksync_accounts[submitter.0],
+        );
+
+        let order_0 = accounts.0.sign_order(
+            tokens.0 .0,
+            tokens.1 .0,
+            amounts.0.clone(),
+            amounts.1.clone(),
+            amounts.0.clone(),
+            &accounts.2.address,
+            None,
+            true,
+            time_range,
+        );
+
+        let order_1 = accounts.1.sign_order(
+            tokens.1 .0,
+            tokens.0 .0,
+            amounts.1.clone(),
+            amounts.0.clone(),
+            amounts.1.clone(),
+            &accounts.3.address,
+            None,
+            true,
+            time_range,
+        );
+
+        ZkSyncTx::Swap(Box::new(
+            accounts
+                .4
+                .sign_swap(
+                    (order_0, order_1),
+                    amounts,
+                    nonce,
+                    increment_nonce,
+                    tokens.2 .0,
+                    "",
+                    fee,
+                )
+                .0,
+        ))
+    }
 }

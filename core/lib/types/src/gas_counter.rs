@@ -36,7 +36,7 @@ impl CommitCost {
     pub const WITHDRAW_NFT_COST: u64 = 3_500; // TODO Verify value
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
     pub const MINT_TOKEN_COST: u64 = 3_500;
-    pub const SWAP_COST: u64 = 800; // TODO verify value (ZKS-594)
+    pub const SWAP_COST: u64 = 600;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
