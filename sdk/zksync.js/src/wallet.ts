@@ -936,7 +936,7 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
-        return this.ethMessageSigner.getMintEthEthSignMessage({
+        return this.ethMessageSigner.getMintNFTEthSignMessage({
             stringToken,
             stringFee,
             recipient: mintNFT.recipient,
