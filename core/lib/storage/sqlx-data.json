@@ -504,6 +504,16 @@
       ]
     }
   },
+  "0e87e9e74e0f718229b45f1a293dd181135b9fb22b489ef558a30e588973ba01": {
+    "query": "\n            DELETE FROM account_tree_cache \n            WHERE true\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
   "0fb38a8f186b2b0a2b3d608bf43b111876e16bafe8e10ad9078b5066908ea0cf": {
     "query": "DELETE FROM proofs WHERE block_number > $1",
     "describe": {
@@ -1437,18 +1447,6 @@
           "Int8",
           "Int4",
           "Numeric"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "3735f085bcc4c64e62f09f6cb64ecb0415f4e949f99e20b8e5caf298b8d80e6d": {
-    "query": "\n            UPDATE account_tree_cache \n            SET tree_cache = NULL\n            WHERE block = $1\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
         ]
       },
       "nullable": []
@@ -5605,6 +5603,27 @@
       ],
       "parameters": {
         "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
+    "query": "SELECT pg_notify($1, $2)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "pg_notify",
+          "type_info": "Void"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
           "Text"
         ]
       },

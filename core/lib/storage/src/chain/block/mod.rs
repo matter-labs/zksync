@@ -828,14 +828,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     // migration for the nft regenesis.
     // Remove this function once the regenesis is complete and the tool is not
     // neded anymore: ZKS-663
-    pub async fn reset_account_tree_cache(&mut self, block: BlockNumber) -> QueryResult<()> {
+    pub async fn reset_account_tree_cache(&mut self) -> QueryResult<()> {
         sqlx::query!(
             "
-            UPDATE account_tree_cache 
-            SET tree_cache = NULL
-            WHERE block = $1
-            ",
-            *block as i64
+            DELETE FROM account_tree_cache 
+            WHERE true
+            "
         )
         .execute(self.0.conn())
         .await?;

@@ -271,7 +271,7 @@ pub async fn migrage_db_for_nft(past_root_hash: Fr, root_hash: Fr) -> anyhow::Re
     transaction
         .chain()
         .block_schema()
-        .reset_account_tree_cache(block_number)
+        .reset_account_tree_cache()
         .await?;
 
     transaction.commit().await?;
