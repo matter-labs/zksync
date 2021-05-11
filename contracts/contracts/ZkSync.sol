@@ -132,10 +132,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         StoredBlockInfo memory lastBlockInfo;
         (lastBlockInfo) = abi.decode(upgradeParameters, (StoredBlockInfo));
+     //return;
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
 
+        return;
         RegenesisMultisig multisig = RegenesisMultisig($$(REGENESIS_MULTISIG_ADDRESS));
+        return;
         bytes32 oldRootHash = multisig.oldRootHash();
+        return;
         require(oldRootHash == lastBlockInfo.stateHash, "wqqe");
         bytes32 newRootHash = multisig.newRootHash();
 
@@ -614,59 +618,59 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner (must be total amount, not part of it)
-    function performExodus(
-        StoredBlockInfo memory _storedBlockInfo,
-        address _owner,
-        uint32 _accountId,
-        uint32 _tokenId,
-        uint128 _amount,
-        uint32 _nftCreatorAccountId,
-        address _nftCreatorAddress,
-        uint32 _nftSerialId,
-        bytes32 _nftContentHash,
-        uint256[] memory _proof
-    ) external nonReentrant {
-        require(_accountId <= MAX_ACCOUNT_ID, "e");
-        require(_accountId != SPECIAL_ACCOUNT_ID, "v");
-        require(_tokenId < SPECIAL_NFT_TOKEN_ID, "T");
+    // function performExodus(
+    //     StoredBlockInfo memory _storedBlockInfo,
+    //     address _owner,
+    //     uint32 _accountId,
+    //     uint32 _tokenId,
+    //     uint128 _amount,
+    //     uint32 _nftCreatorAccountId,
+    //     address _nftCreatorAddress,
+    //     uint32 _nftSerialId,
+    //     bytes32 _nftContentHash,
+    //     uint256[] memory _proof
+    // ) external nonReentrant {
+    //     require(_accountId <= MAX_ACCOUNT_ID, "e");
+    //     require(_accountId != SPECIAL_ACCOUNT_ID, "v");
+    //     require(_tokenId < SPECIAL_NFT_TOKEN_ID, "T");
 
-        require(exodusMode, "s"); // must be in exodus mode
-        require(!performedExodus[_accountId][_tokenId], "t"); // already exited
-        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect stored block info
+    //     require(exodusMode, "s"); // must be in exodus mode
+    //     require(!performedExodus[_accountId][_tokenId], "t"); // already exited
+    //     require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect stored block info
 
-        bool proofCorrect =
-            verifier.verifyExitProof(
-                _storedBlockInfo.stateHash,
-                _accountId,
-                _owner,
-                _tokenId,
-                _amount,
-                _nftCreatorAccountId,
-                _nftCreatorAddress,
-                _nftSerialId,
-                _nftContentHash,
-                _proof
-            );
-        require(proofCorrect, "x");
+    //     bool proofCorrect =
+    //         verifier.verifyExitProof(
+    //             _storedBlockInfo.stateHash,
+    //             _accountId,
+    //             _owner,
+    //             _tokenId,
+    //             _amount,
+    //             _nftCreatorAccountId,
+    //             _nftCreatorAddress,
+    //             _nftSerialId,
+    //             _nftContentHash,
+    //             _proof
+    //         );
+    //     require(proofCorrect, "x");
 
-        if (_tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
-            bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
-            increaseBalanceToWithdraw(packedBalanceKey, _amount);
-        } else {
-            require(_amount != 0, "Z"); // Unsupported nft amount
-            Operations.WithdrawNFT memory withdrawNftOp =
-                Operations.WithdrawNFT(
-                    _nftCreatorAccountId,
-                    _nftCreatorAddress,
-                    _nftSerialId,
-                    _nftContentHash,
-                    _owner,
-                    _tokenId
-                );
-            pendingWithdrawnNFTs[_tokenId] = withdrawNftOp;
-        }
-        performedExodus[_accountId][_tokenId] = true;
-    }
+    //     if (_tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
+    //         bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
+    //         increaseBalanceToWithdraw(packedBalanceKey, _amount);
+    //     } else {
+    //         require(_amount != 0, "Z"); // Unsupported nft amount
+    //         Operations.WithdrawNFT memory withdrawNftOp =
+    //             Operations.WithdrawNFT(
+    //                 _nftCreatorAccountId,
+    //                 _nftCreatorAddress,
+    //                 _nftSerialId,
+    //                 _nftContentHash,
+    //                 _owner,
+    //                 _tokenId
+    //             );
+    //         pendingWithdrawnNFTs[_tokenId] = withdrawNftOp;
+    //     }
+    //     performedExodus[_accountId][_tokenId] = true;
+    // }
 
     /// @notice Set data for changing pubkey hash using onchain authorization.
     ///         Transaction author (msg.sender) should be L2 account address

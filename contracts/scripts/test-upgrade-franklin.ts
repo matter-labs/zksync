@@ -18,20 +18,24 @@ async function main() {
         addHelp: true,
         description: 'Contract upgrade'
     });
-    parser.addArgument('contractAddress');
-    parser.addArgument('upgradeGatekeeperAddress');
-    parser.addArgument('lastBlockInfo');
+    parser.addArgument('--contractAddress');
+    parser.addArgument('--upgradeGatekeeperAddress');
+    parser.addArgument('--lastBlockInfo');
     const args = parser.parseArgs(process.argv.slice(2));
-    if (process.env.CHAIN_ETH_NETWORK !== 'test') {
-        console.log('Upgrading test contract not on test network is not allowed');
-        process.exit(1);
-    }
+    // if (process.env.CHAIN_ETH_NETWORK !== 'test') {
+    //     console.log('Upgrading test contract not on test network is not allowed');
+    //     process.exit(1);
+    // }
 
-    const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [args.lastBlockInfo]);
+    const lastBlockInfo = JSON.parse(args.lastBlockInfo);
+    console.log(lastBlockInfo);
+    const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [lastBlockInfo]);
+
+    console.log(encodedStoredBlockInfo);
 
     const provider = web3Provider();
 
-    const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
+    const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
     const proxyContract = new ethers.Contract(args.contractAddress, testContracts.proxy.abi, wallet);
 
@@ -46,8 +50,15 @@ async function main() {
     });
 
     console.log('Starting upgrade');
+    console.log(wallet.address);
+    console.log(await upgradeGatekeeper.getMaster());
     await (
-        await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetFranklin.address])
+        await upgradeGatekeeper.cancelUpgrade()
+    ).wait();
+    await (
+        await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetFranklin.address], {
+            gasLimit: 500000
+        })
     ).wait();
 
     // wait notice period
@@ -57,11 +68,14 @@ async function main() {
         await (await upgradeGatekeeper.startPreparation({ gasLimit: 300000 })).wait();
     }
 
+    console.log(await proxyContract.getMaster());
+    console.log(upgradeGatekeeper.address);
     console.log('Finish upgrade notice period');
+ //  console.log(await proxyContract.exodusMode());
     // finish upgrade
-    await (await upgradeGatekeeper.finishUpgrade([[], [], [encodedStoredBlockInfo]], { gasLimit: 300000 })).wait();
+    await (await upgradeGatekeeper.finishUpgrade([[], [], encodedStoredBlockInfo], { gasLimit: 3000000 })).wait();
 
-    await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
+    //await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
 }
 
 main()
