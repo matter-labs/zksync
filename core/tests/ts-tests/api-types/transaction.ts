@@ -139,13 +139,17 @@ type FullExit = {
     created_at: string;
     fail_reason: null;
     tx: {
+        type: 'FullExit';
+        serial_id: number | null;
         priority_op: {
+            token: string;
             account_id: number;
             eth_address: string;
-            token: number;
         };
-        type: 'FullExit';
-        withdraw_amount: string | null;
+        content_hash: string | null;
+        creator_address: string | null;
+        withdraw_amount: string;
+        creator_account_id: number | null;
     };
 };
 
