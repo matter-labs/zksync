@@ -378,28 +378,29 @@ export class Wallet {
     }): Promise<Transaction[]> {
         transfer.nonce = transfer.nonce != null ? await this.getNonce(transfer.nonce) : await this.getNonce();
 
-        let fee;
+        let fee: BigNumberish;
         if (transfer.fee == null) {
             fee = await this.provider.getTransactionsBatchFee(
                 ['Transfer', 'Transfer'],
-                [this.address(), this.address()],
+                [transfer.to, this.address()],
                 transfer.feeToken
             );
         } else {
             fee = transfer.fee;
         }
-        const txFee = {
-            to: transfer.to,
-            token: transfer.feeToken,
-            amount: 0,
-            fee
-        };
+
         const txNFT = {
             to: transfer.to,
             token: transfer.token.id,
             amount: 1,
             fee: 0,
             symbol: transfer.token.symbol
+        };
+        const txFee = {
+            to: this.address(),
+            token: transfer.feeToken,
+            amount: 0,
+            fee
         };
 
         return await this.syncMultiTransfer([txNFT, txFee]);
@@ -517,7 +518,7 @@ export class Wallet {
             if (!amount0.eq(0) && !amount1.eq(0)) {
                 swap.amounts = [amount0, amount1];
             } else {
-                throw new Error('If amounts in order are implicit, you must specify them yourself');
+                throw new Error('If amounts in orders are implicit, you must specify them during submission');
             }
         }
 

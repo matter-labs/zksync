@@ -619,7 +619,7 @@ export function serializeOrder(order: Order): Uint8Array {
 }
 
 export async function serializeSwap(swap: Swap): Promise<Uint8Array> {
-    const type = new Uint8Array([9]);
+    const type = new Uint8Array([11]);
     const submitterId = serializeAccountId(swap.submitterId);
     const submitterAddress = serializeAddress(swap.submitterAddress);
     const nonceBytes = serializeNonce(swap.nonce);
