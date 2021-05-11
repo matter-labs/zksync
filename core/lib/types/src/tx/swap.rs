@@ -32,6 +32,7 @@ pub struct Order {
     pub price: (BigUint, BigUint),
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub amount: BigUint,
+    #[serde(flatten)]
     pub time_range: TimeRange,
     pub signature: TxSignature,
 }

@@ -99,6 +99,7 @@ impl GasOperationsCost {
                 OutputFeeType::FastWithdraw,
                 standard_fast_withdrawal_cost.into(),
             ),
+            (OutputFeeType::Swap, constants::BASE_SWAP_COST.into()),
             (
                 OutputFeeType::WithdrawNFT,
                 constants::BASE_WITHDRAW_NFT_COST.into(),
@@ -159,6 +160,7 @@ impl GasOperationsCost {
                 OutputFeeType::FastWithdraw,
                 subsidy_fast_withdrawal_cost.into(),
             ),
+            (OutputFeeType::Swap, constants::SUBSIDY_SWAP_COST.into()),
             (
                 OutputFeeType::WithdrawNFT,
                 constants::SUBSIDY_WITHDRAW_NFT_COST.into(),

@@ -8,7 +8,8 @@ import {
     SignedTransaction,
     TxEthSignature,
     ChangePubkeyTypes,
-    TotalFee
+    TotalFee,
+    Order
 } from './types';
 import { MAX_TIMESTAMP } from './utils';
 import { Wallet } from './wallet';
@@ -17,9 +18,9 @@ import { Wallet } from './wallet';
  * Used by `BatchBuilder` to store transactions until the `build()` call.
  */
 interface InternalTx {
-    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT';
+    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT' | 'Swap';
     tx: any;
-    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT';
+    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT' | 'Swap';
     address: Address;
     token: TokenLike;
     // Whether or not the tx has been signed.
@@ -28,14 +29,13 @@ interface InternalTx {
 }
 
 /**
- * Provides iterface for constructing batches of transactions.
+ * Provides interface for constructing batches of transactions.
  */
 export class BatchBuilder {
     private constructor(private wallet: Wallet, private nonce: Nonce, private txs: InternalTx[] = []) {}
 
     static fromWallet(wallet: Wallet, nonce?: Nonce): BatchBuilder {
-        const batchBuilder = new BatchBuilder(wallet, nonce, []);
-        return batchBuilder;
+        return new BatchBuilder(wallet, nonce, []);
     }
 
     /**
@@ -153,6 +153,30 @@ export class BatchBuilder {
 
         return this;
     }
+
+    addSwap(swap: {
+        orders: [Order, Order];
+        amounts: [BigNumberish, BigNumberish];
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+    }): BatchBuilder {
+        const _swap = {
+            orders: swap.orders,
+            amounts: swap.amounts,
+            nonce: null,
+            fee: swap.fee || 0,
+            feeToken: swap.feeToken
+        };
+        this.txs.push({
+            type: 'Swap',
+            tx: _swap,
+            feeType: 'Swap',
+            address: this.wallet.address(),
+            token: swap.feeToken
+        });
+        return this;
+    }
+
     addTransfer(transfer: {
         to: Address;
         token: TokenLike;
@@ -301,6 +325,10 @@ export class BatchBuilder {
                     messages.push(this.wallet.getMintNFTMessagePart(tx.tx));
                     const mintNft = { tx: await this.wallet.getMintNFT(tx.tx) };
                     processedTxs.push(mintNft);
+                case 'Swap':
+                    messages.push(this.wallet.getSwapEthSignMessagePart(tx.tx));
+                    const swap = { tx: await this.wallet.getSwap(tx.tx) };
+                    processedTxs.push(swap);
                     break;
             }
         }

@@ -13,7 +13,10 @@ import {
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,
-    Create2Data
+    Create2Data,
+    Swap,
+    Order,
+    Price
 } from './types';
 
 export class Signer {
@@ -70,6 +73,54 @@ export class Signer {
             type: 'Transfer',
             token: transfer.tokenId
         });
+    }
+
+    async signSyncOrder(order: {
+        accountId: number;
+        recipientAddress: Address;
+        nonce: number;
+        tokenSell: number;
+        tokenBuy: number;
+        amount: BigNumberish;
+        price: Price;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<Order> {
+        const msgBytes = utils.serializeOrder(order);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...order,
+            amount: BigNumber.from(order.amount).toString(),
+            // @ts-ignore
+            price: order.price.map((p) => BigNumber.from(p).toString()),
+            signature
+        };
+    }
+
+    async signSyncSwap(swap: {
+        orders: [Order, Order];
+        amounts: [BigNumberish, BigNumberish];
+        submitterId: number;
+        submitterAddress: Address;
+        nonce: number;
+        feeToken: number;
+        fee: BigNumberish;
+    }): Promise<Swap> {
+        const tx: Swap = {
+            ...swap,
+            type: 'Swap'
+        };
+
+        const msgBytes = await utils.serializeSwap(tx);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...tx,
+            amounts: [BigNumber.from(tx.amounts[0]).toString(), BigNumber.from(tx.amounts[1]).toString()],
+            fee: BigNumber.from(tx.fee).toString(),
+            signature
+        };
     }
 
     async signSyncTransfer(transfer: {
