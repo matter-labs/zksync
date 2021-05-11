@@ -301,9 +301,9 @@ async fn gas_price_test() {
         .report(&base_cost, "onchain change pubkey", false);
     commit_cost_of_mint_nft(&mut test_setup, 40, rng)
         .await
-        .report(&base_cost, "Mint nft cost", false);
+        .report(&base_cost, "Mint nft", false);
 
-    commit_cost_of_withdrawals_nft(&mut test_setup, 40, rng)
+    commit_cost_of_withdrawals_nft(&mut test_setup, 10, rng)
         .await
         .report(&base_cost, "withdrawals NFT", false);
 
