@@ -11,13 +11,14 @@ use web3::types::{TransactionReceipt, H160, H256, U256};
 
 use zksync_eth_client::ETHDirectClient;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::{AccountId, Address, PriorityOp, PriorityOpId, TokenLike};
+use zksync_types::{AccountId, Address, PriorityOp, PriorityOpId, TokenId, TokenLike};
 
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, utils::u256_to_biguint,
 };
 
 pub use self::priority_op_handle::PriorityOpHandle;
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 
 mod priority_op_handle;
 
@@ -446,8 +447,10 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         token: TokenId,
         account_id: AccountId,
     ) -> Result<H256, ClientError> {
+        if token.0 < MIN_NFT_TOKEN_ID {
+            return Err(ClientError::UnknownToken);
+        }
         let account_id = U256::from(*account_id);
-
         let options = Options {
             gas: Some(500_000.into()),
             ..Default::default()

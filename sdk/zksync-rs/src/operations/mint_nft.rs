@@ -38,7 +38,7 @@ where
         }
     }
 
-    /// Directly returns the signed transfer transaction for the subsequent usage.
+    /// Directly returns the signed mint nft transaction for the subsequent usage.
     pub async fn tx(self) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let recipient = self
             .recipient

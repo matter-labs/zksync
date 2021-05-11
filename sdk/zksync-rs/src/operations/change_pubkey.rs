@@ -41,7 +41,7 @@ where
         }
     }
 
-    /// Directly returns the signed transfer transaction for the subsequent usage.
+    /// Directly returns the signed change pubkey transaction for the subsequent usage.
     pub async fn tx(self) -> Result<ZkSyncTx, ClientError> {
         let fee_token = self
             .fee_token
