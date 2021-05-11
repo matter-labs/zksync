@@ -444,7 +444,7 @@ mod tests {
             ),
             (
                 ZkSyncOp::from(withdraw_nft_op.clone()),
-                CommitCost::WITHDRAW_COST,
+                CommitCost::WITHDRAW_NFT_COST,
             ),
             (
                 ZkSyncOp::from(mint_nft_op.clone()),
