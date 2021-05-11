@@ -53,6 +53,7 @@
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "publish-sources": "hardhat run --network env scripts/publish.ts",
     "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
+    "submit-signatures-regensis": "ts-node scripts/submit-signatures-regenesis.ts",
     "read-variable": "ts-node scripts/read-variable.ts"
   },
   "dependencies": {
