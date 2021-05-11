@@ -254,7 +254,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
         require(op.creatorAddress != address(0), "op"); // No NFT to withdraw
         NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
-        _factory.mintNFTFromZkSync(op.creatorAddress, op.receiver, op.serialId, op.contentHash, op.tokenId);
+        _factory.mintNFTFromZkSync{gas: WITHDRAWAL_NFT_GAS_LIMIT}(
+            op.creatorAddress,
+            op.receiver,
+            op.serialId,
+            op.contentHash,
+            op.tokenId
+        );
         // Save withdrawn nfts for future deposits
         withdrawnNFTs[op.tokenId] = address(_factory);
         emit WithdrawalNFT(op.tokenId);
@@ -389,7 +395,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function withdrawOrStoreNFT(Operations.WithdrawNFT memory op) internal {
         NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
         try
-            _factory.mintNFTFromZkSync{gas: WITHDRAWAL_GAS_LIMIT}(
+            _factory.mintNFTFromZkSync{gas: WITHDRAWAL_NFT_GAS_LIMIT}(
                 op.creatorAddress,
                 op.receiver,
                 op.serialId,
