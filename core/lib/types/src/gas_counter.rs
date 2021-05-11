@@ -22,8 +22,8 @@ impl CommitCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 40_000;
-    pub const DEPOSIT_COST: u64 = 7_700;
+    pub const BASE_COST: u64 = 51_000;
+    pub const DEPOSIT_COST: u64 = 7_000;
     // TODO: estimate after changepubkey gas cost estimation is fixed [ZKS-554]
     pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 25_000;
     pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 12_700;
@@ -91,7 +91,7 @@ impl VerifyCost {
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 10_000;
-    pub const DEPOSIT_COST: u64 = 50;
+    pub const DEPOSIT_COST: u64 = 100;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
@@ -99,8 +99,8 @@ impl VerifyCost {
     pub const FULL_EXIT_COST: u64 = 30_000;
     pub const WITHDRAW_COST: u64 = 48_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
-    pub const MINT_NFT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value
-    pub const WITHDRAW_NFT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value
+    pub const MINT_NFT_COST: u64 = 0;
+    pub const WITHDRAW_NFT_COST: u64 = 200_000;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
