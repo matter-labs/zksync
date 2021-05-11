@@ -132,15 +132,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         StoredBlockInfo memory lastBlockInfo;
         (lastBlockInfo) = abi.decode(upgradeParameters, (StoredBlockInfo));
-     //return;
+
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
 
-        return;
         RegenesisMultisig multisig = RegenesisMultisig($$(REGENESIS_MULTISIG_ADDRESS));
-        return;
         bytes32 oldRootHash = multisig.oldRootHash();
-        return;
         require(oldRootHash == lastBlockInfo.stateHash, "wqqe");
+        
         bytes32 newRootHash = multisig.newRootHash();
 
         // Overriding the old block's root hash with the new one

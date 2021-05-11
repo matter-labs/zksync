@@ -52,9 +52,9 @@ async function main() {
     console.log('Starting upgrade');
     console.log(wallet.address);
     console.log(await upgradeGatekeeper.getMaster());
-    await (
-        await upgradeGatekeeper.cancelUpgrade()
-    ).wait();
+    // await (
+    //     await upgradeGatekeeper.cancelUpgrade()
+    // ).wait();
     await (
         await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetFranklin.address], {
             gasLimit: 500000
