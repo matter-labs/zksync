@@ -13,7 +13,7 @@ use jsonrpc_http_server::ServerBuilder;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::{
-        block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
+        block::records::StorageBlockDetails, operations::records::StoredExecutedPriorityOperation,
         operations_ext::records::TxReceiptResponse,
     },
     ConnectionPool, StorageProcessor,
@@ -180,7 +180,7 @@ impl RpcApp {
         Ok(res)
     }
 
-    async fn get_block_info(&self, block_number: i64) -> Result<Option<BlockDetails>> {
+    async fn get_block_info(&self, block_number: i64) -> Result<Option<StorageBlockDetails>> {
         let start = Instant::now();
         let res = self
             .tx_sender

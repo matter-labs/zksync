@@ -1,9 +1,9 @@
-use anyhow::{ensure, format_err};
 use num::{BigUint, Zero};
 use std::time::Instant;
 use zksync_crypto::params::{max_account_id, max_fungible_token_id, max_token_id};
 use zksync_types::{AccountUpdates, Order, PubKeyHash, Swap, SwapOp};
 
+use crate::handler::error::SwapOpError;
 use crate::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
@@ -11,39 +11,43 @@ use crate::{
 
 impl TxHandler<Swap> for ZkSyncState {
     type Op = SwapOp;
+    type OpError = SwapOpError;
 
-    fn create_op(&self, tx: Swap) -> Result<Self::Op, anyhow::Error> {
+    fn create_op(&self, tx: Swap) -> Result<Self::Op, Self::OpError> {
         self.verify_order(&tx.orders.0)?;
         self.verify_order(&tx.orders.1)?;
-        ensure!(tx.submitter_id <= max_account_id(), "Account id is too big");
-        ensure!(
+        invariant!(
+            tx.submitter_id <= max_account_id(),
+            SwapOpError::AccountIncorrect
+        );
+        invariant!(
             tx.fee_token <= max_fungible_token_id(),
-            "Token is not supported"
+            SwapOpError::InvalidTokenId
         );
 
         let (submitter, submitter_account) = self
             .get_account_by_address(&tx.submitter_address)
-            .ok_or_else(|| format_err!("Submitter account does not exist"))?;
+            .ok_or(SwapOpError::SubmitterAccountNotFound)?;
 
-        ensure!(
+        invariant!(
             submitter_account.pub_key_hash != PubKeyHash::default(),
-            "Account is locked"
+            SwapOpError::AccountLocked
         );
-        ensure!(
+        invariant!(
             tx.verify_signature() == Some(submitter_account.pub_key_hash),
-            "Swap signature is incorrect"
+            SwapOpError::SwapInvalidSignature
         );
-        ensure!(
+        invariant!(
             submitter == tx.submitter_id,
-            "Submitter account_id or address is incorrect"
+            SwapOpError::SubmitterAccountIncorrect
         );
 
         let (recipient_0, _) = self
             .get_account_by_address(&tx.orders.0.recipient_address)
-            .ok_or_else(|| format_err!("Recipient account does not exist"))?;
+            .ok_or(SwapOpError::RecipientAccountNotFound)?;
         let (recipient_1, _) = self
             .get_account_by_address(&tx.orders.1.recipient_address)
-            .ok_or_else(|| format_err!("Recipient account does not exist"))?;
+            .ok_or(SwapOpError::RecipientAccountNotFound)?;
 
         Ok(SwapOp {
             tx: tx.clone(),
@@ -53,7 +57,7 @@ impl TxHandler<Swap> for ZkSyncState {
         })
     }
 
-    fn apply_tx(&mut self, tx: Swap) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, tx: Swap) -> Result<OpSuccess, SwapOpError> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<Swap>>::apply_op(self, &op)?;
@@ -67,60 +71,65 @@ impl TxHandler<Swap> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), SwapOpError> {
         self.apply_swap_op(&op)
     }
 }
 
 impl ZkSyncState {
-    fn verify_order(&self, order: &Order) -> anyhow::Result<()> {
-        ensure!(
-            order.account_id <= max_account_id(),
-            "Account id is too big"
+    fn verify_order(&self, order: &Order) -> Result<(), SwapOpError> {
+        invariant!(
+            order.token_buy <= max_token_id(),
+            SwapOpError::InvalidTokenId
         );
-        ensure!(order.token_buy <= max_token_id(), "Token is not supported");
-        ensure!(order.token_sell <= max_token_id(), "Token is not supported");
-        ensure!(
-            order.token_buy != order.token_sell,
-            "Can't swap tokens with equal IDs"
+        invariant!(
+            order.token_sell <= max_token_id(),
+            SwapOpError::InvalidTokenId
+        );
+        invariant!(
+            order.account_id <= max_account_id(),
+            SwapOpError::AccountIncorrect
         );
 
         let account = self
             .get_account(order.account_id)
-            .ok_or_else(|| format_err!("Account does not exist"))?;
+            .ok_or(SwapOpError::AccountIncorrect)?;
+        let _recipient = self
+            .get_account_by_address(&order.recipient_address)
+            .ok_or(SwapOpError::RecipientAccountNotFound)?;
 
-        ensure!(
+        invariant!(
             account.pub_key_hash != PubKeyHash::default(),
-            "Account is locked"
+            SwapOpError::AccountLocked
         );
-        ensure!(
+        invariant!(
             order.verify_signature() == Some(account.pub_key_hash),
-            "Order signature is incorrect"
+            SwapOpError::OrderInvalidSignature
         );
         Ok(())
     }
 
-    fn verify_swap_accounts(&self, swap: &Swap) -> anyhow::Result<()> {
+    fn verify_swap_accounts(&self, swap: &Swap) -> Result<(), SwapOpError> {
         let submitter = self.get_account(swap.submitter_id).unwrap();
 
-        ensure!(swap.nonce == submitter.nonce, "Nonce mismatch");
-        ensure!(
+        invariant!(swap.nonce == submitter.nonce, SwapOpError::NonceMismatch);
+        invariant!(
             submitter.get_balance(swap.fee_token) >= swap.fee,
-            "Not enough balance"
+            SwapOpError::InsufficientBalance
         );
 
         let verify_account = |order: &Order, amount: &BigUint| {
             let account = self.get_account(order.account_id).unwrap();
-            ensure!(order.nonce == account.nonce, "Nonce mismatch");
+            invariant!(order.nonce == account.nonce, SwapOpError::NonceMismatch);
             let necessary_amount =
                 if swap.submitter_id == order.account_id && swap.fee_token == order.token_sell {
                     amount + &swap.fee
                 } else {
                     amount.clone()
                 };
-            ensure!(
+            invariant!(
                 account.get_balance(order.token_sell) >= necessary_amount,
-                "Not enough balance"
+                SwapOpError::InsufficientBalance
             );
             Ok(())
         };
@@ -129,42 +138,46 @@ impl ZkSyncState {
         verify_account(&swap.orders.1, &swap.amounts.1)
     }
 
-    fn verify_swap(&self, swap: &Swap) -> anyhow::Result<()> {
-        ensure!(
+    fn verify_swap(&self, swap: &Swap) -> Result<(), SwapOpError> {
+        invariant!(
             swap.orders.0.token_buy == swap.orders.1.token_sell,
-            "Buy/Sell tokens do not match"
+            SwapOpError::BuySellNotMatched
         );
-        ensure!(
+        invariant!(
             swap.orders.1.token_buy == swap.orders.0.token_sell,
-            "Buy/Sell tokens do not match"
+            SwapOpError::BuySellNotMatched
         );
-        ensure!(
+        invariant!(
+            swap.orders.0.token_sell != swap.orders.1.token_sell,
+            SwapOpError::SwapSameToken
+        );
+        invariant!(
             swap.orders.0.amount.is_zero() || swap.orders.0.amount == swap.amounts.0,
-            "Amounts do not match"
+            SwapOpError::AmountsNotMatched
         );
-        ensure!(
+        invariant!(
             swap.orders.1.amount.is_zero() || swap.orders.1.amount == swap.amounts.1,
-            "Amounts do not match"
+            SwapOpError::AmountsNotMatched
         );
-        ensure!(
+        invariant!(
             swap.orders.0.account_id != swap.orders.1.account_id,
-            "Self-swap is not allowed"
+            SwapOpError::SelfSwap
         );
 
         let sold = &swap.amounts.0 * &swap.orders.0.price.1;
         let bought = &swap.amounts.1 * &swap.orders.0.price.0;
-        ensure!(sold <= bought, "Amounts are not compatible with prices");
+        invariant!(sold <= bought, SwapOpError::AmountsNotCompatible);
 
         let sold = &swap.amounts.1 * &swap.orders.1.price.1;
         let bought = &swap.amounts.0 * &swap.orders.1.price.0;
-        ensure!(sold <= bought, "Amounts are not compatible with prices");
+        invariant!(sold <= bought, SwapOpError::AmountsNotCompatible);
         Ok(())
     }
 
     fn apply_swap_op(
         &mut self,
         op: &SwapOp,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), SwapOpError> {
         let start = Instant::now();
 
         self.verify_swap(&op.tx)?;

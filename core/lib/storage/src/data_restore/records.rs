@@ -3,7 +3,7 @@ use serde_json::Value;
 // Workspace imports
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use zksync_types::{AccountId, Address, BlockNumber, TokenId, ZkSyncOp};
+use zksync_types::{AccountId, Address, BlockNumber, TokenId, ZkSyncOp, H256};
 // Workspace imports
 // Local imports
 
@@ -13,11 +13,13 @@ pub struct NewTokenEvent {
     pub id: TokenId,
 }
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone)]
 pub struct StoredRollupOpsBlock {
     pub block_num: BlockNumber,
     pub ops: Vec<ZkSyncOp>,
     pub fee_account: AccountId,
+    pub timestamp: Option<u64>,
+    pub previous_block_root_hash: H256,
 }
 
 // #[derive(Debug, Insertable, PartialEq)]
@@ -38,6 +40,8 @@ pub struct StoredZkSyncOp {
     pub block_num: i64,
     pub operation: Value,
     pub fee_account: i64,
+    pub timestamp: Option<i64>,
+    pub previous_block_root_hash: Option<Vec<u8>>,
 }
 
 impl StoredZkSyncOp {
@@ -50,6 +54,8 @@ pub struct NewZkSyncOp {
     pub block_num: i64,
     pub operation: Value,
     pub fee_account: i64,
+    pub timestamp: Option<i64>,
+    pub previous_block_root_hash: Option<Vec<u8>>,
 }
 
 impl NewZkSyncOp {
@@ -57,11 +63,15 @@ impl NewZkSyncOp {
         franklin_op: &ZkSyncOp,
         block: BlockNumber,
         fee_account: AccountId,
+        timestamp: Option<u64>,
+        previous_block_root_hash: Vec<u8>,
     ) -> Self {
         Self {
             block_num: i64::from(*block),
             operation: serde_json::to_value(franklin_op.clone()).unwrap(),
             fee_account: i64::from(*fee_account),
+            timestamp: timestamp.map(|t| t as i64),
+            previous_block_root_hash: Some(previous_block_root_hash),
         }
     }
 }

@@ -6,9 +6,14 @@ use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::{H256, U256};
 // Workspace imports
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
-use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
-use zksync_types::BlockNumber;
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    ethereum::{ETHOperation, InsertedOperationResponse},
+    event::{
+        account::AccountStateChangeStatus, block::BlockStatus, transaction::TransactionStatus,
+    },
+    BlockNumber,
+};
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
@@ -82,11 +87,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             );
 
             // If there is an operation, convert it to the `Operation` type.
-            let op = if let Some(raw_op) = raw_op {
-                Some(raw_op.into_aggregated_op())
-            } else {
-                None
-            };
+            let op = raw_op.map(|raw| raw.into_aggregated_op());
 
             // Convert the fields into expected format.
             let op_type = AggregatedActionType::from_str(eth_op.op_type.as_ref())
@@ -502,16 +503,50 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .await?;
 
         // If there is a ZKSync operation, mark it as confirmed as well.
-        sqlx::query!(
-            "
-            UPDATE aggregate_operations
-                SET confirmed = $1
-                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $2)",
-            true,
+        let aggregated_op = sqlx::query_as!(
+            StoredAggregatedOperation,
+            "SELECT * FROM aggregate_operations
+                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $1)",
             eth_op_id,
         )
-        .execute(transaction.conn())
+        .fetch_optional(transaction.conn())
         .await?;
+
+        if let Some(op) = &aggregated_op {
+            let (from_block, to_block) = (op.from_block as u32, op.to_block as u32);
+            let action_type = AggregatedActionType::from_str(&op.action_type).unwrap();
+            transaction
+                .chain()
+                .operations_schema()
+                .confirm_aggregated_operations(
+                    BlockNumber(from_block),
+                    BlockNumber(to_block),
+                    action_type,
+                )
+                .await?;
+
+            let status = AccountStateChangeStatus::try_from(action_type).ok();
+            if let Some(status) = status {
+                let block_status = BlockStatus::from(status);
+                let block_operations_status = TransactionStatus::from(status);
+                // Store events about the block, corresponding account updates and
+                // executed operations.
+                for block_number in from_block..=to_block {
+                    transaction
+                        .event_schema()
+                        .store_block_event(BlockNumber(block_number), block_status)
+                        .await?;
+                    transaction
+                        .event_schema()
+                        .store_state_updated_event(BlockNumber(block_number), status)
+                        .await?;
+                    transaction
+                        .event_schema()
+                        .store_transaction_event(BlockNumber(block_number), block_operations_status)
+                        .await?;
+                }
+            }
+        }
 
         transaction.commit().await?;
 
@@ -525,7 +560,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// This method expects the database to be initially prepared with inserting the actual
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
-    pub(crate) async fn get_next_nonce(&mut self) -> QueryResult<i64> {
+    #[doc = "hidden"]
+    pub async fn get_next_nonce(&mut self) -> QueryResult<i64> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -615,5 +651,29 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             .flatten();
 
         Ok(final_hash)
+    }
+
+    // Updates eth_parameters with given nonce and last block.
+    // It updates last_verified_block only if it is greater than given last block.
+    pub async fn update_eth_parameters(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        sqlx::query!(
+            "UPDATE eth_parameters SET last_verified_block = $1 WHERE id = true AND last_verified_block > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        transaction.commit().await?;
+
+        metrics::histogram!("sql.ethereum.update_eth_parameters", start.elapsed());
+        Ok(())
     }
 }

@@ -636,11 +636,12 @@ describe('zkSync test process next operation', function () {
         const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
         const fullExitAmount = parseEther('0.7');
         const accountId = 0x00faffaf;
+        const serialId = 0;
         const contentHash = '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996';
 
         await zksyncContract.requestFullExit(accountId, tokenContract.address);
         // construct full exit pubdata
-        const pubdata = Buffer.alloc(CHUNK_SIZE * 10, 0);
+        const pubdata = Buffer.alloc(CHUNK_SIZE * 11, 0);
         pubdata[0] = 0x06;
         let offset = 1;
         pubdata.writeUInt32BE(accountId, offset);
@@ -657,10 +658,13 @@ describe('zkSync test process next operation', function () {
             'hex'
         ).copy(pubdata, offset);
         offset += 16;
+        pubdata.writeUInt32BE(accountId, offset);
+        offset += 4;
         Buffer.from(wallet.address.substr(2), 'hex').copy(pubdata, offset);
         offset += 20;
+        pubdata.writeUInt32BE(serialId, offset);
+        offset += 4;
         Buffer.from(contentHash.substr(2), 'hex').copy(pubdata, offset);
-
         const blockData = newBlockDataFromPubdata(pubdata);
         blockData.onchainOperations.push({
             publicDataOffset: 0,
@@ -668,9 +672,7 @@ describe('zkSync test process next operation', function () {
         });
 
         const expectedHash = keccak256(ethers.utils.concat([EMPTY_KECCAK, pubdata]));
-
-        await zksyncContract.collectOnchainOpsExternal(blockData, expectedHash, 1, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-
+        await zksyncContract.collectOnchainOpsExternal(blockData, expectedHash, 1, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
         await zksyncContract.commitPriorityRequests();
     });
 

@@ -496,4 +496,101 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         });
         Ok(aggregated_op)
     }
+
+    // Removes ethereum unprocessed aggregated operations
+    pub async fn remove_eth_unprocessed_aggregated_ops(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!("TRUNCATE eth_unprocessed_aggregated_ops")
+            .execute(self.0.conn())
+            .await?;
+
+        metrics::histogram!(
+            "sql.chain.operations.remove_eth_unprocessed_aggregated_ops",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    // Removes executed priority operations for blocks with number greater than `last_block`
+    pub async fn remove_executed_priority_operations(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM executed_priority_operations WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.operations.remove_executed_priority_operations",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    // Removes aggregate operations and bindings for blocks with number greater than `last_block`
+    pub async fn remove_aggregate_operations_and_bindings(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        let op_ids: Vec<i64> = sqlx::query!(
+            "SELECT id FROM aggregate_operations WHERE from_block > $1",
+            *last_block as i64
+        )
+        .fetch_all(transaction.conn())
+        .await?
+        .into_iter()
+        .map(|record| record.id)
+        .collect();
+
+        let eth_op_ids: Vec<i64> = sqlx::query!(
+            "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
+            &op_ids
+        )
+        .fetch_all(transaction.conn())
+        .await?
+        .into_iter()
+        .map(|record| record.eth_op_id)
+        .collect();
+
+        sqlx::query!(
+            "DELETE FROM eth_tx_hashes WHERE eth_op_id = ANY($1)",
+            &eth_op_ids
+        )
+        .execute(transaction.conn())
+        .await?;
+        sqlx::query!(
+            "DELETE FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
+            &op_ids
+        )
+        .execute(transaction.conn())
+        .await?;
+        sqlx::query!("DELETE FROM eth_operations WHERE id = ANY($1)", &eth_op_ids)
+            .execute(transaction.conn())
+            .await?;
+        sqlx::query!(
+            "DELETE FROM aggregate_operations WHERE from_block > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        sqlx::query!(
+            "UPDATE aggregate_operations SET to_block = $1 WHERE to_block > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        transaction.commit().await?;
+
+        metrics::histogram!(
+            "sql.chain.operations.remove_aggregate_operations_and_bindings",
+            start.elapsed()
+        );
+        Ok(())
+    }
 }

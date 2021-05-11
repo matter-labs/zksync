@@ -52,6 +52,27 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
+    async ethSignSwap(swap: { fee: string; feeToken: string; nonce: number }): Promise<TxEthSignature> {
+        const message = this.getSwapEthSignMessage(swap);
+        return await this.getEthMessageSignature(message);
+    }
+
+    getSwapEthSignMessagePart(swap: { fee: string; feeToken: string }): string {
+        if (swap.fee != '0' && swap.fee) {
+            return `Swap fee: ${swap.fee} ${swap.feeToken}`;
+        }
+        return '';
+    }
+
+    getSwapEthSignMessage(swap: { fee: string; feeToken: string; nonce: number }): string {
+        let message = this.getSwapEthSignMessagePart(swap);
+        if (message != '') {
+            message += '\n';
+        }
+        message += `Nonce: ${swap.nonce}`;
+        return message;
+    }
+
     async ethSignForcedExit(forcedExit: {
         stringToken: string;
         stringFee: string;
@@ -62,7 +83,7 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
-    getMintEthEthSignMessage(mintNft: {
+    getMintNFTEthSignMessage(mintNft: {
         stringToken: string;
         stringFee: string;
         recipient: string;
@@ -176,7 +197,7 @@ export class EthMessageSigner {
         contentHash: string;
         nonce: number;
     }): Promise<TxEthSignature> {
-        const message = this.getMintEthEthSignMessage(mintNFT);
+        const message = this.getMintNFTEthSignMessage(mintNFT);
         return await this.getEthMessageSignature(message);
     }
 

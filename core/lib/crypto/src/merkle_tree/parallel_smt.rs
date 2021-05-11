@@ -1,13 +1,17 @@
 /// Sparse Merkle tree with batch updates
 use super::hasher::Hasher;
-use crate::ff::{PrimeField, PrimeFieldRepr};
-use crate::primitives::GetBits;
-use crate::Fr;
+use crate::{
+    ff::{PrimeField, PrimeFieldRepr},
+    primitives::GetBits,
+    Fr,
+};
 
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use std::sync::{RwLock, RwLockReadGuard};
+use std::{
+    fmt::Debug,
+    sync::{RwLock, RwLockReadGuard},
+};
 
 /// Nodes are indexed starting with index(root) = 0
 /// To store the index, at least 2 * TREE_HEIGHT bits is required.
@@ -91,11 +95,11 @@ where
 
         Self {
             items,
-            prehashed,
-            tree_depth,
             hasher,
+            tree_depth,
             root,
             nodes,
+            prehashed,
             cache,
         }
     }
@@ -523,8 +527,8 @@ where
         right: Option<NodeRef>,
     ) -> NodeRef {
         self.nodes.push(Node {
-            index,
             depth,
+            index,
             left,
             right,
         });

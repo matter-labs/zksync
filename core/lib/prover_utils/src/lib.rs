@@ -84,9 +84,9 @@ impl SetupForStepByStepProver {
             download_setup_file,
         )?);
         Ok(SetupForStepByStepProver {
-            setup_power_of_two,
             setup_polynomials,
             hints,
+            setup_power_of_two,
             key_monomial_form,
         })
     }

@@ -1,6 +1,5 @@
 use std::time::Instant;
 
-use anyhow::{bail, ensure, format_err};
 use num::BigUint;
 
 use zksync_crypto::params::{self, max_account_id};
@@ -9,37 +8,38 @@ use zksync_types::{
 };
 
 use crate::{
-    handler::TxHandler,
+    handler::{error::WithdrawNFTOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
 impl TxHandler<WithdrawNFT> for ZkSyncState {
     type Op = WithdrawNFTOp;
+    type OpError = WithdrawNFTOpError;
 
-    fn create_op(&self, tx: WithdrawNFT) -> Result<Self::Op, anyhow::Error> {
-        ensure!(
+    fn create_op(&self, tx: WithdrawNFT) -> Result<Self::Op, Self::OpError> {
+        invariant!(
             tx.token <= params::max_token_id() && tx.token >= TokenId(params::MIN_NFT_TOKEN_ID),
-            "Token id is not supported"
+            WithdrawNFTOpError::InvalidTokenId
         );
         let (account_id, account) = self
             .get_account_by_address(&tx.from)
-            .ok_or_else(|| format_err!("Account does not exist"))?;
-        ensure!(
+            .ok_or(WithdrawNFTOpError::FromAccountIncorrect)?;
+        invariant!(
             account.pub_key_hash != PubKeyHash::default(),
-            "Account is locked"
+            WithdrawNFTOpError::FromAccountLocked
         );
-        ensure!(
+        invariant!(
             tx.verify_signature() == Some(account.pub_key_hash),
-            "withdraw signature is incorrect"
+            WithdrawNFTOpError::InvalidSignature
         );
-        ensure!(
+        invariant!(
             account_id == tx.account_id,
-            "Withdraw account id is incorrect"
+            WithdrawNFTOpError::FromAccountIncorrect
         );
         if let Some(nft) = self.nfts.get(&tx.token) {
             let (creator_id, _creator_account) = self
                 .get_account_by_address(&nft.creator_address)
-                .ok_or_else(|| format_err!("Account does not exist"))?;
+                .ok_or(WithdrawNFTOpError::FromAccountNotFound)?;
             let withdraw_op = WithdrawNFTOp {
                 tx,
                 creator_id,
@@ -50,11 +50,11 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
 
             Ok(withdraw_op)
         } else {
-            bail!("NFT was not found")
+            Err(WithdrawNFTOpError::NFTNotFound)
         }
     }
 
-    fn apply_tx(&mut self, tx: WithdrawNFT) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, tx: WithdrawNFT) -> Result<OpSuccess, Self::OpError> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<WithdrawNFT>>::apply_op(self, &op)?;
@@ -68,15 +68,15 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), Self::OpError> {
         let start = Instant::now();
-        ensure!(
+        invariant!(
             op.tx.account_id <= max_account_id(),
-            "Withdraw account id is bigger than max supported"
+            WithdrawNFTOpError::FromAccountIncorrect
         );
-        ensure!(
+        invariant!(
             op.creator_id <= max_account_id(),
-            "Withdraw creator id is bigger than max supported"
+            WithdrawNFTOpError::CreatorAccountIncorrect
         );
 
         let mut updates = Vec::new();
@@ -85,10 +85,13 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
         let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
 
-        ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
-        ensure!(
+        invariant!(
+            op.tx.nonce == from_old_nonce,
+            WithdrawNFTOpError::NonceMismatch
+        );
+        invariant!(
             from_old_balance == BigUint::from(1u32),
-            "NFT balance is not correct"
+            WithdrawNFTOpError::InsufficientBalance
         );
 
         from_account.sub_balance(op.tx.token, &from_old_balance);
@@ -108,7 +111,11 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
         ));
 
         let from_old_balance = from_account.get_balance(op.tx.fee_token);
-        ensure!(from_old_balance >= op.tx.fee, "Not enough balance");
+
+        invariant!(
+            from_old_balance >= op.tx.fee,
+            WithdrawNFTOpError::InsufficientBalance
+        );
         from_account.sub_balance(op.tx.fee_token, &op.tx.fee);
         let from_new_balance = from_account.get_balance(op.tx.fee_token);
         // Pay fee

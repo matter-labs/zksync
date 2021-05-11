@@ -1,15 +1,14 @@
 use crate::Engine;
-use anyhow::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use zksync_crypto::franklin_crypto::{
-    alt_babyjubjub::{
-        fs::FsRepr,
-        JubjubEngine, {edwards, AltJubjubBn256},
+use thiserror::Error;
+use zksync_crypto::{
+    franklin_crypto::{
+        alt_babyjubjub::{edwards, fs::FsRepr, AltJubjubBn256, JubjubEngine},
+        bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
+        eddsa::Signature,
     },
-    bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
-    eddsa::Signature,
+    params::JUBJUB_PARAMS,
 };
-use zksync_crypto::params::JUBJUB_PARAMS;
 
 #[derive(Clone)]
 pub struct PackedSignature(pub Signature<Engine>);
@@ -25,23 +24,35 @@ impl PackedSignature {
         Ok(packed_signature.to_vec())
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(bytes.len() == 64, "Signature size mismatch");
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializeError> {
+        if bytes.len() != 64 {
+            return Err(DeserializeError::IncorrectSignatureLength);
+        }
         let (r_bar, s_bar) = bytes.split_at(32);
 
         let r = edwards::Point::read(r_bar, &JUBJUB_PARAMS as &AltJubjubBn256)
-            .map_err(|e| format_err!("Failed to restore R point from R_bar: {}", e.to_string()))?;
+            .map_err(DeserializeError::RestoreRPoint)?;
 
         let mut s_repr = FsRepr::default();
-        s_repr
-            .read_le(s_bar)
-            .map_err(|e| format_err!("s read err: {}", e.to_string()))?;
+        s_repr.read_le(s_bar).map_err(DeserializeError::ReadS)?;
 
-        let s = <Engine as JubjubEngine>::Fs::from_repr(s_repr)
-            .map_err(|e| format_err!("Failed to restore s scalar from s_bar: {}", e.to_string()))?;
+        let s =
+            <Engine as JubjubEngine>::Fs::from_repr(s_repr).map_err(DeserializeError::RestoreS)?;
 
         Ok(Self(Signature { r, s }))
     }
+}
+
+#[derive(Debug, Error)]
+pub enum DeserializeError {
+    #[error("Signature length should be 64 bytes")]
+    IncorrectSignatureLength,
+    #[error("Failed to restore R point from R_bar: {0}")]
+    RestoreRPoint(std::io::Error),
+    #[error("Cannot read S scalar: {0}")]
+    ReadS(std::io::Error),
+    #[error("Cannot restore S scalar: {0}")]
+    RestoreS(zksync_crypto::ff::PrimeFieldDecodingError),
 }
 
 impl Serialize for PackedSignature {

@@ -1,16 +1,17 @@
 use crate::{
     helpers::{pack_fee_amount, unpack_fee_amount},
-    Withdraw,
+    operations::error::WithdrawOpError,
+    AccountId, Address, Nonce, TokenId, Withdraw,
 };
-use crate::{AccountId, Address, Nonce, TokenId};
-use anyhow::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH,
-    FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH,
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
 };
-use zksync_crypto::primitives::FromBytes;
 
 /// Withdraw operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,11 +45,10 @@ impl WithdrawOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(
-            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
-            "Wrong bytes length for withdraw pubdata"
-        );
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, WithdrawOpError> {
+        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+            return Err(WithdrawOpError::PubdataSizeMismatch);
+        }
 
         let account_offset = 1;
         let token_id_offset = account_offset + ACCOUNT_ID_BIT_WIDTH / 8;
@@ -58,22 +58,22 @@ impl WithdrawOp {
 
         let account_id =
             u32::from_bytes(&bytes[account_offset..account_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get account id from withdraw pubdata"))?;
+                .ok_or(WithdrawOpError::CannotGetAccountId)?;
         let from = Address::zero(); // From pubdata it is unknown
         let token = u32::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-            .ok_or_else(|| format_err!("Cant get token id from withdraw pubdata"))?;
+            .ok_or(WithdrawOpError::CannotGetTokenId)?;
         let to = Address::from_slice(
             &bytes[eth_address_offset..eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8],
         );
         let amount = BigUint::from_u128(
             u128::from_bytes(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get amount from withdraw pubdata"))?,
+                .ok_or(WithdrawOpError::CannotGetAmount)?,
         )
         .unwrap();
         let fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
         )
-        .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
+        .ok_or(WithdrawOpError::CannotGetFee)?;
         let nonce = 0; // From pubdata it is unknown
         let time_range = Default::default();
 

@@ -42,6 +42,13 @@ export async function privateKeyToPubKeyHash(privateKey: Uint8Array): Promise<st
     return `sync:${utils.hexlify(_zks.private_key_to_pubkey_hash(privateKey)).substr(2)}`;
 }
 
+export async function rescueHashOrders(orders: Uint8Array): Promise<Uint8Array> {
+    await loadZkSyncCrypto();
+
+    const _zks = asmJs || zks;
+    return _zks.rescueHashOrders(orders);
+}
+
 let zksyncCryptoLoaded = false;
 export async function loadZkSyncCrypto(wasmFileUrl?: string) {
     if (zksyncCryptoLoaded) {

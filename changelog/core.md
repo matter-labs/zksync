@@ -15,6 +15,7 @@ All notable changes to the core components will be documented in this file.
   now.
 - (`api_server`): Make `submit_txs_batch` send only one signature request.
 - Fast withdrawals now can trigger aggregated block execution.
+- Replaced `anyhow` errors with typed errors in `lib/state`, `lib/crypto` and `lib/types`.
 
 ### Added
 
@@ -28,11 +29,14 @@ All notable changes to the core components will be documented in this file.
   ETHDirectClient.
 - (`api_server`): Support for accounts that don't have to pay fees (e.g. network service accounts) was added.
 - Added `BlockMetadata` structure and corresponding table to track block data that is not related to protocol.
+- (`block_revert`): CLI that calls `revertBlocks` smart contract function and updates the database respectively.
 
 ### Fixed
 
 - (`zksync_api`): Internal error with tokens not listed on CoinGecko.
 - Fix wrong block info cache behavior in the `api_server`.
+- Bug with gas price limit being used instead of average gas price when storing data to DB in gas adjuster.
+- `timeout` in ETH sender main loop was replaced with `tokio::time::delay_for`.
 
 ## Release 2021-02-19
 

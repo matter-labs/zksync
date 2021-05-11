@@ -1,4 +1,3 @@
-use anyhow::{ensure, Result};
 use std::collections::{HashMap, VecDeque};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External uses
@@ -38,6 +37,7 @@ use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
 };
+use zksync_state::error::{OpError, TxBatchError};
 
 #[cfg(test)]
 mod tests;
@@ -280,6 +280,19 @@ impl ZkSyncStateInitParams {
                 }
             }
         }
+
+        // We have to load actual number of the last committed block, since above we load the block number from state,
+        // and in case of empty block being sealed (that may happen because of bug).
+        // Note that if this block is greater than the `block_number`, it means that some empty blocks were committed,
+        // so the root hash has not changed and we don't need to update the tree in order to get the right root hash.
+        let last_actually_committed_block_number = storage
+            .chain()
+            .block_schema()
+            .get_last_saved_block()
+            .await?;
+
+        let block_number = std::cmp::max(last_actually_committed_block_number, block_number);
+
         if *block_number != 0 {
             let storage_root_hash = storage
                 .chain()
@@ -293,6 +306,7 @@ impl ZkSyncStateInitParams {
                 "restored root_hash is different"
             );
         }
+
         Ok(block_number)
     }
 
@@ -781,7 +795,7 @@ impl ZkSyncStateKeeper {
         &mut self,
         tx: ZkSyncTx,
         block_timestamp: u64,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), OpError> {
         let time_range = match tx {
             ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
             ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
@@ -792,10 +806,9 @@ impl ZkSyncStateKeeper {
             ZkSyncTx::Swap(tx) => tx.time_range(),
             ZkSyncTx::WithdrawNFT(tx) => tx.time_range,
         };
-        ensure!(
-            time_range.is_valid(block_timestamp),
-            "The transaction can't be executed in the block because of an invalid timestamp"
-        );
+        if !time_range.is_valid(block_timestamp) {
+            return Err(OpError::TimestampError);
+        }
         Ok(())
     }
 
@@ -803,19 +816,17 @@ impl ZkSyncStateKeeper {
         &mut self,
         txs: &[SignedZkSyncTx],
         block_timestamp: u64,
-    ) -> Vec<Result<OpSuccess, anyhow::Error>> {
+    ) -> Vec<Result<OpSuccess, TxBatchError>> {
         for (id, tx) in txs.iter().enumerate() {
             if let Err(error) = self.check_transaction_timestamps(tx.tx.clone(), block_timestamp) {
-                // Create message for an error.
-                let error_msg = format!(
-                    "Batch execution failed, since tx #{} of batch failed with a reason: {}",
-                    id + 1,
-                    error
-                );
-
                 // Create the same error for each transaction.
                 let errors = (0..txs.len())
-                    .map(|_| Err(anyhow::format_err!("{}", error_msg)))
+                    .map(|_| {
+                        Err(TxBatchError {
+                            failed_tx_index: id + 1,
+                            reason: error.clone(),
+                        })
+                    })
                     .collect();
 
                 // Stop execution and return an error.
@@ -826,11 +837,7 @@ impl ZkSyncStateKeeper {
         self.state.execute_txs_batch(txs)
     }
 
-    fn execute_tx(
-        &mut self,
-        tx: ZkSyncTx,
-        block_timestamp: u64,
-    ) -> Result<OpSuccess, anyhow::Error> {
+    fn execute_tx(&mut self, tx: ZkSyncTx, block_timestamp: u64) -> Result<OpSuccess, OpError> {
         self.check_transaction_timestamps(tx.clone(), block_timestamp)?;
 
         self.state.execute_tx(tx)
@@ -843,6 +850,7 @@ impl ZkSyncStateKeeper {
     ) -> Result<Vec<ExecutedOperations>, ()> {
         metrics::gauge!("tx_batch_size", txs.len() as f64);
         let start = Instant::now();
+
         let chunks_needed = self.state.chunks_for_batch(txs);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
@@ -851,28 +859,42 @@ impl ZkSyncStateKeeper {
             return Err(());
         }
 
-        for tx in txs {
-            // Check if adding this transaction to the block won't make the contract operations
-            // too expensive.
-            let non_executed_op = self.state.zksync_tx_to_zksync_op(tx.tx.clone());
-            if let Ok(non_executed_op) = non_executed_op {
-                // We only care about successful conversions, since if conversion failed,
-                // then transaction will fail as well (as it shares the same code base).
-                if self
-                    .pending_block
-                    .gas_counter
-                    .add_op(&non_executed_op)
-                    .is_err()
-                {
-                    // We've reached the gas limit, seal the block.
-                    // This transaction will go into the next one.
-                    return Err(());
-                }
+        let ops: Vec<_> = txs
+            .iter()
+            .filter_map(|tx| self.state.zksync_tx_to_zksync_op(tx.tx.clone()).ok())
+            .collect();
+
+        let mut executed_operations = Vec::new();
+
+        // If batch doesn't fit into an empty block than we should mark it as failed.
+        if !GasCounter::batch_fits_into_empty_block(&ops) {
+            let fail_reason = "Amount of gas required to process batch is too big".to_string();
+            vlog::warn!("Failed to execute batch: {}", fail_reason);
+            for tx in txs {
+                let failed_tx = ExecutedTx {
+                    signed_tx: tx.clone(),
+                    success: false,
+                    op: None,
+                    fail_reason: Some(fail_reason.clone()),
+                    block_index: None,
+                    created_at: chrono::Utc::now(),
+                    batch_id: Some(batch_id),
+                };
+                self.pending_block.failed_txs.push(failed_tx.clone());
+                let exec_result = ExecutedOperations::Tx(Box::new(failed_tx));
+                executed_operations.push(exec_result);
             }
+            metrics::histogram!("state_keeper.apply_batch", start.elapsed());
+            return Ok(executed_operations);
+        }
+
+        // If we can't add the tx to the block due to the gas limit, we return this tx,
+        // seal the block and execute it again.
+        if !self.pending_block.gas_counter.can_include(&ops) {
+            return Err(());
         }
 
         let all_updates = self.execute_txs_batch(txs, self.pending_block.timestamp);
-        let mut executed_operations = Vec::new();
 
         for (tx, tx_updates) in txs.iter().zip(all_updates) {
             match tx_updates {
@@ -881,6 +903,11 @@ impl ZkSyncStateKeeper {
                     mut updates,
                     executed_op,
                 }) => {
+                    self.pending_block
+                        .gas_counter
+                        .add_op(&executed_op)
+                        .expect("We have already checked that we can include this tx");
+
                     self.pending_block.chunks_left -= executed_op.chunks();
                     self.pending_block.account_updates.append(&mut updates);
                     if let Some(fee) = fee {
@@ -941,11 +968,10 @@ impl ZkSyncStateKeeper {
         if let Ok(non_executed_op) = non_executed_op {
             // We only care about successful conversions, since if conversion failed,
             // then transaction will fail as well (as it shares the same code base).
-            if self
+            if !self
                 .pending_block
                 .gas_counter
-                .add_op(&non_executed_op)
-                .is_err()
+                .can_include(&[non_executed_op])
             {
                 // We've reached the gas limit, seal the block.
                 // This transaction will go into the next one.
@@ -968,6 +994,11 @@ impl ZkSyncStateKeeper {
                 mut updates,
                 executed_op,
             }) => {
+                self.pending_block
+                    .gas_counter
+                    .add_op(&executed_op)
+                    .expect("We have already checked that we can include this tx");
+
                 self.pending_block.chunks_left -= chunks_needed;
                 self.pending_block.account_updates.append(&mut updates);
                 if let Some(fee) = fee {

@@ -30,9 +30,10 @@ describe('NFTFactory unit tests', function () {
         // The test checks the ability to mint NFT from allowed contract
         const address = await wallet2.getAddress();
         nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet1);
-        await nftFactory.mintNFT(
+        await nftFactory.mintNFTFromZkSync(
             address,
             address,
+            10,
             '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996',
             10
         );
@@ -44,9 +45,10 @@ describe('NFTFactory unit tests', function () {
         nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet2);
         const address = await wallet2.getAddress();
         const { revertReason } = await getCallRevertReason(() =>
-            nftFactory.mintNFT(
+            nftFactory.mintNFTFromZkSync(
                 address,
                 address,
+                10,
                 '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996',
                 10
             )

@@ -1,4 +1,4 @@
-use anyhow::ensure;
+use crate::operations::error::NoopOpError;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::AccountId;
 use zksync_crypto::params::CHUNK_BYTES;
@@ -11,11 +11,10 @@ impl NoopOp {
     pub const CHUNKS: usize = 1;
     pub const OP_CODE: u8 = 0x00;
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(
-            bytes == [0; CHUNK_BYTES],
-            format!("Wrong pubdata for noop operation {:?}", bytes)
-        );
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, NoopOpError> {
+        if bytes != [0; CHUNK_BYTES] {
+            return Err(NoopOpError::IncorrectPubdata);
+        }
         Ok(Self {})
     }
 

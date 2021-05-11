@@ -7,8 +7,8 @@ use zksync_basic_types::{AccountId, Address};
 use crate::{
     operations::{ChangePubKeyOp, MintNFTOp},
     tx::{
-        ChangePubKey, Close, ForcedExit, MintNFT, Swap, Transfer, TxEthSignature, TxHash, Withdraw,
-        WithdrawNFT,
+        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, MintNFT, Swap, Transfer,
+        TxEthSignature, TxHash, Withdraw, WithdrawNFT,
     },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
@@ -138,7 +138,7 @@ impl ZkSyncTx {
         }
     }
 
-    pub fn account_id(&self) -> anyhow::Result<AccountId> {
+    pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ZkSyncTx::Transfer(tx) => Ok(tx.account_id),
             ZkSyncTx::Withdraw(tx) => Ok(tx.account_id),
@@ -147,7 +147,7 @@ impl ZkSyncTx {
             ZkSyncTx::MintNFT(tx) => Ok(tx.creator_id),
             ZkSyncTx::Swap(tx) => Ok(tx.submitter_id),
             ZkSyncTx::WithdrawNFT(tx) => Ok(tx.account_id),
-            ZkSyncTx::Close(_) => Err(anyhow::anyhow!("Close operations are disabled")),
+            ZkSyncTx::Close(_) => Err(CloseOperationsDisabled()),
         }
     }
 

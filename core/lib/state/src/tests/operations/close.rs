@@ -15,5 +15,5 @@ fn expected_fail() {
         time_range: Default::default(),
     };
 
-    tb.test_tx_fail(close.into(), "Account closing is disabled");
+    tb.test_tx_fail(close.into(), "Close operations are disabled");
 }

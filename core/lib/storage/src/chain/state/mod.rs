@@ -6,7 +6,8 @@ use sqlx::types::BigDecimal;
 // Workspace imports
 use zksync_types::{
     helpers::{apply_updates, reverse_updates},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PubKeyHash, TokenId, NFT,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, Address, BlockNumber, PubKeyHash,
+    TokenId, NFT,
 };
 // Local imports
 use crate::chain::{
@@ -17,7 +18,6 @@ use crate::diff::StorageAccountDiff;
 use crate::utils::address_to_stored_string;
 // use crate::schema::*;
 use crate::{QueryResult, StorageProcessor};
-use zksync_basic_types::Address;
 
 /// State schema is capable of managing... well, the state of the chain.
 ///
@@ -63,6 +63,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 **id,
                 *block_number
             );
+
             match *upd {
                 AccountUpdate::Create { ref address, nonce } => {
                     let account_id = i64::from(**id);
@@ -675,5 +676,59 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 .await
         };
         Ok(tokens?)
+    }
+
+    // Removes account balance updates for blocks with number greater than `last_block`
+    pub async fn remove_account_balance_updates(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM account_balance_updates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.state.remove_account_balance_updates",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    // Removes account creates for blocks with number greater than `last_block`
+    pub async fn remove_account_creates(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM account_creates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.state.remove_account_creates", start.elapsed());
+        Ok(())
+    }
+
+    // Removes account pubkey updates for blocks with number greater than `last_block`
+    pub async fn remove_account_pubkey_updates(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM account_pubkey_updates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.state.remove_account_pubkey_updates",
+            start.elapsed()
+        );
+        Ok(())
     }
 }

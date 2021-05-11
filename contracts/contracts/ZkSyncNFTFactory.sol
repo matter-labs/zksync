@@ -18,7 +18,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         _zkSyncAddress = zkSyncAddress;
     }
 
-    function mintNFT(
+    function mintNFTFromZkSync(
         address creator,
         address recipient,
         uint32 serialId,
@@ -29,7 +29,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         _safeMint(recipient, tokenId);
         _contentHashes[tokenId] = contentHash;
 
-        emit MintNFT(creator, recipient, serialId, contentHash, tokenId);
+        emit MintNFTFromZkSync(creator, recipient, serialId, contentHash, tokenId);
     }
 
     function _beforeTokenTransfer(

@@ -17,6 +17,8 @@ components, the logs will have the following format:
 
 - (`token_list_manager`): CLI for updating to new version of a previously saved list of trusted tokens.
 
+- (`loadnext`): Crate, a new implementation of the loadtest for zkSync.
+
 ### Fixed
 
 ## Release 2021-02-19

@@ -230,6 +230,7 @@ export class Provider {
             | 'Transfer'
             | 'FastWithdraw'
             | 'MintNFT'
+            | 'Swap'
             | ChangePubKeyFee
             | LegacyChangePubKeyFee
             | 'WithdrawNFT'
@@ -258,6 +259,7 @@ export class Provider {
             | 'MintNFT'
             | 'WithdrawNFT'
             | 'FastWithdrawNFT'
+            | 'Swap'
         )[],
         addresses: Address[],
         tokenLike: TokenLike
