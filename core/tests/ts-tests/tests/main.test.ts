@@ -86,7 +86,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a mintNFT', async () => {
-        await tester.testMintNFT(alice, chuck, '0x' + ''.padStart(64, "0"), token);
+        await tester.testMintNFT(alice, chuck, '0x' + ''.padStart(64, "0"), token, true);
     });
 
     step('should execute a transfer to existing account', async () => {
@@ -108,9 +108,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should test multi-transfers', async () => {
-        if (onlyBasic) {
-            return;
-        }
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
@@ -162,9 +159,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a ForcedExit', async () => {
-        if (onlyBasic) {
-            return;
-        }
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
 

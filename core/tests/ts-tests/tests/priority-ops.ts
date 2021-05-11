@@ -44,7 +44,7 @@ Tester.prototype.testFullExit = async function (wallet: Wallet, token: TokenLike
 Tester.prototype.testFullExitNFT = async function (wallet: Wallet, accountId?: number) {
     const state = await wallet.getAccountState();
     let nft: any = Object.values(state.verified.nfts)[0];
-
+    expect(nft !== undefined);
     const balanceBefore = await wallet.getNFT(nft.id);
     expect(balanceBefore.id == nft.id, 'Account does not have an NFT initially').to.be.true;
 

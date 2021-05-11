@@ -54,13 +54,13 @@ Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet
 Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wallet, feeToken: TokenLike) {
     const fee = await this.syncProvider.getTransactionsBatchFee(
         ['Transfer', 'Transfer'],
-        [receiver.address(), receiver.address()],
+        [sender.address(), receiver.address()],
         feeToken
     );
 
     const state = await sender.getAccountState();
     let nft: any = Object.values(state.verified.nfts)[0];
-
+    expect(nft !== undefined);
     const senderBefore = await sender.getNFT(nft.id);
     const receiverBefore = await receiver.getNFT(nft.id);
     const handles = await sender.syncTransferNFT({

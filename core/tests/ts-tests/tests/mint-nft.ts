@@ -48,7 +48,8 @@ Tester.prototype.testMintNFT = async function (
     expect(balanceBefore.sub(balanceAfter).eq(fee), 'Wrong amount in wallet after withdraw').to.be.true;
     const state = await receiver.getAccountState();
     const nft: any = Object.values(state.committed.nfts)[0];
-    expect(nft.contentHash).eq(contentHash);
+    expect(nft !== undefined);
+    expect(nft.contentHash == contentHash).to.be.true;
 
     this.runningFee = this.runningFee.add(fee);
     return handle;
