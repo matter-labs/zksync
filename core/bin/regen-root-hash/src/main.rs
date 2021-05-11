@@ -27,7 +27,7 @@ pub struct Params {
     pub current_root_hash: Option<String>,
 
     /// A flag to tell that we want to migrate the db
-    #[structopt(short = "d")]
+    #[structopt(long = "db-migrate")]
     pub db_migrate: bool,
 
     /// A flag that indicates that the new tree will not be
