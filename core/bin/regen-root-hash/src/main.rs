@@ -17,14 +17,14 @@ use zksync_circuit::witness::utils::fr_from_bytes;
 use hasher::{get_state, verify_accounts_equal, verify_identical_trees};
 use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
 
-use crate::db_migrate::migrage_db_for_nft;
+use crate::db_migrate::{get_last_block_info, migrage_db_for_nft};
 use crate::{db_migrate::read_accounts_from_db, utils::get_message_to_sign};
 
 #[derive(Debug, StructOpt)]
 pub struct Params {
     /// The current root hash (balance subtree depth 11)
     #[structopt(short = "h", env = "CURRENT_ROOT_HASH")]
-    pub current_root_hash: String,
+    pub current_root_hash: Option<String>,
 
     /// A flag to tell that we want to migrate the db
     #[structopt(short = "d")]
@@ -34,6 +34,10 @@ pub struct Params {
     /// double-checked. Shoult NOT be used in production
     #[structopt(long = "no-double-check")]
     pub no_double_check: bool,
+
+    /// Only retrieve StoredBlockInfo about the last block
+    #[structopt(long = "last-block-info")]
+    pub last_block_info: bool,
 
     /// The path to the JSON dump of the accounts table
     #[structopt(short = "a", env = "ACCOUNTS_DUMP")]
@@ -52,6 +56,14 @@ pub struct Params {
 async fn main() -> anyhow::Result<()> {
     let params = Params::from_args();
 
+    if params.last_block_info {
+        let last_block_info = get_last_block_info().await?;
+        println!("{}", last_block_info);
+        return Ok(());
+    }
+
+    let current_root_hash = params.current_root_hash.unwrap();
+
     let accounts = if params.db_migrate {
         read_accounts_from_db().await?
     } else {
@@ -64,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
         read_accounts(accounts_dump, balances_dump)?
     };
 
-    let current_hash_bytes = hex::decode(params.current_root_hash).unwrap();
+    let current_hash_bytes = hex::decode(current_root_hash).unwrap();
     let current_hash_fr = fr_from_bytes(current_hash_bytes);
 
     let old_tree = get_state::<CircuitAccountDepth11>(&accounts);

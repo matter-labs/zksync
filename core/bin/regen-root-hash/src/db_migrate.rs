@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use zksync_crypto::{
@@ -19,6 +20,8 @@ use zksync_storage::{
     BigDecimal,
 };
 use zksync_types::{Account, AccountUpdate, BlockNumber, Token};
+
+use crate::utils::fr_to_hex;
 
 pub async fn get_verified_block_number(
     storage: &mut StorageProcessor<'_>,
@@ -275,4 +278,50 @@ pub async fn migrage_db_for_nft(past_root_hash: Fr, root_hash: Fr) -> anyhow::Re
     println!("DB migration complete.");
 
     Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredBlockInfo {
+    block_number: u32,
+    priority_operations: u64,
+    pending_onchain_operations_hash: String,
+    timestamp: u64,
+    state_hash: String,
+    commitment: String,
+}
+
+pub async fn get_last_block_info() -> anyhow::Result<String> {
+    let mut storage_processor = StorageProcessor::establish_connection().await?;
+
+    let last_block_number = get_verified_block_number(&mut storage_processor).await?;
+
+    let block = storage_processor
+        .chain()
+        .block_schema()
+        .get_block(last_block_number)
+        .await?
+        .unwrap();
+
+    let priority_op_hash = block
+        .get_onchain_operations_block_info()
+        .1
+        .as_bytes()
+        .to_vec();
+    let priority_op_hash = hex::encode(&priority_op_hash);
+
+    let commitment_str = hex::encode(block.block_commitment.as_bytes());
+
+    let last_block_info = StoredBlockInfo {
+        block_number: *block.block_number,
+        priority_operations: block.number_of_processed_prior_ops(),
+        pending_onchain_operations_hash: format!("0x{}", priority_op_hash),
+        timestamp: block.timestamp,
+        state_hash: format!("0x{}", fr_to_hex(block.new_root_hash)),
+        commitment: format!("0x{}", commitment_str),
+    };
+
+    let info_str = serde_json::ser::to_string(&last_block_info)?;
+
+    Ok(info_str)
 }
