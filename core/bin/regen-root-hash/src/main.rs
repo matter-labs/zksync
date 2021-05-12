@@ -63,6 +63,8 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let current_root_hash = params.current_root_hash.unwrap();
+    // Removing 0x...
+    let current_root_hash = current_root_hash[2..].to_owned();
 
     let accounts = if params.db_migrate {
         read_accounts_from_db().await?
@@ -115,6 +117,7 @@ async fn main() -> anyhow::Result<()> {
         println!("\nSigning prefixed message: {}", message_to_sign);
 
         let private_key = params.private_key.expect("Private key should be supplied");
+        let private_key = private_key[2..].to_owned();
         let signature = sign_message(private_key, message_to_sign);
         println!("\nSignature: 0x{}", signature);
     }

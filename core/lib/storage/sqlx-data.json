@@ -504,16 +504,6 @@
       ]
     }
   },
-  "0e87e9e74e0f718229b45f1a293dd181135b9fb22b489ef558a30e588973ba01": {
-    "query": "\n            DELETE FROM account_tree_cache \n            WHERE true\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": []
-    }
-  },
   "0fb38a8f186b2b0a2b3d608bf43b111876e16bafe8e10ad9078b5066908ea0cf": {
     "query": "DELETE FROM proofs WHERE block_number > $1",
     "describe": {
@@ -5609,6 +5599,18 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "f5bb5886974577c7f43179f77638507511ffbe1462bb75844a1f1c72414a4d83": {
+    "query": "\n            DELETE FROM account_tree_cache \n            WHERE block = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {

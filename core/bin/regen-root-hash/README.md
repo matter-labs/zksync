@@ -14,7 +14,7 @@ Note that the re-verification process is computation heavy, so running under `re
 using the tool:
 
 ```sh
-> cargo run --release -- -a ./sample/accounts -b ./sample/balances -h 2bd61f42837c0fa77fc113b3b341c520edb1ffadefc48c2b907901aaaf42b906 -p d03f45dc6e06aa9a0fc53189a2a89561c42dc4ffffc13881d64401cd0beb604a
+> cargo run --release -- -a ./sample/accounts -b ./sample/balances -h 0x2bd61f42837c0fa77fc113b3b341c520edb1ffadefc48c2b907901aaaf42b906 -p 0xd03f45dc6e06aa9a0fc53189a2a89561c42dc4ffffc13881d64401cd0beb604a
 
 OldHash: 0x2bd61f42837c0fa77fc113b3b341c520edb1ffadefc48c2b907901aaaf42b906
 NewHash: 0x2a9b50e17ece607c8c88b1833426fd9e60332685b94a1534fcf26948e373604c
