@@ -198,7 +198,6 @@ impl<W: EthClient> EthWatch<W> {
             new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
         let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
-
         let priority_queue = self
             .client
             .get_priority_op_events(

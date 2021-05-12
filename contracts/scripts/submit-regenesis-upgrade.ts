@@ -3,10 +3,8 @@ import { deployContract } from 'ethereum-waffle';
 import { constants, ethers } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
-import { web3Provider } from './utils';
+import { web3Provider, storedBlockInfoParam } from './utils';
 import { readProductionContracts } from '../src.ts/deploy';
-
-const { expect } = require('chai');
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
@@ -18,19 +16,18 @@ async function main() {
         addHelp: true,
         description: 'Contract upgrade'
     });
-    parser.addArgument('contractAddress');
-    parser.addArgument('upgradeGatekeeperAddress');
+    parser.addArgument('--masterPrivateKey');
+    parser.addArgument('--upgradeGatekeeperAddress');
+    parser.addArgument('--lastBlockInfo');
     const args = parser.parseArgs(process.argv.slice(2));
-    if (process.env.CHAIN_ETH_NETWORK !== 'test') {
-        console.log('Upgrading test contract not on test network is not allowed');
-        process.exit(1);
-    }
+
+    const lastBlockInfo = JSON.parse(args.lastBlockInfo);
+    const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [lastBlockInfo]);
 
     const provider = web3Provider();
-
-    const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
-
-    const proxyContract = new ethers.Contract(args.contractAddress, testContracts.proxy.abi, wallet);
+    const wallet = args.masterPrivateKey
+        ? new ethers.Wallet(args.masterPrivateKey).connect(provider)
+        : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
     const upgradeGatekeeper = new ethers.Contract(
         args.upgradeGatekeeperAddress,
@@ -38,13 +35,19 @@ async function main() {
         wallet
     );
 
-    const newTargetFranklin = await deployContract(wallet, testContracts.zkSync, [], {
+    const newTargetZkSync = await deployContract(wallet, testContracts.zkSync, [], {
+        gasLimit: 6500000
+    });
+
+    const newTargetGov = await deployContract(wallet, testContracts.governance, [], {
         gasLimit: 6500000
     });
 
     console.log('Starting upgrade');
     await (
-        await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetFranklin.address])
+        await upgradeGatekeeper.startUpgrade([newTargetGov.address, constants.AddressZero, newTargetZkSync.address], {
+            gasLimit: 500000
+        })
     ).wait();
 
     // wait notice period
@@ -55,10 +58,9 @@ async function main() {
     }
 
     console.log('Finish upgrade notice period');
+    //  console.log(await proxyContract.exodusMode());
     // finish upgrade
-    await (await upgradeGatekeeper.finishUpgrade([[], [], []], { gasLimit: 300000 })).wait();
-
-    await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
+    await (await upgradeGatekeeper.finishUpgrade([[], [], encodedStoredBlockInfo], { gasLimit: 3000000 })).wait();
 }
 
 main()
