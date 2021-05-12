@@ -13,6 +13,8 @@ use zksync_types::Account;
 pub static BALANCE_TREE_32: Lazy<CircuitBalanceTree> = Lazy::new(|| SparseMerkleTree::new(32));
 pub static BALANCE_TREE_11: Lazy<CircuitBalanceTree> = Lazy::new(|| SparseMerkleTree::new(11));
 
+pub const NUMBER_OF_OLD_TOKENS: u32 = 2u32.pow(11);
+
 pub type CustomMerkleTree<T> = SparseMerkleTree<T, Fr, RescueHasher<Engine>>;
 
 pub fn get_state<T: CircuitAccountWrapper>(accounts: &[(i64, Account)]) -> CustomMerkleTree<T> {
@@ -104,14 +106,12 @@ pub fn verify_accounts_equal<T: CircuitAccountWrapper, S: CircuitAccountWrapper>
         ));
     }
 
-    // It is better to hardcode the account tree depth in one place
-    // the to create a function which takes this as a param and returns another function
-    let elements_to_check = 2u32.pow(11);
-
     verify_identical_trees(
         &first_account.subtree,
         &second_account.subtree,
-        elements_to_check,
+        // It is better to hardcode the account tree size in one place
+        // than to create a function which takes this as a param and returns another function
+        NUMBER_OF_OLD_TOKENS,
         verify_identical_balances,
     )
     .map_err(|err| anyhow::format_err!("Account {}: {}", index, err))?;

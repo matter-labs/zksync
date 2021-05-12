@@ -25,9 +25,8 @@ pub fn get_balance_tree(depth: usize) -> CircuitBalanceTree {
         _ => panic!("Depth {} is not supported", depth),
     }
 }
-// Unfortunately we need to reimplement the structs for CircuitAccount
-// using macros as the implementaion of Default() is very important in calculating
-// the hash
+
+// Unfortunately we need to reimplement the structs for CircuitAccount for different tree depths
 macro_rules! custom_circuit_account {
     ($(#[$attr:meta])* $name:ident, $balance_tree:literal) => {
         $(#[$attr])*

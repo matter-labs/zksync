@@ -754,7 +754,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     // This method does not have metrics, since it is used only for the
     // migration for the nft regenesis.
     // Remove this function once the regenesis is complete and the tool is not
-    // neded anymore: ZKS-663
+    // needed anymore: ZKS-663
     pub async fn change_block_root_hash(
         &mut self,
         block_number: BlockNumber,
@@ -827,7 +827,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     // This method does not have metrics, since it is used only for the
     // migration for the nft regenesis.
     // Remove this function once the regenesis is complete and the tool is not
-    // neded anymore: ZKS-663
+    // needed anymore: ZKS-663
     pub async fn reset_account_tree_cache(&mut self) -> QueryResult<()> {
         sqlx::query!(
             "
