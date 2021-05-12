@@ -168,7 +168,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a transfer NFT', async () => {
-        await tester.testTransferNFT(chuck, alice, token);
+        await tester.testTransferNFT(alice, chuck, token);
     });
 
     step('should execute a forced exit', async () => {
