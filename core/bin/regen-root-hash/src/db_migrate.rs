@@ -21,7 +21,7 @@ use zksync_storage::{
 };
 use zksync_types::{Account, AccountUpdate, BlockNumber, Token};
 
-use crate::utils::fr_to_hex;
+use crate::{account::CircuitAccountWrapper, hasher::CustomMerkleTree, utils::fr_to_hex};
 
 pub async fn get_verified_block_number(
     storage: &mut StorageProcessor<'_>,
@@ -240,7 +240,10 @@ pub async fn insert_nft_account(
     Ok(())
 }
 
-pub async fn migrage_db_for_nft(past_root_hash: Fr, root_hash: Fr) -> anyhow::Result<()> {
+pub async fn migrage_db_for_nft<T: CircuitAccountWrapper>(
+    past_root_hash: Fr,
+    new_tree: CustomMerkleTree<T>,
+) -> anyhow::Result<()> {
     let mut storage_processor = StorageProcessor::establish_connection().await?;
     let mut transaction = storage_processor.start_transaction().await?;
 
@@ -258,10 +261,13 @@ pub async fn migrage_db_for_nft(past_root_hash: Fr, root_hash: Fr) -> anyhow::Re
     );
 
     println!("The last block's hash is correct. Setting the new root hash...");
+
+    let new_root_hash = new_tree.root_hash();
+
     transaction
         .chain()
         .block_schema()
-        .change_block_root_hash(block_number, root_hash)
+        .change_block_root_hash(block_number, new_root_hash)
         .await?;
 
     println!("The new root hash is set. Inserting nft account.");
@@ -271,7 +277,15 @@ pub async fn migrage_db_for_nft(past_root_hash: Fr, root_hash: Fr) -> anyhow::Re
     transaction
         .chain()
         .block_schema()
-        .reset_account_tree_cache()
+        .reset_account_tree_cache(block_number)
+        .await?;
+
+    let tree_cache = new_tree.get_internals();
+    let tree_cache = serde_json::to_value(tree_cache)?;
+    transaction
+        .chain()
+        .block_schema()
+        .store_account_tree_cache(block_number, tree_cache)
         .await?;
 
     transaction.commit().await?;

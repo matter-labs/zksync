@@ -109,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
 
     if params.db_migrate {
         println!("Migrating the database to enable NFTs");
-        migrage_db_for_nft(old_hash, new_hash).await?;
+        migrage_db_for_nft(old_hash, new_tree).await?;
     } else {
         let message_to_sign = get_message_to_sign(old_hash, new_hash);
         println!("\nSigning prefixed message: {}", message_to_sign);
