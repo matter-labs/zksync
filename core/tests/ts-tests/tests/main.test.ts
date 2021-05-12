@@ -168,6 +168,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a transfer NFT', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testTransferNFT(alice, chuck, token);
     });
 
