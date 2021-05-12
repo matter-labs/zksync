@@ -40,9 +40,9 @@ Tester.prototype.testSwap = async function (
         tokenSell: tokenA,
         tokenBuy: tokenB,
         amount,
-        price: utils.price({
-            sellPrice: 1,
-            buyPrice: 2
+        ratio: utils.ratio({
+            tokenSell: 1,
+            tokenBuy: 2
         })
     });
 
@@ -50,9 +50,9 @@ Tester.prototype.testSwap = async function (
         tokenSell: tokenB,
         tokenBuy: tokenA,
         amount: amount.mul(2),
-        price: utils.price({
-            sellPrice: 2,
-            buyPrice: 1
+        ratio: utils.ratio({
+            tokenSell: 2,
+            tokenBuy: 1
         })
     });
 
@@ -103,18 +103,18 @@ Tester.prototype.testSwapBatch = async function (
     const orderA = await walletA.getLimitOrder({
         tokenSell: tokenA,
         tokenBuy: tokenB,
-        price: utils.price({
-            sellPrice: 2,
-            buyPrice: 5
+        ratio: utils.ratio({
+            tokenSell: 2,
+            tokenBuy: 5
         })
     });
 
     const orderB = await walletB.getLimitOrder({
         tokenSell: tokenB,
         tokenBuy: tokenA,
-        price: utils.price({
-            sellPrice: 4,
-            buyPrice: 1
+        ratio: utils.ratio({
+            tokenSell: 4,
+            tokenBuy: 1
         })
     });
 

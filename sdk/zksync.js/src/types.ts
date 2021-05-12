@@ -89,15 +89,15 @@ export interface Signature {
     signature: string;
 }
 
-export type Price = [BigNumberish, BigNumberish];
+export type Ratio = [BigNumberish, BigNumberish];
 
 export interface Order {
     accountId: number;
-    recipientAddress: Address;
+    recipient: Address;
     nonce: number;
     tokenSell: number;
     tokenBuy: number;
-    price: Price;
+    ratio: Ratio;
     amount: BigNumberish;
     signature?: Signature;
     validFrom: number;

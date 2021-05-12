@@ -16,7 +16,7 @@ import {
     Create2Data,
     Swap,
     Order,
-    Price
+    Ratio
 } from './types';
 
 export class Signer {
@@ -75,25 +75,14 @@ export class Signer {
         });
     }
 
-    async signSyncOrder(order: {
-        accountId: number;
-        recipientAddress: Address;
-        nonce: number;
-        tokenSell: number;
-        tokenBuy: number;
-        amount: BigNumberish;
-        price: Price;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Order> {
+    async signSyncOrder(order: Order): Promise<Order> {
         const msgBytes = utils.serializeOrder(order);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
             ...order,
             amount: BigNumber.from(order.amount).toString(),
-            // @ts-ignore
-            price: order.price.map((p) => BigNumber.from(p).toString()),
+            ratio: order.ratio.map((p) => BigNumber.from(p).toString()) as Ratio,
             signature
         };
     }

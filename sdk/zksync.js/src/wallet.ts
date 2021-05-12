@@ -28,7 +28,7 @@ import {
     NFT,
     Order,
     Swap,
-    Price
+    Ratio
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -409,7 +409,7 @@ export class Wallet {
     async getLimitOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
-        price: Price;
+        ratio: Ratio;
         recipient?: Address;
         nonce?: Nonce;
         validFrom?: number;
@@ -424,7 +424,7 @@ export class Wallet {
     async getOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
-        price: Price;
+        ratio: Ratio;
         amount: BigNumberish;
         recipient?: Address;
         nonce?: Nonce;
@@ -436,18 +436,18 @@ export class Wallet {
         }
         await this.setRequiredAccountIdFromServer('Swap order');
         const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
-        const recipientAddress = order.recipient || this.address();
+        const recipient = order.recipient || this.address();
 
         return this.signer.signSyncOrder({
             accountId: this.accountId,
-            recipientAddress,
+            recipient,
             nonce,
             amount: order.amount || BigNumber.from(0),
             tokenSell: this.provider.tokenSet.resolveTokenId(order.tokenSell),
             tokenBuy: this.provider.tokenSet.resolveTokenId(order.tokenBuy),
             validFrom: order.validFrom || 0,
             validUntil: order.validUntil || MAX_TIMESTAMP,
-            price: order.price
+            ratio: order.ratio
         });
     }
 

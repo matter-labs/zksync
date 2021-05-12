@@ -16,7 +16,7 @@ import {
     MintNFT,
     Order,
     Swap,
-    Price
+    Ratio
 } from './types';
 import { rescueHashOrders } from './crypto';
 
@@ -59,8 +59,8 @@ const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
 
-export function price(price: { sellPrice: BigNumberish; buyPrice: BigNumberish }): Price {
-    return [BigNumber.from(price.sellPrice), BigNumber.from(price.buyPrice)];
+export function ratio(price: { tokenSell: BigNumberish; tokenBuy: BigNumberish }): Ratio {
+    return [BigNumber.from(price.tokenSell), BigNumber.from(price.tokenBuy)];
 }
 
 export function floatToInteger(
@@ -594,12 +594,12 @@ export function serializeTimestamp(time: number): Uint8Array {
 export function serializeOrder(order: Order): Uint8Array {
     const type = new Uint8Array(['o'.charCodeAt(0)]);
     const accountId = serializeAccountId(order.accountId);
-    const recipientBytes = serializeAddress(order.recipientAddress);
+    const recipientBytes = serializeAddress(order.recipient);
     const nonceBytes = serializeNonce(order.nonce);
     const tokenSellId = serializeTokenId(order.tokenSell);
     const tokenBuyId = serializeTokenId(order.tokenBuy);
-    const sellPriceBytes = BigNumber.from(order.price[0]).toHexString();
-    const buyPriceBytes = BigNumber.from(order.price[1]).toHexString();
+    const sellPriceBytes = BigNumber.from(order.ratio[0]).toHexString();
+    const buyPriceBytes = BigNumber.from(order.ratio[1]).toHexString();
     const amountBytes = serializeAmountPacked(order.amount);
     const validFrom = serializeTimestamp(order.validFrom);
     const validUntil = serializeTimestamp(order.validUntil);
