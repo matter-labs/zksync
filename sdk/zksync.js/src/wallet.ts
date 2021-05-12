@@ -1248,7 +1248,7 @@ export class Wallet {
         throw error;
     }
 
-    async setRequiredAccountIdFromServer(actionName: string) {
+    private async setRequiredAccountIdFromServer(actionName: string) {
         if (this.accountId === undefined) {
             const accountIdFromServer = await this.getAccountId();
             if (accountIdFromServer == null) {
