@@ -109,9 +109,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should test multi-transfers', async () => {
-        if (onlyBasic) {
-            return;
-        }
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
@@ -167,9 +164,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a forced exit', async () => {
-        if (onlyBasic) {
-            return;
-        }
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
 
