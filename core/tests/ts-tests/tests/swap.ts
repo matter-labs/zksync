@@ -22,8 +22,53 @@ declare module './tester' {
             tokenB: TokenLike,
             amount: BigNumber
         ): Promise<void>;
+        testSwapNFT(walletA: Wallet, walletB: Wallet, token: TokenLike, nft: number, amount: BigNumber): Promise<void>;
     }
 }
+
+Tester.prototype.testSwapNFT = async function (
+    walletA: Wallet,
+    walletB: Wallet,
+    token: TokenLike,
+    nft: number,
+    amount: BigNumber
+) {
+    const { totalFee: fee } = await this.syncProvider.getTransactionFee('Swap', walletA.address(), token);
+    expect(await walletB.getNFT(nft), 'wallet does not own an NFT').to.exist;
+
+    const orderA = await walletA.getOrder({
+        tokenSell: token,
+        tokenBuy: nft,
+        amount,
+        ratio: utils.ratio({
+            tokenSell: amount,
+            tokenBuy: 1
+        })
+    });
+
+    const orderB = await walletB.getOrder({
+        tokenSell: nft,
+        tokenBuy: token,
+        amount: 1,
+        ratio: utils.ratio({
+            tokenSell: 1,
+            tokenBuy: amount
+        })
+    });
+
+    const swap = await walletA.syncSwap({
+        orders: [orderA, orderB],
+        feeToken: token,
+        fee
+    });
+
+    const receipt = await swap.awaitReceipt();
+    expect(receipt.success, `Swap transaction failed with a reason: ${receipt.failReason}`).to.be.true;
+    expect(await walletA.getNFT(nft), 'NFT was not swapped').to.exist;
+    expect(await walletB.getNFT(nft), 'NFT is present even after swap').to.not.exist;
+
+    this.runningFee = this.runningFee.add(fee);
+};
 
 Tester.prototype.testSwap = async function (
     walletA: Wallet,

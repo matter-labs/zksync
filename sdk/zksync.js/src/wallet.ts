@@ -670,13 +670,14 @@ export class Wallet {
     }
 
     async mintNFT(mintNft: {
-        recipient: string;
-        contentHash: string;
+        recipient: Address;
+        contentHash: ethers.BytesLike;
         feeToken: TokenLike;
         fee?: BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
         mintNft.nonce = mintNft.nonce != null ? await this.getNonce(mintNft.nonce) : await this.getNonce();
+        mintNft.contentHash = ethers.utils.hexlify(mintNft.contentHash);
 
         if (mintNft.fee == null) {
             const fullFee = await this.provider.getTransactionFee('MintNFT', mintNft.recipient, mintNft.feeToken);
