@@ -1,13 +1,15 @@
 use num::BigUint;
 use zksync_crypto::params::MIN_NFT_TOKEN_ID;
-use zksync_eth_signer::{error::SignerError, EthereumSigner};
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
-    tx::{PackedEthSignature, TxEthSignature, TxHash},
+    tx::PackedEthSignature,
     Address, Nonce, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
-use crate::{error::ClientError, provider::Provider, wallet::Wallet};
+use crate::{
+    error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
+};
 use zksync_types::tx::TimeRange;
 
 #[derive(Debug)]
@@ -42,7 +44,15 @@ where
     }
 
     /// Directly returns the couple of transfer transactions for the subsequent usage.
-    pub async fn tx(self) -> Result<(ZkSyncTx, ZkSyncTx, Option<PackedEthSignature>), ClientError> {
+    pub async fn tx(
+        self,
+    ) -> Result<
+        (
+            (ZkSyncTx, Option<PackedEthSignature>),
+            (ZkSyncTx, Option<PackedEthSignature>),
+        ),
+        ClientError,
+    > {
         let token = self
             .token
             .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
@@ -84,7 +94,7 @@ where
             .tokens
             .resolve(TokenLike::Id(token))
             .ok_or(ClientError::UnknownToken)?;
-        let tx_nft = self
+        let (tx_nft, tx_nft_signature) = self
             .wallet
             .signer
             .sign_transfer(
@@ -96,9 +106,9 @@ where
                 TimeRange::new(valid_from, valid_until),
             )
             .await
-            .map(|(tx, _)| ZkSyncTx::Transfer(Box::new(tx)))
+            .map(|(tx, signature)| (ZkSyncTx::Transfer(Box::new(tx)), signature))
             .map_err(ClientError::SigningError)?;
-        let tx_fee = self
+        let (tx_fee, tx_fee_signature) = self
             .wallet
             .signer
             .sign_transfer(
@@ -110,41 +120,23 @@ where
                 TimeRange::new(valid_from, valid_until),
             )
             .await
-            .map(|(tx, _)| ZkSyncTx::Transfer(Box::new(tx)))
+            .map(|(tx, signature)| (ZkSyncTx::Transfer(Box::new(tx)), signature))
             .map_err(ClientError::SigningError)?;
-        let message_part_1 = tx_nft.get_ethereum_sign_message_part(token).unwrap();
-        let message_part_2 = tx_fee.get_ethereum_sign_message_part(fee_token).unwrap();
-        let message = format!("{}\n{}\nNonce: {}", message_part_1, message_part_2, nonce);
 
-        let eth_signature = match &self.wallet.signer.eth_signer {
-            Some(signer) => {
-                let signature = signer
-                    .sign_message(&message.as_bytes())
-                    .await
-                    .map_err(ClientError::SigningError)?;
-
-                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
-                    Some(packed_signature)
-                } else {
-                    return Err(ClientError::SigningError(SignerError::MissingEthSigner));
-                }
-            }
-            _ => None,
-        };
-
-        Ok((tx_nft, tx_fee, eth_signature))
+        Ok(((tx_nft, tx_nft_signature), (tx_fee, tx_fee_signature)))
     }
 
     /// Sends the transaction batch, returning the hashes of its transactions.
-    pub async fn send(self) -> Result<Vec<TxHash>, ClientError> {
+    pub async fn send(self) -> Result<Vec<SyncTransactionHandle<P>>, ClientError> {
         let provider = self.wallet.provider.clone();
 
-        let (tx_nft, tx_fee, eth_signature) = self.tx().await?;
-        let tx_hashes = provider
-            .send_txs_batch(vec![(tx_nft, None), (tx_fee, None)], eth_signature)
-            .await?;
+        let (tx_nft, tx_fee) = self.tx().await?;
+        let tx_hashes = provider.send_txs_batch(vec![tx_nft, tx_fee], None).await?;
 
-        Ok(tx_hashes)
+        Ok(tx_hashes
+            .into_iter()
+            .map(|tx_hash| SyncTransactionHandle::new(tx_hash, provider.clone()))
+            .collect())
     }
 
     /// Sets the transaction token id. Returns an error if token is not supported by zkSync.
