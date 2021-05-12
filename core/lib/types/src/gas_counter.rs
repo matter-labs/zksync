@@ -23,7 +23,7 @@ impl CommitCost {
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 51_000;
-    pub const DEPOSIT_COST: u64 = 7_000;
+    pub const DEPOSIT_COST: u64 = 7_700;
     // TODO: estimate after changepubkey gas cost estimation is fixed [ZKS-554]
     pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 25_000;
     pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 12_700;
@@ -466,7 +466,10 @@ mod tests {
             (ZkSyncOp::from(full_exit_op), VerifyCost::FULL_EXIT_COST),
             (ZkSyncOp::from(forced_exit_op), VerifyCost::FORCED_EXIT_COST),
             (ZkSyncOp::from(withdraw_op), VerifyCost::WITHDRAW_COST),
-            (ZkSyncOp::from(withdraw_nft_op), VerifyCost::WITHDRAW_COST),
+            (
+                ZkSyncOp::from(withdraw_nft_op),
+                VerifyCost::WITHDRAW_NFT_COST,
+            ),
             (ZkSyncOp::from(mint_nft_op), VerifyCost::MINT_NFT_COST),
         ];
 

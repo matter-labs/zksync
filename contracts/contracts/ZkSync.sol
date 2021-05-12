@@ -409,7 +409,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function withdrawOrStoreNFT(Operations.WithdrawNFT memory op) internal {
         NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
         try
-            _factory.mintNFTFromZkSync{gas: WITHDRAWAL_GAS_LIMIT}(
+            _factory.mintNFTFromZkSync{gas: WITHDRAWAL_NFT_GAS_LIMIT}(
                 op.creatorAddress,
                 op.receiver,
                 op.serialId,
