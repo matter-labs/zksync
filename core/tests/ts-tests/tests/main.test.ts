@@ -167,9 +167,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a forced exit', async () => {
-        if (onlyBasic) {
-            return;
-        }
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
 
