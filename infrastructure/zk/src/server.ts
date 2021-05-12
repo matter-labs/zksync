@@ -18,7 +18,7 @@ export async function server() {
     // However, it does not matter, since the only thing the function does is depositing
     // to the forced exit sender account, and server should be capable of recognizing
     // priority operaitons that happened before it was booted
-    //   await prepareForcedExitRequestAccount();
+    await prepareForcedExitRequestAccount();
 }
 
 export async function genesis() {

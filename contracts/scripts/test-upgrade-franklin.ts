@@ -79,7 +79,7 @@ async function main() {
     // finish upgrade
     await (await upgradeGatekeeper.finishUpgrade([[], [], encodedStoredBlockInfo], { gasLimit: 3000000 })).wait();
 
-    //await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
+    await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
 }
 
 main()
