@@ -12,12 +12,13 @@ use crate::{
 
 pub use self::{
     change_pubkey::ChangePubKeyBuilder, mint_nft::MintNFTBuilder, transfer::TransferBuilder,
-    withdraw::WithdrawBuilder, withdraw_nft::WithdrawNFTBuilder,
+    transfer_nft::TransferNFTBuilder, withdraw::WithdrawBuilder, withdraw_nft::WithdrawNFTBuilder,
 };
 
 mod change_pubkey;
 mod mint_nft;
 mod transfer;
+mod transfer_nft;
 mod withdraw;
 mod withdraw_nft;
 

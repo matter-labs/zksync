@@ -119,6 +119,11 @@ where
         TransferBuilder::new(self)
     }
 
+    /// Initializes `TransferNFT` transaction sending.
+    pub fn start_transfer_nft(&self) -> TransferNFTBuilder<'_, S, P> {
+        TransferNFTBuilder::new(self)
+    }
+
     /// Initializes `ChangePubKey` transaction sending.
     pub fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_, S, P> {
         ChangePubKeyBuilder::new(self)
