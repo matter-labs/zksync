@@ -142,7 +142,7 @@ type FullExit = {
         type: 'FullExit';
         serial_id: number | null;
         priority_op: {
-            token: string;
+            token: number;
             account_id: number;
             eth_address: string;
         };
