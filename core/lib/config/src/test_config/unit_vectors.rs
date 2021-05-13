@@ -210,7 +210,7 @@ pub struct WithdrawSignatureInputs {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WithdrawNFTSignatureInputs {
-    pub token: String,
+    pub token: TokenId,
     pub to: Address,
     pub string_fee: String,
     pub string_fee_token: String,
