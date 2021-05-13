@@ -23,7 +23,7 @@
 use std::time::{Duration, Instant};
 use std::{convert::TryFrom, env};
 
-use num::{BigUint, Zero};
+use num::Zero;
 
 use zksync::operations::SyncTransactionHandle;
 use zksync::{

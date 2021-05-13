@@ -302,25 +302,25 @@ mod signatures_with_vectors {
                 let signer = get_signer(
                     &inputs.eth_private_key,
                     withdraw_nft_tx.from,
-                    sign_data.account_id,
+                    withdraw_nft_tx.account_id,
                 )
                 .await;
 
                 let fee_token = Token {
                     id: withdraw_nft_tx.fee_token_id,
                     address: Default::default(),
-                    symbol: sign_data.string_token.clone(),
+                    symbol: sign_data.string_fee_token.clone(),
                     decimals: 0,
                     is_nft: false,
                 };
 
                 let (withdraw_nft, eth_signature) = signer
                     .sign_withdraw_nft(
-                        sign_data.eth_address,
+                        withdraw_nft_tx.to,
                         withdraw_nft_tx.token_id,
                         fee_token,
                         withdraw_nft_tx.fee.clone(),
-                        sign_data.nonce,
+                        withdraw_nft_tx.nonce,
                         withdraw_nft_tx.time_range,
                     )
                     .await
@@ -335,7 +335,7 @@ mod signatures_with_vectors {
 
                 assert_eq!(
                     withdraw_nft
-                        .get_ethereum_sign_message(&sign_data.string_token, 0)
+                        .get_ethereum_sign_message(&sign_data.string_fee_token, 0)
                         .into_bytes(),
                     outputs.eth_sign_message.unwrap()
                 );
@@ -360,14 +360,14 @@ mod signatures_with_vectors {
                 let signer = get_signer(
                     &inputs.eth_private_key,
                     mint_nft_tx.creator_address,
-                    sign_data.account_id,
+                    mint_nft_tx.creator_id,
                 )
                 .await;
 
                 let fee_token = Token {
                     id: mint_nft_tx.fee_token_id,
                     address: Default::default(),
-                    symbol: sign_data.string_token.clone(),
+                    symbol: sign_data.string_fee_token.clone(),
                     decimals: 0,
                     is_nft: false,
                 };
@@ -378,7 +378,7 @@ mod signatures_with_vectors {
                         mint_nft_tx.content_hash,
                         fee_token,
                         mint_nft_tx.fee.clone(),
-                        sign_data.nonce,
+                        mint_nft_tx.nonce,
                     )
                     .await
                     .expect("Withdraw nft signing error");
@@ -392,7 +392,7 @@ mod signatures_with_vectors {
 
                 assert_eq!(
                     mint_nft
-                        .get_ethereum_sign_message(&sign_data.string_token, 0)
+                        .get_ethereum_sign_message(&sign_data.string_fee_token, 0)
                         .into_bytes(),
                     outputs.eth_sign_message.unwrap()
                 );

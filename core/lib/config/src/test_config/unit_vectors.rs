@@ -148,7 +148,7 @@ pub struct Withdraw {
 pub struct WithdrawNFT {
     pub account_id: AccountId,
     pub from: Address,
-    pub eth_address: Address,
+    pub to: Address,
     pub token_id: TokenId,
     pub fee_token_id: TokenId,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
@@ -210,19 +210,20 @@ pub struct WithdrawSignatureInputs {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WithdrawNFTSignatureInputs {
-    pub string_token: String,
+    pub token: String,
+    pub to: Address,
     pub string_fee: String,
-    pub eth_address: Address,
-    pub account_id: AccountId,
+    pub string_fee_token: String,
     pub nonce: Nonce,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MintNFTSignatureInputs {
-    pub string_token: String,
+    pub string_fee_token: String,
     pub string_fee: String,
-    pub account_id: AccountId,
+    pub recipient: Address,
+    pub content_hash: H256,
     pub nonce: Nonce,
 }
 
