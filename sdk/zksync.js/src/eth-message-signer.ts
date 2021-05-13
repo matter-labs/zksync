@@ -84,7 +84,7 @@ export class EthMessageSigner {
     }
 
     getMintNFTEthMessagePart(mintNFT: {
-        stringToken: string;
+        stringFeeToken: string;
         stringFee: string;
         recipient: string;
         contentHash: string;
@@ -92,14 +92,14 @@ export class EthMessageSigner {
         let humanReadableTxInfo = `MintNFT ${mintNFT.contentHash} for: ${mintNFT.recipient.toLowerCase()}`;
 
         if (mintNFT.stringFee != null) {
-            humanReadableTxInfo += `\nFee: ${mintNFT.stringFee} ${mintNFT.stringToken}`;
+            humanReadableTxInfo += `\nFee: ${mintNFT.stringFee} ${mintNFT.stringFeeToken}`;
         }
 
         return humanReadableTxInfo;
     }
 
     getMintNFTEthSignMessage(mintNFT: {
-        stringToken: string;
+        stringFeeToken: string;
         stringFee: string;
         recipient: string;
         contentHash: string;
@@ -232,7 +232,7 @@ export class EthMessageSigner {
     }
 
     async ethSignMintNFT(mintNFT: {
-        stringToken: string;
+        stringFeeToken: string;
         stringFee: string;
         recipient: string;
         contentHash: string;
