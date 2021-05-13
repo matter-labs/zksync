@@ -133,7 +133,7 @@
             "nonce": 12
           },
           "ethSignData": {
-            "stringToken": "ETH",
+            "stringFeeToken": "ETH",
             "stringFee": "1000000.0",
             "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
             "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",

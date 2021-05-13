@@ -521,12 +521,12 @@ export class Wallet {
         const stringFee = BigNumber.from(mintNFT.fee).isZero()
             ? null
             : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
+        const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
         const ethereumSignature =
             this.ethSigner instanceof Create2WalletSigner
                 ? null
                 : await this.ethMessageSigner.ethSignMintNFT({
-                      stringToken,
+                      stringFeeToken,
                       stringFee,
                       recipient: mintNFT.recipient,
                       contentHash: mintNFT.contentHash,
@@ -900,9 +900,9 @@ export class Wallet {
         const stringFee = BigNumber.from(mintNFT.fee).isZero()
             ? null
             : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
+        const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
         return this.ethMessageSigner.getMintNFTEthMessagePart({
-            stringToken,
+            stringFeeToken,
             stringFee,
             recipient: mintNFT.recipient,
             contentHash: mintNFT.contentHash
