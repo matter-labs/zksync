@@ -136,6 +136,7 @@ impl<S: EthereumSigner> Signer<S> {
         Ok(change_pubkey)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn sign_transfer(
         &self,
         token_id: TokenId,

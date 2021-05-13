@@ -95,7 +95,7 @@ where
             BlockStatus::Verified => self.account_info().await?.verified,
         };
 
-        Ok(account_state.nfts.get(&token_id).map(|nft| nft.clone()))
+        Ok(account_state.nfts.get(&token_id).cloned())
     }
 
     /// Returns the current account ID.
