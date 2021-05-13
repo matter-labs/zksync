@@ -88,7 +88,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a mintNFT', async () => {
-        await tester.testMintNFT(alice, chuck, '0x' + ''.padStart(64, "0"), token, true);
+        nft =  await tester.testMintNFT(alice, chuck,  token, true);
     });
 
     step('should execute a transfer to existing account', async () => {
@@ -172,11 +172,11 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         if (onlyBasic) {
             return;
         }
-        await tester.testTransferNFT(chuck, alice, token);
+        await tester.testTransferNFT(alice, chuck, token);
     });
 
     step('should execute NFT withdraw', async () => {
-        await tester.testWithdrawNFT(alice, token);
+        await tester.testWithdrawNFT(chuck, token);
     });
 
     step('should execute a ForcedExit', async () => {
@@ -228,7 +228,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             if (onlyBasic) {
                 return;
             }
-            await tester.testMintNFT(carl, carl, '0x' + '1'.padStart(64, "0"), token, true);
+            await tester.testMintNFT(carl, carl, token, true);
             await tester.testFullExitNFT(carl);
         });
 

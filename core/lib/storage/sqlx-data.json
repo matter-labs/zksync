@@ -5558,6 +5558,27 @@
       ]
     }
   },
+  "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
+    "query": "SELECT pg_notify($1, $2)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "pg_notify",
+          "type_info": "Void"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "fabb011dfd474fd56c71b7fb1707bbe586e66f9a45deac15b486845ba5c87979": {
     "query": "SELECT * FROM mint_nft_updates WHERE block_number <= $1",
     "describe": {

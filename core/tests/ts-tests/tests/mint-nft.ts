@@ -7,10 +7,13 @@ type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testMintNFT(wallet: Wallet, receiver: Wallet, feeToken: TokenLike,
+        testMintNFT(
+            wallet: Wallet,
+            receiver: Wallet,
+            feeToken: TokenLike,
 
-                    waitVerified?: boolean
-                    ): Promise<types.NFT>;
+            waitVerified?: boolean
+        ): Promise<types.NFT>;
     }
 }
 
