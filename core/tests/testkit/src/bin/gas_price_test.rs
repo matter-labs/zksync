@@ -27,7 +27,7 @@ use zksync_testkit::*;
 use zksync_types::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
     tx::ChangePubKeyCREATE2Data,
-    Address, ChangePubKeyOp, DepositOp, FullExitOp, MintNFTOp, Nonce, PubKeyHash, TokenId,
+    Address, ChangePubKeyOp, DepositOp, FullExitOp, MintNFTOp, Nonce, PubKeyHash, SwapOp, TokenId,
     TransferOp, TransferToNewOp, WithdrawNFTOp, WithdrawOp,
 };
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
@@ -295,18 +295,9 @@ async fn gas_price_test() {
     commit_cost_of_create2_change_pubkey(&mut test_setup, 50)
         .await
         .report(&base_cost, "create2 change pubkey", false);
-
     commit_cost_of_onchain_change_pubkey(&mut test_setup, 50)
         .await
         .report(&base_cost, "onchain change pubkey", false);
-    commit_cost_of_mint_nft(&mut test_setup, 40, rng)
-        .await
-        .report(&base_cost, "Mint nft cost", false);
-
-    commit_cost_of_withdrawals_nft(&mut test_setup, 40, rng)
-        .await
-        .report(&base_cost, "withdrawals NFT", false);
-
     commit_cost_of_change_pubkey(&mut test_setup, 50)
         .await
         .report(&base_cost, "change pubkey", false);
@@ -317,6 +308,13 @@ async fn gas_price_test() {
     commit_cost_of_transfers_to_new(&mut test_setup, 500, rng)
         .await
         .report(&base_cost, "transfer to new", false);
+    commit_cost_of_swaps(&mut test_setup, 60, rng)
+        .await
+        .report(&base_cost, "swap", false);
+    commit_cost_of_mint_nft(&mut test_setup, 60, rng)
+        .await
+        .report(&base_cost, "mint nft", false);
+
     commit_cost_of_full_exits(&mut test_setup, 100, Token(TokenId(0)))
         .await
         .report(&base_cost, "full exit ETH", true);
@@ -330,6 +328,9 @@ async fn gas_price_test() {
     commit_cost_of_withdrawals(&mut test_setup, 40, Token(TokenId(1)), rng)
         .await
         .report(&base_cost, "withdrawals ERC20", false);
+    commit_cost_of_withdrawals_nft(&mut test_setup, 10, rng)
+        .await
+        .report(&base_cost, "withdrawals NFT", false);
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
@@ -479,6 +480,114 @@ async fn commit_cost_of_transfers(
     );
     transfer_execute_result.commit_result.gas_used.unwrap();
     CostsSample::new(n_transfers, U256::from(0), transfer_execute_result)
+}
+
+async fn commit_cost_of_swaps(
+    test_setup: &mut TestSetup,
+    n_swaps: usize,
+    rng: &mut impl Rng,
+) -> CostsSample {
+    let mut swap_amounts = Vec::new();
+    let mut swap_fees = Vec::new();
+    let change_pk_fee = gen_packable_fee(rng);
+    let mut deposit_amount_0 = change_pk_fee.clone();
+    let mut deposit_amount_1 = change_pk_fee.clone();
+    let mut fee_amount = change_pk_fee.clone();
+
+    for _ in 0..n_swaps {
+        let amount_0 = gen_packable_amount(rng);
+        let amount_1 = gen_packable_amount(rng);
+        let fee = gen_packable_fee(rng);
+        deposit_amount_0 += &amount_0;
+        deposit_amount_1 += &amount_1;
+        fee_amount += &fee;
+        swap_amounts.push((amount_0, amount_1));
+        swap_fees.push(fee);
+    }
+
+    // Prepare block with swaps
+    test_setup.start_block();
+    test_setup
+        .deposit(
+            ETHAccountId(1),
+            ZKSyncAccountId(1),
+            Token(TokenId(0)),
+            deposit_amount_0,
+        )
+        .await;
+    test_setup.start_block();
+    test_setup
+        .deposit(
+            ETHAccountId(2),
+            ZKSyncAccountId(2),
+            Token(TokenId(1)),
+            deposit_amount_1,
+        )
+        .await;
+    test_setup
+        .deposit(
+            ETHAccountId(3),
+            ZKSyncAccountId(3),
+            Token(TokenId(1)),
+            fee_amount,
+        )
+        .await;
+    test_setup
+        .deposit(
+            ETHAccountId(1),
+            ZKSyncAccountId(4),
+            Token(TokenId(0)),
+            0u32.into(),
+        )
+        .await;
+    test_setup
+        .deposit(
+            ETHAccountId(1),
+            ZKSyncAccountId(5),
+            Token(TokenId(0)),
+            0u32.into(),
+        )
+        .await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(TokenId(0)), 0u32.into())
+        .await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(2), Token(TokenId(1)), 0u32.into())
+        .await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(3), Token(TokenId(1)), 0u32.into())
+        .await;
+    test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+
+    // Execute swaps
+    test_setup.start_block();
+    for i in 0..n_swaps {
+        test_setup
+            .swap(
+                (ZKSyncAccountId(1), ZKSyncAccountId(2)),
+                (ZKSyncAccountId(4), ZKSyncAccountId(5)),
+                ZKSyncAccountId(3),
+                (Token(TokenId(0)), Token(TokenId(1)), Token(TokenId(1))),
+                swap_amounts[i].clone(),
+                swap_fees[i].clone(),
+                Default::default(),
+            )
+            .await;
+    }
+    let swap_execute_result = test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+    assert_eq!(
+        swap_execute_result.block_size_chunks,
+        n_swaps * SwapOp::CHUNKS,
+        "block size mismatch"
+    );
+    swap_execute_result.commit_result.gas_used.unwrap();
+    CostsSample::new(n_swaps, U256::from(0), swap_execute_result)
 }
 
 async fn commit_cost_of_transfers_to_new(

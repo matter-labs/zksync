@@ -14,8 +14,12 @@ import {
     Withdraw,
     CloseAccount,
     MintNFT,
+    Order,
+    Swap,
+    Ratio,
     WithdrawNFT
 } from './types';
+import { rescueHashOrders } from './crypto';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = Math.pow(2, 31);
@@ -55,6 +59,10 @@ const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
+
+export function ratio(price: { tokenSell: BigNumberish; tokenBuy: BigNumberish }): Ratio {
+    return [BigNumber.from(price.tokenSell), BigNumber.from(price.tokenBuy)];
+}
 
 export function floatToInteger(
     floatBytes: Uint8Array,
@@ -582,6 +590,58 @@ export function serializeTimestamp(time: number): Uint8Array {
         throw new Error('Negative timestamp');
     }
     return ethers.utils.concat([new Uint8Array(4), numberToBytesBE(time, 4)]);
+}
+
+export function serializeOrder(order: Order): Uint8Array {
+    const type = new Uint8Array(['o'.charCodeAt(0)]);
+    const accountId = serializeAccountId(order.accountId);
+    const recipientBytes = serializeAddress(order.recipient);
+    const nonceBytes = serializeNonce(order.nonce);
+    const tokenSellId = serializeTokenId(order.tokenSell);
+    const tokenBuyId = serializeTokenId(order.tokenBuy);
+    const sellPriceBytes = BigNumber.from(order.ratio[0]).toHexString();
+    const buyPriceBytes = BigNumber.from(order.ratio[1]).toHexString();
+    const amountBytes = serializeAmountPacked(order.amount);
+    const validFrom = serializeTimestamp(order.validFrom);
+    const validUntil = serializeTimestamp(order.validUntil);
+    return ethers.utils.concat([
+        type,
+        accountId,
+        recipientBytes,
+        nonceBytes,
+        tokenSellId,
+        tokenBuyId,
+        ethers.utils.zeroPad(sellPriceBytes, 15),
+        ethers.utils.zeroPad(buyPriceBytes, 15),
+        amountBytes,
+        validFrom,
+        validUntil
+    ]);
+}
+
+export async function serializeSwap(swap: Swap): Promise<Uint8Array> {
+    const type = new Uint8Array([11]);
+    const submitterId = serializeAccountId(swap.submitterId);
+    const submitterAddress = serializeAddress(swap.submitterAddress);
+    const nonceBytes = serializeNonce(swap.nonce);
+    const orderA = serializeOrder(swap.orders[0]);
+    const orderB = serializeOrder(swap.orders[1]);
+    const ordersHashed = await rescueHashOrders(ethers.utils.concat([orderA, orderB]));
+    const tokenIdBytes = serializeTokenId(swap.feeToken);
+    const feeBytes = serializeFeePacked(swap.fee);
+    const amountABytes = serializeAmountPacked(swap.amounts[0]);
+    const amountBBytes = serializeAmountPacked(swap.amounts[1]);
+    return ethers.utils.concat([
+        type,
+        submitterId,
+        submitterAddress,
+        nonceBytes,
+        ordersHashed,
+        tokenIdBytes,
+        feeBytes,
+        amountABytes,
+        amountBBytes
+    ]);
 }
 
 export function serializeWithdraw(withdraw: Withdraw): Uint8Array {

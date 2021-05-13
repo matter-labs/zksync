@@ -25,6 +25,9 @@ import {
     ChangePubKeyCREATE2,
     Create2Data,
     MintNFT,
+    Order,
+    Swap,
+    Ratio,
     WithdrawNFT,
     NFT
 } from './types';
@@ -376,22 +379,17 @@ export class Wallet {
     }): Promise<Transaction[]> {
         transfer.nonce = transfer.nonce != null ? await this.getNonce(transfer.nonce) : await this.getNonce();
 
-        let fee;
+        let fee: BigNumberish;
         if (transfer.fee == null) {
             fee = await this.provider.getTransactionsBatchFee(
                 ['Transfer', 'Transfer'],
-                [this.address(), this.address()],
+                [transfer.to, this.address()],
                 transfer.feeToken
             );
         } else {
             fee = transfer.fee;
         }
-        const txFee = {
-            to: transfer.to,
-            token: transfer.feeToken,
-            amount: 0,
-            fee
-        };
+
         const txNFT = {
             to: transfer.to,
             token: transfer.token.id,
@@ -399,8 +397,134 @@ export class Wallet {
             fee: 0,
             symbol: transfer.token.symbol
         };
+        const txFee = {
+            to: this.address(),
+            token: transfer.feeToken,
+            amount: 0,
+            fee
+        };
 
         return await this.syncMultiTransfer([txNFT, txFee]);
+    }
+
+    async getLimitOrder(order: {
+        tokenSell: TokenLike;
+        tokenBuy: TokenLike;
+        ratio: Ratio;
+        recipient?: Address;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Order> {
+        return this.getOrder({
+            ...order,
+            amount: 0
+        });
+    }
+
+    async getOrder(order: {
+        tokenSell: TokenLike;
+        tokenBuy: TokenLike;
+        ratio: Ratio;
+        amount: BigNumberish;
+        recipient?: Address;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Order> {
+        if (!this.signer) {
+            throw new Error('zkSync signer is required for signing an order');
+        }
+        await this.setRequiredAccountIdFromServer('Swap order');
+        const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
+        const recipient = order.recipient || this.address();
+
+        return this.signer.signSyncOrder({
+            accountId: this.accountId,
+            recipient,
+            nonce,
+            amount: order.amount || BigNumber.from(0),
+            tokenSell: this.provider.tokenSet.resolveTokenId(order.tokenSell),
+            tokenBuy: this.provider.tokenSet.resolveTokenId(order.tokenBuy),
+            validFrom: order.validFrom || 0,
+            validUntil: order.validUntil || MAX_TIMESTAMP,
+            ratio: order.ratio
+        });
+    }
+
+    async getSwap(swap: {
+        orders: [Order, Order];
+        feeToken: number;
+        amounts: [BigNumberish, BigNumberish];
+        nonce: number;
+        fee: BigNumberish;
+    }): Promise<Swap> {
+        if (!this.signer) {
+            throw new Error('zkSync signer is required for swapping funds');
+        }
+        await this.setRequiredAccountIdFromServer('Swap submission');
+        const feeToken = this.provider.tokenSet.resolveTokenId(swap.feeToken);
+
+        return this.signer.signSyncSwap({
+            ...swap,
+            submitterId: await this.getAccountId(),
+            submitterAddress: this.address(),
+            feeToken
+        });
+    }
+
+    async signSyncSwap(swap: {
+        orders: [Order, Order];
+        feeToken: number;
+        amounts: [BigNumberish, BigNumberish];
+        nonce: number;
+        fee: BigNumberish;
+    }): Promise<SignedTransaction> {
+        const signedSwapTransaction = await this.getSwap(swap);
+        const stringFee = BigNumber.from(swap.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
+        const ethereumSignature =
+            this.ethSigner instanceof Create2WalletSigner
+                ? null
+                : await this.ethMessageSigner.ethSignSwap({
+                      fee: stringFee,
+                      feeToken: stringToken,
+                      nonce: swap.nonce
+                  });
+
+        return {
+            tx: signedSwapTransaction,
+            ethereumSignature
+        };
+    }
+
+    async syncSwap(swap: {
+        orders: [Order, Order];
+        feeToken: TokenLike;
+        amounts?: [BigNumberish, BigNumberish];
+        nonce?: number;
+        fee?: BigNumberish;
+    }): Promise<Transaction> {
+        swap.nonce = swap.nonce != null ? await this.getNonce(swap.nonce) : await this.getNonce();
+        if (swap.fee == null) {
+            const fullFee = await this.provider.getTransactionFee('Swap', this.address(), swap.feeToken);
+            swap.fee = fullFee.totalFee;
+        }
+
+        if (swap.amounts == null) {
+            let amount0 = BigNumber.from(swap.orders[0].amount);
+            let amount1 = BigNumber.from(swap.orders[1].amount);
+            if (!amount0.eq(0) && !amount1.eq(0)) {
+                swap.amounts = [amount0, amount1];
+            } else {
+                throw new Error('If amounts in orders are implicit, you must specify them during submission');
+            }
+        }
+
+        const signedSwapTransaction = await this.signSyncSwap(swap as any);
+        return submitSignedTransaction(signedSwapTransaction, this.provider);
     }
 
     async syncTransfer(transfer: {
@@ -612,13 +736,14 @@ export class Wallet {
     }
 
     async mintNFT(mintNFT: {
-        recipient: string;
-        contentHash: string;
+        recipient: Address;
+        contentHash: ethers.BytesLike;
         feeToken: TokenLike;
         fee?: BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
         mintNFT.nonce = mintNFT.nonce != null ? await this.getNonce(mintNFT.nonce) : await this.getNonce();
+        mintNFT.contentHash = ethers.utils.hexlify(mintNFT.contentHash);
 
         if (mintNFT.fee == null) {
             const fullFee = await this.provider.getTransactionFee('MintNFT', mintNFT.recipient, mintNFT.feeToken);
@@ -909,23 +1034,17 @@ export class Wallet {
         });
     }
 
-    getWithdrawNFTEthMessagePart(withdrawNFT: {
-        to: string;
-        token: number;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-    }): string {
-        const stringFee = BigNumber.from(withdrawNFT.fee).isZero()
+    getSwapEthSignMessagePart(swap: { fee: BigNumberish; feeToken: TokenLike }): string {
+        const stringFee = BigNumber.from(swap.fee).isZero()
             ? null
-            : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
-        const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
-        return this.ethMessageSigner.getWithdrawNFTEthMessagePart({
-            token: withdrawNFT.token,
-            to: withdrawNFT.to,
-            stringFee,
-            stringFeeToken
+            : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
+        return this.ethMessageSigner.getSwapEthSignMessagePart({
+            fee: stringFee,
+            feeToken: stringToken
         });
     }
+
 
     getForcedExitEthMessagePart(forcedExit: { target: Address; token: TokenLike; fee: BigNumberish }): string {
         const stringFee = BigNumber.from(forcedExit.fee).isZero()

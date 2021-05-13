@@ -89,6 +89,33 @@ export interface Signature {
     signature: string;
 }
 
+export type Ratio = [BigNumberish, BigNumberish];
+
+export interface Order {
+    accountId: number;
+    recipient: Address;
+    nonce: number;
+    tokenSell: number;
+    tokenBuy: number;
+    ratio: Ratio;
+    amount: BigNumberish;
+    signature?: Signature;
+    validFrom: number;
+    validUntil: number;
+}
+
+export interface Swap {
+    type: 'Swap';
+    orders: [Order, Order];
+    amounts: [BigNumberish, BigNumberish];
+    submitterId: number;
+    submitterAddress: Address;
+    nonce: number;
+    signature?: Signature;
+    feeToken: number;
+    fee: BigNumberish;
+}
+
 export interface Transfer {
     type: 'Transfer';
     accountId: number;
@@ -197,7 +224,7 @@ export interface CloseAccount {
 }
 
 export interface SignedTransaction {
-    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT;
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT | Swap;
     ethereumSignature?: TxEthSignature;
 }
 
@@ -255,7 +282,7 @@ export interface LegacyChangePubKeyFee {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT' | 'WithdrawNFT';
+    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT' | 'WithdrawNFT' | 'Swap';
     // Amount of gas used by transaction
     gasTxAmount: BigNumber;
     // Gas price (in wei)

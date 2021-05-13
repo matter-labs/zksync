@@ -12,6 +12,7 @@ import './forced-exit';
 import './misc';
 import './batch-builder';
 import './create2';
+import './swap';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -31,6 +32,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let judy: Wallet;
     let chris: Wallet;
     let operatorBalance: BigNumber;
+    let nft: types.NFT;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', transport);
@@ -70,8 +72,8 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
                 await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
                 'Token should not be approved'
             ).to.be.false;
-            const approveERC20_next = await tester.syncWallet.approveERC20TokenDeposits(token);
-            await approveERC20_next.wait();
+            const approveERC20Next = await tester.syncWallet.approveERC20TokenDeposits(token);
+            await approveERC20Next.wait();
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved')
                 .to.be.true;
         }
@@ -136,6 +138,22 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
     });
 
+    step('should test swaps and limit orders', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        await tester.testSwap(alice, frank, token, secondToken, TX_AMOUNT);
+        await tester.testSwapBatch(alice, frank, david, token, secondToken, TX_AMOUNT);
+    });
+
+    step('should swap NFT for fungible tokens', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        await tester.testSwapNFT(alice, chuck, token, nft.id, TX_AMOUNT);
+    });
+
     step('should test multi-signers', async () => {
         // At this point, all these wallets already have their public keys set.
         await tester.testMultipleBatchSigners([alice, david, frank], token, TX_AMOUNT);
@@ -151,6 +169,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute NFT transfer', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testTransferNFT(chuck, alice, token);
     });
 
