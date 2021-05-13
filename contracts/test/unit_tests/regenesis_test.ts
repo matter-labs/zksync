@@ -98,8 +98,12 @@ describe('Regenesis test', function () {
         };
 
         const StoredBlockInfo = storedBlockInfoParam();
+        
+        // We need some address, but it is not needed for upgrade itself, so we don't care
+        const additionalZkSyncAddress = '0xc0f97CC918C9d6fA4E9fc6be61a6a06589D199b2'; 
 
-        const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode([StoredBlockInfo], [genesisBlock]);
+        const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode(
+            [StoredBlockInfo, 'address'], [genesisBlock, additionalZkSyncAddress]);
 
         const tx = await upgradeGatekeeperContract.finishUpgrade([[], [], encodedStoredBlockInfo]);
         await tx.wait();
@@ -113,6 +117,8 @@ describe('Regenesis test', function () {
 
         const expectedNewBlockHash = ethers.utils.keccak256(newBlockData);
         const newBlockHash = await zksyncContract.getStoredBlockHash();
+        const newAdditionalZkSyncAddress = await zksyncContract.getAdditionalZkSync();
         expect(expectedNewBlockHash).to.eq(newBlockHash, 'The new block has been applied wrongly');
+        expect(additionalZkSyncAddress).to.eq(newAdditionalZkSyncAddress, 'The additional zkSync address has been changed wrongly');
     });
 });

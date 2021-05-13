@@ -22,7 +22,6 @@ async function main() {
     const args = parser.parseArgs(process.argv.slice(2));
 
     const lastBlockInfo = JSON.parse(args.lastBlockInfo);
-    const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [lastBlockInfo]);
 
     const provider = web3Provider();
     const wallet = args.masterPrivateKey
@@ -38,10 +37,18 @@ async function main() {
     const newTargetZkSync = await deployContract(wallet, testContracts.zkSync, [], {
         gasLimit: 6500000
     });
+    const newTargetAdditionalZkSync = await deployContract(wallet, testContracts.additionalZkSync, [], {
+        gasLimit: 6500000
+    });
 
     const newTargetGov = await deployContract(wallet, testContracts.governance, [], {
         gasLimit: 6500000
     });
+
+    const upgradeData = ethers.utils.defaultAbiCoder.encode([
+        storedBlockInfoParam(),
+        'address'
+    ], [lastBlockInfo, newTargetAdditionalZkSync.address]);
 
     console.log('Starting upgrade');
     await (
@@ -60,7 +67,7 @@ async function main() {
     console.log('Finish upgrade notice period');
     //  console.log(await proxyContract.exodusMode());
     // finish upgrade
-    await (await upgradeGatekeeper.finishUpgrade([[], [], encodedStoredBlockInfo], { gasLimit: 3000000 })).wait();
+    await (await upgradeGatekeeper.finishUpgrade([[], [], upgradeData], { gasLimit: 3000000 })).wait();
 }
 
 main()

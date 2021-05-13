@@ -13,4 +13,8 @@ contract ZkSyncRegenesisTest is ZkSync {
 
         return storedBlockHashes[totalBlocksExecuted];
     }
+
+    function getAdditionalZkSync() external view returns (address) {
+        return additionalZkSync;
+    }
 }
