@@ -159,6 +159,9 @@ pub enum OutputFeeType {
     FastWithdraw,
     Withdraw,
     ChangePubKey(ChangePubKeyFeeType),
+    MintNFT,
+    WithdrawNFT,
+    FastWithdrawNFT,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

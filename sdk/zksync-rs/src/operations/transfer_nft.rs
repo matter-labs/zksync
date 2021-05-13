@@ -1,21 +1,21 @@
 use num::BigUint;
-use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
     tx::PackedEthSignature,
-    Address, Nonce, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, Nonce, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 use crate::{
-    error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
+    error::ClientError, operations::SyncTransactionHandle, provider::Provider, types::NFT,
+    wallet::Wallet,
 };
 use zksync_types::tx::TimeRange;
 
 #[derive(Debug)]
 pub struct TransferNFTBuilder<'a, S: EthereumSigner, P: Provider> {
     wallet: &'a Wallet<S, P>,
-    token: Option<TokenId>,
+    nft: Option<NFT>,
     fee_token: Option<Token>,
     fee: Option<BigUint>,
     to: Option<Address>,
@@ -33,7 +33,7 @@ where
     pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
-            token: None,
+            nft: None,
             fee_token: None,
             fee: None,
             to: None,
@@ -53,9 +53,9 @@ where
         ),
         ClientError,
     > {
-        let token = self
-            .token
-            .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
+        let nft = self
+            .nft
+            .ok_or_else(|| ClientError::MissingRequiredField("nft".into()))?;
         let fee_token = self
             .fee_token
             .ok_or_else(|| ClientError::MissingRequiredField("fee_token".into()))?;
@@ -83,22 +83,23 @@ where
                 let fee = self
                     .wallet
                     .provider
-                    .get_tx_fee(TxFeeTypes::Transfer, to, fee_token.id)
+                    .get_txs_batch_fee(
+                        vec![TxFeeTypes::Transfer, TxFeeTypes::Transfer],
+                        vec![to, to],
+                        fee_token.id,
+                    )
                     .await?;
-                fee.total_fee
+                fee
             }
         };
 
-        let token = self
-            .wallet
-            .tokens
-            .resolve(TokenLike::Id(token))
-            .ok_or(ClientError::UnknownToken)?;
         let (tx_nft, tx_nft_signature) = self
             .wallet
             .signer
             .sign_transfer(
-                token.clone(),
+                nft.id,
+                nft.symbol,
+                1u8,
                 BigUint::from(1u16),
                 BigUint::from(0u16),
                 to,
@@ -112,7 +113,9 @@ where
             .wallet
             .signer
             .sign_transfer(
-                fee_token.clone(),
+                fee_token.id,
+                fee_token.symbol,
+                fee_token.decimals,
                 BigUint::from(0u16),
                 fee,
                 to,
@@ -131,6 +134,7 @@ where
         let provider = self.wallet.provider.clone();
 
         let (tx_nft, tx_fee) = self.tx().await?;
+        println!("tx is got");
         let tx_hashes = provider.send_txs_batch(vec![tx_nft, tx_fee], None).await?;
 
         Ok(tx_hashes
@@ -139,13 +143,10 @@ where
             .collect())
     }
 
-    /// Sets the transaction token id. Returns an error if token is not supported by zkSync.
-    pub fn token(mut self, token: TokenId) -> Result<Self, ClientError> {
-        if token.0 < MIN_NFT_TOKEN_ID {
-            return Err(ClientError::UnknownToken);
-        }
-        self.token = Some(token);
-        Ok(self)
+    /// Sets the transaction nft.
+    pub fn nft(mut self, nft: NFT) -> Self {
+        self.nft = Some(nft);
+        self
     }
 
     /// Sets the transaction fee token. Returns an error if token is not supported by zkSync.

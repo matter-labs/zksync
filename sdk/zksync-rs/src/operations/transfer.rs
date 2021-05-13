@@ -86,7 +86,9 @@ where
         self.wallet
             .signer
             .sign_transfer(
-                token,
+                token.id,
+                token.symbol,
+                token.decimals,
                 amount,
                 fee,
                 to,

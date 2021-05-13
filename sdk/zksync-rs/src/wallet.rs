@@ -1,6 +1,6 @@
 use num::BigUint;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::{AccountId, Address, TokenLike};
+use zksync_types::{AccountId, Address, TokenId, TokenLike};
 
 use crate::{
     credentials::WalletCredentials,
@@ -10,7 +10,7 @@ use crate::{
     provider::Provider,
     signer::Signer,
     tokens_cache::TokensCache,
-    types::{AccountInfo, BlockStatus},
+    types::{AccountInfo, BlockStatus, NFT},
 };
 
 #[derive(Debug)]
@@ -82,6 +82,20 @@ where
             .get(&token.symbol as &str)
             .map(|x| x.0.clone())
             .unwrap_or_default())
+    }
+
+    /// Returns nft in the account.
+    pub async fn get_nft(
+        &self,
+        block_status: BlockStatus,
+        token_id: TokenId,
+    ) -> Result<Option<NFT>, ClientError> {
+        let account_state = match block_status {
+            BlockStatus::Committed => self.account_info().await?.committed,
+            BlockStatus::Verified => self.account_info().await?.verified,
+        };
+
+        Ok(account_state.nfts.get(&token_id).map(|nft| nft.clone()))
     }
 
     /// Returns the current account ID.

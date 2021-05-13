@@ -199,7 +199,9 @@ mod signatures_with_vectors {
                 };
                 let (transfer, eth_signature) = signer
                     .sign_transfer(
-                        token,
+                        token.id,
+                        token.symbol,
+                        token.decimals,
                         transfer_tx.amount.clone(),
                         transfer_tx.fee.clone(),
                         sign_data.to,
