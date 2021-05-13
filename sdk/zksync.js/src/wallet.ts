@@ -947,6 +947,23 @@ export class Wallet {
 
         return submitSignedTransaction(txData, this.provider);
     }
+    getWithdrawNFTEthMessagePart(withdrawNFT: {
+        to: string;
+        token: number;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+    }): string {
+        const stringFee = BigNumber.from(withdrawNFT.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
+        const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
+        return this.ethMessageSigner.getWithdrawNFTEthMessagePart({
+            token: withdrawNFT.token,
+            to: withdrawNFT.to,
+            stringFee,
+            stringFeeToken
+        });
+    }
 
     // The following methods are needed in case user decided to build
     // a message for the batch himself (e.g. in case of multi-authors batch).
@@ -1044,7 +1061,6 @@ export class Wallet {
             feeToken: stringToken
         });
     }
-
 
     getForcedExitEthMessagePart(forcedExit: { target: Address; token: TokenLike; fee: BigNumberish }): string {
         const stringFee = BigNumber.from(forcedExit.fee).isZero()

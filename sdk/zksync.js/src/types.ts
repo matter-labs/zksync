@@ -282,7 +282,15 @@ export interface LegacyChangePubKeyFee {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT' | 'WithdrawNFT' | 'Swap';
+    feeType:
+        | 'Withdraw'
+        | 'Transfer'
+        | 'TransferToNew'
+        | 'FastWithdraw'
+        | ChangePubKeyFee
+        | 'MintNFT'
+        | 'WithdrawNFT'
+        | 'Swap';
     // Amount of gas used by transaction
     gasTxAmount: BigNumber;
     // Gas price (in wei)

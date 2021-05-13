@@ -177,7 +177,6 @@ export class BatchBuilder {
         return this;
     }
 
-
     addSwap(swap: {
         orders: [Order, Order];
         amounts: [BigNumberish, BigNumberish];
