@@ -232,9 +232,9 @@ export class Provider {
             | 'MintNFT'
             | 'Swap'
             | ChangePubKeyFee
-            | LegacyChangePubKeyFee
             | 'WithdrawNFT'
-            | 'FastWithdrawNFT',
+            | 'FastWithdrawNFT'
+            | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {
@@ -254,11 +254,11 @@ export class Provider {
             | 'Withdraw'
             | 'Transfer'
             | 'FastWithdraw'
-            | ChangePubKeyFee
-            | LegacyChangePubKeyFee
             | 'MintNFT'
             | 'WithdrawNFT'
             | 'FastWithdrawNFT'
+            | ChangePubKeyFee
+            | LegacyChangePubKeyFee
             | 'Swap'
         )[],
         addresses: Address[],

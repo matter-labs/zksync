@@ -18,9 +18,9 @@ import { Wallet } from './wallet';
  * Used by `BatchBuilder` to store transactions until the `build()` call.
  */
 interface InternalTx {
-    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT' | 'Swap';
+    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT' | 'WithdrawNFT' | 'Swap';
     tx: any;
-    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT' | 'Swap';
+    feeType: 'Withdraw' | 'Transfer' | ChangePubKeyFee | 'MintNFT' | 'WithdrawNFT' | 'Swap';
     address: Address;
     token: TokenLike;
     // Whether or not the tx has been signed.
@@ -105,7 +105,6 @@ export class BatchBuilder {
         token: TokenLike;
         amount: BigNumberish;
         fee?: BigNumberish;
-        fastProcessing?: boolean;
         validFrom?: number;
         validUntil?: number;
     }): BatchBuilder {
@@ -118,11 +117,10 @@ export class BatchBuilder {
             validFrom: withdraw.validFrom || 0,
             validUntil: withdraw.validUntil || MAX_TIMESTAMP
         };
-        const feeType = withdraw.fastProcessing === true ? 'FastWithdraw' : 'Withdraw';
         this.txs.push({
             type: 'Withdraw',
             tx: _withdraw,
-            feeType,
+            feeType: 'Withdraw',
             address: _withdraw.ethAddress,
             token: _withdraw.token
         });
@@ -134,14 +132,12 @@ export class BatchBuilder {
         contentHash: string;
         feeToken: TokenLike;
         fee?: BigNumberish;
-        nonce?: Nonce;
     }): BatchBuilder {
         const _mintNft = {
             recipient: mintNFT.recipient,
             contentHash: mintNFT.contentHash,
             feeToken: mintNFT.feeToken,
-            fee: mintNFT.fee || 0,
-            nonce: null
+            fee: mintNFT.fee || 0
         };
         this.txs.push({
             type: 'MintNFT',
@@ -149,6 +145,33 @@ export class BatchBuilder {
             feeType: 'MintNFT',
             address: _mintNft.recipient,
             token: _mintNft.feeToken
+        });
+
+        return this;
+    }
+
+    addWithdrawNFT(withdrawNFT: {
+        to: string;
+        token: TokenLike;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        validFrom?: number;
+        validUntil?: number;
+    }): BatchBuilder {
+        const _withdrawNFT = {
+            to: withdrawNFT.to,
+            token: withdrawNFT.token,
+            feeToken: withdrawNFT.feeToken,
+            fee: withdrawNFT.fee || 0,
+            validFrom: withdrawNFT.validFrom || 0,
+            validUntil: withdrawNFT.validUntil || MAX_TIMESTAMP
+        };
+        this.txs.push({
+            type: 'WithdrawNFT',
+            tx: _withdrawNFT,
+            feeType: 'WithdrawNFT',
+            address: _withdrawNFT.to,
+            token: _withdrawNFT.feeToken
         });
 
         return this;
@@ -322,13 +345,19 @@ export class BatchBuilder {
                     processedTxs.push(forcedExit);
                     break;
                 case 'MintNFT':
-                    messages.push(this.wallet.getMintNFTMessagePart(tx.tx));
+                    messages.push(this.wallet.getMintNFTEthMessagePart(tx.tx));
                     const mintNft = { tx: await this.wallet.getMintNFT(tx.tx) };
                     processedTxs.push(mintNft);
+                    break;
                 case 'Swap':
                     messages.push(this.wallet.getSwapEthSignMessagePart(tx.tx));
                     const swap = { tx: await this.wallet.getSwap(tx.tx) };
                     processedTxs.push(swap);
+                    break;
+                case 'WithdrawNFT':
+                    messages.push(this.wallet.getWithdrawNFTEthMessagePart(tx.tx));
+                    const withdrawNft = { tx: await this.wallet.getWithdrawNFT(tx.tx) };
+                    processedTxs.push(withdrawNft);
                     break;
             }
         }

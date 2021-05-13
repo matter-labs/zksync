@@ -111,13 +111,17 @@ type FullExit = {
     tx_hash: string;
     block_number: number;
     op: {
+        type: 'FullExit';
+        serial_id: number | null;
         priority_op: {
+            token: number;
             account_id: number;
             eth_address: string;
-            token: number;
         };
-        type: 'FullExit';
-        withdraw_amount: string | null;
+        content_hash: string | null;
+        creator_address: string | null;
+        withdraw_amount: string;
+        creator_account_id: number | null;
     };
     success: boolean;
     fail_reason: string | null;

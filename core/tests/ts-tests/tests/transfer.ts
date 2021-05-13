@@ -60,7 +60,7 @@ Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wal
 
     const state = await sender.getAccountState();
     const nft = Object.values(state.verified.nfts)[0];
-
+    expect(nft !== undefined);
     const senderBefore = await sender.getNFT(nft.id);
     const receiverBefore = await receiver.getNFT(nft.id);
     const handles = await sender.syncTransferNFT({
