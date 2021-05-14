@@ -150,4 +150,64 @@ type ForcedExit = {
     created_at: string;
 };
 
-export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit | ForcedExit)[];
+type WithdrawNFT = {
+    tx_hash: string;
+    block_number: number;
+    op: {
+        amount: string;
+        fee: string;
+        from: string;
+        accountId: number;
+        nonce: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        to: string;
+        token: number;
+        feeToken: number;
+        type: 'WithdrawNFT';
+        fast: boolean;
+        validFrom: number;
+        validUntil: number;
+    };
+    success: boolean;
+    fail_reason: string | null;
+    created_at: string;
+};
+
+type MintNFT = {
+    tx_hash: string;
+    block_number: number;
+    op: {
+        fee: string;
+        creatorId: number;
+        creatorAddress: string;
+        accountId: number;
+        nonce: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        recipient: string;
+        contentHash: string;
+        feeTokenId: number;
+        type: 'MintNFT';
+        validFrom: number;
+        validUntil: number;
+    };
+    success: boolean;
+    fail_reason: string | null;
+    created_at: string;
+};
+
+export type Interface = (
+    | Deposit
+    | Transfer
+    | Withdraw
+    | ChangePubKey
+    | FullExit
+    | ForcedExit
+    | WithdrawNFT
+    | MintNFT
+)[];

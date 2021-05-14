@@ -249,7 +249,7 @@ Tester.prototype.testBatchBuilderNFT = async function (from: Wallet, to: Wallet,
 
     this.runningFee = this.runningFee.add(totalMintFee);
 
-    const withdraw_batch = await from
+    const withdraw_batch = await to
         .batchBuilder()
         .addWithdrawNFT({ to: to.address(), token: nft1.id, feeToken })
         .addWithdrawNFT({ to: to.address(), token: nft2.id, feeToken })
@@ -257,15 +257,15 @@ Tester.prototype.testBatchBuilderNFT = async function (from: Wallet, to: Wallet,
 
     const totalWithdrawFee = withdraw_batch.totalFee.get(feeToken)!;
 
-    const withdraw_handles = await wallet.submitSignedTransactionsBatch(from.provider, withdraw_batch.txs, [
+    const withdraw_handles = await wallet.submitSignedTransactionsBatch(to.provider, withdraw_batch.txs, [
         withdraw_batch.signature
     ]);
     await Promise.all(withdraw_handles.map((handle) => handle.awaitReceipt()));
 
     const balanceAfterWithdraw1 = await to.getNFT(nft1.id);
     const balanceAfterWithdraw2 = await to.getNFT(nft2.id);
-    expect(balanceAfterWithdraw1.id === undefined, 'Account has NFT after two withdrawNFT txs').to.be.true;
-    expect(balanceAfterWithdraw2.id === undefined, 'Account has NFT after two withdrawNFT txs').to.be.true;
+    expect(balanceAfterWithdraw1 === undefined, 'Account has NFT after two withdrawNFT txs').to.be.true;
+    expect(balanceAfterWithdraw2 === undefined, 'Account has NFT after two withdrawNFT txs').to.be.true;
 
     this.runningFee = this.runningFee.add(totalWithdrawFee);
 };

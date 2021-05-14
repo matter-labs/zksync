@@ -133,7 +133,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
         await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
         await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
-        // await tester.testBatchBuilderNFT(frank, david, feeToken);
+        await tester.testBatchBuilderNFT(frank, david, token);
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
     });
