@@ -19,54 +19,14 @@ import "./Operations.sol";
 
 import "./UpgradeableMaster.sol";
 
-/// @title zkSync main contract
+/// @title zkSync additional main contract
 /// @author Matter Labs
 contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMathUInt128 for uint128;
 
+    // We still keep it to preserve storage layout
     bytes32 private constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
-
-    /// @notice Data needed to process onchain operation from block public data.
-    /// @notice Onchain operations is operations that need some processing on L1: Deposits, Withdrawals, ChangePubKey.
-    /// @param ethWitness Some external data that can be needed for operation processing
-    /// @param publicDataOffset Byte offset in public data for onchain operation
-    struct OnchainOperationData {
-        bytes ethWitness;
-        uint32 publicDataOffset;
-    }
-
-    /// @notice Data needed to commit new block
-    struct CommitBlockInfo {
-        bytes32 newStateHash;
-        bytes publicData;
-        uint256 timestamp;
-        OnchainOperationData[] onchainOperations;
-        uint32 blockNumber;
-        uint32 feeAccount;
-    }
-
-    /// @notice Data needed to execute committed and verified block
-    /// @param commitmentsInSlot verified commitments in one slot
-    /// @param commitmentIdx index such that commitmentsInSlot[commitmentIdx] is current block commitment
-    struct ExecuteBlockInfo {
-        StoredBlockInfo storedBlock;
-        bytes[] pendingOnchainOpsPubdata;
-    }
-
-    /// @notice Recursive proof input data (individual commitments are constructed onchain)
-    struct ProofInput {
-        uint256[] recursiveInput;
-        uint256[] proof;
-        uint256[] commitments;
-        uint8[] vkIndexes;
-        uint256[16] subproofsLimbs;
-    }
-
-    /// @notice Checks that current state not is exodus mode
-    function requireActive() internal view {
-        require(!exodusMode, "L"); // exodus mode activated
-    }
 
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
         uint128 balance = pendingBalances[_packedBalanceKey].balanceToWithdraw;
@@ -155,46 +115,6 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             pendingWithdrawnNFTs[_tokenId] = withdrawNftOp;
         }
         performedExodus[_accountId][_tokenId] = true;
-    }
-
-    /// @dev Creates block commitment from its data
-    /// @dev _offsetCommitment - hash of the array where 1 is stored in chunk where onchainOperation begins and 0 for other chunks
-    function createBlockCommitment(
-        StoredBlockInfo memory _previousBlock,
-        CommitBlockInfo memory _newBlockData,
-        bytes memory _offsetCommitment
-    ) public view returns (bytes32 commitment) {
-        bytes32 hash = sha256(abi.encodePacked(uint256(_newBlockData.blockNumber), uint256(_newBlockData.feeAccount)));
-        hash = sha256(abi.encodePacked(hash, _previousBlock.stateHash));
-        hash = sha256(abi.encodePacked(hash, _newBlockData.newStateHash));
-        hash = sha256(abi.encodePacked(hash, uint256(_newBlockData.timestamp)));
-
-        bytes memory pubdata = abi.encodePacked(_newBlockData.publicData, _offsetCommitment);
-
-        /// The code below is equivalent to `commitment = sha256(abi.encodePacked(hash, _publicData))`
-
-        /// We use inline assembly instead of this concise and readable code in order to avoid copying of `_publicData` (which saves ~90 gas per transfer operation).
-
-        /// Specifically, we perform the following trick:
-        /// First, replace the first 32 bytes of `_publicData` (where normally its length is stored) with the value of `hash`.
-        /// Then, we call `sha256` precompile passing the `_publicData` pointer and the length of the concatenated byte buffer.
-        /// Finally, we put the `_publicData.length` back to its original location (to the first word of `_publicData`).
-        assembly {
-            let hashResult := mload(0x40)
-            let pubDataLen := mload(pubdata)
-            mstore(pubdata, hash)
-            // staticcall to the sha256 precompile at address 0x2
-            let success := staticcall(gas(), 0x2, pubdata, add(pubDataLen, 0x20), hashResult, 0x20)
-            mstore(pubdata, pubDataLen)
-
-            // Use "invalid" to make gas estimation work
-            switch success
-                case 0 {
-                    invalid()
-                }
-
-            commitment := mload(hashResult)
-        }
     }
 
     function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external nonReentrant {
