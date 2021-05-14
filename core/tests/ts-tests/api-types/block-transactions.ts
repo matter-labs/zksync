@@ -120,7 +120,7 @@ type FullExit = {
         };
         content_hash: string | null;
         creator_address: string | null;
-        withdraw_amount: string;
+        withdraw_amount: string | null;
         creator_account_id: number | null;
     };
     success: boolean;
