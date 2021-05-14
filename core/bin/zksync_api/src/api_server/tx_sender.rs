@@ -969,11 +969,8 @@ async fn verify_txs_batch_signature(
                     if batch_sign_data.is_none() && tx.signature.is_none() {
                         return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
                     }
-                    if let Some(signature) = tx.signature {
-                        Some(EthSignData { signature, message })
-                    } else {
-                        None
-                    }
+                    tx.signature
+                        .map(|signature| EthSignData { signature, message })
                 }
             }
         } else {

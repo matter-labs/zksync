@@ -41,9 +41,9 @@ impl ApiTokensData {
         fee_ticker: mpsc::Sender<TickerRequest>,
     ) -> Self {
         Self {
-            pool,
-            tokens,
             fee_ticker,
+            tokens,
+            pool,
         }
     }
 
