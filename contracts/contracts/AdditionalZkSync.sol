@@ -33,29 +33,6 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         pendingBalances[_packedBalanceKey] = PendingBalance(balance.add(_amount), FILLED_GAS_RESERVE_VALUE);
     }
 
-    /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
-    /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
-    /// @dev of existed priority requests expiration block number.
-    /// @return bool flag that is true if the Exodus mode must be entered.
-    function activateExodusMode() public returns (bool) {
-        // #if EASY_EXODUS
-        bool trigger = true;
-        // #else
-        bool trigger =
-            block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
-                priorityRequests[firstPriorityRequestId].expirationBlock != 0;
-        // #endif
-        if (trigger) {
-            if (!exodusMode) {
-                exodusMode = true;
-                emit ExodusMode();
-            }
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     /// @notice Withdraws token from ZkSync to root chain in case of exodus mode. User must provide proof that he owns funds
     /// @param _storedBlockInfo Last verified block
     /// @param _owner Owner of the account

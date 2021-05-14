@@ -575,8 +575,23 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
-    function activateExodusMode() external returns (bool) {
-        delegateAdditional();
+    function activateExodusMode() public returns (bool) {
+        // #if EASY_EXODUS
+        bool trigger = true;
+        // #else
+        bool trigger =
+            block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
+                priorityRequests[firstPriorityRequestId].expirationBlock != 0;
+        // #endif
+        if (trigger) {
+            if (!exodusMode) {
+                exodusMode = true;
+                emit ExodusMode();
+            }
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /// @notice Withdraws token from ZkSync to root chain in case of exodus mode. User must provide proof that he owns funds
