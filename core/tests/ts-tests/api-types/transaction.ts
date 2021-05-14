@@ -180,4 +180,61 @@ type ForcedExit = {
     };
 };
 
-export type Interface = ChangePubKey | Transfer | Withdraw | Deposit | FullExit | ForcedExit;
+type MintNFT = {
+    tx_type: 'MintNFT';
+    from: string;
+    to: string;
+    token: number;
+    amount: string;
+    fee: string;
+    block_number: number;
+    nonce: number;
+    created_at: string;
+    fail_reason: string | null;
+    tx: {
+        fee: string;
+        creatorId: number;
+        nonce: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        creatorAddress: string;
+        recipient: string;
+        contentHash: string;
+        feeToken: number;
+        type: 'MintNFT';
+    };
+};
+
+type WithdrawNFT = {
+    tx_type: 'WithdrawNFT';
+    from: string;
+    to: string;
+    token: number;
+    amount: string;
+    fee: string;
+    block_number: number;
+    nonce: number;
+    created_at: string;
+    fail_reason: string | null;
+    tx: {
+        fee: string;
+        from: string;
+        accountId: number;
+        nonce: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        to: string;
+        token: number;
+        feeToken: number;
+        type: 'WithdrawNFT';
+        fast: boolean;
+        validFrom: number;
+        validUntil: number;
+    };
+};
+
+export type Interface = ChangePubKey | Transfer | Withdraw | Deposit | FullExit | ForcedExit | MintNFT | WithdrawNFT;
