@@ -5,7 +5,7 @@ const { expect } = require('chai');
 const hardhat = require('hardhat');
 import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
 
-describe.only('Regenesis test', function () {
+describe('Regenesis test', function () {
     this.timeout(50000);
 
     // Not sure about different hardhat versions' wallets,

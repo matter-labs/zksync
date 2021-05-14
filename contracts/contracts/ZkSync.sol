@@ -179,34 +179,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Canceling may take several separate transactions to be completed
     /// @param _n number of requests to process
     function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
-        // bytes memory data = abi.encode(_n, _depositsPubdata);
-
-        // (bool success, ) = additionalZkSync.delegatecall(
-        //     abi.encodeWithSignature("cancelOutstandingDepositsForExodusMode(bytes)", (data))
-        // );
-        // require(success, "ups11 ");
         delegateAdditional();
-
-        // require(exodusMode, "8"); // exodus mode not active
-        // uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
-        // require(toProcess == _depositsPubdata.length, "A");
-        // require(toProcess > 0, "9"); // no deposits to process
-        // uint64 currentDepositIdx = 0;
-        // for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
-        //     if (priorityRequests[id].opType == Operations.OpType.Deposit) {
-        //         bytes memory depositPubdata = _depositsPubdata[currentDepositIdx];
-        //         require(Utils.hashBytesToBytes20(depositPubdata) == priorityRequests[id].hashedPubData, "a");
-        //         ++currentDepositIdx;
-
-        //         Operations.Deposit memory op = Operations.readDepositPubdata(depositPubdata);
-        //         bytes22 packedBalanceKey = packAddressAndTokenId(op.owner, uint16(op.tokenId));
-        //         pendingBalances[packedBalanceKey].balanceToWithdraw += op.amount;
-        //     }
-        //     delete priorityRequests[id];
-        // }
-        // firstPriorityRequestId += toProcess;
-        // totalOpenPriorityRequests -= toProcess;
-        // delegateAdditional();
     }
 
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
@@ -606,14 +579,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         delegateAdditional();
     }
 
-    // TODO uncomment it
-    //    /// @notice Withdraws token from ZkSync to root chain in case of exodus mode. User must provide proof that he owns funds
-    //    /// @param _storedBlockInfo Last verified block
-    //    /// @param _owner Owner of the account
-    //    /// @param _accountId Id of the account in the tree
-    //    /// @param _proof Proof
-    //    /// @param _tokenId Verified token id
-    //    /// @param _amount Amount for owner (must be total amount, not part of it)
+    /// @notice Withdraws token from ZkSync to root chain in case of exodus mode. User must provide proof that he owns funds
+    /// @param _storedBlockInfo Last verified block
+    /// @param _owner Owner of the account
+    /// @param _accountId Id of the account in the tree
+    /// @param _proof Proof
+    /// @param _tokenId Verified token id
+    /// @param _amount Amount for owner (must be total amount, not part of it)
     function performExodus(
         StoredBlockInfo memory _storedBlockInfo,
         address _owner,
@@ -972,6 +944,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return callSuccess;
     }
 
+    /// @notice Delegates the call to the additional part of the main contract.
+    /// @notice Should be only use to delegate the external calls as it passes the calldata
     function delegateAdditional() internal {
         address _target = additionalZkSync;
         assembly {
@@ -997,12 +971,5 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     return(ptr, size)
                 }
         }
-    }
-
-    function kek() public {
-        (bool success, ) = additionalZkSync.call(abi.encodeWithSignature("kek()"));
-        require(success, "leldedsdsd");
-
-        //  AdditionalZkSync(additionalZkSync).kek();
     }
 }

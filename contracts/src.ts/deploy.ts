@@ -158,7 +158,7 @@ export class Deployer {
             console.log('Deploying zkSync target');
         }
         const zksContract = await deployContract(this.deployWallet, this.contracts.zkSync, [], {
-            gasLimit: 8000000,
+            gasLimit: 6000000,
             ...ethTxOptions
         });
         const zksRec = await zksContract.deployTransaction.wait();
@@ -177,7 +177,6 @@ export class Deployer {
 
     public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
         let genesis_root = process.env.CONTRACTS_GENESIS_ROOT;
-        console.log('befoer depsds');
         const deployFactoryContract = await deployContract(
             this.deployWallet,
             this.deployFactoryCode,
@@ -190,9 +189,8 @@ export class Deployer {
                 this.governorAddress,
                 process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
             ],
-            { gasLimit: 10000000, ...ethTxOptions }
+            { gasLimit: 5000000, ...ethTxOptions }
         );
-        console.log('deployed!');
         const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
         const deployFactoryInterface = new Interface(this.deployFactoryCode.abi);
 
