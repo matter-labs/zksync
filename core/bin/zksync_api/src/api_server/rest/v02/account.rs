@@ -301,7 +301,7 @@ mod tests {
     use tokio::sync::Mutex;
     use zksync_api_client::rest::client::Client;
     use zksync_api_types::v02::{
-        pagination::PaginationDirection,
+        pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest},
         transaction::{L1Transaction, TransactionData},
         ApiVersion,
     };
@@ -413,7 +413,15 @@ mod tests {
         let (client, server) = get_unconfirmed_ops_loopback(create_pending_ops_handle());
 
         client
-            .get_unconfirmed_ops(Address::default(), AccountId::default())
+            .get_unconfirmed_ops(&PaginationQuery {
+                from: PendingOpsRequest {
+                    address: Address::default(),
+                    account_id: AccountId::default(),
+                    serial_id: 0,
+                },
+                limit: 0,
+                direction: PaginationDirection::Newer,
+            })
             .await?;
 
         server.stop().await;

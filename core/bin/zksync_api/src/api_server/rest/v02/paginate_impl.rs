@@ -6,10 +6,9 @@
 use zksync_api_types::v02::{
     block::{BlockInfo, BlockStatus},
     pagination::{
-        AccountTxsRequest, BlockAndTxHash, Paginated, PaginationDirection, PaginationQuery,
-        PendingOpsRequest,
+        AccountTxsRequest, BlockAndTxHash, Paginated, PaginationQuery, PendingOpsRequest,
     },
-    transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
+    transaction::Transaction,
 };
 use zksync_storage::StorageProcessor;
 use zksync_types::{BlockNumber, Token, TokenId};
@@ -165,59 +164,10 @@ impl Paginate<Transaction, PendingOpsRequest> for CoreApiClient {
         &mut self,
         query: &PaginationQuery<PendingOpsRequest>,
     ) -> Result<Paginated<Transaction, PendingOpsRequest>, Error> {
-        let mut all_ops = self
+        let result = self
             .get_unconfirmed_ops(query)
             .await
             .map_err(Error::core_api)?;
-        let count = all_ops.len();
-
-        let index = match query.direction {
-            PaginationDirection::Newer => {
-                all_ops.sort_by(|a, b| a.serial_id.cmp(&b.serial_id));
-                all_ops
-                    .iter()
-                    .position(|a| a.serial_id >= query.from.serial_id)
-            }
-            PaginationDirection::Older => {
-                all_ops.sort_by(|a, b| b.serial_id.cmp(&a.serial_id));
-                all_ops
-                    .iter()
-                    .position(|a| a.serial_id <= query.from.serial_id)
-            }
-        };
-
-        let list = match index {
-            Some(index) => {
-                let mut ops: Vec<_> = all_ops[index..].iter().collect();
-                ops.truncate(query.limit as usize);
-                ops.into_iter()
-                    .map(|op| {
-                        let tx_hash = op.tx_hash();
-                        let tx = L1Transaction::from_pending_op(
-                            op.data.clone(),
-                            op.eth_hash,
-                            op.serial_id,
-                            tx_hash,
-                        );
-                        Transaction {
-                            tx_hash,
-                            block_number: None,
-                            op: TransactionData::L1(tx),
-                            status: TxInBlockStatus::Queued,
-                            fail_reason: None,
-                            created_at: None,
-                        }
-                    })
-                    .collect()
-            }
-            None => Vec::new(),
-        };
-        Ok(Paginated::new(
-            list,
-            query.from,
-            query.limit,
-            query.direction,
-            count as u32,
-        ))
+        Ok(result)
     }
 }

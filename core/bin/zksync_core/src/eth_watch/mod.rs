@@ -24,7 +24,7 @@ use web3::types::{Address, BlockNumber};
 // Workspace deps
 use zksync_api_types::v02::{
     pagination::{Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
-    transaction::Transaction,
+    transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
 };
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_types::{tx::TxHash, Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp, H256};
@@ -87,7 +87,7 @@ pub enum EthWatchRequest {
     },
     GetUnconfirmedOps {
         query: PaginationQuery<PendingOpsRequest>,
-        resp: oneshot::Sender<Vec<PriorityOp>>,
+        resp: oneshot::Sender<Paginated<Transaction, PendingOpsRequest>>,
     },
     GetUnconfirmedOpByEthHash {
         eth_hash: H256,
@@ -272,24 +272,55 @@ impl<W: EthClient> EthWatch<W> {
         &self,
         query: PaginationQuery<PendingOpsRequest>,
     ) -> Paginated<Transaction, PendingOpsRequest> {
-        let filtered = self
+        let all_ops = self
             .eth_state
             .unconfirmed_queue()
             .iter()
             .filter(|op| match &op.data {
                 ZkSyncPriorityOp::Deposit(deposit) => {
-                    // Address may be set to sender.
+                    // Address may be set to recipient.
                     deposit.to == query.from.address
                 }
                 ZkSyncPriorityOp::FullExit(full_exit) => {
                     full_exit.account_id == query.from.account_id
                 }
             });
-        let sorted = match query.direction {
-            PaginationDirection::Newer => filtered.sorted_by_key(|op| op.serial_id),
-            PaginationDirection::Older => filtered.sorted_by(|a, b| b.serial_id.cmp(&a.serial_id)),
+        let count = all_ops.clone().count();
+        let ops: Vec<PriorityOp> = match query.direction {
+            PaginationDirection::Newer => all_ops
+                .sorted_by_key(|op| op.serial_id)
+                .filter(|op| op.serial_id >= query.from.serial_id)
+                .take(query.limit as usize)
+                .cloned()
+                .collect(),
+            PaginationDirection::Older => all_ops
+                .sorted_by(|a, b| b.serial_id.cmp(&a.serial_id))
+                .filter(|op| op.serial_id <= query.from.serial_id)
+                .take(query.limit as usize)
+                .cloned()
+                .collect(),
         };
-        sorted
+        let txs: Vec<Transaction> = ops
+            .into_iter()
+            .map(|op| {
+                let tx_hash = op.tx_hash();
+                let tx = L1Transaction::from_pending_op(
+                    op.data.clone(),
+                    op.eth_hash,
+                    op.serial_id,
+                    tx_hash,
+                );
+                Transaction {
+                    tx_hash,
+                    block_number: None,
+                    op: TransactionData::L1(tx),
+                    status: TxInBlockStatus::Queued,
+                    fail_reason: None,
+                    created_at: None,
+                }
+            })
+            .collect();
+        Paginated::new(txs, query.from, query.limit, query.direction, count as u32)
     }
 
     async fn poll_eth_node(&mut self) -> anyhow::Result<()> {
