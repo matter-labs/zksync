@@ -154,7 +154,6 @@ type WithdrawNFT = {
     tx_hash: string;
     block_number: number;
     op: {
-        amount: string;
         fee: string;
         from: string;
         accountId: number;
