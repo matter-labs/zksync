@@ -121,8 +121,8 @@ describe('Regenesis test', function () {
         const newBlockHash = await zksyncContract.getStoredBlockHash();
         const newAdditionalZkSyncAddress = await zksyncContract.getAdditionalZkSync();
         expect(expectedNewBlockHash).to.eq(newBlockHash, 'The new block has been applied wrongly');
-        expect(additionalZkSyncAddress).to.eq(
-            newAdditionalZkSyncAddress,
+        expect(additionalZkSyncAddress.toLowerCase()).to.eq(
+            newAdditionalZkSyncAddress.toLowerCase(),
             'The additional zkSync address has been changed wrongly'
         );
     });
