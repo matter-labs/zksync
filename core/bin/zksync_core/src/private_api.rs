@@ -13,11 +13,11 @@ use futures::{
     channel::{mpsc, oneshot},
     sink::SinkExt,
 };
-use serde::Deserialize;
 use std::thread;
+use zksync_api_types::v02::pagination::{PaginationQuery, PendingOpsRequest};
 use zksync_config::configs::api::PrivateApi;
 use zksync_types::{
-    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, AccountId, Address, SignedZkSyncTx,
+    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, Address, SignedZkSyncTx,
 };
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
@@ -97,22 +97,15 @@ async fn unconfirmed_deposits(
     Ok(HttpResponse::Ok().json(response))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct UnconfirmedOpsRequest {
-    address: Address,
-    account_id: AccountId,
-}
-
 /// Obtains information about unconfirmed operations known for a certain account.
 #[actix_web::get("/unconfirmed_ops")]
 async fn unconfirmed_ops(
     data: web::Data<AppState>,
-    web::Query(query): web::Query<UnconfirmedOpsRequest>,
+    web::Query(query): web::Query<PaginationQuery<PendingOpsRequest>>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
     let item = EthWatchRequest::GetUnconfirmedOps {
-        address: query.address,
-        account_id: query.account_id,
+        query,
         resp: sender,
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();

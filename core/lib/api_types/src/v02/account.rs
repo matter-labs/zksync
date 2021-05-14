@@ -18,3 +18,9 @@ pub enum AccountStateType {
     Committed,
     Finalized,
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub enum AccountAddressOrId {
+    Address(Address),
+    Id(AccountId),
+}

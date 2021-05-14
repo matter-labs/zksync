@@ -1,7 +1,7 @@
+use zksync_api_types::v02::pagination::{PaginationQuery, PendingOpsRequest};
 pub use zksync_types::EthBlockId;
 use zksync_types::{
-    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, AccountId, Address, PriorityOp,
-    SignedZkSyncTx,
+    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx,
 };
 
 use crate::tx_error::TxAddError;
@@ -55,14 +55,16 @@ impl CoreApiClient {
     /// Queries information about unconfirmed priority operations for a certain account from a Core.
     pub async fn get_unconfirmed_ops(
         &self,
-        address: Address,
-        account_id: AccountId,
+        query: &PaginationQuery<PendingOpsRequest>,
     ) -> anyhow::Result<Vec<PriorityOp>> {
         let endpoint = format!(
-            "{}/unconfirmed_ops?address=0x{}&account_id={}",
+            "{}/unconfirmed_ops?address=0x{}&account_id={}&serial_id={}&limit={}&direction={:?}",
             self.addr,
-            hex::encode(address),
-            account_id
+            hex::encode(query.from.address),
+            query.from.account_id,
+            query.from.serial_id,
+            query.limit,
+            query.direction
         );
         self.get(&endpoint).await
     }

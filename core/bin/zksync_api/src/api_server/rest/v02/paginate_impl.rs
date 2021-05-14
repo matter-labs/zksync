@@ -166,7 +166,7 @@ impl Paginate<Transaction, PendingOpsRequest> for CoreApiClient {
         query: &PaginationQuery<PendingOpsRequest>,
     ) -> Result<Paginated<Transaction, PendingOpsRequest>, Error> {
         let mut all_ops = self
-            .get_unconfirmed_ops(query.from.address, query.from.account_id)
+            .get_unconfirmed_ops(query)
             .await
             .map_err(Error::core_api)?;
         let count = all_ops.len();

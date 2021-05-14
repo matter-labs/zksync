@@ -17,12 +17,17 @@ use futures::{
     SinkExt, StreamExt,
 };
 
+use itertools::Itertools;
 use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
 
 // Workspace deps
+use zksync_api_types::v02::{
+    pagination::{Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
+    transaction::Transaction,
+};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
-use zksync_types::{tx::TxHash, AccountId, Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp, H256};
+use zksync_types::{tx::TxHash, Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp, H256};
 
 // Local deps
 use self::{
@@ -81,8 +86,7 @@ pub enum EthWatchRequest {
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
     GetUnconfirmedOps {
-        address: Address,
-        account_id: AccountId,
+        query: PaginationQuery<PendingOpsRequest>,
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
     GetUnconfirmedOpByEthHash {
@@ -264,19 +268,28 @@ impl<W: EthClient> EthWatch<W> {
             .collect()
     }
 
-    fn get_ongoing_ops_for(&self, address: Address, account_id: AccountId) -> Vec<PriorityOp> {
-        self.eth_state
+    fn get_ongoing_ops_for(
+        &self,
+        query: PaginationQuery<PendingOpsRequest>,
+    ) -> Paginated<Transaction, PendingOpsRequest> {
+        let filtered = self
+            .eth_state
             .unconfirmed_queue()
             .iter()
             .filter(|op| match &op.data {
                 ZkSyncPriorityOp::Deposit(deposit) => {
                     // Address may be set to sender.
-                    deposit.to == address
+                    deposit.to == query.from.address
                 }
-                ZkSyncPriorityOp::FullExit(full_exit) => full_exit.account_id == account_id,
-            })
-            .cloned()
-            .collect()
+                ZkSyncPriorityOp::FullExit(full_exit) => {
+                    full_exit.account_id == query.from.account_id
+                }
+            });
+        let sorted = match query.direction {
+            PaginationDirection::Newer => filtered.sorted_by_key(|op| op.serial_id),
+            PaginationDirection::Older => filtered.sorted_by(|a, b| b.serial_id.cmp(&a.serial_id)),
+        };
+        sorted
     }
 
     async fn poll_eth_node(&mut self) -> anyhow::Result<()> {
@@ -387,13 +400,9 @@ impl<W: EthClient> EthWatch<W> {
                     let deposits_for_address = self.get_ongoing_deposits_for(address);
                     resp.send(deposits_for_address).ok();
                 }
-                EthWatchRequest::GetUnconfirmedOps {
-                    address,
-                    account_id,
-                    resp,
-                } => {
-                    let deposits_for_address = self.get_ongoing_ops_for(address, account_id);
-                    resp.send(deposits_for_address).ok();
+                EthWatchRequest::GetUnconfirmedOps { query, resp } => {
+                    let unconfirmed_ops = self.get_ongoing_ops_for(query);
+                    resp.send(unconfirmed_ops).ok();
                 }
                 EthWatchRequest::GetUnconfirmedOpByEthHash { eth_hash, resp } => {
                     let unconfirmed_op = self.find_ongoing_op_by_eth_hash(eth_hash);

@@ -9,7 +9,7 @@ use zksync_api_types::v02::{
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     tx::TxHash,
-    AccountId, BlockNumber, ExecutedOperations,
+    BlockNumber, ExecutedOperations,
 };
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
@@ -328,7 +328,6 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                account_id: AccountId(0),
                 tx_hash: setup.get_tx_hash(0, 0),
             },
             limit: 1,
@@ -455,7 +454,6 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
             .get_account_transactions(&PaginationQuery {
                 from: AccountTxsRequest {
                     address: from,
-                    account_id: AccountId(0),
                     tx_hash: request.tx_hash,
                 },
                 limit: request.limit,
@@ -473,7 +471,6 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                account_id: AccountId(0),
                 tx_hash: setup.get_tx_hash(1, 2),
             },
             limit: 1,
@@ -490,7 +487,6 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                account_id: AccountId(0),
                 tx_hash: setup.get_tx_hash(0, 6),
             },
             limit: 2,
@@ -508,7 +504,6 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                account_id: AccountId(0),
                 tx_hash: setup.get_tx_hash(0, 2),
             },
             limit: 1,
@@ -522,7 +517,6 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: to,
-                account_id: AccountId(0),
                 tx_hash: setup.get_tx_hash(0, 2),
             },
             limit: 1,
