@@ -54,11 +54,11 @@ pub struct TotalFee {
 }
 
 impl BatchFee {
-    pub fn new(zkp_fee: Ratio<BigUint>, gas_fee: Ratio<BigUint>) -> BatchFee {
+    pub fn new(zkp_fee: Ratio<BigUint>, gas_fee: Ratio<BigUint>) -> Self {
         let (zkp_fee, gas_fee, total_fee) = total_fee(&zkp_fee, &gas_fee);
-        BatchFee {
-            zkp_fee,
+        Self {
             gas_fee,
+            zkp_fee,
             total_fee,
         }
     }
