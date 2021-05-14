@@ -907,11 +907,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .fetch_optional(transaction.conn())
             .await?;
 
-            if let Some(record) = record {
-                Some((record.created_at, BlockNumber(record.block_number as u32)))
-            } else {
-                None
-            }
+            record.map(|record| (record.created_at, BlockNumber(record.block_number as u32)))
         };
         transaction.commit().await?;
 
@@ -1002,15 +998,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .await?
         {
             Some(batch_info)
-        } else if let Some(batch_info) = transaction
-            .chain()
-            .mempool_schema()
-            .get_queued_batch_info(batch_hash)
-            .await?
-        {
-            Some(batch_info)
         } else {
-            None
+            transaction
+                .chain()
+                .mempool_schema()
+                .get_queued_batch_info(batch_hash)
+                .await?
         };
         transaction.commit().await?;
 
