@@ -58,7 +58,7 @@ impl ApiAccountData {
                     .account_id_by_address(address)
                     .await
                     .map_err(Error::storage)?;
-                account_id.ok_or(Error::from(InvalidDataError::AccountNotFound))
+                account_id.ok_or_else(|| Error::from(InvalidDataError::AccountNotFound))
             }
         }
     }
@@ -76,7 +76,7 @@ impl ApiAccountData {
                     .account_address_by_id(account_id)
                     .await
                     .map_err(Error::storage)?;
-                address.ok_or(Error::from(InvalidDataError::AccountNotFound))
+                address.ok_or_else(|| Error::from(InvalidDataError::AccountNotFound))
             }
             AccountAddressOrId::Address(address) => Ok(address),
         }
