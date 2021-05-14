@@ -14732,14 +14732,10 @@ yocto-queue@^0.1.0:
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-0.1.0.tgz#0294eb3dee05028d31ee1a5fa2c556a6aaf10a1b"
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
 
-"zksync-crypto@link:sdk/zksync-crypto":
-  version "0.0.0"
-  uid ""
-
 "zksync@link:sdk/zksync.js":
-  version "0.10.8"
+  version "0.11.0-beta.0"
   dependencies:
     axios "^0.21.1"
     websocket "^1.0.30"
     websocket-as-promised "^1.1.0"
-    zksync-crypto "link:sdk/zksync-crypto"
+    zksync-crypto "^0.6.0-beta.0"
