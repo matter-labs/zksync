@@ -98,6 +98,8 @@ async fn unconfirmed_deposits(
 }
 
 /// Obtains information about unconfirmed operations known for a certain account.
+/// Both id and address are needed because pending deposits can be matched only with addresses,
+/// while pending full exits can be matched only with account ids.
 #[actix_web::get("/unconfirmed_ops")]
 async fn unconfirmed_ops(
     data: web::Data<AppState>,
