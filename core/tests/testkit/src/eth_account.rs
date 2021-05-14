@@ -149,6 +149,7 @@ impl EthereumAccount {
         account_id: AccountId,
         token_id: TokenId,
         amount: &BigUint,
+        zero_account_address: Address,
         proof: EncodedSingleProof,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let options = Options {
@@ -166,6 +167,10 @@ impl EthereumAccount {
                 u64::from(*account_id),
                 u64::from(*token_id),
                 U128::from(amount.to_u128().unwrap()),
+                0u64,
+                zero_account_address,
+                0u64,
+                H256::default(),
                 proof.proof,
             ),
         );

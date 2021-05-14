@@ -8,7 +8,7 @@ import "./UpgradeGatekeeper.sol";
 import "./ZkSync.sol";
 import "./Verifier.sol";
 import "./TokenInit.sol";
-import "./ZkSyncAdditional.sol";
+import "./AdditionalZkSync.sol";
 
 contract DeployFactory is TokenDeployInit {
     // Why do we deploy contracts in the constructor?
@@ -58,9 +58,12 @@ contract DeployFactory is TokenDeployInit {
         Proxy governance = new Proxy(address(_governanceTarget), abi.encode(this));
         // set this contract as governor
         Proxy verifier = new Proxy(address(_verifierTarget), abi.encode());
-        ZkSyncAdditional additionalZkSync = new ZkSyncAdditional();
+        AdditionalZkSync additionalZkSync = new AdditionalZkSync();
         Proxy zkSync =
-            new Proxy(address(_zksyncTarget), abi.encode(address(governance), address(verifier), address(additionalZkSync), _genesisRoot));
+            new Proxy(
+                address(_zksyncTarget),
+                abi.encode(address(governance), address(verifier), address(additionalZkSync), _genesisRoot)
+            );
 
         UpgradeGatekeeper upgradeGatekeeper = new UpgradeGatekeeper(zkSync);
 

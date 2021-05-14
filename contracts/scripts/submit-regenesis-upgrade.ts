@@ -45,10 +45,10 @@ async function main() {
         gasLimit: 6500000
     });
 
-    const upgradeData = ethers.utils.defaultAbiCoder.encode([
-        storedBlockInfoParam(),
-        'address'
-    ], [lastBlockInfo, newTargetAdditionalZkSync.address]);
+    const upgradeData = ethers.utils.defaultAbiCoder.encode(
+        [storedBlockInfoParam(), 'address'],
+        [lastBlockInfo, newTargetAdditionalZkSync.address]
+    );
 
     console.log('Starting upgrade');
     await (

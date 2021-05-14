@@ -178,8 +178,35 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev WARNING: Only for Exodus mode
     /// @dev Canceling may take several separate transactions to be completed
     /// @param _n number of requests to process
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external nonReentrant {
+    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
+        // bytes memory data = abi.encode(_n, _depositsPubdata);
+
+        // (bool success, ) = additionalZkSync.delegatecall(
+        //     abi.encodeWithSignature("cancelOutstandingDepositsForExodusMode(bytes)", (data))
+        // );
+        // require(success, "ups11 ");
         delegateAdditional();
+
+        // require(exodusMode, "8"); // exodus mode not active
+        // uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
+        // require(toProcess == _depositsPubdata.length, "A");
+        // require(toProcess > 0, "9"); // no deposits to process
+        // uint64 currentDepositIdx = 0;
+        // for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
+        //     if (priorityRequests[id].opType == Operations.OpType.Deposit) {
+        //         bytes memory depositPubdata = _depositsPubdata[currentDepositIdx];
+        //         require(Utils.hashBytesToBytes20(depositPubdata) == priorityRequests[id].hashedPubData, "a");
+        //         ++currentDepositIdx;
+
+        //         Operations.Deposit memory op = Operations.readDepositPubdata(depositPubdata);
+        //         bytes22 packedBalanceKey = packAddressAndTokenId(op.owner, uint16(op.tokenId));
+        //         pendingBalances[packedBalanceKey].balanceToWithdraw += op.amount;
+        //     }
+        //     delete priorityRequests[id];
+        // }
+        // firstPriorityRequestId += toProcess;
+        // totalOpenPriorityRequests -= toProcess;
+        // delegateAdditional();
     }
 
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
@@ -587,20 +614,20 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     //    /// @param _proof Proof
     //    /// @param _tokenId Verified token id
     //    /// @param _amount Amount for owner (must be total amount, not part of it)
-       function performExodus(
-           StoredBlockInfo memory _storedBlockInfo,
-           address _owner,
-           uint32 _accountId,
-           uint32 _tokenId,
-           uint128 _amount,
-           uint32 _nftCreatorAccountId,
-           address _nftCreatorAddress,
-           uint32 _nftSerialId,
-           bytes32 _nftContentHash,
-           uint256[] memory _proof
-       ) external nonReentrant {
-           delegateAdditional();
-       }
+    function performExodus(
+        StoredBlockInfo memory _storedBlockInfo,
+        address _owner,
+        uint32 _accountId,
+        uint32 _tokenId,
+        uint128 _amount,
+        uint32 _nftCreatorAccountId,
+        address _nftCreatorAddress,
+        uint32 _nftSerialId,
+        bytes32 _nftContentHash,
+        uint256[] memory _proof
+    ) external {
+        delegateAdditional();
+    }
 
     /// @notice Set data for changing pubkey hash using onchain authorization.
     ///         Transaction author (msg.sender) should be L2 account address
@@ -959,7 +986,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             // Copy the size length of bytes from return data at zero position to pointer position
             returndatacopy(ptr, 0x0, size)
 
-            return(ptr, size)
             // Depending on result value
             switch result
                 case 0 {
@@ -971,5 +997,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     return(ptr, size)
                 }
         }
+    }
+
+    function kek() public {
+        (bool success, ) = additionalZkSync.call(abi.encodeWithSignature("kek()"));
+        require(success, "leldedsdsd");
+
+        //  AdditionalZkSync(additionalZkSync).kek();
     }
 }

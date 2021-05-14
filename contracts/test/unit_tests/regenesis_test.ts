@@ -5,7 +5,7 @@ const { expect } = require('chai');
 const hardhat = require('hardhat');
 import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
 
-describe('Regenesis test', function () {
+describe.only('Regenesis test', function () {
     this.timeout(50000);
 
     // Not sure about different hardhat versions' wallets,
@@ -98,14 +98,16 @@ describe('Regenesis test', function () {
         };
 
         const StoredBlockInfo = storedBlockInfoParam();
-        
+
         // We need some address, but it is not needed for upgrade itself, so we don't care
-        const additionalZkSyncAddress = '0xc0f97CC918C9d6fA4E9fc6be61a6a06589D199b2'; 
+        const additionalZkSyncAddress = '0x6778b59d7fa1be069fed3c44e603fc807d5057ae';
 
-        const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode(
-            [StoredBlockInfo, 'address'], [genesisBlock, additionalZkSyncAddress]);
+        const encodedUpgradeData = ethers.utils.defaultAbiCoder.encode(
+            [StoredBlockInfo, 'address'],
+            [genesisBlock, additionalZkSyncAddress]
+        );
 
-        const tx = await upgradeGatekeeperContract.finishUpgrade([[], [], encodedStoredBlockInfo]);
+        const tx = await upgradeGatekeeperContract.finishUpgrade([[], [], encodedUpgradeData]);
         await tx.wait();
 
         const newBlock = {
@@ -119,6 +121,9 @@ describe('Regenesis test', function () {
         const newBlockHash = await zksyncContract.getStoredBlockHash();
         const newAdditionalZkSyncAddress = await zksyncContract.getAdditionalZkSync();
         expect(expectedNewBlockHash).to.eq(newBlockHash, 'The new block has been applied wrongly');
-        expect(additionalZkSyncAddress).to.eq(newAdditionalZkSyncAddress, 'The additional zkSync address has been changed wrongly');
+        expect(additionalZkSyncAddress).to.eq(
+            newAdditionalZkSyncAddress,
+            'The additional zkSync address has been changed wrongly'
+        );
     });
 });

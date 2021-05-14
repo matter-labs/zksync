@@ -68,7 +68,6 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         require(!exodusMode, "L"); // exodus mode activated
     }
 
-
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
         uint128 balance = pendingBalances[_packedBalanceKey].balanceToWithdraw;
         pendingBalances[_packedBalanceKey] = PendingBalance(balance.add(_amount), FILLED_GAS_RESERVE_VALUE);
@@ -198,47 +197,6 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         }
     }
 
-    /// @notice Register full exit request - pack pubdata, add priority request
-    /// @param _accountId Numerical id of the account
-    /// @param _token Token address, 0 address for ether
-    // function requestFullExit(uint32 _accountId, address _token) public nonReentrant {
-    //     requireActive();
-    //     require(_accountId <= MAX_ACCOUNT_ID, "e");
-    //     require(_accountId != SPECIAL_ACCOUNT_ID, "v"); // request full exit for nft storage account
-
-    //     uint16 tokenId;
-    //     if (_token == address(0)) {
-    //         tokenId = 0;
-    //     } else {
-    //         tokenId = governance.validateTokenAddress(_token);
-    //     }
-
-    //     // Priority Queue request
-    //     Operations.FullExit memory op =
-    //         Operations.FullExit({
-    //             accountId: _accountId,
-    //             owner: msg.sender,
-    //             tokenId: uint32(tokenId),
-    //             amount: 0, // unknown at this point
-    //             nftCreatorAccountId: uint32(0), // unknown at this point
-    //             nftCreatorAddress: address(0), // unknown at this point
-    //             nftSerialId: uint32(0), // unknown at this point
-    //             nftContentHash: bytes32(0) // unknown at this point
-    //         });
-    //     bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
-    //     addPriorityRequest(Operations.OpType.FullExit, pubData);
-
-    //     // User must fill storage slot of balancesToWithdraw(msg.sender, tokenId) with nonzero value
-    //     // In this case operator should just overwrite this slot during confirming withdrawal
-    //     bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, tokenId);
-    //     pendingBalances[packedBalanceKey].gasReserveValue = FILLED_GAS_RESERVE_VALUE;
-    // }
-
-
-    /// @notice Accrues users balances from deposit priority requests in Exodus mode
-    /// @dev WARNING: Only for Exodus mode
-    /// @dev Canceling may take several separate transactions to be completed
-    /// @param _n number of requests to process
     function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external nonReentrant {
         require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
