@@ -295,6 +295,7 @@ mod tests {
         SharedData,
     };
     use actix_web::{web::Json, App};
+    use chrono::Utc;
     use serde::Deserialize;
     use serde_json::json;
     use std::sync::Arc;
@@ -478,24 +479,26 @@ mod tests {
         let response = client.account_txs(&query, &account_id.to_string()).await?;
         let txs: Paginated<Transaction, AccountTxsRequest> = deserialize_response_result(response)?;
         assert_eq!(txs.list[0].tx_hash, tx_hash);
-
         // Provide unconfirmed pending ops.
         *server.pending_ops.lock().await = json!({
             "list": [
                 {
-                    "serial_id": 10,
-                    "data": {
+                    "tx_hash": TxHash::from_slice(&vec![0u8; 32]),
+                    "block_number": None,
+                    "op": {
                         "type": "Deposit",
-                        "account_id": account_id,
-                        "amount": "100500",
                         "from": Address::default(),
+                        "token_id": 0,
+                        "amount": "100500",
                         "to": address,
-                        "token": 0,
+                        "account_id": None,
+                        "eth_hash": vec![0u8; 32],
+                        "id": 10,
+                        "tx_hash": TxHash::from_slice(&vec![0u8; 32])
                     },
-                    "deadline_block": 10,
-                    "eth_hash": vec![0u8; 32],
-                    "eth_block": 5,
-                    "eth_block_index": 2
+                    "status": "queued",
+                    "fail_reason": None,
+                    "created_at": Utc::now()
                 },
             ],
             "pagination": {
