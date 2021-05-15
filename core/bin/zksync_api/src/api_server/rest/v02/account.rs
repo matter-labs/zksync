@@ -492,7 +492,7 @@ mod tests {
         *server.pending_ops.lock().await = json!({
             "list": [
                 {
-                    "tx_hash": TxHash::from_slice(&vec![0u8; 32]),
+                    "tx_hash": TxHash::from_slice(&[0u8; 32]),
                     "block_number": Option::<BlockNumber>::None,
                     "op": {
                         "type": "Deposit",
@@ -501,9 +501,9 @@ mod tests {
                         "amount": "100500",
                         "to": address,
                         "account_id": Option::<AccountId>::None,
-                        "eth_hash": H256::from_slice(&vec![0u8; 32]),
+                        "eth_hash": H256::from_slice(&[0u8; 32]),
                         "id": 10,
-                        "tx_hash": TxHash::from_slice(&vec![0u8; 32])
+                        "tx_hash": TxHash::from_slice(&[0u8; 32])
                     },
                     "status": "queued",
                     "fail_reason": Option::<String>::None,
