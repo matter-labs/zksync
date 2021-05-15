@@ -61,13 +61,15 @@ impl CoreApiClient {
         query: &PaginationQuery<PendingOpsRequest>,
     ) -> anyhow::Result<Paginated<Transaction, PendingOpsRequest>> {
         let endpoint = format!(
-            "{}/unconfirmed_ops?address=0x{}&account_id={}&serial_id={}&limit={}&direction={:?}",
+            "{}/unconfirmed_ops?address=0x{}&account_id={}&serial_id={}&limit={}&direction={}",
             self.addr,
             hex::encode(query.from.address),
             query.from.account_id,
             query.from.serial_id,
             query.limit,
-            query.direction
+            serde_json::to_string(&query.direction)
+                .unwrap()
+                .replace("\"", "")
         );
         self.get(&endpoint).await
     }

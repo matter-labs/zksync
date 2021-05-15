@@ -311,13 +311,28 @@ mod tests {
     type PendingOpsHandle = Arc<Mutex<serde_json::Value>>;
 
     fn create_pending_ops_handle() -> PendingOpsHandle {
-        Arc::new(Mutex::new(json!([])))
+        Arc::new(Mutex::new(json!({
+            "list": [],
+            "pagination": {
+                "from": {
+                    "address": Address::default(),
+                    "account_id": AccountId::default(),
+                    "serial_id": 1
+                },
+                "limit": 1,
+                "direction": "newer",
+                "count": 0,
+            }
+        })))
     }
 
     #[derive(Debug, Deserialize)]
-    pub struct UnconfirmedOpsRequest {
-        address: Address,
-        account_id: AccountId,
+    struct PendingOpsParams {
+        pub address: Address,
+        pub account_id: AccountId,
+        pub serial_id: u64,
+        pub limit: u32,
+        pub direction: PaginationDirection,
     }
 
     fn get_unconfirmed_ops_loopback(
@@ -325,7 +340,7 @@ mod tests {
     ) -> (CoreApiClient, actix_web::test::TestServer) {
         async fn get_ops(
             data: web::Data<PendingOpsHandle>,
-            web::Query(_query): web::Query<UnconfirmedOpsRequest>,
+            web::Query(_query): web::Query<PendingOpsParams>,
         ) -> Json<serde_json::Value> {
             Json(data.lock().await.clone())
         }
@@ -465,23 +480,35 @@ mod tests {
         assert_eq!(txs.list[0].tx_hash, tx_hash);
 
         // Provide unconfirmed pending ops.
-        *server.pending_ops.lock().await = json!([
-            {
-                "serial_id": 10,
-                "data": {
-                    "type": "Deposit",
-                    "account_id": account_id,
-                    "amount": "100500",
-                    "from": Address::default(),
-                    "to": address,
-                    "token": 0,
+        *server.pending_ops.lock().await = json!({
+            "list": [
+                {
+                    "serial_id": 10,
+                    "data": {
+                        "type": "Deposit",
+                        "account_id": account_id,
+                        "amount": "100500",
+                        "from": Address::default(),
+                        "to": address,
+                        "token": 0,
+                    },
+                    "deadline_block": 10,
+                    "eth_hash": vec![0u8; 32],
+                    "eth_block": 5,
+                    "eth_block_index": 2
                 },
-                "deadline_block": 10,
-                "eth_hash": vec![0u8; 32],
-                "eth_block": 5,
-                "eth_block_index": 2
-            },
-        ]);
+            ],
+            "pagination": {
+                "from": {
+                    "serial_id": 1,
+                    "address": address,
+                    "account_id": account_id
+                },
+                "limit": 1,
+                "count": 1,
+                "direction": "newer"
+            }
+        });
 
         let query = PaginationQuery {
             from: 1,
