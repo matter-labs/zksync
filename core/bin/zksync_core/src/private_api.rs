@@ -108,8 +108,10 @@ struct PendingOpsFlattenRequest {
 }
 
 /// Obtains information about unconfirmed operations known for a certain account.
-/// Both id and address are needed because pending deposits can be matched only with addresses,
+/// Pending deposits can be matched only with addresses,
 /// while pending full exits can be matched only with account ids.
+/// If the account isn't created yet it doesn't have an id
+/// but we can still find pending deposits for its address that is why account_id is Option.
 #[actix_web::get("/unconfirmed_ops")]
 async fn unconfirmed_ops(
     data: web::Data<AppState>,
