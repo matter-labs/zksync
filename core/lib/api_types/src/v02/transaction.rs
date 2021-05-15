@@ -2,7 +2,6 @@ use super::block::BlockStatus;
 use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use zksync_types::{
     tx::TxHash,
     tx::{EthBatchSignatures, TxEthSignature},
@@ -42,7 +41,7 @@ impl From<BlockStatus> for TxInBlockStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TxData {
     pub tx: Transaction,
     pub eth_signature: Option<String>,
@@ -72,7 +71,7 @@ pub enum Receipt {
     L2(L2Receipt),
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Transaction {
     #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
@@ -83,11 +82,11 @@ pub struct Transaction {
     pub created_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TransactionData {
     L1(L1Transaction),
-    L2(Value),
+    L2(ZkSyncTx),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]

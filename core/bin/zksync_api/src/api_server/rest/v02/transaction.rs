@@ -122,7 +122,7 @@ pub fn l2_tx_from_op_and_status(
     Transaction {
         tx_hash,
         block_number,
-        op: TransactionData::L2(op.tx),
+        op: TransactionData::L2(serde_json::from_value(op.tx).unwrap()),
         status,
         fail_reason: op.fail_reason,
         created_at: Some(op.created_at),
@@ -332,7 +332,7 @@ impl ApiTransactionData {
             let tx = Transaction {
                 tx_hash,
                 block_number: None,
-                op: TransactionData::L2(op.tx),
+                op: TransactionData::L2(serde_json::from_value(op.tx).unwrap()),
                 status: TxInBlockStatus::Queued,
                 fail_reason: None,
                 created_at: Some(op.created_at),

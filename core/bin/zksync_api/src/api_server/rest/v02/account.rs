@@ -47,9 +47,9 @@ impl ApiAccountData {
     async fn get_id_by_address_or_id(
         &self,
         account_address_or_id: AccountAddressOrId,
-    ) -> Result<AccountId, Error> {
+    ) -> Result<Option<AccountId>, Error> {
         match account_address_or_id {
-            AccountAddressOrId::Id(account_id) => Ok(account_id),
+            AccountAddressOrId::Id(account_id) => Ok(Some(account_id)),
             AccountAddressOrId::Address(address) => {
                 let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
                 let account_id = storage
@@ -58,7 +58,7 @@ impl ApiAccountData {
                     .account_id_by_address(address)
                     .await
                     .map_err(Error::storage)?;
-                account_id.ok_or_else(|| Error::from(InvalidDataError::AccountNotFound))
+                Ok(account_id)
             }
         }
     }
@@ -185,7 +185,7 @@ impl ApiAccountData {
         &self,
         query: PaginationQuery<SerialId>,
         address: Address,
-        account_id: AccountId,
+        account_id: Option<AccountId>,
     ) -> Result<Paginated<Transaction, PendingOpsRequest>, Error> {
         let new_query = PaginationQuery {
             from: PendingOpsRequest {
@@ -209,7 +209,9 @@ async fn account_committed_info(
         data.parse_account_id_or_address(&account_id_or_address)
             .await
     );
-    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    let account_id_option = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    let account_id =
+        api_try!(account_id_option.ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
     data.account_info(account_id, AccountStateType::Committed)
         .await
         .into()
@@ -223,7 +225,9 @@ async fn account_finalized_info(
         data.parse_account_id_or_address(&account_id_or_address)
             .await
     );
-    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    let account_id_option = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    let account_id =
+        api_try!(account_id_option.ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
     data.account_info(account_id, AccountStateType::Finalized)
         .await
         .into()
@@ -251,10 +255,15 @@ async fn account_pending_txs(
         data.parse_account_id_or_address(&account_id_or_address)
             .await
     );
-    // Both id and address are needed because pending deposits can be matched only with addresses,
+    // Pending deposits can be matched only with addresses,
     // while pending full exits can be matched only with account ids.
-    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id.clone()).await);
-    let address = api_try!(data.get_address_by_address_or_id(address_or_id).await);
+    // If the account isn't created yet it doesn't have an id
+    // but we can still find pending deposits for its address that is why account_id is Option.
+    let address = api_try!(
+        data.get_address_by_address_or_id(address_or_id.clone())
+            .await
+    );
+    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
     data.account_pending_txs(query, address, account_id)
         .await
         .into()
@@ -307,7 +316,7 @@ mod tests {
         ApiVersion,
     };
     use zksync_storage::StorageProcessor;
-    use zksync_types::{AccountId, Address};
+    use zksync_types::{AccountId, Address, H256};
 
     type PendingOpsHandle = Arc<Mutex<serde_json::Value>>;
 
@@ -328,9 +337,9 @@ mod tests {
     }
 
     #[derive(Debug, Deserialize)]
-    struct PendingOpsParams {
+    struct PendingOpsFlattenRequest {
         pub address: Address,
-        pub account_id: AccountId,
+        pub account_id: Option<AccountId>,
         pub serial_id: u64,
         pub limit: u32,
         pub direction: PaginationDirection,
@@ -341,7 +350,7 @@ mod tests {
     ) -> (CoreApiClient, actix_web::test::TestServer) {
         async fn get_ops(
             data: web::Data<PendingOpsHandle>,
-            web::Query(_query): web::Query<PendingOpsParams>,
+            web::Query(_query): web::Query<PendingOpsFlattenRequest>,
         ) -> Json<serde_json::Value> {
             Json(data.lock().await.clone())
         }
@@ -432,7 +441,7 @@ mod tests {
             .get_unconfirmed_ops(&PaginationQuery {
                 from: PendingOpsRequest {
                     address: Address::default(),
-                    account_id: AccountId::default(),
+                    account_id: Some(AccountId::default()),
                     serial_id: 0,
                 },
                 limit: 0,
@@ -484,20 +493,20 @@ mod tests {
             "list": [
                 {
                     "tx_hash": TxHash::from_slice(&vec![0u8; 32]),
-                    "block_number": None,
+                    "block_number": Option::<BlockNumber>::None,
                     "op": {
                         "type": "Deposit",
                         "from": Address::default(),
                         "token_id": 0,
                         "amount": "100500",
                         "to": address,
-                        "account_id": None,
-                        "eth_hash": vec![0u8; 32],
+                        "account_id": Option::<AccountId>::None,
+                        "eth_hash": H256::from_slice(&vec![0u8; 32]),
                         "id": 10,
                         "tx_hash": TxHash::from_slice(&vec![0u8; 32])
                     },
                     "status": "queued",
-                    "fail_reason": None,
+                    "fail_reason": Option::<String>::None,
                     "created_at": Utc::now()
                 },
             ],

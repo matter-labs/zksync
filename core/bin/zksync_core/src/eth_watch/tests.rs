@@ -182,7 +182,7 @@ async fn test_operation_queues() {
     let ops = watcher.get_ongoing_ops_for(PaginationQuery {
         from: PendingOpsRequest {
             address: to_addr,
-            account_id: AccountId(1),
+            account_id: Some(AccountId(1)),
             serial_id: 0,
         },
         limit: 2,
@@ -194,7 +194,7 @@ async fn test_operation_queues() {
         .get_ongoing_ops_for(PaginationQuery {
             from: PendingOpsRequest {
                 address: from_addr,
-                account_id: AccountId(0),
+                account_id: Some(AccountId(0)),
                 serial_id: 0
             },
             limit: 3,

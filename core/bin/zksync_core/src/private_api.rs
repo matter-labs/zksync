@@ -99,9 +99,9 @@ async fn unconfirmed_deposits(
 }
 
 #[derive(Debug, Deserialize)]
-struct PendingOpsParams {
+struct PendingOpsFlattenRequest {
     pub address: Address,
-    pub account_id: AccountId,
+    pub account_id: Option<AccountId>,
     pub serial_id: u64,
     pub limit: u32,
     pub direction: PaginationDirection,
@@ -113,7 +113,7 @@ struct PendingOpsParams {
 #[actix_web::get("/unconfirmed_ops")]
 async fn unconfirmed_ops(
     data: web::Data<AppState>,
-    web::Query(params): web::Query<PendingOpsParams>,
+    web::Query(params): web::Query<PendingOpsFlattenRequest>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
     let query = PaginationQuery {

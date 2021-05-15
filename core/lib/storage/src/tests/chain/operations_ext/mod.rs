@@ -524,7 +524,9 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         })
         .await?
         .unwrap();
-    assert_eq!(from_txs, to_txs);
+    let from_txs_hashes: Vec<TxHash> = from_txs.into_iter().map(|tx| tx.tx_hash).collect();
+    let to_txs_hashes: Vec<TxHash> = to_txs.into_iter().map(|tx| tx.tx_hash).collect();
+    assert_eq!(from_txs_hashes, to_txs_hashes);
 
     Ok(())
 }

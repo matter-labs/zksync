@@ -281,9 +281,11 @@ impl<W: EthClient> EthWatch<W> {
                     // Address may be set to recipient.
                     deposit.to == query.from.address
                 }
-                ZkSyncPriorityOp::FullExit(full_exit) => {
-                    full_exit.account_id == query.from.account_id
-                }
+                ZkSyncPriorityOp::FullExit(full_exit) => query
+                    .from
+                    .account_id
+                    .map(|account_id| account_id == full_exit.account_id)
+                    .unwrap_or(false),
             });
         let count = all_ops.clone().count();
         let ops: Vec<PriorityOp> = match query.direction {

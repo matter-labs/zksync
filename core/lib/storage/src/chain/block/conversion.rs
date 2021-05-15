@@ -234,7 +234,7 @@ pub fn transaction_from_item_and_status(
             L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
         )
     } else {
-        TransactionData::L2(item.op)
+        TransactionData::L2(serde_json::from_value(item.op).unwrap())
     };
     Transaction {
         tx_hash,

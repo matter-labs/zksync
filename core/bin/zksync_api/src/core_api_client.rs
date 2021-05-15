@@ -64,7 +64,7 @@ impl CoreApiClient {
             "{}/unconfirmed_ops?address=0x{}&account_id={}&serial_id={}&limit={}&direction={}",
             self.addr,
             hex::encode(query.from.address),
-            query.from.account_id,
+            serde_json::to_string(&query.from.account_id).unwrap(),
             query.from.serial_id,
             query.limit,
             serde_json::to_string(&query.direction)

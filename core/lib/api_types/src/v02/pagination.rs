@@ -60,7 +60,7 @@ pub struct BlockAndTxHash {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct PendingOpsRequest {
     pub address: Address,
-    pub account_id: AccountId,
+    pub account_id: Option<AccountId>,
     pub serial_id: SerialId,
 }
 
