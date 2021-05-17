@@ -19,11 +19,10 @@ pub enum ErrorCode {
     TokenZeroPriceError = 200,
     InvalidCurrency = 201,
     InvalidBlockPosition = 202,
-    TransactionNotFound = 203,
+    InvalidAccountIdOrAddress = 203,
+    AccountNotFound = 204,
+    TransactionNotFound = 205,
     StorageError = 300,
-    InvalidHexCharacter = 400,
-    HexStringOddLength = 401,
-    InvalidHexStringLength = 402,
     TokenNotFound = 500,
     ExternalApiError = 501,
     InternalError = 600,
@@ -107,6 +106,10 @@ pub enum InvalidDataError {
     TokenZeroPriceError,
     #[error("Cannot parse block position. There are only block_number, last_committed, last_finalized options")]
     InvalidBlockPosition,
+    #[error("Cannot parse account id or address")]
+    InvalidAccountIdOrAddress,
+    #[error("Account is not found")]
+    AccountNotFound,
     #[error("Cannot parse currency. There are only token_id, usd options")]
     InvalidCurrency,
     #[error("Transaction is not found")]
@@ -122,6 +125,8 @@ impl ApiError for InvalidDataError {
         match self {
             Self::TokenZeroPriceError => ErrorCode::TokenZeroPriceError,
             Self::InvalidBlockPosition => ErrorCode::InvalidBlockPosition,
+            Self::InvalidAccountIdOrAddress => ErrorCode::InvalidAccountIdOrAddress,
+            Self::AccountNotFound => ErrorCode::AccountNotFound,
             Self::InvalidCurrency => ErrorCode::InvalidCurrency,
             Self::TransactionNotFound => ErrorCode::TransactionNotFound,
         }

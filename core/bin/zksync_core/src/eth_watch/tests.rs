@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
+use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest};
 use zksync_types::{
     AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp, H256,
 };
@@ -111,48 +112,48 @@ async fn test_operation_queues() {
     let from_addr = [1u8; 20].into();
     let to_addr = [2u8; 20].into();
 
-    client
-        .add_operations(&[
-            PriorityOp {
-                serial_id: 0,
-                data: ZkSyncPriorityOp::Deposit(Deposit {
-                    from: from_addr,
-                    token: TokenId(0),
-                    amount: Default::default(),
-                    to: to_addr,
-                }),
-                deadline_block: 0,
-                eth_hash: [2; 32].into(),
-                eth_block: 4,
-                eth_block_index: Some(1),
-            },
-            PriorityOp {
-                serial_id: 1,
-                data: ZkSyncPriorityOp::Deposit(Deposit {
-                    from: Default::default(),
-                    token: TokenId(0),
-                    amount: Default::default(),
-                    to: Default::default(),
-                }),
-                deadline_block: 0,
-                eth_hash: [3; 32].into(),
-                eth_block: 3,
-                eth_block_index: Some(1),
-            },
-            PriorityOp {
-                serial_id: 2,
-                data: ZkSyncPriorityOp::FullExit(FullExit {
-                    account_id: AccountId(1),
-                    eth_address: from_addr,
-                    token: TokenId(0),
-                }),
-                deadline_block: 0,
-                eth_block: 4,
-                eth_hash: [4; 32].into(),
-                eth_block_index: Some(2),
-            },
-        ])
-        .await;
+    let priority_ops = vec![
+        PriorityOp {
+            serial_id: 0,
+            data: ZkSyncPriorityOp::Deposit(Deposit {
+                from: from_addr,
+                token: TokenId(0),
+                amount: Default::default(),
+                to: to_addr,
+            }),
+            deadline_block: 0,
+            eth_hash: [2; 32].into(),
+            eth_block: 4,
+            eth_block_index: Some(1),
+        },
+        PriorityOp {
+            serial_id: 1,
+            data: ZkSyncPriorityOp::Deposit(Deposit {
+                from: Default::default(),
+                token: TokenId(0),
+                amount: Default::default(),
+                to: Default::default(),
+            }),
+            deadline_block: 0,
+            eth_hash: [3; 32].into(),
+            eth_block: 3,
+            eth_block_index: Some(1),
+        },
+        PriorityOp {
+            serial_id: 2,
+            data: ZkSyncPriorityOp::FullExit(FullExit {
+                account_id: AccountId(1),
+                eth_address: from_addr,
+                token: TokenId(0),
+            }),
+            deadline_block: 0,
+            eth_block: 4,
+            eth_hash: [4; 32].into(),
+            eth_block_index: Some(2),
+        },
+    ];
+
+    client.add_operations(&priority_ops).await;
 
     let mut watcher = create_watcher(client);
     watcher.poll_eth_node().await.unwrap();
@@ -177,12 +178,30 @@ async fn test_operation_queues() {
     // Make sure that the old behavior of the pending deposits getter has not changed.
     let deposits = watcher.get_ongoing_deposits_for(to_addr);
     assert_eq!(deposits.len(), 1);
-    // Check that the new pending operations getter shows only deposits with the same `from` address.
-    let ops = watcher.get_ongoing_ops_for(from_addr);
-
-    assert_eq!(ops[0].serial_id, 0);
-    assert_eq!(ops[1].serial_id, 2);
-    assert!(watcher.get_ongoing_ops_for(to_addr).is_empty());
+    // Check that the new pending operations getter shows only deposits with the same `to` address.
+    let ops = watcher.get_ongoing_ops_for(PaginationQuery {
+        from: PendingOpsRequest {
+            address: to_addr,
+            account_id: Some(AccountId(1)),
+            serial_id: 0,
+        },
+        limit: 2,
+        direction: PaginationDirection::Newer,
+    });
+    assert_eq!(ops.list[0].tx_hash, priority_ops[0].tx_hash());
+    assert_eq!(ops.list[1].tx_hash, priority_ops[2].tx_hash());
+    assert!(watcher
+        .get_ongoing_ops_for(PaginationQuery {
+            from: PendingOpsRequest {
+                address: from_addr,
+                account_id: Some(AccountId(0)),
+                serial_id: 0
+            },
+            limit: 3,
+            direction: PaginationDirection::Newer
+        })
+        .list
+        .is_empty());
 }
 
 /// This test simulates the situation when eth watch module did not poll Ethereum node for some time

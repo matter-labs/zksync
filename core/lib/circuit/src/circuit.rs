@@ -327,10 +327,11 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
 
         let mut validator_balances_processable_tokens = {
             assert_eq!(self.validator_balances.len(), params::total_tokens());
-            for balance in &self.validator_balances[params::number_of_processable_tokens()..] {
-                if let Some(ingored_tokens_balance) = balance {
-                    assert!(ingored_tokens_balance.is_zero());
-                }
+            for balance in self.validator_balances[params::number_of_processable_tokens()..]
+                .iter()
+                .flatten()
+            {
+                assert!(balance.is_zero());
             }
             let allocated_validator_balances = allocate_numbers_vec(
                 cs.namespace(|| "validator_balances"),

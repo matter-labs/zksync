@@ -12,6 +12,7 @@ use zksync_types::network::Network;
 // Local uses
 use crate::api_server::tx_sender::TxSender;
 
+mod account;
 mod block;
 mod config;
 mod error;
@@ -37,6 +38,11 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
             net: zk_config.chain.eth.network,
             api_version: ApiVersion::V02,
         })
+        .service(account::api_scope(
+            tx_sender.pool.clone(),
+            tx_sender.tokens.clone(),
+            tx_sender.core_api_client.clone(),
+        ))
         .service(block::api_scope(
             tx_sender.pool.clone(),
             tx_sender.blocks.clone(),

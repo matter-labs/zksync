@@ -115,12 +115,18 @@ impl RpcApp {
         eth_signatures: Option<EthBatchSignatures>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
-        let result = self
+        let result: Result<Vec<TxHash>> = self
             .tx_sender
             .submit_txs_batch(txs, eth_signatures)
             .await
             .map_err(Error::from)
-            .map(|response| response.transaction_hashes);
+            .map(|response| {
+                response
+                    .transaction_hashes
+                    .into_iter()
+                    .map(|tx_hash| tx_hash.0)
+                    .collect()
+            });
         metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());
         result
     }

@@ -62,13 +62,15 @@ pub struct BlockTransactionItem {
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
-pub struct BlockL1TransactionItem {
+pub struct TransactionItem {
     pub tx_hash: Vec<u8>,
-    pub eth_hash: Vec<u8>,
-    pub priority_op_serialid: i64,
     pub block_number: i64,
-    pub operation: Value,
+    pub op: Value,
     pub created_at: DateTime<Utc>,
+    pub success: bool,
+    pub fail_reason: Option<String>,
+    pub eth_hash: Option<Vec<u8>>,
+    pub priority_op_serialid: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

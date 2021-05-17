@@ -13,10 +13,12 @@ use futures::{
     channel::{mpsc, oneshot},
     sink::SinkExt,
 };
+use serde::Deserialize;
 use std::thread;
+use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest};
 use zksync_config::configs::api::PrivateApi;
 use zksync_types::{
-    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, Address, SignedZkSyncTx,
+    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, AccountId, Address, SignedZkSyncTx,
 };
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
@@ -96,15 +98,37 @@ async fn unconfirmed_deposits(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Obtains information about unconfirmed operations known for a certain address.
-#[actix_web::get("/unconfirmed_ops/{address}")]
+#[derive(Debug, Deserialize)]
+struct PendingOpsFlattenRequest {
+    pub address: Address,
+    pub account_id: Option<AccountId>,
+    pub serial_id: u64,
+    pub limit: u32,
+    pub direction: PaginationDirection,
+}
+
+/// Obtains information about unconfirmed operations known for a certain account.
+/// Pending deposits can be matched only with addresses,
+/// while pending full exits can be matched only with account ids.
+/// If the account isn't created yet it doesn't have an id
+/// but we can still find pending deposits for its address that is why account_id is Option.
+#[actix_web::get("/unconfirmed_ops")]
 async fn unconfirmed_ops(
     data: web::Data<AppState>,
-    web::Path(address): web::Path<Address>,
+    web::Query(params): web::Query<PendingOpsFlattenRequest>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
+    let query = PaginationQuery {
+        from: PendingOpsRequest {
+            address: params.address,
+            account_id: params.account_id,
+            serial_id: params.serial_id,
+        },
+        limit: params.limit,
+        direction: params.direction,
+    };
     let item = EthWatchRequest::GetUnconfirmedOps {
-        address,
+        query,
         resp: sender,
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();

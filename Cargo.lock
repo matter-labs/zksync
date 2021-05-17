@@ -6061,6 +6061,7 @@ dependencies = [
  "tokio 0.2.22",
  "vlog",
  "web3",
+ "zksync_api_types",
  "zksync_balancer",
  "zksync_config",
  "zksync_contracts",

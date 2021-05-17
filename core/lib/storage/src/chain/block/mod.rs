@@ -4,8 +4,9 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use chrono::{DateTime, Utc};
 // Workspace imports
 use zksync_api_types::v02::{
+    block::BlockStatus,
     pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
-    transaction::{L2Status, Transaction},
+    transaction::Transaction,
 };
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
@@ -15,12 +16,9 @@ use zksync_types::{
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
-use self::{
-    conversion::{l1_transaction_from_item_and_status, l2_transaction_from_item_and_status},
-    records::{
-        AccountTreeCache, BlockDetails, BlockL1TransactionItem, BlockTransactionItem, StorageBlock,
-        StorageBlockMetadata, StoragePendingBlock,
-    },
+use self::records::{
+    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StorageBlockMetadata,
+    StoragePendingBlock, TransactionItem,
 };
 use crate::{
     chain::account::records::EthAccountType,
@@ -34,7 +32,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
-mod conversion;
+pub(crate) mod conversion;
 pub mod records;
 
 /// Block schema is a primary sidechain storage controller.
@@ -590,6 +588,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
+    /// Returns the number of last block which commit is confirmed on Ethereum.
+    pub async fn get_last_committed_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
+            .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, Some(true))
+            .await;
+        metrics::histogram!(
+            "sql.chain.block.get_last_committed_confirmed_block",
+            start.elapsed()
+        );
+        result
+    }
+
     /// Returns the number of last block for which proof has been created.
     ///
     /// Note: having a proof for the block doesn't mean that state was updated. Chain state
@@ -943,174 +954,37 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(self.save_block(block).await?)
     }
 
-    /// Retrieves L1 operations stored in the block for the given pagination query
-    pub async fn get_block_l1_transactions_page(
+    /// Returns status and last time it was updated of block that exists in `blocks` table.
+    pub async fn get_status_and_last_updated_of_existing_block(
         &mut self,
-        query: &PaginationQuery<BlockAndTxHash>,
-        time_from: DateTime<Utc>,
-    ) -> QueryResult<Vec<Transaction>> {
-        let start = Instant::now();
+        block_number: BlockNumber,
+    ) -> QueryResult<(BlockStatus, DateTime<Utc>)> {
         let mut transaction = self.0.start_transaction().await?;
-        let raw_txs: Vec<BlockL1TransactionItem> = match query.direction {
-            PaginationDirection::Newer => {
-                sqlx::query_as!(
-                    BlockL1TransactionItem,
-                    r#"
-                        SELECT
-                            block_number,
-                            created_at,
-                            operation,
-                            tx_hash,
-                            eth_hash,
-                            priority_op_serialid
-                        FROM executed_priority_operations
-                        WHERE block_number = $1 AND created_at >= $2
-                        ORDER BY created_at ASC
-                        LIMIT $3
-                    "#,
-                    i64::from(*query.from.block_number),
-                    time_from,
-                    i64::from(query.limit),
-                )
-                .fetch_all(transaction.conn())
-                .await?
-            }
-            PaginationDirection::Older => {
-                sqlx::query_as!(
-                    BlockL1TransactionItem,
-                    r#"
-                        SELECT
-                            block_number,
-                            created_at,
-                            operation,
-                            tx_hash,
-                            eth_hash,
-                            priority_op_serialid
-                        FROM executed_priority_operations
-                        WHERE block_number = $1 AND created_at <= $2
-                        ORDER BY created_at DESC
-                        LIMIT $3
-                    "#,
-                    i64::from(*query.from.block_number),
-                    time_from,
-                    i64::from(query.limit),
-                )
-                .fetch_all(transaction.conn())
-                .await?
-            }
-        };
-        let is_block_finalized = transaction
+        let (is_finalized_confirmed, finalized_at) = transaction
             .chain()
             .operations_schema()
-            .get_stored_aggregated_operation(
-                query.from.block_number,
-                AggregatedActionType::ExecuteBlocks,
-            )
+            .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
             .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false);
-        let txs: Vec<Transaction> = raw_txs
-            .into_iter()
-            .map(|tx| {
-                let status = if is_block_finalized {
-                    L2Status::Finalized
-                } else {
-                    L2Status::Committed
-                };
-                l1_transaction_from_item_and_status(tx, status)
-            })
-            .collect();
-        transaction.commit().await?;
-
-        metrics::histogram!("sql.chain.block.get_block_l1_transactions", start.elapsed());
-        Ok(txs)
-    }
-
-    /// Retrieves L2 operations stored in the block for the given pagination query
-    pub async fn get_block_l2_transactions_page(
-        &mut self,
-        query: &PaginationQuery<BlockAndTxHash>,
-        time_from: DateTime<Utc>,
-    ) -> QueryResult<Vec<Transaction>> {
-        let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
-        let raw_txs: Vec<BlockTransactionItem> = match query.direction {
-            PaginationDirection::Newer => {
-                sqlx::query_as!(
-                    BlockTransactionItem,
-                    r#"
-                        SELECT
-                            '0x' || encode(tx_hash, 'hex') as "tx_hash!",
-                            tx as op,
-                            block_number,
-                            success,
-                            fail_reason,
-                            created_at
-                        FROM executed_transactions
-                        WHERE block_number = $1 AND created_at >= $2
-                        ORDER BY created_at ASC
-                        LIMIT $3
-                    "#,
-                    i64::from(*query.from.block_number),
-                    time_from,
-                    i64::from(query.limit),
-                )
-                .fetch_all(transaction.conn())
-                .await?
-            }
-            PaginationDirection::Older => {
-                sqlx::query_as!(
-                    BlockTransactionItem,
-                    r#"
-                        SELECT
-                            '0x' || encode(tx_hash, 'hex') as "tx_hash!",
-                            tx as op,
-                            block_number,
-                            success,
-                            fail_reason,
-                            created_at
-                        FROM executed_transactions
-                        WHERE block_number = $1 AND created_at <= $2
-                        ORDER BY created_at DESC
-                        LIMIT $3
-                    "#,
-                    i64::from(*query.from.block_number),
-                    time_from,
-                    i64::from(query.limit),
-                )
-                .fetch_all(transaction.conn())
-                .await?
+            .map(|operation| (operation.confirmed, operation.created_at))
+            .unwrap_or((false, chrono::MIN_DATETIME));
+        let result = if is_finalized_confirmed {
+            (BlockStatus::Finalized, finalized_at)
+        } else {
+            let (is_committed_confirmed, committed_at) = transaction
+                .chain()
+                .operations_schema()
+                .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
+                .await
+                .map(|operation| (operation.confirmed, operation.created_at))
+                .unwrap_or((false, chrono::MIN_DATETIME));
+            if is_committed_confirmed {
+                (BlockStatus::Committed, committed_at)
+            } else {
+                (BlockStatus::Queued, chrono::MIN_DATETIME)
             }
         };
-        let is_block_finalized = transaction
-            .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(
-                query.from.block_number,
-                AggregatedActionType::ExecuteBlocks,
-            )
-            .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false);
-        let txs: Vec<Transaction> = raw_txs
-            .into_iter()
-            .map(|tx| {
-                let status = if tx.success {
-                    if is_block_finalized {
-                        L2Status::Finalized
-                    } else {
-                        L2Status::Committed
-                    }
-                } else {
-                    L2Status::Rejected
-                };
-                l2_transaction_from_item_and_status(tx, status)
-            })
-            .collect();
         transaction.commit().await?;
-
-        metrics::histogram!("sql.chain.block.get_block_l2_transactions", start.elapsed());
-        Ok(txs)
+        Ok(result)
     }
 
     /// Retrieves both L1 and L2 operations stored in the block for the given pagination query
@@ -1120,33 +994,136 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     ) -> QueryResult<Option<Vec<Transaction>>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        // 1. Get `created_at` of tx from query.
-        // 2. Get at most `limit` priority ops and at most `limit` transactions.
-        // 3. Merge them and leave at most `limit` entries.
 
-        let created_at: Option<DateTime<Utc>> = transaction
+        let created_at_and_block = transaction
             .chain()
             .operations_ext_schema()
-            .get_tx_created_at(query.from.block_number, query.from.tx_hash)
+            .get_tx_created_at_and_block_number(query.from.tx_hash)
             .await?;
-        let block_txs = if let Some(created_at) = created_at {
-            let mut block_txs = transaction
-                .chain()
-                .block_schema()
-                .get_block_l2_transactions_page(query, created_at)
-                .await?;
-            let mut l1_txs = transaction
-                .chain()
-                .block_schema()
-                .get_block_l1_transactions_page(query, created_at)
-                .await?;
-            block_txs.append(&mut l1_txs);
-            block_txs.sort_by(|a, b| match query.direction {
-                PaginationDirection::Newer => a.created_at.cmp(&b.created_at),
-                PaginationDirection::Older => b.created_at.cmp(&a.created_at),
-            });
-            block_txs.truncate(query.limit as usize);
-            Some(block_txs)
+        let block_txs = if let Some((time_from, block_number)) = created_at_and_block {
+            if block_number == query.from.block_number {
+                let raw_txs: Vec<TransactionItem> = match query.direction {
+                    PaginationDirection::Newer => {
+                        sqlx::query_as!(
+                            TransactionItem,
+                            r#"
+                                WITH transactions AS (
+                                    SELECT
+                                        tx_hash,
+                                        tx as op,
+                                        block_number,
+                                        created_at,
+                                        success,
+                                        fail_reason,
+                                        Null::bytea as eth_hash,
+                                        Null::bigint as priority_op_serialid
+                                    FROM executed_transactions
+                                    WHERE block_number = $1 AND created_at >= $2
+                                ), priority_ops AS (
+                                    SELECT
+                                        tx_hash,
+                                        operation as op,
+                                        block_number,
+                                        created_at,
+                                        true as success,
+                                        Null as fail_reason,
+                                        eth_hash,
+                                        priority_op_serialid
+                                    FROM executed_priority_operations
+                                    WHERE block_number = $1 AND created_at >= $2
+                                ), everything AS (
+                                    SELECT * FROM transactions
+                                    UNION ALL
+                                    SELECT * FROM priority_ops
+                                )
+                                SELECT
+                                    tx_hash as "tx_hash!",
+                                    block_number as "block_number!",
+                                    op as "op!",
+                                    created_at as "created_at!",
+                                    success as "success!",
+                                    fail_reason as "fail_reason?",
+                                    eth_hash as "eth_hash?",
+                                    priority_op_serialid as "priority_op_serialid?"
+                                FROM everything
+                                ORDER BY created_at ASC
+                                LIMIT $3
+                            "#,
+                            i64::from(*block_number),
+                            time_from,
+                            i64::from(query.limit),
+                        )
+                        .fetch_all(transaction.conn())
+                        .await?
+                    }
+                    PaginationDirection::Older => {
+                        sqlx::query_as!(
+                            TransactionItem,
+                            r#"
+                                WITH transactions AS (
+                                    SELECT
+                                        tx_hash,
+                                        tx as op,
+                                        block_number,
+                                        created_at,
+                                        success,
+                                        fail_reason,
+                                        Null::bytea as eth_hash,
+                                        Null::bigint as priority_op_serialid
+                                    FROM executed_transactions
+                                    WHERE block_number = $1 AND created_at <= $2
+                                ), priority_ops AS (
+                                    SELECT
+                                        tx_hash,
+                                        operation as op,
+                                        block_number,
+                                        created_at,
+                                        true as success,
+                                        Null as fail_reason,
+                                        eth_hash,
+                                        priority_op_serialid
+                                    FROM executed_priority_operations
+                                    WHERE block_number = $1 AND created_at <= $2
+                                ), everything AS (
+                                    SELECT * FROM transactions
+                                    UNION ALL
+                                    SELECT * FROM priority_ops
+                                )
+                                SELECT
+                                    tx_hash as "tx_hash!",
+                                    block_number as "block_number!",
+                                    op as "op!",
+                                    created_at as "created_at!",
+                                    success as "success!",
+                                    fail_reason as "fail_reason?",
+                                    eth_hash as "eth_hash?",
+                                    priority_op_serialid as "priority_op_serialid?"
+                                FROM everything
+                                ORDER BY created_at DESC
+                                LIMIT $3
+                            "#,
+                            i64::from(*block_number),
+                            time_from,
+                            i64::from(query.limit),
+                        )
+                        .fetch_all(transaction.conn())
+                        .await?
+                    }
+                };
+                let block_status = transaction
+                    .chain()
+                    .block_schema()
+                    .get_status_and_last_updated_of_existing_block(block_number)
+                    .await?
+                    .0;
+                let txs: Vec<Transaction> = raw_txs
+                    .into_iter()
+                    .map(|tx| TransactionItem::transaction_from_item_and_status(tx, block_status))
+                    .collect();
+                Some(txs)
+            } else {
+                None
+            }
         } else {
             None
         };

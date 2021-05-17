@@ -20,9 +20,8 @@ use zksync_config::ZkSyncConfig;
 
 use self::types::{
     convert::{
-        depositing_balances_from_pending_ops, op_receipt_from_response,
-        pending_account_op_receipt_from_priority_op, search_direction_as_storage,
-        tx_receipt_from_response, validate_receipts_query,
+        depositing_balances_from_pending_ops, pending_account_op_receipt_from_priority_op,
+        validate_receipts_query,
     },
     AccountReceiptsQuery, SearchDirection,
 };
@@ -175,58 +174,59 @@ impl ApiAccountsData {
 
     async fn tx_receipts(
         &self,
-        address: Address,
-        location: TxLocation,
-        direction: SearchDirection,
-        limit: u32,
+        _address: Address,
+        _location: TxLocation,
+        _direction: SearchDirection,
+        _limit: u32,
     ) -> QueryResult<Vec<AccountTxReceipt>> {
-        let mut storage = self.access_storage().await?;
+        // let mut storage = self.access_storage().await?;
 
-        let items = storage
-            .chain()
-            .operations_ext_schema()
-            .get_account_transactions_receipts(
-                address,
-                *location.block as u64,
-                location.index,
-                search_direction_as_storage(direction),
-                limit as u64,
-            )
-            .await?;
+        // let items = storage
+        //     .chain()
+        //     .operations_ext_schema()
+        //     .get_account_transactions_receipts(
+        //         address,
+        //         *location.block as u64,
+        //         location.index,
+        //         search_direction_as_storage(direction),
+        //         limit as u64,
+        //     )
+        //     .await?;
 
-        Ok(items.into_iter().map(tx_receipt_from_response).collect())
+        // Ok(items.into_iter().map(tx_receipt_from_response).collect())
+        Ok(Vec::new())
     }
 
     async fn op_receipts(
         &self,
-        address: Address,
-        location: TxLocation,
-        direction: SearchDirection,
-        limit: u32,
+        _address: Address,
+        _location: TxLocation,
+        _direction: SearchDirection,
+        _limit: u32,
     ) -> QueryResult<Vec<AccountOpReceipt>> {
-        let mut storage = self.access_storage().await?;
+        // let mut storage = self.access_storage().await?;
 
-        let items = storage
-            .chain()
-            .operations_ext_schema()
-            .get_account_operations_receipts(
-                address,
-                *location.block as u64,
-                location.index.unwrap_or_default(),
-                search_direction_as_storage(direction),
-                limit as u64,
-            )
-            .await?;
+        // let items = storage
+        //     .chain()
+        //     .operations_ext_schema()
+        //     .get_account_operations_receipts(
+        //         address,
+        //         *location.block as u64,
+        //         location.index.unwrap_or_default(),
+        //         search_direction_as_storage(direction),
+        //         limit as u64,
+        //     )
+        //     .await?;
 
-        Ok(items.into_iter().map(op_receipt_from_response).collect())
+        Ok(Vec::new())
     }
 
     async fn pending_op_receipts(
         &self,
-        address: Address,
+        _address: Address,
     ) -> QueryResult<Vec<PendingAccountOpReceipt>> {
-        let ongoing_ops = self.core_api_client.get_unconfirmed_ops(address).await?;
-
+        //let ongoing_ops = self.core_api_client.get_unconfirmed_ops(address).await?;
+        let ongoing_ops = Vec::new();
         let receipts = ongoing_ops
             .into_iter()
             .map(pending_account_op_receipt_from_priority_op)

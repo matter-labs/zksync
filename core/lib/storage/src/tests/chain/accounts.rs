@@ -45,6 +45,15 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     let block_size = 100;
 
+    let (last_finalized, _) = AccountSchema(&mut storage)
+        .account_and_last_block(AccountId(1))
+        .await?;
+    let last_committed = AccountSchema(&mut storage)
+        .last_committed_block_with_update_for_acc(AccountId(1))
+        .await?;
+    assert_eq!(last_finalized, 0);
+    assert_eq!(*last_committed, 0);
+
     // Create several accounts.
     let (accounts_block, updates_block) = apply_random_updates(AccountMap::default(), &mut rng);
 
@@ -64,6 +73,16 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Get the accounts by their addresses.
     for (account_id, account) in accounts_block.iter() {
         let mut account = account.clone();
+
+        let (last_finalized, _) = AccountSchema(&mut storage)
+            .account_and_last_block(*account_id)
+            .await?;
+        let last_committed = AccountSchema(&mut storage)
+            .last_committed_block_with_update_for_acc(*account_id)
+            .await?;
+        assert_eq!(last_finalized, 0);
+        assert_eq!(*last_committed, 1);
+
         let account_state = AccountSchema(&mut storage)
             .account_state_by_address(account.address)
             .await?;
@@ -124,6 +143,15 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // After that all the accounts should have a verified state.
     for (account_id, account) in accounts_block {
+        let (last_finalized, _) = AccountSchema(&mut storage)
+            .account_and_last_block(account_id)
+            .await?;
+        let last_committed = AccountSchema(&mut storage)
+            .last_committed_block_with_update_for_acc(account_id)
+            .await?;
+        assert_eq!(last_finalized, 1);
+        assert_eq!(*last_committed, 1);
+
         let account_state = AccountSchema(&mut storage)
             .account_state_by_id(account_id)
             .await?;
