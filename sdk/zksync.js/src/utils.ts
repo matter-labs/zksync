@@ -31,11 +31,9 @@ export const MIN_NFT_TOKEN_ID = 65536;
 
 export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
-
 export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncGov.json').abi);
-
+export const SYNC_NFT_FACTORY_INTERFACE = new utils.Interface(require('../abi/NFTFactory.json').abi);
 export const IEIP1271_INTERFACE = new utils.Interface(require('../abi/IEIP1271.json').abi);
-
 export const MULTICALL_INTERFACE = new utils.Interface(require('../abi/Multicall.json').abi);
 
 export const ERC20_DEPOSIT_GAS_LIMIT = require('../misc/DepositERC20GasLimit.json');

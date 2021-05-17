@@ -35,7 +35,7 @@
         "lint:ts": "tslint -c tslint.json {examples,test,src}/**/*.ts",
         "lint:ts-fix": "tslint -c tslint.json --fix {examples,test,src}/**/*.ts",
         "tests": "mocha -r ts-node/register tests/**/*.test.ts",
-        "build": "tsc",
+        "build": "sh build.sh",
         "watch": "tsc --watch",
         "prepublish": "yarn build && rollup -c",
         "generate-test-vectors": "yarn ts-node tests/test-generator.ts"
