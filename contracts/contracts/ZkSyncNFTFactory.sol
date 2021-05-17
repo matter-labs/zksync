@@ -33,11 +33,11 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
 
     function mintNFTFromZkSync(
         address creator,
-        uint32 creatorAccountId,
         address recipient,
+        uint32 creatorAccountId,
         uint32 serialId,
         bytes32 contentHash,
-        uint32 tokenId
+        uint256 tokenId
     ) external override {
         require(_msgSender() == _zkSyncAddress, "z"); // Minting allowed only from zkSync
         _safeMint(recipient, tokenId);
@@ -45,7 +45,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         uint256 creatorFingerprint = packCreatorFingerprint(creator, creatorAccountId, serialId);
         _creatorFingerprints[tokenId] = creatorFingerprint;
 
-        emit MintNFTFromZkSync(creator, creatorAccountId, recipient, serialId, contentHash, tokenId);
+        emit MintNFTFromZkSync(creator, recipient, creatorAccountId, serialId, contentHash, tokenId);
     }
 
     function _beforeTokenTransfer(

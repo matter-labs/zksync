@@ -103,7 +103,7 @@ Tester.prototype.testWithdrawNFT = async function (wallet: Wallet, feeToken: Tok
     const contentHash = await defaultFactory.getContentHash(nft.id);
 
     expect(creatorId).to.eq(nft.creatorId, 'The creator id was not saved correctly');
-    expect(contentHash).to.eq(nft.contentHash, 'The content hash was not saved correctly')
+    expect(contentHash).to.eq(nft.contentHash, 'The content hash was not saved correctly');
 
     this.runningFee = this.runningFee.add(fee);
 };

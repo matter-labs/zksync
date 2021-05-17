@@ -32,7 +32,7 @@ interface ZkSyncNFTFactoryInterface extends ethers.utils.Interface {
     "getCreatorFingerprint(uint256)": FunctionFragment;
     "getSerialId(uint256)": FunctionFragment;
     "isApprovedForAll(address,address)": FunctionFragment;
-    "mintNFTFromZkSync(address,uint32,address,uint32,bytes32,uint32)": FunctionFragment;
+    "mintNFTFromZkSync(address,address,uint32,uint32,bytes32,uint256)": FunctionFragment;
     "name()": FunctionFragment;
     "ownerOf(uint256)": FunctionFragment;
     "safeTransferFrom(address,address,uint256)": FunctionFragment;
@@ -84,8 +84,8 @@ interface ZkSyncNFTFactoryInterface extends ethers.utils.Interface {
     functionFragment: "mintNFTFromZkSync",
     values: [
       string,
-      BigNumberish,
       string,
+      BigNumberish,
       BigNumberish,
       BytesLike,
       BigNumberish
@@ -201,7 +201,7 @@ interface ZkSyncNFTFactoryInterface extends ethers.utils.Interface {
   events: {
     "Approval(address,address,uint256)": EventFragment;
     "ApprovalForAll(address,address,bool)": EventFragment;
-    "MintNFTFromZkSync(address,uint32,address,uint32,bytes32,uint32)": EventFragment;
+    "MintNFTFromZkSync(address,address,uint32,uint32,bytes32,uint256)": EventFragment;
     "Transfer(address,address,uint256)": EventFragment;
   };
 
@@ -365,18 +365,18 @@ export class ZkSyncNFTFactory extends Contract {
 
     mintNFTFromZkSync(
       creator: string,
-      creatorAccountId: BigNumberish,
       recipient: string,
+      creatorAccountId: BigNumberish,
       serialId: BigNumberish,
       contentHash: BytesLike,
       tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "mintNFTFromZkSync(address,uint32,address,uint32,bytes32,uint32)"(
+    "mintNFTFromZkSync(address,address,uint32,uint32,bytes32,uint256)"(
       creator: string,
-      creatorAccountId: BigNumberish,
       recipient: string,
+      creatorAccountId: BigNumberish,
       serialId: BigNumberish,
       contentHash: BytesLike,
       tokenId: BigNumberish,
@@ -630,18 +630,18 @@ export class ZkSyncNFTFactory extends Contract {
 
   mintNFTFromZkSync(
     creator: string,
-    creatorAccountId: BigNumberish,
     recipient: string,
+    creatorAccountId: BigNumberish,
     serialId: BigNumberish,
     contentHash: BytesLike,
     tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "mintNFTFromZkSync(address,uint32,address,uint32,bytes32,uint32)"(
+  "mintNFTFromZkSync(address,address,uint32,uint32,bytes32,uint256)"(
     creator: string,
-    creatorAccountId: BigNumberish,
     recipient: string,
+    creatorAccountId: BigNumberish,
     serialId: BigNumberish,
     contentHash: BytesLike,
     tokenId: BigNumberish,
@@ -845,18 +845,18 @@ export class ZkSyncNFTFactory extends Contract {
 
     mintNFTFromZkSync(
       creator: string,
-      creatorAccountId: BigNumberish,
       recipient: string,
+      creatorAccountId: BigNumberish,
       serialId: BigNumberish,
       contentHash: BytesLike,
       tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "mintNFTFromZkSync(address,uint32,address,uint32,bytes32,uint32)"(
+    "mintNFTFromZkSync(address,address,uint32,uint32,bytes32,uint256)"(
       creator: string,
-      creatorAccountId: BigNumberish,
       recipient: string,
+      creatorAccountId: BigNumberish,
       serialId: BigNumberish,
       contentHash: BytesLike,
       tokenId: BigNumberish,
@@ -978,8 +978,8 @@ export class ZkSyncNFTFactory extends Contract {
 
     MintNFTFromZkSync(
       creator: string | null,
-      creatorAccountId: BigNumberish | null,
       recipient: string | null,
+      creatorAccountId: null,
       serialId: null,
       contentHash: null,
       tokenId: null
@@ -1090,18 +1090,18 @@ export class ZkSyncNFTFactory extends Contract {
 
     mintNFTFromZkSync(
       creator: string,
-      creatorAccountId: BigNumberish,
       recipient: string,
+      creatorAccountId: BigNumberish,
       serialId: BigNumberish,
       contentHash: BytesLike,
       tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "mintNFTFromZkSync(address,uint32,address,uint32,bytes32,uint32)"(
+    "mintNFTFromZkSync(address,address,uint32,uint32,bytes32,uint256)"(
       creator: string,
-      creatorAccountId: BigNumberish,
       recipient: string,
+      creatorAccountId: BigNumberish,
       serialId: BigNumberish,
       contentHash: BytesLike,
       tokenId: BigNumberish,
@@ -1315,18 +1315,18 @@ export class ZkSyncNFTFactory extends Contract {
 
     mintNFTFromZkSync(
       creator: string,
-      creatorAccountId: BigNumberish,
       recipient: string,
+      creatorAccountId: BigNumberish,
       serialId: BigNumberish,
       contentHash: BytesLike,
       tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "mintNFTFromZkSync(address,uint32,address,uint32,bytes32,uint32)"(
+    "mintNFTFromZkSync(address,address,uint32,uint32,bytes32,uint256)"(
       creator: string,
-      creatorAccountId: BigNumberish,
       recipient: string,
+      creatorAccountId: BigNumberish,
       serialId: BigNumberish,
       contentHash: BytesLike,
       tokenId: BigNumberish,

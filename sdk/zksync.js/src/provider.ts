@@ -16,7 +16,14 @@ import {
     TxEthSignature
 } from './types';
 import { isTokenETH, sleep, TokenSet } from './utils';
-import { Governance, GovernanceFactory, ZkSync, ZkSyncFactory, ZkSyncNFTFactory, ZkSyncNFTFactoryFactory } from './typechain';
+import {
+    Governance,
+    GovernanceFactory,
+    ZkSync,
+    ZkSyncFactory,
+    ZkSyncNFTFactory,
+    ZkSyncNFTFactoryFactory
+} from './typechain';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
     if (transport === 'WS') {
@@ -304,20 +311,20 @@ export class ETHProxy {
         return this.zkSyncContract;
     }
 
-    // This method is very helpful for those who have already fetched the 
+    // This method is very helpful for those who have already fetched the
     // default factory and want to avoid asynchorouns execution from now on
-    getCachedNFTDefaultFactory(): ZkSyncNFTFactory|undefined {
+    getCachedNFTDefaultFactory(): ZkSyncNFTFactory | undefined {
         return this.zksyncNFTFactory;
     }
 
     async getDefaultNFTFactory(): Promise<ZkSyncNFTFactory> {
-        if(this.zksyncNFTFactory) {
+        if (this.zksyncNFTFactory) {
             return this.zksyncNFTFactory;
         }
 
         const nftFactoryAddress = await this.governanceContract.defaultFactory();
 
-        const nftFactory = new ZkSyncNFTFactoryFactory(this.dummySigner);        
+        const nftFactory = new ZkSyncNFTFactoryFactory(this.dummySigner);
         this.zksyncNFTFactory = nftFactory.attach(nftFactoryAddress);
 
         return this.zksyncNFTFactory;

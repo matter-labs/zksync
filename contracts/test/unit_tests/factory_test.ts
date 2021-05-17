@@ -31,7 +31,7 @@ describe('NFTFactory unit tests', function () {
         const address = await wallet2.getAddress();
         const contentHash = '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996';
         nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet1);
-        await nftFactory.mintNFTFromZkSync(address, 1, address, 10, contentHash, 10);
+        await nftFactory.mintNFTFromZkSync(address, address, 1, 10, contentHash, 10);
         const owner = await nftFactory.ownerOf(10);
         expect(owner).to.equal(await wallet2.getAddress());
 
@@ -48,8 +48,8 @@ describe('NFTFactory unit tests', function () {
         const { revertReason } = await getCallRevertReason(() =>
             nftFactory.mintNFTFromZkSync(
                 address,
-                1,
                 address,
+                1,
                 10,
                 '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996',
                 10

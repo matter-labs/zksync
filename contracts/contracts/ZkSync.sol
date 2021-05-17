@@ -256,8 +256,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
         _factory.mintNFTFromZkSync(
             op.creatorAddress,
-            op.creatorAccountId,
             op.receiver,
+            op.creatorAccountId,
             op.serialId,
             op.contentHash,
             op.tokenId
@@ -398,8 +398,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         try
             _factory.mintNFTFromZkSync{gas: WITHDRAWAL_NFT_GAS_LIMIT}(
                 op.creatorAddress,
-                op.creatorAccountId,
                 op.receiver,
+                op.creatorAccountId,
                 op.serialId,
                 op.contentHash,
                 op.tokenId
