@@ -7,45 +7,45 @@ import { BatchBuilder } from './batch-builder';
 import {
     AccountState,
     Address,
-    TokenLike,
-    Nonce,
-    PriorityOperationReceipt,
-    TransactionReceipt,
-    PubKeyHash,
     ChangePubKey,
+    ChangePubKeyCREATE2,
+    ChangePubKeyECDSA,
+    ChangePubKeyOnchain,
+    ChangePubkeyTypes,
+    Create2Data,
     EthSignerType,
+    ForcedExit,
+    MintNFT,
+    NFT,
+    Nonce,
+    Order,
+    PriorityOperationReceipt,
+    PubKeyHash,
+    Ratio,
     SignedTransaction,
+    Swap,
+    TokenLike,
+    TransactionReceipt,
     Transfer,
     TxEthSignature,
-    ForcedExit,
     Withdraw,
-    ChangePubkeyTypes,
-    ChangePubKeyOnchain,
-    ChangePubKeyECDSA,
-    ChangePubKeyCREATE2,
-    Create2Data,
-    MintNFT,
-    Order,
-    Swap,
-    Ratio,
-    WithdrawNFT,
-    NFT
+    WithdrawNFT
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
+    ERC20_DEPOSIT_GAS_LIMIT,
+    ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT,
+    ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
+    getChangePubkeyLegacyMessage,
+    getChangePubkeyMessage,
+    getEthereumBalance,
+    getSignedBytesFromMessage,
     IERC20_INTERFACE,
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
-    SYNC_MAIN_CONTRACT_INTERFACE,
-    ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT,
-    signMessagePersonalAPI,
-    getSignedBytesFromMessage,
-    getChangePubkeyMessage,
     MAX_TIMESTAMP,
-    getEthereumBalance,
-    ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
-    getChangePubkeyLegacyMessage,
-    ERC20_DEPOSIT_GAS_LIMIT
+    signMessagePersonalAPI,
+    SYNC_MAIN_CONTRACT_INTERFACE
 } from './utils';
 
 const EthersErrorCode = ErrorCode;
@@ -219,6 +219,26 @@ export class Wallet {
         return {
             tx: signedTransferTransaction,
             ethereumSignature
+        };
+    }
+
+    async signRegisterFactory(
+        factoryAddress: Address
+    ): Promise<{
+        signature: TxEthSignature;
+        accountId: number;
+        accountAddress: Address;
+    }> {
+        await this.setRequiredAccountIdFromServer("Sign register factory");
+        const signature = await this.ethMessageSigner.ethSignRegisterFactoryMessage(
+            factoryAddress,
+            this.accountId,
+            this.address()
+        );
+        return {
+            signature,
+            accountId: this.accountId,
+            accountAddress: this.address()
         };
     }
 

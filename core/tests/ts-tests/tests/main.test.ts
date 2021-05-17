@@ -13,6 +13,7 @@ import './misc';
 import './batch-builder';
 import './create2';
 import './swap';
+import './register-factory';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -83,6 +84,13 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(alice, token, true);
     });
 
+    step('should register factory and withdraw nft', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        await tester.testRegisterFactory(alice, token);
+    });
+
     step('should execute a transfer to new account', async () => {
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
@@ -137,6 +145,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
     });
+
 
     step('should test swaps and limit orders', async () => {
         if (onlyBasic) {
