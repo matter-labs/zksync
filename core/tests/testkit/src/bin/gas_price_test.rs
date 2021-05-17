@@ -295,18 +295,9 @@ async fn gas_price_test() {
     commit_cost_of_create2_change_pubkey(&mut test_setup, 50)
         .await
         .report(&base_cost, "create2 change pubkey", false);
-
     commit_cost_of_onchain_change_pubkey(&mut test_setup, 50)
         .await
         .report(&base_cost, "onchain change pubkey", false);
-    commit_cost_of_mint_nft(&mut test_setup, 40, rng)
-        .await
-        .report(&base_cost, "Mint nft", false);
-
-    commit_cost_of_withdrawals_nft(&mut test_setup, 10, rng)
-        .await
-        .report(&base_cost, "withdrawals NFT", false);
-
     commit_cost_of_change_pubkey(&mut test_setup, 50)
         .await
         .report(&base_cost, "change pubkey", false);
@@ -320,6 +311,10 @@ async fn gas_price_test() {
     commit_cost_of_swaps(&mut test_setup, 60, rng)
         .await
         .report(&base_cost, "swap", false);
+    commit_cost_of_mint_nft(&mut test_setup, 60, rng)
+        .await
+        .report(&base_cost, "mint nft", false);
+
     commit_cost_of_full_exits(&mut test_setup, 100, Token(TokenId(0)))
         .await
         .report(&base_cost, "full exit ETH", true);
@@ -333,6 +328,9 @@ async fn gas_price_test() {
     commit_cost_of_withdrawals(&mut test_setup, 40, Token(TokenId(1)), rng)
         .await
         .report(&base_cost, "withdrawals ERC20", false);
+    commit_cost_of_withdrawals_nft(&mut test_setup, 10, rng)
+        .await
+        .report(&base_cost, "withdrawals NFT", false);
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
@@ -537,7 +535,7 @@ async fn commit_cost_of_swaps(
     test_setup
         .deposit(
             ETHAccountId(1),
-            ZKSyncAccountId(11),
+            ZKSyncAccountId(4),
             Token(TokenId(0)),
             0u32.into(),
         )
@@ -545,7 +543,7 @@ async fn commit_cost_of_swaps(
     test_setup
         .deposit(
             ETHAccountId(1),
-            ZKSyncAccountId(12),
+            ZKSyncAccountId(5),
             Token(TokenId(0)),
             0u32.into(),
         )
@@ -570,7 +568,7 @@ async fn commit_cost_of_swaps(
         test_setup
             .swap(
                 (ZKSyncAccountId(1), ZKSyncAccountId(2)),
-                (ZKSyncAccountId(11), ZKSyncAccountId(12)),
+                (ZKSyncAccountId(4), ZKSyncAccountId(5)),
                 ZKSyncAccountId(3),
                 (Token(TokenId(0)), Token(TokenId(1)), Token(TokenId(1))),
                 swap_amounts[i].clone(),

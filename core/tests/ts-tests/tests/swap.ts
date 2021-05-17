@@ -22,8 +22,53 @@ declare module './tester' {
             tokenB: TokenLike,
             amount: BigNumber
         ): Promise<void>;
+        testSwapNFT(walletA: Wallet, walletB: Wallet, token: TokenLike, nft: number, amount: BigNumber): Promise<void>;
     }
 }
+
+Tester.prototype.testSwapNFT = async function (
+    walletA: Wallet,
+    walletB: Wallet,
+    token: TokenLike,
+    nft: number,
+    amount: BigNumber
+) {
+    const { totalFee: fee } = await this.syncProvider.getTransactionFee('Swap', walletA.address(), token);
+    expect(await walletB.getNFT(nft), 'wallet does not own an NFT').to.exist;
+
+    const orderA = await walletA.getOrder({
+        tokenSell: token,
+        tokenBuy: nft,
+        amount,
+        ratio: utils.ratio({
+            tokenSell: amount,
+            tokenBuy: 1
+        })
+    });
+
+    const orderB = await walletB.getOrder({
+        tokenSell: nft,
+        tokenBuy: token,
+        amount: 1,
+        ratio: utils.ratio({
+            tokenSell: 1,
+            tokenBuy: amount
+        })
+    });
+
+    const swap = await walletA.syncSwap({
+        orders: [orderA, orderB],
+        feeToken: token,
+        fee
+    });
+
+    const receipt = await swap.awaitReceipt();
+    expect(receipt.success, `Swap transaction failed with a reason: ${receipt.failReason}`).to.be.true;
+    expect(await walletA.getNFT(nft), 'NFT was not swapped').to.exist;
+    expect(await walletB.getNFT(nft), 'NFT is present even after swap').to.not.exist;
+
+    this.runningFee = this.runningFee.add(fee);
+};
 
 Tester.prototype.testSwap = async function (
     walletA: Wallet,
@@ -40,9 +85,9 @@ Tester.prototype.testSwap = async function (
         tokenSell: tokenA,
         tokenBuy: tokenB,
         amount,
-        price: utils.price({
-            sellPrice: 1,
-            buyPrice: 2
+        ratio: utils.ratio({
+            tokenSell: 1,
+            tokenBuy: 2
         })
     });
 
@@ -50,9 +95,9 @@ Tester.prototype.testSwap = async function (
         tokenSell: tokenB,
         tokenBuy: tokenA,
         amount: amount.mul(2),
-        price: utils.price({
-            sellPrice: 2,
-            buyPrice: 1
+        ratio: utils.ratio({
+            tokenSell: 2,
+            tokenBuy: 1
         })
     });
 
@@ -103,18 +148,18 @@ Tester.prototype.testSwapBatch = async function (
     const orderA = await walletA.getLimitOrder({
         tokenSell: tokenA,
         tokenBuy: tokenB,
-        price: utils.price({
-            sellPrice: 2,
-            buyPrice: 5
+        ratio: utils.ratio({
+            tokenSell: 2,
+            tokenBuy: 5
         })
     });
 
     const orderB = await walletB.getLimitOrder({
         tokenSell: tokenB,
         tokenBuy: tokenA,
-        price: utils.price({
-            sellPrice: 4,
-            buyPrice: 1
+        ratio: utils.ratio({
+            tokenSell: 4,
+            tokenBuy: 1
         })
     });
 

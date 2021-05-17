@@ -16,7 +16,8 @@ import {
     MintNFT,
     Order,
     Swap,
-    Price
+    Ratio,
+    WithdrawNFT
 } from './types';
 import { rescueHashOrders } from './crypto';
 
@@ -59,8 +60,8 @@ const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
 
-export function price(price: { sellPrice: BigNumberish; buyPrice: BigNumberish }): Price {
-    return [BigNumber.from(price.sellPrice), BigNumber.from(price.buyPrice)];
+export function ratio(price: { tokenSell: BigNumberish; tokenBuy: BigNumberish }): Ratio {
+    return [BigNumber.from(price.tokenSell), BigNumber.from(price.tokenBuy)];
 }
 
 export function floatToInteger(
@@ -594,12 +595,12 @@ export function serializeTimestamp(time: number): Uint8Array {
 export function serializeOrder(order: Order): Uint8Array {
     const type = new Uint8Array(['o'.charCodeAt(0)]);
     const accountId = serializeAccountId(order.accountId);
-    const recipientBytes = serializeAddress(order.recipientAddress);
+    const recipientBytes = serializeAddress(order.recipient);
     const nonceBytes = serializeNonce(order.nonce);
     const tokenSellId = serializeTokenId(order.tokenSell);
     const tokenBuyId = serializeTokenId(order.tokenBuy);
-    const sellPriceBytes = BigNumber.from(order.price[0]).toHexString();
-    const buyPriceBytes = BigNumber.from(order.price[1]).toHexString();
+    const sellPriceBytes = BigNumber.from(order.ratio[0]).toHexString();
+    const buyPriceBytes = BigNumber.from(order.ratio[1]).toHexString();
     const amountBytes = serializeAmountPacked(order.amount);
     const validFrom = serializeTimestamp(order.validFrom);
     const validUntil = serializeTimestamp(order.validUntil);
@@ -689,6 +690,31 @@ export function serializeMintNFT(mintNFT: MintNFT): Uint8Array {
     ]);
 }
 
+export function serializeWithdrawNFT(withdrawNFT: WithdrawNFT): Uint8Array {
+    const type = new Uint8Array([10]);
+    const accountId = serializeAccountId(withdrawNFT.accountId);
+    const accountBytes = serializeAddress(withdrawNFT.from);
+    const ethAddressBytes = serializeAddress(withdrawNFT.to);
+    const tokenBytes = serializeTokenId(withdrawNFT.token);
+    const tokenIdBytes = serializeTokenId(withdrawNFT.feeToken);
+    const feeBytes = serializeFeePacked(withdrawNFT.fee);
+    const nonceBytes = serializeNonce(withdrawNFT.nonce);
+    const validFrom = serializeTimestamp(withdrawNFT.validFrom);
+    const validUntil = serializeTimestamp(withdrawNFT.validUntil);
+    return ethers.utils.concat([
+        type,
+        accountId,
+        accountBytes,
+        ethAddressBytes,
+        tokenBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes,
+        validFrom,
+        validUntil
+    ]);
+}
+
 export function serializeTransfer(transfer: Transfer): Uint8Array {
     const type = new Uint8Array([5]); // tx type
     const accountId = serializeAccountId(transfer.accountId);
@@ -751,7 +777,9 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
  * Encodes the transaction data as the byte sequence according to the zkSync protocol.
  * @param tx A transaction to serialize.
  */
-export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
+export function serializeTx(
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT
+): Uint8Array {
     switch (tx.type) {
         case 'Transfer':
             return serializeTransfer(tx);
@@ -761,6 +789,10 @@ export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccoun
             return serializeChangePubKey(tx);
         case 'ForcedExit':
             return serializeForcedExit(tx);
+        case 'MintNFT':
+            return serializeMintNFT(tx);
+        case 'WithdrawNFT':
+            return serializeWithdrawNFT(tx);
         default:
             return new Uint8Array();
     }

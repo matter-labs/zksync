@@ -1107,10 +1107,6 @@ impl TestSetup {
         }
 
         if block_checks_failed {
-            println!(
-                "Failed block exec_operations: {:#?}",
-                new_block.block_transactions
-            );
             bail!("Block checks failed")
         }
 

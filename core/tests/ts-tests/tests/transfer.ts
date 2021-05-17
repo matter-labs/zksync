@@ -2,13 +2,14 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
+import { closestPackableTransactionFee } from '../../../../sdk/zksync.js';
 
 type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber, timeout?: number): Promise<void>;
-        testTransferNFT(from: Wallet, to: Wallet, feeToken: TokenLike, timeout?: number): Promise<void>;
+        testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testTransferNFT(from: Wallet, to: Wallet, feeToken: TokenLike): Promise<void>;
         testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testRejectedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
@@ -59,8 +60,8 @@ Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wal
     );
 
     const state = await sender.getAccountState();
-    let nft: any = Object.values(state.verified.nfts)[0];
-
+    const nft = Object.values(state.verified.nfts)[0];
+    expect(nft !== undefined);
     const senderBefore = await sender.getNFT(nft.id);
     const receiverBefore = await receiver.getNFT(nft.id);
     const handles = await sender.syncTransferNFT({
@@ -69,13 +70,14 @@ Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wal
         token: nft,
         fee
     });
+
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getNFT(nft.id);
     const receiverAfter = await receiver.getNFT(nft.id);
-    expect(senderBefore.id == nft.id, 'NFT transfer failed').to.be.true;
-    expect(receiverAfter.id == nft.id, 'NFT transfer failed').to.be.true;
-    expect(senderAfter === undefined, 'NFT transfer failed').to.be.true;
-    expect(receiverBefore === undefined, 'NFT transfer failed').to.be.true;
+    expect(senderBefore, 'NFT transfer failed').to.exist;
+    expect(receiverAfter, 'NFT transfer failed').to.exist;
+    expect(senderAfter, 'NFT transfer failed').to.not.exist;
+    expect(receiverBefore, 'NFT transfer failed').to.not.exist;
     this.runningFee = this.runningFee.add(fee);
 };
 
@@ -125,7 +127,7 @@ Tester.prototype.testIgnoredBatch = async function (
         to: receiver.address(),
         token,
         amount,
-        fee: fee.div(2)
+        fee: closestPackableTransactionFee(fee.div(2))
     };
 
     const senderBefore = await sender.getBalance(token);
