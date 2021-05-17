@@ -162,7 +162,7 @@ contract Governance is Config {
         uint32 _creatorAccountId,
         address _creatorAddress,
         address _factoryAddress
-    ) internal view returns (bytes memory) {
+    ) internal pure returns (bytes memory) {
         return
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n141",

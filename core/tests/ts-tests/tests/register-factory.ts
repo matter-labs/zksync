@@ -1,9 +1,9 @@
 import { deployContract } from 'ethereum-waffle';
 import fs from 'fs';
 import { Tester } from './tester';
-import { ethers, utils } from 'ethers';
+import { utils } from 'ethers';
 import { expect } from 'chai';
-import { Wallet, types, wallet, ETHOperation } from 'zksync';
+import { Wallet, types } from 'zksync';
 type TokenLike = types.TokenLike;
 
 function readContractCode(name: string) {
