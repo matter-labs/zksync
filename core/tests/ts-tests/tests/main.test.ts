@@ -138,6 +138,10 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
     });
 
+    step('sign register factory', async () => {
+        alice.signRegisterFactory(frank.address());
+    });
+
     step('should test swaps and limit orders', async () => {
         if (onlyBasic) {
             return;

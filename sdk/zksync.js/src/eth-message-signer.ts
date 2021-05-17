@@ -1,6 +1,12 @@
 import * as ethers from 'ethers';
-import { TxEthSignature, EthSignerType, PubKeyHash } from './types';
-import { getSignedBytesFromMessage, signMessagePersonalAPI, getChangePubkeyMessage } from './utils';
+import {TxEthSignature, EthSignerType, PubKeyHash, Address} from './types';
+import {
+    getSignedBytesFromMessage,
+    signMessagePersonalAPI,
+    getChangePubkeyMessage,
+    serializeAddress,
+    serializeAccountId
+} from './utils';
 
 /**
  * Wrapper around `ethers.Signer` which provides convenient methods to get and sign messages required for zkSync.
@@ -14,7 +20,6 @@ export class EthMessageSigner {
         }
 
         const signedBytes = getSignedBytesFromMessage(message, !this.ethSignerType.isSignedMsgPrefixed);
-
         const signature = await signMessagePersonalAPI(this.ethSigner, signedBytes);
 
         return {
@@ -280,5 +285,16 @@ export class EthMessageSigner {
     }): Promise<TxEthSignature> {
         const message = this.getChangePubKeyEthSignMessage(changePubKey);
         return await this.getEthMessageSignature(message);
+    }
+
+    async ethSignRegisterFactoryMessage(factoryAddress: Address, accountId: number, accountAddress: Address) {
+        const factoryAddressHex = ethers.utils.hexlify(serializeAddress(factoryAddress)).substr(2);
+        const accountAddressHex= ethers.utils.hexlify(serializeAddress(accountAddress)).substr(2);
+        const msgAccId = ethers.utils.hexlify(serializeAccountId(accountId));
+        const message = `\nCreator's account ID in zkSync: ${msgAccId}\n` +
+            `Creator: ${accountAddressHex}\n` +
+            `Factory: ${factoryAddressHex}`;
+        const msgBytes = ethers.utils.toUtf8Bytes(message);
+        return await this.getEthMessageSignature(msgBytes);
     }
 }

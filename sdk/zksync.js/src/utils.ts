@@ -435,6 +435,7 @@ export function getChangePubkeyLegacyMessage(pubKeyHash: PubKeyHash, nonce: numb
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {
     let messageBytes = typeof message === 'string' ? utils.toUtf8Bytes(message) : utils.arrayify(message);
     if (addPrefix) {
+        console.log("zopa", messageBytes.length);
         messageBytes = utils.concat([
             utils.toUtf8Bytes(`\x19Ethereum Signed Message:\n${messageBytes.length}`),
             messageBytes

@@ -171,7 +171,6 @@ contract Governance is Config {
         bytes32 messageHash =
             keccak256(
                 abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n141",
                     "\nCreator's account ID in zkSync: ",
                     Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAccountId))),
                     "\nCreator: ",
