@@ -85,6 +85,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should register factory and withdraw nft', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testRegisterFactory(alice, token);
     });
 
