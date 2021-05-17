@@ -668,8 +668,8 @@ async fn simple_transfer() -> Result<(), anyhow::Error> {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration-tests"), ignore)]
 async fn nft_test() -> Result<(), anyhow::Error> {
-    let mut alice = init_account_with_one_ether().await?;
-    let mut bob = init_account_with_one_ether().await?;
+    let alice = init_account_with_one_ether().await?;
+    let bob = init_account_with_one_ether().await?;
 
     let alice_balance_before = alice.get_balance(BlockStatus::Committed, "ETH").await?;
     let bob_balance_before = bob.get_balance(BlockStatus::Committed, "ETH").await?;
@@ -691,19 +691,17 @@ async fn nft_test() -> Result<(), anyhow::Error> {
         .await?;
 
     handle
-        .commit_timeout(Duration::from_secs(180))
-        .wait_for_commit()
+        .verify_timeout(Duration::from_secs(180))
+        .wait_for_verify()
         .await?;
-    alice.refresh_tokens_cache().await?;
-    bob.refresh_tokens_cache().await?;
 
     let nft = alice
         .account_info()
         .await?
-        .committed
+        .verified
         .nfts
         .values()
-        .next()
+        .last()
         .expect("NFT was not minted")
         .clone();
     let alice_balance_after_mint = alice.get_balance(BlockStatus::Committed, "ETH").await?;
@@ -785,8 +783,8 @@ async fn full_exit_test() -> Result<(), anyhow::Error> {
         .await?;
 
     handle
-        .commit_timeout(Duration::from_secs(180))
-        .wait_for_commit()
+        .verify_timeout(Duration::from_secs(180))
+        .wait_for_verify()
         .await?;
 
     // ETH full exit
@@ -813,10 +811,10 @@ async fn full_exit_test() -> Result<(), anyhow::Error> {
     let token_id = wallet
         .account_info()
         .await?
-        .committed
+        .verified
         .nfts
         .values()
-        .next()
+        .last()
         .expect("NFT was not minted")
         .id;
     let full_exit_nft_tx_hash = ethereum
