@@ -65,13 +65,13 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
         feeToken
     );
     const nft: any = Object.values(state.committed.nfts)[0];
-    const handle_withdraw = await wallet.withdrawNFT({
+    const handleWithdraw = await wallet.withdrawNFT({
         to: wallet.address(),
         token: nft.id,
         feeToken,
         fee: withdrawFee
     });
-    const receipt_withdraw = await handle_withdraw.awaitVerifyReceipt();
+    const receipt_withdraw = await handleWithdraw.awaitVerifyReceipt();
     expect(receipt_withdraw.success, `Withdraw NFT failed with a reason: ${receipt_withdraw.failReason}`).to.be.true;
     const owner = await contract.ownerOf(nft.id);
     expect(owner == wallet.address(), 'Contract minting is wrong');

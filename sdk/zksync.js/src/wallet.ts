@@ -229,6 +229,7 @@ export class Wallet {
         accountId: number;
         accountAddress: Address;
     }> {
+        await this.setRequiredAccountIdFromServer("Sign register factory");
         const signature = await this.ethMessageSigner.ethSignRegisterFactoryMessage(
             factoryAddress,
             this.accountId,
