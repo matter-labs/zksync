@@ -75,10 +75,10 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         let mut account = account.clone();
 
         let (last_finalized, _) = AccountSchema(&mut storage)
-            .account_and_last_block(account_id.clone())
+            .account_and_last_block(*account_id)
             .await?;
         let last_committed = AccountSchema(&mut storage)
-            .last_committed_block_with_update_for_acc(account_id.clone())
+            .last_committed_block_with_update_for_acc(*account_id)
             .await?;
         assert_eq!(last_finalized, 0);
         assert_eq!(*last_committed, 1);
@@ -144,10 +144,10 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // After that all the accounts should have a verified state.
     for (account_id, account) in accounts_block {
         let (last_finalized, _) = AccountSchema(&mut storage)
-            .account_and_last_block(account_id.clone())
+            .account_and_last_block(account_id)
             .await?;
         let last_committed = AccountSchema(&mut storage)
-            .last_committed_block_with_update_for_acc(account_id.clone())
+            .last_committed_block_with_update_for_acc(account_id)
             .await?;
         assert_eq!(last_finalized, 1);
         assert_eq!(*last_committed, 1);

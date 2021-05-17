@@ -1,5 +1,6 @@
 use crate::tx::{EIP1271Signature, PackedEthSignature};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 /// Representation of the signature secured by L1.
 /// May be either a signature generated via Ethereum private key
@@ -12,13 +13,13 @@ pub enum TxEthSignature {
     EIP1271Signature(EIP1271Signature),
 }
 
-impl ToString for TxEthSignature {
-    fn to_string(&self) -> String {
+impl Display for TxEthSignature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EthereumSignature(sign) => {
-                format!("0x{}", hex::encode(sign.serialize_packed()))
+                write!(f, "0x{}", hex::encode(sign.serialize_packed()))
             }
-            Self::EIP1271Signature(sign) => format!("0x{}", hex::encode(sign.0.clone())),
+            Self::EIP1271Signature(sign) => write!(f, "0x{}", hex::encode(sign.0.clone())),
         }
     }
 }
