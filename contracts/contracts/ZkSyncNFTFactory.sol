@@ -6,13 +6,25 @@ import "./NFTFactory.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 contract ZkSyncNFTFactory is ERC721, NFTFactory {
+    uint16 constant ADDRESS_FOOTPRINT_OFFSET = 0;
+    uint16 constant ADDRESS_SIZE_BITS = 160;
+
+    uint16 constant CREATOR_ID_FOOTPRINT_OFFSET = ADDRESS_FOOTPRINT_OFFSET + ADDRESS_SIZE_BITS;
+    uint16 constant CREATOR_ID_SIZE_BITS = 32;
+
+    uint16 constant SERIAL_ID_FOOTPRINT_OFFSET = CREATOR_ID_FOOTPRINT_OFFSET + CREATOR_ID_SIZE_BITS;
+    uint16 constant SERIAL_ID_SIZE_BITS = 32;
+
     /// @notice Packs address and token id into single word to use as a key in balances mapping
     function packCreatorFingerprint(
         address creatorAddress,
         uint32 creatorId,
         uint32 serialId
     ) internal pure returns (uint256) {
-        return uint256(creatorAddress) | (uint256(creatorId) << 160) | (uint256(serialId) << 192);
+        return (// We shift address by zero bits to preserve consistency
+        (uint256(creatorAddress) << ADDRESS_FOOTPRINT_OFFSET) |
+            (uint256(creatorId) << CREATOR_ID_FOOTPRINT_OFFSET) |
+            (uint256(serialId) << SERIAL_ID_FOOTPRINT_OFFSET));
     }
 
     // Optional mapping for token content hashes
@@ -68,39 +80,45 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         return _creatorFingerprints[_tokenId];
     }
 
-    // Retrieves the bits from firstOne to lastOne bits
+    // Retrieves the bits from firstOne to lastOne bits. The range is exclusive.
+    // This means that if you want to get bits from the zero-th to the first one, then
+    // bitFrom = 0, bitTo = 2
     function getBits(
         uint256 number,
-        uint8 firstOne,
-        uint8 lastOne
+        uint16 bitFrom,
+        uint16 bitTo
     ) internal pure returns (uint256) {
-        require(lastOne > firstOne, "qq");
+        require(bitTo > bitFrom, "qq");
 
         // So here we are creating a mask which consists of only ones
         // from the firstOne bit to the lastOne bit
-        uint256 a = (1 << lastOne) - 1;
-        uint256 b = (1 << firstOne) - 1;
+        uint256 a = (1 << bitFrom) - 1;
+        uint256 b = (1 << bitTo) - 1;
         uint256 mask = a ^ b;
 
         uint256 onlyNeededBits = (number & mask);
-        return onlyNeededBits >> firstOne;
+        return onlyNeededBits >> bitFrom;
     }
 
     function getCreatorAddress(uint256 tokenId) external view returns (address) {
-        uint256 fingerPrint = uint256(_creatorFingerprints[tokenId]);
+        uint256 fingerPrint = _creatorFingerprints[tokenId];
 
-        return address(getBits(fingerPrint, 0, 160));
+        return address(getBits(fingerPrint, ADDRESS_FOOTPRINT_OFFSET, ADDRESS_FOOTPRINT_OFFSET + ADDRESS_SIZE_BITS));
     }
 
     function getCreatorAccountId(uint256 tokenId) external view returns (uint32) {
-        uint256 fingerPrint = uint256(_creatorFingerprints[tokenId]);
+        uint256 fingerPrint = _creatorFingerprints[tokenId];
 
-        return uint32(getBits(fingerPrint, 160, 192));
+        return
+            uint32(
+                getBits(fingerPrint, CREATOR_ID_FOOTPRINT_OFFSET, CREATOR_ID_FOOTPRINT_OFFSET + CREATOR_ID_SIZE_BITS)
+            );
     }
 
     function getSerialId(uint256 tokenId) external view returns (uint32) {
-        uint256 fingerPrint = uint256(_creatorFingerprints[tokenId]);
+        uint256 fingerPrint = _creatorFingerprints[tokenId];
 
-        return uint32(getBits(fingerPrint, 192, 224));
+        return
+            uint32(getBits(fingerPrint, SERIAL_ID_FOOTPRINT_OFFSET, SERIAL_ID_FOOTPRINT_OFFSET + SERIAL_ID_SIZE_BITS));
     }
 }

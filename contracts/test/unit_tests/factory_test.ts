@@ -1,9 +1,10 @@
 import { expect, use } from 'chai';
 import { solidity } from 'ethereum-waffle';
-import { Signer } from 'ethers';
+import { BigNumber, BigNumberish, ethers, Signer } from 'ethers';
 const { getCallRevertReason } = require('./common');
 import { ZkSyncNFTFactory } from '../../typechain/ZkSyncNFTFactory';
 import { ZkSyncNFTFactoryFactory } from '../../typechain/ZkSyncNFTFactoryFactory';
+import { ZkSyncNFTFactoryUnitTest, ZkSyncNFTFactoryUnitTestFactory } from '../../typechain';
 
 import * as hardhat from 'hardhat';
 
@@ -14,6 +15,9 @@ describe('NFTFactory unit tests', function () {
 
     let contract;
     let nftFactory: ZkSyncNFTFactory;
+
+    let unitTestContract: ZkSyncNFTFactoryUnitTest;
+
     let wallet1: Signer;
     let wallet2: Signer;
 
@@ -22,6 +26,9 @@ describe('NFTFactory unit tests', function () {
 
         const nftFactoryFactory = await hardhat.ethers.getContractFactory('ZkSyncNFTFactory');
         contract = await nftFactoryFactory.deploy('test', 'TS', wallet1.getAddress());
+
+        const unitTestContractFactory = new ZkSyncNFTFactoryUnitTestFactory(wallet1);
+        unitTestContract = await unitTestContractFactory.deploy('NFT', 'DEFAULT', ethers.constants.AddressZero);
         // Connecting the wallet to a potential receiver, who can withdraw the funds
         // on the master's behalf
     });
@@ -56,5 +63,39 @@ describe('NFTFactory unit tests', function () {
             )
         );
         expect(revertReason).equal('z');
+    });
+
+    it('Bit operations', async () => {
+        const oneTest = async (
+            number: BigNumberish,
+            firstBit: BigNumberish,
+            lastBit: BigNumberish,
+            expectedOutcome: BigNumberish
+        ) => {
+            const bits = await unitTestContract.getBitsPublic(number, firstBit, lastBit);
+
+            expect(bits.eq(expectedOutcome)).to.eq(true, 'Getting bits does not work');
+        };
+
+        // 7 = 1110000000...
+        // Getting bits from the first one to the third one (the range is exclusive)
+        // means getting bits
+        // 1[110]00000...
+        // 110 = 1 + 2 = 3;
+        await oneTest(7, 1, 4, 3);
+
+        // 128 = 2^7
+        // Getting the seventh bit should return 1
+        await oneTest(128, 7, 8, 1);
+
+        const two_pow_190 = BigNumber.from(2).pow(190);
+        const two_pow_193 = BigNumber.from(2).pow(193);
+        // The range is exclusive
+        await oneTest(two_pow_190.add(two_pow_193), 190, 193, 1);
+
+        const two_pow_191 = BigNumber.from(2).pow(191);
+        const two_pow_200 = BigNumber.from(2).pow(200);
+        // Taking all the bits
+        await oneTest(two_pow_191.add(two_pow_200), 0, 256, two_pow_191.add(two_pow_200));
     });
 });
