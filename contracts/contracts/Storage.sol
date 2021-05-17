@@ -161,4 +161,6 @@ contract Storage {
     mapping(uint32 => address) internal withdrawnNFTs;
 
     mapping(uint32 => Operations.WithdrawNFT) internal pendingWithdrawnNFTs;
+
+    address internal additionalZkSync;
 }

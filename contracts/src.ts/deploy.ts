@@ -30,6 +30,7 @@ export interface Contracts {
     forcedExit;
     regenesisMultisig;
     nftFactory;
+    additionalZkSync;
 }
 
 export interface DeployedAddresses {
@@ -69,7 +70,8 @@ export function readProductionContracts(): Contracts {
         proxy: readContractCode('Proxy'),
         upgradeGatekeeper: readContractCode('UpgradeGatekeeper'),
         forcedExit: readContractCode('ForcedExit'),
-        regenesisMultisig: readContractCode('RegenesisMultisig')
+        regenesisMultisig: readContractCode('RegenesisMultisig'),
+        additionalZkSync: readContractCode('AdditionalZkSync')
     };
 }
 

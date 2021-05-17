@@ -414,11 +414,19 @@ impl TestSetup {
         account_id: AccountId,
         token_id: Token,
         amount: &BigUint,
+        zero_account_address: Address,
         proof: EncodedSingleProof,
     ) -> ETHExecResult {
         let last_block = &self.last_committed_block;
         self.accounts.eth_accounts[sending_account.0]
-            .exit(last_block, account_id, token_id.0, amount, proof)
+            .exit(
+                last_block,
+                account_id,
+                token_id.0,
+                amount,
+                zero_account_address,
+                proof,
+            )
             .await
             .expect("Exit failed")
     }
@@ -1256,6 +1264,17 @@ impl TestSetup {
                 account_map.insert(id, account);
             }
         }
+
+        // Also adding nft account
+        if let Some((id, account)) = state_keeper_get_account(
+            self.state_keeper_request_sender.clone(),
+            &NFT_STORAGE_ACCOUNT_ADDRESS,
+        )
+        .await
+        {
+            account_map.insert(id, account);
+        }
+
         account_map
     }
 
