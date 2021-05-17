@@ -22,21 +22,21 @@ impl CommitCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 40_000;
-    pub const DEPOSIT_COST: u64 = 7_000;
+    pub const BASE_COST: u64 = 51_000;
+    pub const DEPOSIT_COST: u64 = 7_700;
     // TODO: estimate after changepubkey gas cost estimation is fixed [ZKS-554]
     pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 25_000;
-    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 11_050;
-    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 5_530;
-    pub const CHANGE_PUBKEY_COST_CREATE2: u64 = 7_330;
-    pub const TRANSFER_COST: u64 = 250;
-    pub const TRANSFER_TO_NEW_COST: u64 = 780;
-    pub const FULL_EXIT_COST: u64 = 7_000;
-    pub const WITHDRAW_COST: u64 = 3_500;
-    pub const WITHDRAW_NFT_COST: u64 = 3_500; // TODO Verify value
+    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 12_700;
+    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 6_400;
+    pub const CHANGE_PUBKEY_COST_CREATE2: u64 = 8_450;
+    pub const TRANSFER_COST: u64 = 300;
+    pub const TRANSFER_TO_NEW_COST: u64 = 940;
+    pub const FULL_EXIT_COST: u64 = 10_000;
+    pub const WITHDRAW_COST: u64 = 3_900;
+    pub const WITHDRAW_NFT_COST: u64 = 5_150;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
-    pub const MINT_TOKEN_COST: u64 = 3_500;
-    pub const SWAP_COST: u64 = 800; // TODO verify value (ZKS-594)
+    pub const MINT_TOKEN_COST: u64 = 920;
+    pub const SWAP_COST: u64 = 710;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -91,7 +91,7 @@ impl VerifyCost {
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 10_000;
-    pub const DEPOSIT_COST: u64 = 50;
+    pub const DEPOSIT_COST: u64 = 100;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
@@ -99,8 +99,8 @@ impl VerifyCost {
     pub const FULL_EXIT_COST: u64 = 30_000;
     pub const WITHDRAW_COST: u64 = 48_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
-    pub const MINT_NFT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value
-    pub const WITHDRAW_NFT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value
+    pub const MINT_NFT_COST: u64 = 0;
+    pub const WITHDRAW_NFT_COST: u64 = 200_000;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -444,7 +444,7 @@ mod tests {
             ),
             (
                 ZkSyncOp::from(withdraw_nft_op.clone()),
-                CommitCost::WITHDRAW_COST,
+                CommitCost::WITHDRAW_NFT_COST,
             ),
             (
                 ZkSyncOp::from(mint_nft_op.clone()),
@@ -466,7 +466,10 @@ mod tests {
             (ZkSyncOp::from(full_exit_op), VerifyCost::FULL_EXIT_COST),
             (ZkSyncOp::from(forced_exit_op), VerifyCost::FORCED_EXIT_COST),
             (ZkSyncOp::from(withdraw_op), VerifyCost::WITHDRAW_COST),
-            (ZkSyncOp::from(withdraw_nft_op), VerifyCost::WITHDRAW_COST),
+            (
+                ZkSyncOp::from(withdraw_nft_op),
+                VerifyCost::WITHDRAW_NFT_COST,
+            ),
             (ZkSyncOp::from(mint_nft_op), VerifyCost::MINT_NFT_COST),
         ];
 

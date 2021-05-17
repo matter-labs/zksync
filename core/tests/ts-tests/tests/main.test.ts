@@ -12,6 +12,7 @@ import './forced-exit';
 import './misc';
 import './batch-builder';
 import './create2';
+import './swap';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -31,6 +32,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let judy: Wallet;
     let chris: Wallet;
     let operatorBalance: BigNumber;
+    let nft: types.NFT;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', transport);
@@ -70,8 +72,8 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
                 await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
                 'Token should not be approved'
             ).to.be.false;
-            const approveERC20_next = await tester.syncWallet.approveERC20TokenDeposits(token);
-            await approveERC20_next.wait();
+            const approveERC20Next = await tester.syncWallet.approveERC20TokenDeposits(token);
+            await approveERC20Next.wait();
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved')
                 .to.be.true;
         }
@@ -86,7 +88,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a mintNFT', async () => {
-        await tester.testMintNFT(alice, chuck, "0x0000000000000000000000000000000000000000000000000000000000000000", token);
+        nft =  await tester.testMintNFT(alice, chuck,  token, true);
     });
 
     step('should execute a transfer to existing account', async () => {
@@ -108,9 +110,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should test multi-transfers', async () => {
-        if (onlyBasic) {
-            return;
-        }
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
@@ -134,8 +133,25 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
         await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
         await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+        await tester.testBatchBuilderNFT(frank, david, token);
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
+    });
+
+    step('should test swaps and limit orders', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        await tester.testSwap(alice, frank, token, secondToken, TX_AMOUNT);
+        await tester.testSwapBatch(alice, frank, david, token, secondToken, TX_AMOUNT);
+    });
+
+    step('should swap NFT for fungible tokens', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        await tester.testSwapNFT(alice, chuck, token, nft.id, TX_AMOUNT);
     });
 
     step('should test multi-signers', async () => {
@@ -152,14 +168,18 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
 
-    step('should execute a transfer NFT', async () => {
-        await tester.testTransferNFT(chuck, alice, token);
-    });
-
-    step('should execute a ForcedExit', async () => {
+    step('should execute NFT transfer', async () => {
         if (onlyBasic) {
             return;
         }
+        await tester.testTransferNFT(alice, chuck, token);
+    });
+
+    step('should execute NFT withdraw', async () => {
+        await tester.testWithdrawNFT(chuck, token);
+    });
+
+    step('should execute a ForcedExit', async () => {
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
 
@@ -202,6 +222,14 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
             expect(before.eq(after), 'Balance after incorrect Full Exit should not change').to.be.true;
             carl.ethSigner = oldSigner;
+        });
+
+        step('should execute NFT full-exit', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            await tester.testMintNFT(carl, carl, token, true);
+            await tester.testFullExitNFT(carl);
         });
 
         step('should execute a normal full-exit', async () => {

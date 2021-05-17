@@ -91,7 +91,7 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
         );
         invariant!(
             from_old_balance == BigUint::from(1u32),
-            WithdrawNFTOpError::InsufficientBalance
+            WithdrawNFTOpError::InsufficientNFTBalance
         );
 
         from_account.sub_balance(op.tx.token, &from_old_balance);

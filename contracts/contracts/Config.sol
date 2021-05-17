@@ -8,6 +8,9 @@ contract Config {
     /// @dev ERC20 tokens and ETH withdrawals gas limit, used only for complete withdrawals
     uint256 internal constant WITHDRAWAL_GAS_LIMIT = 100000;
 
+    /// @dev NFT withdrawals gas limit, used only for complete withdrawals
+    uint256 internal constant WITHDRAWAL_NFT_GAS_LIMIT = 300000;
+
     /// @dev Bytes in one chunk
     uint8 internal constant CHUNK_BYTES = 10;
 

@@ -30,6 +30,7 @@ declare module './tester' {
             token: TokenLike,
             amount: BigNumber
         ): Promise<void>;
+        testBatchBuilderNFT(from: Wallet, to: Wallet, feeToken: TokenLike): Promise<void>;
     }
 }
 
@@ -221,4 +222,50 @@ Tester.prototype.testBatchBuilderGenericUsage = async function (
     expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed').to.be.true;
     expect(targetBalance.isZero(), 'Forced exit failed');
     this.runningFee = this.runningFee.add(totalFee);
+};
+
+Tester.prototype.testBatchBuilderNFT = async function (from: Wallet, to: Wallet, feeToken: TokenLike) {
+    const mint_batch = await from
+        .batchBuilder()
+        .addMintNFT({ recipient: to.address(), contentHash: '0x' + '2'.padStart(64, '0'), feeToken })
+        .addMintNFT({ recipient: to.address(), contentHash: '0x' + '3'.padStart(64, '0'), feeToken })
+        .build(feeToken);
+
+    const totalMintFee = mint_batch.totalFee.get(feeToken)!;
+
+    const mint_handles = await wallet.submitSignedTransactionsBatch(from.provider, mint_batch.txs, [
+        mint_batch.signature
+    ]);
+    await Promise.all(mint_handles.map((handle) => handle.awaitVerifyReceipt()));
+
+    const state_after_mint = await to.getAccountState();
+    let nft1: any = Object.values(state_after_mint.verified.nfts)[0];
+    let nft2: any = Object.values(state_after_mint.verified.nfts)[1];
+
+    const balanceAfterMint1 = await to.getNFT(nft1.id);
+    const balanceAfterMint2 = await to.getNFT(nft2.id);
+    expect(balanceAfterMint1.id == nft1.id, 'Account does not have any NFT after two mintNFT txs').to.be.true;
+    expect(balanceAfterMint2.id == nft2.id, 'Account has only one NFT after two mintNFT txs').to.be.true;
+
+    this.runningFee = this.runningFee.add(totalMintFee);
+
+    const withdraw_batch = await to
+        .batchBuilder()
+        .addWithdrawNFT({ to: to.address(), token: nft1.id, feeToken })
+        .addWithdrawNFT({ to: to.address(), token: nft2.id, feeToken })
+        .build(feeToken);
+
+    const totalWithdrawFee = withdraw_batch.totalFee.get(feeToken)!;
+
+    const withdraw_handles = await wallet.submitSignedTransactionsBatch(to.provider, withdraw_batch.txs, [
+        withdraw_batch.signature
+    ]);
+    await Promise.all(withdraw_handles.map((handle) => handle.awaitReceipt()));
+
+    const balanceAfterWithdraw1 = await to.getNFT(nft1.id);
+    const balanceAfterWithdraw2 = await to.getNFT(nft2.id);
+    expect(balanceAfterWithdraw1 === undefined, 'Account has NFT after two withdrawNFT txs').to.be.true;
+    expect(balanceAfterWithdraw2 === undefined, 'Account has NFT after two withdrawNFT txs').to.be.true;
+
+    this.runningFee = this.runningFee.add(totalWithdrawFee);
 };
