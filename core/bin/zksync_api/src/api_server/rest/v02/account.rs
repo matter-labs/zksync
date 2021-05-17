@@ -209,9 +209,8 @@ async fn account_committed_info(
         data.parse_account_id_or_address(&account_id_or_address)
             .await
     );
-    let account_id_option = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    let account_id =
-        api_try!(account_id_option.ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
+    let account_id = api_try!(api_try!(data.get_id_by_address_or_id(address_or_id).await)
+        .ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
     data.account_info(account_id, AccountStateType::Committed)
         .await
         .into()
@@ -225,9 +224,8 @@ async fn account_finalized_info(
         data.parse_account_id_or_address(&account_id_or_address)
             .await
     );
-    let account_id_option = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    let account_id =
-        api_try!(account_id_option.ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
+    let account_id = api_try!(api_try!(data.get_id_by_address_or_id(address_or_id).await)
+        .ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
     data.account_info(account_id, AccountStateType::Finalized)
         .await
         .into()
