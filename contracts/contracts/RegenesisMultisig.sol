@@ -50,7 +50,7 @@ contract RegenesisMultisig is Ownable {
         }
 
         uint32 collectedSignatures = 0;
-        for (uint32 i = 0; i < partners.length; i++) {
+        for (uint32 i = 0; i < numberOfPartners; i++) {
             address partner = partners[i];
 
             for (uint256 signatureId = 0; signatureId < _signatures.length; signatureId++) {
