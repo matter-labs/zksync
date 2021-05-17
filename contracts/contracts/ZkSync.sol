@@ -146,7 +146,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         lastBlockInfo.stateHash = newRootHash;
         storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(lastBlockInfo);
         additionalZkSync = address($$(NEW_ADDITIONAL_ZKSYNC_ADDRESS));
-        return;
     }
 
     /// @notice Sends tokens
