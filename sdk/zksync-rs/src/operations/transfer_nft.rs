@@ -93,13 +93,13 @@ where
             }
         };
 
+        // Address is not used in signing, thus default can be passed to the constructor.
+        let nft_token = Token::new_nft(nft.id, Address::default(), &nft.symbol, 1);
         let (tx_nft, tx_nft_signature) = self
             .wallet
             .signer
             .sign_transfer(
-                nft.id,
-                nft.symbol,
-                1u8,
+                nft_token,
                 BigUint::from(1u16),
                 BigUint::from(0u16),
                 to,
@@ -113,9 +113,7 @@ where
             .wallet
             .signer
             .sign_transfer(
-                fee_token.id,
-                fee_token.symbol,
-                fee_token.decimals,
+                fee_token,
                 BigUint::from(0u16),
                 fee,
                 to,

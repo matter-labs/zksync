@@ -139,9 +139,7 @@ impl<S: EthereumSigner> Signer<S> {
     #[allow(clippy::too_many_arguments)]
     pub async fn sign_transfer(
         &self,
-        token_id: TokenId,
-        token_symbol: String,
-        token_decimals: u8,
+        token: Token,
         amount: BigUint,
         fee: BigUint,
         to: Address,
@@ -154,7 +152,7 @@ impl<S: EthereumSigner> Signer<S> {
             account_id,
             self.address,
             to,
-            token_id,
+            token.id,
             amount,
             fee,
             nonce,
@@ -165,7 +163,7 @@ impl<S: EthereumSigner> Signer<S> {
 
         let eth_signature = match &self.eth_signer {
             Some(signer) => {
-                let message = transfer.get_ethereum_sign_message(&token_symbol, token_decimals);
+                let message = transfer.get_ethereum_sign_message(&token.symbol, token.decimals);
                 let signature = signer.sign_message(&message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {

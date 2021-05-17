@@ -697,7 +697,6 @@ async fn nft_test() -> Result<(), anyhow::Error> {
     alice.refresh_tokens_cache().await?;
     bob.refresh_tokens_cache().await?;
 
-    // println!("{:?}", alice.account_info().await?.committed.nfts);
     let nft = alice
         .account_info()
         .await?
@@ -707,7 +706,6 @@ async fn nft_test() -> Result<(), anyhow::Error> {
         .next()
         .expect("NFT was not minted")
         .clone();
-    println!("{}", nft.id);
     let alice_balance_after_mint = alice.get_balance(BlockStatus::Committed, "ETH").await?;
     assert_eq!(fee + alice_balance_after_mint.clone(), alice_balance_before);
 
@@ -878,9 +876,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
         let (transfer, signature) = wallet
             .signer
             .sign_transfer(
-                token.id,
-                token.symbol.clone(),
-                token.decimals,
+                token.clone(),
                 1_000_000u64.into(),
                 // Set a total batch fee in the first transaction.
                 total_fee.take().unwrap_or_default(),
