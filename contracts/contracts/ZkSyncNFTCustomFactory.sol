@@ -19,7 +19,7 @@ contract ZkSyncNFTCustomFactory is ZkSyncNFTFactory {
         uint32 _creatorAccountId,
         address _creatorAddress,
         bytes memory _signature
-    ){
+    ) external {
         governance.registerNFTFactoryCreator(_creatorAccountId, _creatorAddress, _signature);
     }
 }

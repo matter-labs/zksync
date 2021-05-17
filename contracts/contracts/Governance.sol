@@ -158,6 +158,23 @@ contract Governance is Config {
         return tokenId;
     }
 
+    function packRegisterNFTFactoryMsg(
+        uint32 _creatorAccountId,
+        address _creatorAddress,
+        address _factoryAddress
+    ) internal view returns (bytes memory) {
+        return
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n141",
+                "\nCreator's account ID in zkSync: ",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAccountId))),
+                "\nCreator: ",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAddress))),
+                "\nFactory: ",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked((_factoryAddress)))
+            );
+    }
+
     /// @notice Register creator corresponding to the factory
     /// @param _creatorAccountId Creator's zkSync account ID
     /// @param _creatorAddress NFT creator address
@@ -168,17 +185,8 @@ contract Governance is Config {
         bytes memory _signature
     ) external {
         require(address(nftFactories[_creatorAccountId][_creatorAddress]) == address(0), "Q");
-        bytes32 messageHash =
-            keccak256(
-                abi.encodePacked(
-                    "\nCreator's account ID in zkSync: ",
-                    Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAccountId))),
-                    "\nCreator: ",
-                    Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAddress))),
-                    "\nFactory: ",
-                    Bytes.bytesToHexASCIIBytes(abi.encodePacked((msg.sender)))
-                )
-            );
+        bytes32 messageHash = keccak256(packRegisterNFTFactoryMsg(_creatorAccountId, _creatorAddress, msg.sender));
+
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
         require(recoveredAddress == _creatorAddress && recoveredAddress != address(0), "ws");
         nftFactories[_creatorAccountId][_creatorAddress] = NFTFactory(msg.sender);

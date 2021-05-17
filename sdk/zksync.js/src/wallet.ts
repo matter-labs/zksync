@@ -1,9 +1,9 @@
-import {BigNumber, BigNumberish, Contract, ContractTransaction, ethers} from 'ethers';
-import {ErrorCode} from '@ethersproject/logger';
-import {EthMessageSigner} from './eth-message-signer';
-import {Provider} from './provider';
-import {Create2WalletSigner, Signer} from './signer';
-import {BatchBuilder} from './batch-builder';
+import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from 'ethers';
+import { ErrorCode } from '@ethersproject/logger';
+import { EthMessageSigner } from './eth-message-signer';
+import { Provider } from './provider';
+import { Create2WalletSigner, Signer } from './signer';
+import { BatchBuilder } from './batch-builder';
 import {
     AccountState,
     Address,
@@ -222,19 +222,24 @@ export class Wallet {
         };
     }
 
-    async signRegisterFactory(factoryAddress: Address): Promise<{
-       signature: TxEthSignature,
-        accountId: number,
-        accountAddress: Address
+    async signRegisterFactory(
+        factoryAddress: Address
+    ): Promise<{
+        signature: TxEthSignature;
+        accountId: number;
+        accountAddress: Address;
     }> {
-        const signature = await this.ethMessageSigner.ethSignRegisterFactoryMessage(factoryAddress, this.accountId, this.address());
-        return  {
+        const signature = await this.ethMessageSigner.ethSignRegisterFactoryMessage(
+            factoryAddress,
+            this.accountId,
+            this.address()
+        );
+        return {
             signature,
             accountId: this.accountId,
             accountAddress: this.address()
-        }
+        };
     }
-
 
     async getForcedExit(forcedExit: {
         target: Address;
