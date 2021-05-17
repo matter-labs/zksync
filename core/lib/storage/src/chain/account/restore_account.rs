@@ -8,7 +8,7 @@ use zksync_types::{Account, AccountId, Nonce, TokenId};
 // Local imports
 use super::records::*;
 
-pub(crate) fn restore_account(
+pub fn restore_account(
     stored_account: &StorageAccount,
     stored_balances: Vec<StorageBalance>,
 ) -> (AccountId, Account) {

@@ -195,6 +195,117 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         Ok(())
     }
 
+    pub async fn apply_storage_account_diff(
+        &mut self,
+        acc_update: StorageAccountDiff,
+    ) -> QueryResult<()> {
+        match acc_update {
+            StorageAccountDiff::BalanceUpdate(upd) => {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO balances ( account_id, coin_id, balance )
+                    VALUES ( $1, $2, $3 )
+                    ON CONFLICT (account_id, coin_id)
+                    DO UPDATE
+                      SET balance = $3
+                    "#,
+                    upd.account_id,
+                    upd.coin_id,
+                    upd.new_balance.clone(),
+                )
+                .execute(self.0.conn())
+                .await?;
+
+                sqlx::query!(
+                    r#"
+                    UPDATE accounts 
+                    SET last_block = $1, nonce = $2
+                    WHERE id = $3
+                    "#,
+                    upd.block_number,
+                    upd.new_nonce,
+                    upd.account_id,
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+
+            StorageAccountDiff::Create(upd) => {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )
+                    VALUES ( $1, $2, $3, $4, $5 )
+                    "#,
+                    upd.account_id,
+                    upd.block_number,
+                    upd.nonce,
+                    upd.address,
+                    PubKeyHash::default().data.to_vec()
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+            StorageAccountDiff::Delete(upd) => {
+                sqlx::query!(
+                    r#"
+                    DELETE FROM accounts
+                    WHERE id = $1
+                    "#,
+                    upd.account_id,
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+            StorageAccountDiff::ChangePubKey(upd) => {
+                sqlx::query!(
+                    r#"
+                    UPDATE accounts 
+                    SET last_block = $1, nonce = $2, pubkey_hash = $3
+                    WHERE id = $4
+                    "#,
+                    upd.block_number,
+                    upd.new_nonce,
+                    upd.new_pubkey_hash,
+                    upd.account_id,
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+            StorageAccountDiff::MintNFT(upd) => {
+                let address = address_to_stored_string(&Address::from_slice(&upd.address));
+                sqlx::query!(
+                    r#"
+                    INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
+                    VALUES ( $1, $2, $3, $4, true )
+                    "#,
+                    upd.token_id,
+                    address,
+                    upd.symbol,
+                    1
+                )
+                .execute(self.0.conn())
+                .await?;
+
+                sqlx::query!(
+                    r#"
+                    INSERT INTO nft ( token_id, creator_address, creator_account_id, serial_id, address, content_hash )
+                    VALUES ( $1, $2, $3, $4, $5, $6)
+                    "#,
+                    upd.token_id,
+                    upd.creator_address,
+                    upd.creator_account_id,
+                    upd.serial_id,
+                    upd.address,
+                    upd.content_hash,
+                )
+                    .execute(self.0.conn())
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Applies the previously stored list of account changes to the stored state.
     ///
     /// This method is invoked from the `zksync_eth_sender` after corresponding `Verify` transaction
@@ -280,109 +391,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         // Then go through the collected list of changes and apply them by one.
         for acc_update in account_updates.into_iter() {
-            match acc_update {
-                StorageAccountDiff::BalanceUpdate(upd) => {
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO balances ( account_id, coin_id, balance )
-                        VALUES ( $1, $2, $3 )
-                        ON CONFLICT (account_id, coin_id)
-                        DO UPDATE
-                          SET balance = $3
-                        "#,
-                        upd.account_id,
-                        upd.coin_id,
-                        upd.new_balance.clone(),
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-
-                    sqlx::query!(
-                        r#"
-                        UPDATE accounts 
-                        SET last_block = $1, nonce = $2
-                        WHERE id = $3
-                        "#,
-                        upd.block_number,
-                        upd.new_nonce,
-                        upd.account_id,
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-                }
-
-                StorageAccountDiff::Create(upd) => {
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )
-                        VALUES ( $1, $2, $3, $4, $5 )
-                        "#,
-                        upd.account_id,
-                        upd.block_number,
-                        upd.nonce,
-                        upd.address,
-                        PubKeyHash::default().data.to_vec()
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-                }
-                StorageAccountDiff::Delete(upd) => {
-                    sqlx::query!(
-                        r#"
-                        DELETE FROM accounts
-                        WHERE id = $1
-                        "#,
-                        upd.account_id,
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-                }
-                StorageAccountDiff::ChangePubKey(upd) => {
-                    sqlx::query!(
-                        r#"
-                        UPDATE accounts 
-                        SET last_block = $1, nonce = $2, pubkey_hash = $3
-                        WHERE id = $4
-                        "#,
-                        upd.block_number,
-                        upd.new_nonce,
-                        upd.new_pubkey_hash,
-                        upd.account_id,
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-                }
-                StorageAccountDiff::MintNFT(upd) => {
-                    let address = address_to_stored_string(&Address::from_slice(&upd.address));
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
-                        VALUES ( $1, $2, $3, $4, true )
-                        "#,
-                        upd.token_id,
-                        address,
-                        upd.symbol,
-                        1
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO nft ( token_id, creator_address, creator_account_id, serial_id, address, content_hash )
-                        VALUES ( $1, $2, $3, $4, $5, $6)
-                        "#,
-                        upd.token_id,
-                        upd.creator_address,
-                        upd.creator_account_id,
-                        upd.serial_id,
-                        upd.address,
-                        upd.content_hash,
-                    )
-                        .execute(transaction.conn())
-                        .await?;
-                }
-            }
+            transaction
+                .chain()
+                .state_schema()
+                .apply_storage_account_diff(acc_update)
+                .await?;
         }
 
         transaction.commit().await?;
