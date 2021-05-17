@@ -25,8 +25,8 @@ use zksync_storage::{
     QueryResult, StorageProcessor,
 };
 use zksync_types::{
-    priority_ops::PriorityOpLookupQuery, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
-    BlockNumber, EthBlockId, ZkSyncOp, H256,
+    priority_ops::PriorityOpLookupQuery, tx::EthSignData, tx::TxHash, BlockNumber, EthBlockId,
+    ZkSyncOp, H256,
 };
 
 // Local uses
@@ -136,12 +136,7 @@ fn get_sign_bytes(eth_sign_data: serde_json::Value) -> String {
             err
         )
     });
-    match eth_sign_data.signature {
-        TxEthSignature::EthereumSignature(sign) => {
-            format!("0x{}", hex::encode(sign.serialize_packed()))
-        }
-        TxEthSignature::EIP1271Signature(sign) => format!("0x{}", hex::encode(sign.0)),
-    }
+    eth_sign_data.signature.signature_string()
 }
 
 /// Shared data between `api/v0.2/transaction` endpoints.

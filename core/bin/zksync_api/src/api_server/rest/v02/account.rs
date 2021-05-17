@@ -181,6 +181,10 @@ impl ApiAccountData {
         storage.paginate(&new_query).await
     }
 
+    /// Pending deposits can be matched only with addresses,
+    /// while pending full exits can be matched only with account ids.
+    /// If the account isn't created yet it doesn't have an id
+    /// but we can still find pending deposits for its address that is why account_id is Option.
     async fn account_pending_txs(
         &self,
         query: PaginationQuery<SerialId>,
@@ -253,10 +257,6 @@ async fn account_pending_txs(
         data.parse_account_id_or_address(&account_id_or_address)
             .await
     );
-    // Pending deposits can be matched only with addresses,
-    // while pending full exits can be matched only with account ids.
-    // If the account isn't created yet it doesn't have an id
-    // but we can still find pending deposits for its address that is why account_id is Option.
     let address = api_try!(
         data.get_address_by_address_or_id(address_or_id.clone())
             .await
