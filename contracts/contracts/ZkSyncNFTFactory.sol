@@ -21,7 +21,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         uint32 creatorId,
         uint32 serialId
     ) internal pure returns (uint256) {
-        return ( // shift address by zero bits to preserve consistency
+        return (// shift address by zero bits to preserve consistency
         (uint256(creatorAddress) << ADDRESS_FOOTPRINT_OFFSET) |
             (uint256(creatorId) << CREATOR_ID_FOOTPRINT_OFFSET) |
             (uint256(serialId) << SERIAL_ID_FOOTPRINT_OFFSET));
