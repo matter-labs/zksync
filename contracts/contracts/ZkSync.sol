@@ -133,8 +133,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(totalBlocksCommitted == totalBlocksExecuted, "w12"); // All the blocks must be processed
 
         StoredBlockInfo memory lastBlockInfo;
-        address newAdditionalZkSync;
-        (lastBlockInfo, newAdditionalZkSync) = abi.decode(upgradeParameters, (StoredBlockInfo, address));
+        (lastBlockInfo) = abi.decode(upgradeParameters, (StoredBlockInfo));
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
 
         RegenesisMultisig multisig = RegenesisMultisig($$(REGENESIS_MULTISIG_ADDRESS));
@@ -146,7 +145,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Overriding the old block's root hash with the new one
         lastBlockInfo.stateHash = newRootHash;
         storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(lastBlockInfo);
-        additionalZkSync = newAdditionalZkSync;
+        additionalZkSync = address($$(NEW_ADDITIONAL_ZKSYNC_ADDRESS));
         return;
     }
 
@@ -178,7 +177,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev WARNING: Only for Exodus mode
     /// @dev Canceling may take several separate transactions to be completed
     /// @param _n number of requests to process
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
+    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external nonReentrant {
         delegateAdditional();
     }
 
@@ -612,7 +611,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 _nftSerialId,
         bytes32 _nftContentHash,
         uint256[] memory _proof
-    ) external {
+    ) external nonReentrant {
         delegateAdditional();
     }
 

@@ -100,12 +100,9 @@ describe('Regenesis test', function () {
         const StoredBlockInfo = storedBlockInfoParam();
 
         // We need some address, but it is not needed for upgrade itself, so we don't care
-        const additionalZkSyncAddress = '0x6778b59d7fa1be069fed3c44e603fc807d5057ae';
+        const additionalZkSyncAddress = process.env.MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS;
 
-        const encodedUpgradeData = ethers.utils.defaultAbiCoder.encode(
-            [StoredBlockInfo, 'address'],
-            [genesisBlock, additionalZkSyncAddress]
-        );
+        const encodedUpgradeData = ethers.utils.defaultAbiCoder.encode([StoredBlockInfo], [genesisBlock]);
 
         const tx = await upgradeGatekeeperContract.finishUpgrade([[], [], encodedUpgradeData]);
         await tx.wait();
