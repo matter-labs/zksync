@@ -15,22 +15,22 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
     uint16 constant SERIAL_ID_FOOTPRINT_OFFSET = CREATOR_ID_FOOTPRINT_OFFSET + CREATOR_ID_SIZE_BITS;
     uint16 constant SERIAL_ID_SIZE_BITS = 32;
 
-    /// @notice Packs address and token id into single word to use as a key in balances mapping
+    /// @notice Packs address and token ID into single word to use as a key in balances mapping
     function packCreatorFingerprint(
         address creatorAddress,
         uint32 creatorId,
         uint32 serialId
     ) internal pure returns (uint256) {
-        return (// We shift address by zero bits to preserve consistency
+        return ( // shift address by zero bits to preserve consistency
         (uint256(creatorAddress) << ADDRESS_FOOTPRINT_OFFSET) |
             (uint256(creatorId) << CREATOR_ID_FOOTPRINT_OFFSET) |
             (uint256(serialId) << SERIAL_ID_FOOTPRINT_OFFSET));
     }
 
-    // Optional mapping for token content hashes
+    // Optional mapping from token ID to token content hash
     mapping(uint256 => bytes32) private _contentHashes;
 
-    // Optional mapping for creator fingerprints. Each looks as concat(creatorAddress | creatorId | serialId)
+    // Optional mapping from token ID to creator fingerprints -- concat(creatorAddress | creatorId | serialId)
     mapping(uint256 => uint256) private _creatorFingerprints;
 
     address private _zkSyncAddress;
