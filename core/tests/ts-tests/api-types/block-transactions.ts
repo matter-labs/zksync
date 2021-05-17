@@ -182,7 +182,6 @@ type MintNFT = {
         fee: string;
         creatorId: number;
         creatorAddress: string;
-        accountId: number;
         nonce: number;
         signature: {
             pubKey: string;
@@ -190,10 +189,8 @@ type MintNFT = {
         };
         recipient: string;
         contentHash: string;
-        feeTokenId: number;
+        feeToken: number;
         type: 'MintNFT';
-        validFrom: number;
-        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;
