@@ -84,12 +84,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(alice, token, true);
     });
 
-    step('should register factory and withdraw nft', async () => {
-        if (onlyBasic) {
-            return;
-        }
-        await tester.testRegisterFactory(alice, token);
-    });
 
     step('should execute a transfer to new account', async () => {
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
@@ -190,6 +184,13 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should execute a ForcedExit', async () => {
         await tester.testVerifiedForcedExit(alice, bob, token);
+    });
+
+    step('should register factory and withdraw nft', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        await tester.testRegisterFactory(alice, token);
     });
 
     it('should check collected fees', async () => {
