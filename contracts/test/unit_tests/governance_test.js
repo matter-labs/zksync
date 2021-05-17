@@ -28,12 +28,4 @@ describe('Governance unit tests', function () {
             }
         }
     });
-    it('Check correct register factory', async () => {
-        const data = await testContract.publicPackRegisterNFTFactoryMsg(
-            3,
-            '0x5b51e2299151124ea4b8763c8c1a167740302681',
-            '0x2dd77f58e193f7789a6aeb297ea4439c073c7f9c'
-        );
-        console.log(Buffer.from(data));
-    });
 });

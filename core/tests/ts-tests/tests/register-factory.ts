@@ -42,33 +42,38 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
     const tx = await contract.registerNFTFactory(accountId, accountAddress, signature.signature, {
         gasLimit: 5000000
     });
-    const log = await tx.wait();
+    await tx.wait();
 
-    console.log(log);
+    const type = 'MintNFT';
+    const contentHash = utils.randomBytes(32);
+    let { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), feeToken);
 
-    // const type = 'MintNFT';
-    // const contentHash = utils.randomBytes(32);
-    // let { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), feeToken);
-    //
-    // const handle = await wallet.mintNFT({
-    //     recipient: wallet.address(),
-    //     contentHash,
-    //     feeToken,
-    //     fee
-    // });
-    //
-    // const receipt = await handle.awaitVerifyReceipt();
-    // expect(receipt.success, `Mint NFT failed with a reason: ${receipt.failReason}`).to.be.true;
-    // const state = await wallet.getAccountState();
-    // const nft: any = Object.values(state.committed.nfts)[0];
-    // const handle_withdraw = await wallet.withdrawNFT({
-    //     to: wallet.address(),
-    //     token: nft.id,
-    //     feeToken,
-    //     fee,
-    // });
-    // const receipt_withdraw = await handle_withdraw.awaitReceipt();
-    // expect(receipt_withdraw.success, `Withdraw NFT failed with a reason: ${receipt_withdraw.failReason}`).to.be.true;
-    // const owner = await contract.ownerOf(nft.id);
-    // expect(owner == wallet.address(), "Contract minting is wrong");
+    const handle = await wallet.mintNFT({
+        recipient: wallet.address(),
+        contentHash,
+        feeToken,
+        fee
+    });
+
+    this.runningFee = this.runningFee.add(fee);
+    const receipt = await handle.awaitVerifyReceipt();
+    expect(receipt.success, `Mint NFT failed with a reason: ${receipt.failReason}`).to.be.true;
+    const state = await wallet.getAccountState();
+    let { totalFee: withdrawFee } = await this.syncProvider.getTransactionFee(
+        'WithdrawNFT',
+        wallet.address(),
+        feeToken
+    );
+    const nft: any = Object.values(state.committed.nfts)[0];
+    const handle_withdraw = await wallet.withdrawNFT({
+        to: wallet.address(),
+        token: nft.id,
+        feeToken,
+        fee: withdrawFee
+    });
+    const receipt_withdraw = await handle_withdraw.awaitVerifyReceipt();
+    expect(receipt_withdraw.success, `Withdraw NFT failed with a reason: ${receipt_withdraw.failReason}`).to.be.true;
+    const owner = await contract.ownerOf(nft.id);
+    expect(owner == wallet.address(), 'Contract minting is wrong');
+    this.runningFee = this.runningFee.add(withdrawFee);
 };

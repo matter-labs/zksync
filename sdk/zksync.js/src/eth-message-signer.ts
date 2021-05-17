@@ -290,15 +290,12 @@ export class EthMessageSigner {
     async ethSignRegisterFactoryMessage(factoryAddress: Address, accountId: number, accountAddress: Address) {
         const factoryAddressHex = ethers.utils.hexlify(serializeAddress(factoryAddress)).substr(2);
         const accountAddressHex = ethers.utils.hexlify(serializeAddress(accountAddress)).substr(2);
-        const msgAccId = ethers.utils.hexlify(serializeAccountId(accountId));
+        const msgAccId = ethers.utils.hexlify(serializeAccountId(accountId)).substr(2);
         const message =
             `\nCreator's account ID in zkSync: ${msgAccId}\n` +
             `Creator: ${accountAddressHex}\n` +
             `Factory: ${factoryAddressHex}`;
         const msgBytes = ethers.utils.toUtf8Bytes(message);
-        console.log(
-            `Factory address ${factoryAddress} Account ${accountAddress} ${accountId} message ${message} bytes ${msgBytes}`
-        );
         return await this.getEthMessageSignature(msgBytes);
     }
 }
