@@ -136,7 +136,7 @@ fn get_sign_bytes(eth_sign_data: serde_json::Value) -> String {
             err
         )
     });
-    eth_sign_data.signature.signature_string()
+    eth_sign_data.signature.to_string()
 }
 
 /// Shared data between `api/v0.2/transaction` endpoints.
