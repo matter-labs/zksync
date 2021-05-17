@@ -16,12 +16,9 @@ use zksync_types::{
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
-use self::{
-    conversion::transaction_from_item_and_status,
-    records::{
-        AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StorageBlockMetadata,
-        StoragePendingBlock, TransactionItem,
-    },
+use self::records::{
+    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StorageBlockMetadata,
+    StoragePendingBlock, TransactionItem,
 };
 use crate::{
     chain::account::records::EthAccountType,
@@ -1121,7 +1118,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     .0;
                 let txs: Vec<Transaction> = raw_txs
                     .into_iter()
-                    .map(|tx| transaction_from_item_and_status(tx, block_status))
+                    .map(|tx| TransactionItem::transaction_from_item_and_status(tx, block_status))
                     .collect();
                 Some(txs)
             } else {

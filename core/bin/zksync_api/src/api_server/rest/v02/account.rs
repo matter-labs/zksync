@@ -82,7 +82,7 @@ impl ApiAccountData {
         }
     }
 
-    async fn parse_account_id_or_address(
+    fn parse_account_id_or_address(
         &self,
         account_address_or_id: &str,
     ) -> Result<AccountAddressOrId, Error> {
@@ -209,10 +209,7 @@ async fn account_committed_info(
     data: web::Data<ApiAccountData>,
     web::Path(account_id_or_address): web::Path<String>,
 ) -> ApiResult<Option<Account>> {
-    let address_or_id = api_try!(
-        data.parse_account_id_or_address(&account_id_or_address)
-            .await
-    );
+    let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(api_try!(data.get_id_by_address_or_id(address_or_id).await)
         .ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
     data.account_info(account_id, AccountStateType::Committed)
@@ -224,10 +221,7 @@ async fn account_finalized_info(
     data: web::Data<ApiAccountData>,
     web::Path(account_id_or_address): web::Path<String>,
 ) -> ApiResult<Option<Account>> {
-    let address_or_id = api_try!(
-        data.parse_account_id_or_address(&account_id_or_address)
-            .await
-    );
+    let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(api_try!(data.get_id_by_address_or_id(address_or_id).await)
         .ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
     data.account_info(account_id, AccountStateType::Finalized)
@@ -240,10 +234,7 @@ async fn account_txs(
     web::Path(account_id_or_address): web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<TxHash>>,
 ) -> ApiResult<Paginated<Transaction, AccountTxsRequest>> {
-    let address_or_id = api_try!(
-        data.parse_account_id_or_address(&account_id_or_address)
-            .await
-    );
+    let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(data.get_address_by_address_or_id(address_or_id).await);
     data.account_txs(query, address).await.into()
 }
@@ -253,10 +244,7 @@ async fn account_pending_txs(
     web::Path(account_id_or_address): web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<SerialId>>,
 ) -> ApiResult<Paginated<Transaction, PendingOpsRequest>> {
-    let address_or_id = api_try!(
-        data.parse_account_id_or_address(&account_id_or_address)
-            .await
-    );
+    let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(
         data.get_address_by_address_or_id(address_or_id.clone())
             .await

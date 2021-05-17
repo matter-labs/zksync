@@ -212,36 +212,38 @@ impl StoredAggregatedOperation {
     }
 }
 
-pub fn transaction_from_item_and_status(
-    item: TransactionItem,
-    block_status: BlockStatus,
-) -> Transaction {
-    let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
-    let block_number = match block_status {
-        BlockStatus::Queued => None,
-        _ => Some(BlockNumber(item.block_number as u32)),
-    };
-    let status = if item.success {
-        block_status.into()
-    } else {
-        TxInBlockStatus::Rejected
-    };
-    let op = if let Some(eth_hash) = item.eth_hash {
-        let eth_hash = H256::from_slice(&eth_hash);
-        let id = item.priority_op_serialid.unwrap() as u64;
-        let operation: ZkSyncOp = serde_json::from_value(item.op).unwrap();
-        TransactionData::L1(
-            L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
-        )
-    } else {
-        TransactionData::L2(serde_json::from_value(item.op).unwrap())
-    };
-    Transaction {
-        tx_hash,
-        block_number,
-        op,
-        status,
-        fail_reason: item.fail_reason,
-        created_at: Some(item.created_at),
+impl TransactionItem {
+    pub fn transaction_from_item_and_status(
+        item: TransactionItem,
+        block_status: BlockStatus,
+    ) -> Transaction {
+        let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
+        let block_number = match block_status {
+            BlockStatus::Queued => None,
+            _ => Some(BlockNumber(item.block_number as u32)),
+        };
+        let status = if item.success {
+            block_status.into()
+        } else {
+            TxInBlockStatus::Rejected
+        };
+        let op = if let Some(eth_hash) = item.eth_hash {
+            let eth_hash = H256::from_slice(&eth_hash);
+            let id = item.priority_op_serialid.unwrap() as u64;
+            let operation: ZkSyncOp = serde_json::from_value(item.op).unwrap();
+            TransactionData::L1(
+                L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
+            )
+        } else {
+            TransactionData::L2(serde_json::from_value(item.op).unwrap())
+        };
+        Transaction {
+            tx_hash,
+            block_number,
+            op,
+            status,
+            fail_reason: item.fail_reason,
+            created_at: Some(item.created_at),
+        }
     }
 }

@@ -22,7 +22,7 @@ use self::records::{
 };
 use crate::{
     chain::{
-        block::{conversion::transaction_from_item_and_status, records::TransactionItem},
+        block::records::TransactionItem,
         operations::{records::StoredExecutedPriorityOperation, OperationsSchema},
     },
     tokens::TokensSchema,
@@ -821,9 +821,15 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 .into_iter()
                 .map(|tx| {
                     if tx.block_number as u32 <= *last_finalized {
-                        transaction_from_item_and_status(tx, BlockStatus::Finalized)
+                        TransactionItem::transaction_from_item_and_status(
+                            tx,
+                            BlockStatus::Finalized,
+                        )
                     } else {
-                        transaction_from_item_and_status(tx, BlockStatus::Committed)
+                        TransactionItem::transaction_from_item_and_status(
+                            tx,
+                            BlockStatus::Committed,
+                        )
                     }
                 })
                 .collect();

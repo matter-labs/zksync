@@ -314,7 +314,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         Ok(address)
     }
 
-    /// Obtains the last verified state of the account.
+    /// Obtains the last committed block that affects the account.
     pub async fn last_committed_block_with_update_for_acc(
         &mut self,
         account_id: AccountId,
