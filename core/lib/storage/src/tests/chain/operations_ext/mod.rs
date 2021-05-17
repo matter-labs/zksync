@@ -692,3 +692,29 @@ async fn get_batch_info(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     Ok(())
 }
+
+/// Test `get_account_transactions_count` method
+#[db_test]
+async fn account_transactions_count(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+    setup.add_block(1);
+    commit_schema_data(&mut storage, &setup).await?;
+
+    let count_before_commit = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(setup.from_zksync_account.address)
+        .await?;
+    assert_eq!(count_before_commit, 0);
+
+    commit_block(&mut storage, BlockNumber(1)).await?;
+
+    let count_after_commit = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(setup.from_zksync_account.address)
+        .await?;
+    assert_eq!(count_after_commit, 7);
+
+    Ok(())
+}
