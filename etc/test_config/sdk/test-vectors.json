@@ -121,6 +121,70 @@
       },
       {
         "inputs": {
+          "type": "MintNFT",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "creatorId": 44,
+            "creatorAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "fee": "1000000",
+            "feeTokenId": 0,
+            "nonce": 12
+          },
+          "ethSignData": {
+            "stringFeeToken": "ETH",
+            "stringFee": "1000000.0",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "signBytes": "0x090000002cede35562d3555e61120a151b3c8e8e91d83a378a000000000000000000000000000000000000000000000000000000000000012319aa2ed8712072e918632259780e587698ef58df000000007d030000000c",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "8c119b01ff8ae75ba5aabaa4ad480690e6a56d6e99d430ecac3bc3beacbaba28b3740cb20574d130281874fc70daaab884ee8e03a510e9ca9c1c677a2412cf03"
+          },
+          "ethSignMessage": "0x4d696e744e46542030783030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303031323320666f723a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
+          "ethSignature": "0xac4f8b1ad65ea143dd2a940c72dd778ba3e07ee766355ed237a89a0b7e925fe76ead0a04e23db1cc1593399ee69faeb31b2e7e0c6fbec70d5061d6fbc431d64a1b"
+        }
+      },
+      {
+        "inputs": {
+          "type": "WithdrawNFT",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "accountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "tokenId": 100000,
+            "feeTokenId": 0,
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          },
+          "ethSignData": {
+            "token": 100000,
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "stringFee": "1000000.0",
+            "stringFeeToken": "ETH",
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "signBytes": "0x0a0000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000186a0000000007d030000000c000000000000000000000000ffffffff",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "9d94324425f23d09bf76df52e520e8da4561718057eb29fe6d760945be986b8e3a1955d9c02cf415558f533b7d9573564798db9586cc5ba1fdc44f711e455e03"
+          },
+          "ethSignMessage": "0x57697468647261774e46542031303030303020746f3a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
+          "ethSignature": "0x4a50341da6d2b1f0b64a4e37f753c02c43623e89cb0a291026c37fdcc723da9665453ce622f4dd6237bd98430ef0d75755694b1968f3b2d0ea8598f8bc43accf1b"
+        }
+      },
+      {
+        "inputs": {
           "type": "ForcedExit",
           "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
           "data": {
@@ -398,6 +462,42 @@
         },
         "outputs": {
           "hash": "sync-tx:a537d3d53ac9d5ec88375b9cd02c50992da8f13d90844152b029625499d8adfe"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "MintNFT",
+            "creatorId": 44,
+            "creatorAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "fee": "1000000",
+            "feeToken": 0,
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:c915bfc90244f1ed2d0063068474100a707d3ea3098d86cca6a7441e8cc0599b"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "WithdrawNFT",
+            "accountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "token": 100000,
+            "feeToken": 0,
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:2e1fcebb4f4240e3993d0c2878735e02f0a4acb1d28932e357ab808195dec27e"
         }
       }
     ]

@@ -731,22 +731,6 @@
       ]
     }
   },
-  "17fc469643c2d885502a9f3e5d44c2b7032e03f694c663215fe9160fc8db38df": {
-    "query": "\n                        INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )\n                        VALUES ( $1, $2, $3, $4, $5 )\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Bytea",
-          "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "18923147a9a9f03dae77d31f106ac53ca69321df1194c921baef8f48ff963c12": {
     "query": "WITH aggregate_ops AS (\n                SELECT aggregate_operations.id FROM aggregate_operations\n                   WHERE confirmed = $1 and action_type != $2 and aggregate_operations.id != ANY(SELECT id from eth_aggregated_ops_binding)\n                ORDER BY aggregate_operations.id ASC\n              )\n              INSERT INTO eth_unprocessed_aggregated_ops (op_id)\n              SELECT id from aggregate_ops\n              ON CONFLICT (op_id)\n              DO NOTHING",
     "describe": {
@@ -1444,6 +1428,20 @@
       "nullable": []
     }
   },
+  "35e0fd96463a3f958241fd62ef8bd6536f3f084908fa299f2efb09459be6b38c": {
+    "query": "\n                    INSERT INTO balances ( account_id, coin_id, balance )\n                    VALUES ( $1, $2, $3 )\n                    ON CONFLICT (account_id, coin_id)\n                    DO UPDATE\n                      SET balance = $3\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Numeric"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
     "query": "SELECT * FROM balances WHERE account_id = ANY($1)",
     "describe": {
@@ -1484,20 +1482,6 @@
         "Left": [
           "Int8",
           "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "39f351e0d79171f20e82f0df7ea9fd34069c69915f96d4496242d35d6bd22a1b": {
-    "query": "\n                        INSERT INTO balances ( account_id, coin_id, balance )\n                        VALUES ( $1, $2, $3 )\n                        ON CONFLICT (account_id, coin_id)\n                        DO UPDATE\n                          SET balance = $3\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int4",
-          "Numeric"
         ]
       },
       "nullable": []
@@ -1582,18 +1566,6 @@
         "Left": [
           "Int8",
           "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "437c7b571b9be4bfbb677acff6b6b4393c7f8fd8c035264052e782bfd89c67ff": {
-    "query": "\n                        DELETE FROM accounts\n                        WHERE id = $1\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
         ]
       },
       "nullable": []
@@ -2403,6 +2375,19 @@
         false,
         false
       ]
+    }
+  },
+  "6c25f6955c7381b5ed9bf4f2eb233adbd2923baafc688f36b66b86f44b456668": {
+    "query": "UPDATE blocks\n                SET root_hash = $1\n                WHERE number = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
@@ -3248,23 +3233,6 @@
       "nullable": []
     }
   },
-  "9a602c4f3e50a137d2c1d3ed6416536d6e381244400012b85ffe7d76a5a871cc": {
-    "query": "\n                        INSERT INTO nft ( token_id, creator_address, creator_account_id, serial_id, address, content_hash )\n                        VALUES ( $1, $2, $3, $4, $5, $6)\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Bytea",
-          "Int4",
-          "Int4",
-          "Bytea",
-          "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "9aeeb5e20f4f34d4b4e1987f1bf0a23ee931f12da071b134225069d32c1896de": {
     "query": "SELECT * FROM pending_block\n            ORDER BY number DESC\n            LIMIT 1",
     "describe": {
@@ -3311,21 +3279,6 @@
         true,
         false
       ]
-    }
-  },
-  "9c07c9ffe26fede6ef1954c873c7ff392a908489147f4954df45dd941e97aa20": {
-    "query": "\n                        UPDATE accounts \n                        SET last_block = $1, nonce = $2, pubkey_hash = $3\n                        WHERE id = $4\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "9fbf3d0ae8610fb464ac74ff989860eb913f4bfb14790373021ef456b671ed96": {
@@ -4205,6 +4158,21 @@
       ]
     }
   },
+  "c23bc5ab7c6f6148d1e12d408d4c8842d80cca11e3eb539fd9153ae808a11f28": {
+    "query": "\n                    UPDATE accounts \n                    SET last_block = $1, nonce = $2, pubkey_hash = $3\n                    WHERE id = $4\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "c2b72cb3aeb4b448b240edef3988a1026577a82fb4ae1c416fcaf4622afa4ac0": {
     "query": "INSERT INTO aggregate_operations (action_type, arguments, from_block, to_block)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (id)\n            DO NOTHING\n            RETURNING id",
     "describe": {
@@ -4306,6 +4274,22 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "c7459e7624c46417d3a91fc39b05128cf3e88097ae114d8aad6e22b9b2cd84e9": {
+    "query": "\n                    INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )\n                    VALUES ( $1, $2, $3, $4, $5 )\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Bytea",
+          "Bytea"
+        ]
+      },
+      "nullable": []
     }
   },
   "c7bc91425f35b3a77be36fe8ba80030445051a0bc2536fa4a0def7ac498fc5c2": {
@@ -4476,6 +4460,20 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "d32a820014652b70f2035bccb22df070dc98c416813520de6b20157ed670756e": {
+    "query": "\n                    UPDATE accounts \n                    SET last_block = $1, nonce = $2\n                    WHERE id = $3\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "d3b822a6639901acd986e82d2779a7318c3805385a7772db83063d9507c049a7": {
@@ -4761,6 +4759,18 @@
       ]
     }
   },
+  "e10f37a3c41cf1446b91605ffdeef37da79d7d3a77d47fb3dfab764831509536": {
+    "query": "\n                    DELETE FROM accounts\n                    WHERE id = $1\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "e295fe3cf4138c1dfd76fc7b4f5e72ab981229c036c46fb937cd6fc974af843d": {
     "query": "DELETE FROM blocks WHERE number > $1",
     "describe": {
@@ -5042,21 +5052,6 @@
       ]
     }
   },
-  "e9e9c00696bdd5d4cdde4b7e08fa77dd0cb1b46c04d520193e5552da6405d10a": {
-    "query": "\n                        INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n                        VALUES ( $1, $2, $3, $4, true )\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "eab13daa273992f1a4ac94095acdb03a4118f66837fc94694853da8687ae8cc2": {
     "query": "DELETE FROM account_tree_cache WHERE block > $1",
     "describe": {
@@ -5077,6 +5072,51 @@
         "Left": []
       },
       "nullable": []
+    }
+  },
+  "eb9480426aebcc7679526858296f555bb4d3e1ccf488a942de6d0b2dd1ed4720": {
+    "query": "\n                    INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n                    VALUES ( $1, $2, $3, $4, true )\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "ed39b22ac81b690c2102487ae3351915eec23b00a9cf9e409de08662c42fa20d": {
+    "query": "SELECT * FROM balances",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "coin_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "balance",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
     }
   },
   "ed4f6300995e13af62d0263cad9dfce76ae5aa8d2a5bc2be8e2f4b7de32fa2f6": {
@@ -5145,6 +5185,23 @@
         false,
         false
       ]
+    }
+  },
+  "ee0c7b261773695aac26c4c3ca0da12077ab71b8487a04ffc436828a3fcc74d3": {
+    "query": "\n                    INSERT INTO nft ( token_id, creator_address, creator_account_id, serial_id, address, content_hash )\n                    VALUES ( $1, $2, $3, $4, $5, $6)\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Bytea",
+          "Int4",
+          "Int4",
+          "Bytea",
+          "Bytea"
+        ]
+      },
+      "nullable": []
     }
   },
   "f02021c46f5edc171f22c16e29bb028353eb0519aec1555c066fdd8dfe1d61e5": {
@@ -5375,20 +5432,6 @@
       ]
     }
   },
-  "f132881fb1b1eaedb15991e64c7040c6f368271fc306780395cf6214f88b294b": {
-    "query": "\n                        UPDATE accounts \n                        SET last_block = $1, nonce = $2\n                        WHERE id = $3\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "f1f2c5311487585c29e51db49cac9706d0a48e563aef71381c81a2d0d61da422": {
     "query": "SELECT * FROM aggregate_operations\n                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $1)",
     "describe": {
@@ -5556,6 +5599,18 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "f5bb5886974577c7f43179f77638507511ffbe1462bb75844a1f1c72414a4d83": {
+    "query": "\n            DELETE FROM account_tree_cache \n            WHERE block = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {

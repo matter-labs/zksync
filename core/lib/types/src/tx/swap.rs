@@ -24,10 +24,12 @@ use crate::tx::error::TransactionSignatureError;
 #[serde(rename_all = "camelCase")]
 pub struct Order {
     pub account_id: AccountId,
+    #[serde(rename = "recipient")]
     pub recipient_address: Address,
     pub nonce: Nonce,
     pub token_buy: TokenId,
     pub token_sell: TokenId,
+    #[serde(rename = "ratio")]
     #[serde(with = "BigUintPairSerdeAsRadix10Str")]
     pub price: (BigUint, BigUint),
     #[serde(with = "BigUintSerdeAsRadix10Str")]

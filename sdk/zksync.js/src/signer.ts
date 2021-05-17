@@ -10,13 +10,14 @@ import {
     ForcedExit,
     ChangePubKey,
     MintNFT,
+    WithdrawNFT,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,
     Create2Data,
     Swap,
     Order,
-    Price
+    Ratio
 } from './types';
 
 export class Signer {
@@ -54,6 +55,33 @@ export class Signer {
         };
     }
 
+    async signWithdrawNFT(withdrawNft: {
+        accountId: number;
+        from: Address;
+        to: Address;
+        tokenId: number;
+        feeTokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<WithdrawNFT> {
+        const tx: WithdrawNFT = {
+            ...withdrawNft,
+            type: 'WithdrawNFT',
+            token: withdrawNft.tokenId,
+            feeToken: withdrawNft.feeTokenId
+        };
+        const msgBytes = utils.serializeWithdrawNFT(tx);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...tx,
+            fee: BigNumber.from(withdrawNft.fee).toString(),
+            signature
+        };
+    }
+
     /**
      * @deprecated `Signer.*SignBytes` methods will be removed in future. Use `utils.serializeTx` instead.
      */
@@ -75,25 +103,14 @@ export class Signer {
         });
     }
 
-    async signSyncOrder(order: {
-        accountId: number;
-        recipientAddress: Address;
-        nonce: number;
-        tokenSell: number;
-        tokenBuy: number;
-        amount: BigNumberish;
-        price: Price;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Order> {
+    async signSyncOrder(order: Order): Promise<Order> {
         const msgBytes = utils.serializeOrder(order);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
             ...order,
             amount: BigNumber.from(order.amount).toString(),
-            // @ts-ignore
-            price: order.price.map((p) => BigNumber.from(p).toString()),
+            ratio: order.ratio.map((p) => BigNumber.from(p).toString()) as Ratio,
             signature
         };
     }

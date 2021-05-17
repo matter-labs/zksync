@@ -112,7 +112,7 @@ fn no_nft_on_balance() {
     )
     .unwrap();
 
-    tb.test_tx_fail(withdraw.into(), "Not enough balance");
+    tb.test_tx_fail(withdraw.into(), "Not enough nft balance");
 }
 
 #[test]
