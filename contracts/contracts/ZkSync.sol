@@ -18,6 +18,7 @@ import "./Bytes.sol";
 import "./Operations.sol";
 
 import "./UpgradeableMaster.sol";
+import "./RegenesisMultisig.sol";
 
 /// @title zkSync main contract
 /// @author Matter Labs
@@ -125,7 +126,26 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
     // solhint-disable-next-line no-empty-blocks
-    function upgrade(bytes calldata upgradeParameters) external nonReentrant {}
+    function upgrade(bytes calldata upgradeParameters) external nonReentrant {
+        require(totalBlocksCommitted == totalBlocksProven, "wq1"); // All the blocks must be processed
+        require(totalBlocksCommitted == totalBlocksExecuted, "w12"); // All the blocks must be processed
+
+        StoredBlockInfo memory lastBlockInfo;
+        (lastBlockInfo) = abi.decode(upgradeParameters, (StoredBlockInfo));
+
+        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
+
+        RegenesisMultisig multisig = RegenesisMultisig($$(REGENESIS_MULTISIG_ADDRESS));
+        bytes32 oldRootHash = multisig.oldRootHash();
+        require(oldRootHash == lastBlockInfo.stateHash, "wqqe");
+
+        bytes32 newRootHash = multisig.newRootHash();
+
+        // Overriding the old block's root hash with the new one
+        lastBlockInfo.stateHash = newRootHash;
+        storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(lastBlockInfo);
+        return;
+    }
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount

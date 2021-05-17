@@ -98,6 +98,7 @@ pub const INPUT_DATA_ROOT_BYTES_WIDTH: usize = 32;
 pub const INPUT_DATA_EMPTY_BYTES_WIDTH: usize = 64;
 pub const INPUT_DATA_ROOT_HASH_BYTES_WIDTH: usize = 32;
 
+pub const LEGACY_TOKEN_BIT_WIDTH: usize = 16;
 pub const TOKEN_BIT_WIDTH: usize = 32;
 pub const TX_TYPE_BIT_WIDTH: usize = 8;
 
