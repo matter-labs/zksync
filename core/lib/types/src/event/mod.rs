@@ -16,6 +16,7 @@ pub mod test_data;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "data")]
 pub enum EventData {
     Account(AccountEvent),
     Block(BlockEvent),
@@ -31,5 +32,6 @@ pub struct ZkSyncEvent {
     #[serde(skip)]
     pub id: EventId,
     pub block_number: BlockNumber,
+    #[serde(flatten)]
     pub data: EventData,
 }

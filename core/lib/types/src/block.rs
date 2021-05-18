@@ -107,6 +107,15 @@ impl ExecutedOperations {
             .map(|op| op.get_updated_account_ids())
             .unwrap_or_else(Vec::new)
     }
+
+    /// Returns `true` if the operation was successful.
+    pub fn is_successful(&self) -> bool {
+        // L1 priority operations cannot fail in L2.
+        match self {
+            ExecutedOperations::Tx(exec_tx) => exec_tx.success,
+            ExecutedOperations::PriorityOp(_) => true,
+        }
+    }
 }
 
 /// zkSync network block.
