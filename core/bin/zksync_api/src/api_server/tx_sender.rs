@@ -25,7 +25,8 @@ use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
     tx::{
-        EthBatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash,
+        EthBatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature,
+        TxEthSignatureVariant, TxHash,
     },
     AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
@@ -267,7 +268,7 @@ impl TxSender {
     pub async fn submit_tx(
         &self,
         mut tx: ZkSyncTx,
-        signature: Option<TxEthSignature>,
+        signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
     ) -> Result<TxHash, SubmitError> {
         if tx.is_close() {
@@ -374,7 +375,7 @@ impl TxSender {
             tx_sender,
             token.clone(),
             self.get_tx_sender_type(&tx).await?,
-            signature.clone(),
+            signature.tx_signature().clone(),
             msg_to_sign,
             sign_verify_channel,
         )
@@ -955,7 +956,7 @@ async fn verify_txs_batch_signature(
         let eth_sign_data = if let Some(message) = message {
             match sender_type {
                 EthAccountType::CREATE2 => {
-                    if tx.signature.is_some() {
+                    if tx.signature.exists() {
                         return Err(SubmitError::IncorrectTx(
                             "Eth signature from CREATE2 account not expected".to_string(),
                         ));
@@ -963,10 +964,12 @@ async fn verify_txs_batch_signature(
                     None
                 }
                 EthAccountType::Owned => {
-                    if batch_sign_data.is_none() && tx.signature.is_none() {
+                    if batch_sign_data.is_none() && !tx.signature.exists() {
                         return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
                     }
                     tx.signature
+                        .tx_signature()
+                        .clone()
                         .map(|signature| EthSignData { signature, message })
                 }
             }

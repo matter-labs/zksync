@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_storage::StorageProcessor;
 use zksync_types::{
-    tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
+    tx::TxEthSignatureVariant, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
     ZkSyncPriorityOp, ZkSyncTx,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
@@ -25,7 +25,7 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct TxWithSignature {
     pub tx: ZkSyncTx,
-    pub signature: Option<TxEthSignature>,
+    pub signature: TxEthSignatureVariant,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

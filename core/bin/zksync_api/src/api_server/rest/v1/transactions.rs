@@ -16,7 +16,10 @@ pub use zksync_api_client::rest::v1::{
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, BatchFee, BlockNumber, Fee, SignedZkSyncTx};
+use zksync_types::{
+    tx::{TxEthSignatureVariant, TxHash},
+    BatchFee, BlockNumber, Fee, SignedZkSyncTx,
+};
 // Local uses
 use super::{Error as ApiError, JsonResult, Pagination, PaginationQuery};
 use crate::api_server::rpc_server::types::TxWithSignature;
@@ -257,7 +260,7 @@ async fn submit_tx_batch(
         .into_iter()
         .map(|tx| TxWithSignature {
             tx,
-            signature: None,
+            signature: TxEthSignatureVariant::Single(None),
         })
         .collect();
 
