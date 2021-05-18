@@ -313,7 +313,7 @@ mod tests {
                     fee_ticker.clone(),
                 )
             },
-            shared_data,
+            Some(shared_data),
         );
 
         let token_like = TokenLike::Id(TokenId(1));
@@ -341,7 +341,7 @@ mod tests {
             limit: 2,
             direction: PaginationDirection::Older,
         };
-        let response = client.token_pagination_v02(&query).await?;
+        let response = client.token_pagination(&query).await?;
         let pagination: Paginated<ApiToken, TokenId> = deserialize_response_result(response)?;
 
         let expected_pagination = {
@@ -386,18 +386,18 @@ mod tests {
             price: BigDecimal::from_u32(10).unwrap() / BigDecimal::from_u32(10500).unwrap(),
         };
 
-        let response = client.token_price_v02(&token_like, "15").await?;
+        let response = client.token_price(&token_like, "15").await?;
         let price_in_token: TokenPrice = deserialize_response_result(response)?;
         assert_eq!(price_in_token, expected_token_price);
 
         expected_token_price.price_in = String::from("usd");
         expected_token_price.price = BigDecimal::from_u32(10).unwrap();
 
-        let response = client.token_price_v02(&token_like, "usd").await?;
+        let response = client.token_price(&token_like, "usd").await?;
         let price_in_usd: TokenPrice = deserialize_response_result(response)?;
         assert_eq!(price_in_usd, expected_token_price);
 
-        let response = client.token_price_v02(&token_like, "333").await?;
+        let response = client.token_price(&token_like, "333").await?;
         assert!(response.error.is_some());
 
         server.stop().await;

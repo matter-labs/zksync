@@ -451,15 +451,12 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 mod tests {
     use super::*;
     use crate::{
-        api_server::{
-            helpers::try_parse_tx_hash,
-            rest::v02::{
-                test_utils::{
-                    deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
-                    TestServerConfig, TestTransactions,
-                },
-                SharedData,
+        api_server::rest::v02::{
+            test_utils::{
+                deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
+                TestServerConfig, TestTransactions,
             },
+            SharedData,
         },
         core_api_client::CoreApiClient,
     };
@@ -523,11 +520,11 @@ mod tests {
                     &cfg.config,
                 ))
             },
-            shared_data,
+            Some(shared_data),
         );
 
         let tx = TestServerConfig::gen_zk_txs(100_u64).txs[0].0.clone();
-        let response = client.submit_tx_v02(tx.clone(), None).await?;
+        let response = client.submit_tx(tx.clone(), None).await?;
         let tx_hash: TxHash = deserialize_response_result(response)?;
         assert_eq!(tx.hash(), tx_hash);
 
@@ -566,7 +563,7 @@ mod tests {
         };
 
         let response = client
-            .submit_batch_v02(good_batch.clone(), batch_signature)
+            .submit_batch(good_batch.clone(), batch_signature)
             .await?;
         let submit_batch_response: SubmitBatchResponse = deserialize_response_result(response)?;
         assert_eq!(submit_batch_response, expected_response);
@@ -605,9 +602,9 @@ mod tests {
                 .get_block_transactions(BlockNumber(1))
                 .await?;
 
-            try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
+            TxHash::from_str(&transactions[0].tx_hash).unwrap()
         };
-        let response = client.tx_status_v02(tx_hash).await?;
+        let response = client.tx_status(tx_hash).await?;
         let tx_status: Receipt = deserialize_response_result(response)?;
         let expected_tx_status = Receipt::L2(L2Receipt {
             tx_hash,
@@ -617,7 +614,7 @@ mod tests {
         });
         assert_eq!(tx_status, expected_tx_status);
 
-        let response = client.tx_data_v02(tx_hash).await?;
+        let response = client.tx_data(tx_hash).await?;
         let tx_data: Option<TxData> = deserialize_response_result(response)?;
         assert_eq!(tx_data.unwrap().tx.tx_hash, tx_hash);
 
@@ -637,7 +634,7 @@ mod tests {
 
             tx_hash
         };
-        let response = client.tx_status_v02(pending_tx_hash).await?;
+        let response = client.tx_status(pending_tx_hash).await?;
         let tx_status: Receipt = deserialize_response_result(response)?;
         let expected_tx_status = Receipt::L2(L2Receipt {
             tx_hash: pending_tx_hash,
@@ -647,12 +644,12 @@ mod tests {
         });
         assert_eq!(tx_status, expected_tx_status);
 
-        let response = client.tx_data_v02(pending_tx_hash).await?;
+        let response = client.tx_data(pending_tx_hash).await?;
         let tx_data: Option<TxData> = deserialize_response_result(response)?;
         assert_eq!(tx_data.unwrap().tx.tx_hash, pending_tx_hash);
 
         let tx = TestServerConfig::gen_zk_txs(1_u64).txs[0].0.clone();
-        let response = client.tx_data_v02(tx.hash()).await?;
+        let response = client.tx_data(tx.hash()).await?;
         let tx_data: Option<TxData> = deserialize_response_result(response)?;
         assert!(tx_data.is_none());
 

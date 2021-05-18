@@ -7,7 +7,7 @@ use zksync_api_types::v02::{
 use zksync_types::{Address, TokenLike, TxFeeTypes};
 
 impl Client {
-    pub async fn get_txs_fee_v02(
+    pub async fn get_txs_fee(
         &self,
         tx_type: TxFeeTypes,
         address: Address,
@@ -23,7 +23,7 @@ impl Client {
             .await
     }
 
-    pub async fn get_batch_fee_v02(
+    pub async fn get_batch_fee(
         &self,
         transactions: Vec<TxInBatchFeeRequest>,
         token_like: TokenLike,

@@ -43,7 +43,6 @@ use zksync_types::{
 };
 
 // Local uses
-use super::SharedData;
 use crate::{
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
     signature_checker::{VerifiedTx, VerifySignatureRequest},
@@ -82,20 +81,25 @@ pub struct TestTransactions {
 }
 
 impl TestServerConfig {
-    pub fn start_server_with_scope<F>(
+    pub fn start_server_with_scope<F, D>(
         &self,
         scope: String,
         scope_factory: F,
-        shared_data: SharedData,
+        shared_data: Option<D>,
     ) -> (Client, actix_web::test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
+        D: Clone + Send + 'static,
     {
         let this = self.clone();
         let server = actix_web::test::start(move || {
-            App::new()
-                .data(shared_data)
-                .service(web::scope(scope.as_ref()).service(scope_factory(&this)))
+            let app = App::new();
+            let app = if let Some(shared_data) = shared_data.clone() {
+                app.data(shared_data)
+            } else {
+                app
+            };
+            app.service(web::scope(scope.as_ref()).service(scope_factory(&this)))
         });
 
         let url = server.url("").trim_end_matches('/').to_owned();
@@ -104,13 +108,14 @@ impl TestServerConfig {
         (client, server)
     }
 
-    pub fn start_server<F>(
+    pub fn start_server<F, D>(
         &self,
         scope_factory: F,
-        shared_data: SharedData,
+        shared_data: Option<D>,
     ) -> (Client, actix_web::test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
+        D: Clone + Send + 'static,
     {
         self.start_server_with_scope(String::from("/api/v0.2"), scope_factory, shared_data)
     }

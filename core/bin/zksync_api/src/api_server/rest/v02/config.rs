@@ -76,9 +76,11 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
-        let (client, server) =
-            cfg.start_server(|cfg: &TestServerConfig| api_scope(&cfg.config), shared_data);
-        let response = client.config_v02().await?;
+        let (client, server) = cfg.start_server(
+            |cfg: &TestServerConfig| api_scope(&cfg.config),
+            Some(shared_data),
+        );
+        let response = client.config().await?;
         let api_config: ApiConfigData = deserialize_response_result(response)?;
         assert_eq!(api_config, ApiConfigData::new(&cfg.config));
 

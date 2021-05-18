@@ -225,7 +225,7 @@ mod tests {
         };
         let (client, server) = cfg.start_server(
             |cfg: &TestServerConfig| api_scope(cfg.pool.clone(), BlockDetailsCache::new(10)),
-            shared_data,
+            Some(shared_data),
         );
 
         let query = PaginationQuery {
@@ -241,11 +241,11 @@ mod tests {
                 .map_err(|err| anyhow::anyhow!(err.message))?
         };
 
-        let response = client.block_by_number_v02("2").await?;
+        let response = client.block_by_number("2").await?;
         let block: BlockInfo = deserialize_response_result(response)?;
         assert_eq!(block, expected_blocks.list[1]);
 
-        let response = client.block_pagination_v02(&query).await?;
+        let response = client.block_pagination(&query).await?;
         let paginated: Paginated<BlockInfo, BlockNumber> = deserialize_response_result(response)?;
         assert_eq!(paginated, expected_blocks);
 
@@ -269,7 +269,7 @@ mod tests {
         };
 
         let response = client
-            .block_transactions_v02(&query, &*block_number.to_string())
+            .block_transactions(&query, &*block_number.to_string())
             .await?;
         let paginated: Paginated<Transaction, BlockAndTxHash> =
             deserialize_response_result(response)?;

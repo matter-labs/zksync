@@ -378,7 +378,7 @@ mod tests {
                 move |cfg: &TestServerConfig| {
                     api_scope(cfg.pool.clone(), TokenDBCache::new(), core_client.clone())
                 },
-                shared_data,
+                Some(shared_data),
             );
 
             Ok((
@@ -455,13 +455,13 @@ mod tests {
         .await?;
 
         let response = client
-            .account_info_v02(&account_id.to_string(), "committed")
+            .account_info(&account_id.to_string(), "committed")
             .await?;
         let account_info_by_id: Account = deserialize_response_result(response)?;
 
         let address = account_info_by_id.address;
         let response = client
-            .account_info_v02(&format!("{:?}", address), "committed")
+            .account_info(&format!("{:?}", address), "committed")
             .await?;
         let account_info_by_address: Account = deserialize_response_result(response)?;
         assert_eq!(account_info_by_id, account_info_by_address);

@@ -17,9 +17,6 @@ use std::{convert::TryInto, ops::Add};
 pub use zksync_api_client::rest::forced_exit_requests::{
     ForcedExitRegisterRequest, ForcedExitRequestStatus,
 };
-pub use zksync_api_client::rest::v1::{
-    FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData,
-};
 
 use zksync_api_client::rest::forced_exit_requests::ConfigInfo;
 use zksync_config::ZkSyncConfig;
@@ -33,8 +30,7 @@ use zksync_types::{
 };
 
 // Local uses
-use crate::api_server::rest::v1::{Error as ApiError, JsonResult};
-
+use super::{error::ApiError, JsonResult};
 use crate::api_server::forced_exit_checker::ForcedExitAccountAgeChecker;
 
 /// Shared data between `/api/forced_exit_requests/v0.1/` endpoints.
@@ -255,14 +251,16 @@ mod tests {
 
     use num::BigUint;
 
-    use zksync_api_client::rest::v1::Client;
+    use zksync_api_client::rest::client::Client;
     use zksync_config::ForcedExitRequestsConfig;
     use zksync_storage::ConnectionPool;
     use zksync_types::{Address, TokenId};
 
     use super::*;
-    use crate::api_server::forced_exit_checker::DummyForcedExitChecker;
-    use crate::api_server::v1::test_utils::TestServerConfig;
+    use crate::api_server::{
+        forced_exit_checker::DummyForcedExitChecker,
+        rest::v02::{test_utils::TestServerConfig, SharedData},
+    };
 
     struct TestServer {
         api_server: actix_web::test::TestServer,
@@ -274,14 +272,17 @@ mod tests {
         async fn from_config(cfg: TestServerConfig) -> anyhow::Result<(Client, Self)> {
             let pool = cfg.pool.clone();
 
-            let (api_client, api_server) =
-                cfg.start_server_with_scope(String::from("api/forced_exit_requests"), move |cfg| {
+            let (api_client, api_server) = cfg.start_server_with_scope(
+                String::from("api/forced_exit_requests"),
+                move |cfg| {
                     api_scope(
                         cfg.pool.clone(),
                         &cfg.config,
                         Box::new(DummyForcedExitChecker {}),
                     )
-                });
+                },
+                Option::<SharedData>::None,
+            );
 
             Ok((api_client, Self { api_server, pool }))
         }

@@ -93,7 +93,7 @@ mod tests {
         };
         let (client, server) = cfg.start_server(
             |cfg: &TestServerConfig| api_scope(cfg.pool.clone()),
-            shared_data,
+            Some(shared_data),
         );
 
         let expected_status = {

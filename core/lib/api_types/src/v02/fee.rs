@@ -5,6 +5,7 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiFee {
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub gas_fee: BigUint,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub zkp_fee: BigUint,

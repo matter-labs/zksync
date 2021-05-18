@@ -6,7 +6,7 @@ use zksync_api_types::v02::{
 use zksync_types::tx::{EthBatchSignatures, TxEthSignature, TxHash, ZkSyncTx};
 
 impl Client {
-    pub async fn submit_tx_v02(
+    pub async fn submit_tx(
         &self,
         tx: ZkSyncTx,
         signature: Option<TxEthSignature>,
@@ -17,7 +17,7 @@ impl Client {
             .await
     }
 
-    pub async fn submit_batch_v02(
+    pub async fn submit_batch(
         &self,
         txs: Vec<ZkSyncTx>,
         signature: EthBatchSignatures,
@@ -28,7 +28,7 @@ impl Client {
             .await
     }
 
-    pub async fn tx_status_v02(&self, tx_hash: TxHash) -> Result<Response> {
+    pub async fn tx_status(&self, tx_hash: TxHash) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
             &format!("transaction/{}", tx_hash.to_string()),
@@ -37,7 +37,7 @@ impl Client {
         .await
     }
 
-    pub async fn tx_data_v02(&self, tx_hash: TxHash) -> Result<Response> {
+    pub async fn tx_data(&self, tx_hash: TxHash) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
             &format!("transaction/{}/data", tx_hash.to_string()),

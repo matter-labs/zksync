@@ -3,7 +3,7 @@ use zksync_api_types::v02::{pagination::PaginationQuery, Response};
 use zksync_types::{TokenId, TokenLike};
 
 impl Client {
-    pub async fn token_pagination_v02(
+    pub async fn token_pagination(
         &self,
         pagination_query: &PaginationQuery<TokenId>,
     ) -> Result<Response> {
@@ -19,11 +19,7 @@ impl Client {
             .await
     }
 
-    pub async fn token_price_v02(
-        &self,
-        token: &TokenLike,
-        token_id_or_usd: &str,
-    ) -> Result<Response> {
+    pub async fn token_price(&self, token: &TokenLike, token_id_or_usd: &str) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
             &format!("token/{}/price_in/{}", token, token_id_or_usd),

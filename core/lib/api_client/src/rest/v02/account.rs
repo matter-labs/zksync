@@ -4,7 +4,7 @@ use zksync_api_types::v02::{pagination::PaginationQuery, Response};
 use zksync_types::{tx::TxHash, SerialId};
 
 impl Client {
-    pub async fn account_info_v02(
+    pub async fn account_info(
         &self,
         account_id_or_address: &str,
         state_type: &str,

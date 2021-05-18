@@ -5,22 +5,8 @@ use reqwest::StatusCode;
 use serde::{de::DeserializeOwned, ser::Serialize};
 use thiserror::Error;
 
-// Public uses
-pub use super::v1::{
-    accounts::{
-        AccountInfo, AccountQuery, AccountReceipts, AccountState, DepositingBalances,
-        DepositingFunds,
-    },
-    blocks::{BlockInfo, TransactionInfo},
-    config::Contracts,
-    operations::{PriorityOpData, PriorityOpQuery, PriorityOpReceipt},
-    tokens::TokenPriceKind,
-    transactions::{Receipt, TxData},
-    Pagination,
-};
-
 // Local uses
-use super::v1::error::ErrorBody;
+use super::error::ErrorBody;
 
 pub type Result<T> = std::result::Result<T, ClientError>;
 
@@ -53,8 +39,6 @@ pub struct Client {
     url: String,
 }
 
-const API_V1_SCOPE: &str = "/api/v1/";
-
 impl Client {
     /// Creates a new REST API client with the specified Url.
     pub fn new(url: String) -> Self {
@@ -68,11 +52,6 @@ impl Client {
         [&self.url, scope, method].concat()
     }
 
-    /// Constructs GET request for the specified method.
-    pub(crate) fn get(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
-        self.get_with_scope(API_V1_SCOPE, method)
-    }
-
     pub(crate) fn get_with_scope(
         &self,
         scope: impl AsRef<str>,
@@ -83,11 +62,6 @@ impl Client {
             inner: self.inner.get(&url),
             url,
         }
-    }
-
-    /// Constructs POST request for the specified method.
-    pub(crate) fn post(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
-        self.post_with_scope(API_V1_SCOPE, method)
     }
 
     pub(crate) fn post_with_scope(

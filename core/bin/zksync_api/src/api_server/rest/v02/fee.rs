@@ -98,7 +98,7 @@ mod tests {
                     &cfg.config,
                 ))
             },
-            shared_data,
+            Some(shared_data),
         );
 
         let tx_type = TxFeeTypes::Withdraw;
@@ -106,7 +106,7 @@ mod tests {
         let token_like = TokenLike::Id(TokenId(1));
 
         let response = client
-            .get_txs_fee_v02(tx_type, address, token_like.clone())
+            .get_txs_fee(tx_type, address, token_like.clone())
             .await?;
         let api_fee: ApiFee = deserialize_response_result(response)?;
         assert_eq!(api_fee.gas_fee, BigUint::from(1u32));
@@ -119,7 +119,7 @@ mod tests {
         };
         let txs = vec![tx.clone(), tx.clone(), tx];
 
-        let response = client.get_batch_fee_v02(txs, token_like).await?;
+        let response = client.get_batch_fee(txs, token_like).await?;
         let api_batch_fee: ApiFee = deserialize_response_result(response)?;
         assert_eq!(api_batch_fee.gas_fee, BigUint::from(3u32));
         assert_eq!(api_batch_fee.zkp_fee, BigUint::from(3u32));
