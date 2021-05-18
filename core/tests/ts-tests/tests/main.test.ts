@@ -88,7 +88,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a mintNFT', async () => {
-        nft = await tester.testMintNFT(alice, chuck, token);
+        nft =  await tester.testMintNFT(alice, chuck,  token, true);
     });
 
     step('should execute a transfer to existing account', async () => {
@@ -133,6 +133,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
         await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
         await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+        await tester.testBatchBuilderNFT(frank, david, token);
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
     });
@@ -167,14 +168,18 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
 
-    step('should execute a transfer NFT', async () => {
+    step('should execute NFT transfer', async () => {
         if (onlyBasic) {
             return;
         }
         await tester.testTransferNFT(alice, chuck, token);
     });
 
-    step('should execute a forced exit', async () => {
+    step('should execute NFT withdraw', async () => {
+        await tester.testWithdrawNFT(chuck, token);
+    });
+
+    step('should execute a ForcedExit', async () => {
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
 
@@ -217,6 +222,14 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
             expect(before.eq(after), 'Balance after incorrect Full Exit should not change').to.be.true;
             carl.ethSigner = oldSigner;
+        });
+
+        step('should execute NFT full-exit', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            await tester.testMintNFT(carl, carl, token, true);
+            await tester.testFullExitNFT(carl);
         });
 
         step('should execute a normal full-exit', async () => {

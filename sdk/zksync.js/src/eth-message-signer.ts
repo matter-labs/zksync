@@ -83,19 +83,60 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
-    getMintNFTEthSignMessage(mintNft: {
-        stringToken: string;
+    getMintNFTEthMessagePart(mintNFT: {
+        stringFeeToken: string;
+        stringFee: string;
+        recipient: string;
+        contentHash: string;
+    }): string {
+        let humanReadableTxInfo = `MintNFT ${mintNFT.contentHash} for: ${mintNFT.recipient.toLowerCase()}`;
+
+        if (mintNFT.stringFee != null) {
+            humanReadableTxInfo += `\nFee: ${mintNFT.stringFee} ${mintNFT.stringFeeToken}`;
+        }
+
+        return humanReadableTxInfo;
+    }
+
+    getMintNFTEthSignMessage(mintNFT: {
+        stringFeeToken: string;
         stringFee: string;
         recipient: string;
         contentHash: string;
         nonce: number;
     }): string {
-        let humanReadableTxInfo = `MintNFT ${mintNft.contentHash} for: ${mintNft.recipient.toLowerCase()}`;
+        let humanReadableTxInfo = this.getMintNFTEthMessagePart(mintNFT);
 
-        if (mintNft.stringFee != null) {
-            humanReadableTxInfo += `\nFee: ${mintNft.stringFee} ${mintNft.stringToken}`;
+        humanReadableTxInfo += `\nNonce: ${mintNFT.nonce}`;
+
+        return humanReadableTxInfo;
+    }
+
+    getWithdrawNFTEthMessagePart(withdrawNFT: {
+        token: number;
+        to: string;
+        stringFee: string;
+        stringFeeToken: string;
+    }): string {
+        let humanReadableTxInfo = `WithdrawNFT ${withdrawNFT.token} to: ${withdrawNFT.to.toLowerCase()}`;
+
+        if (withdrawNFT.stringFee != null) {
+            humanReadableTxInfo += `\nFee: ${withdrawNFT.stringFee} ${withdrawNFT.stringFeeToken}`;
         }
-        humanReadableTxInfo += `\nNonce: ${mintNft.nonce}`;
+
+        return humanReadableTxInfo;
+    }
+
+    getWithdrawNFTEthSignMessage(withdrawNFT: {
+        token: number;
+        to: string;
+        stringFee: string;
+        stringFeeToken: string;
+        nonce: number;
+    }): string {
+        let humanReadableTxInfo = this.getWithdrawNFTEthMessagePart(withdrawNFT);
+
+        humanReadableTxInfo += `\nNonce: ${withdrawNFT.nonce}`;
 
         return humanReadableTxInfo;
     }
@@ -191,13 +232,24 @@ export class EthMessageSigner {
     }
 
     async ethSignMintNFT(mintNFT: {
-        stringToken: string;
+        stringFeeToken: string;
         stringFee: string;
         recipient: string;
         contentHash: string;
         nonce: number;
     }): Promise<TxEthSignature> {
         const message = this.getMintNFTEthSignMessage(mintNFT);
+        return await this.getEthMessageSignature(message);
+    }
+
+    async ethSignWithdrawNFT(withdrawNFT: {
+        token: number;
+        to: string;
+        stringFee: string;
+        stringFeeToken: string;
+        nonce: number;
+    }): Promise<TxEthSignature> {
+        const message = this.getWithdrawNFTEthSignMessage(withdrawNFT);
         return await this.getEthMessageSignature(message);
     }
 

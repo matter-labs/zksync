@@ -10,6 +10,7 @@ import {
     ForcedExit,
     ChangePubKey,
     MintNFT,
+    WithdrawNFT,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,
@@ -50,6 +51,33 @@ export class Signer {
         return {
             ...tx,
             fee: BigNumber.from(mintNft.fee).toString(),
+            signature
+        };
+    }
+
+    async signWithdrawNFT(withdrawNft: {
+        accountId: number;
+        from: Address;
+        to: Address;
+        tokenId: number;
+        feeTokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<WithdrawNFT> {
+        const tx: WithdrawNFT = {
+            ...withdrawNft,
+            type: 'WithdrawNFT',
+            token: withdrawNft.tokenId,
+            feeToken: withdrawNft.feeTokenId
+        };
+        const msgBytes = utils.serializeWithdrawNFT(tx);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...tx,
+            fee: BigNumber.from(withdrawNft.fee).toString(),
             signature
         };
     }

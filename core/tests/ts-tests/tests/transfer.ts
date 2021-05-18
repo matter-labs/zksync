@@ -2,6 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
+import { closestPackableTransactionFee } from '../../../../sdk/zksync.js';
 
 type TokenLike = types.TokenLike;
 
@@ -60,7 +61,7 @@ Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wal
 
     const state = await sender.getAccountState();
     const nft = Object.values(state.verified.nfts)[0];
-
+    expect(nft !== undefined);
     const senderBefore = await sender.getNFT(nft.id);
     const receiverBefore = await receiver.getNFT(nft.id);
     const handles = await sender.syncTransferNFT({
@@ -126,7 +127,7 @@ Tester.prototype.testIgnoredBatch = async function (
         to: receiver.address(),
         token,
         amount,
-        fee: fee.div(2)
+        fee: closestPackableTransactionFee(fee.div(2))
     };
 
     const senderBefore = await sender.getBalance(token);

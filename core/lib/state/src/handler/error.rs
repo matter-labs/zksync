@@ -126,6 +126,8 @@ pub enum WithdrawNFTOpError {
     NonceMismatch,
     #[error("Not enough balance")]
     InsufficientBalance,
+    #[error("Not enough nft balance")]
+    InsufficientNFTBalance,
     #[error("NFT was not found")]
     NFTNotFound,
 }
