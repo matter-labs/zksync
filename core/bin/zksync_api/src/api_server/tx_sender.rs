@@ -25,7 +25,7 @@ use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
     tx::{
-        EthBatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature,
+        EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
         TxEthSignatureVariant, TxHash,
     },
     AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
@@ -238,20 +238,28 @@ impl TxSender {
     /// the corresponding address.
     async fn get_tx_sender(&self, tx: &ZkSyncTx) -> Result<Address, anyhow::Error> {
         match tx {
-            ZkSyncTx::ForcedExit(tx) => self
-                .pool
-                .access_storage()
-                .await?
-                .chain()
-                .account_schema()
-                .account_address_by_id(tx.initiator_account_id)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Forced Exit account is not found in db")),
+            ZkSyncTx::ForcedExit(tx) => self.get_address_by_id(tx.initiator_account_id).await,
             _ => Ok(tx.account()),
         }
     }
 
+    async fn get_address_by_id(&self, id: AccountId) -> Result<Address, anyhow::Error> {
+        self.pool
+            .access_storage()
+            .await?
+            .chain()
+            .account_schema()
+            .account_address_by_id(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Order signer account id not found in db"))
+    }
+
     async fn get_tx_sender_type(&self, tx: &ZkSyncTx) -> Result<EthAccountType, SubmitError> {
+        self.get_sender_type(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
+            .await
+    }
+
+    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, SubmitError> {
         Ok(self
             .pool
             .access_storage()
@@ -259,10 +267,26 @@ impl TxSender {
             .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
             .chain()
             .account_schema()
-            .account_type_by_id(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
+            .account_type_by_id(id)
             .await
             .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
             .unwrap_or(EthAccountType::Owned))
+    }
+
+    async fn verify_order_eth_signature(
+        &self,
+        order: &Order,
+        signature: Option<TxEthSignature>,
+    ) -> Result<(), SubmitError> {
+        let signer =
+            self.get_address_by_id(order.account_id)
+                .await
+                .or(Err(SubmitError::IncorrectTx(
+                    "Incorrect order signer ID".to_string(),
+                )))?;
+        let signer_type = self.get_sender_type(order.account_id).await?;
+        // TODO
+        Ok(())
     }
 
     pub async fn submit_tx(
@@ -381,6 +405,14 @@ impl TxSender {
         )
         .await?
         .unwrap_tx();
+
+        if let ZkSyncTx::Swap(tx) = &tx {
+            let signatures = signature.orders_signatures();
+            self.verify_order_eth_signature(&tx.orders.0, signatures.0.clone())
+                .await?;
+            self.verify_order_eth_signature(&tx.orders.1, signatures.1.clone())
+                .await?;
+        }
 
         let tx_hash = verified_tx.tx.hash();
         // Send verified transactions to the mempool.
@@ -558,6 +590,16 @@ impl TxSender {
                     (&required_total_usd_fee - &scaled_provided_fee_in_usd).to_string(),
                 );
                 return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
+            }
+        }
+
+        for tx in txs.iter() {
+            if let ZkSyncTx::Swap(swap) = &tx.tx {
+                let signatures = tx.signature.orders_signatures();
+                self.verify_order_eth_signature(&swap.orders.0, signatures.0.clone())
+                    .await?;
+                self.verify_order_eth_signature(&swap.orders.1, signatures.1.clone())
+                    .await?;
             }
         }
 

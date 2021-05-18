@@ -96,7 +96,7 @@ impl Order {
         token_buy: &str,
         decimals: u8,
     ) -> String {
-        let mut message = if self.is_limit_order() {
+        let mut message = if self.amount.is_zero() {
             format!("Limit order for {} -> {}:\n", token_sell, token_buy)
         } else {
             format!(
@@ -106,7 +106,7 @@ impl Order {
                 token_buy
             )
         };
-        message += &format!(
+        message += format!(
             "Ratio: {sell}:{buy}\n\
             Address: {recipient:?}\n\
             Nonce: {nonce}",
@@ -114,7 +114,8 @@ impl Order {
             buy = self.price.1.to_string(),
             recipient = self.recipient_address,
             nonce = self.nonce
-        );
+        )
+        .as_str();
         message
     }
 
