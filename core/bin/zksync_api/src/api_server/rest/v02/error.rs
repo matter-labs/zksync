@@ -2,7 +2,6 @@
 use std::fmt::{Display, Formatter};
 
 // External uses
-use hex::FromHexError;
 use serde::{Deserialize, Serialize};
 use serde_repr::Serialize_repr;
 use thiserror::Error;
@@ -20,22 +19,20 @@ pub enum ErrorCode {
     TokenZeroPriceError = 200,
     InvalidCurrency = 201,
     InvalidBlockPosition = 202,
-    TransactionNotFound = 300,
-    IncorrectTxHash = 301,
-    StorageError = 400,
-    InvalidHexCharacter = 500,
-    HexStringOddLength = 501,
-    InvalidHexStringLength = 502,
-    TokenNotFound = 600,
-    ExternalApiError = 601,
-    InternalError = 700,
-    AccountCloseDisabled = 701,
-    InvalidParams = 702,
-    UnsupportedFastProcessing = 703,
-    IncorrectTx = 704,
-    TxAddError = 705,
-    InappropriateFeeToken = 706,
-    CommunicationCoreServer = 707,
+    InvalidAccountIdOrAddress = 203,
+    AccountNotFound = 204,
+    TransactionNotFound = 205,
+    StorageError = 300,
+    TokenNotFound = 500,
+    ExternalApiError = 501,
+    InternalError = 600,
+    AccountCloseDisabled = 601,
+    InvalidParams = 602,
+    UnsupportedFastProcessing = 603,
+    IncorrectTx = 604,
+    TxAddError = 605,
+    InappropriateFeeToken = 606,
+    CommunicationCoreServer = 607,
     Other = 60_000,
 }
 
@@ -104,34 +101,19 @@ impl ApiError for UnreachableError {
 }
 
 #[derive(Error, Debug)]
-pub enum TxError {
-    #[error("Transaction is not found")]
-    TransactionNotFound,
-    #[error("Incorrect transaction hash")]
-    IncorrectTxHash,
-}
-
-impl ApiError for TxError {
-    fn error_type(&self) -> String {
-        String::from("tx_error")
-    }
-
-    fn code(&self) -> ErrorCode {
-        match self {
-            Self::TransactionNotFound => ErrorCode::TransactionNotFound,
-            Self::IncorrectTxHash => ErrorCode::IncorrectTxHash,
-        }
-    }
-}
-
-#[derive(Error, Debug)]
 pub enum InvalidDataError {
     #[error("Cannot show price in zero price token")]
     TokenZeroPriceError,
     #[error("Cannot parse block position. There are only block_number, last_committed, last_finalized options")]
     InvalidBlockPosition,
+    #[error("Cannot parse account id or address")]
+    InvalidAccountIdOrAddress,
+    #[error("Account is not found")]
+    AccountNotFound,
     #[error("Cannot parse currency. There are only token_id, usd options")]
     InvalidCurrency,
+    #[error("Transaction is not found")]
+    TransactionNotFound,
 }
 
 impl ApiError for InvalidDataError {
@@ -143,7 +125,10 @@ impl ApiError for InvalidDataError {
         match self {
             Self::TokenZeroPriceError => ErrorCode::TokenZeroPriceError,
             Self::InvalidBlockPosition => ErrorCode::InvalidBlockPosition,
+            Self::InvalidAccountIdOrAddress => ErrorCode::InvalidAccountIdOrAddress,
+            Self::AccountNotFound => ErrorCode::AccountNotFound,
             Self::InvalidCurrency => ErrorCode::InvalidCurrency,
+            Self::TransactionNotFound => ErrorCode::TransactionNotFound,
         }
     }
 }
@@ -228,20 +213,6 @@ impl ApiError for PriceError {
             Self::TokenNotFound(_) => ErrorCode::TokenNotFound,
             Self::ApiError(_) => ErrorCode::ExternalApiError,
             Self::DBError(_) => ErrorCode::StorageError,
-        }
-    }
-}
-
-impl ApiError for FromHexError {
-    fn error_type(&self) -> String {
-        String::from("parse_hex_string_error")
-    }
-
-    fn code(&self) -> ErrorCode {
-        match self {
-            Self::InvalidHexCharacter { .. } => ErrorCode::InvalidHexCharacter,
-            Self::OddLength => ErrorCode::HexStringOddLength,
-            Self::InvalidStringLength => ErrorCode::InvalidHexStringLength,
         }
     }
 }

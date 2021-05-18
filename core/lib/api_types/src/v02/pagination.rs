@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use zksync_types::{tx::TxHash, BlockNumber};
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
+use zksync_utils::ZeroPrefixHexSerde;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
@@ -52,5 +53,20 @@ impl<T: Sized + Serialize, F: Serialize> Paginated<T, F> {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct BlockAndTxHash {
     pub block_number: BlockNumber,
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
+    pub tx_hash: TxHash,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct PendingOpsRequest {
+    pub address: Address,
+    pub account_id: Option<AccountId>,
+    pub serial_id: SerialId,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct AccountTxsRequest {
+    pub address: Address,
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
 }

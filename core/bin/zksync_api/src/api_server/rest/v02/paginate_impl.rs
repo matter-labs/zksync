@@ -4,25 +4,25 @@
 
 // Workspace uses
 use zksync_api_types::v02::{
-    block::BlockInfo,
-    pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    transaction::{L2Status, Transaction},
+    block::{BlockInfo, BlockStatus},
+    pagination::{
+        AccountTxsRequest, BlockAndTxHash, Paginated, PaginationQuery, PendingOpsRequest,
+    },
+    transaction::Transaction,
 };
 use zksync_storage::StorageProcessor;
-use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber, Token, TokenId};
+use zksync_types::{BlockNumber, Token, TokenId};
 
 // Local uses
 use super::{
-    block::block_info_from_details,
-    error::{Error, TxError},
+    block::block_info_from_details_and_status,
+    error::{Error, InvalidDataError},
     paginate_trait::Paginate,
-    transaction::transaction_from_item_and_status,
 };
+use crate::core_api_client::CoreApiClient;
 
 #[async_trait::async_trait]
-impl Paginate<Token> for StorageProcessor<'_> {
-    type Index = TokenId;
-
+impl Paginate<Token, TokenId> for StorageProcessor<'_> {
     async fn paginate(
         &mut self,
         query: &PaginationQuery<TokenId>,
@@ -48,9 +48,7 @@ impl Paginate<Token> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<BlockInfo> for StorageProcessor<'_> {
-    type Index = BlockNumber;
-
+impl Paginate<BlockInfo, BlockNumber> for StorageProcessor<'_> {
     async fn paginate(
         &mut self,
         query: &PaginationQuery<BlockNumber>,
@@ -61,7 +59,31 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
             .load_block_page(query)
             .await
             .map_err(Error::storage)?;
-        let blocks: Vec<BlockInfo> = blocks.into_iter().map(block_info_from_details).collect();
+        let last_committed = self
+            .chain()
+            .block_schema()
+            .get_last_committed_confirmed_block()
+            .await
+            .map_err(Error::storage)?;
+        let last_finalized = self
+            .chain()
+            .block_schema()
+            .get_last_verified_confirmed_block()
+            .await
+            .map_err(Error::storage)?;
+        let blocks: Vec<BlockInfo> = blocks
+            .into_iter()
+            .map(|details| {
+                let status = if details.block_number as u32 <= *last_finalized {
+                    BlockStatus::Finalized
+                } else if details.block_number as u32 <= *last_committed {
+                    BlockStatus::Committed
+                } else {
+                    BlockStatus::Queued
+                };
+                block_info_from_details_and_status(details, status)
+            })
+            .collect();
         let count = *self
             .chain()
             .block_schema()
@@ -79,45 +101,18 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<Transaction> for StorageProcessor<'_> {
-    type Index = BlockAndTxHash;
-
+impl Paginate<Transaction, BlockAndTxHash> for StorageProcessor<'_> {
     async fn paginate(
         &mut self,
         query: &PaginationQuery<BlockAndTxHash>,
     ) -> Result<Paginated<Transaction, BlockAndTxHash>, Error> {
-        let raw_txs = self
+        let txs = self
             .chain()
             .block_schema()
             .get_block_transactions_page(query)
             .await
             .map_err(Error::storage)?
-            .ok_or_else(|| Error::from(TxError::TransactionNotFound))?;
-        let is_block_finalized = self
-            .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(
-                query.from.block_number,
-                AggregatedActionType::ExecuteBlocks,
-            )
-            .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false);
-        let txs = raw_txs
-            .into_iter()
-            .map(|tx| {
-                let status = if tx.success.unwrap_or(false) {
-                    if is_block_finalized {
-                        L2Status::Finalized
-                    } else {
-                        L2Status::Committed
-                    }
-                } else {
-                    L2Status::Rejected
-                };
-                transaction_from_item_and_status(tx, status)
-            })
-            .collect();
+            .ok_or_else(|| Error::from(InvalidDataError::TransactionNotFound))?;
         let count = self
             .chain()
             .block_schema()
@@ -131,5 +126,48 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             query.direction,
             count,
         ))
+    }
+}
+
+#[async_trait::async_trait]
+impl Paginate<Transaction, AccountTxsRequest> for StorageProcessor<'_> {
+    async fn paginate(
+        &mut self,
+        query: &PaginationQuery<AccountTxsRequest>,
+    ) -> Result<Paginated<Transaction, AccountTxsRequest>, Error> {
+        let txs = self
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions(query)
+            .await
+            .map_err(Error::storage)?
+            .ok_or_else(|| Error::from(InvalidDataError::TransactionNotFound))?;
+        let count = self
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions_count(query.from.address)
+            .await
+            .map_err(Error::storage)?;
+        Ok(Paginated::new(
+            txs,
+            query.from,
+            query.limit,
+            query.direction,
+            count,
+        ))
+    }
+}
+
+#[async_trait::async_trait]
+impl Paginate<Transaction, PendingOpsRequest> for CoreApiClient {
+    async fn paginate(
+        &mut self,
+        query: &PaginationQuery<PendingOpsRequest>,
+    ) -> Result<Paginated<Transaction, PendingOpsRequest>, Error> {
+        let result = self
+            .get_unconfirmed_ops(query)
+            .await
+            .map_err(Error::core_api)?;
+        Ok(result)
     }
 }

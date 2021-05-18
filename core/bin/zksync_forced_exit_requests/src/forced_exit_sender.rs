@@ -73,8 +73,8 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
 
         Self {
             core_interaction_wrapper,
-            forced_exit_sender_account_id,
             config,
+            forced_exit_sender_account_id,
             sender_private_key,
         }
     }

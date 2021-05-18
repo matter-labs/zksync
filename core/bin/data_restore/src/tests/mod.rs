@@ -85,6 +85,7 @@ fn create_deposit(from: Address, to: Address, amount: u32) -> ExecutedOperations
         deadline_block: 0,
         eth_hash: H256::zero(),
         eth_block: 0,
+        eth_block_index: None,
     };
     let executed_deposit_op = ExecutedPriorityOp {
         priority_op: priority_operation,

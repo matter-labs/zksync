@@ -104,7 +104,7 @@ async fn executed_priority_op_for_query(
         }
         PriorityOpQuery::Hash(eth_hash) => {
             schema
-                .get_executed_priority_operation_by_hash(eth_hash.as_bytes())
+                .get_executed_priority_operation_by_eth_hash(eth_hash.as_bytes())
                 .await
         }
     }

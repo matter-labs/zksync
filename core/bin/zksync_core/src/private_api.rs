@@ -13,9 +13,13 @@ use futures::{
     channel::{mpsc, oneshot},
     sink::SinkExt,
 };
+use serde::Deserialize;
 use std::thread;
+use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest};
 use zksync_config::configs::api::PrivateApi;
-use zksync_types::{tx::TxEthSignature, Address, SignedZkSyncTx, H256};
+use zksync_types::{
+    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, AccountId, Address, SignedZkSyncTx,
+};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
@@ -94,15 +98,37 @@ async fn unconfirmed_deposits(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Obtains information about unconfirmed operations known for a certain address.
-#[actix_web::get("/unconfirmed_ops/{address}")]
+#[derive(Debug, Deserialize)]
+struct PendingOpsFlattenRequest {
+    pub address: Address,
+    pub account_id: Option<AccountId>,
+    pub serial_id: u64,
+    pub limit: u32,
+    pub direction: PaginationDirection,
+}
+
+/// Obtains information about unconfirmed operations known for a certain account.
+/// Pending deposits can be matched only with addresses,
+/// while pending full exits can be matched only with account ids.
+/// If the account isn't created yet it doesn't have an id
+/// but we can still find pending deposits for its address that is why account_id is Option.
+#[actix_web::get("/unconfirmed_ops")]
 async fn unconfirmed_ops(
     data: web::Data<AppState>,
-    web::Path(address): web::Path<Address>,
+    web::Query(params): web::Query<PendingOpsFlattenRequest>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
+    let query = PaginationQuery {
+        from: PendingOpsRequest {
+            address: params.address,
+            account_id: params.account_id,
+            serial_id: params.serial_id,
+        },
+        limit: params.limit,
+        direction: params.direction,
+    };
     let item = EthWatchRequest::GetUnconfirmedOps {
-        address,
+        query,
         resp: sender,
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
@@ -118,16 +144,22 @@ async fn unconfirmed_ops(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Obtains information about unconfirmed deposits known for a certain address.
-#[actix_web::get("/unconfirmed_op/{tx_hash}")]
+/// Returns information about unconfirmed operation by its eth_hash.
+#[actix_web::post("/unconfirmed_op")]
 async fn unconfirmed_op(
     data: web::Data<AppState>,
-    web::Path(eth_hash): web::Path<H256>,
+    web::Json(query): web::Json<PriorityOpLookupQuery>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
-    let item = EthWatchRequest::GetUnconfirmedOpByHash {
-        eth_hash: eth_hash.as_ref().to_vec(),
-        resp: sender,
+    let item = match query {
+        PriorityOpLookupQuery::ByEthHash(eth_hash) => EthWatchRequest::GetUnconfirmedOpByEthHash {
+            eth_hash,
+            resp: sender,
+        },
+        PriorityOpLookupQuery::BySyncHash(tx_hash) => EthWatchRequest::GetUnconfirmedOpByTxHash {
+            tx_hash,
+            resp: sender,
+        },
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
     eth_watch_sender

@@ -4,9 +4,11 @@ use serde_json::Value;
 use std::collections::HashMap;
 use zksync_types::network::Network;
 
+pub mod account;
 pub mod block;
 pub mod fee;
 pub mod pagination;
+pub mod status;
 pub mod token;
 pub mod transaction;
 

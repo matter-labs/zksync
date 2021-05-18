@@ -353,6 +353,7 @@ impl TreeState {
                 deadline_block: 0,
                 eth_hash: H256::zero(),
                 eth_block: 0,
+                eth_block_index: None,
             },
             block_index,
             created_at: chrono::Utc::now(),

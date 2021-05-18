@@ -74,8 +74,8 @@ impl EthHttpClient {
 
         let topics = ContractTopics::new(forced_exit_contract.abi());
         Self {
-            forced_exit_contract,
             web3,
+            forced_exit_contract,
             topics,
         }
     }

@@ -1,3 +1,4 @@
+use parity_crypto::digest::sha256;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryInto, str::FromStr};
 
@@ -21,6 +22,11 @@ impl TxHash {
             out.data.copy_from_slice(slice);
             Some(out)
         }
+    }
+
+    pub fn batch_hash(tx_hashes: &[TxHash]) -> TxHash {
+        let bytes: Vec<u8> = tx_hashes.iter().flat_map(AsRef::as_ref).cloned().collect();
+        TxHash::from_slice(&*sha256(&bytes)).unwrap()
     }
 }
 

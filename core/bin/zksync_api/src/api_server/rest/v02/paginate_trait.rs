@@ -10,11 +10,6 @@ use zksync_api_types::v02::pagination::{Paginated, PaginationQuery};
 use super::error::Error;
 
 #[async_trait::async_trait]
-pub trait Paginate<T: Serialize> {
-    type Index: Serialize;
-
-    async fn paginate(
-        &mut self,
-        query: &PaginationQuery<Self::Index>,
-    ) -> Result<Paginated<T, Self::Index>, Error>;
+pub trait Paginate<T: Serialize, I: Serialize> {
+    async fn paginate(&mut self, query: &PaginationQuery<I>) -> Result<Paginated<T, I>, Error>;
 }

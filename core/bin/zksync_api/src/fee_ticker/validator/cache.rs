@@ -27,7 +27,7 @@ pub(crate) struct TokenInMemoryCache {
 
 impl TokenInDBCache {
     pub fn new(pool: ConnectionPool, inner: TokenDBCache) -> Self {
-        Self { pool, inner }
+        Self { inner, pool }
     }
 }
 

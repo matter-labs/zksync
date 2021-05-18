@@ -126,7 +126,7 @@ pub(super) mod convert {
             }),
             block_number: BlockNumber(inner.block_number as u32),
             op: inner.op,
-            success: inner.success,
+            success: Some(inner.success),
             fail_reason: inner.fail_reason,
             created_at: inner.created_at,
         }

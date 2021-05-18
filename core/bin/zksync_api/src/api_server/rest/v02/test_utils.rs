@@ -557,6 +557,8 @@ impl TestServerConfig {
                     .to_vec(),
                 eth_block: 10,
                 created_at: chrono::Utc::now(),
+                eth_block_index: Some(1),
+                tx_hash: Default::default(),
             },
             // Committed priority operation.
             NewExecutedPriorityOperation {
@@ -576,6 +578,8 @@ impl TestServerConfig {
                     .to_vec(),
                 eth_block: 14,
                 created_at: chrono::Utc::now(),
+                eth_block_index: Some(1),
+                tx_hash: Default::default(),
             },
         ];
 
@@ -634,6 +638,7 @@ pub fn dummy_deposit_op(
             deadline_block: 0,
             eth_hash: H256::default(),
             eth_block: 10,
+            eth_block_index: Some(1),
         },
         op: deposit_op,
         block_index,
@@ -664,6 +669,7 @@ pub fn dummy_full_exit_op(
             deadline_block: 0,
             eth_hash: H256::default(),
             eth_block: 10,
+            eth_block_index: Some(1),
         },
         op: deposit_op,
         block_index,
@@ -754,9 +760,10 @@ pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<Tick
                     transactions,
                     ..
                 } => {
-                    let normal_fee = BatchFee {
-                        total_fee: BigUint::from(2 * transactions.len()),
-                    };
+                    let normal_fee = BatchFee::new(
+                        BigUint::from(transactions.len()).into(),
+                        BigUint::from(transactions.len()).into(),
+                    );
                     let subsidy_fee = normal_fee.clone();
 
                     let res = Ok(ResponseBatchFee {

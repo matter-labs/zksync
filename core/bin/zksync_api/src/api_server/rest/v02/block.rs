@@ -8,7 +8,7 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_types::v02::{
-    block::BlockInfo,
+    block::{BlockInfo, BlockStatus},
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
     transaction::Transaction,
 };
@@ -24,7 +24,12 @@ use super::{
 };
 use crate::{api_try, utils::block_details_cache::BlockDetailsCache};
 
-pub fn block_info_from_details(details: BlockDetails) -> BlockInfo {
+pub fn block_info_from_details_and_status(details: BlockDetails, status: BlockStatus) -> BlockInfo {
+    let (committed_at, finalized_at) = match status {
+        BlockStatus::Queued => (None, None),
+        BlockStatus::Committed => (Some(details.committed_at), None),
+        BlockStatus::Finalized => (Some(details.committed_at), details.verified_at),
+    };
     BlockInfo {
         block_number: BlockNumber(details.block_number as u32),
         new_state_root: Fr::from_bytes(&details.new_state_root).unwrap_or_else(|err| {
@@ -36,8 +41,9 @@ pub fn block_info_from_details(details: BlockDetails) -> BlockInfo {
         block_size: details.block_size as u64,
         commit_tx_hash: details.commit_tx_hash.map(|bytes| H256::from_slice(&bytes)),
         verify_tx_hash: details.verify_tx_hash.map(|bytes| H256::from_slice(&bytes)),
-        committed_at: details.committed_at,
-        finalized_at: details.verified_at,
+        committed_at,
+        finalized_at,
+        status,
     }
 }
 
@@ -59,11 +65,25 @@ impl ApiBlockData {
     /// Returns information about block with the specified number.
     ///
     /// This method caches some of the verified blocks.
-    async fn block_info(&self, block_number: BlockNumber) -> Result<Option<BlockDetails>, Error> {
-        self.verified_blocks_cache
+    async fn block_info(&self, block_number: BlockNumber) -> Result<Option<BlockInfo>, Error> {
+        let details = self
+            .verified_blocks_cache
             .get(&self.pool, block_number)
             .await
-            .map_err(Error::storage)
+            .map_err(Error::storage)?;
+        if let Some(details) = details {
+            let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+            let status = storage
+                .chain()
+                .block_schema()
+                .get_status_and_last_updated_of_existing_block(block_number)
+                .await
+                .map_err(Error::storage)?
+                .0;
+            Ok(Some(block_info_from_details_and_status(details, status)))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn get_block_number_by_position(
@@ -150,10 +170,7 @@ async fn block_by_number(
 ) -> ApiResult<Option<BlockInfo>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
 
-    data.block_info(block_number)
-        .await
-        .map(|details| details.map(block_info_from_details))
-        .into()
+    data.block_info(block_number).await.into()
 }
 
 async fn block_transactions(
@@ -186,7 +203,9 @@ mod tests {
         test_utils::{deserialize_response_result, TestServerConfig},
         SharedData,
     };
-    use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
+    use zksync_api_types::v02::{
+        pagination::PaginationDirection, transaction::TransactionData, ApiVersion,
+    };
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -266,7 +285,9 @@ mod tests {
             assert_eq!(tx.created_at, Some(expected_tx.created_at));
             assert_eq!(*tx.block_number.unwrap(), expected_tx.block_number as u32);
             assert_eq!(tx.fail_reason, expected_tx.fail_reason);
-            assert_eq!(tx.op, expected_tx.op);
+            if matches!(tx.op, TransactionData::L2(_)) {
+                assert_eq!(serde_json::to_value(tx.op).unwrap(), expected_tx.op);
+            }
         }
 
         server.stop().await;

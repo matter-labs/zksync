@@ -598,8 +598,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price) * &token_usd_risk;
         let total_subsidy_gas_fee =
             (wei_price_usd * total_subsidy_gas_tx_amount * scale_gas_price) * &token_usd_risk;
-        let normal_fee = BatchFee::new(&total_zkp_fee, &total_normal_gas_fee);
-        let subsidy_fee = BatchFee::new(&total_zkp_fee, &total_subsidy_gas_fee);
+        let normal_fee = BatchFee::new(total_zkp_fee.clone(), total_normal_gas_fee);
+        let subsidy_fee = BatchFee::new(total_zkp_fee, total_subsidy_gas_fee);
 
         let subsidy_size_usd =
             Ratio::from_integer(&normal_fee.total_fee - &subsidy_fee.total_fee) / &token_usd_risk;
