@@ -2,9 +2,9 @@
 pub use self::{
     api::ApiConfig, chain::ChainConfig, contracts::ContractsConfig, database::DBConfig,
     dev_liquidity_token_watcher::DevLiquidityTokenWatcherConfig, eth_client::ETHClientConfig,
-    eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig,
-    forced_exit_requests::ForcedExitRequestsConfig, misc::MiscConfig, prover::ProverConfig,
-    ticker::TickerConfig,
+    eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig, event_listener::EventListenerConfig,
+    forced_exit_requests::ForcedExitRequestsConfig, gateway_watcher::GatewayWatcherConfig,
+    misc::MiscConfig, prover::ProverConfig, ticker::TickerConfig,
 };
 
 pub mod api;
@@ -15,7 +15,9 @@ pub mod dev_liquidity_token_watcher;
 pub mod eth_client;
 pub mod eth_sender;
 pub mod eth_watch;
+pub mod event_listener;
 pub mod forced_exit_requests;
+pub mod gateway_watcher;
 pub mod misc;
 pub mod prover;
 pub mod ticker;

@@ -1,43 +1,45 @@
-use anyhow::{bail, ensure};
 use num::BigUint;
 use zksync_crypto::params::{self, max_account_id};
 use zksync_types::{AccountUpdate, AccountUpdates, Close, CloseOp, TokenId};
 
 use crate::{
-    handler::TxHandler,
+    handler::{error::CloseOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
 impl TxHandler<Close> for ZkSyncState {
     type Op = CloseOp;
 
-    fn create_op(&self, _tx: Close) -> Result<Self::Op, anyhow::Error> {
+    type OpError = CloseOpError;
+
+    fn create_op(&self, _tx: Close) -> Result<Self::Op, CloseOpError> {
         panic!("Attempt to create disabled closed op");
     }
 
-    fn apply_tx(&mut self, _tx: Close) -> Result<OpSuccess, anyhow::Error> {
-        bail!("Account closing is disabled");
+    fn apply_tx(&mut self, _tx: Close) -> Result<OpSuccess, CloseOpError> {
+        Err(CloseOpError::CloseOperationsDisabled)
     }
 
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
-        ensure!(
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), CloseOpError> {
+        invariant!(
             op.account_id <= max_account_id(),
-            "Close account id is bigger than max supported"
+            CloseOpError::InvalidAccountId
         );
 
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
 
         for token in 0..params::total_tokens() {
-            if account.get_balance(TokenId(token as u16)) != BigUint::from(0u32) {
-                bail!("Account is not empty, token id: {}", token);
-            }
+            invariant!(
+                account.get_balance(TokenId(token as u16)) == BigUint::from(0u32),
+                CloseOpError::AccountNotEmpty(token)
+            );
         }
 
-        ensure!(op.tx.nonce == account.nonce, "Nonce mismatch");
+        invariant!(op.tx.nonce == account.nonce, CloseOpError::NonceMismatch);
 
         self.remove_account(op.account_id);
 

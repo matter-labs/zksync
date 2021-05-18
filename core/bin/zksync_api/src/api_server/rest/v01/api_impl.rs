@@ -15,7 +15,7 @@ use actix_web::{web, HttpResponse, Result as ActixResult};
 use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
-use zksync_types::{Address, BlockNumber};
+use zksync_types::{Address, BlockNumber, Token, TokenId};
 
 /// Helper macro which wraps the serializable object into `Ok(HttpResponse::Ok().json(...))`.
 macro_rules! ok_json {
@@ -64,13 +64,23 @@ impl ApiV01 {
         );
 
         let mut storage = self_.access_storage().await?;
-        let tokens = storage
+        let mut tokens = storage
             .tokens_schema()
             .load_tokens_by_market_volume(liquidity_volume)
             .await
             .map_err(Self::db_error)?;
 
+        // Add ETH for tokens allowed for fee
+        // Different APIs have different views on how to represent ETH in their system.
+        // But ETH is always allowed to pay fee, and in all cases it should be on the list.
+
+        if tokens.get(&TokenId(0)).is_none() {
+            let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
+            tokens.insert(eth.id, eth);
+        }
+
         let mut tokens = tokens.values().cloned().collect::<Vec<_>>();
+
         tokens.sort_by_key(|t| t.id);
 
         metrics::histogram!("api.v01.tokens_acceptable_for_fees", start.elapsed());

@@ -42,7 +42,7 @@ impl ApiBlocksData {
     async fn block_info(
         &self,
         block_number: BlockNumber,
-    ) -> QueryResult<Option<records::BlockDetails>> {
+    ) -> QueryResult<Option<records::StorageBlockDetails>> {
         self.verified_blocks.get(&self.pool, block_number).await
     }
 
@@ -53,7 +53,7 @@ impl ApiBlocksData {
         &self,
         max_block: Option<BlockNumber>,
         limit: u32,
-    ) -> QueryResult<Vec<records::BlockDetails>> {
+    ) -> QueryResult<Vec<records::StorageBlockDetails>> {
         let max_block = max_block.unwrap_or(BlockNumber(u32::MAX));
 
         let mut storage = self.pool.access_storage().await?;
@@ -83,7 +83,7 @@ pub(super) mod convert {
 
     use super::*;
 
-    pub fn block_info_from_details(inner: records::BlockDetails) -> BlockInfo {
+    pub fn block_info_from_details(inner: records::StorageBlockDetails) -> BlockInfo {
         BlockInfo {
                 block_number: BlockNumber(inner.block_number as u32),
                 new_state_root: Fr::from_bytes(&inner.new_state_root).unwrap_or_else(|err| {

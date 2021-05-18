@@ -1,15 +1,16 @@
 use crate::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
-    Transfer,
+    operations::error::TransferOpError,
+    AccountId, Address, Nonce, TokenId, Transfer,
 };
-use crate::{AccountId, Address, Nonce, TokenId};
-use anyhow::{ensure, format_err};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
-    FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
 };
-use zksync_crypto::primitives::FromBytes;
 
 /// TransferToNew operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,11 +36,10 @@ impl TransferToNewOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(
-            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
-            "Wrong bytes length for transfer to new pubdata"
-        );
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, TransferOpError> {
+        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+            return Err(TransferOpError::PubdataSizeMismatch);
+        }
 
         let from_offset = 1;
         let token_id_offset = from_offset + ACCOUNT_ID_BIT_WIDTH / 8;
@@ -50,22 +50,22 @@ impl TransferToNewOp {
         let fee_offset = to_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
 
         let from_id = u32::from_bytes(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-            .ok_or_else(|| format_err!("Cant get from account id from transfer to new pubdata"))?;
+            .ok_or(TransferOpError::CannotGetFromAccountId)?;
         let to_id = u32::from_bytes(&bytes[to_id_offset..to_id_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-            .ok_or_else(|| format_err!("Cant get to account id from transfer to new pubdata"))?;
+            .ok_or(TransferOpError::CannotGetToAccountId)?;
         let from = Address::zero(); // It is unknown from pubdata;
         let to = Address::from_slice(&bytes[to_address_offset..to_address_offset + FR_ADDRESS_LEN]);
         let token = u16::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-            .ok_or_else(|| format_err!("Cant get token id from transfer to new pubdata"))?;
+            .ok_or(TransferOpError::CannotGetTokenId)?;
         let amount = unpack_token_amount(
             &bytes[amount_offset
                 ..amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8],
         )
-        .ok_or_else(|| format_err!("Cant get amount from transfer to new pubdata"))?;
+        .ok_or(TransferOpError::CannotGetAmount)?;
         let fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
         )
-        .ok_or_else(|| format_err!("Cant get fee from transfer to new pubdata"))?;
+        .ok_or(TransferOpError::CannotGetFee)?;
         let nonce = 0; // It is unknown from pubdata
         let time_range = Default::default();
 

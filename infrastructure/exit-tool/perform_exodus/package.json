@@ -1,0 +1,23 @@
+{
+    "name": "perform_exodus",
+    "version": "0.0.1",
+    "description": "CLI tool for executing exodus transactions",
+    "main": "build/index.js",
+    "bin": "build/index.js",
+    "repository": "https://github.com/matter-labs/zksync-dev.git",
+    "author": "The Matter Labs Team",
+    "license": "MIT",
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc --watch",
+        "start": "node build/index.js"
+    },
+    "devDependencies": {
+        "typescript": "^4.0.2"
+    },
+    "dependencies": {
+        "@types/node": "^14.14.35",
+        "commander": "^6.0.0",
+        "ethers": "^5.0.31"
+    }
+}

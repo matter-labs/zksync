@@ -6,16 +6,43 @@ use std::time::Instant;
 use structopt::StructOpt;
 use zksync_crypto::proof::EncodedSingleProof;
 use zksync_storage::ConnectionPool;
-use zksync_types::{AccountId, Address, TokenId, TokenLike};
+use zksync_types::{block::Block, AccountId, Address, BlockNumber, TokenId, TokenLike, H256};
 use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct StoredBlockInfo {
+    block_number: BlockNumber,
+    priority_operations: u64,
+    pending_onchain_operations_hash: H256,
+    timestamp: u64,
+    state_hash: H256,
+    commitment: H256,
+}
+
+impl StoredBlockInfo {
+    pub fn from_block(block: &Block) -> Self {
+        Self {
+            block_number: block.block_number,
+            priority_operations: block.number_of_processed_prior_ops(),
+            pending_onchain_operations_hash: block.get_onchain_operations_block_info().1,
+            timestamp: block.timestamp,
+            state_hash: block.get_eth_encoded_root(),
+            commitment: block.block_commitment,
+        }
+    }
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct ExitProofData {
-    token_id: TokenId,
+    stored_block_info: StoredBlockInfo,
+    owner: Address,
     account_id: AccountId,
-    account_address: Address,
+    token_id: TokenId,
     amount: BigUintSerdeWrapper,
     proof: EncodedSingleProof,
+    token_address: Address,
 }
 
 #[derive(StructOpt)]
@@ -25,9 +52,9 @@ struct ExitProofData {
     rename_all = "snake_case"
 )]
 struct Opt {
-    /// Account id of the account
+    /// Account address
     #[structopt(long)]
-    account_id: String,
+    address: Address,
 
     /// Token to withdraw - "ETH" or address of the ERC20 token
     #[structopt(long)]
@@ -40,7 +67,7 @@ async fn main() {
 
     let opt = Opt::from_args();
 
-    let account_id = opt.account_id.parse::<AccountId>().unwrap();
+    let address = opt.address;
     let token = TokenLike::parse(&opt.token);
 
     let timer = Instant::now();
@@ -51,24 +78,26 @@ async fn main() {
         .await
         .expect("Storage access failed");
 
-    let token_id = storage
+    let token_info = storage
         .tokens_schema()
         .get_token(token)
         .await
         .expect("Db access fail")
         .expect(
             "Token not found. If you're addressing an ERC-20 token by it's symbol, \
-                  it may not be available after data restore. Try using token address in that case",
-        )
-        .id;
-    let address = storage
+              it may not be available after data restore. Try using token address in that case",
+        );
+    let token_id = token_info.id;
+    let token_address = token_info.address;
+
+    let account_id = storage
         .chain()
         .account_schema()
-        .last_verified_state_for_account(account_id)
+        .account_id_by_address(address)
         .await
-        .expect("DB access fail")
-        .expect("Account not found in the db")
-        .address;
+        .expect("Db access fail")
+        .unwrap_or_else(|| panic!("Unable to find account ID for address: {}", address));
+
     let accounts = storage
         .chain()
         .state_schema()
@@ -77,6 +106,21 @@ async fn main() {
         .expect("Failed to load verified state")
         .1;
 
+    let latest_block = storage
+        .chain()
+        .block_schema()
+        .get_last_verified_confirmed_block()
+        .await
+        .expect("Db access fail");
+    let block = storage
+        .chain()
+        .block_schema()
+        .get_block(latest_block)
+        .await
+        .expect("Db access fail")
+        .expect("Block not stored");
+    let stored_block_info = StoredBlockInfo::from_block(&block);
+
     vlog::info!("Restored state from db: {} s", timer.elapsed().as_secs());
 
     let (proof, amount) =
@@ -84,11 +128,13 @@ async fn main() {
             .expect("Failed to generate exit proof");
 
     let proof_data = ExitProofData {
+        stored_block_info,
+        owner: address,
         token_id,
         account_id,
-        account_address: address,
         amount: amount.into(),
         proof,
+        token_address,
     };
 
     println!("\n\n");

@@ -3,8 +3,9 @@
 use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
 // Workspace deps
-use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
-use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
+use crate::{
+    franklin_crypto::rescue::bn256::Bn256RescueParams, merkle_tree::rescue_hasher::BabyRescueHasher,
+};
 use zksync_basic_types::{AccountId, TokenId};
 
 /// Depth of the account tree.

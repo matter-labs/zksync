@@ -24,7 +24,7 @@ impl DBConfig {
     const SECS_PER_HOUR: u64 = 3600;
 
     pub fn from_env() -> Self {
-        envy_load!("contracts", "DATABASE_")
+        envy_load!("database", "DATABASE_")
     }
 
     pub fn rejected_transactions_max_age(&self) -> chrono::Duration {

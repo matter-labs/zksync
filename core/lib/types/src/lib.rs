@@ -41,6 +41,7 @@ pub mod aggregated_operations;
 pub mod block;
 pub mod config;
 pub mod ethereum;
+pub mod event;
 pub mod fee;
 pub mod forced_exit_requests;
 pub mod gas_counter;

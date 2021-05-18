@@ -47,3 +47,9 @@ basic_type!(
     EthBlockId,
     u64
 );
+
+basic_type!(
+    /// Unique identifier of the zkSync event.
+    EventId,
+    u64
+);

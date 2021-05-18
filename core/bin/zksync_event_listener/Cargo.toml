@@ -1,0 +1,26 @@
+[package]
+name = "zksync_event_listener"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
+
+[dependencies]
+actix-web-actors = "3"
+actix = "0.10.0"
+actix-web = "3"
+
+anyhow = "1.0"
+futures-util = "0.3"
+serde = "1"
+serde_json = "1"
+
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+vlog = { path = "../../lib/vlog", version = "1.0", features = ['actix'] }

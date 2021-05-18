@@ -16,16 +16,21 @@ use crate::{
     SignedCallResult,
 };
 
-/// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
-#[derive(Debug, Clone)]
-pub struct MockEthereum {
-    pub block_number: u64,
-    pub gas_price: U256,
-    pub tx_statuses: Arc<RwLock<HashMap<H256, ExecutedTxStatus>>>,
-    pub sent_txs: Arc<RwLock<HashSet<Vec<u8>>>>,
+#[derive(Debug)]
+struct MockEthereumInner {
+    block_number: u64,
+    gas_price: U256,
+    tx_statuses: Arc<RwLock<HashMap<H256, ExecutedTxStatus>>>,
+    sent_txs: Arc<RwLock<HashSet<Vec<u8>>>>,
 }
 
-impl Default for MockEthereum {
+/// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
+#[derive(Debug, Default, Clone)]
+pub struct MockEthereum {
+    inner: Arc<MockEthereumInner>,
+}
+
+impl Default for MockEthereumInner {
     fn default() -> Self {
         Self {
             block_number: 1,
@@ -54,7 +59,7 @@ impl MockEthereum {
     /// Checks that there was a request to send the provided transaction.
     pub async fn assert_sent(&self, tx: &[u8]) {
         assert!(
-            self.sent_txs.read().await.contains(tx),
+            self.inner.sent_txs.read().await.contains(tx),
             "Transaction {:?} was not sent",
             tx
         );
@@ -62,50 +67,64 @@ impl MockEthereum {
 
     /// Adds an response for the sent transaction for `ETHSender` to receive.
     pub async fn add_execution(&mut self, hash: &H256, status: &ExecutedTxStatus) {
-        self.tx_statuses.write().await.insert(*hash, status.clone());
+        self.inner
+            .tx_statuses
+            .write()
+            .await
+            .insert(*hash, status.clone());
     }
 
     /// Increments the blocks by a provided `confirmations` and marks the sent transaction
     /// as a success.
     pub async fn add_successfull_execution(&mut self, tx_hash: H256, confirmations: u64) {
-        self.block_number += confirmations;
+        Arc::get_mut(&mut self.inner).unwrap().block_number += confirmations;
 
         let status = ExecutedTxStatus {
             confirmations,
             success: true,
             receipt: None,
         };
-        self.tx_statuses.write().await.insert(tx_hash, status);
+        self.inner.tx_statuses.write().await.insert(tx_hash, status);
     }
 
     /// Same as `add_successfull_execution`, but marks the transaction as a failure.
     pub async fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
-        self.block_number += confirmations;
+        Arc::get_mut(&mut self.inner).unwrap().block_number += confirmations;
 
         let status = ExecutedTxStatus {
             confirmations,
             success: false,
             receipt: Some(Default::default()),
         };
-        self.tx_statuses.write().await.insert(*hash, status);
+        self.inner.tx_statuses.write().await.insert(*hash, status);
     }
     pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
-        Ok(self.tx_statuses.read().await.get(&hash).cloned())
+        Ok(self.inner.tx_statuses.read().await.get(&hash).cloned())
     }
 
     pub async fn block_number(&self) -> anyhow::Result<U64> {
-        Ok(self.block_number.into())
+        Ok(self.inner.block_number.into())
+    }
+
+    pub async fn set_block_number(&mut self, val: U64) -> anyhow::Result<U64> {
+        Arc::get_mut(&mut self.inner).unwrap().block_number = val.as_u64();
+        Ok(self.inner.block_number.into())
     }
 
     pub async fn get_gas_price(&self) -> anyhow::Result<U256> {
-        Ok(self.gas_price)
+        Ok(self.inner.gas_price)
+    }
+
+    pub async fn set_gas_price(&mut self, val: U256) -> anyhow::Result<U256> {
+        Arc::get_mut(&mut self.inner).unwrap().gas_price = val;
+        Ok(self.inner.gas_price)
     }
 
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
         // Cut hash of transaction
         let mut hash: [u8; 32] = Default::default();
         hash.copy_from_slice(&tx[..32]);
-        self.sent_txs.write().await.insert(hash.to_vec());
+        self.inner.sent_txs.write().await.insert(hash.to_vec());
         Ok(H256::from(hash))
     }
 
@@ -114,7 +133,7 @@ impl MockEthereum {
         raw_tx: Vec<u8>,
         options: Options,
     ) -> anyhow::Result<SignedCallResult> {
-        let gas_price = options.gas_price.unwrap_or(self.gas_price);
+        let gas_price = options.gas_price.unwrap_or(self.inner.gas_price);
         let nonce = options.nonce.expect("Nonce must be set for every tx");
 
         // Nonce and gas_price are appended to distinguish the same transactions

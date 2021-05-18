@@ -1,18 +1,20 @@
 // Built-in deps
-use std::convert::TryInto;
-use std::mem;
+use std::{convert::TryInto, mem};
 // External deps
-use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
-use crate::franklin_crypto::bellman::pairing::ff::ScalarEngine;
-use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
-use anyhow::bail;
+use crate::franklin_crypto::bellman::pairing::{
+    bn256::Bn256,
+    ff::{PrimeField, PrimeFieldRepr, ScalarEngine},
+    CurveAffine, Engine,
+};
 use num::{BigUint, ToPrimitive};
 use zksync_basic_types::U256;
 // Workspace deps
-use crate::circuit::utils::append_le_fixed_width;
-use crate::merkle_tree::{hasher::Hasher, rescue_hasher::BabyRescueHasher};
-use crate::params;
+use crate::{
+    circuit::utils::append_le_fixed_width,
+    error::PackingError,
+    merkle_tree::{hasher::Hasher, rescue_hasher::BabyRescueHasher},
+    params,
+};
 
 pub trait GetBits {
     fn get_bits_le(&self) -> Vec<bool>;
@@ -239,14 +241,14 @@ impl FloatConversions {
     }
 
     /// Packs a u128 to a floating-point number with the given parameters that is less or equal to integer.
-    /// Can lose accuracy with small parameters `exponent_len` and `mantissa_len`.
+    /// Can lose accuracy with small parameters `exponent_length` and `mantissa_length`.
     #[allow(clippy::wrong_self_convention)]
     pub fn to_float(
         integer: u128,
         exponent_length: usize,
         mantissa_length: usize,
         exponent_base: u32,
-    ) -> Result<Vec<bool>, anyhow::Error> {
+    ) -> Result<Vec<bool>, PackingError> {
         let exponent_base = u128::from(exponent_base);
 
         let max_power = (1 << exponent_length) - 1;
@@ -255,8 +257,9 @@ impl FloatConversions {
 
         let max_mantissa = (1u128 << mantissa_length) - 1;
 
-        if integer > (max_mantissa.saturating_mul(max_exponent)) {
-            bail!("Integer is too big");
+        let limit = max_mantissa.saturating_mul(max_exponent);
+        if integer > limit {
+            return Err(PackingError::IntegerTooBig { integer, limit });
         }
 
         // The algortihm is as follows: calculate minimal exponent
@@ -318,7 +321,7 @@ impl FloatConversions {
         exponent_length: usize,
         mantissa_length: usize,
         exponent_base: u32,
-    ) -> Result<Vec<bool>, anyhow::Error> {
+    ) -> Result<Vec<bool>, PackingError> {
         let exponent_base = u128::from(exponent_base);
 
         let max_power = (1 << exponent_length) - 1;
@@ -327,8 +330,9 @@ impl FloatConversions {
 
         let max_mantissa = (1u128 << mantissa_length) - 1;
 
-        if integer > (max_mantissa.saturating_mul(max_exponent)) {
-            bail!("Integer is too big");
+        let limit = max_mantissa.saturating_mul(max_exponent);
+        if integer > limit {
+            return Err(PackingError::IntegerTooBig { integer, limit });
         }
 
         // The algortihm is as follows: calculate minimal exponent
@@ -490,6 +494,16 @@ mod test {
                 true, false, false, false, false, false, true, true, true, false, false, true,
                 true, false, false, false
             ])
+        );
+
+        // Test behaviour when too large integer is passed
+        let convert_number = FloatConversions::to_float_up(20000, 2, 4, 10);
+        assert_eq!(
+            convert_number.err(),
+            Some(PackingError::IntegerTooBig {
+                integer: 20000,
+                limit: 15000
+            })
         );
     }
 

@@ -9,7 +9,7 @@ use zksync_api_types::v02::transaction::{
 use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxEthSignature, TxHash},
-    SignedZkSyncTx,
+    BlockNumber, SignedZkSyncTx,
 };
 // Local imports
 use self::records::{MempoolTx, QueuedBatchTx};
@@ -458,5 +458,41 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_queued_batch_info");
         Ok(result)
+    }
+
+    // Returns executed txs back to mempool for blocks with number greater than `last_block`
+    pub async fn return_executed_txs_to_mempool(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            r#"
+            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
+            SELECT tx_hash, tx, created_at, eth_sign_data, COALESCE(batch_id, 0) FROM executed_transactions
+            WHERE block_number > $1
+        "#,
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        sqlx::query!(
+            r#"
+            DELETE FROM executed_transactions
+            WHERE block_number > $1
+        "#,
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        transaction.commit().await?;
+
+        metrics::histogram!(
+            "sql.chain.mempool.return_executed_txs_to_mempool",
+            start.elapsed()
+        );
+        Ok(())
     }
 }

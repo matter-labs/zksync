@@ -185,14 +185,12 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
         loop {
-            let load_new_operation_future = time::timeout(
-                self.options.sender.tx_poll_period(),
-                self.load_new_operations(),
-            );
-            // If the time has expired then we do nothing, but if we received an error
-            // when loading an new operation, then panic.
-            if let Ok(load_new_operation) = load_new_operation_future.await {
-                load_new_operation.unwrap_or_else(|e| panic!("Failed load new operations: {}", e));
+            // We perform a loading routine every X seconds.
+            tokio::time::delay_for(self.options.sender.tx_poll_period()).await;
+            // If we received an error when loading a new operation, we can't do anything about it and should panic.
+            if let Err(error) = self.load_new_operations().await {
+                vlog::error!("Unable to restore operations from the database: {}", error);
+                panic!("Unable to restore operations from the database: {}", error);
             }
 
             if self.options.sender.is_enabled {
@@ -214,6 +212,12 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         let mut transaction = connection.start_transaction().await?;
 
         let new_operations = self.db.load_new_operations(&mut transaction).await?;
+
+        if !new_operations.is_empty() {
+            vlog::info!("Loaded {} new operations", new_operations.len());
+        } else {
+            vlog::debug!("No new operations are loaded from the database");
+        }
 
         // let's mark the operations as successful processed.
         // So that next time you do not add them to the queue again.
@@ -766,12 +770,15 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 }
 
 #[must_use]
-pub fn run_eth_sender(pool: ConnectionPool, options: ZkSyncConfig) -> JoinHandle<()> {
-    let ethereum = EthereumGateway::from_config(&options);
+pub fn run_eth_sender(
+    pool: ConnectionPool,
+    eth_gateway: EthereumGateway,
+    options: ZkSyncConfig,
+) -> JoinHandle<()> {
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(options.eth_sender, db, ethereum).await;
+        let eth_sender = ETHSender::new(options.eth_sender, db, eth_gateway).await;
 
         eth_sender.run().await
     })

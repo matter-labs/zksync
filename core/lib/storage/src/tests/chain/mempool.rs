@@ -5,7 +5,7 @@ use zksync_types::{
     mempool::SignedTxVariant,
     tx::TxHash,
     tx::{ChangePubKey, Transfer, Withdraw},
-    AccountId, Address, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx,
+    AccountId, Address, BlockNumber, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx,
 };
 // Local imports
 use crate::test_data::gen_eth_sign_data;
@@ -372,6 +372,57 @@ async fn test_get_batch_info_from_mempool(mut storage: StorageProcessor<'_>) -> 
         .map(|tx_hash| tx_hash.0)
         .collect();
     assert_eq!(actual_tx_hashes, tx_hashes);
+}
+
+/// Checks that returning executed txs to mempool works correctly.
+#[db_test]
+async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let txs = gen_transfers(5);
+
+    // Insert 5 executed transactions.
+    for block_number in 1..=5 {
+        let tx_data = txs.get(block_number - 1).unwrap();
+        let executed_tx = NewExecutedTransaction {
+            block_number: block_number as i64,
+            tx_hash: tx_data.hash().as_ref().to_vec(),
+            tx: serde_json::to_value(&tx_data.tx).unwrap(),
+            operation: Default::default(),
+            from_account: Default::default(),
+            to_account: None,
+            success: true,
+            fail_reason: None,
+            block_index: None,
+            primary_account_address: Default::default(),
+            nonce: Default::default(),
+            created_at: chrono::Utc::now(),
+            eth_sign_data: None,
+            batch_id: None,
+        };
+
+        OperationsSchema(&mut storage)
+            .store_executed_tx(executed_tx)
+            .await?;
+    }
+
+    // Return txs with block numbers greater than 3 back to mempool.
+    MempoolSchema(&mut storage)
+        .return_executed_txs_to_mempool(BlockNumber(3))
+        .await?;
+
+    // Check that the first 3 txs are executed and 2 last are in mempool.
+    assert_eq!(MempoolSchema(&mut storage).load_txs().await?.len(), 2);
+    for block_number in 1..=5 {
+        let tx_hash = txs.get(block_number - 1).unwrap().hash();
+        let tx_in_executed = OperationsSchema(&mut storage)
+            .get_executed_operation(tx_hash.as_ref())
+            .await?
+            .is_some();
+        if block_number <= 3 {
+            assert!(tx_in_executed);
+        } else {
+            assert!(!tx_in_executed);
+        }
+    }
 
     Ok(())
 }
