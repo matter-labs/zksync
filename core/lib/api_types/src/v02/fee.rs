@@ -4,6 +4,7 @@ use zksync_types::{Address, BatchFee, Fee, TokenLike, TxFeeTypes};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiFee {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub gas_fee: BigUint,
@@ -34,6 +35,7 @@ impl From<BatchFee> for ApiFee {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct TxFeeRequest {
     pub tx_type: TxFeeTypes,
     pub address: Address,
@@ -41,12 +43,14 @@ pub struct TxFeeRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct TxInBatchFeeRequest {
     pub tx_type: TxFeeTypes,
     pub address: Address,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct BatchFeeRequest {
     pub transactions: Vec<TxInBatchFeeRequest>,
     pub token_like: TokenLike,

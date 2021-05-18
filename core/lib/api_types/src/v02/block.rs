@@ -4,7 +4,7 @@ use zksync_crypto::{serialization::FrSerde, Fr};
 use zksync_types::{BlockNumber, H256};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub enum BlockStatus {
     Queued,
     Committed,
@@ -12,6 +12,7 @@ pub enum BlockStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct BlockInfo {
     pub block_number: BlockNumber,
     #[serde(with = "FrSerde")]

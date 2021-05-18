@@ -312,8 +312,8 @@ mod tests {
             "pagination": {
                 "from": {
                     "address": Address::default(),
-                    "account_id": AccountId::default(),
-                    "serial_id": 1
+                    "accountId": AccountId::default(),
+                    "serialId": 1
                 },
                 "limit": 1,
                 "direction": "newer",
@@ -478,29 +478,29 @@ mod tests {
         *server.pending_ops.lock().await = json!({
             "list": [
                 {
-                    "tx_hash": TxHash::from_slice(&[0u8; 32]),
-                    "block_number": Option::<BlockNumber>::None,
+                    "txHash": TxHash::from_slice(&[0u8; 32]),
+                    "blockNumber": Option::<BlockNumber>::None,
                     "op": {
                         "type": "Deposit",
                         "from": Address::default(),
-                        "token_id": 0,
+                        "tokenId": 0,
                         "amount": "100500",
                         "to": address,
-                        "account_id": Option::<AccountId>::None,
-                        "eth_hash": H256::from_slice(&[0u8; 32]),
+                        "accountId": Option::<AccountId>::None,
+                        "ethHash": H256::from_slice(&[0u8; 32]),
                         "id": 10,
-                        "tx_hash": TxHash::from_slice(&[0u8; 32])
+                        "txHash": TxHash::from_slice(&[0u8; 32])
                     },
                     "status": "queued",
-                    "fail_reason": Option::<String>::None,
-                    "created_at": Utc::now()
+                    "failReason": Option::<String>::None,
+                    "createdAt": Utc::now()
                 },
             ],
             "pagination": {
                 "from": {
-                    "serial_id": 1,
+                    "serialId": 1,
                     "address": address,
-                    "account_id": account_id
+                    "accountId": account_id
                 },
                 "limit": 1,
                 "count": 1,

@@ -7,17 +7,12 @@ use actix_web::{web, Scope};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_api_types::v02::ZksyncVersion;
 use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 
 // Local uses
 use super::response::ApiResult;
-
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ZksyncVersion {
-    ContractV4,
-}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ApiConfigData {

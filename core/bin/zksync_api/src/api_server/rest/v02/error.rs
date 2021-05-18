@@ -38,6 +38,7 @@ pub enum ErrorCode {
 
 /// Error object in a response
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Error {
     pub error_type: String,
     pub code: ErrorCode,
@@ -78,28 +79,6 @@ impl Error {
     }
 }
 
-#[derive(Debug)]
-pub struct UnreachableError;
-
-impl Display for UnreachableError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(
-            "Unreachable error; you should never see this message, \
-            please contact us at https://github.com/matter-labs/zksync with a report",
-        )
-    }
-}
-
-impl ApiError for UnreachableError {
-    fn error_type(&self) -> String {
-        String::from("api_error")
-    }
-
-    fn code(&self) -> ErrorCode {
-        ErrorCode::UnreacheableError
-    }
-}
-
 #[derive(Error, Debug)]
 pub enum InvalidDataError {
     #[error("Cannot show price in zero price token")]
@@ -118,7 +97,7 @@ pub enum InvalidDataError {
 
 impl ApiError for InvalidDataError {
     fn error_type(&self) -> String {
-        String::from("invalid_data_error")
+        String::from("invalidDataError")
     }
 
     fn code(&self) -> ErrorCode {
@@ -150,7 +129,7 @@ impl Display for StorageError {
 
 impl ApiError for StorageError {
     fn error_type(&self) -> String {
-        String::from("storage_error")
+        String::from("storageError")
     }
 
     fn code(&self) -> ErrorCode {
@@ -175,7 +154,7 @@ impl Display for CoreApiError {
 
 impl ApiError for CoreApiError {
     fn error_type(&self) -> String {
-        String::from("core_api_error")
+        String::from("coreApiError")
     }
 
     fn code(&self) -> ErrorCode {
@@ -185,7 +164,7 @@ impl ApiError for CoreApiError {
 
 impl ApiError for SubmitError {
     fn error_type(&self) -> String {
-        String::from("submit_error")
+        String::from("submitError")
     }
 
     fn code(&self) -> ErrorCode {
@@ -205,7 +184,7 @@ impl ApiError for SubmitError {
 
 impl ApiError for PriceError {
     fn error_type(&self) -> String {
-        String::from("token_error")
+        String::from("tokenError")
     }
 
     fn code(&self) -> ErrorCode {

@@ -11,19 +11,21 @@ use zksync_types::{
 use zksync_utils::{BigUintSerdeAsRadix10Str, ZeroPrefixHexSerde};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct IncomingTxBatch {
     pub txs: Vec<ZkSyncTx>,
     pub signature: EthBatchSignatures,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct IncomingTx {
     pub tx: ZkSyncTx,
     pub signature: Option<TxEthSignature>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub enum TxInBlockStatus {
     Queued,
     Committed,
@@ -42,12 +44,14 @@ impl From<BlockStatus> for TxInBlockStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TxData {
     pub tx: Transaction,
     pub eth_signature: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct L1Receipt {
     pub status: BlockStatus,
     pub eth_block: EthBlockId,
@@ -56,6 +60,7 @@ pub struct L1Receipt {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct L2Receipt {
     #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
@@ -72,6 +77,7 @@ pub enum Receipt {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Transaction {
     #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
@@ -154,6 +160,7 @@ impl L1Transaction {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiDeposit {
     pub from: Address,
     pub token_id: TokenId,
@@ -168,6 +175,7 @@ pub struct ApiDeposit {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiFullExit {
     pub account_id: AccountId,
     pub token_id: TokenId,
@@ -183,6 +191,7 @@ pub struct TxHashSerializeWrapper(
 );
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct SubmitBatchResponse {
     pub transaction_hashes: Vec<TxHashSerializeWrapper>,
     #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
@@ -190,6 +199,7 @@ pub struct SubmitBatchResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiTxBatch {
     #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub batch_hash: TxHash,
@@ -199,6 +209,7 @@ pub struct ApiTxBatch {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct BatchStatus {
     pub updated_at: DateTime<Utc>,
     pub last_state: TxInBlockStatus,

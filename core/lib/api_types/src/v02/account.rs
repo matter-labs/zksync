@@ -4,6 +4,7 @@ use zksync_types::{AccountId, Address, BlockNumber, Nonce, PubKeyHash};
 use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Account {
     pub account_id: AccountId,
     pub address: Address,
@@ -14,12 +15,14 @@ pub struct Account {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum AccountStateType {
     Committed,
     Finalized,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum AccountAddressOrId {
     Address(Address),
     Id(AccountId),

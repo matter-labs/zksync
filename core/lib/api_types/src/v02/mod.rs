@@ -12,20 +12,27 @@ pub mod status;
 pub mod token;
 pub mod transaction;
 
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ZksyncVersion {
+    ContractV4,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub enum ApiVersion {
     V02,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub enum ResultStatus {
     Success,
     Error,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Request {
     pub network: Network,
     pub api_version: ApiVersion,
@@ -35,6 +42,7 @@ pub struct Request {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Response {
     pub request: Request,
     pub status: ResultStatus,

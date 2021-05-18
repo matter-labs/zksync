@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use zksync_types::{Address, Token, TokenId};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiToken {
     pub id: TokenId,
     pub address: Address,
@@ -12,6 +13,7 @@ pub struct ApiToken {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct TokenPrice {
     pub token_id: TokenId,
     pub token_symbol: String,
