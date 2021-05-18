@@ -421,6 +421,8 @@ async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<(
         .get_executed_priority_operation_by_tx_hash(&[0xDE, 0xAD, 0xBE, 0xEF])
         .await?;
     assert!(op.is_none());
+
+    Ok(())
 }
 
 /// Checks if executed_priority_operations are removed correctly.
@@ -441,6 +443,8 @@ async fn test_remove_executed_priority_operations(
             eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
             eth_block: 10,
             created_at: chrono::Utc::now(),
+            eth_block_index: Some(1),
+            tx_hash: Default::default(),
         };
         OperationsSchema(&mut storage)
             .store_executed_priority_op(executed_priority_op)

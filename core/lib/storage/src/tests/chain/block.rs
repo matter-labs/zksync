@@ -1035,6 +1035,8 @@ async fn test_get_block_status_and_last_updated(
         .get_status_and_last_updated_of_existing_block(BlockNumber(1))
         .await?;
     assert_eq!(result.0, BlockStatus::Finalized);
+
+    Ok(())
 }
 
 /// Check that blocks are removed correctly.
@@ -1225,6 +1227,8 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         })
         .await?;
     assert!(result.is_none());
+
+    Ok(())
 }
 
 /// Check that account tree cache is removed correctly.

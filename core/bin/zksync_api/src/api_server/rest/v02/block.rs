@@ -13,7 +13,7 @@ use zksync_api_types::v02::{
     transaction::Transaction,
 };
 use zksync_crypto::{convert::FeConvert, Fr};
-use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
+use zksync_storage::{chain::block::records::StorageBlockDetails, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber, H256};
 
 // Local uses
@@ -24,7 +24,10 @@ use super::{
 };
 use crate::{api_try, utils::block_details_cache::BlockDetailsCache};
 
-pub fn block_info_from_details_and_status(details: BlockDetails, status: BlockStatus) -> BlockInfo {
+pub fn block_info_from_details_and_status(
+    details: StorageBlockDetails,
+    status: BlockStatus,
+) -> BlockInfo {
     let (committed_at, finalized_at) = match status {
         BlockStatus::Queued => (None, None),
         BlockStatus::Committed => (Some(details.committed_at), None),

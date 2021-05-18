@@ -372,6 +372,8 @@ async fn test_get_batch_info_from_mempool(mut storage: StorageProcessor<'_>) -> 
         .map(|tx_hash| tx_hash.0)
         .collect();
     assert_eq!(actual_tx_hashes, tx_hashes);
+
+    Ok(())
 }
 
 /// Checks that returning executed txs to mempool works correctly.
