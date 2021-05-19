@@ -231,3 +231,56 @@ export interface BatchFee {
     // Total fee amount (in wei)
     totalFee: BigNumber;
 }
+
+export interface ApiRequest {
+    network: Network;
+    api_version: 'v02';
+    resource: string;
+    args: any;
+    timestamp: string;
+}
+
+export interface ApiResponse {
+    request: ApiRequest;
+    status: 'success' | 'error';
+    error: any;
+    result: any;
+}
+
+export interface PaginationQuery {
+    from: any;
+    limit: number;
+    direction: 'newer' | 'older';
+}
+
+export interface Paginated {
+    list: [any];
+    pagination: {
+        from: any;
+        limit: number;
+        direction: 'newer' | 'older';
+        count: number;
+    }
+}
+
+export interface ApiBlockInfo {
+    blockNumber: number;
+    newStateRoot: string;
+    blockSize: number;
+    commitTxHash: string | null;
+    verifyTxHash: string | null;
+    committedAt: string | null;
+    finalizedAt: string | null;
+    status: 'queued' | 'committed' | 'finalized';
+}
+
+export interface ApiAccountInfo {
+    accountId: number;
+    address: Address;
+    nonce: number;
+    pubKeyHash: PubKeyHash;
+    lastUpdateInBlock: number;
+    balances: {
+        [token: string]: BigNumberish;
+    };
+}
