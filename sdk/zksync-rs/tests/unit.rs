@@ -289,6 +289,121 @@ mod signatures_with_vectors {
     }
 
     #[tokio::test]
+    async fn test_withdraw_nft_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let TxData::WithdrawNFT {
+                data: withdraw_nft_tx,
+                eth_sign_data: sign_data,
+            } = &inputs.data
+            {
+                let signer = get_signer(
+                    &inputs.eth_private_key,
+                    withdraw_nft_tx.from,
+                    withdraw_nft_tx.account_id,
+                )
+                .await;
+
+                let fee_token = Token {
+                    id: withdraw_nft_tx.fee_token_id,
+                    address: Default::default(),
+                    symbol: sign_data.string_fee_token.clone(),
+                    decimals: 0,
+                    is_nft: false,
+                };
+
+                let (withdraw_nft, eth_signature) = signer
+                    .sign_withdraw_nft(
+                        withdraw_nft_tx.to,
+                        withdraw_nft_tx.token_id,
+                        fee_token,
+                        withdraw_nft_tx.fee.clone(),
+                        withdraw_nft_tx.nonce,
+                        withdraw_nft_tx.time_range,
+                    )
+                    .await
+                    .expect("Withdraw nft signing error");
+
+                assert_eq!(withdraw_nft.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &withdraw_nft.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+
+                assert_eq!(
+                    withdraw_nft
+                        .get_ethereum_sign_message(&sign_data.string_fee_token, 0)
+                        .into_bytes(),
+                    outputs.eth_sign_message.unwrap()
+                );
+
+                if let Some(expected_eth_signature) = outputs.eth_signature {
+                    let eth_signature = eth_signature.unwrap().serialize_packed();
+                    assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mint_nft_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let TxData::MintNFT {
+                data: mint_nft_tx,
+                eth_sign_data: sign_data,
+            } = &inputs.data
+            {
+                let signer = get_signer(
+                    &inputs.eth_private_key,
+                    mint_nft_tx.creator_address,
+                    mint_nft_tx.creator_id,
+                )
+                .await;
+
+                let fee_token = Token {
+                    id: mint_nft_tx.fee_token_id,
+                    address: Default::default(),
+                    symbol: sign_data.string_fee_token.clone(),
+                    decimals: 0,
+                    is_nft: false,
+                };
+
+                let (mint_nft, eth_signature) = signer
+                    .sign_mint_nft(
+                        mint_nft_tx.recipient,
+                        mint_nft_tx.content_hash,
+                        fee_token,
+                        mint_nft_tx.fee.clone(),
+                        mint_nft_tx.nonce,
+                    )
+                    .await
+                    .expect("Withdraw nft signing error");
+
+                assert_eq!(mint_nft.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &mint_nft.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+
+                assert_eq!(
+                    mint_nft
+                        .get_ethereum_sign_message(&sign_data.string_fee_token, 0)
+                        .into_bytes(),
+                    outputs.eth_sign_message.unwrap()
+                );
+
+                if let Some(expected_eth_signature) = outputs.eth_signature {
+                    let eth_signature = eth_signature.unwrap().serialize_packed();
+                    assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn test_change_pubkey_signature() {
         let test_vectors = TestVectorsConfig::load();
         for TestEntry { inputs, outputs } in test_vectors.transactions.items {
@@ -454,6 +569,7 @@ mod wallet_tests {
                     balances: committed_balances,
                     nonce: Nonce(0),
                     pub_key_hash: self.pub_key_hash().await,
+                    ..Default::default()
                 },
                 verified: AccountState {
                     balances: verified_balances,

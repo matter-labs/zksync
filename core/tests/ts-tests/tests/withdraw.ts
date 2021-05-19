@@ -1,6 +1,6 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types } from 'zksync';
+import { Wallet, types, ETHProxy } from 'zksync';
 import { BigNumber } from 'ethers';
 
 type TokenLike = types.TokenLike;
@@ -73,7 +73,7 @@ Tester.prototype.testWithdrawNFT = async function (wallet: Wallet, feeToken: Tok
     const { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), feeToken);
 
     const state = await wallet.getAccountState();
-    let nft: any = Object.values(state.committed.nfts)[0];
+    let nft: types.NFT = Object.values(state.committed.nfts)[0];
     expect(nft !== undefined);
 
     const balanceBefore = await wallet.getNFT(nft.id);
@@ -92,6 +92,18 @@ Tester.prototype.testWithdrawNFT = async function (wallet: Wallet, feeToken: Tok
 
     const balanceAfter = await wallet.getNFT(nft.id);
     expect(balanceAfter === undefined, 'Account has an NFT after withdrawing').to.be.true;
+
+    // Checking that the metadata was saved correctly
+    await handle.awaitVerifyReceipt();
+
+    const ethProxy = new ETHProxy(this.ethProvider, await this.syncProvider.getContractAddress());
+    const defaultFactory = await ethProxy.getDefaultNFTFactory();
+
+    const creatorId = await defaultFactory.getCreatorAccountId(nft.id);
+    const contentHash = await defaultFactory.getContentHash(nft.id);
+
+    expect(creatorId).to.eq(nft.creatorId, 'The creator id was not saved correctly');
+    expect(contentHash).to.eq(nft.contentHash, 'The content hash was not saved correctly');
 
     this.runningFee = this.runningFee.add(fee);
 };

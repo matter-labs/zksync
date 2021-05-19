@@ -28,7 +28,9 @@ export interface Contracts {
     proxy;
     upgradeGatekeeper;
     forcedExit;
+    regenesisMultisig;
     nftFactory;
+    additionalZkSync;
 }
 
 export interface DeployedAddresses {
@@ -41,6 +43,7 @@ export interface DeployedAddresses {
     ZkSyncTarget: string;
     DeployFactory: string;
     ForcedExit: string;
+    RegenesisMultisig: string;
     NFTFactory: string;
 }
 
@@ -66,7 +69,9 @@ export function readProductionContracts(): Contracts {
         verifier: readContractCode('Verifier'),
         proxy: readContractCode('Proxy'),
         upgradeGatekeeper: readContractCode('UpgradeGatekeeper'),
-        forcedExit: readContractCode('ForcedExit')
+        forcedExit: readContractCode('ForcedExit'),
+        regenesisMultisig: readContractCode('RegenesisMultisig'),
+        additionalZkSync: readContractCode('AdditionalZkSync')
     };
 }
 
@@ -81,7 +86,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         VerifierTarget: process.env.CONTRACTS_VERIFIER_TARGET_ADDR,
         ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
         ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
-        ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR
+        ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
+        RegenesisMultisig: process.env.MISC_REGENESIS_MULTISIG_ADDRESS
     };
 }
 
@@ -275,6 +281,41 @@ export class Deployer {
             );
         }
         this.addresses.ForcedExit = forcedExitContract.address;
+    }
+
+    public async deployRegenesisMultisig(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying Regenesis Multisig contract');
+        }
+
+        const partners = process.env.MISC_REGENESIS_PARTNERS.split(',');
+        const numberOfNeededSignatures = +process.env.MISC_REGENESIS_NEEDED_SIGNATURES;
+
+        if (partners.length < numberOfNeededSignatures) {
+            throw new Error('Number of required signatures for Genesis is higher than the number of partners');
+        }
+
+        const regenesisMultisigContract = await deployContract(
+            this.deployWallet,
+            this.contracts.regenesisMultisig,
+            [partners, numberOfNeededSignatures],
+            {
+                gasLimit: 6000000,
+                ...ethTxOptions
+            }
+        );
+        const zksRec = await regenesisMultisigContract.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = regenesisMultisigContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`MISC_REGENESIS_MULTISIG_ADDRESS=${regenesisMultisigContract.address}`);
+            console.log(
+                `Regenesis Multisig contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.RegenesisMultisig = regenesisMultisigContract.address;
     }
 
     public async publishSourcesToTesseracts() {

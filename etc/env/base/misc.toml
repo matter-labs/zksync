@@ -27,3 +27,15 @@ established_assets_for_withdrawing_through_zksync="ETH,DAI,USDC"
 log_format="plain"
 
 sentry_url="unset"
+
+# The address of the regenesis multisig smart contract
+regenesis_multisig_address="0xAA7113B9de498556dC76eDFEFc57681083c861C1"
+
+# The number of signatures needed for the regenesis to complete
+regenesis_needed_signatures=3
+
+# The list of partners signatures of which will be collected for the regenesis
+regenesis_partners="0xB991c776AedacfA5a7e8CF3e7aD6CB6C1AcB9227,0x093Cf8450c5eE506aB865F68F5f8EB8C4C2073C2,0x0d2200E8Ff14516397E86Ad63670516D371Dc862,0x374Ac2A10cBCaE93d2aBBe468f0EDEF6768e65eE"
+
+# The address of the new additional zkSync
+new_additional_zksync_address="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"

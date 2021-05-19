@@ -7,7 +7,7 @@ describe('Governance unit tests', function () {
 
     let testContract;
     before(async () => {
-        const contractFactory = await hardhat.ethers.getContractFactory('Governance');
+        const contractFactory = await hardhat.ethers.getContractFactory('TestGovernance');
         testContract = await contractFactory.deploy();
         await testContract.initialize(
             hardhat.ethers.utils.defaultAbiCoder.encode(['address'], [await testContract.signer.getAddress()])

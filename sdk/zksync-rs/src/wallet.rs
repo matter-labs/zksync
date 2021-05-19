@@ -1,6 +1,6 @@
 use num::BigUint;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::{AccountId, Address, TokenLike};
+use zksync_types::{AccountId, Address, TokenId, TokenLike};
 
 use crate::{
     credentials::WalletCredentials,
@@ -10,7 +10,7 @@ use crate::{
     provider::Provider,
     signer::Signer,
     tokens_cache::TokensCache,
-    types::{AccountInfo, BlockStatus},
+    types::{AccountInfo, BlockStatus, NFT},
 };
 
 #[derive(Debug)]
@@ -84,6 +84,20 @@ where
             .unwrap_or_default())
     }
 
+    /// Returns nft in the account.
+    pub async fn get_nft(
+        &self,
+        block_status: BlockStatus,
+        token_id: TokenId,
+    ) -> Result<Option<NFT>, ClientError> {
+        let account_state = match block_status {
+            BlockStatus::Committed => self.account_info().await?.committed,
+            BlockStatus::Verified => self.account_info().await?.verified,
+        };
+
+        Ok(account_state.nfts.get(&token_id).cloned())
+    }
+
     /// Returns the current account ID.
     /// Result may be `None` if the signing key was not set for account via `ChangePubKey` transaction.
     pub fn account_id(&self) -> Option<AccountId> {
@@ -119,6 +133,11 @@ where
         TransferBuilder::new(self)
     }
 
+    /// Initializes `TransferNFT` transaction sending.
+    pub fn start_transfer_nft(&self) -> TransferNFTBuilder<'_, S, P> {
+        TransferNFTBuilder::new(self)
+    }
+
     /// Initializes `ChangePubKey` transaction sending.
     pub fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_, S, P> {
         ChangePubKeyBuilder::new(self)
@@ -127,6 +146,16 @@ where
     /// Initializes `Withdraw` transaction sending.
     pub fn start_withdraw(&self) -> WithdrawBuilder<'_, S, P> {
         WithdrawBuilder::new(self)
+    }
+
+    /// Initializes `MintNFT` transaction sending.
+    pub fn start_mint_nft(&self) -> MintNFTBuilder<'_, S, P> {
+        MintNFTBuilder::new(self)
+    }
+
+    /// Initializes `WithdrawNFT` transaction sending.
+    pub fn start_withdraw_nft(&self) -> WithdrawNFTBuilder<'_, S, P> {
+        WithdrawNFTBuilder::new(self)
     }
 
     /// Creates an `EthereumProvider` to interact with the Ethereum network.
