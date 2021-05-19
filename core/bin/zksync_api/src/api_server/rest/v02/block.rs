@@ -97,11 +97,11 @@ impl ApiBlockData {
             Ok(BlockNumber(number))
         } else {
             match block_position {
-                "last_committed" => self
+                "lastCommitted" => self
                     .get_last_committed_block_number()
                     .await
                     .map_err(Error::storage),
-                "last_finalized" => self
+                "lastFinalized" => self
                     .get_last_finalized_block_number()
                     .await
                     .map_err(Error::storage),
