@@ -256,7 +256,7 @@ pub fn api_scope(
         .data(data)
         .route("", web::get().to(token_pagination))
         .route("{token_id}", web::get().to(token_by_id))
-        .route("{token_id}/price_in/{currency}", web::get().to(token_price))
+        .route("{token_id}/priceIn/{currency}", web::get().to(token_price))
 }
 
 #[cfg(test)]

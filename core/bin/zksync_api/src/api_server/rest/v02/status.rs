@@ -64,7 +64,7 @@ async fn get_status(data: web::Data<ApiStatusData>) -> ApiResult<NetworkStatus> 
 pub fn api_scope(pool: ConnectionPool) -> Scope {
     let data = ApiStatusData::new(pool);
 
-    web::scope("network_status")
+    web::scope("networkStatus")
         .data(data)
         .route("", web::get().to(get_status))
 }
