@@ -97,10 +97,10 @@ impl Order {
         decimals: u8,
     ) -> String {
         let mut message = if self.amount.is_zero() {
-            format!("Limit order for {} -> {}:\n", token_sell, token_buy)
+            format!("Limit order for {} -> {}\n", token_sell, token_buy)
         } else {
             format!(
-                "Order for {} {} -> {}:\n",
+                "Order for {} {} -> {}\n",
                 format_units(&self.amount, decimals),
                 token_sell,
                 token_buy

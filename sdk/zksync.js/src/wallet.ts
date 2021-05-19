@@ -439,7 +439,7 @@ export class Wallet {
         const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
         const recipient = order.recipient || this.address();
 
-        return this.signer.signSyncOrder({
+        const signedOrder = await this.signer.signSyncOrder({
             accountId: this.accountId,
             recipient,
             nonce,
@@ -450,6 +450,29 @@ export class Wallet {
             validUntil: order.validUntil || MAX_TIMESTAMP,
             ratio: order.ratio
         });
+
+        return this.signOrder(signedOrder);
+    }
+
+    async signOrder(order: Order): Promise<Order> {
+        const stringAmount = BigNumber.from(order.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(order.tokenSell, order.amount);
+        const stringTokenSell = this.provider.tokenSet.resolveTokenSymbol(order.tokenSell);
+        const stringTokenBuy = this.provider.tokenSet.resolveTokenSymbol(order.tokenBuy);
+        const ethereumSignature =
+            this.ethSigner instanceof Create2WalletSigner
+                ? null
+                : await this.ethMessageSigner.ethSignOrder({
+                      amount: stringAmount,
+                      tokenSell: stringTokenSell,
+                      tokenBuy: stringTokenBuy,
+                      nonce: order.nonce,
+                      recipient: order.recipient,
+                      ratio: order.ratio
+                  });
+        order.ethSignature = ethereumSignature;
+        return order;
     }
 
     async getSwap(swap: {
@@ -496,7 +519,7 @@ export class Wallet {
 
         return {
             tx: signedSwapTransaction,
-            ethereumSignature
+            ethereumSignature: [ethereumSignature, swap.orders[0].ethSignature, swap.orders[1].ethSignature]
         };
     }
 
