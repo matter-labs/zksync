@@ -4,8 +4,8 @@ use std::str::FromStr;
 use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    AccountId, BlockNumber, Token, TokenGenesisListItem, TokenId, H256,
-    {block::Block, AccountUpdate, AccountUpdates, ZkSyncOp},
+    Token, TokenGenesisListItem, TokenId,
+    {block::Block, AccountUpdate, AccountUpdates},
 };
 
 // Local deps
@@ -61,18 +61,16 @@ impl<'a> DatabaseStorageInteractor<'a> {
 #[async_trait::async_trait]
 impl StorageInteractor for DatabaseStorageInteractor<'_> {
     async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]) {
-        let mut ops: Vec<(BlockNumber, &ZkSyncOp, AccountId, Option<u64>, H256)> = vec![];
+        let mut ops = Vec::with_capacity(blocks.len());
 
         for block in blocks {
-            for op in &block.ops {
-                ops.push((
-                    block.block_num,
-                    op,
-                    block.fee_account,
-                    block.timestamp,
-                    block.previous_block_root_hash,
-                ));
-            }
+            ops.push((
+                block.block_num,
+                block.ops.as_slice(),
+                block.fee_account,
+                block.timestamp,
+                block.previous_block_root_hash,
+            ));
         }
 
         self.storage
@@ -248,8 +246,8 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .load_rollup_ops_blocks()
             .await
             .expect("Cant load operation blocks")
-            .iter()
-            .map(|block| stored_ops_block_into_ops_block(&block))
+            .into_iter()
+            .map(|block| stored_ops_block_into_ops_block(block))
             .collect()
     }
 

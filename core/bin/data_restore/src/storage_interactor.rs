@@ -138,12 +138,23 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
 ///
 /// * `op_block` - Stored ZkSync operations block description
 ///
-pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> RollupOpsBlock {
+pub fn stored_ops_block_into_ops_block(op_block: StoredRollupOpsBlock) -> RollupOpsBlock {
     RollupOpsBlock {
-        block_num: op_block.block_num,
-        ops: op_block.ops.clone(),
-        fee_account: op_block.fee_account,
-        timestamp: op_block.timestamp,
-        previous_block_root_hash: op_block.previous_block_root_hash,
+        block_num: BlockNumber::from(op_block.block_num as u32),
+        ops: op_block
+            .ops
+            .unwrap_or_default()
+            .into_iter()
+            .map(|op| {
+                serde_json::from_value(op)
+                    .expect("couldn't deserialize `ZkSyncOp` from the database")
+            })
+            .collect(),
+        fee_account: AccountId::from(op_block.fee_account as u32),
+        timestamp: op_block.timestamp.map(|t| t as u64),
+        previous_block_root_hash: op_block
+            .previous_block_root_hash
+            .map(|h| H256::from_slice(&h))
+            .unwrap_or_default(),
     }
 }
