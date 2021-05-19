@@ -61,6 +61,7 @@ pub struct AccountState {
     /// Account wallet balances.
     pub balances: BTreeMap<String, BigUintSerdeWrapper>,
     pub nfts: HashMap<TokenId, NFT>,
+    pub minted_nfts: HashMap<TokenId, NFT>,
     /// zkSync account nonce.
     pub nonce: Nonce,
     /// Hash of the account's owner public key.
