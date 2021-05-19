@@ -67,9 +67,8 @@ pub(super) mod convert {
         }
         let minted_nfts = account
             .minted_nfts
-            .clone()
-            .into_iter()
-            .map(|(id, nft)| (id, nft.into()))
+            .iter()
+            .map(|(id, nft)| (*id, nft.clone().into()))
             .collect();
 
         Ok(AccountState {

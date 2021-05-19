@@ -282,11 +282,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             )
             .fetch_all(&mut transaction)
             .await?;
-            nfts.into_iter().for_each(|nft| {
-                account
-                    .minted_nfts
-                    .insert(TokenId(nft.token_id as u32), nft.into());
-            });
+            account.minted_nfts.extend(
+                nfts.into_iter()
+                    .map(|nft| (TokenId(nft.token_id as u32), nft.into())),
+            );
             Ok((last_block, Some(account)))
         } else {
             Ok((0, None))
