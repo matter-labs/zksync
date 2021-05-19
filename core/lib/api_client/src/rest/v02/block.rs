@@ -5,7 +5,7 @@ use zksync_types::{tx::TxHash, BlockNumber};
 
 impl Client {
     pub async fn block_by_number(&self, block_position: &str) -> Result<Response> {
-        self.get_with_scope(super::API_V02_SCOPE, &format!("block/{}", block_position))
+        self.get_with_scope(super::API_V02_SCOPE, &format!("blocks/{}", block_position))
             .send()
             .await
     }
@@ -17,7 +17,7 @@ impl Client {
     ) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("block/{}/transaction", block_position),
+            &format!("blocks/{}/transaction", block_position),
         )
         .query(&pagination_query)
         .send()
@@ -28,7 +28,7 @@ impl Client {
         &self,
         pagination_query: &PaginationQuery<BlockNumber>,
     ) -> Result<Response> {
-        self.get_with_scope(super::API_V02_SCOPE, "block")
+        self.get_with_scope(super::API_V02_SCOPE, "blocks")
             .query(pagination_query)
             .send()
             .await

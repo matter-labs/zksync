@@ -7,14 +7,14 @@ impl Client {
         &self,
         pagination_query: &PaginationQuery<TokenId>,
     ) -> Result<Response> {
-        self.get_with_scope(super::API_V02_SCOPE, "token")
+        self.get_with_scope(super::API_V02_SCOPE, "tokens")
             .query(&pagination_query)
             .send()
             .await
     }
 
     pub async fn token_by_id(&self, token: &TokenLike) -> Result<Response> {
-        self.get_with_scope(super::API_V02_SCOPE, &format!("token/{}", token))
+        self.get_with_scope(super::API_V02_SCOPE, &format!("tokens/{}", token))
             .send()
             .await
     }
@@ -22,7 +22,7 @@ impl Client {
     pub async fn token_price(&self, token: &TokenLike, token_id_or_usd: &str) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("token/{}/price_in/{}", token, token_id_or_usd),
+            &format!("tokens/{}/price_in/{}", token, token_id_or_usd),
         )
         .send()
         .await

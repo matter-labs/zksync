@@ -97,11 +97,11 @@ impl ApiBlockData {
             Ok(BlockNumber(number))
         } else {
             match block_position {
-                "last_committed" => self
+                "lastCommitted" => self
                     .get_last_committed_block_number()
                     .await
                     .map_err(Error::storage),
-                "last_finalized" => self
+                "lastFinalized" => self
                     .get_last_finalized_block_number()
                     .await
                     .map_err(Error::storage),
@@ -167,7 +167,7 @@ async fn block_pagination(
 
 // TODO: take `block_position` as enum.
 // Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318 (ZKS-628)
-async fn block_by_number(
+async fn block_by_position(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>> {
@@ -189,12 +189,12 @@ async fn block_transactions(
 pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
     let data = ApiBlockData::new(pool, cache);
 
-    web::scope("block")
+    web::scope("blocks")
         .data(data)
         .route("", web::get().to(block_pagination))
-        .route("{block_number}", web::get().to(block_by_number))
+        .route("{block_position}", web::get().to(block_by_position))
         .route(
-            "{block_number}/transaction",
+            "{block_position}/transactions",
             web::get().to(block_transactions),
         )
 }
