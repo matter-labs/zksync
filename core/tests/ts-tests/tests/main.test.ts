@@ -238,7 +238,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             if (onlyBasic) {
                 return;
             }
-            await tester.testMintNFT(carl, carl, token, true);
+            await tester.testMintNFT(alice, carl, token, true);
             await tester.testFullExitNFT(carl);
         });
 
