@@ -20,7 +20,8 @@ import {
     SubmitBatchResponse,
     ApiTxReceipt,
     ApiTxAndSignature,
-    ApiBatchData
+    ApiBatchData,
+    L2Tx
 } from './types';
 
 export function getDefaultRestProvider(network: Network): RestProvider {
@@ -222,11 +223,11 @@ export class RestProvider {
         return this.parse_response(await this.tokenPriceDetailed(id_or_address, token_id_or_usd));
     }
 
-    async submitTxDetailed(tx: any, signature?: TxEthSignature): Promise<ApiResponse> {
+    async submitTxDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<ApiResponse> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
-    async submitTx(tx: any, signature?: TxEthSignature): Promise<String> {
+    async submitTx(tx: L2Tx, signature?: TxEthSignature): Promise<String> {
         return this.parse_response(await this.submitTxDetailed(tx, signature));
     }
 
@@ -246,11 +247,11 @@ export class RestProvider {
         return this.parse_response(await this.txDataDetailed(txHash));
     }
 
-    async submitBatchDetailed(txs: [any], signature: TxEthSignature | TxEthSignature[]): Promise<ApiResponse> {
+    async submitBatchDetailed(txs: [L2Tx], signature: TxEthSignature | TxEthSignature[]): Promise<ApiResponse> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
-    async submitBatch(txs: [any], signature: TxEthSignature | TxEthSignature[]): Promise<SubmitBatchResponse> {
+    async submitBatch(txs: [L2Tx], signature: TxEthSignature | TxEthSignature[]): Promise<SubmitBatchResponse> {
         return this.parse_response(await this.submitBatchDetailed(txs, signature));
     }
 
