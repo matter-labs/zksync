@@ -234,7 +234,7 @@ export interface BatchFee {
 
 export interface ApiRequest {
     network: Network;
-    api_version: 'v02';
+    apiVersion: 'v02';
     resource: string;
     args: any;
     timestamp: string;
@@ -260,7 +260,7 @@ export interface Paginated {
         limit: number;
         direction: 'newer' | 'older';
         count: number;
-    }
+    };
 }
 
 export interface ApiBlockInfo {
@@ -281,6 +281,114 @@ export interface ApiAccountInfo {
     pubKeyHash: PubKeyHash;
     lastUpdateInBlock: number;
     balances: {
-        [token: string]: BigNumberish;
+        [token: string]: BigNumber;
     };
+}
+
+export interface ApiConfig {
+    network: Network;
+    contract: Address;
+    govContract: Address;
+    depositConfirmations: number;
+    zksyncVersion: 'contractV4';
+    // TODO: server_version (ZKS-627)
+}
+
+export interface ApiFee {
+    gasFee: BigNumber;
+    zkpFee: BigNumber;
+    totalFee: BigNumber;
+}
+
+export interface NetworkStatus {
+    lastCommitted: number;
+    finalized: number;
+    totalTransactions: number;
+    mempoolSize: number;
+}
+
+export interface TokenInfo {
+    id: number;
+    address: Address;
+    symbol: string;
+    decimals: number;
+    enabledForFees: boolean;
+}
+
+export interface TokenPriceInfo {
+    tokenId: number;
+    tokenSymbol: string;
+    priceIn: string;
+    decimals: number;
+    price: BigNumber;
+}
+
+export interface SubmitBatchResponse {
+    transactionHashes: [string];
+    batchHash: string;
+}
+
+export interface ApiL1TxReceipt {
+    status: 'queued' | 'committed' | 'finalized';
+    ethBlock: number;
+    rollupBlock: number | null;
+    id: number;
+}
+
+export interface ApiL2TxReceipt {
+    txHash: string;
+    rollupBlock: number | null;
+    status: 'queued' | 'committed' | 'finalized' | 'rejected';
+    failReason: string | null;
+}
+
+export type ApiTxReceipt = ApiL1TxReceipt | ApiL2TxReceipt;
+
+export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit;
+
+export interface ApiDeposit {
+    from: Address;
+    tokenId: number;
+    amount: BigNumber;
+    to: Address;
+    accountId: number | null;
+    ethHash: string;
+    id: number;
+    txHash: string;
+}
+
+export interface ApiFullExit {
+    accountId: number;
+    tokenId: number;
+    ethHash: string;
+    id: number;
+    txHash: string;
+}
+
+export type TransactionData = L2Tx | ApiDeposit | ApiFullExit;
+
+export interface ApiTransaction {
+    txHash: string;
+    blockNumber: number | null;
+    op: TransactionData;
+    status: 'queued' | 'committed' | 'finalized' | 'rejected';
+    failReason: string | null;
+    createdAt: string | null;
+}
+
+export interface ApiTxAndSignature {
+    tx: ApiTransaction;
+    ethSignature: string | null;
+}
+
+export interface ApiBatchStatus {
+    updatedAt: String;
+    lastState: 'queued' | 'committed' | 'finalized' | 'rejected';
+}
+
+export interface ApiBatchData {
+    batchHash: string;
+    transactionHashes: [string];
+    createdAt: string;
+    batchStatus: ApiBatchStatus;
 }

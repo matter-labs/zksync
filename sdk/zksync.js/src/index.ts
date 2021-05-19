@@ -8,4 +8,5 @@ export * as wallet from './wallet';
 export * as types from './types';
 export * as utils from './utils';
 export * as crypto from './crypto';
+export * as restProvider from './rest-provider';
 import './withdraw-helpers';

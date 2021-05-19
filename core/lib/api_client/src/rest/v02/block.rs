@@ -17,7 +17,7 @@ impl Client {
     ) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("blocks/{}/transaction", block_position),
+            &format!("blocks/{}/transactions", block_position),
         )
         .query(&pagination_query)
         .send()

@@ -22,7 +22,7 @@ impl Client {
     pub async fn token_price(&self, token: &TokenLike, token_id_or_usd: &str) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("tokens/{}/price_in/{}", token, token_id_or_usd),
+            &format!("tokens/{}/priceIn/{}", token, token_id_or_usd),
         )
         .send()
         .await
