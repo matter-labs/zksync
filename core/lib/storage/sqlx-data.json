@@ -224,6 +224,18 @@
       "nullable": []
     }
   },
+  "095e24b8638392c33840516e84d9526783511d14a3405ab8e5302b9396b2986f": {
+    "query": "DELETE FROM mint_nft_updates WHERE block_number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0bdd32081fc9c8fbfb63787696884617129c30915c400e5647d2a81f882c6d4d": {
     "query": "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
     "describe": {
@@ -5611,27 +5623,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
-    "query": "SELECT pg_notify($1, $2)",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "pg_notify",
-          "type_info": "Void"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "fabb011dfd474fd56c71b7fb1707bbe586e66f9a45deac15b486845ba5c87979": {
