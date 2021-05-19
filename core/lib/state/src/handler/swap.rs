@@ -1,6 +1,6 @@
 use num::{BigUint, Zero};
 use std::time::Instant;
-use zksync_crypto::params::{max_account_id, max_fungible_token_id, max_token_id};
+use zksync_crypto::params::{max_account_id, max_processable_token, max_token_id};
 use zksync_types::{AccountUpdates, Order, PubKeyHash, Swap, SwapOp};
 
 use crate::handler::error::SwapOpError;
@@ -21,7 +21,7 @@ impl TxHandler<Swap> for ZkSyncState {
             SwapOpError::AccountIncorrect
         );
         invariant!(
-            tx.fee_token <= max_fungible_token_id(),
+            tx.fee_token <= max_processable_token(),
             SwapOpError::InvalidTokenId
         );
 

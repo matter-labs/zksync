@@ -7,6 +7,7 @@ use crate::{
     handler::{error::ForcedExitOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
+use num::{BigUint, Zero};
 
 impl TxHandler<ForcedExit> for ZkSyncState {
     type Op = ForcedExitOp;
@@ -28,6 +29,14 @@ impl TxHandler<ForcedExit> for ZkSyncState {
             tx.token <= params::max_fungible_token_id(),
             ForcedExitOpError::InvalidTokenId
         );
+
+        if tx.fee != BigUint::zero() {
+            // Fee can only be paid in processable tokens
+            invariant!(
+                tx.token <= params::max_processable_token(),
+                ForcedExitOpError::InvalidFeeTokenId
+            );
+        }
 
         // Check that target account does not have an account ID set.
         let (target_account_id, account) = self

@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum ChangePubKeyOpError {
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Account does not exist")]
     AccountNotFound,
     #[error("Account address is incorrect")]
@@ -48,6 +50,8 @@ pub enum ForcedExitOpError {
     TargetAccountNotFound,
     #[error("ForcedExit signature is incorrect")]
     InvalidSignature,
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Token id is not supported")]
     InvalidTokenId,
     #[error("Target account is not locked; forced exit is forbidden")]
@@ -62,6 +66,8 @@ pub enum ForcedExitOpError {
 
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum TransferOpError {
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Token id is not supported")]
     InvalidTokenId,
     #[error("Transfer to Account with address 0 is not allowed")]
@@ -112,6 +118,8 @@ pub enum MintNFTOpError {
 
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum WithdrawNFTOpError {
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Token id is not supported")]
     InvalidTokenId,
     #[error("From account does not exist")]
@@ -136,6 +144,8 @@ pub enum WithdrawNFTOpError {
 
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum WithdrawOpError {
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Token id is not supported")]
     InvalidTokenId,
     #[error("From account does not exist")]
