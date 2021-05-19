@@ -171,6 +171,29 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     "unknown amount".to_string(),
                     operation["feeToken"].as_i64().unwrap_or(-1),
                 ),
+                "MintNFT" => (
+                    operation["creatorAddress"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["recipient"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
+                    "1".to_string(),
+                    operation["feeToken"].as_i64().unwrap_or(-1),
+                ),
+                "WithdrawNFT" => (
+                    operation["from"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["to"].as_str().unwrap_or("unknown to").to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
+                    "1".to_string(),
+                    operation["token"].as_i64().unwrap_or(-1),
+                ),
                 "ForcedExit" => (
                     operation["target"]
                         .as_str()

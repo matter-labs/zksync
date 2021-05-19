@@ -5,7 +5,7 @@ use zksync_types::{
     operations::MintNFTOp,
     tokens::NFT,
     tx::{calculate_token_address, calculate_token_data, calculate_token_hash},
-    Account, AccountUpdate, AccountUpdates, Address, MintNFT, Nonce, TokenId, ZkSyncOp,
+    Account, AccountUpdate, AccountUpdates, Address, MintNFT, Nonce, PubKeyHash, TokenId, ZkSyncOp,
 };
 
 use zksync_crypto::params::{
@@ -31,6 +31,18 @@ impl TxHandler<MintNFT> for ZkSyncState {
             tx.recipient != Address::zero(),
             MintNFTOpError::RecipientAccountIncorrect
         );
+        let creator = self
+            .get_account(tx.creator_id)
+            .ok_or(MintNFTOpError::CreatorAccountNotFound)?;
+        invariant!(
+            creator.pub_key_hash != PubKeyHash::default(),
+            MintNFTOpError::CreatorAccountIsLocked
+        );
+        invariant!(
+            tx.verify_signature() == Some(creator.pub_key_hash),
+            MintNFTOpError::InvalidSignature
+        );
+
         let (recipient, _) = self
             .get_account_by_address(&tx.recipient)
             .ok_or(MintNFTOpError::RecipientAccountNotFound)?;
