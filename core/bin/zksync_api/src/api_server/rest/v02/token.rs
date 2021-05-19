@@ -317,7 +317,7 @@ mod tests {
         );
 
         let token_like = TokenLike::Id(TokenId(1));
-        let response = client.token_by_id_v02(&token_like).await?;
+        let response = client.token_by_id(&token_like).await?;
         let api_token: ApiToken = deserialize_response_result(response)?;
 
         let expected_token = {

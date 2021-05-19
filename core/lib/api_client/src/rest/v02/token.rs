@@ -13,7 +13,7 @@ impl Client {
             .await
     }
 
-    pub async fn token_by_id_v02(&self, token: &TokenLike) -> Result<Response> {
+    pub async fn token_by_id(&self, token: &TokenLike) -> Result<Response> {
         self.get_with_scope(super::API_V02_SCOPE, &format!("token/{}", token))
             .send()
             .await
