@@ -47,7 +47,7 @@ pub fn number_of_processable_tokens() -> usize {
     num
 }
 
-/// Number of tokens that are processed by this release
+/// Max TokenId that can be processed by this release
 pub fn max_processable_token() -> TokenId {
     let num = 2usize.pow(PROCESSABLE_TOKENS_DEPTH);
 

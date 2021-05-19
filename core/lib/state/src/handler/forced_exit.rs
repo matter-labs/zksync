@@ -42,6 +42,12 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         let (target_account_id, account) = self
             .get_account_by_address(&tx.target)
             .ok_or(ForcedExitOpError::TargetAccountNotFound)?;
+
+        invariant!(
+            target_account_id != params::NFT_STORAGE_ACCOUNT_ID,
+            ForcedExitOpError::TargetAccountNotFound
+        );
+
         invariant!(
             account.pub_key_hash == PubKeyHash::default(),
             ForcedExitOpError::TargetAccountNotLocked
