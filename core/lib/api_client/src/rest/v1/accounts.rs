@@ -40,6 +40,8 @@ pub struct NFT {
     id: TokenId,
     content_hash: H256,
     creator_id: AccountId,
+    serial_id: u32,
+    address: Address,
     symbol: String,
 }
 
@@ -49,6 +51,8 @@ impl From<zksync_types::NFT> for NFT {
             id: val.id,
             content_hash: val.content_hash,
             creator_id: val.creator_id,
+            serial_id: val.serial_id,
+            address: val.address,
             symbol: val.symbol,
         }
     }
