@@ -252,7 +252,7 @@ pub fn api_scope(
 ) -> Scope {
     let data = ApiTokenData::new(config, pool, tokens_db, fee_ticker);
 
-    web::scope("token")
+    web::scope("tokens")
         .data(data)
         .route("", web::get().to(token_pagination))
         .route("{token_id}", web::get().to(token_by_id))

@@ -438,7 +438,7 @@ async fn get_batch(
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
-    web::scope("transaction")
+    web::scope("transactions")
         .data(data)
         .route("", web::post().to(submit_tx))
         .route("{tx_hash}", web::get().to(tx_status))

@@ -262,7 +262,7 @@ pub fn api_scope(
 ) -> Scope {
     let data = ApiAccountData::new(pool, tokens, core_api_client);
 
-    web::scope("account")
+    web::scope("accounts")
         .data(data)
         .route(
             "{account_id_or_address}/committed",
