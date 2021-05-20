@@ -499,7 +499,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
                 if let Some(tok_val) = tx_info.get_mut("token") {
                     if let Some(token_id) = tok_val.as_u64() {
-                        if token_id >= params::MIN_NFT_TOKEN_ID as u64 {
+                        if token_id < params::MIN_NFT_TOKEN_ID as u64 {
                             let token_id = TokenId(token_id as u32);
                             let token_symbol = tokens
                                 .get(&token_id)
@@ -682,13 +682,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
                 if let Some(tok_val) = tx_info.get_mut("token") {
                     if let Some(token_id) = tok_val.as_u64() {
-                        let token_id = TokenId(token_id as u32);
-                        let token_symbol = tokens
-                            .get(&token_id)
-                            .map(|t| t.symbol.clone())
-                            .unwrap_or_else(|| "UNKNOWN".to_string());
-                        *tok_val =
-                            serde_json::to_value(token_symbol).expect("json string to value");
+                        if token_id < params::MIN_NFT_TOKEN_ID as u64 {
+                            let token_id = TokenId(token_id as u32);
+                            let token_symbol = tokens
+                                .get(&token_id)
+                                .map(|t| t.symbol.clone())
+                                .unwrap_or_else(|| "UNKNOWN".to_string());
+                            *tok_val =
+                                serde_json::to_value(token_symbol).expect("json string to value");
+                        } else {
+                            *tok_val =
+                                serde_json::to_value(token_id).expect("json string to value");
+                        }
                     };
                 };
             }
