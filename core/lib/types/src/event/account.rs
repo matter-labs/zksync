@@ -26,7 +26,9 @@ pub enum AccountStateChangeType {
     Delete,
     UpdateBalance,
     ChangePubKeyHash,
+    #[serde(skip)]
     MintNFT,
+    #[serde(skip)]
     RemoveNFT,
 }
 
