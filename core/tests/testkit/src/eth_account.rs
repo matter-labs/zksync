@@ -507,8 +507,8 @@ impl ETHExecResult {
 
         Self {
             success,
-            revert_reason,
             receipt,
+            revert_reason,
         }
     }
 

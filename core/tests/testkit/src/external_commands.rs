@@ -42,13 +42,15 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
             String::from("CONTRACTS_UPGRADE_GATEKEEPER_ADDR"),
             Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if let Some(output) = deploy_script_out.strip_prefix("CONTRACTS_TEST_ERC20=0x") {
-        Some((
-            String::from("CONTRACTS_TEST_ERC20"),
-            Address::from_str(output).expect("can't parse contract address"),
-        ))
     } else {
-        None
+        deploy_script_out
+            .strip_prefix("CONTRACTS_TEST_ERC20=0x")
+            .map(|output| {
+                (
+                    String::from("CONTRACTS_TEST_ERC20"),
+                    Address::from_str(output).expect("can't parse contract address"),
+                )
+            })
     }
 }
 

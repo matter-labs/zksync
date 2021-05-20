@@ -174,8 +174,8 @@ pub fn start_admin_server(
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
             actix_rt::System::new("api-server").block_on(async move {
                 let app_state = AppState {
-                    connection_pool,
                     secret_auth,
+                    connection_pool,
                 };
 
                 run_server(app_state, bind_to).await;

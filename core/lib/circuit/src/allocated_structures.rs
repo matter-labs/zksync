@@ -191,17 +191,17 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
         );
 
         Ok(AllocatedOperationData {
-            eth_address,
-            pub_nonce,
             amount_packed,
             fee_packed,
-            fee,
             amount_unpacked,
             full_amount,
+            fee,
             first_sig_msg,
             second_sig_msg,
             third_sig_msg,
             new_pubkey_hash,
+            eth_address,
+            pub_nonce,
             a,
             b,
             valid_from,
@@ -313,17 +313,17 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
         )?;
 
         Ok(AllocatedOperationData {
-            eth_address,
-            pub_nonce,
             amount_packed,
             fee_packed,
-            fee,
             amount_unpacked,
             full_amount,
+            fee,
             first_sig_msg,
             second_sig_msg,
             third_sig_msg,
             new_pubkey_hash,
+            eth_address,
+            pub_nonce,
             a,
             b,
             valid_from,

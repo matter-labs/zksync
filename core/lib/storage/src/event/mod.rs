@@ -229,8 +229,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        // Load all operations executed in the given block. Rejected transaction
-        // are present in the database at the moment of events creation.
+        // Load all operations executed in the given block.
         let block_operations = transaction
             .chain()
             .block_schema()
@@ -239,6 +238,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         let mut events = Vec::with_capacity(block_operations.len());
         for executed_operation in block_operations {
+            // Rejected transactions are not included in the block, skip them.
+            if !executed_operation.is_successful() {
+                continue;
+            }
             // Like in the case of block events, we return `Ok`
             // if we didn't manage to fetch the account id for the given
             // operation.
@@ -254,7 +257,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                         in the database. Operation: {:?}",
                         executed_operation
                     );
-                    return Ok(());
+                    continue;
                 }
             };
 
@@ -278,6 +281,68 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         transaction.commit().await?;
 
         metrics::histogram!("sql.event.store_transaction_event", start.elapsed());
+        Ok(())
+    }
+
+    /// Fetch rejected transactions for the given block and store corresponding
+    /// events in the database. Unlike `store_transaction_event`, this method is called
+    /// when the block is not yet committed on the chain.
+    pub async fn store_rejected_transaction_event(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        // Load all failed block operations.
+        let block_operations = transaction
+            .chain()
+            .block_schema()
+            .get_block_executed_ops(block_number)
+            .await?
+            .into_iter()
+            .filter(|op| !op.is_successful());
+
+        let mut events = Vec::new();
+        for rejected_tx in block_operations {
+            let account_id = match transaction
+                .event_schema()
+                .account_id_from_op(&rejected_tx)
+                .await
+            {
+                Ok(account_id) => account_id,
+                _ => {
+                    vlog::warn!(
+                        "Couldn't create transaction event, no account id exists \
+                        in the database. Operation: {:?}",
+                        rejected_tx
+                    );
+                    continue;
+                }
+            };
+
+            let transaction_event = TransactionEvent::from_executed_operation(
+                rejected_tx,
+                block_number,
+                account_id,
+                TransactionStatus::Rejected,
+            );
+
+            let event_data = serde_json::to_value(transaction_event)
+                .expect("couldn't serialize transaction event");
+
+            events.push(event_data);
+        }
+
+        transaction
+            .event_schema()
+            .store_event_data(block_number, EventType::Transaction, &events)
+            .await?;
+        transaction.commit().await?;
+
+        metrics::histogram!(
+            "sql.event.store_rejected_transaction_event",
+            start.elapsed()
+        );
         Ok(())
     }
 }

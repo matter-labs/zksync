@@ -95,11 +95,11 @@ where
 
         Self {
             items,
-            prehashed,
-            tree_depth,
             hasher,
+            tree_depth,
             root,
             nodes,
+            prehashed,
             cache,
         }
     }
@@ -527,8 +527,8 @@ where
         right: Option<NodeRef>,
     ) -> NodeRef {
         self.nodes.push(Node {
-            index,
             depth,
+            index,
             left,
             right,
         });

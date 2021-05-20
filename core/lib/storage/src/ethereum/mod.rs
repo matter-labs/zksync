@@ -87,11 +87,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             );
 
             // If there is an operation, convert it to the `Operation` type.
-            let op = if let Some(raw_op) = raw_op {
-                Some(raw_op.into_aggregated_op())
-            } else {
-                None
-            };
+            let op = raw_op.map(|raw| raw.into_aggregated_op());
 
             // Convert the fields into expected format.
             let op_type = AggregatedActionType::from_str(eth_op.op_type.as_ref())
