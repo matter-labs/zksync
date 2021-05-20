@@ -14,6 +14,7 @@ declare module './tester' {
 
             waitVerified?: boolean
         ): Promise<types.NFT>;
+        testGetNFT(wallet: Wallet, feeToken: TokenLike): Promise<void>;
     }
 }
 
@@ -54,4 +55,26 @@ Tester.prototype.testMintNFT = async function (
 
     this.runningFee = this.runningFee.add(fee);
     return nft;
+};
+
+Tester.prototype.testGetNFT = async function (wallet: Wallet, feeToken: TokenLike) {
+    const type = 'MintNFT';
+    const contentHash = utils.randomBytes(32);
+    let { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), feeToken);
+    const handle = await wallet.mintNFT({
+        recipient: wallet.address(),
+        contentHash,
+        feeToken,
+        fee
+    });
+    await handle.awaitReceipt();
+    const state = await wallet.getAccountState();
+    const nft: any = Object.values(state.committed.nfts)[0];
+    const nft1 = await wallet.provider.getNFT(nft.id);
+    expect(nft1).eq(null, ' NFT does not exist yet');
+    await handle.awaitVerifyReceipt();
+    const nft2 = await wallet.provider.getNFT(nft.id);
+    expect(nft2.id).eq(nft.id);
+    expect(nft2.contentHash).eq(nft.contentHash);
+    expect(nft2.creatorId).eq(nft.creatorId);
 };
