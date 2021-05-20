@@ -21,7 +21,11 @@ import {
     ApiTxReceipt,
     ApiTxAndSignature,
     ApiBatchData,
-    L2Tx
+    L2Tx,
+    ApiTransaction,
+    BlockAndTxHash,
+    PendingOpsRequest,
+    AccountTxsRequest
 } from './types';
 
 export function getDefaultRestProvider(network: Network): RestProvider {
@@ -45,23 +49,23 @@ export function getDefaultRestProvider(network: Network): RestProvider {
 export class RestProvider {
     public constructor(public address: string) {}
 
-    parse_response(response: ApiResponse): any {
+    parse_response<T>(response: ApiResponse<T>): T {
         if (response.status === 'success') {
             return response.result;
         } else {
             throw new Error(
-                `zkSync API response error: errorType: ${response.error.error_type}; code ${response.error.code}; message: ${response.error.message}`
+                `zkSync API response error: errorType: ${response.error.errorType}; code ${response.error.code}; message: ${response.error.message}`
             );
         }
     }
 
-    async get(url: string): Promise<ApiResponse> {
+    async get<T>(url: string): Promise<ApiResponse<T>> {
         return await Axios.get(url).then((resp) => {
             return resp.data;
         });
     }
 
-    async post(url: string, body: any): Promise<ApiResponse> {
+    async post<T>(url: string, body: any): Promise<ApiResponse<T>> {
         return await Axios.post(url, body).then((resp) => {
             return resp.data;
         });
@@ -70,7 +74,7 @@ export class RestProvider {
     async accountInfoDetailed(
         id_or_address: number | Address,
         info_type: 'committed' | 'finalized'
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponse<ApiAccountInfo | null>> {
         return await this.get(`${this.address}/accounts/${id_or_address}/${info_type}`);
     }
 
@@ -81,40 +85,53 @@ export class RestProvider {
         return this.parse_response(await this.accountInfoDetailed(id_or_address, info_type));
     }
 
-    async accountTxsDetailed(id_or_address: number | Address, pagination_query: PaginationQuery): Promise<ApiResponse> {
+    async accountTxsDetailed(
+        id_or_address: number | Address,
+        pagination_query: PaginationQuery<string>
+    ): Promise<ApiResponse<Paginated<ApiTransaction, AccountTxsRequest>>> {
         return await this.get(
             `${this.address}/accounts/${id_or_address}/transactions?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
         );
     }
 
-    async accountTxs(id_or_address: number | Address, pagination_query: PaginationQuery): Promise<Paginated> {
+    async accountTxs(
+        id_or_address: number | Address,
+        pagination_query: PaginationQuery<string>
+    ): Promise<Paginated<ApiTransaction, AccountTxsRequest>> {
         return this.parse_response(await this.accountTxsDetailed(id_or_address, pagination_query));
     }
 
     async accountPendingTxsDetailed(
         id_or_address: number | Address,
-        pagination_query: PaginationQuery
-    ): Promise<ApiResponse> {
+        pagination_query: PaginationQuery<number>
+    ): Promise<ApiResponse<Paginated<ApiTransaction, PendingOpsRequest>>> {
         return await this.get(
             `${this.address}/accounts/${id_or_address}/transactions/pending?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
         );
     }
 
-    async accountPendingTxs(id_or_address: number | Address, pagination_query: PaginationQuery): Promise<Paginated> {
-        return this.parse_response(await this.accountTxsDetailed(id_or_address, pagination_query));
+    async accountPendingTxs(
+        id_or_address: number | Address,
+        pagination_query: PaginationQuery<number>
+    ): Promise<Paginated<ApiTransaction, PendingOpsRequest>> {
+        return this.parse_response(await this.accountPendingTxsDetailed(id_or_address, pagination_query));
     }
 
-    async blockPaginationDetailed(pagination_query: PaginationQuery): Promise<ApiResponse> {
+    async blockPaginationDetailed(
+        pagination_query: PaginationQuery<number>
+    ): Promise<ApiResponse<Paginated<ApiBlockInfo, number>>> {
         return await this.get(
             `${this.address}/blocks?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
         );
     }
 
-    async blockPagination(pagination_query: PaginationQuery): Promise<Paginated> {
+    async blockPagination(pagination_query: PaginationQuery<number>): Promise<Paginated<ApiBlockInfo, number>> {
         return this.parse_response(await this.blockPaginationDetailed(pagination_query));
     }
 
-    async blockByPositionDetailed(block_position: number | 'lastCommitted' | 'lastFinalized'): Promise<ApiResponse> {
+    async blockByPositionDetailed(
+        block_position: number | 'lastCommitted' | 'lastFinalized'
+    ): Promise<ApiResponse<ApiBlockInfo | null>> {
         return await this.get(`${this.address}/blocks/${block_position}`);
     }
 
@@ -124,8 +141,8 @@ export class RestProvider {
 
     async blockTransactionsDetailed(
         block_position: number | 'lastCommitted' | 'lastFinalized',
-        pagination_query: PaginationQuery
-    ): Promise<ApiResponse> {
+        pagination_query: PaginationQuery<string>
+    ): Promise<ApiResponse<Paginated<ApiTransaction, BlockAndTxHash>>> {
         return await this.get(
             `${this.address}/blocks/${block_position}/transactions?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
         );
@@ -133,12 +150,12 @@ export class RestProvider {
 
     async blockTransactions(
         block_position: number | 'lastCommitted' | 'lastFinalized',
-        pagination_query: PaginationQuery
-    ): Promise<Paginated> {
+        pagination_query: PaginationQuery<string>
+    ): Promise<Paginated<ApiTransaction, BlockAndTxHash>> {
         return this.parse_response(await this.blockTransactionsDetailed(block_position, pagination_query));
     }
 
-    async configDetailed(): Promise<ApiResponse> {
+    async configDetailed(): Promise<ApiResponse<ApiConfig>> {
         return await this.get(`${this.address}/config`);
     }
 
@@ -150,7 +167,7 @@ export class RestProvider {
         txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponse<ApiFee>> {
         return await this.post(`${this.address}/fee`, { txType, address, tokenLike });
     }
 
@@ -170,7 +187,7 @@ export class RestProvider {
             }
         ],
         tokenLike: TokenLike
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponse<ApiFee>> {
         return await this.post(`${this.address}/fee/batch`, { transactions, tokenLike });
     }
 
@@ -186,7 +203,7 @@ export class RestProvider {
         return this.parse_response(await this.getBatchFeeDetailed(transactions, tokenLike));
     }
 
-    async networkStatusDetailed(): Promise<ApiResponse> {
+    async networkStatusDetailed(): Promise<ApiResponse<NetworkStatus>> {
         return await this.get(`${this.address}/networkStatus`);
     }
 
@@ -194,17 +211,19 @@ export class RestProvider {
         return this.parse_response(await this.networkStatusDetailed());
     }
 
-    async tokenPaginationDetailed(pagination_query: PaginationQuery): Promise<ApiResponse> {
+    async tokenPaginationDetailed(
+        pagination_query: PaginationQuery<number>
+    ): Promise<ApiResponse<Paginated<TokenInfo, number>>> {
         return await this.get(
             `${this.address}/tokens?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
         );
     }
 
-    async tokenPagination(pagination_query: PaginationQuery): Promise<Paginated> {
+    async tokenPagination(pagination_query: PaginationQuery<number>): Promise<Paginated<TokenInfo, number>> {
         return this.parse_response(await this.tokenPaginationDetailed(pagination_query));
     }
 
-    async tokenByIdOrAddressDetailed(id_or_address: number | TokenAddress): Promise<ApiResponse> {
+    async tokenByIdOrAddressDetailed(id_or_address: number | TokenAddress): Promise<ApiResponse<TokenInfo>> {
         return await this.get(`${this.address}/tokens/${id_or_address}`);
     }
 
@@ -215,7 +234,7 @@ export class RestProvider {
     async tokenPriceDetailed(
         id_or_address: number | TokenAddress,
         token_id_or_usd: number | 'usd'
-    ): Promise<ApiResponse> {
+    ): Promise<ApiResponse<TokenPriceInfo>> {
         return await this.get(`${this.address}/tokens/${id_or_address}/priceIn/${token_id_or_usd}`);
     }
 
@@ -223,7 +242,7 @@ export class RestProvider {
         return this.parse_response(await this.tokenPriceDetailed(id_or_address, token_id_or_usd));
     }
 
-    async submitTxDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<ApiResponse> {
+    async submitTxDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<ApiResponse<String>> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
@@ -231,7 +250,7 @@ export class RestProvider {
         return this.parse_response(await this.submitTxDetailed(tx, signature));
     }
 
-    async txStatusDetailed(txHash: string): Promise<ApiResponse> {
+    async txStatusDetailed(txHash: string): Promise<ApiResponse<ApiTxReceipt>> {
         return await this.get(`${this.address}/transactions/${txHash}`);
     }
 
@@ -239,7 +258,7 @@ export class RestProvider {
         return this.parse_response(await this.txStatusDetailed(txHash));
     }
 
-    async txDataDetailed(txHash: string): Promise<ApiResponse> {
+    async txDataDetailed(txHash: string): Promise<ApiResponse<ApiTxAndSignature>> {
         return await this.get(`${this.address}/transactions/${txHash}`);
     }
 
@@ -247,7 +266,10 @@ export class RestProvider {
         return this.parse_response(await this.txDataDetailed(txHash));
     }
 
-    async submitBatchDetailed(txs: [L2Tx], signature: TxEthSignature | TxEthSignature[]): Promise<ApiResponse> {
+    async submitBatchDetailed(
+        txs: [L2Tx],
+        signature: TxEthSignature | TxEthSignature[]
+    ): Promise<ApiResponse<SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
@@ -255,7 +277,7 @@ export class RestProvider {
         return this.parse_response(await this.submitBatchDetailed(txs, signature));
     }
 
-    async getBatchDetailed(batchHash: string): Promise<ApiResponse> {
+    async getBatchDetailed(batchHash: string): Promise<ApiResponse<ApiBatchData>> {
         return await this.get(`${this.address}/transactions/batches/${batchHash}`);
     }
 

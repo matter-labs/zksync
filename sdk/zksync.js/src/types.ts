@@ -240,23 +240,29 @@ export interface ApiRequest {
     timestamp: string;
 }
 
-export interface ApiResponse {
-    request: ApiRequest;
-    status: 'success' | 'error';
-    error: any;
-    result: any;
+export interface ApiError {
+    errorType: string;
+    code: number;
+    message: string;
 }
 
-export interface PaginationQuery {
-    from: any;
+export interface ApiResponse<T> {
+    request: ApiRequest;
+    status: 'success' | 'error';
+    error: ApiError;
+    result: T;
+}
+
+export interface PaginationQuery<F> {
+    from: F;
     limit: number;
     direction: 'newer' | 'older';
 }
 
-export interface Paginated {
-    list: [any];
+export interface Paginated<T, F> {
+    list: [T];
     pagination: {
-        from: any;
+        from: F;
         limit: number;
         direction: 'newer' | 'older';
         count: number;
@@ -382,7 +388,7 @@ export interface ApiTxAndSignature {
 }
 
 export interface ApiBatchStatus {
-    updatedAt: String;
+    updatedAt: string;
     lastState: 'queued' | 'committed' | 'finalized' | 'rejected';
 }
 
@@ -391,4 +397,20 @@ export interface ApiBatchData {
     transactionHashes: [string];
     createdAt: string;
     batchStatus: ApiBatchStatus;
+}
+
+export interface BlockAndTxHash {
+    blockNumber: number;
+    txHash: string;
+}
+
+export interface PendingOpsRequest {
+    address: Address;
+    accountId: number | null;
+    serialId: number;
+}
+
+export interface AccountTxsRequest {
+    address: Address;
+    txHash: string;
 }
