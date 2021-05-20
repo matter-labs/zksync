@@ -90,6 +90,8 @@ pub enum TransferOpError {
 pub enum MintNFTOpError {
     #[error("Token id is not supported")]
     InvalidTokenId,
+    #[error("Creator account is locked")]
+    CreatorAccountIsLocked,
     #[error("Creator account does not exist")]
     CreatorAccountNotFound,
     #[error("Account is locked")]

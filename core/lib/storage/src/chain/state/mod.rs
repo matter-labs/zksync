@@ -725,6 +725,20 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes mint_nft_updates for blocks with number greater than `last_block`
+    pub async fn remove_mint_nft_updates(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM mint_nft_updates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.state.remove_mint_nft_updates", start.elapsed());
+        Ok(())
+    }
+
     // Removes account pubkey updates for blocks with number greater than `last_block`
     pub async fn remove_account_pubkey_updates(
         &mut self,

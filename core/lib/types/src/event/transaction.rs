@@ -22,6 +22,9 @@ pub enum TransactionStatus {
 pub enum TransactionType {
     Transfer,
     Withdraw,
+    WithdrawNFT,
+    MintNFT,
+    Swap,
     ChangePubKey,
     ForcedExit,
     FullExit,

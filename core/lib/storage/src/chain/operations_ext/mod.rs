@@ -5,6 +5,7 @@ use std::time::Instant;
 use chrono::{DateTime, Utc};
 
 // Workspace imports
+use zksync_crypto::params;
 use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::{Address, BlockNumber, TokenId};
 
@@ -170,6 +171,29 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     operation["fee"].as_str().map(|v| v.to_string()),
                     "unknown amount".to_string(),
                     operation["feeToken"].as_i64().unwrap_or(-1),
+                ),
+                "MintNFT" => (
+                    operation["creatorAddress"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["recipient"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
+                    "1".to_string(),
+                    operation["feeToken"].as_i64().unwrap_or(-1),
+                ),
+                "WithdrawNFT" => (
+                    operation["from"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["to"].as_str().unwrap_or("unknown to").to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
+                    "1".to_string(),
+                    operation["token"].as_i64().unwrap_or(-1),
                 ),
                 "ForcedExit" => (
                     operation["target"]
@@ -475,13 +499,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
                 if let Some(tok_val) = tx_info.get_mut("token") {
                     if let Some(token_id) = tok_val.as_u64() {
-                        let token_id = TokenId(token_id as u32);
-                        let token_symbol = tokens
-                            .get(&token_id)
-                            .map(|t| t.symbol.clone())
-                            .unwrap_or_else(|| "UNKNOWN".to_string());
-                        *tok_val =
-                            serde_json::to_value(token_symbol).expect("json string to value");
+                        if token_id < params::MIN_NFT_TOKEN_ID as u64 {
+                            let token_id = TokenId(token_id as u32);
+                            let token_symbol = tokens
+                                .get(&token_id)
+                                .map(|t| t.symbol.clone())
+                                .unwrap_or_else(|| "UNKNOWN".to_string());
+                            *tok_val =
+                                serde_json::to_value(token_symbol).expect("json string to value");
+                        } else {
+                            *tok_val =
+                                serde_json::to_value(token_id).expect("json string to value");
+                        }
                     };
                 };
             }
@@ -653,13 +682,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
                 if let Some(tok_val) = tx_info.get_mut("token") {
                     if let Some(token_id) = tok_val.as_u64() {
-                        let token_id = TokenId(token_id as u32);
-                        let token_symbol = tokens
-                            .get(&token_id)
-                            .map(|t| t.symbol.clone())
-                            .unwrap_or_else(|| "UNKNOWN".to_string());
-                        *tok_val =
-                            serde_json::to_value(token_symbol).expect("json string to value");
+                        if token_id < params::MIN_NFT_TOKEN_ID as u64 {
+                            let token_id = TokenId(token_id as u32);
+                            let token_symbol = tokens
+                                .get(&token_id)
+                                .map(|t| t.symbol.clone())
+                                .unwrap_or_else(|| "UNKNOWN".to_string());
+                            *tok_val =
+                                serde_json::to_value(token_symbol).expect("json string to value");
+                        } else {
+                            *tok_val =
+                                serde_json::to_value(token_id).expect("json string to value");
+                        }
                     };
                 };
             }

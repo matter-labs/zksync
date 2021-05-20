@@ -18,7 +18,7 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
 
     fn create_op(&self, tx: WithdrawNFT) -> Result<Self::Op, Self::OpError> {
         invariant!(
-            tx.token <= params::max_token_id() && tx.token >= TokenId(params::MIN_NFT_TOKEN_ID),
+            TokenId(params::MIN_NFT_TOKEN_ID) <= tx.token && tx.token <= params::max_token_id(),
             WithdrawNFTOpError::InvalidTokenId
         );
         let (account_id, account) = self

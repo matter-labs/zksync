@@ -35,7 +35,7 @@ pub(crate) const BASE_CHANGE_PUBKEY_ONCHAIN_COST: u64 = CommitCost::CHANGE_PUBKE
     + AMORTIZED_COST_PER_CHUNK * (ChangePubKeyOp::CHUNKS as u64);
 pub(crate) const BASE_MINT_NFT_COST: u64 = VerifyCost::MINT_NFT_COST
     + CommitCost::MINT_TOKEN_COST
-    + AMORTIZED_COST_PER_CHUNK * (MintNFTOp::CHUNKS as u64); // TODO Verify this constant
+    + AMORTIZED_COST_PER_CHUNK * (MintNFTOp::CHUNKS as u64);
 pub(crate) const BASE_SWAP_COST: u64 = CommitCost::SWAP_COST
     + VerifyCost::SWAP_COST
     + AMORTIZED_COST_PER_CHUNK * (SwapOp::CHUNKS as u64);

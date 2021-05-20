@@ -51,7 +51,7 @@ export default {
         settings: {
             optimizer: {
                 enabled: true,
-                runs: 30
+                runs: 200
             },
             outputSelection: {
                 '*': {
