@@ -224,9 +224,11 @@ export interface CloseAccount {
     signature: Signature;
 }
 
+export type TxEthSignatureVariant = null | TxEthSignature | (TxEthSignature | null)[];
+
 export interface SignedTransaction {
     tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT | Swap;
-    ethereumSignature: null | TxEthSignature | (TxEthSignature | null)[];
+    ethereumSignature?: TxEthSignatureVariant;
 }
 
 export interface BlockInfo {

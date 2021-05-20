@@ -13,7 +13,8 @@ import {
     TokenLike,
     Tokens,
     TransactionReceipt,
-    TxEthSignature
+    TxEthSignature,
+    TxEthSignatureVariant
 } from './types';
 import { isTokenETH, sleep, TokenSet } from './utils';
 import {
@@ -118,14 +119,14 @@ export class Provider {
     }
 
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
+    async submitTx(tx: any, signature?: TxEthSignatureVariant, fastProcessing?: boolean): Promise<string> {
         return await this.transport.request('tx_submit', [tx, signature, fastProcessing]);
     }
 
     // Requests `zkSync` server to execute several transactions together.
     // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTxsBatch(
-        transactions: { tx: any; signature?: TxEthSignature }[],
+        transactions: { tx: any; signature?: TxEthSignatureVariant }[],
         ethSignatures?: TxEthSignature | TxEthSignature[]
     ): Promise<string[]> {
         let signatures: TxEthSignature[] = [];
