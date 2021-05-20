@@ -68,6 +68,7 @@ Tester.prototype.testGetNFT = async function (wallet: Wallet, feeToken: TokenLik
         fee
     });
     await handle.awaitReceipt();
+    this.runningFee = this.runningFee.add(fee);
     const state = await wallet.getAccountState();
     const nft: any = Object.values(state.committed.nfts)[0];
     const nft1 = await wallet.provider.getNFT(nft.id);
