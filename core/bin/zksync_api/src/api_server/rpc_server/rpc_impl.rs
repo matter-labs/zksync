@@ -153,6 +153,7 @@ impl RpcApp {
             gov_contract,
         })
     }
+
     pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<NFT>> {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
