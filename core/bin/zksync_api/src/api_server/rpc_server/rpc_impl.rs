@@ -4,9 +4,10 @@ use std::time::Instant;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
+use zksync_api_client::rest::v1::accounts::NFT;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -151,6 +152,17 @@ impl RpcApp {
             main_contract,
             gov_contract,
         })
+    }
+    pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<NFT>> {
+        let start = Instant::now();
+        let mut storage = self.access_storage().await?;
+        let result = storage.tokens_schema().get_nft(id).await.map_err(|err| {
+            vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
+            Error::internal_error()
+        })?;
+
+        metrics::histogram!("api.rpc.get_nft", start.elapsed());
+        Ok(result.map(|nft| nft.into()))
     }
 
     pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {

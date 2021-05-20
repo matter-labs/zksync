@@ -7,7 +7,7 @@ import {
     ContractAddress,
     Fee,
     LegacyChangePubKeyFee,
-    Network,
+    Network, NFT,
     PriorityOperationReceipt,
     TokenAddress,
     TokenLike,
@@ -173,6 +173,10 @@ export class Provider {
 
     async getEthTxForWithdrawal(withdrawal_hash: string): Promise<string> {
         return await this.transport.request('get_eth_tx_for_withdrawal', [withdrawal_hash]);
+    }
+
+    async getNFT(id: number): Promise<NFT> {
+        return await this.transport.request('get_nft', [id]);
     }
 
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {

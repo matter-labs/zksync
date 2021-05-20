@@ -25,6 +25,8 @@ describe('ZkSync REST API tests', () => {
             await tester.testWithdraw(alice, token, thousand.div(5));
             await tester.testFullExit(alice, token);
             await tester.testDeposit(alice, token, thousand.div(10), true);
+            await tester.testMintNFT(alice, alice, token, true);
+            await tester.testWithdrawNFT(alice, token);
         }
         api.deleteUnusedGenFiles();
     });

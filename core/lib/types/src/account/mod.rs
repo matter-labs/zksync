@@ -172,7 +172,6 @@ impl Account {
                     account.nonce = new_nonce;
                     Some(account)
                 }
-                // Minting does not change the account state
                 AccountUpdate::MintNFT { token } => {
                     account.minted_nfts.insert(token.id, token);
                     Some(account)
