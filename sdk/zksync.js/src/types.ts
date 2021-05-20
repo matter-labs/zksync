@@ -28,6 +28,9 @@ export interface NFT {
     id: number;
     symbol: string;
     creatorId: number;
+    serialId: number;
+    address: string;
+    creatorAddress: string;
     contentHash: string;
 }
 
@@ -55,6 +58,10 @@ export interface AccountState {
             // NFT are indexed by their id
             [tokenId: number]: NFT;
         };
+        mintedNfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
         nonce: number;
         pubKeyHash: PubKeyHash;
     };
@@ -64,6 +71,10 @@ export interface AccountState {
             [token: string]: BigNumberish;
         };
         nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
+        mintedNfts: {
             // NFT are indexed by their id
             [tokenId: number]: NFT;
         };

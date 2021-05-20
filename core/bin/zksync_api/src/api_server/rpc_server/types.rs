@@ -33,6 +33,7 @@ pub struct TxWithSignature {
 pub struct ResponseAccountState {
     pub balances: HashMap<String, BigUintSerdeWrapper>,
     pub nfts: HashMap<TokenId, NFT>,
+    pub minted_nfts: HashMap<TokenId, NFT>,
     pub nonce: Nonce,
     pub pub_key_hash: PubKeyHash,
 }
@@ -54,6 +55,7 @@ impl ResponseAccountState {
         Ok(Self {
             balances,
             nfts: inner.nfts,
+            minted_nfts: inner.minted_nfts,
             nonce: inner.nonce,
             pub_key_hash: inner.pub_key_hash,
         })

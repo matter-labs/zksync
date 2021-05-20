@@ -85,6 +85,12 @@ async fn ethereum_empty_load(mut storage: StorageProcessor<'_>) -> QueryResult<(
 async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     EthereumSchema(&mut storage).initialize_eth_data().await?;
 
+    for expected_next_nonce in 0..5 {
+        let actual_next_nonce = EthereumSchema(&mut storage).get_next_nonce().await?;
+
+        assert_eq!(actual_next_nonce, expected_next_nonce);
+    }
+
     let unconfirmed_operations = EthereumSchema(&mut storage)
         .load_unconfirmed_operations()
         .await?;
@@ -187,20 +193,6 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     assert_eq!(updated_stats.last_committed_block, 1);
     assert_eq!(updated_stats.last_verified_block, 0);
     assert_eq!(updated_stats.last_executed_block, 0);
-
-    Ok(())
-}
-
-/// Check that stored nonce starts with 0 and is incremented after every getting.
-#[db_test]
-async fn eth_nonce(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    EthereumSchema(&mut storage).initialize_eth_data().await?;
-
-    for expected_next_nonce in 0..5 {
-        let actual_next_nonce = EthereumSchema(&mut storage).get_next_nonce().await?;
-
-        assert_eq!(actual_next_nonce, expected_next_nonce);
-    }
 
     Ok(())
 }

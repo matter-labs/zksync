@@ -3,7 +3,7 @@ use std::time::Instant;
 // External imports
 use sqlx::Acquire;
 // Workspace imports
-use zksync_types::{Account, AccountId, AccountUpdates, Address};
+use zksync_types::{Account, AccountId, AccountUpdates, Address, TokenId};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;
@@ -15,6 +15,7 @@ mod stored_state;
 
 pub(crate) use self::restore_account::restore_account;
 pub use self::stored_state::StoredAccountState;
+use crate::tokens::records::StorageNFT;
 
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
@@ -167,6 +168,17 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         )
         .fetch_all(transaction.conn())
         .await?;
+        let mint_nft_updates = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            "
+                SELECT * FROM mint_nft_updates
+                WHERE creator_account_id = $1 AND block_number > $2
+            ",
+            *account_id as i32,
+            last_block
+        )
+        .fetch_all(transaction.conn())
+        .await?;
 
         // Chain the diffs, converting them into `StorageAccountDiff`.
         let account_diff = {
@@ -186,6 +198,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                     .into_iter()
                     .map(StorageAccountDiff::from),
             );
+            account_diff.extend(mint_nft_updates.into_iter().map(StorageAccountDiff::from));
             account_diff.sort_by(StorageAccountDiff::cmp_order);
 
             account_diff
@@ -258,7 +271,21 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .await?;
 
             let last_block = account.last_block;
-            let (_, account) = restore_account(&account, balances);
+            let (_, mut account) = restore_account(&account, balances);
+            let nfts: Vec<StorageNFT> = sqlx::query_as!(
+                StorageNFT,
+                "
+                    SELECT * FROM nft 
+                    WHERE creator_account_id = $1
+                ",
+                *account_id as i32
+            )
+            .fetch_all(&mut transaction)
+            .await?;
+            account.minted_nfts.extend(
+                nfts.into_iter()
+                    .map(|nft| (TokenId(nft.token_id as u32), nft.into())),
+            );
             Ok((last_block, Some(account)))
         } else {
             Ok((0, None))

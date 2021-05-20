@@ -6,7 +6,7 @@ use zksync_types::{
 // Local imports
 use super::block::apply_random_updates;
 use crate::chain::operations::OperationsSchema;
-use crate::test_data::{gen_sample_block, gen_unique_aggregated_operation};
+use crate::test_data::{gen_sample_block, gen_unique_aggregated_operation, generate_nft};
 use crate::tests::{create_rng, db_test};
 use crate::{
     chain::{
@@ -16,6 +16,7 @@ use crate::{
     },
     QueryResult, StorageProcessor,
 };
+use zksync_types::helpers::apply_updates;
 
 /// The save/load routine for EthAccountType
 #[db_test]
@@ -45,9 +46,24 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     let block_size = 100;
 
+    let accounts = AccountMap::default();
     // Create several accounts.
-    let (accounts_block, updates_block) = apply_random_updates(AccountMap::default(), &mut rng);
+    let (mut accounts_block, mut updates_block) = apply_random_updates(accounts, &mut rng);
 
+    let mut nft_updates = vec![];
+    accounts_block
+        .iter()
+        .enumerate()
+        .for_each(|(id, (account_id, account))| {
+            nft_updates.append(&mut generate_nft(
+                *account_id,
+                account,
+                accounts_block.len() as u32 + id as u32,
+            ));
+        });
+    apply_updates(&mut accounts_block, nft_updates.clone());
+
+    updates_block.extend(nft_updates);
     // Execute and commit block with them.
     // Also store account updates.
     BlockSchema(&mut storage)
@@ -135,6 +151,11 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         assert!(
             account_state.verified.is_some(),
             "No verified state for the account"
+        );
+
+        assert!(
+            !account_state.committed.unwrap().1.minted_nfts.is_empty(),
+            "Some NFTs should be minted by account"
         );
 
         // Compare the obtained stored account with expected one.

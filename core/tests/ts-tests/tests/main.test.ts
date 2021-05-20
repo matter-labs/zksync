@@ -84,13 +84,15 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(alice, token, true);
     });
 
-
     step('should execute a transfer to new account', async () => {
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
 
     step('should execute a mintNFT', async () => {
         nft =  await tester.testMintNFT(alice, chuck,  token, true);
+    });
+    step('should execute a getNFT', async () => {
+        await tester.testGetNFT(alice, token);
     });
 
     step('should execute a transfer to existing account', async () => {
