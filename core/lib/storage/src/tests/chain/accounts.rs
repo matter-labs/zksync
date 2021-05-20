@@ -58,7 +58,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             nft_updates.append(&mut generate_nft(
                 *account_id,
                 account,
-                1 * accounts_block.len() as u32 + id as u32,
+                accounts_block.len() as u32 + id as u32,
             ));
         });
     apply_updates(&mut accounts_block, nft_updates.clone());
