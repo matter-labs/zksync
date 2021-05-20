@@ -414,7 +414,7 @@ export class Wallet {
             to: transfer.to,
             token: transfer.token.id,
             amount: 1,
-            fee: 0,
+            fee: 0
         };
         const txFee = {
             to: this.address(),
@@ -809,7 +809,7 @@ export class Wallet {
     }): Promise<Transaction> {
         withdrawNFT.nonce = withdrawNFT.nonce != null ? await this.getNonce(withdrawNFT.nonce) : await this.getNonce();
         if (!isNFT(withdrawNFT.token)) {
-            throw new Error("This token ID does not correspond to an NFT");
+            throw new Error('This token ID does not correspond to an NFT');
         }
 
         if (withdrawNFT.fee == null) {
