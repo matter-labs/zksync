@@ -13,7 +13,8 @@ const IMAGES = [
     'exit-tool',
     'dev-liquidity-token-watcher',
     'ci-integration-test',
-    'zk-environment'
+    'zk-environment',
+    'event-listener'
 ];
 
 async function dockerCommand(command: 'push' | 'build', image: string) {
@@ -52,7 +53,7 @@ async function _build(image: string) {
 async function _push(image: string) {
     // TODO Uncomment this code, after nft deploying
     // await utils.spawn(`docker push matterlabs/${image}:latest`);
-    if (['nginx', 'server', 'prover'].includes(image)) {
+    if (['nginx', 'server', 'prover', 'event-listener'].includes(image)) {
         const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
         await utils.spawn(`docker push matterlabs/${image}:${imageTag}`);
     }
