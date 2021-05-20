@@ -9,7 +9,7 @@ use zksync_types::{
 };
 
 use zksync_crypto::params::{
-    max_fungible_token_id, MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID,
+    max_processable_token, MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID,
     NFT_TOKEN_ID,
 };
 
@@ -24,7 +24,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
 
     fn create_op(&self, tx: MintNFT) -> Result<Self::Op, Self::OpError> {
         invariant!(
-            tx.fee_token <= max_fungible_token_id(),
+            tx.fee_token <= max_processable_token(),
             MintNFTOpError::InvalidTokenId
         );
         invariant!(

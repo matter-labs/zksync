@@ -1,5 +1,7 @@
 use num::BigUint;
+use std::convert::Infallible;
 use std::time::Instant;
+
 use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, FullExit, FullExitOp, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
@@ -8,8 +10,6 @@ use crate::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
-use std::convert::Infallible;
-use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 
 impl TxHandler<FullExit> for ZkSyncState {
     type Op = FullExitOp;
@@ -28,7 +28,7 @@ impl TxHandler<FullExit> for ZkSyncState {
             .map(|acccount| acccount.get_balance(priority_op.token))
             .map(BigUintSerdeWrapper);
 
-        let op = if priority_op.token.0 >= MIN_NFT_TOKEN_ID
+        let op = if priority_op.token > params::max_fungible_token_id()
             && self.nfts.get(&priority_op.token).is_some()
         {
             let nft = self.nfts.get(&priority_op.token).unwrap();

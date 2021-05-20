@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_fungible_token_id, max_token_id, MIN_NFT_TOKEN_ID},
+    params::{max_account_id, max_processable_token, max_token_id, MIN_NFT_TOKEN_ID},
 };
 
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
@@ -138,7 +138,7 @@ impl WithdrawNFT {
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = is_fee_amount_packable(&self.fee)
             && self.account_id <= max_account_id()
-            && self.fee_token <= max_fungible_token_id()
+            && self.fee_token <= max_processable_token()
             && self.token <= max_token_id()
             && self.token >= TokenId(MIN_NFT_TOKEN_ID)
             && self.time_range.check_correctness();
