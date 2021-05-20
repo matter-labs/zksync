@@ -30,6 +30,7 @@ export interface NFT {
     creatorId: number;
     serialId: number;
     address: string;
+    creatorAddress: string;
     contentHash: string;
 }
 
