@@ -45,6 +45,7 @@ import {
     MAX_ERC20_APPROVE_AMOUNT,
     MAX_TIMESTAMP,
     signMessagePersonalAPI,
+    isNFT,
     SYNC_MAIN_CONTRACT_INTERFACE
 } from './utils';
 
@@ -338,7 +339,6 @@ export class Wallet {
             token: TokenLike;
             amount: BigNumberish;
             fee: BigNumberish;
-            symbol?: string;
             nonce?: Nonce;
             validFrom?: number;
             validUntil?: number;
@@ -372,7 +372,7 @@ export class Wallet {
                 validFrom: transfer.validFrom || 0,
                 validUntil: transfer.validUntil || MAX_TIMESTAMP
             });
-            const message = this.getTransferEthMessagePart({ stringToken: transfer.symbol, ...transfer });
+            const message = await this.getTransferEthMessagePart(transfer);
             messages.push(message);
             batch.push({ tx, signature: null });
         }
@@ -415,7 +415,6 @@ export class Wallet {
             token: transfer.token.id,
             amount: 1,
             fee: 0,
-            symbol: transfer.token.symbol
         };
         const txFee = {
             to: this.address(),
@@ -478,8 +477,8 @@ export class Wallet {
         const stringAmount = BigNumber.from(order.amount).isZero()
             ? null
             : this.provider.tokenSet.formatToken(order.tokenSell, order.amount);
-        const stringTokenSell = this.provider.tokenSet.resolveTokenSymbol(order.tokenSell);
-        const stringTokenBuy = this.provider.tokenSet.resolveTokenSymbol(order.tokenBuy);
+        const stringTokenSell = await this.provider.getTokenSymbol(order.tokenSell);
+        const stringTokenBuy = await this.provider.getTokenSymbol(order.tokenBuy);
         const ethereumSignature =
             this.ethSigner instanceof Create2WalletSigner
                 ? null
@@ -809,6 +808,9 @@ export class Wallet {
         validUntil?: number;
     }): Promise<Transaction> {
         withdrawNFT.nonce = withdrawNFT.nonce != null ? await this.getNonce(withdrawNFT.nonce) : await this.getNonce();
+        if (!isNFT(withdrawNFT.token)) {
+            throw new Error("This token ID does not correspond to an NFT");
+        }
 
         if (withdrawNFT.fee == null) {
             const feeType = withdrawNFT.fastProcessing === true ? 'FastWithdrawNFT' : 'WithdrawNFT';
@@ -1013,24 +1015,19 @@ export class Wallet {
     // It might seem that these belong to ethMessageSigner, however, we have
     // to resolve the token and format amount/fee before constructing the
     // transaction.
-    getTransferEthMessagePart(transfer: {
+    async getTransferEthMessagePart(transfer: {
         to: Address;
         token: TokenLike;
         amount: BigNumberish;
         fee: BigNumberish;
-        stringToken?: string;
-    }): string {
+    }): Promise<string> {
         const stringAmount = BigNumber.from(transfer.amount).isZero()
             ? null
             : this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
         const stringFee = BigNumber.from(transfer.fee).isZero()
             ? null
             : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
-
-        const stringToken =
-            transfer.stringToken == null
-                ? this.provider.tokenSet.resolveTokenSymbol(transfer.token)
-                : transfer.stringToken;
+        const stringToken = await this.provider.getTokenSymbol(transfer.token);
         return this.ethMessageSigner.getTransferEthMessagePart({
             stringAmount,
             stringFee,

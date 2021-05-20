@@ -17,7 +17,7 @@ import {
     TxEthSignature,
     TxEthSignatureVariant
 } from './types';
-import { isTokenETH, sleep, TokenSet } from './utils';
+import { isTokenETH, sleep, TokenSet, isNFT } from './utils';
 import {
     Governance,
     GovernanceFactory,
@@ -179,6 +179,14 @@ export class Provider {
 
     async getNFT(id: number): Promise<NFT> {
         return await this.transport.request('get_nft', [id]);
+    }
+
+    async getTokenSymbol(token: TokenLike): Promise<string> {
+        if (isNFT(token)) {
+            const nft = await this.getNFT(token as number);
+            return nft.symbol;
+        }
+        return this.tokenSet.resolveTokenSymbol(token);
     }
 
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {

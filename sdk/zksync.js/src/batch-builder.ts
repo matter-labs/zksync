@@ -316,7 +316,7 @@ export class BatchBuilder {
                     processedTxs.push(withdraw);
                     break;
                 case 'Transfer':
-                    messages.push(this.wallet.getTransferEthMessagePart(tx.tx));
+                    messages.push(await this.wallet.getTransferEthMessagePart(tx.tx));
                     const transfer = { tx: await this.wallet.getTransfer(tx.tx) };
                     processedTxs.push(transfer);
                     break;

@@ -306,7 +306,7 @@ export function isTransactionFeePackable(amount: BigNumberish): boolean {
 
 // Check that this token could be an NFT.
 // NFT is not represented in TokenSets, so we cannot check the availability of NFT in TokenSets
-function isNFT(token: TokenLike): boolean {
+export function isNFT(token: TokenLike): boolean {
     return typeof token === 'number' && token >= MIN_NFT_TOKEN_ID;
 }
 

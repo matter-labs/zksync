@@ -51,7 +51,8 @@ export async function tokenInfo(address: string) {
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn');
-    await utils.spawn('yarn crypto build');
+    // Uncomment only if you updated zksync-crypto and CI is broken
+    // await utils.spawn('yarn crypto build');
     await utils.spawn('yarn reading-tool build');
     await utils.spawn('yarn zksync prepublish');
 }
