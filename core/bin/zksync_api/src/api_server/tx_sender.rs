@@ -38,7 +38,9 @@ use crate::{
     api_server::rpc_server::types::TxWithSignature,
     core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
-    signature_checker::{BatchRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest},
+    signature_checker::{
+        BatchRequest, OrderRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest,
+    },
     tx_error::TxAddError,
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
@@ -278,14 +280,40 @@ impl TxSender {
         order: &Order,
         signature: Option<TxEthSignature>,
     ) -> Result<(), SubmitError> {
-        let signer =
-            self.get_address_by_id(order.account_id)
-                .await
-                .or(Err(SubmitError::IncorrectTx(
-                    "Incorrect order signer ID".to_string(),
-                )))?;
         let signer_type = self.get_sender_type(order.account_id).await?;
-        // TODO
+        if matches!(signer_type, EthAccountType::CREATE2) {
+            return if signature.is_some() {
+                Err(SubmitError::IncorrectTx(
+                    "Eth signature from CREATE2 account not expected".to_string(),
+                ))
+            } else {
+                Ok(())
+            };
+        }
+        let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+        let signer = self
+            .get_address_by_id(order.account_id)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+
+        let token_sell = self.token_info_from_id(order.token_sell).await?;
+        let token_buy = self.token_info_from_id(order.token_buy).await?;
+        let message = order
+            .get_ethereum_sign_message(&token_sell.symbol, &token_buy.symbol, token_sell.decimals)
+            .into_bytes();
+        let eth_sign_data = EthSignData { signature, message };
+        let (sender, receiever) = oneshot::channel();
+
+        let request = VerifySignatureRequest {
+            data: RequestData::Order(OrderRequest {
+                order: Box::new(order.clone()),
+                sign_data: eth_sign_data,
+                sender: signer,
+            }),
+            response: sender,
+        };
+
+        send_verify_request_and_recv(request, self.sign_verify_requests.clone(), receiever).await?;
         Ok(())
     }
 
