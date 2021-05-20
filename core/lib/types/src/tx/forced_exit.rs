@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_fungible_token_id},
+    params::{max_account_id, max_fungible_token_id, max_processable_token},
 };
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
@@ -136,6 +136,10 @@ impl ForcedExit {
             && self.time_range.check_correctness();
 
         if valid {
+            if self.fee != BigUint::zero() {
+                // Fee can only be paid in processable tokens
+                valid = self.token <= max_processable_token();
+            }
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
             self.cached_signer = VerifiedSignatureCache::Cached(signer);

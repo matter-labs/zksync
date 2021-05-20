@@ -47,6 +47,15 @@ pub fn number_of_processable_tokens() -> usize {
     num
 }
 
+/// Max TokenId that can be processed by this release
+pub fn max_processable_token() -> TokenId {
+    let num = 2usize.pow(PROCESSABLE_TOKENS_DEPTH);
+
+    assert!(num <= total_tokens());
+    assert!(num.is_power_of_two());
+
+    TokenId((num - 1) as u32)
+}
 /// NFT settings
 
 /// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.

@@ -6,6 +6,7 @@ use crate::{
     handler::{error::WithdrawOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
+use num::{BigUint, Zero};
 
 impl TxHandler<Withdraw> for ZkSyncState {
     type Op = WithdrawOp;
@@ -17,6 +18,14 @@ impl TxHandler<Withdraw> for ZkSyncState {
             tx.token <= params::max_fungible_token_id(),
             WithdrawOpError::InvalidTokenId
         );
+        if tx.fee != BigUint::zero() {
+            // Fee can only be paid in processable tokens
+            invariant!(
+                tx.token <= params::max_processable_token(),
+                WithdrawOpError::InvalidFeeTokenId
+            );
+        }
+
         let (account_id, account) = self
             .get_account_by_address(&tx.from)
             .ok_or(WithdrawOpError::FromAccountNotFound)?;

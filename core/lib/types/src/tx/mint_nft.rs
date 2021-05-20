@@ -5,7 +5,7 @@ use num::{BigUint, Zero};
 use zksync_crypto::{
     convert::FeConvert,
     franklin_crypto::bellman::pairing::bn256::{Bn256, Fr},
-    params::{max_account_id, max_fungible_token_id},
+    params::{max_account_id, max_processable_token},
     rescue_poseidon::rescue_hash,
     PrivateKey,
 };
@@ -133,7 +133,7 @@ impl MintNFT {
         let mut valid = self.fee <= BigUint::from(u128::MAX)
             && is_fee_amount_packable(&self.fee)
             && self.creator_id <= max_account_id()
-            && self.fee_token <= max_fungible_token_id();
+            && self.fee_token <= max_processable_token();
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
