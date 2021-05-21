@@ -249,8 +249,8 @@ export interface ApiError {
 export interface ApiResponse<T> {
     request: ApiRequest;
     status: 'success' | 'error';
-    error: ApiError;
-    result: T;
+    error: ApiError | null;
+    result: T | null;
 }
 
 export interface PaginationQuery<F> {
@@ -260,7 +260,7 @@ export interface PaginationQuery<F> {
 }
 
 export interface Paginated<T, F> {
-    list: [T];
+    list: T[];
     pagination: {
         from: F;
         limit: number;
@@ -330,7 +330,7 @@ export interface TokenPriceInfo {
 }
 
 export interface SubmitBatchResponse {
-    transactionHashes: [string];
+    transactionHashes: string[];
     batchHash: string;
 }
 
@@ -394,7 +394,7 @@ export interface ApiBatchStatus {
 
 export interface ApiBatchData {
     batchHash: string;
-    transactionHashes: [string];
+    transactionHashes: string[];
     createdAt: string;
     batchStatus: ApiBatchStatus;
 }

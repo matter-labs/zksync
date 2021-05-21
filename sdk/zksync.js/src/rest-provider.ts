@@ -27,6 +27,7 @@ import {
     PendingOpsRequest,
     AccountTxsRequest
 } from './types';
+import { sleep } from './utils';
 
 export function getDefaultRestProvider(network: Network): RestProvider {
     if (network === 'localhost') {
@@ -47,6 +48,8 @@ export function getDefaultRestProvider(network: Network): RestProvider {
 }
 
 export class RestProvider {
+    public pollIntervalMilliSecs = 500;
+
     public constructor(public address: string) {}
 
     parse_response<T>(response: ApiResponse<T>): T {
@@ -72,87 +75,87 @@ export class RestProvider {
     }
 
     async accountInfoDetailed(
-        id_or_address: number | Address,
-        info_type: 'committed' | 'finalized'
+        idOrAddress: number | Address,
+        infoType: 'committed' | 'finalized'
     ): Promise<ApiResponse<ApiAccountInfo | null>> {
-        return await this.get(`${this.address}/accounts/${id_or_address}/${info_type}`);
+        return await this.get(`${this.address}/accounts/${idOrAddress}/${infoType}`);
     }
 
     async accountInfo(
-        id_or_address: number | Address,
-        info_type: 'committed' | 'finalized'
+        idOrAddress: number | Address,
+        infoType: 'committed' | 'finalized'
     ): Promise<ApiAccountInfo | null> {
-        return this.parse_response(await this.accountInfoDetailed(id_or_address, info_type));
+        return this.parse_response(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
     async accountTxsDetailed(
-        id_or_address: number | Address,
-        pagination_query: PaginationQuery<string>
+        idOrAddress: number | Address,
+        paginationQuery: PaginationQuery<string>
     ): Promise<ApiResponse<Paginated<ApiTransaction, AccountTxsRequest>>> {
         return await this.get(
-            `${this.address}/accounts/${id_or_address}/transactions?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
+            `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
         );
     }
 
     async accountTxs(
-        id_or_address: number | Address,
-        pagination_query: PaginationQuery<string>
+        idOrAddress: number | Address,
+        paginationQuery: PaginationQuery<string>
     ): Promise<Paginated<ApiTransaction, AccountTxsRequest>> {
-        return this.parse_response(await this.accountTxsDetailed(id_or_address, pagination_query));
+        return this.parse_response(await this.accountTxsDetailed(idOrAddress, paginationQuery));
     }
 
     async accountPendingTxsDetailed(
-        id_or_address: number | Address,
-        pagination_query: PaginationQuery<number>
+        idOrAddress: number | Address,
+        paginationQuery: PaginationQuery<number>
     ): Promise<ApiResponse<Paginated<ApiTransaction, PendingOpsRequest>>> {
         return await this.get(
-            `${this.address}/accounts/${id_or_address}/transactions/pending?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
+            `${this.address}/accounts/${idOrAddress}/transactions/pending?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
         );
     }
 
     async accountPendingTxs(
-        id_or_address: number | Address,
-        pagination_query: PaginationQuery<number>
+        idOrAddress: number | Address,
+        paginationQuery: PaginationQuery<number>
     ): Promise<Paginated<ApiTransaction, PendingOpsRequest>> {
-        return this.parse_response(await this.accountPendingTxsDetailed(id_or_address, pagination_query));
+        return this.parse_response(await this.accountPendingTxsDetailed(idOrAddress, paginationQuery));
     }
 
     async blockPaginationDetailed(
-        pagination_query: PaginationQuery<number>
+        paginationQuery: PaginationQuery<number>
     ): Promise<ApiResponse<Paginated<ApiBlockInfo, number>>> {
         return await this.get(
-            `${this.address}/blocks?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
+            `${this.address}/blocks?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
         );
     }
 
-    async blockPagination(pagination_query: PaginationQuery<number>): Promise<Paginated<ApiBlockInfo, number>> {
-        return this.parse_response(await this.blockPaginationDetailed(pagination_query));
+    async blockPagination(paginationQuery: PaginationQuery<number>): Promise<Paginated<ApiBlockInfo, number>> {
+        return this.parse_response(await this.blockPaginationDetailed(paginationQuery));
     }
 
     async blockByPositionDetailed(
-        block_position: number | 'lastCommitted' | 'lastFinalized'
+        blockPosition: number | 'lastCommitted' | 'lastFinalized'
     ): Promise<ApiResponse<ApiBlockInfo | null>> {
-        return await this.get(`${this.address}/blocks/${block_position}`);
+        return await this.get(`${this.address}/blocks/${blockPosition}`);
     }
 
-    async blockByPosition(block_position: number | 'lastCommitted' | 'lastFinalized'): Promise<ApiBlockInfo | null> {
-        return this.parse_response(await this.blockByPositionDetailed(block_position));
+    async blockByPosition(blockPosition: number | 'lastCommitted' | 'lastFinalized'): Promise<ApiBlockInfo | null> {
+        return this.parse_response(await this.blockByPositionDetailed(blockPosition));
     }
 
     async blockTransactionsDetailed(
-        block_position: number | 'lastCommitted' | 'lastFinalized',
-        pagination_query: PaginationQuery<string>
+        blockPosition: number | 'lastCommitted' | 'lastFinalized',
+        paginationQuery: PaginationQuery<string>
     ): Promise<ApiResponse<Paginated<ApiTransaction, BlockAndTxHash>>> {
         return await this.get(
-            `${this.address}/blocks/${block_position}/transactions?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
+            `${this.address}/blocks/${blockPosition}/transactions?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
         );
     }
 
     async blockTransactions(
-        block_position: number | 'lastCommitted' | 'lastFinalized',
-        pagination_query: PaginationQuery<string>
+        blockPosition: number | 'lastCommitted' | 'lastFinalized',
+        paginationQuery: PaginationQuery<string>
     ): Promise<Paginated<ApiTransaction, BlockAndTxHash>> {
-        return this.parse_response(await this.blockTransactionsDetailed(block_position, pagination_query));
+        return this.parse_response(await this.blockTransactionsDetailed(blockPosition, paginationQuery));
     }
 
     async configDetailed(): Promise<ApiResponse<ApiConfig>> {
@@ -180,24 +183,20 @@ export class RestProvider {
     }
 
     async getBatchFeeDetailed(
-        transactions: [
-            {
-                txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee;
-                address: Address;
-            }
-        ],
+        transactions: {
+            txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee;
+            address: Address;
+        }[],
         tokenLike: TokenLike
     ): Promise<ApiResponse<ApiFee>> {
         return await this.post(`${this.address}/fee/batch`, { transactions, tokenLike });
     }
 
     async getBatchFee(
-        transactions: [
-            {
-                txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee;
-                address: Address;
-            }
-        ],
+        transactions: {
+            txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee;
+            address: Address;
+        }[],
         tokenLike: TokenLike
     ): Promise<ApiFee> {
         return this.parse_response(await this.getBatchFeeDetailed(transactions, tokenLike));
@@ -212,34 +211,34 @@ export class RestProvider {
     }
 
     async tokenPaginationDetailed(
-        pagination_query: PaginationQuery<number>
+        paginationQuery: PaginationQuery<number>
     ): Promise<ApiResponse<Paginated<TokenInfo, number>>> {
         return await this.get(
-            `${this.address}/tokens?from=${pagination_query.from}&limit=${pagination_query.limit}&direction=${pagination_query.direction}`
+            `${this.address}/tokens?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
         );
     }
 
-    async tokenPagination(pagination_query: PaginationQuery<number>): Promise<Paginated<TokenInfo, number>> {
-        return this.parse_response(await this.tokenPaginationDetailed(pagination_query));
+    async tokenPagination(paginationQuery: PaginationQuery<number>): Promise<Paginated<TokenInfo, number>> {
+        return this.parse_response(await this.tokenPaginationDetailed(paginationQuery));
     }
 
-    async tokenByIdOrAddressDetailed(id_or_address: number | TokenAddress): Promise<ApiResponse<TokenInfo>> {
-        return await this.get(`${this.address}/tokens/${id_or_address}`);
+    async tokenByIdOrAddressDetailed(idOrAddress: number | TokenAddress): Promise<ApiResponse<TokenInfo>> {
+        return await this.get(`${this.address}/tokens/${idOrAddress}`);
     }
 
-    async tokenByIdOrAddress(id_or_address: number | TokenAddress): Promise<TokenInfo> {
-        return this.parse_response(await this.tokenByIdOrAddressDetailed(id_or_address));
+    async tokenByIdOrAddress(idOrAddress: number | TokenAddress): Promise<TokenInfo> {
+        return this.parse_response(await this.tokenByIdOrAddressDetailed(idOrAddress));
     }
 
     async tokenPriceDetailed(
-        id_or_address: number | TokenAddress,
-        token_id_or_usd: number | 'usd'
+        idOrAddress: number | TokenAddress,
+        tokenIdOrUsd: number | 'usd'
     ): Promise<ApiResponse<TokenPriceInfo>> {
-        return await this.get(`${this.address}/tokens/${id_or_address}/priceIn/${token_id_or_usd}`);
+        return await this.get(`${this.address}/tokens/${idOrAddress}/priceIn/${tokenIdOrUsd}`);
     }
 
-    async tokenPrice(id_or_address: number | TokenAddress, token_id_or_usd: number | 'usd'): Promise<TokenPriceInfo> {
-        return this.parse_response(await this.tokenPriceDetailed(id_or_address, token_id_or_usd));
+    async tokenPrice(idOrAddress: number | TokenAddress, tokenIdOrUsd: number | 'usd'): Promise<TokenPriceInfo> {
+        return this.parse_response(await this.tokenPriceDetailed(idOrAddress, tokenIdOrUsd));
     }
 
     async submitTxDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<ApiResponse<String>> {
@@ -267,13 +266,13 @@ export class RestProvider {
     }
 
     async submitBatchDetailed(
-        txs: [L2Tx],
+        txs: L2Tx[],
         signature: TxEthSignature | TxEthSignature[]
     ): Promise<ApiResponse<SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
-    async submitBatch(txs: [L2Tx], signature: TxEthSignature | TxEthSignature[]): Promise<SubmitBatchResponse> {
+    async submitBatch(txs: L2Tx[], signature: TxEthSignature | TxEthSignature[]): Promise<SubmitBatchResponse> {
         return this.parse_response(await this.submitBatchDetailed(txs, signature));
     }
 
@@ -283,5 +282,36 @@ export class RestProvider {
 
     async getBatch(batchHash: string): Promise<ApiBatchData> {
         return this.parse_response(await this.getBatchDetailed(batchHash));
+    }
+
+    async notifyTransactionDetailed(
+        txHash: string,
+        state: 'committed' | 'finalized'
+    ): Promise<ApiResponse<ApiTxReceipt>> {
+        while (true) {
+            let transactionStatus = await this.txStatusDetailed(txHash);
+            let notifyDone;
+            if (state === 'committed') {
+                notifyDone = transactionStatus.result && transactionStatus.result.rollupBlock;
+            } else {
+                if (transactionStatus.result && transactionStatus.result.rollupBlock) {
+                    // If the transaction status is rejected it cannot be known if transaction is queued, committed or finalized.
+                    const blockStatus = await this.blockByPositionDetailed(transactionStatus.result.rollupBlock);
+                    notifyDone = blockStatus.result && blockStatus.result.status === 'finalized';
+                }
+            }
+            if (notifyDone) {
+                // Transaction status needs to be updated if status
+                // was updated between `txStatusDetailed` and `blockByPositionDetailed` queries.
+                transactionStatus = await this.txStatusDetailed(txHash);
+                return transactionStatus;
+            } else {
+                await sleep(this.pollIntervalMilliSecs);
+            }
+        }
+    }
+
+    async notifyTransaction(txHash: string, state: 'committed' | 'finalized'): Promise<ApiTxReceipt> {
+        return this.parse_response(await this.notifyTransactionDetailed(txHash, state));
     }
 }
