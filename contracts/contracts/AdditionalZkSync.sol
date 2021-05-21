@@ -112,4 +112,22 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         firstPriorityRequestId += toProcess;
         totalOpenPriorityRequests -= toProcess;
     }
+
+    function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
+        Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
+        require(op.creatorAddress != address(0), "op"); // No NFT to withdraw
+        NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
+        _factory.mintNFTFromZkSync(
+            op.creatorAddress,
+            op.receiver,
+            op.creatorAccountId,
+            op.serialId,
+            op.contentHash,
+            op.tokenId
+        );
+        // Save withdrawn nfts for future deposits
+        withdrawnNFTs[op.tokenId] = address(_factory);
+        emit WithdrawalNFT(op.tokenId);
+        delete pendingWithdrawnNFTs[_tokenId];
+    }
 }

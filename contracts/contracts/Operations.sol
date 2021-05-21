@@ -81,9 +81,22 @@ library Operations {
         );
     }
 
+    /// Serialize legacy deposit pubdata
+    function writeLegacyDepositPubdataForPriorityQueue(Deposit memory op) internal pure returns (bytes memory buf) {
+        buf = abi.encodePacked(
+            uint8(OpType.Deposit),
+            bytes4(0), // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            uint16(op.tokenId), // tokenId
+            op.amount, // amount
+            op.owner // owner
+        );
+    }
+
     /// @notice Write deposit pubdata for priority queue check.
     function checkDepositInPriorityQueue(Deposit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        return Utils.hashBytesToBytes20(writeDepositPubdataForPriorityQueue(op)) == hashedPubdata;
+        return
+            Utils.hashBytesToBytes20(writeDepositPubdataForPriorityQueue(op)) == hashedPubdata ||
+            Utils.hashBytesToBytes20(writeLegacyDepositPubdataForPriorityQueue(op)) == hashedPubdata;
     }
 
     // FullExit pubdata
@@ -140,8 +153,24 @@ library Operations {
         );
     }
 
+    function writeLegacyFullExitPubdataForPriorityQueue(FullExit memory op) internal pure returns (bytes memory buf) {
+        buf = abi.encodePacked(
+            uint8(OpType.FullExit),
+            op.accountId, // accountId
+            op.owner, // owner
+            uint16(op.tokenId), // tokenId
+            uint128(0), // amount -- ignored
+            uint32(0), // nftCreatorAccountId -- ignored
+            address(0), // nftCreatorAddress -- ignored
+            uint32(0), // nftSerialId -- ignored
+            bytes32(0) // nftContentHash -- ignored
+        );
+    }
+
     function checkFullExitInPriorityQueue(FullExit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        return Utils.hashBytesToBytes20(writeFullExitPubdataForPriorityQueue(op)) == hashedPubdata;
+        return
+            Utils.hashBytesToBytes20(writeFullExitPubdataForPriorityQueue(op)) == hashedPubdata ||
+            Utils.hashBytesToBytes20(writeLegacyFullExitPubdataForPriorityQueue(op)) == hashedPubdata;
     }
 
     // PartialExit pubdata
