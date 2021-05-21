@@ -128,6 +128,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(10));
         await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(10));
         await tester.testTransfer(alice, chris, token, TX_AMOUNT.mul(10));
+
         // Also deposit another token to pay with.
         await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
 
@@ -184,7 +185,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testWithdrawNFT(chuck, token);
     });
 
-    step('should execute a ForcedExit', async () => {
+    step('should execute a forced exit', async () => {
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
 

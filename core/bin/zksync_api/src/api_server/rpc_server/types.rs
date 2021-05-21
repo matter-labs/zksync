@@ -25,6 +25,7 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct TxWithSignature {
     pub tx: ZkSyncTx,
+    #[serde(default)]
     pub signature: TxEthSignatureVariant,
 }
 

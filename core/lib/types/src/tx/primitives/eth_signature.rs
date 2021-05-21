@@ -26,6 +26,12 @@ pub enum TxEthSignatureVariant {
     ),
 }
 
+impl Default for TxEthSignatureVariant {
+    fn default() -> Self {
+        Self::Single(None)
+    }
+}
+
 impl TxEthSignatureVariant {
     pub fn is_single(&self) -> bool {
         matches!(self, Self::Single(_))

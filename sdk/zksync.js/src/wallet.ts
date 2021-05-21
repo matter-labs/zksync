@@ -536,7 +536,11 @@ export class Wallet {
 
         return {
             tx: signedSwapTransaction,
-            ethereumSignature: [ethereumSignature, swap.orders[0].ethSignature, swap.orders[1].ethSignature]
+            ethereumSignature: [
+                ethereumSignature,
+                swap.orders[0].ethSignature || null,
+                swap.orders[1].ethSignature || null
+            ]
         };
     }
 

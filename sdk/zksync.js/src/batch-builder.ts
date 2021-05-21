@@ -351,7 +351,14 @@ export class BatchBuilder {
                     break;
                 case 'Swap':
                     messages.push(this.wallet.getSwapEthSignMessagePart(tx.tx));
-                    const swap = { tx: await this.wallet.getSwap(tx.tx) };
+                    const swap = {
+                        tx: await this.wallet.getSwap(tx.tx),
+                        ethereumSignature: [
+                            null,
+                            tx.tx.orders[0].ethSignature || null,
+                            tx.tx.orders[1].ethSignature || null
+                        ]
+                    };
                     processedTxs.push(swap);
                     break;
                 case 'WithdrawNFT':

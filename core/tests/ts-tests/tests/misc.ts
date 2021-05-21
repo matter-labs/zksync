@@ -92,7 +92,7 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
         const transfer = await sender.getTransfer(transferArgs);
         batch.push({ tx: transfer });
 
-        const messagePart = sender.getTransferEthMessagePart(transferArgs);
+        const messagePart = await sender.getTransferEthMessagePart(transferArgs);
         messages.push(`From: ${sender.address().toLowerCase()}\n${messagePart}\nNonce: ${nonce}`);
     }
 

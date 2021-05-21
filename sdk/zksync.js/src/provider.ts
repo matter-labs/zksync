@@ -184,7 +184,7 @@ export class Provider {
     async getTokenSymbol(token: TokenLike): Promise<string> {
         if (isNFT(token)) {
             const nft = await this.getNFT(token as number);
-            return nft.symbol;
+            return nft.symbol || `NFT-${token}`;
         }
         return this.tokenSet.resolveTokenSymbol(token);
     }
