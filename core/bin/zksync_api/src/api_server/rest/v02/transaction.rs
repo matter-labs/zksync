@@ -155,13 +155,27 @@ impl ApiTransactionData {
         storage: &mut StorageProcessor<'_>,
         tx_hash: TxHash,
     ) -> Result<Option<L1Receipt>, Error> {
-        if let Some(op) = storage
+        let op = if let Some(op) = storage
             .chain()
             .operations_schema()
             .get_executed_priority_operation_by_tx_hash(tx_hash.as_ref())
             .await
             .map_err(Error::storage)?
         {
+            Some(op)
+        } else if let Some(op) = storage
+            .chain()
+            .operations_schema()
+            .get_executed_priority_operation_by_eth_hash(tx_hash.as_ref())
+            .await
+            .map_err(Error::storage)?
+        {
+            Some(op)
+        } else {
+            None
+        };
+
+        if let Some(op) = op {
             let status = storage
                 .chain()
                 .block_schema()
@@ -171,21 +185,35 @@ impl ApiTransactionData {
                 .0;
 
             Ok(Some(l1_receipt_from_op_and_status(op, status)))
-        } else if let Some((eth_block, priority_op)) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::BySyncHash(tx_hash))
-            .await
-            .map_err(Error::core_api)?
-        {
+        } else {
+            let op = if let Some((_, priority_op)) = self
+                .tx_sender
+                .core_api_client
+                .get_unconfirmed_op(PriorityOpLookupQuery::BySyncHash(tx_hash))
+                .await
+                .map_err(Error::core_api)?
+            {
+                priority_op
+            } else if let Some((_, priority_op)) = self
+                .tx_sender
+                .core_api_client
+                .get_unconfirmed_op(PriorityOpLookupQuery::ByEthHash(H256::from_slice(
+                    tx_hash.as_ref(),
+                )))
+                .await
+                .map_err(Error::core_api)?
+            {
+                priority_op
+            } else {
+                return Ok(None);
+            };
+
             Ok(Some(L1Receipt {
                 status: BlockStatus::Queued,
-                eth_block,
+                eth_block: EthBlockId(op.eth_block),
                 rollup_block: None,
-                id: priority_op.serial_id,
+                id: op.serial_id,
             }))
-        } else {
-            Ok(None)
         }
     }
 
@@ -251,13 +279,27 @@ impl ApiTransactionData {
         storage: &mut StorageProcessor<'_>,
         tx_hash: TxHash,
     ) -> Result<Option<TxData>, Error> {
-        let operation = storage
+        let op = if let Some(op) = storage
             .chain()
             .operations_schema()
             .get_executed_priority_operation_by_tx_hash(tx_hash.as_ref())
             .await
-            .map_err(Error::storage)?;
-        if let Some(op) = operation {
+            .map_err(Error::storage)?
+        {
+            Some(op)
+        } else if let Some(op) = storage
+            .chain()
+            .operations_schema()
+            .get_executed_priority_operation_by_eth_hash(tx_hash.as_ref())
+            .await
+            .map_err(Error::storage)?
+        {
+            Some(op)
+        } else {
+            None
+        };
+
+        if let Some(op) = op {
             let status = storage
                 .chain()
                 .block_schema()
@@ -266,20 +308,36 @@ impl ApiTransactionData {
                 .map_err(Error::storage)?
                 .0;
             Ok(Some(l1_tx_data_from_op_and_status(op, status)))
-        } else if let Some((_, priority_op)) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::BySyncHash(tx_hash))
-            .await
-            .map_err(Error::core_api)?
-        {
+        } else {
+            let op = if let Some((_, priority_op)) = self
+                .tx_sender
+                .core_api_client
+                .get_unconfirmed_op(PriorityOpLookupQuery::BySyncHash(tx_hash))
+                .await
+                .map_err(Error::core_api)?
+            {
+                priority_op
+            } else if let Some((_, priority_op)) = self
+                .tx_sender
+                .core_api_client
+                .get_unconfirmed_op(PriorityOpLookupQuery::ByEthHash(H256::from_slice(
+                    tx_hash.as_ref(),
+                )))
+                .await
+                .map_err(Error::core_api)?
+            {
+                priority_op
+            } else {
+                return Ok(None);
+            };
+
             let tx = Transaction {
                 tx_hash,
                 block_number: None,
                 op: TransactionData::L1(L1Transaction::from_pending_op(
-                    priority_op.data,
-                    priority_op.eth_hash,
-                    priority_op.serial_id,
+                    op.data,
+                    op.eth_hash,
+                    op.serial_id,
                     tx_hash,
                 )),
                 status: TxInBlockStatus::Queued,
@@ -291,8 +349,6 @@ impl ApiTransactionData {
                 tx,
                 eth_signature: None,
             }))
-        } else {
-            Ok(None)
         }
     }
 
