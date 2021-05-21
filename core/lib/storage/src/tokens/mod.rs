@@ -374,6 +374,9 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             r#"
             INSERT INTO nft_factory ( creator_id, factory_address, creator_address )
             VALUES ( $1, $2, $3 )
+            ON CONFLICT ( creator_id ) 
+            DO UPDATE 
+            SET factory_address = $2 
             "#,
             creator_id.0 as i32,
             address_to_stored_string(&factory_address),

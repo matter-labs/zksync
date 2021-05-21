@@ -38,7 +38,7 @@ impl TryFrom<Log> for RegisterNFTFactoryEvent {
             &event.data.0,
         )
         .map_err(RegisterNFTFactoryEventParseError::ParseError)?;
-        let creator_address = Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]);
+        let creator_address = Address::from_slice(&event.topics[2].as_fixed_bytes()[12..]);
         let factory_address = decoded_event.remove(0).to_address().unwrap();
         Ok(Self {
             factory_address,
