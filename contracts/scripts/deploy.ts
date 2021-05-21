@@ -81,6 +81,13 @@ async function main() {
     if (args.contract === 'ForcedExit' || args.contract == null) {
         await deployer.deployForcedExit({ gasPrice, nonce: args.nonce });
     }
+
+    // We don't deploy it by default, since
+    // the address of it wouldn't be able to be inserted into the solpp
+    // for ZkSync smart contract
+    if (args.contract === 'AdditionalZkSync') {
+        await deployer.deployAdditionalZkSync({ gasPrice, nonce: args.nonce });
+    }
 }
 
 main()
