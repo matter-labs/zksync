@@ -10,6 +10,7 @@ use crate::{
     handler::{error::ChangePubKeyOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
+use zksync_crypto::params::max_processable_token;
 
 impl TxHandler<ChangePubKey> for ZkSyncState {
     type Op = ChangePubKeyOp;
@@ -22,6 +23,10 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
         invariant!(
             tx.account == account.address,
             ChangePubKeyOpError::InvalidAccountAddress
+        );
+        invariant!(
+            tx.fee_token <= max_processable_token(),
+            ChangePubKeyOpError::InvalidFeeTokenId
         );
         invariant!(
             tx.is_eth_auth_data_valid(),

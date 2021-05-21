@@ -283,6 +283,29 @@ export class Deployer {
         this.addresses.ForcedExit = forcedExitContract.address;
     }
 
+    public async deployAdditionalZkSync(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying Additional Zksync contract');
+        }
+
+        const additionalZkSyncContract = await deployContract(this.deployWallet, this.contracts.additionalZkSync, [], {
+            gasLimit: 6000000,
+            ...ethTxOptions
+        });
+        const zksRec = await additionalZkSyncContract.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = additionalZkSyncContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS=${additionalZkSyncContract.address}`);
+            console.log(
+                `Additiinal zkSync contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.RegenesisMultisig = additionalZkSyncContract.address;
+    }
+
     public async deployRegenesisMultisig(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
             console.log('Deploying Regenesis Multisig contract');

@@ -37,18 +37,12 @@ async function main() {
     const newTargetZkSync = await deployContract(wallet, testContracts.zkSync, [], {
         gasLimit: 6500000
     });
-    const newTargetAdditionalZkSync = await deployContract(wallet, testContracts.additionalZkSync, [], {
-        gasLimit: 6500000
-    });
 
     const newTargetGov = await deployContract(wallet, testContracts.governance, [], {
         gasLimit: 6500000
     });
 
-    const upgradeData = ethers.utils.defaultAbiCoder.encode(
-        [storedBlockInfoParam(), 'address'],
-        [lastBlockInfo, newTargetAdditionalZkSync.address]
-    );
+    const upgradeData = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [lastBlockInfo]);
 
     console.log('Starting upgrade');
     await (

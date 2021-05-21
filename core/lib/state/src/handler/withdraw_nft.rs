@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use num::BigUint;
 
-use zksync_crypto::params::{self, max_account_id};
+use zksync_crypto::params::{self, max_account_id, max_processable_token};
 use zksync_types::{
     AccountUpdate, AccountUpdates, PubKeyHash, TokenId, WithdrawNFT, WithdrawNFTOp, ZkSyncOp,
 };
@@ -35,6 +35,10 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
         invariant!(
             account_id == tx.account_id,
             WithdrawNFTOpError::FromAccountIncorrect
+        );
+        invariant!(
+            tx.fee_token <= max_processable_token(),
+            WithdrawNFTOpError::InvalidFeeTokenId
         );
         if let Some(nft) = self.nfts.get(&tx.token) {
             let (creator_id, _creator_account) = self

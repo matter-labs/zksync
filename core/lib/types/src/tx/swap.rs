@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_fungible_token_id, max_token_id, PRICE_BIT_WIDTH},
+    params::{max_account_id, max_processable_token, max_token_id, PRICE_BIT_WIDTH},
     primitives::rescue_hash_orders,
 };
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
@@ -291,7 +291,7 @@ impl Swap {
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.check_amounts()
             && self.submitter_id <= max_account_id()
-            && self.fee_token <= max_fungible_token_id()
+            && self.fee_token <= max_processable_token()
             && self.orders.0.check_correctness()
             && self.orders.1.check_correctness()
             && self.time_range().check_correctness();

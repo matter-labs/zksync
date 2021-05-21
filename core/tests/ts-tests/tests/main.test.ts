@@ -89,7 +89,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a mintNFT', async () => {
-        nft =  await tester.testMintNFT(alice, chuck,  token, true);
+        nft =  await tester.testMintNFT(alice, chuck,  token);
     });
     step('should execute a getNFT', async () => {
         await tester.testGetNFT(alice, token);

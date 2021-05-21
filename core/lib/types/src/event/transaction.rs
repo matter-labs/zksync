@@ -63,11 +63,7 @@ impl TransactionEvent {
                 token_id: exec_tx.signed_tx.token_id(),
                 block_number,
                 tx: serde_json::to_value(exec_tx.signed_tx.tx).unwrap(),
-                status: if exec_tx.success {
-                    status
-                } else {
-                    TransactionStatus::Rejected
-                },
+                status,
                 fail_reason: exec_tx.fail_reason,
                 created_at: exec_tx.created_at,
                 tx_type: OnceCell::default(),

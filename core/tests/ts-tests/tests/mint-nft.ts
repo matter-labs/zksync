@@ -35,6 +35,7 @@ Tester.prototype.testMintNFT = async function (
         fee
     });
 
+    this.runningFee = this.runningFee.add(fee);
     const balanceBefore = await wallet.getBalance(feeToken);
     let receipt;
     if (waitVerified === true) {
@@ -53,7 +54,6 @@ Tester.prototype.testMintNFT = async function (
     expect(nft !== undefined);
     expect(nft.contentHash).eq(utils.hexlify(contentHash));
 
-    this.runningFee = this.runningFee.add(fee);
     return nft;
 };
 

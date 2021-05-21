@@ -1,20 +1,21 @@
-use crate::{
-    helpers::{is_fee_amount_packable, pack_fee_amount},
-    AccountId, Nonce, TokenId,
-};
-use num::{BigUint, ToPrimitive};
-
-use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
+use num::{BigUint, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
+
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_fungible_token_id},
+    params::{max_account_id, max_fungible_token_id, max_processable_token},
 };
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
+use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
+use crate::{
+    helpers::{is_fee_amount_packable, pack_fee_amount},
+    tx::error::TransactionSignatureError,
+    AccountId, Nonce, TokenId,
+};
+
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
-use crate::tx::error::TransactionSignatureError;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,6 +153,10 @@ impl Withdraw {
                 .unwrap_or(true);
 
         if valid {
+            if self.fee != BigUint::zero() {
+                // Fee can only be paid in processable tokens
+                valid = self.token <= max_processable_token();
+            }
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
             self.cached_signer = VerifiedSignatureCache::Cached(signer);
