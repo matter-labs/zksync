@@ -67,13 +67,21 @@ async function rustCryptoTests() {
     process.chdir(process.env.ZKSYNC_HOME as string);
 }
 
-export async function rust() {
+export async function serverRust() {
     await utils.spawn('cargo test --release');
     await db(true);
     await rustApi(true);
     await prover();
+}
+
+export async function cryptoRust() {
     await circuit(4);
     await rustCryptoTests();
+}
+
+export async function rust() {
+    await serverRust();
+    await cryptoRust();
 }
 
 export const command = new Command('test').description('run test suites').addCommand(integration.command);
@@ -83,6 +91,8 @@ command.command('prover').description('run unit-tests for the prover').action(pr
 command.command('witness-generator').description('run unit-tests for the witness-generator').action(witness_generator);
 command.command('contracts').description('run unit-tests for the contracts').action(contracts);
 command.command('rust').description('run unit-tests for all rust binaries and libraries').action(rust);
+command.command('server-rust').description('run unit-tests for server binaries and libraries').action(serverRust);
+command.command('crypto-rust').description('run unit-tests for rust crypto binaries and libraries').action(cryptoRust);
 
 command
     .command('db')

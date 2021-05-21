@@ -75,7 +75,7 @@ jobs:
         run: ci_run zk test js
 
       - name: rust-unit-tests
-        run: ci_run zk test rust
+        run: ci_run zk test server-rust
 
   integration:
     runs-on: [self-hosted, FAST]
@@ -133,6 +133,25 @@ jobs:
           ci_run cat server.log
           ci_run cat dummy_prover.log
 
+  circuit-tests:
+    runs-on: [self-hosted, CI-worker]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: prepare
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
+      - name: init
+        run: |
+          ci_run ln -s /usr/src/keys/setup keys/setup
+          ci_run zk
+          ci_run zk run verify-keys unpack
+
+      - name: integration-testkit
+        run: ci_run zk test crypto-rust
 
   testkit:
     runs-on: [self-hosted, CI-worker]
