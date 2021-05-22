@@ -73,8 +73,11 @@ impl ZkSyncContractVersion {
     /// Returns supported block chunks sizes by the verifier contract
     /// with the given version.
     pub fn available_block_chunk_sizes(&self) -> &'static [usize] {
+        use ZkSyncContractVersion::*;
         match self {
-            _ => &[10, 32, 72, 156, 322, 654],
+            V0 | V1 | V2 => &[6, 30, 74, 150, 334, 678],
+            V3 => &[6, 30, 74, 150, 320, 630],
+            V4 => &[10, 32, 72, 156, 322, 654],
         }
     }
 }
