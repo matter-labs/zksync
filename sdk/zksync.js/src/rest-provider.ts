@@ -31,7 +31,6 @@ import {
     ContractAddress,
     Tokens,
     AccountState,
-    Fee,
     TransactionReceipt,
     PriorityOperationReceipt
 } from './types';
@@ -265,11 +264,11 @@ export class RestProvider extends SyncProvider {
         return this.parse_response(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
     }
 
-    async submitTxNewDetailed(tx: any, signature?: TxEthSignature): Promise<ApiResponse<string>> {
+    async submitTxNewDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<ApiResponse<string>> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
-    async submitTxNew(tx: any, signature?: TxEthSignature): Promise<string> {
+    async submitTxNew(tx: L2Tx, signature?: TxEthSignature): Promise<string> {
         return this.parse_response(await this.submitTxNewDetailed(tx, signature));
     }
 

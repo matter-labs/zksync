@@ -67,7 +67,7 @@ describe('ZkSync REST API V0.1 tests', () => {
 describe('ZkSync REST API V0.2 tests', () => {
     let tester: Tester;
     let alice: Wallet;
-    let provider: RestProvider = getDefaultRestProvider('localhost');
+    let provider: RestProvider;
     let lastTxHash: string;
     let lastTxReceipt: types.ApiTxReceipt;
 
@@ -75,6 +75,7 @@ describe('ZkSync REST API V0.2 tests', () => {
         tester = await Tester.init('localhost', 'HTTP');
         alice = await tester.fundedWallet('1.0');
         let bob = await tester.emptyWallet();
+        provider = await getDefaultRestProvider('localhost');
         for (const token of ['ETH', 'DAI']) {
             const thousand = tester.syncProvider.tokenSet.parseToken(token, '1000');
             await tester.testDeposit(alice, token, thousand, true);
@@ -92,7 +93,7 @@ describe('ZkSync REST API V0.2 tests', () => {
             amount: alice.provider.tokenSet.parseToken('ETH', '1')
         });
         lastTxHash = handle.txHash.replace('sync-tx:', '0x');
-        lastTxReceipt = await provider.notifyTransaction(lastTxHash, 'committed');
+        lastTxReceipt = await provider.notifyAnyTransaction(lastTxHash, 'COMMIT');
     });
 
     it('should check api v0.2 account scope', async () => {
@@ -142,8 +143,8 @@ describe('ZkSync REST API V0.2 tests', () => {
     });
 
     it('should check api v0.2 fee scope', async () => {
-        await provider.getTxFee('Withdraw', alice.address(), 'ETH');
-        await provider.getBatchFee(
+        await provider.getTransactionFee('Withdraw', alice.address(), 'ETH');
+        await provider.getBatchFullFee(
             [
                 { txType: 'Transfer', address: alice.address() },
                 { txType: 'Withdraw', address: alice.address() }
