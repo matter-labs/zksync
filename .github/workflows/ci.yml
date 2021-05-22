@@ -150,7 +150,7 @@ jobs:
           ci_run zk
           ci_run zk run verify-keys unpack
 
-      - name: integration-testkit
+      - name: circuit-tests
         run: ci_run zk test crypto-rust
 
   testkit:
