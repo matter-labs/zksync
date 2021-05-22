@@ -49,9 +49,14 @@ pub enum StorageUpdateState {
 pub struct DataRestoreDriver<T: Transport, I> {
     /// Web3 provider endpoint
     pub web3: Web3<T>,
-    /// Provides Ethereum Governance contract unterface
+    /// Provides Ethereum Governance contract interface
     pub governance_contract: (ethabi::Contract, Contract<T>),
-    /// Provides Ethereum Rollup contract unterface
+    /// Address of the Upgrade GateKeeper contract. Provides logs about
+    /// zkSync contract upgrades.
+    pub upgrade_gatekeeper_addr: H160,
+    /// The initial version of the deployed zkSync contract.
+    pub init_contract_version: u32,
+    /// Provides Ethereum Rollup contract interface
     pub zksync_contract: ZkSyncDeployedContract<T>,
     /// Rollup contract events state
     pub events_state: EventsState,
@@ -82,6 +87,8 @@ where
     ///
     /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
+    /// * `upgrade_gatekeeper_addr` - Upgrade GateKeeper contract address
+    /// * `init_contract_version` - The initial version of the deployed zkSync contract.
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     /// * `finite_mode` - Finite mode flag.
@@ -92,6 +99,8 @@ where
     pub fn new(
         web3: Web3<T>,
         governance_contract_eth_addr: H160,
+        upgrade_gatekeeper_addr: H160,
+        init_contract_version: u32,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         finite_mode: bool,
@@ -112,6 +121,8 @@ where
         Self {
             web3,
             governance_contract,
+            upgrade_gatekeeper_addr,
+            init_contract_version,
             zksync_contract,
             events_state,
             tree_state,
@@ -300,8 +311,10 @@ where
                 &self.web3,
                 &self.zksync_contract,
                 &self.governance_contract,
+                self.upgrade_gatekeeper_addr,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
+                self.init_contract_version,
             )
             .await
             .expect("Updating events state: cant update events state");

@@ -2,14 +2,15 @@
 use anyhow::format_err;
 use std::convert::TryFrom;
 use web3::contract::Contract;
-use web3::types::Transaction;
-use web3::types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H256, U256};
+use web3::types::{
+    BlockNumber as Web3BlockNumber, FilterBuilder, Log, Transaction, H160, H256, U256, U64,
+};
 use web3::{Transport, Web3};
 // Workspace deps
 use zksync_contracts::upgrade_gatekeeper;
 use zksync_types::{Address, BlockNumber, TokenId};
 // Local deps
-use crate::contract::ZkSyncDeployedContract;
+use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
 use crate::events::{BlockEvent, EventType};
 
@@ -86,13 +87,16 @@ impl EventsState {
     /// * `eth_blocks_step` - Blocks step for watching
     /// * `end_eth_blocks_offset` - Delta between last eth block and last watched block
     ///
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_events_state<T: Transport>(
         &mut self,
         web3: &Web3<T>,
         zksync_contract: &ZkSyncDeployedContract<T>,
         governance_contract: &(ethabi::Contract, Contract<T>),
+        upgrade_gatekeeper_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
+        init_contract_version: u32,
     ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, u64), anyhow::Error> {
         self.remove_verified_events();
 
@@ -107,9 +111,26 @@ impl EventsState {
             )
             .await?;
 
+        let contract_upgrade_eth_blocks: Vec<U64> =
+            Self::get_gatekeeper_logs(web3, upgrade_gatekeeper_addr)
+                .await?
+                .into_iter()
+                .map(|log| {
+                    log.block_number
+                        .expect("no Ethereum block number for upgrade log")
+                })
+                .collect();
+        let init_contract_version = ZkSyncContractVersion::try_from(init_contract_version)
+            .expect("invalid initial contract version provided");
+
         self.last_watched_eth_block_number = to_block_number;
         for (zksync_contract, block_events) in events {
-            self.update_blocks_state(zksync_contract, &block_events);
+            self.update_blocks_state(
+                zksync_contract,
+                &block_events,
+                &contract_upgrade_eth_blocks,
+                init_contract_version,
+            );
         }
 
         let mut events_to_return = self.committed_events.clone();
@@ -327,6 +348,8 @@ impl EventsState {
         &mut self,
         contract: &ZkSyncDeployedContract<T>,
         logs: &[Log],
+        contract_upgrade_eth_blocks: &[U64],
+        init_contract_version: ZkSyncContractVersion,
     ) -> bool {
         if logs.is_empty() {
             return false;
@@ -376,13 +399,23 @@ impl EventsState {
             let transaction_hash = log
                 .transaction_hash
                 .expect("There are no tx hash in block event");
+
+            let eth_block = log
+                .block_number
+                .expect("no Ethereum block number for block log");
+            let num = contract_upgrade_eth_blocks
+                .iter()
+                .filter(|block| eth_block >= **block)
+                .count();
+            let contract_version = init_contract_version.upgrade(num as u32);
+
             let block_num = log.topics[1];
 
             let mut block = BlockEvent {
                 block_num: BlockNumber(U256::from(block_num.as_bytes()).as_u32()),
                 transaction_hash,
                 block_type: EventType::Committed,
-                contract_version: contract.version,
+                contract_version,
             };
             if topic == block_verified_topic {
                 block.block_type = EventType::Verified;
@@ -416,7 +449,7 @@ mod test {
         types::Bytes,
     };
 
-    use crate::contract::ZkSyncDeployedContract;
+    use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
     use crate::tests::utils::{create_log, u32_to_32bytes, FakeTransport};
 
     #[test]
@@ -459,7 +492,9 @@ mod test {
             ));
         }
 
-        events_state.update_blocks_state(&contract, &logs);
+        let v4 = ZkSyncContractVersion::V4;
+        let upgrade_blocks = Vec::new();
+        events_state.update_blocks_state(&contract, &logs, &upgrade_blocks, v4);
         assert_eq!(events_state.committed_events.len(), 32);
         assert_eq!(events_state.verified_events.len(), 32);
 
@@ -475,7 +510,7 @@ mod test {
             3,
             u32_to_32bytes(1).into(),
         );
-        events_state.update_blocks_state(&contract, &[log]);
+        events_state.update_blocks_state(&contract, &[log], &upgrade_blocks, v4);
         assert_eq!(events_state.committed_events.len(), 16);
         assert_eq!(events_state.verified_events.len(), 11);
     }

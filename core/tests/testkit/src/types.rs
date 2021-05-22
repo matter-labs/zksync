@@ -3,14 +3,16 @@ use num::BigUint;
 use std::collections::HashMap;
 use web3::types::TransactionReceipt;
 use zksync_config::ZkSyncConfig;
-use zksync_types::block::Block;
 use zksync_types::TokenId;
+use zksync_types::{block::Block, H160};
 
 #[derive(Debug, Clone)]
 pub struct TestkitConfig {
     pub chain_id: u8,
     pub gas_price_factor: f64,
     pub web3_url: String,
+    pub upgrade_gatekeeper_addr: H160,
+    pub init_contract_version: u32,
 }
 
 impl TestkitConfig {
@@ -20,6 +22,8 @@ impl TestkitConfig {
             chain_id: config.eth_client.chain_id,
             gas_price_factor: config.eth_client.gas_price_factor,
             web3_url: config.eth_client.web3_url(),
+            upgrade_gatekeeper_addr: config.contracts.upgrade_gatekeeper_addr,
+            init_contract_version: config.contracts.init_contract_version,
         }
     }
 }

@@ -65,7 +65,7 @@ impl ZkSyncContractVersion {
     /// # Panics
     ///
     /// Panics if the the result is greater than the latest supported version.
-    pub fn upgrade(&mut self, num: u32) -> Self {
+    pub fn upgrade(&self, num: u32) -> Self {
         Self::try_from(i32::from(*self) as u32 + num)
             .expect("cannot upgrade past the latest contract version")
     }

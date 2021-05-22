@@ -15,6 +15,7 @@ use web3::{
 };
 
 use db_test_macro::test as db_test;
+use zksync_config::ContractsConfig;
 use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_crypto::Fr;
 use zksync_storage::{
@@ -282,6 +283,8 @@ impl Transport for Web3Transport {
 async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let mut transport = Web3Transport::new();
 
+    let contracts_config = ContractsConfig::from_env();
+
     let mut interactor = DatabaseStorageInteractor::new(storage);
     let contract = zksync_contract();
     let gov_contract = governance_contract();
@@ -384,6 +387,8 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let mut driver = DataRestoreDriver::new(
         Web3::new(transport.clone()),
         [1u8; 20].into(),
+        contracts_config.upgrade_gatekeeper_addr,
+        contracts_config.init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         true,
@@ -417,6 +422,8 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let mut driver = DataRestoreDriver::new(
         Web3::new(transport.clone()),
         [1u8; 20].into(),
+        contracts_config.upgrade_gatekeeper_addr,
+        contracts_config.init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         true,
@@ -433,6 +440,8 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 #[tokio::test]
 async fn test_with_inmemory_storage() {
     let mut transport = Web3Transport::new();
+
+    let contracts_config = ContractsConfig::from_env();
 
     let mut interactor = InMemoryStorageInteractor::new();
     let contract = zksync_contract();
@@ -588,6 +597,8 @@ async fn test_with_inmemory_storage() {
     let mut driver = DataRestoreDriver::new(
         web3.clone(),
         [1u8; 20].into(),
+        contracts_config.upgrade_gatekeeper_addr,
+        contracts_config.init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         true,
@@ -614,6 +625,8 @@ async fn test_with_inmemory_storage() {
     let mut driver = DataRestoreDriver::new(
         web3.clone(),
         [1u8; 20].into(),
+        contracts_config.upgrade_gatekeeper_addr,
+        contracts_config.init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         true,

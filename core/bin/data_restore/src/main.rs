@@ -50,8 +50,10 @@ struct Opt {
 pub struct ContractsConfig {
     eth_network: Network,
     governance_addr: Address,
+    upgrade_gatekeeper_addr: Address,
     genesis_tx_hash: H256,
     contract_addr: Address,
+    init_contract_version: u32,
 }
 
 impl ContractsConfig {
@@ -68,8 +70,10 @@ impl ContractsConfig {
         Self {
             eth_network: chain_opts.eth.network,
             governance_addr: contracts_opts.governance_addr,
+            upgrade_gatekeeper_addr: contracts_opts.upgrade_gatekeeper_addr,
             genesis_tx_hash: contracts_opts.genesis_tx_hash,
             contract_addr: contracts_opts.contract_addr,
+            init_contract_version: contracts_opts.init_contract_version,
         }
     }
 }
@@ -107,6 +111,8 @@ async fn main() {
     let mut driver = DataRestoreDriver::new(
         web3,
         config.governance_addr,
+        config.upgrade_gatekeeper_addr,
+        config.init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         finite_mode,

@@ -1,6 +1,8 @@
 {
     "eth_network": "ropsten",
     "governance_addr": "0x0C5C6cD4E2436B1b308A0C11942705418F41F730",
+    "upgrade_gatekeeper_addr": "0x3d3cDd04acBf3EcFb3c207F77b14C51Ea4E00c4b",
     "genesis_tx_hash": "0xd37743975fbad2d8be5fc75ecb4299c2eef36e483ad1a12f74777e8b86a952b5",
-    "contract_addr": "0x17dE8874259c59cd9f7E6ec86b6813Bda661A57c"
+    "contract_addr": "0x17dE8874259c59cd9f7E6ec86b6813Bda661A57c",
+    "init_contract_version": 4
 }
