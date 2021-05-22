@@ -52,7 +52,6 @@ pub struct ContractsConfig {
     governance_addr: Address,
     genesis_tx_hash: H256,
     contract_addr: Address,
-    available_block_chunk_sizes: Vec<usize>,
 }
 
 impl ContractsConfig {
@@ -71,7 +70,6 @@ impl ContractsConfig {
             governance_addr: contracts_opts.governance_addr,
             genesis_tx_hash: contracts_opts.genesis_tx_hash,
             contract_addr: contracts_opts.contract_addr,
-            available_block_chunk_sizes: chain_opts.state_keeper.block_chunk_sizes,
         }
     }
 }
@@ -114,7 +112,6 @@ async fn main() {
         finite_mode,
         final_hash,
         contract,
-        config.available_block_chunk_sizes,
     );
 
     let mut interactor = DatabaseStorageInteractor::new(storage);

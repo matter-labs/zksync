@@ -97,17 +97,20 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         // For each block aggregate its operations from the
         // `data_restore_rollup_block_ops` table into array and
         // match it by the block number from `data_restore_rollup_blocks`.
+        // The contract version is obtained from block events.
         let stored_blocks = sqlx::query_as!(
             StoredRollupOpsBlock,
-            "SELECT blocks.block_num AS block_num,
-            ops, fee_account, timestamp, previous_block_root_hash
+            "SELECT blocks.block_num AS block_num, ops, fee_account,
+            timestamp, previous_block_root_hash, contract_version
             FROM data_restore_rollup_blocks AS blocks
             JOIN (
                 SELECT block_num, array_agg(operation) as ops
                 FROM data_restore_rollup_block_ops
                 GROUP BY block_num
             ) ops
-            ON blocks.block_num = ops.block_num
+                ON blocks.block_num = ops.block_num
+            JOIN data_restore_events_state as events
+                ON blocks.block_num = events.block_num
             ORDER BY blocks.block_num ASC"
         )
         .fetch_all(self.0.conn())

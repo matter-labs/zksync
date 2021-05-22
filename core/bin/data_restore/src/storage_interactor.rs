@@ -156,5 +156,9 @@ pub fn stored_ops_block_into_ops_block(op_block: StoredRollupOpsBlock) -> Rollup
             .previous_block_root_hash
             .map(|h| H256::from_slice(&h))
             .unwrap_or_default(),
+        contract_version: Some(
+            ZkSyncContractVersion::try_from(op_block.contract_version as u32)
+                .expect("invalid contract version in the database"),
+        ),
     }
 }

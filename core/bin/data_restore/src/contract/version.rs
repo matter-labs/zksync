@@ -45,11 +45,15 @@ impl ZkSyncContractVersion {
         data: Vec<u8>,
     ) -> anyhow::Result<Vec<RollupOpsBlock>> {
         use ZkSyncContractVersion::*;
-        let res = match self {
+        let mut blocks = match self {
             V0 | V1 | V2 | V3 => vec![contract::default::rollup_ops_blocks_from_bytes(data)?],
             V4 => contract::v4::rollup_ops_blocks_from_bytes(data)?,
         };
-        Ok(res)
+        // Set the contract version.
+        for block in blocks.iter_mut() {
+            block.contract_version = Some(*self);
+        }
+        Ok(blocks)
     }
 
     /// Increment the contract version by one.

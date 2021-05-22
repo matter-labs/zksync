@@ -20,6 +20,7 @@ pub struct StoredRollupOpsBlock {
     pub fee_account: i64,
     pub timestamp: Option<i64>,
     pub previous_block_root_hash: Option<Vec<u8>>,
+    pub contract_version: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, FromRow, PartialEq)]

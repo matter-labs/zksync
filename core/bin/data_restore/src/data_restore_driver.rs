@@ -68,7 +68,6 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// Expected root hash to be observed after restoring process. Only
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
-    pub available_block_chunk_sizes: Vec<usize>,
     phantom_data: PhantomData<I>,
 }
 
@@ -98,7 +97,6 @@ where
         finite_mode: bool,
         final_hash: Option<Fr>,
         zksync_contract: ZkSyncDeployedContract<T>,
-        available_block_chunk_sizes: Vec<usize>,
     ) -> Self {
         let governance_contract = {
             let abi = governance_contract();
@@ -122,7 +120,6 @@ where
             finite_mode,
             final_hash,
             phantom_data: Default::default(),
-            available_block_chunk_sizes,
         }
     }
 
@@ -330,9 +327,13 @@ where
         let mut updates = vec![];
         let mut count = 0;
         for op_block in new_ops_blocks {
+            let available_block_chunk_sizes = op_block
+                .contract_version
+                .expect("contract version must be set")
+                .available_block_chunk_sizes();
             let (block, acc_updates) = self
                 .tree_state
-                .update_tree_states_from_ops_block(&op_block, &self.available_block_chunk_sizes)
+                .update_tree_states_from_ops_block(&op_block, available_block_chunk_sizes)
                 .expect("Updating tree state: cant update tree from operations");
             blocks.push(block);
             updates.push(acc_updates);
