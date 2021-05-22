@@ -485,4 +485,8 @@ export class RestProvider extends SyncProvider {
             };
         }
     }
+
+    getEthTxForWithdrawal(withdrawal_hash: string): Promise<string> {
+        throw new Error('Ethereum tx for withdrawal cannot be got using API v0.2');
+    }
 }

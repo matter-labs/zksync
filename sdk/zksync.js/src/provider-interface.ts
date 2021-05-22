@@ -48,6 +48,7 @@ export abstract class SyncProvider {
         tokenLike: TokenLike
     ): Promise<BigNumber>;
     abstract getTokenPrice(tokenLike: TokenLike): Promise<number>;
+    abstract getEthTxForWithdrawal(withdrawal_hash: string): Promise<string>;
 
     async updateTokenSet(): Promise<void> {
         const updatedTokenSet = new TokenSet(await this.getTokens());
