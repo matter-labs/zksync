@@ -51,4 +51,22 @@ impl ZkSyncContractVersion {
         };
         Ok(res)
     }
+
+    /// Increment the contract version by one.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the version is already latest.
+    pub fn upgrade(&mut self) {
+        *self = Self::try_from(i32::from(*self) as u32 + 1)
+            .expect("cannot upgrade latest contract version");
+    }
+
+    /// Returns supported block chunks sizes by the verifier contract
+    /// with the given version.
+    pub fn available_block_chunk_sizes(&self) -> &'static [usize] {
+        match self {
+            _ => &[10, 32, 72, 156, 322, 654],
+        }
+    }
 }

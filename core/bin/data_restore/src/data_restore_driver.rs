@@ -1,11 +1,11 @@
 // External deps
 use web3::{
     contract::Contract,
-    types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H160, H256},
+    types::{H160, H256},
     Transport, Web3,
 };
 // Workspace deps
-use zksync_contracts::{governance_contract, upgrade_gatekeeper};
+use zksync_contracts::governance_contract;
 use zksync_crypto::Fr;
 
 use zksync_types::{AccountId, AccountMap, AccountUpdate, BlockNumber};
@@ -18,7 +18,6 @@ use crate::{
     storage_interactor::StorageInteractor,
     tree_state::TreeState,
 };
-use ethabi::Address;
 
 use std::marker::PhantomData;
 
@@ -125,32 +124,6 @@ where
             phantom_data: Default::default(),
             available_block_chunk_sizes,
         }
-    }
-
-    pub async fn get_gatekeeper_logs(
-        &self,
-        upgrade_gatekeeper_contract_address: Address,
-    ) -> anyhow::Result<Vec<Log>> {
-        let gatekeeper_abi = upgrade_gatekeeper();
-        let upgrade_contract_event = gatekeeper_abi
-            .event("UpgradeComplete")
-            .expect("Upgrade Gatekeeper contract abi error")
-            .signature();
-
-        let filter = FilterBuilder::default()
-            .address(vec![upgrade_gatekeeper_contract_address])
-            .from_block(Web3BlockNumber::Earliest)
-            .to_block(Web3BlockNumber::Latest)
-            .topics(Some(vec![upgrade_contract_event]), None, None, None)
-            .build();
-
-        let result = self
-            .web3
-            .eth()
-            .logs(filter)
-            .await
-            .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
-        Ok(result)
     }
 
     /// Sets the 'genesis' state.

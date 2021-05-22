@@ -6,10 +6,12 @@ use web3::types::Transaction;
 use web3::types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H256, U256};
 use web3::{Transport, Web3};
 // Workspace deps
+use zksync_contracts::upgrade_gatekeeper;
+use zksync_types::{Address, BlockNumber, TokenId};
+// Local deps
 use crate::contract::ZkSyncDeployedContract;
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
 use crate::events::{BlockEvent, EventType};
-use zksync_types::{Address, BlockNumber, TokenId};
 
 #[derive(Debug)]
 pub struct NewTokenEvent {
@@ -189,6 +191,42 @@ impl EventsState {
         logs.push((zksync_contract, block_logs));
 
         Ok((logs, token_logs, to_block_number_u64))
+    }
+
+    /// Returns logs about complete contract upgrades.
+    ///
+    /// # Arguments
+    ///
+    /// * `web3` - Web3 provider url
+    /// * `upgrade_gatekeeper_contract_address` - UpgradeGateKeeper contract address
+    /// * `from` - From ethereum block number
+    /// * `to` - To ethereum block number
+    ///
+    pub async fn get_gatekeeper_logs<T: Transport>(
+        web3: &Web3<T>,
+        upgrade_gatekeeper_contract_address: Address,
+        from: Web3BlockNumber,
+        to: Web3BlockNumber,
+    ) -> anyhow::Result<Vec<Log>> {
+        let gatekeeper_abi = upgrade_gatekeeper();
+        let upgrade_contract_event = gatekeeper_abi
+            .event("UpgradeComplete")
+            .expect("Upgrade Gatekeeper contract abi error")
+            .signature();
+
+        let filter = FilterBuilder::default()
+            .address(vec![upgrade_gatekeeper_contract_address])
+            .from_block(from)
+            .to_block(to)
+            .topics(Some(vec![upgrade_contract_event]), None, None, None)
+            .build();
+
+        let result = web3
+            .eth()
+            .logs(filter)
+            .await
+            .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
+        Ok(result)
     }
 
     /// Returns new added token logs
