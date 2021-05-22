@@ -1,4 +1,6 @@
 import Axios from 'axios';
+import { BigNumber } from 'ethers';
+import { SyncProvider } from './provider-interface';
 import {
     Network,
     TokenLike,
@@ -25,32 +27,54 @@ import {
     ApiTransaction,
     BlockAndTxHash,
     PendingOpsRequest,
-    AccountTxsRequest
+    AccountTxsRequest,
+    ContractAddress,
+    Tokens,
+    AccountState,
+    Fee,
+    TransactionReceipt,
+    PriorityOperationReceipt
 } from './types';
-import { sleep } from './utils';
+import { sleep, TokenSet } from './utils';
 
-export function getDefaultRestProvider(network: Network): RestProvider {
+export async function getDefaultRestProvider(network: Network): Promise<RestProvider> {
     if (network === 'localhost') {
-        return new RestProvider('http://127.0.0.1:3001/api/v0.2');
+        return await RestProvider.newProvider('http://127.0.0.1:3001/api/v0.2');
     } else if (network === 'ropsten') {
-        return new RestProvider('https://ropsten-api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider('https://ropsten-api.zksync.io/api/v0.2');
     } else if (network === 'rinkeby') {
-        return new RestProvider('https://rinkeby-api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider('https://rinkeby-api.zksync.io/api/v0.2');
     } else if (network === 'ropsten-beta') {
-        return new RestProvider('https://ropsten-beta-api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider('https://ropsten-beta-api.zksync.io/api/v0.2');
     } else if (network === 'rinkeby-beta') {
-        return new RestProvider('https://rinkeby-beta-api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider('https://rinkeby-beta-api.zksync.io/api/v0.2');
     } else if (network === 'mainnet') {
-        return new RestProvider('https://api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider('https://api.zksync.io/api/v0.2');
     } else {
         throw new Error(`Ethereum network ${network} is not supported`);
     }
 }
 
-export class RestProvider {
+export class RestProvider extends SyncProvider {
     public pollIntervalMilliSecs = 500;
 
-    public constructor(public address: string) {}
+    private constructor(public address: string) {
+        super();
+        this.providerType = 'Rest';
+    }
+
+    static async newProvider(
+        address: string = 'http://127.0.0.1:3030',
+        pollIntervalMilliSecs?: number
+    ): Promise<RestProvider> {
+        const provider = new RestProvider(address);
+        if (pollIntervalMilliSecs) {
+            provider.pollIntervalMilliSecs = pollIntervalMilliSecs;
+        }
+        provider.contractAddress = await provider.getContractAddress();
+        provider.tokenSet = new TokenSet(await provider.getTokens());
+        return provider;
+    }
 
     parse_response<T>(response: ApiResponse<T>): T {
         if (response.status === 'success') {
@@ -166,7 +190,7 @@ export class RestProvider {
         return this.parse_response(await this.configDetailed());
     }
 
-    async getTxFeeDetailed(
+    async getTransactionFeeDetailed(
         txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
@@ -174,15 +198,15 @@ export class RestProvider {
         return await this.post(`${this.address}/fee`, { txType, address, tokenLike });
     }
 
-    async getTxFee(
+    async getTransactionFee(
         txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
     ): Promise<ApiFee> {
-        return this.parse_response(await this.getTxFeeDetailed(txType, address, tokenLike));
+        return this.parse_response(await this.getTransactionFeeDetailed(txType, address, tokenLike));
     }
 
-    async getBatchFeeDetailed(
+    async getBatchFullFeeDetailed(
         transactions: {
             txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee;
             address: Address;
@@ -192,14 +216,14 @@ export class RestProvider {
         return await this.post(`${this.address}/fee/batch`, { transactions, tokenLike });
     }
 
-    async getBatchFee(
+    async getBatchFullFee(
         transactions: {
             txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee;
             address: Address;
         }[],
         tokenLike: TokenLike
     ): Promise<ApiFee> {
-        return this.parse_response(await this.getBatchFeeDetailed(transactions, tokenLike));
+        return this.parse_response(await this.getBatchFullFeeDetailed(transactions, tokenLike));
     }
 
     async networkStatusDetailed(): Promise<ApiResponse<NetworkStatus>> {
@@ -230,50 +254,71 @@ export class RestProvider {
         return this.parse_response(await this.tokenByIdOrAddressDetailed(idOrAddress));
     }
 
-    async tokenPriceDetailed(
+    async tokenPriceInfoDetailed(
         idOrAddress: number | TokenAddress,
         tokenIdOrUsd: number | 'usd'
     ): Promise<ApiResponse<TokenPriceInfo>> {
         return await this.get(`${this.address}/tokens/${idOrAddress}/priceIn/${tokenIdOrUsd}`);
     }
 
-    async tokenPrice(idOrAddress: number | TokenAddress, tokenIdOrUsd: number | 'usd'): Promise<TokenPriceInfo> {
-        return this.parse_response(await this.tokenPriceDetailed(idOrAddress, tokenIdOrUsd));
+    async tokenPriceInfo(idOrAddress: number | TokenAddress, tokenIdOrUsd: number | 'usd'): Promise<TokenPriceInfo> {
+        return this.parse_response(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
     }
 
-    async submitTxDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<ApiResponse<String>> {
+    async submitTxNewDetailed(tx: any, signature?: TxEthSignature): Promise<ApiResponse<string>> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
-    async submitTx(tx: L2Tx, signature?: TxEthSignature): Promise<String> {
-        return this.parse_response(await this.submitTxDetailed(tx, signature));
+    async submitTxNew(tx: any, signature?: TxEthSignature): Promise<string> {
+        return this.parse_response(await this.submitTxNewDetailed(tx, signature));
     }
 
-    async txStatusDetailed(txHash: string): Promise<ApiResponse<ApiTxReceipt>> {
+    async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
+        if (fastProcessing !== undefined) {
+            tx.fastProcessing = fastProcessing;
+        }
+        return await this.submitTxNew(tx, signature);
+    }
+
+    async txStatusDetailed(txHash: string): Promise<ApiResponse<ApiTxReceipt | null>> {
         return await this.get(`${this.address}/transactions/${txHash}`);
     }
 
-    async txStatus(txHash: string): Promise<ApiTxReceipt> {
+    async txStatus(txHash: string): Promise<ApiTxReceipt | null> {
         return this.parse_response(await this.txStatusDetailed(txHash));
     }
 
-    async txDataDetailed(txHash: string): Promise<ApiResponse<ApiTxAndSignature>> {
+    async txDataDetailed(txHash: string): Promise<ApiResponse<ApiTxAndSignature | null>> {
         return await this.get(`${this.address}/transactions/${txHash}`);
     }
 
-    async txData(txHash: string): Promise<ApiTxAndSignature> {
+    async txData(txHash: string): Promise<ApiTxAndSignature | null> {
         return this.parse_response(await this.txDataDetailed(txHash));
     }
 
-    async submitBatchDetailed(
+    async submitTxsBatchNewDetailed(
         txs: L2Tx[],
         signature: TxEthSignature | TxEthSignature[]
     ): Promise<ApiResponse<SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
-    async submitBatch(txs: L2Tx[], signature: TxEthSignature | TxEthSignature[]): Promise<SubmitBatchResponse> {
-        return this.parse_response(await this.submitBatchDetailed(txs, signature));
+    async submitTxsBatchNew(txs: L2Tx[], signature: TxEthSignature | TxEthSignature[]): Promise<SubmitBatchResponse> {
+        return this.parse_response(await this.submitTxsBatchNewDetailed(txs, signature));
+    }
+
+    async submitTxsBatch(
+        transactions: { tx: any; signature?: TxEthSignature }[],
+        ethSignatures?: TxEthSignature | TxEthSignature[]
+    ): Promise<string[]> {
+        let txs = [];
+        for (const txAndSignature of transactions) {
+            txs.push(txAndSignature.tx);
+        }
+        if (ethSignatures === undefined) {
+            throw new Error('Batch signature should be provided in API v0.2');
+        }
+        return await (await this.submitTxsBatchNew(txs, ethSignatures)).transactionHashes;
     }
 
     async getBatchDetailed(batchHash: string): Promise<ApiResponse<ApiBatchData>> {
@@ -284,34 +329,161 @@ export class RestProvider {
         return this.parse_response(await this.getBatchDetailed(batchHash));
     }
 
-    async notifyTransactionDetailed(
-        txHash: string,
-        state: 'committed' | 'finalized'
-    ): Promise<ApiResponse<ApiTxReceipt>> {
+    async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<ApiTxReceipt> {
         while (true) {
-            let transactionStatus = await this.txStatusDetailed(txHash);
+            let transactionStatus = await this.txStatus(hash);
             let notifyDone;
-            if (state === 'committed') {
-                notifyDone = transactionStatus.result && transactionStatus.result.rollupBlock;
+            if (action === 'COMMIT') {
+                notifyDone = transactionStatus.rollupBlock !== null;
             } else {
-                if (transactionStatus.result && transactionStatus.result.rollupBlock) {
+                if (transactionStatus.rollupBlock !== null) {
                     // If the transaction status is rejected it cannot be known if transaction is queued, committed or finalized.
-                    const blockStatus = await this.blockByPositionDetailed(transactionStatus.result.rollupBlock);
-                    notifyDone = blockStatus.result && blockStatus.result.status === 'finalized';
+                    const blockStatus = await this.blockByPosition(transactionStatus.rollupBlock);
+                    notifyDone = blockStatus.status === 'finalized';
                 }
             }
             if (notifyDone) {
-                // Transaction status needs to be updated if status
-                // was updated between `txStatusDetailed` and `blockByPositionDetailed` queries.
-                transactionStatus = await this.txStatusDetailed(txHash);
-                return transactionStatus;
+                // Transaction status needs to be recalculated because it can
+                // be updated between `txStatus` and `blockByPosition` calls.
+                return await this.txStatus(hash);
             } else {
                 await sleep(this.pollIntervalMilliSecs);
             }
         }
     }
 
-    async notifyTransaction(txHash: string, state: 'committed' | 'finalized'): Promise<ApiTxReceipt> {
-        return this.parse_response(await this.notifyTransactionDetailed(txHash, state));
+    async notifyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<TransactionReceipt> {
+        await this.notifyAnyTransaction(hash, action);
+        return await this.getTxReceipt(hash);
+    }
+
+    async notifyPriorityOp(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {
+        await this.notifyAnyTransaction(hash, action);
+        return await this.getPriorityOpStatus(hash);
+    }
+
+    async getContractAddress(): Promise<ContractAddress> {
+        const config = await this.config();
+        return {
+            mainContract: config.contract,
+            govContract: config.govContract
+        };
+    }
+
+    async getTokens(): Promise<Tokens> {
+        let tokens = {};
+        let lastId = 0;
+        let maxLimit = 100; //TODO
+        let tokenPage: Paginated<TokenInfo, number>;
+        do {
+            tokenPage = await this.tokenPagination({
+                from: lastId,
+                limit: maxLimit,
+                direction: 'newer'
+            });
+            for (let token of tokenPage.list) {
+                tokens[token.symbol] = {
+                    address: token.address,
+                    id: token.id,
+                    symbol: token.symbol,
+                    decimals: token.decimals
+                };
+            }
+            lastId += maxLimit;
+        } while (tokenPage.list.length == maxLimit);
+
+        return tokens;
+    }
+
+    async getState(address: Address): Promise<AccountState> {
+        const committed = await this.accountInfo(address, 'committed');
+        const finalized = await this.accountInfo(address, 'finalized');
+        return {
+            address,
+            id: committed.accountId,
+            committed: {
+                balances: committed.balances,
+                nonce: committed.nonce,
+                pubKeyHash: committed.pubKeyHash
+            },
+            verified: {
+                balances: finalized.balances,
+                nonce: finalized.nonce,
+                pubKeyHash: finalized.pubKeyHash
+            }
+        };
+    }
+
+    async getConfirmationsForEthOpAmount(): Promise<number> {
+        const config = await this.config();
+        return config.depositConfirmations;
+    }
+
+    async getTransactionsBatchFee(
+        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee)[],
+        addresses: Address[],
+        tokenLike: TokenLike
+    ): Promise<BigNumber> {
+        let transactions = [];
+        for (let i = 0; i < txTypes.length; ++i) {
+            transactions.push({ txType: txTypes[i], address: addresses[i] });
+        }
+        const fee = await this.getBatchFullFee(transactions, tokenLike);
+        return fee.totalFee;
+    }
+
+    async getTokenPrice(tokenLike: TokenLike): Promise<number> {
+        const price = await this.tokenPriceInfo(tokenLike, 'usd');
+        return price.price.toNumber();
+    }
+
+    async getTxReceipt(txHash: string): Promise<TransactionReceipt> {
+        const receipt = await this.txStatus(txHash);
+        if (receipt === null || receipt.rollupBlock === null) {
+            return {
+                executed: false
+            };
+        } else {
+            const blockFullInfo = await this.blockByPosition(receipt.rollupBlock);
+            const blockInfo = {
+                blockNumber: blockFullInfo.blockNumber,
+                committed: blockFullInfo.commitTxHash !== null,
+                verified: blockFullInfo.verifyTxHash !== null
+            };
+            if (receipt.status === 'rejected') {
+                return {
+                    executed: true,
+                    success: false,
+                    failReason: receipt.failReason,
+                    block: blockInfo
+                };
+            } else {
+                return {
+                    executed: true,
+                    success: true,
+                    block: blockInfo
+                };
+            }
+        }
+    }
+
+    async getPriorityOpStatus(hash: string): Promise<PriorityOperationReceipt> {
+        const receipt = await this.txStatus(hash);
+        if (receipt === null || receipt.rollupBlock === null) {
+            return {
+                executed: false
+            };
+        } else {
+            const blockFullInfo = await this.blockByPosition(receipt.rollupBlock);
+            const blockInfo = {
+                blockNumber: blockFullInfo.blockNumber,
+                committed: blockFullInfo.commitTxHash !== null,
+                verified: blockFullInfo.verifyTxHash !== null
+            };
+            return {
+                executed: true,
+                block: blockInfo
+            };
+        }
     }
 }

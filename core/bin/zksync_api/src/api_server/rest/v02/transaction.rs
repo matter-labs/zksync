@@ -163,16 +163,13 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Some(op)
-        } else if let Some(op) = storage
-            .chain()
-            .operations_schema()
-            .get_executed_priority_operation_by_eth_hash(tx_hash.as_ref())
-            .await
-            .map_err(Error::storage)?
-        {
-            Some(op)
         } else {
-            None
+            storage
+                .chain()
+                .operations_schema()
+                .get_executed_priority_operation_by_eth_hash(tx_hash.as_ref())
+                .await
+                .map_err(Error::storage)?
         };
 
         if let Some(op) = op {
@@ -287,16 +284,13 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Some(op)
-        } else if let Some(op) = storage
-            .chain()
-            .operations_schema()
-            .get_executed_priority_operation_by_eth_hash(tx_hash.as_ref())
-            .await
-            .map_err(Error::storage)?
-        {
-            Some(op)
         } else {
-            None
+            storage
+                .chain()
+                .operations_schema()
+                .get_executed_priority_operation_by_eth_hash(tx_hash.as_ref())
+                .await
+                .map_err(Error::storage)?
         };
 
         if let Some(op) = op {

@@ -16,6 +16,7 @@ import {
     TxEthSignature
 } from './types';
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
+import { SyncProvider } from './provider-interface';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
     if (transport === 'WS') {
@@ -62,14 +63,11 @@ export async function getDefaultProvider(network: Network, transport: 'WS' | 'HT
     }
 }
 
-export class Provider {
-    contractAddress: ContractAddress;
-    public tokenSet: TokenSet;
-
-    // For HTTP provider
-    public pollIntervalMilliSecs = 500;
-
-    private constructor(public transport: AbstractJSONRPCTransport) {}
+export class Provider extends SyncProvider {
+    private constructor(public transport: AbstractJSONRPCTransport) {
+        super();
+        this.providerType = 'RPC';
+    }
 
     /**
      * @deprecated Websocket support will be removed in future. Use HTTP transport instead.
@@ -139,11 +137,6 @@ export class Provider {
 
     async getTokens(): Promise<Tokens> {
         return await this.transport.request('tokens', null);
-    }
-
-    async updateTokenSet(): Promise<void> {
-        const updatedTokenSet = new TokenSet(await this.getTokens());
-        this.tokenSet = updatedTokenSet;
     }
 
     async getState(address: Address): Promise<AccountState> {

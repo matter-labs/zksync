@@ -27,7 +27,7 @@ export interface Create2Data {
 export interface AccountState {
     address: Address;
     id?: number;
-    depositing: {
+    depositing?: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: {
@@ -214,11 +214,11 @@ export interface LegacyChangePubKeyFee {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee;
+    feeType?: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee;
     // Amount of gas used by transaction
-    gasTxAmount: BigNumber;
+    gasTxAmount?: BigNumber;
     // Gas price (in wei)
-    gasPriceWei: BigNumber;
+    gasPriceWei?: BigNumber;
     // Ethereum gas part of fee (in wei)
     gasFee: BigNumber;
     // Zero-knowledge proof part of fee (in wei)
@@ -228,6 +228,10 @@ export interface Fee {
 }
 
 export interface BatchFee {
+    // Ethereum gas part of fee (in wei)
+    gasFee?: BigNumber;
+    // Zero-knowledge proof part of fee (in wei)
+    zkpFee?: BigNumber;
     // Total fee amount (in wei)
     totalFee: BigNumber;
 }
