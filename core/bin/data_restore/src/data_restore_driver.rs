@@ -340,6 +340,7 @@ where
         let mut updates = vec![];
         let mut count = 0;
         for op_block in new_ops_blocks {
+            // Take the contract version into account when choosing block chunk sizes.
             let available_block_chunk_sizes = op_block
                 .contract_version
                 .expect("contract version must be set")

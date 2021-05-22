@@ -84,8 +84,10 @@ impl EventsState {
     /// * `web3` - Web3 provider url
     /// * `zksync_contract` - Rollup contract
     /// * `governance_contract` - Governance contract
+    /// * `upgrade_gatekeeper_addr` - UpgradeGateKeeper contract address
     /// * `eth_blocks_step` - Blocks step for watching
     /// * `end_eth_blocks_offset` - Delta between last eth block and last watched block
+    /// * `init_contract_version` - The initial version of the deployed zkSync contract
     ///
     #[allow(clippy::too_many_arguments)]
     pub async fn update_events_state<T: Transport>(
@@ -110,7 +112,8 @@ impl EventsState {
                 end_eth_blocks_offset,
             )
             .await?;
-
+        // Save Ethereum block numbers that correspond to `UpgradeComplete`
+        // events emitted by the Upgrade GateKeeper.
         let contract_upgrade_eth_blocks: Vec<U64> =
             Self::get_gatekeeper_logs(web3, upgrade_gatekeeper_addr)
                 .await?
@@ -343,7 +346,8 @@ impl EventsState {
     ///
     /// * `contract` - Specified contract
     /// * `logs` - Block events with their info
-    ///
+    /// * `contract_upgrade_eth_blocks` - Ethereum blocks that correspond to emitted `UpgradeComplete` events
+    /// * `init_contract_version` - The initial version of the deployed zkSync contract
     fn update_blocks_state<T: Transport>(
         &mut self,
         contract: &ZkSyncDeployedContract<T>,
@@ -399,7 +403,7 @@ impl EventsState {
             let transaction_hash = log
                 .transaction_hash
                 .expect("There are no tx hash in block event");
-
+            // Restore the number of contract upgrades using Eth block numbers.
             let eth_block = log
                 .block_number
                 .expect("no Ethereum block number for block log");
