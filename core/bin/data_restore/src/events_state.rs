@@ -199,14 +199,10 @@ impl EventsState {
     ///
     /// * `web3` - Web3 provider url
     /// * `upgrade_gatekeeper_contract_address` - UpgradeGateKeeper contract address
-    /// * `from` - From ethereum block number
-    /// * `to` - To ethereum block number
     ///
     pub async fn get_gatekeeper_logs<T: Transport>(
         web3: &Web3<T>,
         upgrade_gatekeeper_contract_address: Address,
-        from: Web3BlockNumber,
-        to: Web3BlockNumber,
     ) -> anyhow::Result<Vec<Log>> {
         let gatekeeper_abi = upgrade_gatekeeper();
         let upgrade_contract_event = gatekeeper_abi
@@ -216,8 +212,8 @@ impl EventsState {
 
         let filter = FilterBuilder::default()
             .address(vec![upgrade_gatekeeper_contract_address])
-            .from_block(from)
-            .to_block(to)
+            .from_block(Web3BlockNumber::Earliest)
+            .to_block(Web3BlockNumber::Latest)
             .topics(Some(vec![upgrade_contract_event]), None, None, None)
             .build();
 

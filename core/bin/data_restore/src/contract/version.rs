@@ -56,14 +56,18 @@ impl ZkSyncContractVersion {
         Ok(blocks)
     }
 
-    /// Increment the contract version by one.
+    /// Returns the contract version incremented by `num`.
+    ///
+    /// # Arguments
+    ///
+    /// * `num` - how many times to upgrade.
     ///
     /// # Panics
     ///
-    /// Panics if the version is already latest.
-    pub fn upgrade(&mut self) {
-        *self = Self::try_from(i32::from(*self) as u32 + 1)
-            .expect("cannot upgrade latest contract version");
+    /// Panics if the the result is greater than the latest supported version.
+    pub fn upgrade(&mut self, num: u32) -> Self {
+        Self::try_from(i32::from(*self) as u32 + num)
+            .expect("cannot upgrade past the latest contract version")
     }
 
     /// Returns supported block chunks sizes by the verifier contract
