@@ -1,7 +1,10 @@
 // Built-in deps
 use std::str::FromStr;
 // Workspace deps
-use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
+use zksync_storage::{
+    data_restore::records::{NewBlockEvent, NewRollupOpsBlock},
+    StorageProcessor,
+};
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
     Token, TokenGenesisListItem, TokenId,
@@ -64,13 +67,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
         let mut ops = Vec::with_capacity(blocks.len());
 
         for block in blocks {
-            ops.push((
-                block.block_num,
-                block.ops.as_slice(),
-                block.fee_account,
-                block.timestamp,
-                block.previous_block_root_hash,
-            ));
+            ops.push(NewRollupOpsBlock {
+                block_num: block.block_num,
+                ops: block.ops.as_slice(),
+                fee_account: block.fee_account,
+                timestamp: block.timestamp,
+                previous_block_root_hash: block.previous_block_root_hash,
+            });
         }
 
         self.storage
@@ -247,7 +250,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .await
             .expect("Cant load operation blocks")
             .into_iter()
-            .map(|block| stored_ops_block_into_ops_block(block))
+            .map(stored_ops_block_into_ops_block)
             .collect()
     }
 

@@ -6,11 +6,11 @@ use zksync_types::{
     aggregated_operations::{
         AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
     },
-    AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp, H256,
+    AccountId, AccountUpdate, BlockNumber, Token,
 };
 // Local imports
 use self::records::{
-    NewBlockEvent, NewStorageState, NewTokenEvent, StoredBlockEvent,
+    NewBlockEvent, NewRollupOpsBlock, NewStorageState, NewTokenEvent, StoredBlockEvent,
     StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState,
 };
 
@@ -206,7 +206,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
     pub async fn save_rollup_ops(
         &mut self,
-        rollup_blocks: &[(BlockNumber, &[ZkSyncOp], AccountId, Option<u64>, H256)],
+        rollup_blocks: &[NewRollupOpsBlock<'_>],
     ) -> QueryResult<()> {
         let start = Instant::now();
         let new_state = self.new_storage_state("Operations");
@@ -221,16 +221,16 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             sqlx::query!(
                 "INSERT INTO data_restore_rollup_blocks
                 VALUES ($1, $2, $3, $4)",
-                i64::from(*block.0),
-                i64::from(*block.2),
-                block.3.map(|t| t as i64),
-                Some(block.4.as_bytes().to_vec())
+                i64::from(*block.block_num),
+                i64::from(*block.fee_account),
+                block.timestamp.map(|t| t as i64),
+                Some(block.previous_block_root_hash.as_bytes().to_vec())
             )
             .execute(transaction.conn())
             .await?;
 
             let operations: Vec<_> = block
-                .1
+                .ops
                 .iter()
                 .map(|op| serde_json::to_value(op.clone()).unwrap())
                 .collect();
@@ -239,7 +239,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 SELECT $1, u.operation
                     FROM UNNEST ($2::jsonb[])
                     AS u(operation)",
-                i64::from(*block.0),
+                i64::from(*block.block_num),
                 &operations,
             )
             .execute(transaction.conn())

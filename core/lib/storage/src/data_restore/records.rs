@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::FromRow;
 // Workspace imports
-use zksync_types::{Address, TokenId};
+use zksync_types::{AccountId, Address, BlockNumber, TokenId, ZkSyncOp, H256};
 // Workspace imports
 // Local imports
 
@@ -11,6 +11,15 @@ use zksync_types::{Address, TokenId};
 pub struct NewTokenEvent {
     pub address: Address,
     pub id: TokenId,
+}
+
+#[derive(Debug)]
+pub struct NewRollupOpsBlock<'a> {
+    pub block_num: BlockNumber,
+    pub ops: &'a [ZkSyncOp],
+    pub fee_account: AccountId,
+    pub timestamp: Option<u64>,
+    pub previous_block_root_hash: H256,
 }
 
 #[derive(Debug, Clone, FromRow)]
