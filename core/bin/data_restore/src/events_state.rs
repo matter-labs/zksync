@@ -450,7 +450,7 @@ mod test {
     use super::EventsState;
     use web3::{
         api::{Eth, Namespace},
-        types::Bytes,
+        types::{Bytes, H160},
     };
 
     use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
@@ -461,6 +461,7 @@ mod test {
         let mut events_state = EventsState::default();
 
         let contract = ZkSyncDeployedContract::version4(Eth::new(FakeTransport), [1u8; 20].into());
+        let contract_addr = H160::from([1u8; 20]);
 
         let block_verified_topic = contract
             .abi
@@ -481,6 +482,7 @@ mod test {
         let mut logs = vec![];
         for i in 0..32 {
             logs.push(create_log(
+                contract_addr,
                 block_committed_topic,
                 vec![u32_to_32bytes(i).into()],
                 Bytes(vec![]),
@@ -488,6 +490,7 @@ mod test {
                 u32_to_32bytes(i).into(),
             ));
             logs.push(create_log(
+                contract_addr,
                 block_verified_topic,
                 vec![u32_to_32bytes(i).into()],
                 Bytes(vec![]),
@@ -508,6 +511,7 @@ mod test {
         data.extend(&last_block_com);
         data.extend(&last_block_ver);
         let log = create_log(
+            contract_addr,
             reverted_topic,
             vec![u32_to_32bytes(3).into()],
             Bytes(data),
