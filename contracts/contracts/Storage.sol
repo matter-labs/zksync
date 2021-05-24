@@ -98,10 +98,10 @@ contract Storage {
     mapping(uint64 => PriorityOperationDEPRECATED) internal priorityRequestsDEPRECATED;
 
     /// @dev First open priority request id
-    uint64 internal firstPriorityRequestId;
+    uint64 public firstPriorityRequestId;
 
     /// @dev Total number of requests
-    uint64 internal totalOpenPriorityRequests;
+    uint64 public totalOpenPriorityRequests;
 
     /// @dev Total number of committed requests.
     /// @dev Used in checks: if the request matches the operation on Rollup contract and if provided number of requests is not too big
@@ -134,7 +134,7 @@ contract Storage {
     }
 
     /// @dev Stored hashed StoredBlockInfo for some block number
-    mapping(uint32 => bytes32) internal storedBlockHashes;
+    mapping(uint32 => bytes32) public storedBlockHashes;
 
     /// @dev Total blocks proven.
     uint32 internal totalBlocksProven;
