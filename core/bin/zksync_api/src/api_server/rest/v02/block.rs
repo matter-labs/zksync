@@ -115,7 +115,7 @@ impl ApiBlockData {
         query: PaginationQuery<BlockNumber>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        storage.paginate(&query).await
+        storage.paginate_checked(&query).await
     }
 
     async fn transaction_page(
@@ -134,7 +134,7 @@ impl ApiBlockData {
             direction: query.direction,
         };
 
-        storage.paginate(&new_query).await
+        storage.paginate_checked(&new_query).await
     }
 
     async fn get_last_committed_block_number(&self) -> QueryResult<BlockNumber> {

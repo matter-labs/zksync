@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
 use zksync_utils::ZeroPrefixHexSerde;
 
+pub const MAX_LIMIT: u32 = 100;
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum PaginationDirection {

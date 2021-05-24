@@ -178,7 +178,7 @@ impl ApiAccountData {
             direction: query.direction,
         };
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        storage.paginate(&new_query).await
+        storage.paginate_checked(&new_query).await
     }
 
     /// Pending deposits can be matched only with addresses,
@@ -201,7 +201,7 @@ impl ApiAccountData {
             direction: query.direction,
         };
         let mut client = self.core_api_client.clone();
-        client.paginate(&new_query).await
+        client.paginate_checked(&new_query).await
     }
 }
 
