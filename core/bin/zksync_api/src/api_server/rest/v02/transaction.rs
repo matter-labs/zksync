@@ -14,7 +14,8 @@ use zksync_api_types::v02::{
     block::BlockStatus,
     transaction::{
         ApiTxBatch, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, L2Receipt, Receipt,
-        SubmitBatchResponse, Transaction, TransactionData, TxData, TxInBlockStatus,
+        SubmitBatchResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
+        TxInBlockStatus,
     },
 };
 use zksync_storage::{
@@ -445,14 +446,14 @@ async fn tx_data(
 async fn submit_tx(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<IncomingTx>,
-) -> ApiResult<TxHash> {
+) -> ApiResult<TxHashSerializeWrapper> {
     let tx_hash = data
         .tx_sender
         .submit_tx(body.tx, body.signature)
         .await
         .map_err(Error::from);
 
-    tx_hash.into()
+    tx_hash.map(TxHashSerializeWrapper).into()
 }
 
 async fn submit_batch(

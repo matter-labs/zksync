@@ -210,11 +210,14 @@ async fn account_committed_info(
     web::Path(account_id_or_address): web::Path<String>,
 ) -> ApiResult<Option<Account>> {
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
-    let account_id = api_try!(api_try!(data.get_id_by_address_or_id(address_or_id).await)
-        .ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
-    data.account_info(account_id, AccountStateType::Committed)
-        .await
-        .into()
+    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    if let Some(account_id) = account_id {
+        data.account_info(account_id, AccountStateType::Committed)
+            .await
+            .into()
+    } else {
+        ApiResult::Ok(None)
+    }
 }
 
 async fn account_finalized_info(
@@ -222,11 +225,14 @@ async fn account_finalized_info(
     web::Path(account_id_or_address): web::Path<String>,
 ) -> ApiResult<Option<Account>> {
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
-    let account_id = api_try!(api_try!(data.get_id_by_address_or_id(address_or_id).await)
-        .ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
-    data.account_info(account_id, AccountStateType::Finalized)
-        .await
-        .into()
+    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    if let Some(account_id) = account_id {
+        data.account_info(account_id, AccountStateType::Finalized)
+            .await
+            .into()
+    } else {
+        ApiResult::Ok(None)
+    }
 }
 
 async fn account_txs(

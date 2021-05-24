@@ -21,7 +21,7 @@ import {
     TokenPriceInfo,
     SubmitBatchResponse,
     ApiTxReceipt,
-    ApiTxAndSignature,
+    ApiSignedTx,
     ApiBatchData,
     L2Tx,
     ApiTransaction,
@@ -55,7 +55,7 @@ export async function getDefaultRestProvider(network: Network): Promise<RestProv
 }
 
 export class RestProvider extends SyncProvider {
-    public static readonly MAX_LIMIT = 100; 
+    public static readonly MAX_LIMIT = 100;
 
     private constructor(public address: string) {
         super();
@@ -80,7 +80,8 @@ export class RestProvider extends SyncProvider {
             return response.result;
         } else {
             throw new Error(
-                `zkSync API response error: errorType: ${response.error.errorType}; code ${response.error.code}; message: ${response.error.message}`
+                `zkSync API response error: errorType: ${response.error.errorType};` +
+                    ` code ${response.error.code}; message: ${response.error.message}`
             );
         }
     }
@@ -116,7 +117,8 @@ export class RestProvider extends SyncProvider {
         paginationQuery: PaginationQuery<string>
     ): Promise<ApiResponse<Paginated<ApiTransaction, AccountTxsRequest>>> {
         return await this.get(
-            `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
+            `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}` +
+                `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
         );
     }
 
@@ -132,7 +134,8 @@ export class RestProvider extends SyncProvider {
         paginationQuery: PaginationQuery<number>
     ): Promise<ApiResponse<Paginated<ApiTransaction, PendingOpsRequest>>> {
         return await this.get(
-            `${this.address}/accounts/${idOrAddress}/transactions/pending?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
+            `${this.address}/accounts/${idOrAddress}/transactions/pending?from=${paginationQuery.from}` +
+                `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
         );
     }
 
@@ -147,7 +150,8 @@ export class RestProvider extends SyncProvider {
         paginationQuery: PaginationQuery<number>
     ): Promise<ApiResponse<Paginated<ApiBlockInfo, number>>> {
         return await this.get(
-            `${this.address}/blocks?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
+            `${this.address}/blocks?from=${paginationQuery.from}&limit=${paginationQuery.limit}` +
+                `&direction=${paginationQuery.direction}`
         );
     }
 
@@ -170,7 +174,8 @@ export class RestProvider extends SyncProvider {
         paginationQuery: PaginationQuery<string>
     ): Promise<ApiResponse<Paginated<ApiTransaction, BlockAndTxHash>>> {
         return await this.get(
-            `${this.address}/blocks/${blockPosition}/transactions?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
+            `${this.address}/blocks/${blockPosition}/transactions?from=${paginationQuery.from}` +
+                `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
         );
     }
 
@@ -237,7 +242,8 @@ export class RestProvider extends SyncProvider {
         paginationQuery: PaginationQuery<number>
     ): Promise<ApiResponse<Paginated<TokenInfo, number>>> {
         return await this.get(
-            `${this.address}/tokens?from=${paginationQuery.from}&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
+            `${this.address}/tokens?from=${paginationQuery.from}&limit=${paginationQuery.limit}` +
+                `&direction=${paginationQuery.direction}`
         );
     }
 
@@ -279,7 +285,9 @@ export class RestProvider extends SyncProvider {
         if (fastProcessing !== undefined) {
             tx.fastProcessing = fastProcessing;
         }
-        return await this.submitTxNew(tx, signature);
+        let txHash = await this.submitTxNew(tx, signature);
+        txHash.replace('0x', 'sync-tx:');
+        return txHash;
     }
 
     async txStatusDetailed(txHash: string): Promise<ApiResponse<ApiTxReceipt | null>> {
@@ -290,11 +298,11 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.txStatusDetailed(txHash));
     }
 
-    async txDataDetailed(txHash: string): Promise<ApiResponse<ApiTxAndSignature | null>> {
-        return await this.get(`${this.address}/transactions/${txHash}`);
+    async txDataDetailed(txHash: string): Promise<ApiResponse<ApiSignedTx | null>> {
+        return await this.get(`${this.address}/transactions/${txHash}/data`);
     }
 
-    async txData(txHash: string): Promise<ApiTxAndSignature | null> {
+    async txData(txHash: string): Promise<ApiSignedTx | null> {
         return this.parseResponse(await this.txDataDetailed(txHash));
     }
 
@@ -336,10 +344,12 @@ export class RestProvider extends SyncProvider {
             let transactionStatus = await this.txStatus(hash);
             let notifyDone;
             if (action === 'COMMIT') {
-                notifyDone = transactionStatus.rollupBlock !== null;
+                notifyDone = transactionStatus !== null && transactionStatus.rollupBlock !== null;
             } else {
-                if (transactionStatus.rollupBlock !== null) {
-                    // If the transaction status is rejected it cannot be known if transaction is queued, committed or finalized.
+                if (transactionStatus !== null && transactionStatus.rollupBlock !== null) {
+                    // If the transaction status is rejected
+                    // it cannot be known if transaction is queued, committed or finalized.
+                    // That is why there is separate `blockByPosition` query.
                     const blockStatus = await this.blockByPosition(transactionStatus.rollupBlock);
                     notifyDone = blockStatus.status === 'finalized';
                 }
@@ -375,7 +385,7 @@ export class RestProvider extends SyncProvider {
     async getTokens(limit?: number): Promise<Tokens> {
         let tokens = {};
         let tmpId = 0;
-        limit = (limit !== undefined) ? limit : RestProvider.MAX_LIMIT;
+        limit = limit !== undefined ? limit : RestProvider.MAX_LIMIT;
         let tokenPage: Paginated<TokenInfo, number>;
         do {
             tokenPage = await this.tokenPagination({
@@ -398,22 +408,54 @@ export class RestProvider extends SyncProvider {
     }
 
     async getState(address: Address): Promise<AccountState> {
-        const committed = await this.accountInfo(address, 'committed');
-        const finalized = await this.accountInfo(address, 'finalized');
-        return {
-            address,
-            id: committed.accountId,
-            committed: {
-                balances: committed.balances,
-                nonce: committed.nonce,
-                pubKeyHash: committed.pubKeyHash
-            },
-            verified: {
-                balances: finalized.balances,
-                nonce: finalized.nonce,
-                pubKeyHash: finalized.pubKeyHash
-            }
-        };
+        const committedFullInfo = await this.accountInfo(address, 'committed');
+        const finalizedFullInfo = await this.accountInfo(address, 'finalized');
+
+        if (finalizedFullInfo) {
+            return {
+                address,
+                id: committedFullInfo.accountId,
+                committed: {
+                    balances: committedFullInfo.balances,
+                    nonce: committedFullInfo.nonce,
+                    pubKeyHash: committedFullInfo.pubKeyHash
+                },
+                verified: {
+                    balances: finalizedFullInfo.balances,
+                    nonce: finalizedFullInfo.nonce,
+                    pubKeyHash: finalizedFullInfo.pubKeyHash
+                }
+            };
+        } else if (committedFullInfo) {
+            return {
+                address,
+                id: committedFullInfo.accountId,
+                committed: {
+                    balances: committedFullInfo.balances,
+                    nonce: committedFullInfo.nonce,
+                    pubKeyHash: committedFullInfo.pubKeyHash
+                },
+                verified: {
+                    balances: {},
+                    nonce: 0,
+                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
+                }
+            };
+        } else {
+            return {
+                address,
+                committed: {
+                    balances: {},
+                    nonce: 0,
+                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
+                },
+                verified: {
+                    balances: {},
+                    nonce: 0,
+                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
+                }
+            };
+        }
     }
 
     async getConfirmationsForEthOpAmount(): Promise<number> {

@@ -360,9 +360,10 @@ export interface ApiL2TxReceipt {
 
 export type ApiTxReceipt = ApiL1TxReceipt | ApiL2TxReceipt;
 
-export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit;
+export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount;
 
 export interface ApiDeposit {
+    type: 'Deposit';
     from: Address;
     tokenId: number;
     amount: BigNumber;
@@ -374,6 +375,7 @@ export interface ApiDeposit {
 }
 
 export interface ApiFullExit {
+    type: 'FullExit';
     accountId: number;
     tokenId: number;
     ethHash: string;
@@ -392,7 +394,7 @@ export interface ApiTransaction {
     createdAt: string | null;
 }
 
-export interface ApiTxAndSignature {
+export interface ApiSignedTx {
     tx: ApiTransaction;
     ethSignature: string | null;
 }

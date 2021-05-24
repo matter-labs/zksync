@@ -19,7 +19,7 @@ const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 // prettier-ignore
 /// We don't want to run tests with all tokens, so we highlight basic operations such as: Deposit, Withdrawal, Forced Exit
 /// We want to check basic operations with all tokens, and other operations only if it's necessary
-const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', onlyBasic: boolean = false) =>
+const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', providerType: 'REST' | 'RPC', onlyBasic: boolean = false) =>
 describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, () => {
     let tester: Tester;
     let alice: Wallet;
@@ -32,7 +32,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let operatorBalance: BigNumber;
 
     before('create tester and test wallets', async () => {
-        tester = await Tester.init('localhost', transport);
+        tester = await Tester.init('localhost', transport, providerType);
         alice = await tester.fundedWallet('5.0');
         bob = await tester.emptyWallet();
         chuck = await tester.emptyWallet();
@@ -274,6 +274,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).
 // Using this token will help us to detect decimals-related errors.
 const defaultERC20 = 'wBTC';
+const defaultProviderType = 'REST';
 
 let tokenAndTransport = [];
 if (process.env.TEST_TRANSPORT) {
@@ -284,7 +285,8 @@ if (process.env.TEST_TRANSPORT) {
         tokenAndTransport = [
             {
                 transport: envTransport,
-                token: envToken
+                token: envToken,
+                providerType: process.env.TEST_PROVIDER ? process.env.TEST_PROVIDER : defaultProviderType
             }
         ];
     } else {
@@ -293,7 +295,8 @@ if (process.env.TEST_TRANSPORT) {
         tokenAndTransport = [
             {
                 transport: envTransport,
-                token: defaultERC20
+                token: defaultERC20,
+                providerType: process.env.TEST_PROVIDER ? process.env.TEST_PROVIDER : defaultProviderType
             }
         ];
     }
@@ -303,11 +306,13 @@ if (process.env.TEST_TRANSPORT) {
         {
             transport: 'HTTP',
             token: 'ETH',
+            providerType: 'RPC',
             onlyBasic: true
         },
         {
             transport: 'HTTP',
             token: defaultERC20,
+            providerType: 'REST',
             onlyBasic: false
         }
     ];
@@ -315,5 +320,5 @@ if (process.env.TEST_TRANSPORT) {
 
 for (const input of tokenAndTransport) {
     // @ts-ignore
-    TestSuite(input.token, input.transport, input.onlyBasic);
+    TestSuite(input.token, input.transport, input.providerType, input.onlyBasic);
 }
