@@ -111,6 +111,7 @@ export interface Order {
     ratio: Ratio;
     amount: BigNumberish;
     signature?: Signature;
+    ethSignature?: TxEthSignature;
     validFrom: number;
     validUntil: number;
 }
@@ -234,9 +235,11 @@ export interface CloseAccount {
     signature: Signature;
 }
 
+export type TxEthSignatureVariant = null | TxEthSignature | (TxEthSignature | null)[];
+
 export interface SignedTransaction {
     tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT | Swap;
-    ethereumSignature?: TxEthSignature;
+    ethereumSignature?: TxEthSignatureVariant;
 }
 
 export interface BlockInfo {

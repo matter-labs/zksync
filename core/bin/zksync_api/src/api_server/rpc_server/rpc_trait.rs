@@ -9,7 +9,7 @@ use jsonrpc_derive::rpc;
 use zksync_api_client::rest::v1::accounts::NFT;
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
-    tx::{EthBatchSignatures, TxEthSignature, TxHash},
+    tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
     Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -33,7 +33,7 @@ pub trait Rpc {
     fn tx_submit(
         &self,
         tx: Box<ZkSyncTx>,
-        signature: Box<Option<TxEthSignature>>,
+        signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash>;
 
@@ -115,7 +115,7 @@ impl Rpc for RpcApp {
     fn tx_submit(
         &self,
         tx: Box<ZkSyncTx>,
-        signature: Box<Option<TxEthSignature>>,
+        signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash> {
         let handle = self.runtime_handle.clone();

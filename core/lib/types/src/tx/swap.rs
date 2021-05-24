@@ -90,6 +90,35 @@ impl Order {
             && self.time_range.check_correctness()
     }
 
+    pub fn get_ethereum_sign_message(
+        &self,
+        token_sell: &str,
+        token_buy: &str,
+        decimals: u8,
+    ) -> String {
+        let mut message = if self.amount.is_zero() {
+            format!("Limit order for {} -> {}\n", token_sell, token_buy)
+        } else {
+            format!(
+                "Order for {} {} -> {}\n",
+                format_units(&self.amount, decimals),
+                token_sell,
+                token_buy
+            )
+        };
+        message += format!(
+            "Ratio: {sell}:{buy}\n\
+            Address: {recipient:?}\n\
+            Nonce: {nonce}",
+            sell = self.price.0.to_string(),
+            buy = self.price.1.to_string(),
+            recipient = self.recipient_address,
+            nonce = self.nonce
+        )
+        .as_str();
+        message
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new_signed(
         account_id: AccountId,

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_types::{
-    tx::{EthBatchSignatures, EthSignData, TxEthSignature, TxHash},
+    tx::{EthBatchSignatures, EthSignData, TxEthSignatureVariant, TxHash},
     Address, BatchFee, BlockNumber, Fee, SignedZkSyncTx, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -43,7 +43,7 @@ pub struct TxData {
 #[serde(rename_all = "camelCase")]
 pub struct IncomingTx {
     pub tx: ZkSyncTx,
-    pub signature: Option<TxEthSignature>,
+    pub signature: TxEthSignatureVariant,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -110,7 +110,7 @@ impl Client {
     pub async fn submit_tx(
         &self,
         tx: ZkSyncTx,
-        signature: Option<TxEthSignature>,
+        signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
     ) -> Result<TxHash, ClientError> {
         self.post("transactions/submit")

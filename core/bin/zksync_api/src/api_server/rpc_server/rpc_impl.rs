@@ -6,7 +6,7 @@ use jsonrpc_core::{Error, Result};
 // Workspace uses
 use zksync_api_client::rest::v1::accounts::NFT;
 use zksync_types::{
-    tx::{EthBatchSignatures, TxEthSignature, TxHash},
+    tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
     Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -96,7 +96,7 @@ impl RpcApp {
     pub async fn _impl_tx_submit(
         self,
         tx: Box<ZkSyncTx>,
-        signature: Box<Option<TxEthSignature>>,
+        signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
     ) -> Result<TxHash> {
         let start = Instant::now();

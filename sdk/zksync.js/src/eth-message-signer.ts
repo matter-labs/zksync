@@ -1,5 +1,5 @@
 import * as ethers from 'ethers';
-import { TxEthSignature, EthSignerType, PubKeyHash, Address } from './types';
+import { TxEthSignature, EthSignerType, PubKeyHash, Address, Ratio } from './types';
 import {
     getSignedBytesFromMessage,
     signMessagePersonalAPI,
@@ -62,6 +62,18 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
+    async ethSignOrder(order: {
+        tokenSell: string;
+        tokenBuy: string;
+        recipient: string;
+        amount: string;
+        ratio: Ratio;
+        nonce: number;
+    }): Promise<TxEthSignature> {
+        const message = this.getOrderEthSignMessage(order);
+        return await this.getEthMessageSignature(message);
+    }
+
     getSwapEthSignMessagePart(swap: { fee: string; feeToken: string }): string {
         if (swap.fee != '0' && swap.fee) {
             return `Swap fee: ${swap.fee} ${swap.feeToken}`;
@@ -75,6 +87,27 @@ export class EthMessageSigner {
             message += '\n';
         }
         message += `Nonce: ${swap.nonce}`;
+        return message;
+    }
+
+    getOrderEthSignMessage(order: {
+        tokenSell: string;
+        tokenBuy: string;
+        recipient: string;
+        amount: string;
+        ratio: Ratio;
+        nonce: number;
+    }): string {
+        let message: string;
+        if (order.amount == '0' || order.amount == null) {
+            message = `Limit order for ${order.tokenSell} -> ${order.tokenBuy}\n`;
+        } else {
+            message = `Order for ${order.amount} ${order.tokenSell} -> ${order.tokenBuy}\n`;
+        }
+        message +=
+            `Ratio: ${order.ratio[0].toString()}:${order.ratio[1].toString()}\n` +
+            `Address: ${order.recipient.toLowerCase()}\n` +
+            `Nonce: ${order.nonce}`;
         return message;
     }
 
