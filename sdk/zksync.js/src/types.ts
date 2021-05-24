@@ -27,6 +27,7 @@ export interface Create2Data {
 export interface AccountState {
     address: Address;
     id?: number;
+    // This field will be presented only if using RPC API.
     depositing?: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
@@ -214,10 +215,13 @@ export interface LegacyChangePubKeyFee {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
+    // This field will be presented only if using RPC API.
     feeType?: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee;
     // Amount of gas used by transaction
+    // This field will be presented only if using RPC API.
     gasTxAmount?: BigNumber;
     // Gas price (in wei)
+    // This field will be presented only if using RPC API.
     gasPriceWei?: BigNumber;
     // Ethereum gas part of fee (in wei)
     gasFee: BigNumber;
@@ -229,8 +233,10 @@ export interface Fee {
 
 export interface BatchFee {
     // Ethereum gas part of fee (in wei)
+    // This field will be presented only if using REST API.
     gasFee?: BigNumber;
     // Zero-knowledge proof part of fee (in wei)
+    // This field will be presented only if using REST API.
     zkpFee?: BigNumber;
     // Total fee amount (in wei)
     totalFee: BigNumber;

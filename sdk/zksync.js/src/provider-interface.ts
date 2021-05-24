@@ -54,4 +54,5 @@ export abstract class SyncProvider {
         const updatedTokenSet = new TokenSet(await this.getTokens());
         this.tokenSet = updatedTokenSet;
     }
+    async disconnect() {}
 }

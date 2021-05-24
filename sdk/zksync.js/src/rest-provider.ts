@@ -55,7 +55,7 @@ export async function getDefaultRestProvider(network: Network): Promise<RestProv
 }
 
 export class RestProvider extends SyncProvider {
-    public pollIntervalMilliSecs = 500;
+    public static readonly MAX_LIMIT = 100; 
 
     private constructor(public address: string) {
         super();
@@ -75,7 +75,7 @@ export class RestProvider extends SyncProvider {
         return provider;
     }
 
-    parse_response<T>(response: ApiResponse<T>): T {
+    parseResponse<T>(response: ApiResponse<T>): T {
         if (response.status === 'success') {
             return response.result;
         } else {
@@ -108,7 +108,7 @@ export class RestProvider extends SyncProvider {
         idOrAddress: number | Address,
         infoType: 'committed' | 'finalized'
     ): Promise<ApiAccountInfo | null> {
-        return this.parse_response(await this.accountInfoDetailed(idOrAddress, infoType));
+        return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
     async accountTxsDetailed(
@@ -124,7 +124,7 @@ export class RestProvider extends SyncProvider {
         idOrAddress: number | Address,
         paginationQuery: PaginationQuery<string>
     ): Promise<Paginated<ApiTransaction, AccountTxsRequest>> {
-        return this.parse_response(await this.accountTxsDetailed(idOrAddress, paginationQuery));
+        return this.parseResponse(await this.accountTxsDetailed(idOrAddress, paginationQuery));
     }
 
     async accountPendingTxsDetailed(
@@ -140,7 +140,7 @@ export class RestProvider extends SyncProvider {
         idOrAddress: number | Address,
         paginationQuery: PaginationQuery<number>
     ): Promise<Paginated<ApiTransaction, PendingOpsRequest>> {
-        return this.parse_response(await this.accountPendingTxsDetailed(idOrAddress, paginationQuery));
+        return this.parseResponse(await this.accountPendingTxsDetailed(idOrAddress, paginationQuery));
     }
 
     async blockPaginationDetailed(
@@ -152,7 +152,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async blockPagination(paginationQuery: PaginationQuery<number>): Promise<Paginated<ApiBlockInfo, number>> {
-        return this.parse_response(await this.blockPaginationDetailed(paginationQuery));
+        return this.parseResponse(await this.blockPaginationDetailed(paginationQuery));
     }
 
     async blockByPositionDetailed(
@@ -162,7 +162,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async blockByPosition(blockPosition: number | 'lastCommitted' | 'lastFinalized'): Promise<ApiBlockInfo | null> {
-        return this.parse_response(await this.blockByPositionDetailed(blockPosition));
+        return this.parseResponse(await this.blockByPositionDetailed(blockPosition));
     }
 
     async blockTransactionsDetailed(
@@ -178,7 +178,7 @@ export class RestProvider extends SyncProvider {
         blockPosition: number | 'lastCommitted' | 'lastFinalized',
         paginationQuery: PaginationQuery<string>
     ): Promise<Paginated<ApiTransaction, BlockAndTxHash>> {
-        return this.parse_response(await this.blockTransactionsDetailed(blockPosition, paginationQuery));
+        return this.parseResponse(await this.blockTransactionsDetailed(blockPosition, paginationQuery));
     }
 
     async configDetailed(): Promise<ApiResponse<ApiConfig>> {
@@ -186,7 +186,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async config(): Promise<ApiConfig> {
-        return this.parse_response(await this.configDetailed());
+        return this.parseResponse(await this.configDetailed());
     }
 
     async getTransactionFeeDetailed(
@@ -202,7 +202,7 @@ export class RestProvider extends SyncProvider {
         address: Address,
         tokenLike: TokenLike
     ): Promise<ApiFee> {
-        return this.parse_response(await this.getTransactionFeeDetailed(txType, address, tokenLike));
+        return this.parseResponse(await this.getTransactionFeeDetailed(txType, address, tokenLike));
     }
 
     async getBatchFullFeeDetailed(
@@ -222,7 +222,7 @@ export class RestProvider extends SyncProvider {
         }[],
         tokenLike: TokenLike
     ): Promise<ApiFee> {
-        return this.parse_response(await this.getBatchFullFeeDetailed(transactions, tokenLike));
+        return this.parseResponse(await this.getBatchFullFeeDetailed(transactions, tokenLike));
     }
 
     async networkStatusDetailed(): Promise<ApiResponse<NetworkStatus>> {
@@ -230,7 +230,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async networkStatus(): Promise<NetworkStatus> {
-        return this.parse_response(await this.networkStatusDetailed());
+        return this.parseResponse(await this.networkStatusDetailed());
     }
 
     async tokenPaginationDetailed(
@@ -242,7 +242,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async tokenPagination(paginationQuery: PaginationQuery<number>): Promise<Paginated<TokenInfo, number>> {
-        return this.parse_response(await this.tokenPaginationDetailed(paginationQuery));
+        return this.parseResponse(await this.tokenPaginationDetailed(paginationQuery));
     }
 
     async tokenByIdOrAddressDetailed(idOrAddress: number | TokenAddress): Promise<ApiResponse<TokenInfo>> {
@@ -250,7 +250,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async tokenByIdOrAddress(idOrAddress: number | TokenAddress): Promise<TokenInfo> {
-        return this.parse_response(await this.tokenByIdOrAddressDetailed(idOrAddress));
+        return this.parseResponse(await this.tokenByIdOrAddressDetailed(idOrAddress));
     }
 
     async tokenPriceInfoDetailed(
@@ -261,7 +261,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async tokenPriceInfo(idOrAddress: number | TokenAddress, tokenIdOrUsd: number | 'usd'): Promise<TokenPriceInfo> {
-        return this.parse_response(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
+        return this.parseResponse(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
     }
 
     async submitTxNewDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<ApiResponse<string>> {
@@ -269,9 +269,12 @@ export class RestProvider extends SyncProvider {
     }
 
     async submitTxNew(tx: L2Tx, signature?: TxEthSignature): Promise<string> {
-        return this.parse_response(await this.submitTxNewDetailed(tx, signature));
+        return this.parseResponse(await this.submitTxNewDetailed(tx, signature));
     }
 
+    /**
+     * @deprecated Use submitTxNew method instead
+     */
     async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
         if (fastProcessing !== undefined) {
             tx.fastProcessing = fastProcessing;
@@ -284,7 +287,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async txStatus(txHash: string): Promise<ApiTxReceipt | null> {
-        return this.parse_response(await this.txStatusDetailed(txHash));
+        return this.parseResponse(await this.txStatusDetailed(txHash));
     }
 
     async txDataDetailed(txHash: string): Promise<ApiResponse<ApiTxAndSignature | null>> {
@@ -292,7 +295,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async txData(txHash: string): Promise<ApiTxAndSignature | null> {
-        return this.parse_response(await this.txDataDetailed(txHash));
+        return this.parseResponse(await this.txDataDetailed(txHash));
     }
 
     async submitTxsBatchNewDetailed(
@@ -303,7 +306,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async submitTxsBatchNew(txs: L2Tx[], signature: TxEthSignature | TxEthSignature[]): Promise<SubmitBatchResponse> {
-        return this.parse_response(await this.submitTxsBatchNewDetailed(txs, signature));
+        return this.parseResponse(await this.submitTxsBatchNewDetailed(txs, signature));
     }
 
     async submitTxsBatch(
@@ -311,8 +314,8 @@ export class RestProvider extends SyncProvider {
         ethSignatures?: TxEthSignature | TxEthSignature[]
     ): Promise<string[]> {
         let txs = [];
-        for (const txAndSignature of transactions) {
-            txs.push(txAndSignature.tx);
+        for (const signedTx of transactions) {
+            txs.push(signedTx.tx);
         }
         if (ethSignatures === undefined) {
             throw new Error('Batch signature should be provided in API v0.2');
@@ -325,7 +328,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async getBatch(batchHash: string): Promise<ApiBatchData> {
-        return this.parse_response(await this.getBatchDetailed(batchHash));
+        return this.parseResponse(await this.getBatchDetailed(batchHash));
     }
 
     async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<ApiTxReceipt> {
@@ -369,15 +372,15 @@ export class RestProvider extends SyncProvider {
         };
     }
 
-    async getTokens(): Promise<Tokens> {
+    async getTokens(limit?: number): Promise<Tokens> {
         let tokens = {};
-        let lastId = 0;
-        let maxLimit = 100; //TODO
+        let tmpId = 0;
+        limit = (limit !== undefined) ? limit : RestProvider.MAX_LIMIT;
         let tokenPage: Paginated<TokenInfo, number>;
         do {
             tokenPage = await this.tokenPagination({
-                from: lastId,
-                limit: maxLimit,
+                from: tmpId,
+                limit,
                 direction: 'newer'
             });
             for (let token of tokenPage.list) {
@@ -388,8 +391,8 @@ export class RestProvider extends SyncProvider {
                     decimals: token.decimals
                 };
             }
-            lastId += maxLimit;
-        } while (tokenPage.list.length == maxLimit);
+            tmpId += limit;
+        } while (tokenPage.list.length == limit);
 
         return tokens;
     }
