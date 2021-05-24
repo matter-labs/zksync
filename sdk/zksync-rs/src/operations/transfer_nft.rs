@@ -93,7 +93,6 @@ where
             }
         };
 
-        // Address is not used in signing, thus default can be passed to the constructor.
         let nft_token = Token::new_nft(nft.id, &nft.symbol);
         let (tx_nft, tx_nft_signature) = self
             .wallet
