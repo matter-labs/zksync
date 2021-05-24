@@ -281,7 +281,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     upd.token_id,
                     address,
                     upd.symbol,
-                    1
+                    0
                 )
                 .execute(self.0.conn())
                 .await?;

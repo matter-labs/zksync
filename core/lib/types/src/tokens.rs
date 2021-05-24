@@ -117,12 +117,12 @@ impl Token {
         }
     }
 
-    pub fn new_nft(id: TokenId, address: Address, symbol: &str, decimals: u8) -> Self {
+    pub fn new_nft(id: TokenId, symbol: &str) -> Self {
         Self {
             id,
-            address,
+            address: Default::default(),
             symbol: symbol.to_string(),
-            decimals,
+            decimals: 0,
             is_nft: true,
         }
     }

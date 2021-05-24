@@ -50,8 +50,8 @@ Tester.prototype.testMintNFT = async function (
 
     expect(balanceBefore.sub(balanceAfter).eq(fee), 'Wrong amount in wallet after withdraw').to.be.true;
     const state = await receiver.getAccountState();
-    const nft: any = Object.values(state.committed.nfts)[0];
-    expect(nft !== undefined);
+    const nft = Object.values(state.committed.nfts)[0];
+    expect(nft).to.exist;
     expect(nft.contentHash).eq(utils.hexlify(contentHash));
 
     return nft;
@@ -70,9 +70,9 @@ Tester.prototype.testGetNFT = async function (wallet: Wallet, feeToken: TokenLik
     await handle.awaitReceipt();
     this.runningFee = this.runningFee.add(fee);
     const state = await wallet.getAccountState();
-    const nft: any = Object.values(state.committed.nfts)[0];
+    const nft = Object.values(state.committed.nfts)[0];
     const nft1 = await wallet.provider.getNFT(nft.id);
-    expect(nft1).eq(null, ' NFT does not exist yet');
+    expect(nft1).eq(null, 'NFT does not exist yet');
     await handle.awaitVerifyReceipt();
     const nft2 = await wallet.provider.getNFT(nft.id);
     expect(nft2.id).eq(nft.id);
