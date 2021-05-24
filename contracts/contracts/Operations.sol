@@ -159,11 +159,7 @@ library Operations {
             op.accountId, // accountId
             op.owner, // owner
             uint16(op.tokenId), // tokenId
-            uint128(0), // amount -- ignored
-            uint32(0), // nftCreatorAccountId -- ignored
-            address(0), // nftCreatorAddress -- ignored
-            uint32(0), // nftSerialId -- ignored
-            bytes32(0) // nftContentHash -- ignored
+            uint128(0) // amount -- ignored
         );
     }
 
