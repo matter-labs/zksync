@@ -383,7 +383,7 @@ export class TokenSet {
 
     public resolveTokenDecimals(tokenLike: TokenOrId): number {
         if (isNFT(tokenLike)) {
-            return 1;
+            return 0;
         }
         return this.resolveTokenObject(tokenLike).decimals;
     }
