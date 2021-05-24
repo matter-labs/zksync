@@ -9,7 +9,7 @@ use zksync_types::{
     AccountMap, BlockNumber,
 };
 // Local uses
-use super::{chain::apply_random_updates, create_rng, db_test};
+use super::{chain::apply_random_updates, create_rng, db_test, ACCOUNT_MUTEX};
 use crate::{
     test_data::{
         dummy_ethereum_tx_hash, gen_sample_block, gen_unique_aggregated_operation,
@@ -216,6 +216,7 @@ fn check_account_event(event: &ZkSyncEvent, status: AccountStateChangeStatus) ->
 /// new events in a single query and verify their correctness.
 #[db_test]
 async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let _lock = ACCOUNT_MUTEX.lock().await;
     let last_event_id = EventId(0);
     assert!(
         storage
