@@ -1,22 +1,22 @@
 // Built-in deps
 use std::time::Instant;
 // External imports
-use itertools::Itertools;
-use zksync_basic_types::H256;
 // Workspace imports
-use zksync_types::{AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp};
+use zksync_types::{
+    aggregated_operations::{
+        AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
+    },
+    AccountId, AccountUpdate, BlockNumber, Token,
+};
 // Local imports
 use self::records::{
-    NewBlockEvent, NewStorageState, NewTokenEvent, NewZkSyncOp, StoredBlockEvent,
-    StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState, StoredZkSyncOp,
+    NewBlockEvent, NewRollupOpsBlock, NewStorageState, NewTokenEvent, StoredBlockEvent,
+    StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState,
 };
 
 use crate::chain::operations::OperationsSchema;
 use crate::{chain::state::StateSchema, tokens::TokensSchema};
 use crate::{QueryResult, StorageProcessor};
-use zksync_types::aggregated_operations::{
-    AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
-};
 
 pub mod records;
 
@@ -94,49 +94,29 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
     pub async fn load_rollup_ops_blocks(&mut self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
         let start = Instant::now();
-        let stored_operations = sqlx::query_as!(
-            StoredZkSyncOp,
-            "SELECT * FROM data_restore_rollup_ops
-            ORDER BY id ASC"
+        // For each block aggregate its operations from the
+        // `data_restore_rollup_block_ops` table into array and
+        // match it by the block number from `data_restore_rollup_blocks`.
+        // The contract version is obtained from block events.
+        let stored_blocks = sqlx::query_as!(
+            StoredRollupOpsBlock,
+            "SELECT blocks.block_num AS block_num, ops, fee_account,
+            timestamp, previous_block_root_hash, contract_version
+            FROM data_restore_rollup_blocks AS blocks
+            JOIN (
+                SELECT block_num, array_agg(operation) as ops
+                FROM data_restore_rollup_block_ops
+                GROUP BY block_num
+            ) ops
+                ON blocks.block_num = ops.block_num
+            JOIN data_restore_events_state as events
+                ON blocks.block_num = events.block_num
+            ORDER BY blocks.block_num ASC"
         )
         .fetch_all(self.0.conn())
         .await?;
-
-        let ops_blocks: Vec<StoredRollupOpsBlock> = stored_operations
-            .into_iter()
-            .group_by(|op| op.block_num)
-            .into_iter()
-            .map(|(_, stored_ops)| {
-                // let stored_ops = group.clone();
-                // let mut ops: Vec<ZkSyncOp> = vec![];
-                let mut block_num: i64 = 0;
-                let mut fee_account: i64 = 0;
-                let mut timestamp: Option<u64> = None;
-                let mut previous_block_root_hash: H256 = H256::default();
-                let ops: Vec<ZkSyncOp> = stored_ops
-                    .map(|stored_op| {
-                        block_num = stored_op.block_num;
-                        fee_account = stored_op.fee_account;
-                        timestamp = stored_op.timestamp.map(|t| t as u64);
-                        previous_block_root_hash = stored_op
-                            .previous_block_root_hash
-                            .clone()
-                            .map(|h| H256::from_slice(&h))
-                            .unwrap_or_default();
-                        stored_op.into_franklin_op()
-                    })
-                    .collect();
-                StoredRollupOpsBlock {
-                    block_num: BlockNumber(block_num as u32),
-                    ops,
-                    fee_account: AccountId(fee_account as u32),
-                    timestamp,
-                    previous_block_root_hash,
-                }
-            })
-            .collect();
         metrics::histogram!("sql.data_restore.load_rollup_ops_blocks", start.elapsed());
-        Ok(ops_blocks)
+        Ok(stored_blocks)
     }
 
     /// Stores the last seen Ethereum block number.
@@ -226,23 +206,43 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
     pub async fn save_rollup_ops(
         &mut self,
-        ops: &[(BlockNumber, &ZkSyncOp, AccountId, Option<u64>, H256)],
+        rollup_blocks: &[NewRollupOpsBlock<'_>],
     ) -> QueryResult<()> {
         let start = Instant::now();
         let new_state = self.new_storage_state("Operations");
         let mut transaction = self.0.start_transaction().await?;
-        sqlx::query!("DELETE FROM data_restore_rollup_ops")
+        // Clean up the blocks table. Operations will be removed too since there
+        // is a foreign-key constraint on the block number.
+        sqlx::query!("DELETE FROM data_restore_rollup_blocks")
             .execute(transaction.conn())
             .await?;
 
-        for op in ops.iter() {
-            let stored_op =
-                NewZkSyncOp::prepare_stored_op(&op.1, op.0, op.2, op.3, op.4.as_bytes().to_vec());
-
+        for block in rollup_blocks {
             sqlx::query!(
-                "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account, timestamp, previous_block_root_hash) VALUES ($1, $2, $3, $4, $5)",
-                stored_op.block_num, stored_op.operation, stored_op.fee_account, stored_op.timestamp, stored_op.previous_block_root_hash
-            ).execute(transaction.conn())
+                "INSERT INTO data_restore_rollup_blocks
+                VALUES ($1, $2, $3, $4)",
+                i64::from(*block.block_num),
+                i64::from(*block.fee_account),
+                block.timestamp.map(|t| t as i64),
+                Some(block.previous_block_root_hash.as_bytes().to_vec())
+            )
+            .execute(transaction.conn())
+            .await?;
+
+            let operations: Vec<_> = block
+                .ops
+                .iter()
+                .map(|op| serde_json::to_value(op.clone()).unwrap())
+                .collect();
+            sqlx::query!(
+                "INSERT INTO data_restore_rollup_block_ops (block_num, operation)
+                SELECT $1, u.operation
+                    FROM UNNEST ($2::jsonb[])
+                    AS u(operation)",
+                i64::from(*block.block_num),
+                &operations,
+            )
+            .execute(transaction.conn())
             .await?;
         }
         DataRestoreSchema(&mut transaction)

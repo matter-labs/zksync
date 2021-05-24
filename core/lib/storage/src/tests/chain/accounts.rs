@@ -7,7 +7,7 @@ use zksync_types::{
 use super::block::apply_random_updates;
 use crate::chain::operations::OperationsSchema;
 use crate::test_data::{gen_sample_block, gen_unique_aggregated_operation};
-use crate::tests::{create_rng, db_test};
+use crate::tests::{create_rng, db_test, ACCOUNT_MUTEX};
 use crate::{
     chain::{
         account::{records::EthAccountType, AccountSchema},
@@ -41,6 +41,7 @@ async fn eth_account_type(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 /// Checks that stored accounts can be obtained once they're committed.
 #[db_test]
 async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let _lock = ACCOUNT_MUTEX.lock().await;
     let mut rng = create_rng();
 
     let block_size = 100;
