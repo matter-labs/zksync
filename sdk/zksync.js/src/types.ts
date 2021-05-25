@@ -104,8 +104,8 @@ export type Ratio = [BigNumberish, BigNumberish];
 
 export type TokenRatio = {
     type: 'Token';
-    [token: string]: string;
-    [token: number]: string;
+    [token: string]: string | number;
+    [token: number]: string | number;
 };
 
 export type WeiRatio = {

@@ -59,7 +59,7 @@ const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
 
-export function tokenRatio(ratio: { [token: string]: string; [token: number]: string }): TokenRatio {
+export function tokenRatio(ratio: { [token: string]: string | number; [token: number]: string | number }): TokenRatio {
     return {
         type: 'Token',
         ...ratio

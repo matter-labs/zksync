@@ -472,8 +472,10 @@ export class Wallet {
             ratio = [
                 isNFT(sell)
                     ? BigNumber.from(order.ratio[sell])
-                    : this.provider.tokenSet.parseToken(sell, order.ratio[sell]),
-                isNFT(buy) ? BigNumber.from(order.ratio[buy]) : this.provider.tokenSet.parseToken(buy, order.ratio[buy])
+                    : this.provider.tokenSet.parseToken(sell, order.ratio[sell].toString()),
+                isNFT(buy)
+                    ? BigNumber.from(order.ratio[buy])
+                    : this.provider.tokenSet.parseToken(buy, order.ratio[buy].toString())
             ];
         }
 
