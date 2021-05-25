@@ -28,6 +28,7 @@ const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export const MAX_TIMESTAMP = 4294967295;
 export const MIN_NFT_TOKEN_ID = 65536;
+export const CURRENT_TX_VERSION = 1;
 
 export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
@@ -592,6 +593,7 @@ export function serializeTimestamp(time: number): Uint8Array {
 
 export function serializeOrder(order: Order): Uint8Array {
     const type = new Uint8Array(['o'.charCodeAt(0)]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountId = serializeAccountId(order.accountId);
     const recipientBytes = serializeAddress(order.recipient);
     const nonceBytes = serializeNonce(order.nonce);
@@ -604,6 +606,7 @@ export function serializeOrder(order: Order): Uint8Array {
     const validUntil = serializeTimestamp(order.validUntil);
     return ethers.utils.concat([
         type,
+        version,
         accountId,
         recipientBytes,
         nonceBytes,
@@ -618,7 +621,8 @@ export function serializeOrder(order: Order): Uint8Array {
 }
 
 export async function serializeSwap(swap: Swap): Promise<Uint8Array> {
-    const type = new Uint8Array([11]);
+    const type = new Uint8Array([255 - 11]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const submitterId = serializeAccountId(swap.submitterId);
     const submitterAddress = serializeAddress(swap.submitterAddress);
     const nonceBytes = serializeNonce(swap.nonce);
@@ -631,6 +635,7 @@ export async function serializeSwap(swap: Swap): Promise<Uint8Array> {
     const amountBBytes = serializeAmountPacked(swap.amounts[1]);
     return ethers.utils.concat([
         type,
+        version,
         submitterId,
         submitterAddress,
         nonceBytes,
@@ -643,7 +648,8 @@ export async function serializeSwap(swap: Swap): Promise<Uint8Array> {
 }
 
 export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
-    const type = new Uint8Array([3]);
+    const type = new Uint8Array([255 - 3]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountId = serializeAccountId(withdraw.accountId);
     const accountBytes = serializeAddress(withdraw.from);
     const ethAddressBytes = serializeAddress(withdraw.to);
@@ -655,6 +661,7 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
     const validUntil = serializeTimestamp(withdraw.validUntil);
     return ethers.utils.concat([
         type,
+        version,
         accountId,
         accountBytes,
         ethAddressBytes,
@@ -668,7 +675,8 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
 }
 
 export function serializeMintNFT(mintNFT: MintNFT): Uint8Array {
-    const type = new Uint8Array([9]);
+    const type = new Uint8Array([255 - 9]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountId = serializeAccountId(mintNFT.creatorId);
     const accountBytes = serializeAddress(mintNFT.creatorAddress);
     const contentHashBytes = serializeContentHash(mintNFT.contentHash);
@@ -678,6 +686,7 @@ export function serializeMintNFT(mintNFT: MintNFT): Uint8Array {
     const nonceBytes = serializeNonce(mintNFT.nonce);
     return ethers.utils.concat([
         type,
+        version,
         accountId,
         accountBytes,
         contentHashBytes,
@@ -689,7 +698,8 @@ export function serializeMintNFT(mintNFT: MintNFT): Uint8Array {
 }
 
 export function serializeWithdrawNFT(withdrawNFT: WithdrawNFT): Uint8Array {
-    const type = new Uint8Array([10]);
+    const type = new Uint8Array([255 - 10]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountId = serializeAccountId(withdrawNFT.accountId);
     const accountBytes = serializeAddress(withdrawNFT.from);
     const ethAddressBytes = serializeAddress(withdrawNFT.to);
@@ -701,6 +711,7 @@ export function serializeWithdrawNFT(withdrawNFT: WithdrawNFT): Uint8Array {
     const validUntil = serializeTimestamp(withdrawNFT.validUntil);
     return ethers.utils.concat([
         type,
+        version,
         accountId,
         accountBytes,
         ethAddressBytes,
@@ -714,7 +725,8 @@ export function serializeWithdrawNFT(withdrawNFT: WithdrawNFT): Uint8Array {
 }
 
 export function serializeTransfer(transfer: Transfer): Uint8Array {
-    const type = new Uint8Array([5]); // tx type
+    const type = new Uint8Array([255 - 5]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountId = serializeAccountId(transfer.accountId);
     const from = serializeAddress(transfer.from);
     const to = serializeAddress(transfer.to);
@@ -724,11 +736,12 @@ export function serializeTransfer(transfer: Transfer): Uint8Array {
     const nonce = serializeNonce(transfer.nonce);
     const validFrom = serializeTimestamp(transfer.validFrom);
     const validUntil = serializeTimestamp(transfer.validUntil);
-    return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce, validFrom, validUntil]);
+    return ethers.utils.concat([type, version, accountId, from, to, token, amount, fee, nonce, validFrom, validUntil]);
 }
 
 export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
-    const type = new Uint8Array([7]);
+    const type = new Uint8Array([255 - 7]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountIdBytes = serializeAccountId(changePubKey.accountId);
     const accountBytes = serializeAddress(changePubKey.account);
     const pubKeyHashBytes = serializeAddress(changePubKey.newPkHash);
@@ -739,6 +752,7 @@ export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
     const validUntil = serializeTimestamp(changePubKey.validUntil);
     return ethers.utils.concat([
         type,
+        version,
         accountIdBytes,
         accountBytes,
         pubKeyHashBytes,
@@ -751,7 +765,8 @@ export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
 }
 
 export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
-    const type = new Uint8Array([8]);
+    const type = new Uint8Array([255 - 8]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
     const targetBytes = serializeAddress(forcedExit.target);
     const tokenIdBytes = serializeTokenId(forcedExit.token);
@@ -761,6 +776,7 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
     const validUntil = serializeTimestamp(forcedExit.validUntil);
     return ethers.utils.concat([
         type,
+        version,
         initiatorAccountIdBytes,
         targetBytes,
         tokenIdBytes,
