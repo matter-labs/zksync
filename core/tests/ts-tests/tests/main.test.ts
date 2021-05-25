@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { BigNumber, utils } from 'ethers';
-import { Wallet, types, getDefaultProvider, getDefaultRestProvider } from 'zksync';
+import { Wallet, types } from 'zksync';
 
 import { Tester } from './tester';
 import './priority-ops';
