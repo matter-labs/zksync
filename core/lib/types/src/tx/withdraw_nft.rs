@@ -15,6 +15,7 @@ use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
     AccountId, Address, Engine, Nonce, TokenId,
 };
+use zksync_crypto::params::CURRENT_TX_VERSION;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,7 +117,8 @@ impl WithdrawNFT {
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(self.to.as_bytes());

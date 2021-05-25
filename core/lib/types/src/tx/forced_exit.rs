@@ -15,6 +15,7 @@ use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::tx::{error::TransactionSignatureError, TimeRange};
+use zksync_crypto::params::CURRENT_TX_VERSION;
 
 /// `ForcedExit` transaction is used to withdraw funds from an unowned
 /// account to its corresponding L1 address.
@@ -111,9 +112,23 @@ impl ForcedExit {
     }
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
-    pub fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_old_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
+        out.extend_from_slice(&self.target.as_bytes());
+        out.extend_from_slice(&(self.token.0 as u16).to_be_bytes());
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out.extend_from_slice(&self.time_range.to_be_bytes());
+        out
+    }
+
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
+    pub fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
         out.extend_from_slice(&self.target.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -152,6 +167,13 @@ impl ForcedExit {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
+            if let Some(res) = self
+                .signature
+                .verify_musig(&self.get_old_bytes())
+                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+            {
+                return Some(res);
+            }
             self.signature
                 .verify_musig(&self.get_bytes())
                 .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))

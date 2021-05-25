@@ -19,6 +19,8 @@ use crate::{
     tokens::ChangePubKeyFeeTypeArg,
     tx::error::{ChangePubkeySignedDataError, TransactionSignatureError},
 };
+use std::convert::TryFrom;
+use zksync_crypto::params::CURRENT_TX_VERSION;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum ChangePubKeyType {
@@ -241,16 +243,40 @@ impl ChangePubKey {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
+            if let Some(res) = self
+                .signature
+                .verify_musig(&self.get_old_bytes())
+                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+            {
+                return Some(res);
+            }
             self.signature
                 .verify_musig(&self.get_bytes())
                 .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
         }
     }
 
+    /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
+    pub fn get_old_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account_id.to_be_bytes());
+        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(&self.new_pk_hash.data);
+        out.extend_from_slice(&(u16::try_from(self.fee_token.0).unwrap()).to_be_bytes());
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        if let Some(time_range) = &self.time_range {
+            out.extend_from_slice(&time_range.to_be_bytes());
+        }
+        out
+    }
+
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);

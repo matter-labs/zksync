@@ -13,6 +13,8 @@ use crate::{
 pub const ACCOUNT_TREE_DEPTH: usize = 32;
 /// Depth of the balance tree for each account.
 pub const BALANCE_TREE_DEPTH: usize = 32;
+/// Version of transactions.
+pub const CURRENT_TX_VERSION: u8 = 1;
 
 /// account_tree_depth.
 pub fn account_tree_depth() -> usize {

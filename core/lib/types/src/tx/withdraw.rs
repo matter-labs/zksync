@@ -16,6 +16,7 @@ use crate::{
 };
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
+use zksync_crypto::params::{CURRENT_TX_VERSION, MIN_NFT_TOKEN_ID};
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,10 +117,31 @@ impl Withdraw {
         Ok(tx)
     }
 
+    /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
+    pub fn get_old_bytes(&self) -> Vec<u8> {
+        if self.token.0 > MIN_NFT_TOKEN_ID {
+            panic!("Could not generate old bytes for tokens bigger than 2**16")
+        }
+        let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account_id.to_be_bytes());
+        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(self.to.as_bytes());
+        out.extend_from_slice(&(self.token.0 as u16).to_be_bytes());
+        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        if let Some(time_range) = &self.time_range {
+            out.extend_from_slice(&time_range.to_be_bytes());
+        }
+        out
+    }
+
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(self.to.as_bytes());
@@ -169,6 +191,15 @@ impl Withdraw {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
+            if self.token.0 < MIN_NFT_TOKEN_ID {
+                if let Some(res) = self
+                    .signature
+                    .verify_musig(&self.get_old_bytes())
+                    .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                {
+                    return Some(res);
+                }
+            }
             self.signature
                 .verify_musig(&self.get_bytes())
                 .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))

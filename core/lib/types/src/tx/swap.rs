@@ -19,6 +19,7 @@ use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRad
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::tx::error::TransactionSignatureError;
+use zksync_crypto::params::CURRENT_TX_VERSION;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,7 +62,9 @@ impl Order {
     pub const MSG_TYPE: u8 = b'o'; // 'o' for "order"
 
     pub fn get_bytes(&self) -> Vec<u8> {
-        let mut out = vec![Self::MSG_TYPE];
+        let mut out = Vec::new();
+        out.extend_from_slice(&[255u8 - Self::MSG_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.recipient_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -249,7 +252,9 @@ impl Swap {
     /// Encodes transaction data, using provided encoded data for orders.
     /// This function does not care how orders are encoded: is it data or hash.
     fn get_swap_bytes(&self, order_bytes: &[u8]) -> Vec<u8> {
-        let mut out = vec![Self::TX_TYPE];
+        let mut out = Vec::new();
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.submitter_id.to_be_bytes());
         out.extend_from_slice(&self.submitter_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());

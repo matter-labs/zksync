@@ -18,6 +18,7 @@ use crate::{
     tx::{TxSignature, VerifiedSignatureCache},
     AccountId, Address, Nonce, PubKeyHash, TokenId, H256,
 };
+use zksync_crypto::params::CURRENT_TX_VERSION;
 
 /// `MintNFT` transaction performs NFT minting for the recipient.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,7 +114,8 @@ impl MintNFT {
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.creator_id.to_be_bytes());
         out.extend_from_slice(&self.creator_address.as_bytes());
         out.extend_from_slice(&self.content_hash.as_bytes());

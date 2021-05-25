@@ -16,6 +16,7 @@ use crate::{
     helpers::{pack_fee_amount, pack_token_amount},
     AccountId, Engine, Nonce, TokenId,
 };
+use zksync_crypto::params::CURRENT_TX_VERSION;
 
 fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
@@ -63,7 +64,8 @@ fn test_print_transfer_for_protocol() {
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
     let signed_fields = vec![
-        ("type", vec![Transfer::TX_TYPE]),
+        ("type", vec![255u8 - Transfer::TX_TYPE]),
+        ("version", vec![CURRENT_TX_VERSION]),
         ("accountId", transfer.account_id.to_be_bytes().to_vec()),
         ("from", transfer.from.as_bytes().to_vec()),
         ("to", transfer.to.as_bytes().to_vec()),
@@ -122,7 +124,8 @@ fn test_print_withdraw_for_protocol() {
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
     let signed_fields = vec![
-        ("type", vec![Withdraw::TX_TYPE]),
+        ("type", vec![255u8 - Withdraw::TX_TYPE]),
+        ("version", vec![CURRENT_TX_VERSION]),
         ("accountId", withdraw.account_id.to_be_bytes().to_vec()),
         ("from", withdraw.from.as_bytes().to_vec()),
         ("to", withdraw.to.as_bytes().to_vec()),
