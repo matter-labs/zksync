@@ -41,8 +41,8 @@ Tester.prototype.testSwapNFT = async function (
         tokenBuy: nft,
         amount,
         ratio: utils.weiRatio({
-            token: amount,
-            nft: 1
+            [token]: amount,
+            [nft]: 1
         })
     });
 
@@ -51,8 +51,8 @@ Tester.prototype.testSwapNFT = async function (
         tokenBuy: token,
         amount: 1,
         ratio: utils.weiRatio({
-            token: amount,
-            nft: 1
+            [token]: amount,
+            [nft]: 1
         })
     });
 
@@ -86,8 +86,8 @@ Tester.prototype.testSwap = async function (
         tokenBuy: tokenB,
         amount,
         ratio: utils.weiRatio({
-            tokenA: 1,
-            tokenB: 2
+            [tokenA]: 1,
+            [tokenB]: 2
         })
     });
 
@@ -96,8 +96,8 @@ Tester.prototype.testSwap = async function (
         tokenBuy: tokenA,
         amount: amount.mul(2),
         ratio: utils.weiRatio({
-            tokenA: 1,
-            tokenB: 2
+            [tokenA]: 1,
+            [tokenB]: 2
         })
     });
 
@@ -149,8 +149,8 @@ Tester.prototype.testSwapBatch = async function (
         tokenSell: tokenA,
         tokenBuy: tokenB,
         ratio: utils.weiRatio({
-            tokenA: 2,
-            tokenB: 5
+            [tokenA]: 2,
+            [tokenB]: 5
         })
     });
 
@@ -158,8 +158,8 @@ Tester.prototype.testSwapBatch = async function (
         tokenSell: tokenB,
         tokenBuy: tokenA,
         ratio: utils.weiRatio({
-            tokenA: 1,
-            tokenB: 4
+            [tokenA]: 1,
+            [tokenB]: 4
         })
     });
 
