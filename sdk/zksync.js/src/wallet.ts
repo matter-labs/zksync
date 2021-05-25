@@ -462,6 +462,10 @@ export class Wallet {
         const sell = order.tokenSell;
         const buy = order.tokenBuy;
 
+        if (!order.ratio[sell] || !order.ratio[buy]) {
+            throw new Error('Wrong tokens in the ratio object');
+        }
+
         if (order.ratio.type == 'Wei') {
             ratio = [order.ratio[sell], order.ratio[buy]];
         } else if (order.ratio.type == 'Token') {
