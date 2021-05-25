@@ -5,7 +5,6 @@ import {
     Network,
     TokenLike,
     TxEthSignature,
-    ApiResponse,
     PaginationQuery,
     Paginated,
     ApiBlockInfo,
@@ -54,6 +53,33 @@ export async function getDefaultRestProvider(network: Network): Promise<RestProv
     }
 }
 
+export interface Request {
+    network: Network;
+    apiVersion: 'v02';
+    resource: string;
+    args: any;
+    timestamp: string;
+}
+
+export interface Error {
+    errorType: string;
+    code: number;
+    message: string;
+}
+
+export interface Response<T> {
+    request: Request;
+    status: 'success' | 'error';
+    error?: Error;
+    result?: T;
+}
+
+export class RESTError extends Error {
+    constructor(message: string, public restError: Error) {
+        super(message);
+    }
+}
+
 export class RestProvider extends SyncProvider {
     public static readonly MAX_LIMIT = 100;
 
@@ -63,7 +89,7 @@ export class RestProvider extends SyncProvider {
     }
 
     static async newProvider(
-        address: string = 'http://127.0.0.1:3030',
+        address: string = 'http://127.0.0.1:3001',
         pollIntervalMilliSecs?: number
     ): Promise<RestProvider> {
         const provider = new RestProvider(address);
@@ -75,24 +101,25 @@ export class RestProvider extends SyncProvider {
         return provider;
     }
 
-    parseResponse<T>(response: ApiResponse<T>): T {
+    parseResponse<T>(response: Response<T>): T {
         if (response.status === 'success') {
             return response.result;
         } else {
-            throw new Error(
+            throw new RESTError(
                 `zkSync API response error: errorType: ${response.error.errorType};` +
-                    ` code ${response.error.code}; message: ${response.error.message}`
+                    ` code ${response.error.code}; message: ${response.error.message}`,
+                response.error
             );
         }
     }
 
-    async get<T>(url: string): Promise<ApiResponse<T>> {
+    async get<T>(url: string): Promise<Response<T>> {
         return await Axios.get(url).then((resp) => {
             return resp.data;
         });
     }
 
-    async post<T>(url: string, body: any): Promise<ApiResponse<T>> {
+    async post<T>(url: string, body: any): Promise<Response<T>> {
         return await Axios.post(url, body).then((resp) => {
             return resp.data;
         });
@@ -101,21 +128,18 @@ export class RestProvider extends SyncProvider {
     async accountInfoDetailed(
         idOrAddress: number | Address,
         infoType: 'committed' | 'finalized'
-    ): Promise<ApiResponse<ApiAccountInfo | null>> {
+    ): Promise<Response<ApiAccountInfo>> {
         return await this.get(`${this.address}/accounts/${idOrAddress}/${infoType}`);
     }
 
-    async accountInfo(
-        idOrAddress: number | Address,
-        infoType: 'committed' | 'finalized'
-    ): Promise<ApiAccountInfo | null> {
+    async accountInfo(idOrAddress: number | Address, infoType: 'committed' | 'finalized'): Promise<ApiAccountInfo> {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
     async accountTxsDetailed(
         idOrAddress: number | Address,
         paginationQuery: PaginationQuery<string>
-    ): Promise<ApiResponse<Paginated<ApiTransaction, AccountTxsRequest>>> {
+    ): Promise<Response<Paginated<ApiTransaction, AccountTxsRequest>>> {
         return await this.get(
             `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -132,7 +156,7 @@ export class RestProvider extends SyncProvider {
     async accountPendingTxsDetailed(
         idOrAddress: number | Address,
         paginationQuery: PaginationQuery<number>
-    ): Promise<ApiResponse<Paginated<ApiTransaction, PendingOpsRequest>>> {
+    ): Promise<Response<Paginated<ApiTransaction, PendingOpsRequest>>> {
         return await this.get(
             `${this.address}/accounts/${idOrAddress}/transactions/pending?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -148,7 +172,7 @@ export class RestProvider extends SyncProvider {
 
     async blockPaginationDetailed(
         paginationQuery: PaginationQuery<number>
-    ): Promise<ApiResponse<Paginated<ApiBlockInfo, number>>> {
+    ): Promise<Response<Paginated<ApiBlockInfo, number>>> {
         return await this.get(
             `${this.address}/blocks?from=${paginationQuery.from}&limit=${paginationQuery.limit}` +
                 `&direction=${paginationQuery.direction}`
@@ -161,18 +185,18 @@ export class RestProvider extends SyncProvider {
 
     async blockByPositionDetailed(
         blockPosition: number | 'lastCommitted' | 'lastFinalized'
-    ): Promise<ApiResponse<ApiBlockInfo | null>> {
+    ): Promise<Response<ApiBlockInfo>> {
         return await this.get(`${this.address}/blocks/${blockPosition}`);
     }
 
-    async blockByPosition(blockPosition: number | 'lastCommitted' | 'lastFinalized'): Promise<ApiBlockInfo | null> {
+    async blockByPosition(blockPosition: number | 'lastCommitted' | 'lastFinalized'): Promise<ApiBlockInfo> {
         return this.parseResponse(await this.blockByPositionDetailed(blockPosition));
     }
 
     async blockTransactionsDetailed(
         blockPosition: number | 'lastCommitted' | 'lastFinalized',
         paginationQuery: PaginationQuery<string>
-    ): Promise<ApiResponse<Paginated<ApiTransaction, BlockAndTxHash>>> {
+    ): Promise<Response<Paginated<ApiTransaction, BlockAndTxHash>>> {
         return await this.get(
             `${this.address}/blocks/${blockPosition}/transactions?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -186,7 +210,7 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.blockTransactionsDetailed(blockPosition, paginationQuery));
     }
 
-    async configDetailed(): Promise<ApiResponse<ApiConfig>> {
+    async configDetailed(): Promise<Response<ApiConfig>> {
         return await this.get(`${this.address}/config`);
     }
 
@@ -198,8 +222,33 @@ export class RestProvider extends SyncProvider {
         txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
-    ): Promise<ApiResponse<ApiFee>> {
-        return await this.post(`${this.address}/fee`, { txType, address, tokenLike });
+    ): Promise<Response<ApiFee>> {
+        const rawFee = await this.post<{ gasFee: string; zkpFee: string; totalFee: string }>(`${this.address}/fee`, {
+            txType,
+            address,
+            tokenLike
+        });
+        let fee: Response<ApiFee>;
+        if (rawFee.status === 'success') {
+            fee = {
+                request: rawFee.request,
+                status: rawFee.status,
+                error: null,
+                result: {
+                    gasFee: BigNumber.from(rawFee.result.gasFee),
+                    zkpFee: BigNumber.from(rawFee.result.zkpFee),
+                    totalFee: BigNumber.from(rawFee.result.totalFee)
+                }
+            };
+        } else {
+            fee = {
+                request: rawFee.request,
+                status: rawFee.status,
+                error: rawFee.error,
+                result: null
+            };
+        }
+        return fee;
     }
 
     async getTransactionFee(
@@ -216,8 +265,32 @@ export class RestProvider extends SyncProvider {
             address: Address;
         }[],
         tokenLike: TokenLike
-    ): Promise<ApiResponse<ApiFee>> {
-        return await this.post(`${this.address}/fee/batch`, { transactions, tokenLike });
+    ): Promise<Response<ApiFee>> {
+        const rawFee = await this.post<{ gasFee: string; zkpFee: string; totalFee: string }>(
+            `${this.address}/fee/batch`,
+            { transactions, tokenLike }
+        );
+        let fee: Response<ApiFee>;
+        if (rawFee.status === 'success') {
+            fee = {
+                request: rawFee.request,
+                status: rawFee.status,
+                error: null,
+                result: {
+                    gasFee: BigNumber.from(rawFee.result.gasFee),
+                    zkpFee: BigNumber.from(rawFee.result.zkpFee),
+                    totalFee: BigNumber.from(rawFee.result.totalFee)
+                }
+            };
+        } else {
+            fee = {
+                request: rawFee.request,
+                status: rawFee.status,
+                error: rawFee.error,
+                result: null
+            };
+        }
+        return fee;
     }
 
     async getBatchFullFee(
@@ -230,7 +303,7 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.getBatchFullFeeDetailed(transactions, tokenLike));
     }
 
-    async networkStatusDetailed(): Promise<ApiResponse<NetworkStatus>> {
+    async networkStatusDetailed(): Promise<Response<NetworkStatus>> {
         return await this.get(`${this.address}/networkStatus`);
     }
 
@@ -240,7 +313,7 @@ export class RestProvider extends SyncProvider {
 
     async tokenPaginationDetailed(
         paginationQuery: PaginationQuery<number>
-    ): Promise<ApiResponse<Paginated<TokenInfo, number>>> {
+    ): Promise<Response<Paginated<TokenInfo, number>>> {
         return await this.get(
             `${this.address}/tokens?from=${paginationQuery.from}&limit=${paginationQuery.limit}` +
                 `&direction=${paginationQuery.direction}`
@@ -251,7 +324,7 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.tokenPaginationDetailed(paginationQuery));
     }
 
-    async tokenByIdOrAddressDetailed(idOrAddress: number | TokenAddress): Promise<ApiResponse<TokenInfo>> {
+    async tokenByIdOrAddressDetailed(idOrAddress: number | TokenAddress): Promise<Response<TokenInfo>> {
         return await this.get(`${this.address}/tokens/${idOrAddress}`);
     }
 
@@ -262,7 +335,7 @@ export class RestProvider extends SyncProvider {
     async tokenPriceInfoDetailed(
         idOrAddress: number | TokenAddress,
         tokenIdOrUsd: number | 'usd'
-    ): Promise<ApiResponse<TokenPriceInfo>> {
+    ): Promise<Response<TokenPriceInfo>> {
         return await this.get(`${this.address}/tokens/${idOrAddress}/priceIn/${tokenIdOrUsd}`);
     }
 
@@ -270,7 +343,7 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
     }
 
-    async submitTxNewDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<ApiResponse<string>> {
+    async submitTxNewDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<Response<string>> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
@@ -282,7 +355,7 @@ export class RestProvider extends SyncProvider {
      * @deprecated Use submitTxNew method instead
      */
     async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
-        if (fastProcessing !== undefined) {
+        if (fastProcessing) {
             tx.fastProcessing = fastProcessing;
         }
         let txHash = await this.submitTxNew(tx, signature);
@@ -290,26 +363,26 @@ export class RestProvider extends SyncProvider {
         return txHash;
     }
 
-    async txStatusDetailed(txHash: string): Promise<ApiResponse<ApiTxReceipt | null>> {
+    async txStatusDetailed(txHash: string): Promise<Response<ApiTxReceipt>> {
         return await this.get(`${this.address}/transactions/${txHash}`);
     }
 
-    async txStatus(txHash: string): Promise<ApiTxReceipt | null> {
+    async txStatus(txHash: string): Promise<ApiTxReceipt> {
         return this.parseResponse(await this.txStatusDetailed(txHash));
     }
 
-    async txDataDetailed(txHash: string): Promise<ApiResponse<ApiSignedTx | null>> {
+    async txDataDetailed(txHash: string): Promise<Response<ApiSignedTx>> {
         return await this.get(`${this.address}/transactions/${txHash}/data`);
     }
 
-    async txData(txHash: string): Promise<ApiSignedTx | null> {
+    async txData(txHash: string): Promise<ApiSignedTx> {
         return this.parseResponse(await this.txDataDetailed(txHash));
     }
 
     async submitTxsBatchNewDetailed(
         txs: L2Tx[],
         signature: TxEthSignature | TxEthSignature[]
-    ): Promise<ApiResponse<SubmitBatchResponse>> {
+    ): Promise<Response<SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
@@ -325,13 +398,13 @@ export class RestProvider extends SyncProvider {
         for (const signedTx of transactions) {
             txs.push(signedTx.tx);
         }
-        if (ethSignatures === undefined) {
+        if (!ethSignatures) {
             throw new Error('Batch signature should be provided in API v0.2');
         }
-        return await (await this.submitTxsBatchNew(txs, ethSignatures)).transactionHashes;
+        return (await this.submitTxsBatchNew(txs, ethSignatures)).transactionHashes;
     }
 
-    async getBatchDetailed(batchHash: string): Promise<ApiResponse<ApiBatchData>> {
+    async getBatchDetailed(batchHash: string): Promise<Response<ApiBatchData>> {
         return await this.get(`${this.address}/transactions/batches/${batchHash}`);
     }
 
@@ -344,14 +417,18 @@ export class RestProvider extends SyncProvider {
             let transactionStatus = await this.txStatus(hash);
             let notifyDone;
             if (action === 'COMMIT') {
-                notifyDone = transactionStatus !== null && transactionStatus.rollupBlock !== null;
+                notifyDone = transactionStatus && transactionStatus.rollupBlock;
             } else {
-                if (transactionStatus !== null && transactionStatus.rollupBlock !== null) {
-                    // If the transaction status is rejected
-                    // it cannot be known if transaction is queued, committed or finalized.
-                    // That is why there is separate `blockByPosition` query.
-                    const blockStatus = await this.blockByPosition(transactionStatus.rollupBlock);
-                    notifyDone = blockStatus.status === 'finalized';
+                if (transactionStatus && transactionStatus.rollupBlock) {
+                    if (transactionStatus.status === 'rejected') {
+                        // If the transaction status is rejected
+                        // it cannot be known if transaction is queued, committed or finalized.
+                        // That is why there is separate `blockByPosition` query.
+                        const blockStatus = await this.blockByPosition(transactionStatus.rollupBlock);
+                        notifyDone = blockStatus.status === 'finalized';
+                    } else {
+                        notifyDone = transactionStatus.status === 'finalized';
+                    }
                 }
             }
             if (notifyDone) {
@@ -385,7 +462,7 @@ export class RestProvider extends SyncProvider {
     async getTokens(limit?: number): Promise<Tokens> {
         let tokens = {};
         let tmpId = 0;
-        limit = limit !== undefined ? limit : RestProvider.MAX_LIMIT;
+        limit = limit ? limit : RestProvider.MAX_LIMIT;
         let tokenPage: Paginated<TokenInfo, number>;
         do {
             tokenPage = await this.tokenPagination({
@@ -483,18 +560,18 @@ export class RestProvider extends SyncProvider {
 
     async getTxReceipt(txHash: string): Promise<TransactionReceipt> {
         const receipt = await this.txStatus(txHash);
-        if (receipt === null || receipt.rollupBlock === null) {
+        if (!receipt || !receipt.rollupBlock) {
             return {
                 executed: false
             };
         } else {
-            const blockFullInfo = await this.blockByPosition(receipt.rollupBlock);
-            const blockInfo = {
-                blockNumber: blockFullInfo.blockNumber,
-                committed: blockFullInfo.commitTxHash !== null,
-                verified: blockFullInfo.verifyTxHash !== null
-            };
             if (receipt.status === 'rejected') {
+                const blockFullInfo = await this.blockByPosition(receipt.rollupBlock);
+                const blockInfo = {
+                    blockNumber: blockFullInfo.blockNumber,
+                    committed: <boolean>(<any>blockFullInfo.commitTxHash),
+                    verified: <boolean>(<any>blockFullInfo.verifyTxHash)
+                };
                 return {
                     executed: true,
                     success: false,
@@ -505,7 +582,11 @@ export class RestProvider extends SyncProvider {
                 return {
                     executed: true,
                     success: true,
-                    block: blockInfo
+                    block: {
+                        blockNumber: receipt.rollupBlock,
+                        committed: true,
+                        verified: receipt.status === 'finalized'
+                    }
                 };
             }
         }
@@ -513,25 +594,28 @@ export class RestProvider extends SyncProvider {
 
     async getPriorityOpStatus(hash: string): Promise<PriorityOperationReceipt> {
         const receipt = await this.txStatus(hash);
-        if (receipt === null || receipt.rollupBlock === null) {
+        if (!receipt || !receipt.rollupBlock) {
             return {
                 executed: false
             };
         } else {
-            const blockFullInfo = await this.blockByPosition(receipt.rollupBlock);
-            const blockInfo = {
-                blockNumber: blockFullInfo.blockNumber,
-                committed: blockFullInfo.commitTxHash !== null,
-                verified: blockFullInfo.verifyTxHash !== null
-            };
             return {
                 executed: true,
-                block: blockInfo
+                block: {
+                    blockNumber: receipt.rollupBlock,
+                    committed: true,
+                    verified: receipt.status === 'finalized'
+                }
             };
         }
     }
 
-    getEthTxForWithdrawal(_withdrawal_hash: string): Promise<string> {
-        throw new Error('Ethereum tx for withdrawal cannot be got using API v0.2');
+    async getEthTxForWithdrawal(withdrawalHash: string): Promise<string> {
+        const txData = await this.txData(withdrawalHash);
+        if (txData.tx.op.type === 'Withdraw' || txData.tx.op.type === 'ForcedExit') {
+            return txData.tx.op.ethTxHash;
+        } else {
+            return null;
+        }
     }
 }

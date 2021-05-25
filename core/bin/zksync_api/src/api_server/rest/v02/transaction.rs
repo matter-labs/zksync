@@ -13,9 +13,9 @@ use actix_web::{
 use zksync_api_types::v02::{
     block::BlockStatus,
     transaction::{
-        ApiTxBatch, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, L2Receipt, Receipt,
-        SubmitBatchResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
-        TxInBlockStatus,
+        ApiTxBatch, ApiZkSyncTx, ForcedExitData, IncomingTx, IncomingTxBatch, L1Receipt,
+        L1Transaction, L2Receipt, Receipt, SubmitBatchResponse, Transaction, TransactionData,
+        TxData, TxHashSerializeWrapper, TxInBlockStatus, WithdrawData,
     },
 };
 use zksync_storage::{
@@ -27,7 +27,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     priority_ops::PriorityOpLookupQuery, tx::EthSignData, tx::TxHash, BlockNumber, EthBlockId,
-    ZkSyncOp, H256,
+    ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local uses
@@ -106,10 +106,11 @@ pub fn l1_tx_data_from_op_and_status(
     }
 }
 
-pub fn l2_tx_from_op_and_status(
+pub async fn l2_tx_from_op_and_status(
     op: StoredExecutedTransaction,
     block_status: BlockStatus,
-) -> Transaction {
+    storage: &mut StorageProcessor<'_>,
+) -> QueryResult<Transaction> {
     let block_number = match block_status {
         BlockStatus::Queued => None,
         _ => Some(BlockNumber(op.block_number as u32)),
@@ -120,14 +121,15 @@ pub fn l2_tx_from_op_and_status(
         TxInBlockStatus::Rejected
     };
     let tx_hash = TxHash::from_slice(&op.tx_hash).unwrap();
-    Transaction {
+    let tx_data = tx_data_from_zksync_tx(serde_json::from_value(op.tx).unwrap(), storage).await?;
+    Ok(Transaction {
         tx_hash,
         block_number,
-        op: TransactionData::L2(serde_json::from_value(op.tx).unwrap()),
+        op: tx_data,
         status,
         fail_reason: op.fail_reason,
         created_at: Some(op.created_at),
-    }
+    })
 }
 
 fn get_sign_bytes(eth_sign_data: serde_json::Value) -> String {
@@ -138,6 +140,40 @@ fn get_sign_bytes(eth_sign_data: serde_json::Value) -> String {
         )
     });
     eth_sign_data.signature.to_string()
+}
+
+pub async fn tx_data_from_zksync_tx(
+    tx: ZkSyncTx,
+    storage: &mut StorageProcessor<'_>,
+) -> QueryResult<TransactionData> {
+    let tx = match tx {
+        ZkSyncTx::ChangePubKey(tx) => ApiZkSyncTx::ChangePubKey(tx),
+        ZkSyncTx::Close(tx) => ApiZkSyncTx::Close(tx),
+        ZkSyncTx::ForcedExit(tx) => {
+            let complete_withdrawals_tx_hash = storage
+                .chain()
+                .operations_schema()
+                .eth_tx_for_withdrawal(&ZkSyncTx::ForcedExit(tx.clone()).hash())
+                .await?;
+            ApiZkSyncTx::ForcedExit(Box::new(ForcedExitData {
+                tx: *tx,
+                eth_tx_hash: complete_withdrawals_tx_hash,
+            }))
+        }
+        ZkSyncTx::Transfer(tx) => ApiZkSyncTx::Transfer(tx),
+        ZkSyncTx::Withdraw(tx) => {
+            let complete_withdrawals_tx_hash = storage
+                .chain()
+                .operations_schema()
+                .eth_tx_for_withdrawal(&ZkSyncTx::Withdraw(tx.clone()).hash())
+                .await?;
+            ApiZkSyncTx::Withdraw(Box::new(WithdrawData {
+                tx: *tx,
+                eth_tx_hash: complete_withdrawals_tx_hash,
+            }))
+        }
+    };
+    Ok(TransactionData::L2(tx))
 }
 
 /// Shared data between `api/v0.2/transaction` endpoints.
@@ -366,7 +402,7 @@ impl ApiTransactionData {
                 .await?
                 .0;
             let eth_signature = op.eth_sign_data.clone().map(get_sign_bytes);
-            let tx = l2_tx_from_op_and_status(op, block_status);
+            let tx = l2_tx_from_op_and_status(op, block_status, storage).await?;
 
             Ok(Some(TxData { tx, eth_signature }))
         } else if let Some(op) = storage
@@ -375,10 +411,12 @@ impl ApiTransactionData {
             .get_mempool_tx(tx_hash)
             .await?
         {
+            let tx_data =
+                tx_data_from_zksync_tx(serde_json::from_value(op.tx).unwrap(), storage).await?;
             let tx = Transaction {
                 tx_hash,
                 block_number: None,
-                op: TransactionData::L2(serde_json::from_value(op.tx).unwrap()),
+                op: tx_data,
                 status: TxInBlockStatus::Queued,
                 fail_reason: None,
                 created_at: Some(op.created_at),

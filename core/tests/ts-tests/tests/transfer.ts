@@ -10,8 +10,20 @@ declare module './tester' {
         testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber, timeout?: number): Promise<void>;
         testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testRejectedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testInvalidFeeBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testRejectedBatch(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
+        testInvalidFeeBatch(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
     }
 }
 
@@ -107,21 +119,28 @@ Tester.prototype.testIgnoredBatch = async function (
         { ...tx, amount: amount.mul(10 ** 6) }
     ]);
 
+    // One correct tx is needed because block will not be committed if it contains only rejected txs.
+    const handle = await sender.syncTransfer(tx);
+
     for (const handle of handles) {
         await suppress(handle.awaitReceipt());
     }
+    await handle.awaitReceipt();
 
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
-    expect(senderBefore.eq(senderAfter), 'Wrong batch was not ignored').to.be.true;
-    expect(receiverAfter.eq(receiverBefore), 'Wrong batch was not ignored').to.be.true;
+    expect(senderBefore.eq(senderAfter.add(amount).add(fee.div(2))), 'Wrong batch was not ignored').to.be.true;
+    expect(receiverAfter.eq(receiverBefore.add(amount)), 'Wrong batch was not ignored').to.be.true;
+
+    this.runningFee = this.runningFee.add(fee.div(2));
 };
 
 Tester.prototype.testRejectedBatch = async function (
     sender: Wallet,
     receiver: Wallet,
     token: types.TokenLike,
-    amount: BigNumber
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
 ) {
     const tx = {
         to: receiver.address(),
@@ -138,7 +157,13 @@ Tester.prototype.testRejectedBatch = async function (
         }
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal(
+                'Transaction adding error: Transactions batch summary fee is too low.'
+            );
+        } else {
+            expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+        }
     }
     expect(thrown, 'Batch should have failed').to.be.true;
 };
@@ -149,7 +174,8 @@ Tester.prototype.testInvalidFeeBatch = async function (
     sender: Wallet,
     receiver: Wallet,
     token: types.TokenLike,
-    amount: BigNumber
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
 ) {
     // Ignore the second transfer.
     const fee = await this.syncProvider.getTransactionsBatchFee(['Transfer'], [receiver.address()], token);
@@ -181,7 +207,13 @@ Tester.prototype.testInvalidFeeBatch = async function (
         }
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal(
+                'Transaction adding error: Transactions batch summary fee is too low.'
+            );
+        } else {
+            expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+        }
     }
     expect(thrown, 'Batch should have failed').to.be.true;
 };

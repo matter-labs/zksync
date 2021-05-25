@@ -3,8 +3,10 @@ use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use zksync_types::{
-    tx::TxHash,
-    tx::{EthBatchSignatures, TxEthSignature},
+    tx::{
+        ChangePubKey, Close, EthBatchSignatures, ForcedExit, Transfer, TxEthSignature, TxHash,
+        Withdraw,
+    },
     AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
     ZkSyncTx, H256,
 };
@@ -92,7 +94,34 @@ pub struct Transaction {
 #[serde(untagged)]
 pub enum TransactionData {
     L1(L1Transaction),
-    L2(ZkSyncTx),
+    L2(ApiZkSyncTx),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ApiZkSyncTx {
+    Transfer(Box<Transfer>),
+    Withdraw(Box<WithdrawData>),
+    #[doc(hidden)]
+    Close(Box<Close>),
+    ChangePubKey(Box<ChangePubKey>),
+    ForcedExit(Box<ForcedExitData>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForcedExitData {
+    #[serde(flatten)]
+    pub tx: ForcedExit,
+    pub eth_tx_hash: Option<H256>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawData {
+    #[serde(flatten)]
+    pub tx: Withdraw,
+    pub eth_tx_hash: Option<H256>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]

@@ -1,4 +1,4 @@
-import { Wallet, RestProvider, getDefaultRestProvider, types, wallet } from 'zksync';
+import { Wallet, RestProvider, getDefaultRestProvider, types } from 'zksync';
 import { Tester } from './tester';
 import './priority-ops';
 import './change-pub-key';
