@@ -278,9 +278,9 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.get_bytes(),
             ZkSyncTx::ChangePubKey(tx) => tx.get_old_bytes(),
             ZkSyncTx::ForcedExit(tx) => tx.get_old_bytes(),
-            ZkSyncTx::MintNFT(_) => unreachable!("Not supported for old sdk"),
-            ZkSyncTx::Swap(_) => unreachable!("Not supported for old sdk"),
-            ZkSyncTx::WithdrawNFT(_) => unreachable!("Not supported for old sdk"),
+            ZkSyncTx::MintNFT(_) => vec![], // Not supported for old sdk
+            ZkSyncTx::Swap(_) => vec![],    // Not supported for old sdk
+            ZkSyncTx::WithdrawNFT(_) => vec![], // Not supported for old sdk
         }
     }
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.

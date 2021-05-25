@@ -812,7 +812,7 @@ export function serializeTx(
     }
 }
 
-function numberToBytesBE(number: number, bytes: number): Uint8Array {
+export function numberToBytesBE(number: number, bytes: number): Uint8Array {
     const result = new Uint8Array(bytes);
     for (let i = bytes - 1; i >= 0; i--) {
         result[i] = number & 0xff;

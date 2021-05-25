@@ -5,14 +5,17 @@ import { BigNumber, ethers } from 'ethers';
 import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
 import { MAX_TIMESTAMP } from 'zksync/build/utils';
-import {Transfer, Withdraw} from "zksync/build/types";
+import { Transfer, Withdraw } from 'zksync/build/types';
 import {
     serializeAccountId,
-    serializeAddress, serializeAmountFull,
+    serializeAddress,
+    serializeAmountFull,
     serializeAmountPacked,
-    serializeFeePacked, serializeNonce, serializeTimestamp,
-    serializeTokenId
-} from "zksync/build/utils";
+    serializeFeePacked,
+    serializeNonce,
+    serializeTimestamp,
+    numberToBytesBE
+} from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -253,7 +256,7 @@ export function serializeOldTransfer(transfer: Transfer): Uint8Array {
     const accountId = serializeAccountId(transfer.accountId);
     const from = serializeAddress(transfer.from);
     const to = serializeAddress(transfer.to);
-    const token = serializeTokenId(transfer.token);
+    const token = numberToBytesBE(transfer.token, 2);
     const amount = serializeAmountPacked(transfer.amount);
     const fee = serializeFeePacked(transfer.fee);
     const nonce = serializeNonce(transfer.nonce);
@@ -267,7 +270,7 @@ export function serializeOldWithdraw(withdraw: Withdraw): Uint8Array {
     const accountId = serializeAccountId(withdraw.accountId);
     const accountBytes = serializeAddress(withdraw.from);
     const ethAddressBytes = serializeAddress(withdraw.to);
-    const tokenIdBytes = serializeTokenId(withdraw.token);
+    const tokenIdBytes = numberToBytesBE(withdraw.token, 2);
     const amountBytes = serializeAmountFull(withdraw.amount);
     const feeBytes = serializeFeePacked(withdraw.fee);
     const nonceBytes = serializeNonce(withdraw.nonce);
