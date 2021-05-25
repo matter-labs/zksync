@@ -9,13 +9,12 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_fungible_token_id, max_processable_token},
+    params::{max_account_id, max_fungible_token_id, max_processable_token, CURRENT_TX_VERSION},
 };
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::tx::{error::TransactionSignatureError, TimeRange};
-use zksync_crypto::params::CURRENT_TX_VERSION;
 
 /// `ForcedExit` transaction is used to withdraw funds from an unowned
 /// account to its corresponding L1 address.

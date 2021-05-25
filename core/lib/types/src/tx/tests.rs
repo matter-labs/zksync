@@ -6,7 +6,7 @@ use zksync_crypto::{
         eddsa::{PrivateKey, PublicKey},
         jubjub::FixedGenerators,
     },
-    params::{max_account_id, max_fungible_token_id, JUBJUB_PARAMS},
+    params::{max_account_id, max_fungible_token_id, CURRENT_TX_VERSION, JUBJUB_PARAMS},
     public_key_from_private,
     rand::{Rng, SeedableRng, XorShiftRng},
 };
@@ -16,7 +16,6 @@ use crate::{
     helpers::{pack_fee_amount, pack_token_amount},
     AccountId, Engine, Nonce, TokenId,
 };
-use zksync_crypto::params::CURRENT_TX_VERSION;
 
 fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

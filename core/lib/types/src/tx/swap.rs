@@ -12,14 +12,15 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_processable_token, max_token_id, PRICE_BIT_WIDTH},
+    params::{
+        max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION, PRICE_BIT_WIDTH,
+    },
     primitives::rescue_hash_orders,
 };
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::tx::error::TransactionSignatureError;
-use zksync_crypto::params::CURRENT_TX_VERSION;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,7 +64,7 @@ impl Order {
 
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
-        out.extend_from_slice(&[255u8 - Self::MSG_TYPE]);
+        out.extend_from_slice(&[Self::MSG_TYPE]);
         out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.recipient_address.as_bytes());

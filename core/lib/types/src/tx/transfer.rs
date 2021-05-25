@@ -1,10 +1,14 @@
+use std::convert::TryFrom;
+
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
 
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION},
+    params::{
+        max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION, MIN_NFT_TOKEN_ID,
+    },
 };
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
@@ -19,8 +23,6 @@ use crate::{
 
 use crate::tx::error::TransactionSignatureError;
 use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
-use std::convert::TryFrom;
-use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 
 /// `Transfer` transaction performs a move of funds from one zkSync account to another.
 #[derive(Debug, Clone, Serialize, Deserialize)]

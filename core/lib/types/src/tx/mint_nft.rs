@@ -5,7 +5,7 @@ use num::{BigUint, Zero};
 use zksync_crypto::{
     convert::FeConvert,
     franklin_crypto::bellman::pairing::bn256::{Bn256, Fr},
-    params::{max_account_id, max_processable_token},
+    params::{max_account_id, max_processable_token, CURRENT_TX_VERSION},
     rescue_poseidon::rescue_hash,
     PrivateKey,
 };
@@ -18,7 +18,6 @@ use crate::{
     tx::{TxSignature, VerifiedSignatureCache},
     AccountId, Address, Nonce, PubKeyHash, TokenId, H256,
 };
-use zksync_crypto::params::CURRENT_TX_VERSION;
 
 /// `MintNFT` transaction performs NFT minting for the recipient.
 #[derive(Debug, Clone, Serialize, Deserialize)]

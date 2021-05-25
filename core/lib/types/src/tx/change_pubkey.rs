@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
     AccountId, Nonce, TxFeeTypes,
@@ -9,7 +11,7 @@ use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::{Address, TokenId, H256};
 use zksync_crypto::{
-    params::{max_account_id, max_processable_token},
+    params::{max_account_id, max_processable_token, CURRENT_TX_VERSION},
     PrivateKey,
 };
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
@@ -19,8 +21,6 @@ use crate::{
     tokens::ChangePubKeyFeeTypeArg,
     tx::error::{ChangePubkeySignedDataError, TransactionSignatureError},
 };
-use std::convert::TryFrom;
-use zksync_crypto::params::CURRENT_TX_VERSION;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum ChangePubKeyType {

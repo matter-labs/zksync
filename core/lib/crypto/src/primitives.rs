@@ -392,7 +392,7 @@ pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
 // - It encodes the resulting Fr a bit differently
 // - It returns 31 byte instead of 32
 pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
-    assert_eq!(msg.len(), 176);
+    assert_eq!(msg.len(), 178);
     let msg_bits = BitConvert::from_be_bytes(msg);
     let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());

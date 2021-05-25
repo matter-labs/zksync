@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_processable_token, max_token_id, MIN_NFT_TOKEN_ID},
+    params::{
+        max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION, MIN_NFT_TOKEN_ID,
+    },
 };
 
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
@@ -15,7 +17,6 @@ use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
     AccountId, Address, Engine, Nonce, TokenId,
 };
-use zksync_crypto::params::CURRENT_TX_VERSION;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
