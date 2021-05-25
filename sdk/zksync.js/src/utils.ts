@@ -16,7 +16,8 @@ import {
     MintNFT,
     Order,
     Swap,
-    Ratio,
+    TokenRatio,
+    WeiRatio,
     WithdrawNFT
 } from './types';
 import { rescueHashOrders } from './crypto';
@@ -58,8 +59,18 @@ const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
 
-export function ratio(price: { tokenSell: BigNumberish; tokenBuy: BigNumberish }): Ratio {
-    return [BigNumber.from(price.tokenSell), BigNumber.from(price.tokenBuy)];
+export function tokenRatio(ratio: { [token: string]: string; [token: number]: string }): TokenRatio {
+    return {
+        type: 'Token',
+        ...ratio
+    };
+}
+
+export function weiRatio(ratio: { [token: string]: BigNumberish; [token: number]: BigNumberish }): WeiRatio {
+    return {
+        type: 'Wei',
+        ...ratio
+    };
 }
 
 export function floatToInteger(

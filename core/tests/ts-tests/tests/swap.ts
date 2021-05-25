@@ -40,7 +40,7 @@ Tester.prototype.testSwapNFT = async function (
         tokenSell: token,
         tokenBuy: nft,
         amount,
-        ratio: utils.ratio({
+        ratio: utils.weiRatio({
             tokenSell: amount,
             tokenBuy: 1
         })
@@ -50,7 +50,7 @@ Tester.prototype.testSwapNFT = async function (
         tokenSell: nft,
         tokenBuy: token,
         amount: 1,
-        ratio: utils.ratio({
+        ratio: utils.weiRatio({
             tokenSell: 1,
             tokenBuy: amount
         })
@@ -85,7 +85,7 @@ Tester.prototype.testSwap = async function (
         tokenSell: tokenA,
         tokenBuy: tokenB,
         amount,
-        ratio: utils.ratio({
+        ratio: utils.weiRatio({
             tokenSell: 1,
             tokenBuy: 2
         })
@@ -95,7 +95,7 @@ Tester.prototype.testSwap = async function (
         tokenSell: tokenB,
         tokenBuy: tokenA,
         amount: amount.mul(2),
-        ratio: utils.ratio({
+        ratio: utils.weiRatio({
             tokenSell: 2,
             tokenBuy: 1
         })
@@ -148,7 +148,7 @@ Tester.prototype.testSwapBatch = async function (
     const orderA = await walletA.getLimitOrder({
         tokenSell: tokenA,
         tokenBuy: tokenB,
-        ratio: utils.ratio({
+        ratio: utils.weiRatio({
             tokenSell: 2,
             tokenBuy: 5
         })
@@ -157,7 +157,7 @@ Tester.prototype.testSwapBatch = async function (
     const orderB = await walletB.getLimitOrder({
         tokenSell: tokenB,
         tokenBuy: tokenA,
-        ratio: utils.ratio({
+        ratio: utils.weiRatio({
             tokenSell: 4,
             tokenBuy: 1
         })

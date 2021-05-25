@@ -102,6 +102,18 @@ export interface Signature {
 
 export type Ratio = [BigNumberish, BigNumberish];
 
+export type TokenRatio = {
+    type: 'Token';
+    [token: string]: string;
+    [token: number]: string;
+};
+
+export type WeiRatio = {
+    type: 'Wei';
+    [token: string]: BigNumberish;
+    [token: number]: BigNumberish;
+};
+
 export interface Order {
     accountId: number;
     recipient: Address;
