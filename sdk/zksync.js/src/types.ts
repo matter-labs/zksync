@@ -102,12 +102,14 @@ export interface Signature {
 
 export type Ratio = [BigNumberish, BigNumberish];
 
+/// represents ratio between tokens themself
 export type TokenRatio = {
     type: 'Token';
     [token: string]: string | number;
     [token: number]: string | number;
 };
 
+/// represents ratio between lowest token denominations (wei, satoshi, etc.)
 export type WeiRatio = {
     type: 'Wei';
     [token: string]: BigNumberish;
