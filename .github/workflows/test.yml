@@ -73,7 +73,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       -
-        name: Update cargo dependecies
+        name: Update cargo dependencies
         run: |
           cargo install --version=0.5.2 sqlx-cli
           cargo install diesel_cli --no-default-features --features postgres
@@ -97,6 +97,9 @@ jobs:
 
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+      DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
+      IMAGE_TAG: $(git rev-parse --short HEAD)
+      HFENV: zksync-loadtest
 
     steps:
       -
@@ -110,19 +113,10 @@ jobs:
         name: Deploy apps
         working-directory: helm-infra
         run: |
-          # copy helm plugins and update repos!
-          cp -rf /dysnix/kubectl/.local $HOME/.local
-          UPDATE_REPOS=y helmfile $hfArgs repos
+          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
 
-          # set the image tag for scheduled runs
-          IMAGE_TAG=$(git rev-parse --short HEAD)
-          export IMAGE_TAG
-
-          # !!REMOVE IMAGE_TAG override bellow!!
-          export IMAGE_TAG=3fa53ea
-          helmfile $hfArgs -l name=server sync
-          helmfile $hfArgs -l name=explorer sync
-          helmfile $hfArgs -l name=prover sync
+          UPDATE_REPOS=y helmfile -e $HFENV repos
+          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
 
   loadtest:
     name: Perform loadtest
