@@ -320,6 +320,12 @@ if (process.env.TEST_TRANSPORT) {
         },
         {
             transport: 'HTTP',
+            token: 'ETH',
+            providerType: 'REST',
+            onlyBasic: true
+        },
+        {
+            transport: 'HTTP',
             token: defaultERC20,
             providerType: 'REST',
             onlyBasic: false

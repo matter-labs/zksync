@@ -264,9 +264,9 @@ export interface ApiBlockInfo {
     blockSize: number;
     commitTxHash?: string;
     verifyTxHash?: string;
-    committedAt?: string;
+    committedAt: string;
     finalizedAt?: string;
-    status: 'queued' | 'committed' | 'finalized';
+    status: 'committed' | 'finalized';
 }
 
 export interface ApiAccountInfo {
