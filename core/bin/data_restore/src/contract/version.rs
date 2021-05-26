@@ -45,10 +45,39 @@ impl ZkSyncContractVersion {
         data: Vec<u8>,
     ) -> anyhow::Result<Vec<RollupOpsBlock>> {
         use ZkSyncContractVersion::*;
-        let res = match self {
+        let mut blocks = match self {
             V0 | V1 | V2 | V3 => vec![contract::default::rollup_ops_blocks_from_bytes(data)?],
             V4 => contract::v4::rollup_ops_blocks_from_bytes(data)?,
         };
-        Ok(res)
+        // Set the contract version.
+        for block in blocks.iter_mut() {
+            block.contract_version = Some(*self);
+        }
+        Ok(blocks)
+    }
+
+    /// Returns the contract version incremented by `num`.
+    ///
+    /// # Arguments
+    ///
+    /// * `num` - how many times to upgrade.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the the result is greater than the latest supported version.
+    pub fn upgrade(&self, num: u32) -> Self {
+        Self::try_from(i32::from(*self) as u32 + num)
+            .expect("cannot upgrade past the latest contract version")
+    }
+
+    /// Returns supported block chunks sizes by the verifier contract
+    /// with the given version.
+    pub fn available_block_chunk_sizes(&self) -> &'static [usize] {
+        use ZkSyncContractVersion::*;
+        match self {
+            V0 | V1 | V2 => &[6, 30, 74, 150, 334, 678],
+            V3 => &[6, 30, 74, 150, 320, 630],
+            V4 => &[10, 32, 72, 156, 322, 654],
+        }
     }
 }

@@ -91,6 +91,7 @@ pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupO
                         fee_account: AccountId(fee_acc.as_u32()),
                         timestamp: Some(timestamp.as_u64()),
                         previous_block_root_hash,
+                        contract_version: None,
                     });
 
                     previous_block_root_hash = H256::from_slice(&root_hash);

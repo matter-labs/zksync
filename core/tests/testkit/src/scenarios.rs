@@ -111,13 +111,12 @@ pub async fn perform_basic_tests() {
     let tokens = vec![token];
 
     verify_restore(
-        &testkit_config.web3_url,
+        &testkit_config,
         &contracts,
         fee_account_address,
         test_setup.get_accounts_state().await,
         tokens,
         test_setup.last_committed_block.new_root_hash,
-        testkit_config.available_block_chunk_sizes,
     )
     .await;
 

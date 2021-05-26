@@ -2,7 +2,7 @@ use web3::{Transport, Web3};
 
 use zksync_types::operations::ZkSyncOp;
 
-use crate::contract;
+use crate::contract::ZkSyncContractVersion;
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
 use zksync_types::{AccountId, BlockNumber, H256};
@@ -20,6 +20,10 @@ pub struct RollupOpsBlock {
     pub timestamp: Option<u64>,
     /// Previous block root hash.
     pub previous_block_root_hash: H256,
+    /// zkSync contract version for the given block.
+    /// Used to obtain block chunk sizes. Stored in the database
+    /// in the corresponding block event.
+    pub contract_version: Option<ZkSyncContractVersion>,
 }
 
 impl RollupOpsBlock {
@@ -37,13 +41,9 @@ impl RollupOpsBlock {
     ) -> anyhow::Result<Vec<Self>> {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash).await?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
-        let blocks = if let Ok(block) =
-            contract::default::rollup_ops_blocks_from_bytes(input_data.clone())
-        {
-            vec![block]
-        } else {
-            contract::v4::rollup_ops_blocks_from_bytes(input_data)?
-        };
+        let blocks: Vec<RollupOpsBlock> = event_data
+            .contract_version
+            .rollup_ops_blocks_from_bytes(input_data)?;
         Ok(blocks)
     }
 }
