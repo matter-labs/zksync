@@ -56,6 +56,14 @@ async function finishUpgrade(upgradeGatekeeper: Contract, lastBlockInfo: string)
     console.log('The upgrade has finished');
 }
 
+async function cancelUpgrade(upgradeGatekeeper: Contract) {
+    await (
+        await upgradeGatekeeper.cancelUpgrade({
+            gasLimit: 500000
+        })
+    ).wait();
+}
+
 async function main() {
     const parser = new ArgumentParser({
         version: '0.0.1',
@@ -68,6 +76,7 @@ async function main() {
     parser.addArgument('--startUpgrade');
     parser.addArgument('--finishUpgrade');
     parser.addArgument('--startPreparation');
+    parser.addArgument('--cancelUpgrade');
     const args = parser.parseArgs(process.argv.slice(2));
 
     const provider = web3Provider();
@@ -81,7 +90,7 @@ async function main() {
         wallet
     );
 
-    if (!args.startUpgrade && !args.startPreparation && !args.finishUpgrade) {
+    if (!args.startUpgrade && !args.startPreparation && !args.finishUpgrade && !args.cancelUpgrade) {
         console.log(`Please supply at least one of the following flags:
         --startUpgrade,
         --startPreparation,
@@ -100,6 +109,10 @@ async function main() {
 
     if (args.finishUpgrade) {
         await finishUpgrade(upgradeGatekeeper, args.lastBlockInfo);
+    }
+
+    if (args.cancelUpgrade) {
+        await cancelUpgrade(upgradeGatekeeper);
     }
 }
 
