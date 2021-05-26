@@ -25,7 +25,7 @@ describe(`Withdrawal helpers tests (provider: ${providerType})`, () => {
     let chuck: Wallet;
 
     before('create tester and test wallets', async () => {
-        tester = await Tester.init('localhost', 'HTTP', 'REST');
+        tester = await Tester.init('localhost', 'HTTP', providerType);
         alice = await tester.fundedWallet('10.0');
         bob = await tester.fundedWallet('10.0');
         chuck = await tester.emptyWallet();
@@ -79,7 +79,7 @@ describe(`Withdrawal helpers tests (provider: ${providerType})`, () => {
     });
 });
 
-for (const input of ['RPC', 'REST']) {
+for (const providerType of ['RPC', 'REST']) {
     // @ts-ignore
-    TestSuite(input.providerType);
+    TestSuite(providerType);
 }
