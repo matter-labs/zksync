@@ -119,20 +119,14 @@ Tester.prototype.testIgnoredBatch = async function (
         { ...tx, amount: amount.mul(10 ** 6) }
     ]);
 
-    // One correct tx is needed because block will not be committed if it contains only rejected txs.
-    const handle = await sender.syncTransfer(tx);
-
     for (const handle of handles) {
         await suppress(handle.awaitReceipt());
     }
-    await handle.awaitReceipt();
 
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
-    expect(senderBefore.eq(senderAfter.add(amount).add(fee.div(2))), 'Wrong batch was not ignored').to.be.true;
-    expect(receiverAfter.eq(receiverBefore.add(amount)), 'Wrong batch was not ignored').to.be.true;
-
-    this.runningFee = this.runningFee.add(fee.div(2));
+    expect(senderBefore.eq(senderAfter), 'Wrong batch was not ignored').to.be.true;
+    expect(receiverAfter.eq(receiverBefore), 'Wrong batch was not ignored').to.be.true;
 };
 
 Tester.prototype.testRejectedBatch = async function (

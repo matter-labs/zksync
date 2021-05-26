@@ -425,7 +425,7 @@ export class RestProvider extends SyncProvider {
                         // it cannot be known if transaction is queued, committed or finalized.
                         // That is why there is separate `blockByPosition` query.
                         const blockStatus = await this.blockByPosition(transactionStatus.rollupBlock);
-                        notifyDone = blockStatus.status === 'finalized';
+                        notifyDone = blockStatus && blockStatus.status === 'finalized';
                     } else {
                         notifyDone = transactionStatus.status === 'finalized';
                     }
@@ -568,9 +568,9 @@ export class RestProvider extends SyncProvider {
             if (receipt.status === 'rejected') {
                 const blockFullInfo = await this.blockByPosition(receipt.rollupBlock);
                 const blockInfo = {
-                    blockNumber: blockFullInfo.blockNumber,
-                    committed: <boolean>(<any>blockFullInfo.commitTxHash),
-                    verified: <boolean>(<any>blockFullInfo.verifyTxHash)
+                    blockNumber: receipt.rollupBlock,
+                    committed: blockFullInfo ? true : false,
+                    verified: blockFullInfo && blockFullInfo.status === 'finalized' ? true : false
                 };
                 return {
                     executed: true,
