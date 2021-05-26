@@ -232,13 +232,12 @@ async fn revert_blocks_test() {
     handler.join().expect("sk thread join");
 
     verify_restore(
-        test_config.web3_url.as_str(),
+        &test_config,
         &contracts,
         fee_account.address,
         balance_tree_to_account_map(&state.tree),
         vec![TokenId(0)],
         test_setup.current_state_root.unwrap(),
-        test_config.available_block_chunk_sizes,
     )
     .await;
     println!("some blocks are committed and verified \n\n");

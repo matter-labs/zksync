@@ -1,11 +1,14 @@
 // Built-in deps
 use std::str::FromStr;
 // Workspace deps
-use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
+use zksync_storage::{
+    data_restore::records::{NewBlockEvent, NewRollupOpsBlock},
+    StorageProcessor,
+};
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    AccountId, BlockNumber, NewTokenEvent, Token, TokenId, TokenInfo, H256,
-    {block::Block, AccountUpdate, AccountUpdates, ZkSyncOp},
+    Token, TokenId, TokenInfo, NewTokenEvent,
+    {block::Block, AccountUpdate, AccountUpdates},
 };
 
 // Local deps
@@ -52,18 +55,16 @@ impl<'a> DatabaseStorageInteractor<'a> {
 #[async_trait::async_trait]
 impl StorageInteractor for DatabaseStorageInteractor<'_> {
     async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]) {
-        let mut ops: Vec<(BlockNumber, &ZkSyncOp, AccountId, Option<u64>, H256)> = vec![];
+        let mut ops = Vec::with_capacity(blocks.len());
 
         for block in blocks {
-            for op in &block.ops {
-                ops.push((
-                    block.block_num,
-                    op,
-                    block.fee_account,
-                    block.timestamp,
-                    block.previous_block_root_hash,
-                ));
-            }
+            ops.push(NewRollupOpsBlock {
+                block_num: block.block_num,
+                ops: block.ops.as_slice(),
+                fee_account: block.fee_account,
+                timestamp: block.timestamp,
+                previous_block_root_hash: block.previous_block_root_hash,
+            });
         }
 
         self.storage
@@ -246,8 +247,8 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .load_rollup_ops_blocks()
             .await
             .expect("Cant load operation blocks")
-            .iter()
-            .map(|block| stored_ops_block_into_ops_block(&block))
+            .into_iter()
+            .map(stored_ops_block_into_ops_block)
             .collect()
     }
 
