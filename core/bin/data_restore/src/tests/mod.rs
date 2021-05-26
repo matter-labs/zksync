@@ -10,12 +10,12 @@ use num::BigUint;
 use serde_json::{json, Value};
 use web3::{
     contract::tokens::Tokenize,
-    types::{Bytes, Transaction},
+    types::{Bytes, Transaction, H160},
     RequestId, Transport, Web3,
 };
 
 use db_test_macro::test as db_test;
-use zksync_contracts::{governance_contract, zksync_contract};
+use zksync_contracts::{governance_contract, upgrade_gatekeeper, zksync_contract};
 use zksync_crypto::Fr;
 use zksync_storage::{
     chain::account::AccountSchema, data_restore::DataRestoreSchema, StorageProcessor,
@@ -281,6 +281,11 @@ impl Transport for Web3Transport {
 
 #[db_test]
 async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
+    let contract_addr = H160::from([1u8; 20]);
+    let upgrade_gatekeeper_addr = H160::from([2u8; 20]);
+    // Use old contract version.
+    let init_contract_version: u32 = 3;
+
     let mut transport = Web3Transport::new();
 
     let mut interactor = DatabaseStorageInteractor::new(storage);
@@ -296,6 +301,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         block_verified_topic_string,
         vec![
             create_log(
+                contract_addr,
                 block_verified_topic,
                 vec![u32_to_32bytes(1).into()],
                 Bytes(vec![]),
@@ -303,6 +309,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
                 u32_to_32bytes(1).into(),
             ),
             create_log(
+                contract_addr,
                 block_verified_topic,
                 vec![u32_to_32bytes(2).into()],
                 Bytes(vec![]),
@@ -321,6 +328,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         block_commit_topic_string,
         vec![
             create_log(
+                contract_addr,
                 block_committed_topic,
                 vec![u32_to_32bytes(1).into()],
                 Bytes(vec![]),
@@ -328,6 +336,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
                 u32_to_32bytes(1).into(),
             ),
             create_log(
+                contract_addr,
                 block_committed_topic,
                 vec![u32_to_32bytes(2).into()],
                 Bytes(vec![]),
@@ -351,6 +360,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     transport.insert_logs(
         new_token_topic_string,
         vec![create_log(
+            contract_addr,
             new_token_topic,
             vec![[0; 32].into(), u32_to_32bytes(3).into()],
             Bytes(vec![]),
@@ -382,16 +392,16 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     ]);
 
     let eth = Eth::new(transport.clone());
-    let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
     let mut driver = DataRestoreDriver::new(
         Web3::new(transport.clone()),
-        [1u8; 20].into(),
+        contract_addr,
+        upgrade_gatekeeper_addr,
+        init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         true,
         None,
         ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
-        available_block_chunk_sizes,
     );
 
     driver.run_state_update(&mut interactor).await;
@@ -417,16 +427,16 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     // Nullify the state of driver
     let eth = Eth::new(transport.clone());
 
-    let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
     let mut driver = DataRestoreDriver::new(
         Web3::new(transport.clone()),
-        [1u8; 20].into(),
+        contract_addr,
+        upgrade_gatekeeper_addr,
+        init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         true,
         None,
         ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
-        available_block_chunk_sizes,
     );
 
     // Load state from db and check it
@@ -437,21 +447,29 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 
 #[tokio::test]
 async fn test_with_inmemory_storage() {
+    let contract_addr = H160::from([1u8; 20]);
+    let upgrade_gatekeeper_addr = H160::from([2u8; 20]);
+    // Start with V3, upgrade it after a couple of blocks to V4.
+    let init_contract_version: u32 = 3;
+
     let mut transport = Web3Transport::new();
 
     let mut interactor = InMemoryStorageInteractor::new();
     let contract = zksync_contract();
     let gov_contract = governance_contract();
+    let upgrade_gatekeeper = upgrade_gatekeeper();
 
     let block_verified_topic = contract
         .event("BlockVerification")
         .expect("Main contract abi error")
         .signature();
     let block_verified_topic_string = format!("{:?}", block_verified_topic);
+    // Starting from Eth block number 3 the version is upgraded.
     transport.insert_logs(
         block_verified_topic_string,
         vec![
             create_log(
+                contract_addr,
                 block_verified_topic,
                 vec![u32_to_32bytes(1).into()],
                 Bytes(vec![]),
@@ -459,6 +477,7 @@ async fn test_with_inmemory_storage() {
                 u32_to_32bytes(1).into(),
             ),
             create_log(
+                contract_addr,
                 block_verified_topic,
                 vec![u32_to_32bytes(2).into()],
                 Bytes(vec![]),
@@ -466,6 +485,7 @@ async fn test_with_inmemory_storage() {
                 u32_to_32bytes(2).into(),
             ),
             create_log(
+                contract_addr,
                 block_verified_topic,
                 vec![u32_to_32bytes(3).into()],
                 Bytes(vec![]),
@@ -473,6 +493,7 @@ async fn test_with_inmemory_storage() {
                 u32_to_32bytes(3).into(),
             ),
             create_log(
+                contract_addr,
                 block_verified_topic,
                 vec![u32_to_32bytes(4).into()],
                 Bytes(vec![]),
@@ -480,6 +501,23 @@ async fn test_with_inmemory_storage() {
                 u32_to_32bytes(3).into(),
             ),
         ],
+    );
+    // Save the event about finished upgrade in Eth block number 3.
+    // Additional topics and data don't matter.
+    let upgrade_complete_topic = upgrade_gatekeeper
+        .event("UpgradeComplete")
+        .expect("Upgrade gatekeeper abi error")
+        .signature();
+    transport.insert_logs(
+        format!("{:?}", upgrade_complete_topic),
+        vec![create_log(
+            upgrade_gatekeeper_addr,
+            upgrade_complete_topic,
+            Vec::new(),
+            Bytes(Vec::new()),
+            3,
+            H256::zero(),
+        )],
     );
 
     let block_committed_topic = contract
@@ -491,6 +529,7 @@ async fn test_with_inmemory_storage() {
         block_commit_topic_string,
         vec![
             create_log(
+                contract_addr,
                 block_committed_topic,
                 vec![u32_to_32bytes(1).into()],
                 Bytes(vec![]),
@@ -498,6 +537,7 @@ async fn test_with_inmemory_storage() {
                 u32_to_32bytes(1).into(),
             ),
             create_log(
+                contract_addr,
                 block_committed_topic,
                 vec![u32_to_32bytes(2).into()],
                 Bytes(vec![]),
@@ -505,6 +545,7 @@ async fn test_with_inmemory_storage() {
                 u32_to_32bytes(2).into(),
             ),
             create_log(
+                contract_addr,
                 block_committed_topic,
                 vec![u32_to_32bytes(3).into()],
                 Bytes(vec![]),
@@ -512,6 +553,7 @@ async fn test_with_inmemory_storage() {
                 u32_to_32bytes(3).into(),
             ),
             create_log(
+                contract_addr,
                 block_committed_topic,
                 vec![u32_to_32bytes(4).into()],
                 Bytes(vec![]),
@@ -535,6 +577,7 @@ async fn test_with_inmemory_storage() {
     transport.insert_logs(
         new_token_topic_string,
         vec![create_log(
+            contract_addr,
             new_token_topic,
             vec![[0; 32].into(), u32_to_32bytes(3).into()],
             Bytes(vec![]),
@@ -590,16 +633,16 @@ async fn test_with_inmemory_storage() {
     let web3 = Web3::new(transport.clone());
 
     let eth = Eth::new(transport.clone());
-    let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
     let mut driver = DataRestoreDriver::new(
         web3.clone(),
-        [1u8; 20].into(),
+        contract_addr,
+        upgrade_gatekeeper_addr,
+        init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         true,
         None,
         ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
-        available_block_chunk_sizes,
     );
 
     driver.run_state_update(&mut interactor).await;
@@ -618,16 +661,16 @@ async fn test_with_inmemory_storage() {
 
     // Nullify the state of driver
     let eth = Eth::new(transport.clone());
-    let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
     let mut driver = DataRestoreDriver::new(
         web3.clone(),
-        [1u8; 20].into(),
+        contract_addr,
+        upgrade_gatekeeper_addr,
+        init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         true,
         None,
         ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
-        available_block_chunk_sizes,
     );
 
     // Load state from db and check it

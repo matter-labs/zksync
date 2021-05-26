@@ -221,10 +221,11 @@ async fn create_aggregated_commits_storage(
     storage: &mut StorageProcessor<'_>,
     config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
-    let last_aggregate_committed_block = OperationsSchema(storage)
+    let mut transaction = storage.start_transaction().await?;
+    let last_aggregate_committed_block = OperationsSchema(&mut transaction)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
         .await?;
-    let old_committed_block = BlockSchema(storage)
+    let old_committed_block = BlockSchema(&mut transaction)
         .get_block(last_aggregate_committed_block)
         .await?
         .expect("Failed to get last committed block from db");
@@ -232,12 +233,16 @@ async fn create_aggregated_commits_storage(
     let mut new_blocks = Vec::new();
     let mut block_number = last_aggregate_committed_block + 1;
 
-    while let Some(block) = BlockSchema(storage).get_block(block_number).await? {
+    while let Some(block) = BlockSchema(&mut transaction)
+        .get_block(block_number)
+        .await?
+    {
         new_blocks.push(block);
         block_number.0 += 1;
     }
 
-    let fast_processing_requested = is_fast_processing_requested(storage, &new_blocks).await?;
+    let fast_processing_requested =
+        is_fast_processing_requested(&mut transaction, &new_blocks).await?;
 
     let commit_operation = create_new_commit_operation(
         &old_committed_block,
@@ -249,26 +254,30 @@ async fn create_aggregated_commits_storage(
         fast_processing_requested,
     );
 
-    if let Some(commit_operation) = commit_operation {
+    let result = if let Some(commit_operation) = commit_operation {
         let aggregated_op = commit_operation.into();
         log_aggregated_op_creation(&aggregated_op);
-        OperationsSchema(storage)
+        OperationsSchema(&mut transaction)
             .store_aggregated_action(aggregated_op)
             .await?;
         Ok(true)
     } else {
         Ok(false)
-    }
+    };
+
+    transaction.commit().await?;
+    result
 }
 
 async fn create_aggregated_prover_task_storage(
     storage: &mut StorageProcessor<'_>,
     config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
-    let last_aggregate_committed_block = OperationsSchema(storage)
+    let mut transaction = storage.start_transaction().await?;
+    let last_aggregate_committed_block = OperationsSchema(&mut transaction)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
         .await?;
-    let last_aggregate_create_proof_block = OperationsSchema(storage)
+    let last_aggregate_create_proof_block = OperationsSchema(&mut transaction)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CreateProofBlocks)
         .await?;
     if last_aggregate_committed_block <= last_aggregate_create_proof_block {
@@ -278,12 +287,12 @@ async fn create_aggregated_prover_task_storage(
     let mut blocks_with_proofs = Vec::new();
     for block_number in last_aggregate_create_proof_block.0 + 1..=last_aggregate_committed_block.0 {
         let block_number = BlockNumber(block_number);
-        let proof_exists = ProverSchema(storage)
+        let proof_exists = ProverSchema(&mut transaction)
             .load_proof(block_number)
             .await?
             .is_some();
         if proof_exists {
-            let block = BlockSchema(storage)
+            let block = BlockSchema(&mut transaction)
                 .get_block(block_number)
                 .await?
                 .expect("failed to fetch committed block from db");
@@ -294,7 +303,7 @@ async fn create_aggregated_prover_task_storage(
     }
 
     let fast_processing_requested =
-        is_fast_processing_requested(storage, &blocks_with_proofs).await?;
+        is_fast_processing_requested(&mut transaction, &blocks_with_proofs).await?;
 
     let create_proof_operation = create_new_create_proof_operation(
         &blocks_with_proofs,
@@ -304,25 +313,29 @@ async fn create_aggregated_prover_task_storage(
         config.chain.state_keeper.max_aggregated_tx_gas.into(),
         fast_processing_requested,
     );
-    if let Some(operation) = create_proof_operation {
+    let result = if let Some(operation) = create_proof_operation {
         let aggregated_op = operation.into();
         log_aggregated_op_creation(&aggregated_op);
-        OperationsSchema(storage)
+        OperationsSchema(&mut transaction)
             .store_aggregated_action(aggregated_op)
             .await?;
         Ok(true)
     } else {
         Ok(false)
-    }
+    };
+
+    transaction.commit().await?;
+    result
 }
 
 async fn create_aggregated_publish_proof_operation_storage(
     storage: &mut StorageProcessor<'_>,
 ) -> anyhow::Result<bool> {
-    let last_aggregate_create_proof_block = OperationsSchema(storage)
+    let mut transaction = storage.start_transaction().await?;
+    let last_aggregate_create_proof_block = OperationsSchema(&mut transaction)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CreateProofBlocks)
         .await?;
-    let last_aggregate_publish_proof_block = OperationsSchema(storage)
+    let last_aggregate_publish_proof_block = OperationsSchema(&mut transaction)
         .get_last_affected_block_by_aggregated_action(
             AggregatedActionType::PublishProofBlocksOnchain,
         )
@@ -332,7 +345,7 @@ async fn create_aggregated_publish_proof_operation_storage(
     }
 
     let last_unpublished_create_proof_operation = {
-        let (_, aggregated_operation) = OperationsSchema(storage)
+        let (_, aggregated_operation) = OperationsSchema(&mut transaction)
             .get_aggregated_op_that_affects_block(
                 AggregatedActionType::CreateProofBlocks,
                 last_aggregate_publish_proof_block + 1,
@@ -361,34 +374,38 @@ async fn create_aggregated_publish_proof_operation_storage(
             .last()
             .map(|b| b.block_number)
             .unwrap();
-        storage
+        transaction
             .prover_schema()
             .load_aggregated_proof(first_block, last_block)
             .await?
     };
 
-    if let Some(proof) = aggregated_proof {
+    let result = if let Some(proof) = aggregated_proof {
         let operation =
             create_publish_proof_operation(&last_unpublished_create_proof_operation, &proof);
         let aggregated_op = operation.into();
         log_aggregated_op_creation(&aggregated_op);
-        OperationsSchema(storage)
+        OperationsSchema(&mut transaction)
             .store_aggregated_action(aggregated_op)
             .await?;
         Ok(true)
     } else {
         Ok(false)
-    }
+    };
+
+    transaction.commit().await?;
+    result
 }
 
 async fn create_aggregated_execute_operation_storage(
     storage: &mut StorageProcessor<'_>,
     config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
-    let last_aggregate_executed_block = OperationsSchema(storage)
+    let mut transaction = storage.start_transaction().await?;
+    let last_aggregate_executed_block = OperationsSchema(&mut transaction)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks)
         .await?;
-    let last_aggregate_publish_proof_block = OperationsSchema(storage)
+    let last_aggregate_publish_proof_block = OperationsSchema(&mut transaction)
         .get_last_affected_block_by_aggregated_action(
             AggregatedActionType::PublishProofBlocksOnchain,
         )
@@ -400,14 +417,14 @@ async fn create_aggregated_execute_operation_storage(
 
     let mut blocks = Vec::new();
     for block_number in last_aggregate_executed_block.0 + 1..=last_aggregate_publish_proof_block.0 {
-        let block = BlockSchema(storage)
+        let block = BlockSchema(&mut transaction)
             .get_block(BlockNumber(block_number))
             .await?
             .expect("Failed to get block that should be committed");
         blocks.push(block);
     }
 
-    let fast_processing_requested = is_fast_processing_requested(storage, &blocks).await?;
+    let fast_processing_requested = is_fast_processing_requested(&mut transaction, &blocks).await?;
 
     let execute_operation = create_execute_blocks_operation(
         &blocks,
@@ -418,16 +435,19 @@ async fn create_aggregated_execute_operation_storage(
         fast_processing_requested,
     );
 
-    if let Some(operation) = execute_operation {
+    let result = if let Some(operation) = execute_operation {
         let aggregated_op = operation.into();
         log_aggregated_op_creation(&aggregated_op);
-        OperationsSchema(storage)
+        OperationsSchema(&mut transaction)
             .store_aggregated_action(aggregated_op)
             .await?;
         Ok(true)
     } else {
         Ok(false)
-    }
+    };
+
+    transaction.commit().await?;
+    result
 }
 
 pub async fn create_aggregated_operations_storage(

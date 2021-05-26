@@ -4,8 +4,8 @@
 use std::ops::Deref;
 
 // External imports
-use lazy_static::lazy_static;
 use num::BigUint;
+use once_cell::sync::Lazy;
 use parity_crypto::publickey::{Generator, Random};
 // Workspace imports
 use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
@@ -26,9 +26,8 @@ use zksync_types::{
 };
 // Local imports
 
-lazy_static! {
-    static ref SAMPLE_PROOF: PrecomputedSampleProofs = load_precomputed_proofs().unwrap();
-}
+static SAMPLE_PROOF: Lazy<PrecomputedSampleProofs> =
+    Lazy::new(|| load_precomputed_proofs().unwrap());
 
 pub fn get_sample_single_proof() -> SingleProof {
     SAMPLE_PROOF.single_proofs[0].0.clone()

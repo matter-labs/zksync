@@ -1,18 +1,18 @@
 // External imports
 use anyhow::format_err;
+use once_cell::sync::Lazy;
+use tokio::sync::Mutex;
 // Workspace imports
-use zksync_types::prover::{ProverJob, ProverJobType};
+use zksync_types::{
+    prover::{ProverJob, ProverJobType},
+    BlockNumber,
+};
 // Local imports
 use crate::test_data::{gen_sample_block, get_sample_aggregated_proof, get_sample_single_proof};
 use crate::tests::db_test;
 use crate::{prover::ProverSchema, QueryResult, StorageProcessor};
-use lazy_static::lazy_static;
-use tokio::sync::Mutex;
-use zksync_types::BlockNumber;
 
-lazy_static! {
-    static ref MUTEX: Mutex<()> = Mutex::new(());
-}
+static MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 async fn get_idle_job_from_queue(mut storage: &mut StorageProcessor<'_>) -> QueryResult<ProverJob> {
     let job = ProverSchema(&mut storage)

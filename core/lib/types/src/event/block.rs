@@ -16,6 +16,7 @@ pub enum BlockStatus {
     Reverted,
 }
 
+#[serde_with::skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlockDetails {
     pub block_number: BlockNumber,
@@ -25,14 +26,15 @@ pub struct BlockDetails {
 
     pub block_size: i64,
 
-    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
+    #[serde(default, with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
     pub commit_tx_hash: Option<Vec<u8>>,
 
-    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
+    #[serde(default, with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
     pub verify_tx_hash: Option<Vec<u8>>,
 
     pub committed_at: DateTime<Utc>,
 
+    #[serde(default)]
     pub verified_at: Option<DateTime<Utc>>,
 }
 

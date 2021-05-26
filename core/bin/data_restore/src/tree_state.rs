@@ -465,6 +465,7 @@ mod test {
             fee_account: AccountId(0),
             timestamp: None,
             previous_block_root_hash: Default::default(),
+            contract_version: None,
         };
 
         // Withdraw 20 with 1 fee from 7 to 10
@@ -491,6 +492,7 @@ mod test {
             fee_account: AccountId(0),
             timestamp: None,
             previous_block_root_hash: Default::default(),
+            contract_version: None,
         };
 
         // Transfer 40 with 1 fee from 7 to 8
@@ -518,6 +520,7 @@ mod test {
             fee_account: AccountId(0),
             timestamp: None,
             previous_block_root_hash: Default::default(),
+            contract_version: None,
         };
 
         // Transfer 19 with 1 fee from 8 to 7
@@ -545,6 +548,7 @@ mod test {
             fee_account: AccountId(0),
             timestamp: None,
             previous_block_root_hash: Default::default(),
+            contract_version: None,
         };
 
         let pub_key_hash_7 = PubKeyHash::from_hex("sync:8888888888888888888888888888888888888888")
@@ -572,6 +576,7 @@ mod test {
             fee_account: AccountId(0),
             timestamp: None,
             previous_block_root_hash: Default::default(),
+            contract_version: None,
         };
 
         // Full exit for 8
@@ -592,6 +597,7 @@ mod test {
             fee_account: AccountId(0),
             timestamp: None,
             previous_block_root_hash: Default::default(),
+            contract_version: None,
         };
 
         // Forced exit for 7
@@ -617,6 +623,7 @@ mod test {
             fee_account: AccountId(1),
             timestamp: None,
             previous_block_root_hash: Default::default(),
+            contract_version: None,
         };
         // This transaction have to be deleted, do not uncomment. Delete it after removing the corresponding code        // let tx6 = Close {
         //     account: Address::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
@@ -818,6 +825,7 @@ mod test {
             fee_account: AccountId(0),
             timestamp: None,
             previous_block_root_hash: Default::default(),
+            contract_version: None,
         };
 
         let mut tree = TreeState::new();

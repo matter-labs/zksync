@@ -573,54 +573,6 @@
       "nullable": []
     }
   },
-  "0fbc25e0f2aab2b56acf7e09d75690a78f7c2df7cec0644a8e45461ee9aab75b": {
-    "query": "SELECT * FROM data_restore_rollup_ops\n            ORDER BY id ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_num",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "operation",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "fee_account",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "timestamp",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "previous_block_root_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        true,
-        true
-      ]
-    }
-  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -1405,6 +1357,21 @@
       "nullable": []
     }
   },
+  "357ebeff6558884f8b8337eee4e0e0e5bd19a0673959f914a79785de0b5f549a": {
+    "query": "INSERT INTO data_restore_rollup_blocks\n                VALUES ($1, $2, $3, $4)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "38ba90a27d582bd0c3247fc9716ddb76b1d2b0d87bec4e299c6c621168adf491": {
     "query": "\n            SELECT * FROM tokens\n            WHERE id >= $1\n            ORDER BY id ASC\n            LIMIT $2\n            ",
     "describe": {
@@ -1641,6 +1608,54 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "44946f944f3c496ba90d5843084acf36aa3db3dd9d90f72a9bbeee862af056e4": {
+    "query": "SELECT blocks.block_num AS block_num, ops, fee_account,\n            timestamp, previous_block_root_hash, contract_version\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN data_restore_events_state as events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_num",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "ops",
+          "type_info": "JsonbArray"
+        },
+        {
+          "ordinal": 2,
+          "name": "fee_account",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "timestamp",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "previous_block_root_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "contract_version",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        null,
+        false,
+        true,
+        true,
+        false
+      ]
     }
   },
   "44b276fda62734e9c9d9853f493340265116ab7f13599674d27aafe3d3887391": {
@@ -3168,22 +3183,6 @@
       "nullable": []
     }
   },
-  "87da73cc513debdbf4c40c4c3ebceca7aecdd985323c0ecb6cd6bbaab17fa4be": {
-    "query": "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account, timestamp, previous_block_root_hash) VALUES ($1, $2, $3, $4, $5)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Jsonb",
-          "Int8",
-          "Int8",
-          "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
@@ -3273,6 +3272,19 @@
         "Left": [
           "Int8",
           "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "8eb8865ba9f727bf86cbb3713903241b60e61b02b200fcf60483c99ff7cdc57c": {
+    "query": "INSERT INTO data_restore_rollup_block_ops (block_num, operation)\n                SELECT $1, u.operation\n                    FROM UNNEST ($2::jsonb[])\n                    AS u(operation)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "JsonbArray"
         ]
       },
       "nullable": []
@@ -3517,6 +3529,16 @@
           "Bytea",
           "Int8"
         ]
+      },
+      "nullable": []
+    }
+  },
+  "9c0a30a24bb6c2481323effc74b01db6163f9e9a368da85ceda727b6e547f087": {
+    "query": "DELETE FROM data_restore_rollup_blocks",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
       },
       "nullable": []
     }
@@ -5200,16 +5222,6 @@
       "nullable": []
     }
   },
-  "eb0993e049fd111aa11978aeb1617b11d859a008afec77a4a80a6cfadc1565ff": {
-    "query": "DELETE FROM data_restore_rollup_ops",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": []
-    }
-  },
   "f02021c46f5edc171f22c16e29bb028353eb0519aec1555c066fdd8dfe1d61e5": {
     "query": "\n            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n            SELECT tx_hash, tx, created_at, eth_sign_data, COALESCE(batch_id, 0) FROM executed_transactions\n            WHERE block_number > $1\n        ",
     "describe": {
@@ -5591,6 +5603,27 @@
       ]
     }
   },
+  "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
+    "query": "SELECT pg_notify($1, $2)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "pg_notify",
+          "type_info": "Void"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "f8f2208c71cbf2d42de633222bb888c773a47b82dd0095b76ad38f535d74fdce": {
     "query": "SELECT created_at, block_number FROM executed_transactions\n            WHERE tx_hash = $1",
     "describe": {
@@ -5682,27 +5715,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
-    "query": "SELECT pg_notify($1, $2)",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "pg_notify",
-          "type_info": "Void"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   }

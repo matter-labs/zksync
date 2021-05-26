@@ -1,8 +1,8 @@
 use std::future::Future;
 
 use web3::{
-    types::H256,
     types::{Bytes, Log},
+    types::{H160, H256},
     RequestId, Transport,
 };
 
@@ -34,6 +34,7 @@ pub(crate) fn u32_to_32bytes(value: u32) -> [u8; 32] {
 }
 
 pub(crate) fn create_log(
+    address: H160,
     topic: H256,
     additional_topics: Vec<H256>,
     data: Bytes,
@@ -43,7 +44,7 @@ pub(crate) fn create_log(
     let mut topics = vec![topic];
     topics.extend(additional_topics);
     Log {
-        address: [1u8; 20].into(),
+        address,
         topics,
         data,
         block_hash: None,
