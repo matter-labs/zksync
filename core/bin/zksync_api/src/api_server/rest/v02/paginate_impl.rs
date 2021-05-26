@@ -4,7 +4,7 @@
 
 // Workspace uses
 use zksync_api_types::v02::{
-    block::{BlockInfo, BlockStatus},
+    block::BlockInfo,
     pagination::{
         AccountTxsRequest, BlockAndTxHash, Paginated, PaginationQuery, PendingOpsRequest,
     },
@@ -15,7 +15,7 @@ use zksync_types::{BlockNumber, Token, TokenId};
 
 // Local uses
 use super::{
-    block::block_info_from_details_and_status,
+    block::block_info_from_details,
     error::{Error, InvalidDataError},
     paginate_trait::Paginate,
 };
@@ -59,35 +59,11 @@ impl Paginate<BlockInfo, BlockNumber> for StorageProcessor<'_> {
             .load_block_page(query)
             .await
             .map_err(Error::storage)?;
-        let last_committed = self
-            .chain()
-            .block_schema()
-            .get_last_committed_confirmed_block()
-            .await
-            .map_err(Error::storage)?;
-        let last_finalized = self
-            .chain()
-            .block_schema()
-            .get_last_verified_confirmed_block()
-            .await
-            .map_err(Error::storage)?;
-        let blocks: Vec<BlockInfo> = blocks
-            .into_iter()
-            .map(|details| {
-                let status = if details.block_number as u32 <= *last_finalized {
-                    BlockStatus::Finalized
-                } else if details.block_number as u32 <= *last_committed {
-                    BlockStatus::Committed
-                } else {
-                    BlockStatus::Queued
-                };
-                block_info_from_details_and_status(details, status)
-            })
-            .collect();
+        let blocks: Vec<BlockInfo> = blocks.into_iter().map(block_info_from_details).collect();
         let count = *self
             .chain()
             .block_schema()
-            .get_last_committed_block()
+            .get_last_committed_confirmed_block()
             .await
             .map_err(Error::storage)?;
         Ok(Paginated::new(

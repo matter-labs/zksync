@@ -38,7 +38,6 @@ pub enum TxInBlockStatus {
 impl From<BlockStatus> for TxInBlockStatus {
     fn from(status: BlockStatus) -> Self {
         match status {
-            BlockStatus::Queued => TxInBlockStatus::Queued,
             BlockStatus::Committed => TxInBlockStatus::Committed,
             BlockStatus::Finalized => TxInBlockStatus::Finalized,
         }
@@ -55,7 +54,7 @@ pub struct TxData {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct L1Receipt {
-    pub status: BlockStatus,
+    pub status: TxInBlockStatus,
     pub eth_block: EthBlockId,
     pub rollup_block: Option<BlockNumber>,
     pub id: SerialId,

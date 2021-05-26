@@ -10,13 +10,10 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_api_types::v02::{
-    block::BlockStatus,
-    transaction::{
-        ApiTxBatch, ApiZkSyncTx, ForcedExitData, IncomingTx, IncomingTxBatch, L1Receipt,
-        L1Transaction, L2Receipt, Receipt, SubmitBatchResponse, Transaction, TransactionData,
-        TxData, TxHashSerializeWrapper, TxInBlockStatus, WithdrawData,
-    },
+use zksync_api_types::v02::transaction::{
+    ApiTxBatch, ApiZkSyncTx, ForcedExitData, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction,
+    L2Receipt, Receipt, SubmitBatchResponse, Transaction, TransactionData, TxData,
+    TxHashSerializeWrapper, TxInBlockStatus, WithdrawData,
 };
 use zksync_storage::{
     chain::{
@@ -34,17 +31,18 @@ use zksync_types::{
 use super::{error::Error, response::ApiResult};
 use crate::api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender};
 
-pub fn l1_receipt_from_op_and_status(
+pub fn l1_receipt_from_op(
     op: StoredExecutedPriorityOperation,
-    status: BlockStatus,
+    is_block_finalized: bool,
 ) -> L1Receipt {
     let eth_block = EthBlockId(op.eth_block as u64);
-    let rollup_block = match status {
-        BlockStatus::Queued => None,
-        _ => Some(BlockNumber(op.block_number as u32)),
-    };
+    let rollup_block = Some(BlockNumber(op.block_number as u32));
     let id = op.priority_op_serialid as u64;
-
+    let status = if is_block_finalized {
+        TxInBlockStatus::Finalized
+    } else {
+        TxInBlockStatus::Committed
+    };
     L1Receipt {
         status,
         eth_block,
@@ -53,19 +51,17 @@ pub fn l1_receipt_from_op_and_status(
     }
 }
 
-pub fn l2_receipt_from_response_and_status(
-    receipt: TxReceiptResponse,
-    block_status: BlockStatus,
-) -> L2Receipt {
+pub fn l2_receipt_from_response(receipt: TxReceiptResponse) -> L2Receipt {
     let tx_hash_prefixed = format!("0x{}", receipt.tx_hash);
     let tx_hash = TxHash::from_str(&tx_hash_prefixed).unwrap();
-    let rollup_block = match block_status {
-        BlockStatus::Queued => None,
-        _ => Some(BlockNumber(receipt.block_number as u32)),
-    };
+    let rollup_block = Some(BlockNumber(receipt.block_number as u32));
     let fail_reason = receipt.fail_reason;
     let status = if receipt.success {
-        block_status.into()
+        if receipt.verified {
+            TxInBlockStatus::Finalized
+        } else {
+            TxInBlockStatus::Committed
+        }
     } else {
         TxInBlockStatus::Rejected
     };
@@ -77,25 +73,24 @@ pub fn l2_receipt_from_response_and_status(
     }
 }
 
-pub fn l1_tx_data_from_op_and_status(
-    op: StoredExecutedPriorityOperation,
-    block_status: BlockStatus,
-) -> TxData {
-    let block_number = match block_status {
-        BlockStatus::Queued => None,
-        _ => Some(BlockNumber(op.block_number as u32)),
-    };
+pub fn l1_tx_data_from_op(op: StoredExecutedPriorityOperation, is_block_finalized: bool) -> TxData {
+    let block_number = Some(BlockNumber(op.block_number as u32));
     let operation: ZkSyncOp = serde_json::from_value(op.operation).unwrap();
     let eth_hash = H256::from_slice(&op.eth_hash);
     let id = op.priority_op_serialid as u64;
     let tx_hash = TxHash::from_slice(&op.tx_hash).unwrap();
+    let status = if is_block_finalized {
+        TxInBlockStatus::Finalized
+    } else {
+        TxInBlockStatus::Committed
+    };
     let tx = Transaction {
         tx_hash,
         block_number,
         op: TransactionData::L1(
             L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
         ),
-        status: block_status.into(),
+        status,
         fail_reason: None,
         created_at: Some(op.created_at),
     };
@@ -106,17 +101,18 @@ pub fn l1_tx_data_from_op_and_status(
     }
 }
 
-pub async fn l2_tx_from_op_and_status(
+pub async fn l2_tx_from_op(
     op: StoredExecutedTransaction,
-    block_status: BlockStatus,
+    is_block_finalized: bool,
     storage: &mut StorageProcessor<'_>,
 ) -> QueryResult<Transaction> {
-    let block_number = match block_status {
-        BlockStatus::Queued => None,
-        _ => Some(BlockNumber(op.block_number as u32)),
-    };
+    let block_number = Some(BlockNumber(op.block_number as u32));
     let status = if op.success {
-        block_status.into()
+        if is_block_finalized {
+            TxInBlockStatus::Finalized
+        } else {
+            TxInBlockStatus::Committed
+        }
     } else {
         TxInBlockStatus::Rejected
     };
@@ -210,15 +206,13 @@ impl ApiTransactionData {
         };
 
         if let Some(op) = op {
-            let status = storage
+            let is_block_finalized = storage
                 .chain()
                 .block_schema()
-                .get_status_and_last_updated_of_existing_block(BlockNumber(op.block_number as u32))
+                .is_block_finalized(BlockNumber(op.block_number as u32))
                 .await
-                .map_err(Error::storage)?
-                .0;
-
-            Ok(Some(l1_receipt_from_op_and_status(op, status)))
+                .map_err(Error::storage)?;
+            Ok(Some(l1_receipt_from_op(op, is_block_finalized)))
         } else {
             let op = if let Some((_, priority_op)) = self
                 .tx_sender
@@ -243,7 +237,7 @@ impl ApiTransactionData {
             };
 
             Ok(Some(L1Receipt {
-                status: BlockStatus::Queued,
+                status: TxInBlockStatus::Queued,
                 eth_block: EthBlockId(op.eth_block),
                 rollup_block: None,
                 id: op.serial_id,
@@ -262,15 +256,7 @@ impl ApiTransactionData {
             .tx_receipt(tx_hash.as_ref())
             .await?
         {
-            let status = storage
-                .chain()
-                .block_schema()
-                .get_status_and_last_updated_of_existing_block(BlockNumber(
-                    receipt.block_number as u32,
-                ))
-                .await?
-                .0;
-            Ok(Some(l2_receipt_from_response_and_status(receipt, status)))
+            Ok(Some(l2_receipt_from_response(receipt)))
         } else if storage
             .chain()
             .mempool_schema()
@@ -331,14 +317,13 @@ impl ApiTransactionData {
         };
 
         if let Some(op) = op {
-            let status = storage
+            let is_block_finalized = storage
                 .chain()
                 .block_schema()
-                .get_status_and_last_updated_of_existing_block(BlockNumber(op.block_number as u32))
+                .is_block_finalized(BlockNumber(op.block_number as u32))
                 .await
-                .map_err(Error::storage)?
-                .0;
-            Ok(Some(l1_tx_data_from_op_and_status(op, status)))
+                .map_err(Error::storage)?;
+            Ok(Some(l1_tx_data_from_op(op, is_block_finalized)))
         } else {
             let op = if let Some((_, priority_op)) = self
                 .tx_sender
@@ -395,14 +380,13 @@ impl ApiTransactionData {
             .await?;
 
         if let Some(op) = operation {
-            let block_status = storage
+            let eth_signature = op.eth_sign_data.clone().map(get_sign_bytes);
+            let is_block_finalized = storage
                 .chain()
                 .block_schema()
-                .get_status_and_last_updated_of_existing_block(BlockNumber(op.block_number as u32))
-                .await?
-                .0;
-            let eth_signature = op.eth_sign_data.clone().map(get_sign_bytes);
-            let tx = l2_tx_from_op_and_status(op, block_status, storage).await?;
+                .is_block_finalized(BlockNumber(op.block_number as u32))
+                .await?;
+            let tx = l2_tx_from_op(op, is_block_finalized, storage).await?;
 
             Ok(Some(TxData { tx, eth_signature }))
         } else if let Some(op) = storage

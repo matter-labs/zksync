@@ -643,7 +643,10 @@ async fn get_batch_info(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .collect();
     assert_eq!(batch_info.batch_hash, batch_hash);
     assert_eq!(actual_tx_hashes, tx_hashes);
-    assert_eq!(batch_info.batch_status.last_state, TxInBlockStatus::Queued);
+    assert_eq!(
+        batch_info.batch_status.last_state,
+        TxInBlockStatus::Committed
+    );
 
     // Get batch from committed block.
     commit_block(&mut storage, BlockNumber(1)).await?;

@@ -6,9 +6,8 @@
 use std::convert::TryFrom;
 // External imports
 // Workspace imports
-use zksync_api_types::v02::{
-    block::BlockStatus,
-    transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
+use zksync_api_types::v02::transaction::{
+    L1Transaction, Transaction, TransactionData, TxInBlockStatus,
 };
 use zksync_types::{
     aggregated_operations::AggregatedOperation,
@@ -213,17 +212,15 @@ impl StoredAggregatedOperation {
 }
 
 impl TransactionItem {
-    pub fn transaction_from_item_and_status(
-        item: TransactionItem,
-        block_status: BlockStatus,
-    ) -> Transaction {
+    pub fn transaction_from_item(item: TransactionItem, is_block_finalized: bool) -> Transaction {
         let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
-        let block_number = match block_status {
-            BlockStatus::Queued => None,
-            _ => Some(BlockNumber(item.block_number as u32)),
-        };
+        let block_number = Some(BlockNumber(item.block_number as u32));
         let status = if item.success {
-            block_status.into()
+            if is_block_finalized {
+                TxInBlockStatus::Finalized
+            } else {
+                TxInBlockStatus::Committed
+            }
         } else {
             TxInBlockStatus::Rejected
         };

@@ -6,7 +6,6 @@ use chrono::{DateTime, Utc};
 
 // Workspace imports
 use zksync_api_types::v02::{
-    block::BlockStatus,
     pagination::{AccountTxsRequest, PaginationDirection, PaginationQuery},
     transaction::{ApiTxBatch, BatchStatus, Transaction, TxHashSerializeWrapper, TxInBlockStatus},
 };
@@ -694,16 +693,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .get_tx_created_at_and_block_number(query.from.tx_hash)
             .await?;
         let txs = if let Some((time_from, _)) = created_at_and_block {
-            let last_committed = transaction
-                .chain()
-                .block_schema()
-                .get_last_committed_confirmed_block()
-                .await?;
-            let last_finalized = transaction
-                .chain()
-                .block_schema()
-                .get_last_verified_confirmed_block()
-                .await?;
             let raw_txs: Vec<TransactionItem> = match query.direction {
                 PaginationDirection::Newer => {
                     sqlx::query_as!(
@@ -721,7 +710,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     Null::bigint as priority_op_serialid
                                 FROM executed_transactions
                                 WHERE (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
-                                    AND block_number <= $2 AND created_at >= $3
+                                    AND created_at >= $2
                                 ), priority_ops AS (
                                 SELECT
                                     tx_hash,
@@ -733,7 +722,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     eth_hash,
                                     priority_op_serialid
                                 FROM executed_priority_operations
-                                WHERE (from_account = $1 OR to_account = $1) AND block_number <= $2 AND created_at >= $3
+                                WHERE (from_account = $1 OR to_account = $1) AND created_at >= $2
                             ), everything AS (
                                 SELECT * FROM transactions
                                 UNION ALL
@@ -750,10 +739,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 priority_op_serialid as "priority_op_serialid?"
                             FROM everything
                             ORDER BY created_at ASC
-                            LIMIT $4
+                            LIMIT $3
                         "#,
                         query.from.address.as_bytes(),
-                        i64::from(*last_committed),
                         time_from,
                         i64::from(query.limit),
                     )
@@ -776,7 +764,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     Null::bigint as priority_op_serialid
                                 FROM executed_transactions
                                 WHERE (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
-                                    AND block_number <= $2 AND created_at <= $3
+                                    AND created_at <= $2
                             ), priority_ops AS (
                                 SELECT
                                     tx_hash,
@@ -788,7 +776,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     eth_hash,
                                     priority_op_serialid
                                 FROM executed_priority_operations
-                                WHERE (from_account = $1 OR to_account = $1) AND block_number <= $2 AND created_at <= $3
+                                WHERE (from_account = $1 OR to_account = $1) AND created_at <= $2
                             ), everything AS (
                                 SELECT * FROM transactions
                                 UNION ALL
@@ -805,10 +793,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 priority_op_serialid as "priority_op_serialid?"
                             FROM everything
                             ORDER BY created_at DESC
-                            LIMIT $4
+                            LIMIT $3
                         "#,
                         query.from.address.as_bytes(),
-                        i64::from(*last_committed),
                         time_from,
                         i64::from(query.limit),
                     )
@@ -816,20 +803,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     .await?
                 }
             };
-
+            let last_finalized = transaction
+                .chain()
+                .block_schema()
+                .get_last_verified_confirmed_block()
+                .await?;
             let txs: Vec<Transaction> = raw_txs
                 .into_iter()
                 .map(|tx| {
                     if tx.block_number as u32 <= *last_finalized {
-                        TransactionItem::transaction_from_item_and_status(
-                            tx,
-                            BlockStatus::Finalized,
-                        )
+                        TransactionItem::transaction_from_item(tx, true)
                     } else {
-                        TransactionItem::transaction_from_item_and_status(
-                            tx,
-                            BlockStatus::Committed,
-                        )
+                        TransactionItem::transaction_from_item(tx, false)
                     }
                 })
                 .collect();
@@ -953,24 +938,24 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 .collect();
             let block_number = BlockNumber(batch_data[0].block_number as u32);
             let batch_status = if batch_data[0].success {
-                let (block_status, updated_at) = transaction
+                if let Some(op) = transaction
                     .chain()
-                    .block_schema()
-                    .get_status_and_last_updated_of_existing_block(block_number)
-                    .await?;
-                match block_status {
-                    BlockStatus::Finalized => BatchStatus {
-                        updated_at,
+                    .operations_schema()
+                    .get_stored_aggregated_operation(
+                        block_number,
+                        AggregatedActionType::ExecuteBlocks,
+                    )
+                    .await
+                {
+                    BatchStatus {
+                        updated_at: op.created_at,
                         last_state: TxInBlockStatus::Finalized,
-                    },
-                    BlockStatus::Committed => BatchStatus {
-                        updated_at,
-                        last_state: TxInBlockStatus::Committed,
-                    },
-                    BlockStatus::Queued => BatchStatus {
+                    }
+                } else {
+                    BatchStatus {
                         updated_at: created_at,
-                        last_state: TxInBlockStatus::Queued,
-                    },
+                        last_state: TxInBlockStatus::Committed,
+                    }
                 }
             } else {
                 BatchStatus {

@@ -23,7 +23,7 @@ describe('Withdrawal helpers tests', () => {
     let chuck: Wallet;
 
     before('create tester and test wallets', async () => {
-        tester = await Tester.init('localhost', 'HTTP');
+        tester = await Tester.init('localhost', 'HTTP', 'REST');
         alice = await tester.fundedWallet('10.0');
         bob = await tester.fundedWallet('10.0');
         chuck = await tester.emptyWallet();

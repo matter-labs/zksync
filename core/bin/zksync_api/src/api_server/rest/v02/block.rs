@@ -24,14 +24,11 @@ use super::{
 };
 use crate::{api_try, utils::block_details_cache::BlockDetailsCache};
 
-pub fn block_info_from_details_and_status(
-    details: StorageBlockDetails,
-    status: BlockStatus,
-) -> BlockInfo {
-    let (committed_at, finalized_at) = match status {
-        BlockStatus::Queued => (None, None),
-        BlockStatus::Committed => (Some(details.committed_at), None),
-        BlockStatus::Finalized => (Some(details.committed_at), details.verified_at),
+pub fn block_info_from_details(details: StorageBlockDetails) -> BlockInfo {
+    let status = if details.verified_at.is_some() {
+        BlockStatus::Finalized
+    } else {
+        BlockStatus::Committed
     };
     BlockInfo {
         block_number: BlockNumber(details.block_number as u32),
@@ -44,8 +41,8 @@ pub fn block_info_from_details_and_status(
         block_size: details.block_size as u64,
         commit_tx_hash: details.commit_tx_hash.map(|bytes| H256::from_slice(&bytes)),
         verify_tx_hash: details.verify_tx_hash.map(|bytes| H256::from_slice(&bytes)),
-        committed_at,
-        finalized_at,
+        committed_at: details.committed_at,
+        finalized_at: details.verified_at,
         status,
     }
 }
@@ -75,15 +72,7 @@ impl ApiBlockData {
             .await
             .map_err(Error::storage)?;
         if let Some(details) = details {
-            let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-            let status = storage
-                .chain()
-                .block_schema()
-                .get_status_and_last_updated_of_existing_block(block_number)
-                .await
-                .map_err(Error::storage)?
-                .0;
-            Ok(Some(block_info_from_details_and_status(details, status)))
+            Ok(Some(block_info_from_details(details)))
         } else {
             Ok(None)
         }
@@ -142,7 +131,7 @@ impl ApiBlockData {
         storage
             .chain()
             .block_schema()
-            .get_last_committed_block()
+            .get_last_committed_confirmed_block()
             .await
     }
 
