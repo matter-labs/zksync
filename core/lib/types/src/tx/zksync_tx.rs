@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use zksync_basic_types::{AccountId, Address};
 
+use crate::tx::error::GetOldBytesError;
 use crate::{
     operations::{ChangePubKeyOp, MintNFTOp},
     tx::{
@@ -271,16 +272,14 @@ impl ZkSyncTx {
     }
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
-    pub fn get_old_bytes(&self) -> Vec<u8> {
+    pub fn get_old_bytes(&self) -> Result<Vec<u8>, GetOldBytesError> {
         match self {
             ZkSyncTx::Transfer(tx) => tx.get_old_bytes(),
             ZkSyncTx::Withdraw(tx) => tx.get_old_bytes(),
-            ZkSyncTx::Close(tx) => tx.get_bytes(),
-            ZkSyncTx::ChangePubKey(tx) => tx.get_old_bytes(),
-            ZkSyncTx::ForcedExit(tx) => tx.get_old_bytes(),
-            ZkSyncTx::MintNFT(_) => vec![], // Not supported for old sdk
-            ZkSyncTx::Swap(_) => vec![],    // Not supported for old sdk
-            ZkSyncTx::WithdrawNFT(_) => vec![], // Not supported for old sdk
+            ZkSyncTx::Close(tx) => Ok(tx.get_bytes()),
+            ZkSyncTx::ChangePubKey(tx) => Ok(tx.get_old_bytes()),
+            ZkSyncTx::ForcedExit(tx) => Ok(tx.get_old_bytes()),
+            _ => Err(GetOldBytesError::TransactionTypeNotSupported),
         }
     }
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
