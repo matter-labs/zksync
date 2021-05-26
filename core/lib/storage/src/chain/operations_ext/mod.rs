@@ -211,6 +211,19 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         .to_string(),
                     operation["token"].as_i64().unwrap_or(-1),
                 ),
+                "Swap" => (
+                    operation["submitterAddress"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["submitterAddress"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
+                    "0".to_string(),
+                    operation["feeToken"].as_i64().unwrap_or(-1),
+                ),
                 &_ => (
                     "unknown from".to_string(),
                     "unknown to".to_string(),
