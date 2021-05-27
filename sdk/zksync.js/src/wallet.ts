@@ -223,7 +223,9 @@ export class Wallet {
         };
     }
 
-    async signRegisterFactory(factoryAddress: Address): Promise<{
+    async signRegisterFactory(
+        factoryAddress: Address
+    ): Promise<{
         signature: TxEthSignature;
         accountId: number;
         accountAddress: Address;
