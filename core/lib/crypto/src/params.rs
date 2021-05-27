@@ -221,9 +221,20 @@ pub const OLD_SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 
 /// Size of the data that is signed for forced exit tx
 pub const SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + TOKEN_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
+
+/// Size of the data that is signed for forced exit tx with 2-byte token representation
+pub const OLD_SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + ADDRESS_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH

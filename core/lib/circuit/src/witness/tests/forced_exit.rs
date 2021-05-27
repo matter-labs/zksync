@@ -6,7 +6,7 @@ use zksync_state::{
     handler::TxHandler,
     state::{CollectedFee, ZkSyncState},
 };
-use zksync_types::{AccountId, ForcedExit, ForcedExitOp, TokenId};
+use zksync_types::{tx::TxSignature, AccountId, ForcedExit, ForcedExitOp, Nonce, TokenId};
 // Local deps
 use crate::witness::{
     forced_exit::ForcedExitWitness,
@@ -51,6 +51,73 @@ fn test_forced_exit_success() {
         // Additional data required for performing the operation.
         let input = SigDataInput::from_forced_exit_op(&forced_exit_op)
             .expect("SigDataInput creation failed");
+
+        generic_test_scenario::<ForcedExitWitness<Bn256>, _>(
+            &accounts,
+            forced_exit_op,
+            input,
+            |plasma_state, op| {
+                let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, &op)
+                    .expect("ForcedExit failed")
+                    .0
+                    .unwrap();
+
+                vec![fee]
+            },
+        );
+    }
+}
+
+/// Basic check for execution of `ForcedExit` operation in circuit with old signature scheme.
+/// Here we create two accounts, the second one has no signing key set, and it is forced to exit by the first account.
+#[test]
+#[ignore]
+fn test_forced_exit_old_signature_success() {
+    // Test vector of (withdraw_amount, fee_amount).
+    let test_vector = vec![(7u64, 3u64), (1, 1), (10000, 1), (1, 10000)];
+
+    for (withdraw_amount, fee_amount) in test_vector {
+        // Input data.
+        let mut accounts = vec![
+            WitnessTestAccount::new(AccountId(1), fee_amount),
+            WitnessTestAccount::new(AccountId(2), withdraw_amount),
+        ];
+        // Remove pubkey hash from the target account.
+        accounts[1].set_empty_pubkey_hash();
+
+        let (account_from, account_to) = (&accounts[0], &accounts[1]);
+        let mut tx = ForcedExit::new(
+            AccountId(1),
+            account_to.account.address,
+            TokenId(0),
+            BigUint::from(fee_amount),
+            Nonce(0),
+            Default::default(),
+            None,
+        );
+        tx.signature = TxSignature::sign_musig(
+            &account_from.zksync_account.private_key,
+            &tx.get_old_bytes(),
+        );
+        let forced_exit_op = ForcedExitOp {
+            tx,
+            target_account_id: account_to.id,
+            withdraw_amount: Some(BigUint::from(withdraw_amount).into()),
+        };
+
+        // Additional data required for performing the operation.
+        let sign_packed = forced_exit_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let input = SigDataInput::new(
+            &sign_packed,
+            &forced_exit_op.tx.get_old_bytes(),
+            &forced_exit_op.tx.signature.pub_key,
+        )
+        .expect("input constructing fails");
 
         generic_test_scenario::<ForcedExitWitness<Bn256>, _>(
             &accounts,

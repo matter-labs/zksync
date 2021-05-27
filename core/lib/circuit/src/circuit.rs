@@ -3957,8 +3957,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // construct signature message preimage (serialized_tx)
 
         let mut serialized_tx_bits = vec![];
-
-        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(reversed_tx_type_bits_be(ForcedExitOp::OP_CODE));
+        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
         serialized_tx_bits.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits.extend(rhs.account.address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
@@ -3967,6 +3967,22 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
         serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), SIGNED_FORCED_EXIT_BIT_WIDTH);
+
+        // Construct serialized tx
+        let mut serialized_tx_bits_old = vec![];
+        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_old.extend(rhs.account.address.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old.extend(lhs.account.nonce.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old.len(),
+            params::OLD_SIGNED_FORCED_EXIT_BIT_WIDTH
+        );
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -4032,11 +4048,27 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
+        let is_new_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_new_serialized_tx_correct"),
             serialized_tx_bits,
             &op_data,
         )?;
+
+        let mut is_old_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old_serialized_tx_correct"),
+            serialized_tx_bits_old,
+            &op_data,
+        )?;
+        is_old_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old_serialized_tx_correct and fungible"),
+            &[is_old_serialized_tx_correct, is_fungible_token.clone()],
+        )?;
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
+        )?;
+
         lhs_valid_flags.push(is_serialized_tx_correct);
 
         let is_signer_valid = CircuitElement::equals(
