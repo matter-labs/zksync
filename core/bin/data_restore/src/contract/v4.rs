@@ -1,6 +1,9 @@
 use ethabi::{ParamType, Token};
 
-use crate::{contract::default::get_rollup_ops_from_data, rollup_ops::RollupOpsBlock};
+use crate::{
+    contract::default::{get_rollup_ops_from_data, get_rollup_ops_from_legacy_data},
+    rollup_ops::RollupOpsBlock,
+};
 use zksync_types::{AccountId, BlockNumber, H256};
 
 fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token>> {
@@ -36,6 +39,13 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
 }
 
 pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupOpsBlock>> {
+    rollup_ops_blocks_from_bytes_inner(data, true)
+}
+
+fn rollup_ops_blocks_from_bytes_inner(
+    data: Vec<u8>,
+    is_legacy: bool,
+) -> anyhow::Result<Vec<RollupOpsBlock>> {
     let root_hash_argument_id = 0;
     let public_data_argument_id = 1;
     let timestamp_argument_id = 2;
@@ -84,7 +94,10 @@ pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupO
                     &operation[op_block_number_argument_id],
                     &operation[timestamp_argument_id],
                 ) {
-                    let ops = get_rollup_ops_from_data(public_data.as_slice())?;
+                    let ops = match is_legacy {
+                        true => get_rollup_ops_from_legacy_data(public_data.as_slice())?,
+                        false => get_rollup_ops_from_data(public_data.as_slice())?,
+                    };
                     blocks.push(RollupOpsBlock {
                         block_num: BlockNumber(block_number.as_u32()),
                         ops,
@@ -118,7 +131,6 @@ pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupO
 mod test {
     use super::*;
     #[test]
-    #[ignore]
     // TODO Update input data, we need to use 4 bytes for token instead of 2 (ZKS-657)
     fn test_decode_commitment() {
         let input_data = hex::decode(

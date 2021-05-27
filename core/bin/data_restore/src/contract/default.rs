@@ -36,7 +36,7 @@ pub fn rollup_ops_blocks_from_bytes(input_data: Vec<u8>) -> Result<RollupOpsBloc
         &decoded_commitment_parameters[fee_account_argument_id],
         &decoded_commitment_parameters[public_data_argument_id],
     ) {
-        let ops = get_rollup_ops_from_data(public_data.as_slice())?;
+        let ops = get_rollup_ops_from_legacy_data(public_data.as_slice())?;
         let fee_account = AccountId(fee_acc.as_u32());
 
         let block = RollupOpsBlock {
@@ -58,17 +58,43 @@ pub fn rollup_ops_blocks_from_bytes(input_data: Vec<u8>) -> Result<RollupOpsBloc
 }
 
 pub fn get_rollup_ops_from_data(data: &[u8]) -> Result<Vec<ZkSyncOp>, anyhow::Error> {
+    parse_pub_data(
+        data,
+        ZkSyncOp::from_public_data,
+        ZkSyncOp::public_data_length,
+    )
+}
+
+pub fn get_rollup_ops_from_legacy_data(data: &[u8]) -> Result<Vec<ZkSyncOp>, anyhow::Error> {
+    parse_pub_data(
+        data,
+        ZkSyncOp::from_legacy_public_data,
+        ZkSyncOp::legacy_public_data_length,
+    )
+}
+
+fn parse_pub_data<E1, E2, F, S>(
+    data: &[u8],
+    parse: F,
+    data_size: S,
+) -> Result<Vec<ZkSyncOp>, anyhow::Error>
+where
+    E1: std::error::Error + Send + Sync + 'static,
+    E2: std::error::Error + Send + Sync + 'static,
+    F: Fn(&[u8]) -> Result<ZkSyncOp, E1>,
+    S: Fn(u8) -> Result<usize, E2>,
+{
     let mut current_pointer = 0;
-    let mut ops = vec![];
+    let mut ops = Vec::new();
     while current_pointer < data.len() {
         let op_type: u8 = data[current_pointer];
 
-        let pub_data_size = ZkSyncOp::public_data_length(op_type)?;
+        let pub_data_size = data_size(op_type)?;
 
         let pre = current_pointer;
         let post = pre + pub_data_size;
 
-        let op = ZkSyncOp::from_public_data(&data[pre..post])?;
+        let op = parse(&data[pre..post])?;
 
         ops.push(op);
         current_pointer += pub_data_size;
