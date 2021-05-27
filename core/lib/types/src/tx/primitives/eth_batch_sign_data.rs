@@ -100,12 +100,14 @@ impl EthBatchSignData {
     where
         I: Iterator<Item = &'a ZkSyncTx>,
     {
-        tiny_keccak::keccak256(
-            txs.flat_map(ZkSyncTx::get_old_bytes)
-                .collect::<Vec<u8>>()
-                .as_slice(),
-        )
-        .to_vec()
+        let mut bytes = vec![];
+        for tx in txs {
+            if let Ok(old_bytes) = ZkSyncTx::get_old_bytes(tx) {
+                bytes.extend(old_bytes)
+            }
+            // Skip unsupported tokens and transactions
+        }
+        tiny_keccak::keccak256(bytes.as_slice()).to_vec()
     }
 }
 

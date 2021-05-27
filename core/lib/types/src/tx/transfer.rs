@@ -21,7 +21,7 @@ use crate::{
     AccountId, Nonce, TokenId,
 };
 
-use crate::tx::error::TransactionSignatureError;
+use crate::tx::error::{GetOldBytesError, TransactionSignatureError};
 use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
 
 /// `Transfer` transaction performs a move of funds from one zkSync account to another.
@@ -138,9 +138,9 @@ impl Transfer {
         out
     }
     /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
-    pub fn get_old_bytes(&self) -> Vec<u8> {
+    pub fn get_old_bytes(&self) -> Result<Vec<u8>, GetOldBytesError> {
         if self.token.0 > MIN_NFT_TOKEN_ID {
-            panic!("Could not generate old bytes for tokens bigger than 2**16")
+            return Err(GetOldBytesError::TokenIdNotSupported);
         }
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
@@ -154,7 +154,7 @@ impl Transfer {
         if let Some(time_range) = &self.time_range {
             out.extend_from_slice(&time_range.to_be_bytes());
         }
-        out
+        Ok(out)
     }
 
     /// Verifies the transaction correctness:
@@ -197,7 +197,11 @@ impl Transfer {
             if self.token.0 < MIN_NFT_TOKEN_ID {
                 if let Some(res) = self
                     .signature
-                    .verify_musig(&self.get_old_bytes())
+                    .verify_musig(
+                        &self
+                            .get_old_bytes()
+                            .expect("We have checked this invariant earlier"),
+                    )
                     .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
                 {
                     return Some(res);

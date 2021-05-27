@@ -19,3 +19,11 @@ pub enum ChangePubkeySignedDataError {
 #[derive(Error, Debug, PartialEq)]
 #[error("Close operations are disabled")]
 pub struct CloseOperationsDisabled();
+
+#[derive(Debug, Error, PartialEq)]
+pub enum GetOldBytesError {
+    #[error("Token id is not supported")]
+    TokenIdNotSupported,
+    #[error("Transaction type not supported")]
+    TransactionTypeNotSupported,
+}
