@@ -1,6 +1,6 @@
 import { ArgumentParser } from 'argparse';
 import { deployContract } from 'ethereum-waffle';
-import { constants, ethers } from 'ethers';
+import { Contract, ethers } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { web3Provider, storedBlockInfoParam } from './utils';
@@ -9,6 +9,60 @@ import { readProductionContracts } from '../src.ts/deploy';
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const testContracts = readProductionContracts();
+
+async function startUpgrade(wallet: ethers.Wallet, upgradeGatekeeper: Contract) {
+    console.log('Deploying new Governance target...');
+    const newTargetGov = await deployContract(wallet, testContracts.governance, [], {
+        gasLimit: 6500000
+    });
+
+    console.log('Deploying new Verifier target...');
+    const newTargetVerifier = await deployContract(wallet, testContracts.verifier, [], {
+        gasLimit: 6500000
+    });
+
+    console.log('Deploying new zkSync target...');
+    const newTargetZkSync = await deployContract(wallet, testContracts.zkSync, [], {
+        gasLimit: 6500000
+    });
+
+    console.log('Starting upgrade...');
+    await (
+        await upgradeGatekeeper.startUpgrade(
+            [newTargetGov.address, newTargetVerifier.address, newTargetZkSync.address],
+            {
+                gasLimit: 500000
+            }
+        )
+    ).wait();
+    console.log('Upgrade has been successfully started.');
+}
+
+async function startPreparation(upgradeGatekeeper: Contract) {
+    console.log('Trying to start preparation...');
+    while (parseInt(await upgradeGatekeeper.upgradeStatus()) !== 2 /*Preparation*/) {
+        await new Promise((r) => setTimeout(r, 1000));
+        await (await upgradeGatekeeper.startPreparation({ gasLimit: 300000 })).wait();
+    }
+    console.log('Upgrade preparation has been successfully started');
+}
+
+async function finishUpgrade(upgradeGatekeeper: Contract, lastBlockInfo: string) {
+    const blockInfo = JSON.parse(lastBlockInfo);
+    const upgradeData = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [blockInfo]);
+
+    console.log('Finishing upgrade');
+    await (await upgradeGatekeeper.finishUpgrade([[], [], upgradeData], { gasLimit: 3000000 })).wait();
+    console.log('The upgrade has finished');
+}
+
+async function cancelUpgrade(upgradeGatekeeper: Contract) {
+    await (
+        await upgradeGatekeeper.cancelUpgrade({
+            gasLimit: 500000
+        })
+    ).wait();
+}
 
 async function main() {
     const parser = new ArgumentParser({
@@ -19,9 +73,11 @@ async function main() {
     parser.addArgument('--masterPrivateKey');
     parser.addArgument('--upgradeGatekeeperAddress');
     parser.addArgument('--lastBlockInfo');
+    parser.addArgument('--startUpgrade');
+    parser.addArgument('--finishUpgrade');
+    parser.addArgument('--startPreparation');
+    parser.addArgument('--cancelUpgrade');
     const args = parser.parseArgs(process.argv.slice(2));
-
-    const lastBlockInfo = JSON.parse(args.lastBlockInfo);
 
     const provider = web3Provider();
     const wallet = args.masterPrivateKey
@@ -34,34 +90,30 @@ async function main() {
         wallet
     );
 
-    const newTargetZkSync = await deployContract(wallet, testContracts.zkSync, [], {
-        gasLimit: 6500000
-    });
-
-    const newTargetGov = await deployContract(wallet, testContracts.governance, [], {
-        gasLimit: 6500000
-    });
-
-    const upgradeData = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [lastBlockInfo]);
-
-    console.log('Starting upgrade');
-    await (
-        await upgradeGatekeeper.startUpgrade([newTargetGov.address, constants.AddressZero, newTargetZkSync.address], {
-            gasLimit: 500000
-        })
-    ).wait();
-
-    // wait notice period
-    console.log('Waiting notice period');
-    while (parseInt(await upgradeGatekeeper.upgradeStatus()) !== 2 /*Preparation*/) {
-        await new Promise((r) => setTimeout(r, 1000));
-        await (await upgradeGatekeeper.startPreparation({ gasLimit: 300000 })).wait();
+    if (!args.startUpgrade && !args.startPreparation && !args.finishUpgrade && !args.cancelUpgrade) {
+        console.log(`Please supply at least one of the following flags:
+        --startUpgrade,
+        --startPreparation,
+        --finishUpgrade
+        `);
+        return;
     }
 
-    console.log('Finish upgrade notice period');
-    //  console.log(await proxyContract.exodusMode());
-    // finish upgrade
-    await (await upgradeGatekeeper.finishUpgrade([[], [], upgradeData], { gasLimit: 3000000 })).wait();
+    if (args.startUpgrade) {
+        await startUpgrade(wallet, upgradeGatekeeper);
+    }
+
+    if (args.startPreparation) {
+        await startPreparation(upgradeGatekeeper);
+    }
+
+    if (args.finishUpgrade) {
+        await finishUpgrade(upgradeGatekeeper, args.lastBlockInfo);
+    }
+
+    if (args.cancelUpgrade) {
+        await cancelUpgrade(upgradeGatekeeper);
+    }
 }
 
 main()

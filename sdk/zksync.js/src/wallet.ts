@@ -29,7 +29,9 @@ import {
     Transfer,
     TxEthSignature,
     Withdraw,
-    WithdrawNFT
+    WithdrawNFT,
+    TokenRatio,
+    WeiRatio
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -427,7 +429,7 @@ export class Wallet {
     async getLimitOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
-        ratio: Ratio;
+        ratio: TokenRatio | WeiRatio;
         recipient?: Address;
         nonce?: Nonce;
         validFrom?: number;
@@ -442,7 +444,7 @@ export class Wallet {
     async getOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
-        ratio: Ratio;
+        ratio: TokenRatio | WeiRatio;
         amount: BigNumberish;
         recipient?: Address;
         nonce?: Nonce;
@@ -456,6 +458,23 @@ export class Wallet {
         const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
         const recipient = order.recipient || this.address();
 
+        let ratio: Ratio;
+        const sell = order.tokenSell;
+        const buy = order.tokenBuy;
+
+        if (!order.ratio[sell] || !order.ratio[buy]) {
+            throw new Error(`Wrong tokens in the ratio object: should be ${sell} and ${buy}`);
+        }
+
+        if (order.ratio.type == 'Wei') {
+            ratio = [order.ratio[sell], order.ratio[buy]];
+        } else if (order.ratio.type == 'Token') {
+            ratio = [
+                this.provider.tokenSet.parseToken(sell, order.ratio[sell].toString()),
+                this.provider.tokenSet.parseToken(buy, order.ratio[buy].toString())
+            ];
+        }
+
         const signedOrder = await this.signer.signSyncOrder({
             accountId: this.accountId,
             recipient,
@@ -465,7 +484,7 @@ export class Wallet {
             tokenBuy: this.provider.tokenSet.resolveTokenId(order.tokenBuy),
             validFrom: order.validFrom || 0,
             validUntil: order.validUntil || MAX_TIMESTAMP,
-            ratio: order.ratio
+            ratio
         });
 
         return this.signOrder(signedOrder);
