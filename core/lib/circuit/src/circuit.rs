@@ -3141,6 +3141,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         serialized_order_bits_0.extend(order_type.get_bits_be());
+        serialized_order_bits_0.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
         serialized_order_bits_0.extend(op_data.special_accounts[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_eth_addresses[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_nonces[0].get_bits_be());
@@ -3153,6 +3154,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_order_bits_0.extend(op_data.valid_until.get_bits_be());
 
         serialized_order_bits_1.extend(order_type.get_bits_be());
+        serialized_order_bits_1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
         serialized_order_bits_1.extend(op_data.special_accounts[2].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_eth_addresses[1].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_nonces[1].get_bits_be());
@@ -3174,7 +3176,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &orders_bits,
         )?;
 
-        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(reversed_tx_type_bits_be(SwapOp::OP_CODE));
+        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
         serialized_tx_bits.extend(op_data.special_accounts[4].get_bits_be());
         serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(op_data.special_nonces[2].get_bits_be());
