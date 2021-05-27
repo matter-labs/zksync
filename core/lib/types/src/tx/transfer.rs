@@ -139,7 +139,7 @@ impl Transfer {
     }
     /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
     pub fn get_old_bytes(&self) -> Result<Vec<u8>, GetOldBytesError> {
-        if self.token.0 > MIN_NFT_TOKEN_ID {
+        if self.token.0 >= MIN_NFT_TOKEN_ID {
             return Err(GetOldBytesError::TokenIdNotSupported);
         }
         let mut out = Vec::new();
