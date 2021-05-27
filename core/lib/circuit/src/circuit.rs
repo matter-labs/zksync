@@ -2846,6 +2846,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         *pubdata_holder = packed_pubdata;
 
         // construct signature message preimage (serialized_tx)
+        // we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
 
         let mut serialized_tx_bits = vec![];
         serialized_tx_bits.extend(reversed_tx_type_bits_be(TransferOp::OP_CODE));
