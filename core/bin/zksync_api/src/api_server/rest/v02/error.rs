@@ -24,6 +24,7 @@ pub enum ErrorCode {
     AccountNotFound = 204,
     TransactionNotFound = 205,
     PaginationLimitTooBig = 206,
+    QueryDeserializationError = 207,
     StorageError = 300,
     TokenNotFound = 500,
     ExternalApiError = 501,
@@ -97,6 +98,8 @@ pub enum InvalidDataError {
     TransactionNotFound,
     #[error("Limit for pagination should be less or equal than {}", MAX_LIMIT)]
     PaginationLimitTooBig,
+    #[error("Cannot parse query parameters")]
+    QueryDeserializationError,
 }
 
 impl ApiError for InvalidDataError {
@@ -113,6 +116,7 @@ impl ApiError for InvalidDataError {
             Self::InvalidCurrency => ErrorCode::InvalidCurrency,
             Self::TransactionNotFound => ErrorCode::TransactionNotFound,
             Self::PaginationLimitTooBig => ErrorCode::PaginationLimitTooBig,
+            Self::QueryDeserializationError => ErrorCode::QueryDeserializationError,
         }
     }
 }

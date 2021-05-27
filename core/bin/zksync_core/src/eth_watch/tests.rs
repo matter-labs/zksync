@@ -3,7 +3,9 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest};
+use zksync_api_types::v02::pagination::{
+    IdOrLatest, PaginationDirection, PaginationQuery, PendingOpsRequest,
+};
 use zksync_types::{
     AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp, H256,
 };
@@ -183,7 +185,7 @@ async fn test_operation_queues() {
         from: PendingOpsRequest {
             address: to_addr,
             account_id: Some(AccountId(1)),
-            serial_id: 0,
+            serial_id: IdOrLatest::Id(0),
         },
         limit: 2,
         direction: PaginationDirection::Newer,
@@ -195,7 +197,7 @@ async fn test_operation_queues() {
             from: PendingOpsRequest {
                 address: from_addr,
                 account_id: Some(AccountId(0)),
-                serial_id: 0
+                serial_id: IdOrLatest::Id(0)
             },
             limit: 3,
             direction: PaginationDirection::Newer

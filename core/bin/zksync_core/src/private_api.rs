@@ -15,7 +15,9 @@ use futures::{
 };
 use serde::Deserialize;
 use std::thread;
-use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest};
+use zksync_api_types::v02::pagination::{
+    IdOrLatest, PaginationDirection, PaginationQuery, PendingOpsRequest,
+};
 use zksync_config::configs::api::PrivateApi;
 use zksync_types::{
     priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, AccountId, Address, SignedZkSyncTx,
@@ -102,7 +104,7 @@ async fn unconfirmed_deposits(
 struct PendingOpsFlattenRequest {
     pub address: Address,
     pub account_id: Option<AccountId>,
-    pub serial_id: u64,
+    pub serial_id: IdOrLatest<u64>,
     pub limit: u32,
     pub direction: PaginationDirection,
 }

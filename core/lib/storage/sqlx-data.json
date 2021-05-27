@@ -2171,6 +2171,26 @@
       ]
     }
   },
+  "597929a791027d1ee6a6ecbc51d59765b9849bcfb86d7e26083b088f9046b6a4": {
+    "query": "\n                WITH transactions AS (\n                    SELECT tx_hash, created_at\n                    FROM executed_transactions\n                    WHERE from_account = $1 OR to_account = $1 OR primary_account_address = $1\n                ), priority_ops AS (\n                    SELECT tx_hash, created_at\n                    FROM executed_priority_operations\n                    WHERE from_account = $1 OR to_account = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\"\n                FROM everything\n                ORDER BY created_at DESC\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "59c4e0d8255c2e4dd6eece1b24245daf3414d4f15b6cba7b369dc1ac32bed018": {
     "query": "\n                SELECT * FROM accounts\n                WHERE id = $1\n            ",
     "describe": {
@@ -3853,6 +3873,24 @@
       ]
     }
   },
+  "b1b0fd6eab9edcac470d79302d6da97ad73181c41fe313b08c7a6bfa3b0ccd11": {
+    "query": "SELECT MAX(id) FROM tokens",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {
     "query": "INSERT INTO block_witness (block, witness)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING",
     "describe": {
@@ -4666,6 +4704,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "cff2a15f1bbaf417d076cbfd678fbad745205c7d7128aa29289fc541c37a202c": {
+    "query": "\n                WITH transactions AS (\n                    SELECT tx_hash, created_at\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT tx_hash, created_at\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\"\n                FROM everything\n                ORDER BY created_at DESC\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "d18525d8bf10383d307bf56110fac63276a82dc8b65b358c098fca7c2991579e": {

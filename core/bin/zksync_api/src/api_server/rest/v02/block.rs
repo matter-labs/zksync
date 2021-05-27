@@ -9,8 +9,8 @@ use actix_web::{web, Scope};
 // Workspace uses
 use zksync_api_types::v02::{
     block::{BlockInfo, BlockStatus},
-    pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    transaction::Transaction,
+    pagination::{parse_query, BlockAndTxHashOrLatest, IdOrLatest, Paginated, PaginationQuery},
+    transaction::{Transaction, TxHashSerializeWrapper},
 };
 use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records::StorageBlockDetails, ConnectionPool, QueryResult};
@@ -101,7 +101,7 @@ impl ApiBlockData {
 
     async fn block_page(
         &self,
-        query: PaginationQuery<BlockNumber>,
+        query: PaginationQuery<IdOrLatest<BlockNumber>>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         storage.paginate_checked(&query).await
@@ -110,12 +110,12 @@ impl ApiBlockData {
     async fn transaction_page(
         &self,
         block_number: BlockNumber,
-        query: PaginationQuery<TxHash>,
-    ) -> Result<Paginated<Transaction, BlockAndTxHash>, Error> {
+        query: PaginationQuery<IdOrLatest<TxHash>>,
+    ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
 
         let new_query = PaginationQuery {
-            from: BlockAndTxHash {
+            from: BlockAndTxHashOrLatest {
                 block_number,
                 tx_hash: query.from,
             },
@@ -149,8 +149,11 @@ impl ApiBlockData {
 
 async fn block_pagination(
     data: web::Data<ApiBlockData>,
-    web::Query(query): web::Query<PaginationQuery<BlockNumber>>,
+    web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<BlockInfo, BlockNumber>> {
+    let query = api_try!(
+        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
+    );
     data.block_page(query).await.into()
 }
 
@@ -168,9 +171,12 @@ async fn block_by_position(
 async fn block_transactions(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
-    web::Query(query): web::Query<PaginationQuery<TxHash>>,
-) -> ApiResult<Paginated<Transaction, BlockAndTxHash>> {
+    web::Query(query): web::Query<PaginationQuery<String>>,
+) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
+    let query = api_try!(
+        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
+    );
 
     data.transaction_page(block_number, query).await.into()
 }
@@ -218,7 +224,7 @@ mod tests {
         );
 
         let query = PaginationQuery {
-            from: BlockNumber(1),
+            from: IdOrLatest::Id(BlockNumber(1)),
             limit: 3,
             direction: PaginationDirection::Newer,
         };
@@ -252,7 +258,7 @@ mod tests {
         let tx_hash = TxHash::from_str(tx_hash_str).unwrap();
 
         let query = PaginationQuery {
-            from: tx_hash,
+            from: IdOrLatest::Id(tx_hash),
             limit: 2,
             direction: PaginationDirection::Older,
         };
@@ -260,14 +266,12 @@ mod tests {
         let response = client
             .block_transactions(&query, &*block_number.to_string())
             .await?;
-        let paginated: Paginated<Transaction, BlockAndTxHash> =
-            deserialize_response_result(response)?;
+        let paginated: Paginated<Transaction, TxHash> = deserialize_response_result(response)?;
         assert_eq!(paginated.pagination.count as usize, expected_txs.len());
         assert_eq!(paginated.pagination.limit, query.limit);
         assert_eq!(paginated.list.len(), query.limit as usize);
         assert_eq!(paginated.pagination.direction, PaginationDirection::Older);
-        assert_eq!(paginated.pagination.from.tx_hash, tx_hash);
-        assert_eq!(paginated.pagination.from.block_number, block_number);
+        assert_eq!(paginated.pagination.from, tx_hash);
 
         for (tx, expected_tx) in paginated.list.into_iter().zip(expected_txs) {
             assert_eq!(

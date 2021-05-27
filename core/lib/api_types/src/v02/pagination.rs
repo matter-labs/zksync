@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
-use zksync_utils::ZeroPrefixHexSerde;
 
 pub const MAX_LIMIT: u32 = 100;
 
@@ -9,6 +8,39 @@ pub const MAX_LIMIT: u32 = 100;
 pub enum PaginationDirection {
     Newer,
     Older,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub enum Latest {
+    Latest,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "camelCase", untagged)]
+pub enum IdOrLatest<Id> {
+    Id(Id),
+    Latest(Latest),
+}
+
+pub fn parse_query<T: DeserializeOwned>(
+    query: PaginationQuery<String>,
+) -> Option<PaginationQuery<IdOrLatest<T>>> {
+    let from = match query.from.as_str() {
+        "latest" => IdOrLatest::Latest(Latest::Latest),
+        _ => {
+            if let Ok(id) = serde_json::from_str(&query.from) {
+                IdOrLatest::Id(id)
+            } else {
+                return None;
+            }
+        }
+    };
+    Some(PaginationQuery {
+        from,
+        limit: query.limit,
+        direction: query.direction,
+    })
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,9 +89,15 @@ impl<T: Sized + Serialize, F: Serialize> Paginated<T, F> {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
+pub struct BlockAndTxHashOrLatest {
+    pub block_number: BlockNumber,
+    pub tx_hash: IdOrLatest<TxHash>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
 pub struct BlockAndTxHash {
     pub block_number: BlockNumber,
-    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
 }
 
@@ -68,13 +106,19 @@ pub struct BlockAndTxHash {
 pub struct PendingOpsRequest {
     pub address: Address,
     pub account_id: Option<AccountId>,
-    pub serial_id: SerialId,
+    pub serial_id: IdOrLatest<SerialId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountTxsRequestWithLatest {
+    pub address: Address,
+    pub tx_hash: IdOrLatest<TxHash>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountTxsRequest {
     pub address: Address,
-    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
 }

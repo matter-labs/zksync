@@ -23,7 +23,7 @@ use web3::types::{Address, BlockNumber};
 
 // Workspace deps
 use zksync_api_types::v02::{
-    pagination::{Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
+    pagination::{IdOrLatest, Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
     transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
 };
 use zksync_crypto::params::PRIORITY_EXPIRATION;
@@ -87,7 +87,7 @@ pub enum EthWatchRequest {
     },
     GetUnconfirmedOps {
         query: PaginationQuery<PendingOpsRequest>,
-        resp: oneshot::Sender<Paginated<Transaction, PendingOpsRequest>>,
+        resp: oneshot::Sender<Paginated<Transaction, u64>>,
     },
     GetUnconfirmedOpByEthHash {
         eth_hash: H256,
@@ -271,7 +271,7 @@ impl<W: EthClient> EthWatch<W> {
     fn get_ongoing_ops_for(
         &self,
         query: PaginationQuery<PendingOpsRequest>,
-    ) -> Paginated<Transaction, PendingOpsRequest> {
+    ) -> Paginated<Transaction, u64> {
         let all_ops = self
             .eth_state
             .unconfirmed_queue()
@@ -288,16 +288,32 @@ impl<W: EthClient> EthWatch<W> {
                     .unwrap_or(false),
             });
         let count = all_ops.clone().count();
+        let from_serial_id = match query.from.serial_id {
+            IdOrLatest::Id(id) => id,
+            IdOrLatest::Latest(_) => {
+                if let Some(op) = all_ops.clone().max_by_key(|op| op.serial_id) {
+                    op.serial_id
+                } else {
+                    return Paginated::new(
+                        Vec::new(),
+                        Default::default(),
+                        query.limit,
+                        query.direction,
+                        0,
+                    );
+                }
+            }
+        };
         let ops: Vec<PriorityOp> = match query.direction {
             PaginationDirection::Newer => all_ops
                 .sorted_by_key(|op| op.serial_id)
-                .filter(|op| op.serial_id >= query.from.serial_id)
+                .filter(|op| op.serial_id >= from_serial_id)
                 .take(query.limit as usize)
                 .cloned()
                 .collect(),
             PaginationDirection::Older => all_ops
                 .sorted_by(|a, b| b.serial_id.cmp(&a.serial_id))
-                .filter(|op| op.serial_id <= query.from.serial_id)
+                .filter(|op| op.serial_id <= from_serial_id)
                 .take(query.limit as usize)
                 .cloned()
                 .collect(),
@@ -322,7 +338,13 @@ impl<W: EthClient> EthWatch<W> {
                 }
             })
             .collect();
-        Paginated::new(txs, query.from, query.limit, query.direction, count as u32)
+        Paginated::new(
+            txs,
+            from_serial_id,
+            query.limit,
+            query.direction,
+            count as u32,
+        )
     }
 
     async fn poll_eth_node(&mut self) -> anyhow::Result<()> {

@@ -17,7 +17,7 @@ use num::{rational::Ratio, BigUint, FromPrimitive};
 
 // Workspace uses
 use zksync_api_types::v02::{
-    pagination::{Paginated, PaginationQuery},
+    pagination::{parse_query, IdOrLatest, Paginated, PaginationQuery},
     token::{ApiToken, TokenPrice},
 };
 use zksync_config::ZkSyncConfig;
@@ -78,7 +78,7 @@ impl ApiTokenData {
 
     async fn token_page(
         &self,
-        query: PaginationQuery<TokenId>,
+        query: PaginationQuery<IdOrLatest<TokenId>>,
     ) -> Result<Paginated<ApiToken, TokenId>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let paginated_tokens: Result<Paginated<Token, TokenId>, Error> =
@@ -191,8 +191,11 @@ impl ApiTokenData {
 
 async fn token_pagination(
     data: web::Data<ApiTokenData>,
-    web::Query(query): web::Query<PaginationQuery<TokenId>>,
+    web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<ApiToken, TokenId>> {
+    let query = api_try!(
+        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
+    );
     data.token_page(query).await.into()
 }
 
@@ -343,7 +346,7 @@ mod tests {
         assert_eq!(api_token, expected_api_token);
 
         let query = PaginationQuery {
-            from: TokenId(15),
+            from: IdOrLatest::Id(TokenId(15)),
             limit: 2,
             direction: PaginationDirection::Older,
         };

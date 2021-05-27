@@ -10,8 +10,11 @@ use actix_web::{web, Scope};
 // Workspace uses
 use zksync_api_types::v02::{
     account::{Account, AccountAddressOrId, AccountStateType},
-    pagination::{AccountTxsRequest, Paginated, PaginationQuery, PendingOpsRequest},
-    transaction::Transaction,
+    pagination::{
+        parse_query, AccountTxsRequestWithLatest, IdOrLatest, Paginated, PaginationQuery,
+        PendingOpsRequest,
+    },
+    transaction::{Transaction, TxHashSerializeWrapper},
 };
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
@@ -166,18 +169,18 @@ impl ApiAccountData {
 
     async fn account_txs(
         &self,
-        query: PaginationQuery<TxHash>,
+        query: PaginationQuery<IdOrLatest<TxHash>>,
         address: Address,
-    ) -> Result<Paginated<Transaction, AccountTxsRequest>, Error> {
+    ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let new_query = PaginationQuery {
-            from: AccountTxsRequest {
+            from: AccountTxsRequestWithLatest {
                 address,
                 tx_hash: query.from,
             },
             limit: query.limit,
             direction: query.direction,
         };
-        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         storage.paginate_checked(&new_query).await
     }
 
@@ -187,10 +190,10 @@ impl ApiAccountData {
     /// but we can still find pending deposits for its address that is why account_id is Option.
     async fn account_pending_txs(
         &self,
-        query: PaginationQuery<SerialId>,
+        query: PaginationQuery<IdOrLatest<SerialId>>,
         address: Address,
         account_id: Option<AccountId>,
-    ) -> Result<Paginated<Transaction, PendingOpsRequest>, Error> {
+    ) -> Result<Paginated<Transaction, SerialId>, Error> {
         let new_query = PaginationQuery {
             from: PendingOpsRequest {
                 address,
@@ -238,8 +241,11 @@ async fn account_finalized_info(
 async fn account_txs(
     data: web::Data<ApiAccountData>,
     web::Path(account_id_or_address): web::Path<String>,
-    web::Query(query): web::Query<PaginationQuery<TxHash>>,
-) -> ApiResult<Paginated<Transaction, AccountTxsRequest>> {
+    web::Query(query): web::Query<PaginationQuery<String>>,
+) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
+    let query = api_try!(
+        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
+    );
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(data.get_address_by_address_or_id(address_or_id).await);
     data.account_txs(query, address).await.into()
@@ -248,8 +254,11 @@ async fn account_txs(
 async fn account_pending_txs(
     data: web::Data<ApiAccountData>,
     web::Path(account_id_or_address): web::Path<String>,
-    web::Query(query): web::Query<PaginationQuery<SerialId>>,
-) -> ApiResult<Paginated<Transaction, PendingOpsRequest>> {
+    web::Query(query): web::Query<PaginationQuery<String>>,
+) -> ApiResult<Paginated<Transaction, SerialId>> {
+    let query = api_try!(
+        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
+    );
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(
         data.get_address_by_address_or_id(address_or_id.clone())
@@ -434,7 +443,7 @@ mod tests {
                 from: PendingOpsRequest {
                     address: Address::default(),
                     account_id: Some(AccountId::default()),
-                    serial_id: 0,
+                    serial_id: IdOrLatest::Id(0),
                 },
                 limit: 0,
                 direction: PaginationDirection::Newer,
@@ -473,12 +482,12 @@ mod tests {
         assert_eq!(account_info_by_id, account_info_by_address);
 
         let query = PaginationQuery {
-            from: tx_hash,
+            from: IdOrLatest::Id(tx_hash),
             limit: 1,
             direction: PaginationDirection::Newer,
         };
         let response = client.account_txs(&query, &account_id.to_string()).await?;
-        let txs: Paginated<Transaction, AccountTxsRequest> = deserialize_response_result(response)?;
+        let txs: Paginated<Transaction, TxHash> = deserialize_response_result(response)?;
         assert_eq!(txs.list[0].tx_hash, tx_hash);
         // Provide unconfirmed pending ops.
         *server.pending_ops.lock().await = json!({
@@ -515,7 +524,7 @@ mod tests {
         });
 
         let query = PaginationQuery {
-            from: 1,
+            from: IdOrLatest::Id(1),
             limit: 1,
             direction: PaginationDirection::Newer,
         };
