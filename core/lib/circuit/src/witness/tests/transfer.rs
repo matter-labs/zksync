@@ -115,7 +115,7 @@ fn test_transfer_old_signature_success() {
         );
         tx.signature = TxSignature::sign_musig(
             &account_from.zksync_account.private_key,
-            &tx.get_old_bytes(),
+            &tx.get_old_bytes().expect("get_old_bytes fails"),
         );
         let transfer_op = TransferOp {
             tx,
@@ -131,7 +131,7 @@ fn test_transfer_old_signature_success() {
             .expect("signature serialize");
         let input = SigDataInput::new(
             &sign_packed,
-            &transfer_op.tx.get_old_bytes(),
+            &transfer_op.tx.get_old_bytes().expect("get_old_bytes fails"),
             &transfer_op.tx.signature.pub_key,
         )
         .expect("input constructing fails");
