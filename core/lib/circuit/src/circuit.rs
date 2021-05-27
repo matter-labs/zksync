@@ -1314,19 +1314,22 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         // construct signature message
 
-        let mut serialized_tx_bits = vec![];
-        serialized_tx_bits.extend(reversed_tx_type_bits_be(WithdrawOp::OP_CODE));
-        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
-        serialized_tx_bits.extend(cur.account_id.get_bits_be());
-        serialized_tx_bits.extend(cur.account.address.get_bits_be());
-        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-        assert_eq!(serialized_tx_bits.len(), params::SIGNED_WITHDRAW_BIT_WIDTH);
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(WithdrawOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.full_amount.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_version1.len(),
+            params::SIGNED_WITHDRAW_BIT_WIDTH
+        );
 
         let mut serialized_tx_bits_old1 = vec![];
         serialized_tx_bits_old1.extend(global_variables.chunk_data.tx_type.get_bits_be());
@@ -1397,9 +1400,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         base_valid_flags.push(is_withdraw);
         base_valid_flags.push(is_valid_timestamp.clone());
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
 
@@ -1426,7 +1429,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
             &[
-                is_new_serialized_tx_correct,
+                is_version1_serialized_tx_correct,
                 is_old1_serialized_tx_correct,
                 is_old2_serialized_tx_correct,
             ],
@@ -1917,19 +1920,19 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         );
 
         // Construct serialized tx
-        let mut serialized_tx_bits = vec![];
-        serialized_tx_bits.extend(reversed_tx_type_bits_be(ChangePubKeyOp::OP_CODE));
-        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
-        serialized_tx_bits.extend(cur.account_id.get_bits_be());
-        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(ChangePubKeyOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
         assert_eq!(
-            serialized_tx_bits.len(),
+            serialized_tx_bits_version1.len(),
             params::SIGNED_CHANGE_PUBKEY_BIT_WIDTH
         );
 
@@ -1965,9 +1968,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             params::OLD2_SIGNED_CHANGE_PUBKEY_BIT_WIDTH
         );
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
 
@@ -1994,7 +1997,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
             &[
-                is_new_serialized_tx_correct,
+                is_version1_serialized_tx_correct,
                 is_old1_serialized_tx_correct,
                 is_old2_serialized_tx_correct,
             ],
@@ -2333,27 +2336,27 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             // Here will be checked signature of the creator.
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
 
-            let mut serialized_tx_bits = vec![];
-            serialized_tx_bits.extend(reversed_tx_type_bits_be(MintNFTOp::OP_CODE)); // reversed_tx_type
-            serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION)); // signature scheme identificator
-            serialized_tx_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_id
-            serialized_tx_bits.extend(cur.account.address.get_bits_be()); // creator_address
-            serialized_tx_bits.extend(
+            let mut serialized_tx_bits_version1 = vec![];
+            serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(MintNFTOp::OP_CODE)); // reversed_tx_type
+            serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION)); // signature scheme identificator
+            serialized_tx_bits_version1.extend(op_data.special_accounts[0].get_bits_be()); // creator_id
+            serialized_tx_bits_version1.extend(cur.account.address.get_bits_be()); // creator_address
+            serialized_tx_bits_version1.extend(
                 op_data
                     .special_content_hash
                     .iter()
                     .map(|bit| bit.get_bits_be())
                     .flatten(),
             ); // content_hash
-            serialized_tx_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // recipient_address
-            serialized_tx_bits.extend(cur.token.get_bits_be()); // fee token
-            serialized_tx_bits.extend(op_data.fee_packed.get_bits_be()); // fee
-            serialized_tx_bits.extend(cur.account.nonce.get_bits_be()); // nonce
-            assert_eq!(serialized_tx_bits.len(), SIGNED_MINT_NFT_BIT_WIDTH);
+            serialized_tx_bits_version1.extend(op_data.special_eth_addresses[0].get_bits_be()); // recipient_address
+            serialized_tx_bits_version1.extend(cur.token.get_bits_be()); // fee token
+            serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be()); // fee
+            serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be()); // nonce
+            assert_eq!(serialized_tx_bits_version1.len(), SIGNED_MINT_NFT_BIT_WIDTH);
 
             let is_serialized_tx_correct = verify_signature_message_construction(
                 cs.namespace(|| "is_serialized_tx_correct"),
-                serialized_tx_bits,
+                serialized_tx_bits_version1,
                 &op_data,
             )?;
             flags.push(is_serialized_tx_correct);
@@ -2646,23 +2649,26 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             // Here will be checked signature of the initiator.
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
 
-            let mut serialized_tx_bits = vec![];
-            serialized_tx_bits.extend(reversed_tx_type_bits_be(WithdrawNFTOp::OP_CODE)); // reversed_tx_type
-            serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION)); // signature scheme identificator
-            serialized_tx_bits.extend(op_data.special_accounts[1].get_bits_be()); // initiator_id
-            serialized_tx_bits.extend(cur.account.address.get_bits_be()); // initiator_address
-            serialized_tx_bits.extend(op_data.eth_address.get_bits_be()); // to_address
-            serialized_tx_bits.extend(op_data.special_tokens[1].get_bits_be()); // token
-            serialized_tx_bits.extend(cur.token.get_bits_be()); // fee_token
-            serialized_tx_bits.extend(op_data.fee_packed.get_bits_be()); // fee
-            serialized_tx_bits.extend(cur.account.nonce.get_bits_be()); // nonce
-            serialized_tx_bits.extend(op_data.valid_from.get_bits_be()); // valid_from
-            serialized_tx_bits.extend(op_data.valid_until.get_bits_be()); // valid_until
-            assert_eq!(serialized_tx_bits.len(), SIGNED_WITHDRAW_NFT_BIT_WIDTH);
+            let mut serialized_tx_bits_version1 = vec![];
+            serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(WithdrawNFTOp::OP_CODE)); // reversed_tx_type
+            serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION)); // signature scheme identificator
+            serialized_tx_bits_version1.extend(op_data.special_accounts[1].get_bits_be()); // initiator_id
+            serialized_tx_bits_version1.extend(cur.account.address.get_bits_be()); // initiator_address
+            serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be()); // to_address
+            serialized_tx_bits_version1.extend(op_data.special_tokens[1].get_bits_be()); // token
+            serialized_tx_bits_version1.extend(cur.token.get_bits_be()); // fee_token
+            serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be()); // fee
+            serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be()); // nonce
+            serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be()); // valid_from
+            serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be()); // valid_until
+            assert_eq!(
+                serialized_tx_bits_version1.len(),
+                SIGNED_WITHDRAW_NFT_BIT_WIDTH
+            );
 
             let is_serialized_tx_correct = verify_signature_message_construction(
                 cs.namespace(|| "is_serialized_tx_correct"),
-                serialized_tx_bits,
+                serialized_tx_bits_version1,
                 &op_data,
             )?;
             flags.push(is_serialized_tx_correct);
@@ -2848,19 +2854,22 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // construct signature message preimage (serialized_tx)
         // we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
 
-        let mut serialized_tx_bits = vec![];
-        serialized_tx_bits.extend(reversed_tx_type_bits_be(TransferOp::OP_CODE));
-        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
-        serialized_tx_bits.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-        assert_eq!(serialized_tx_bits.len(), params::SIGNED_TRANSFER_BIT_WIDTH);
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(TransferOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_version1.len(),
+            params::SIGNED_TRANSFER_BIT_WIDTH
+        );
 
         let mut serialized_tx_bits_old1 = vec![];
         serialized_tx_bits_old1.extend(u8_into_bits_be(TransferOp::OP_CODE));
@@ -2951,9 +2960,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
 
@@ -2980,7 +2989,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
             &[
-                is_new_serialized_tx_correct,
+                is_version1_serialized_tx_correct,
                 is_old1_serialized_tx_correct,
                 is_old2_serialized_tx_correct,
             ],
@@ -3205,7 +3214,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let mut serialized_order_bits_0 = vec![];
         let mut serialized_order_bits_1 = vec![];
-        let mut serialized_tx_bits = vec![];
+        let mut serialized_tx_bits_version1 = vec![];
 
         let order_type = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "order message type"),
@@ -3249,16 +3258,16 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &orders_bits,
         )?;
 
-        serialized_tx_bits.extend(reversed_tx_type_bits_be(SwapOp::OP_CODE));
-        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
-        serialized_tx_bits.extend(op_data.special_accounts[4].get_bits_be());
-        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits.extend(op_data.special_nonces[2].get_bits_be());
-        serialized_tx_bits.extend(result_orders_hash);
-        serialized_tx_bits.extend(op_data.special_tokens[2].get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
-        serialized_tx_bits.extend(op_data.second_amount_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(SwapOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(op_data.special_accounts[4].get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.special_nonces[2].get_bits_be());
+        serialized_tx_bits_version1.extend(result_orders_hash);
+        serialized_tx_bits_version1.extend(op_data.special_tokens[2].get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.second_amount_packed.get_bits_be());
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -3599,7 +3608,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let is_serialized_swap_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_swap_correct"),
-            serialized_tx_bits,
+            serialized_tx_bits_version1,
             &op_data,
         )?;
 
@@ -3803,19 +3812,19 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         *pubdata_holder = packed_pubdata;
 
         // construct signature message preimage (serialized_tx)
-        let mut serialized_tx_bits = vec![];
-        serialized_tx_bits.extend(reversed_tx_type_bits_be(TransferOp::OP_CODE));
-        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
-        serialized_tx_bits.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(rhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(TransferOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(serialized_tx_bits_version1.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
         let mut serialized_tx_bits_old1 = vec![];
         serialized_tx_bits_old1.extend(global_variables.chunk_data.tx_type.get_bits_be());
@@ -3913,9 +3922,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
 
@@ -3942,7 +3951,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
             &[
-                is_new_serialized_tx_correct,
+                is_version1_serialized_tx_correct,
                 is_old1_serialized_tx_correct,
                 is_old2_serialized_tx_correct,
             ],
@@ -4072,17 +4081,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         // construct signature message preimage (serialized_tx)
 
-        let mut serialized_tx_bits = vec![];
-        serialized_tx_bits.extend(reversed_tx_type_bits_be(ForcedExitOp::OP_CODE));
-        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
-        serialized_tx_bits.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits.extend(rhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-        assert_eq!(serialized_tx_bits.len(), SIGNED_FORCED_EXIT_BIT_WIDTH);
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(ForcedExitOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(lhs.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_version1.len(),
+            SIGNED_FORCED_EXIT_BIT_WIDTH
+        );
 
         // Construct serialized tx
         let mut serialized_tx_bits_old = vec![];
@@ -4164,9 +4176,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
 
@@ -4182,7 +4194,10 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
+            &[
+                is_version1_serialized_tx_correct,
+                is_old_serialized_tx_correct,
+            ],
         )?;
 
         lhs_valid_flags.push(is_serialized_tx_correct);
