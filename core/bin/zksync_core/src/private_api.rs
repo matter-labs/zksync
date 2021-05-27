@@ -16,7 +16,7 @@ use futures::{
 use serde::Deserialize;
 use std::thread;
 use zksync_api_types::v02::pagination::{
-    IdOrLatest, PaginationDirection, PaginationQuery, PendingOpsRequest,
+    parse_from, PaginationDirection, PaginationQuery, PendingOpsRequest,
 };
 use zksync_config::configs::api::PrivateApi;
 use zksync_types::{
@@ -104,7 +104,7 @@ async fn unconfirmed_deposits(
 struct PendingOpsFlattenRequest {
     pub address: Address,
     pub account_id: Option<AccountId>,
-    pub serial_id: IdOrLatest<u64>,
+    pub serial_id: String,
     pub limit: u32,
     pub direction: PaginationDirection,
 }
@@ -120,11 +120,14 @@ async fn unconfirmed_ops(
     web::Query(params): web::Query<PendingOpsFlattenRequest>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
+    // Serializing enum query parameters doesn't work, so parse it separately.
+    let serial_id = parse_from(&params.serial_id)
+        .ok_or_else(|| HttpResponse::InternalServerError().finish())?;
     let query = PaginationQuery {
         from: PendingOpsRequest {
             address: params.address,
             account_id: params.account_id,
-            serial_id: params.serial_id,
+            serial_id,
         },
         limit: params.limit,
         direction: params.direction,

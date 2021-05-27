@@ -151,9 +151,9 @@ async fn block_pagination(
     data: web::Data<ApiBlockData>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<BlockInfo, BlockNumber>> {
-    let query = api_try!(
-        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
-    );
+    let query =
+        api_try!(parse_query(query)
+            .ok_or_else(|| Error::from(InvalidDataError::QueryDeserializationError)));
     data.block_page(query).await.into()
 }
 
@@ -174,9 +174,9 @@ async fn block_transactions(
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
-    let query = api_try!(
-        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
-    );
+    let query =
+        api_try!(parse_query(query)
+            .ok_or_else(|| Error::from(InvalidDataError::QueryDeserializationError)));
 
     data.transaction_page(block_number, query).await.into()
 }
@@ -210,7 +210,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn v02_test_block_scope() -> anyhow::Result<()> {
+    async fn blocks_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 

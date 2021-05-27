@@ -24,9 +24,6 @@ import {
     ApiBatchData,
     L2Tx,
     ApiTransaction,
-    BlockAndTxHash,
-    PendingOpsRequest,
-    AccountTxsRequest,
     ContractAddress,
     Tokens,
     AccountState,
@@ -139,7 +136,7 @@ export class RestProvider extends SyncProvider {
     async accountTxsDetailed(
         idOrAddress: number | Address,
         paginationQuery: PaginationQuery<string>
-    ): Promise<Response<Paginated<ApiTransaction, AccountTxsRequest>>> {
+    ): Promise<Response<Paginated<ApiTransaction, string>>> {
         return await this.get(
             `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -149,14 +146,14 @@ export class RestProvider extends SyncProvider {
     async accountTxs(
         idOrAddress: number | Address,
         paginationQuery: PaginationQuery<string>
-    ): Promise<Paginated<ApiTransaction, AccountTxsRequest>> {
+    ): Promise<Paginated<ApiTransaction, string>> {
         return this.parseResponse(await this.accountTxsDetailed(idOrAddress, paginationQuery));
     }
 
     async accountPendingTxsDetailed(
         idOrAddress: number | Address,
         paginationQuery: PaginationQuery<number>
-    ): Promise<Response<Paginated<ApiTransaction, PendingOpsRequest>>> {
+    ): Promise<Response<Paginated<ApiTransaction, number>>> {
         return await this.get(
             `${this.address}/accounts/${idOrAddress}/transactions/pending?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -166,7 +163,7 @@ export class RestProvider extends SyncProvider {
     async accountPendingTxs(
         idOrAddress: number | Address,
         paginationQuery: PaginationQuery<number>
-    ): Promise<Paginated<ApiTransaction, PendingOpsRequest>> {
+    ): Promise<Paginated<ApiTransaction, number>> {
         return this.parseResponse(await this.accountPendingTxsDetailed(idOrAddress, paginationQuery));
     }
 
@@ -196,7 +193,7 @@ export class RestProvider extends SyncProvider {
     async blockTransactionsDetailed(
         blockPosition: number | 'lastCommitted' | 'lastFinalized',
         paginationQuery: PaginationQuery<string>
-    ): Promise<Response<Paginated<ApiTransaction, BlockAndTxHash>>> {
+    ): Promise<Response<Paginated<ApiTransaction, string>>> {
         return await this.get(
             `${this.address}/blocks/${blockPosition}/transactions?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -206,7 +203,7 @@ export class RestProvider extends SyncProvider {
     async blockTransactions(
         blockPosition: number | 'lastCommitted' | 'lastFinalized',
         paginationQuery: PaginationQuery<string>
-    ): Promise<Paginated<ApiTransaction, BlockAndTxHash>> {
+    ): Promise<Paginated<ApiTransaction, string>> {
         return this.parseResponse(await this.blockTransactionsDetailed(blockPosition, paginationQuery));
     }
 

@@ -243,9 +243,9 @@ async fn account_txs(
     web::Path(account_id_or_address): web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
-    let query = api_try!(
-        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
-    );
+    let query =
+        api_try!(parse_query(query)
+            .ok_or_else(|| Error::from(InvalidDataError::QueryDeserializationError)));
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(data.get_address_by_address_or_id(address_or_id).await);
     data.account_txs(query, address).await.into()
@@ -256,9 +256,9 @@ async fn account_pending_txs(
     web::Path(account_id_or_address): web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, SerialId>> {
-    let query = api_try!(
-        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
-    );
+    let query =
+        api_try!(parse_query(query)
+            .ok_or_else(|| Error::from(InvalidDataError::QueryDeserializationError)));
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(
         data.get_address_by_address_or_id(address_or_id.clone())
@@ -325,14 +325,10 @@ mod tests {
         Arc::new(Mutex::new(json!({
             "list": [],
             "pagination": {
-                "from": {
-                    "address": Address::default(),
-                    "accountId": AccountId::default(),
-                    "serialId": 1
-                },
+                "from": 1,
                 "limit": 1,
                 "direction": "newer",
-                "count": 0,
+                "count": 0
             }
         })))
     }
@@ -341,7 +337,7 @@ mod tests {
     struct PendingOpsFlattenRequest {
         pub address: Address,
         pub account_id: Option<AccountId>,
-        pub serial_id: u64,
+        pub serial_id: String,
         pub limit: u32,
         pub direction: PaginationDirection,
     }
@@ -437,7 +433,6 @@ mod tests {
     )]
     async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
         let (client, server) = get_unconfirmed_ops_loopback(create_pending_ops_handle());
-
         client
             .get_unconfirmed_ops(&PaginationQuery {
                 from: PendingOpsRequest {
@@ -509,14 +504,10 @@ mod tests {
                     "status": "queued",
                     "failReason": Option::<String>::None,
                     "createdAt": Utc::now()
-                },
+                }
             ],
             "pagination": {
-                "from": {
-                    "serialId": 1,
-                    "address": address,
-                    "accountId": account_id
-                },
+                "from": 1,
                 "limit": 1,
                 "count": 1,
                 "direction": "newer"
@@ -531,7 +522,7 @@ mod tests {
         let response = client
             .account_pending_txs(&query, &account_id.to_string())
             .await?;
-        let txs: Paginated<Transaction, PendingOpsRequest> = deserialize_response_result(response)?;
+        let txs: Paginated<Transaction, SerialId> = deserialize_response_result(response)?;
         match &txs.list[0].op {
             TransactionData::L1(tx) => match tx {
                 L1Transaction::Deposit(deposit) => {

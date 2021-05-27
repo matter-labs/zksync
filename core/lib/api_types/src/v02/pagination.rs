@@ -23,19 +23,25 @@ pub enum IdOrLatest<Id> {
     Latest(Latest),
 }
 
+pub fn parse_from<T: DeserializeOwned>(value: &str) -> Option<IdOrLatest<T>> {
+    match value {
+        "latest" => Some(IdOrLatest::Latest(Latest::Latest)),
+        _ => {
+            if let Ok(id) = serde_json::from_str(value) {
+                Some(IdOrLatest::Id(id))
+            } else if let Ok(id) = serde_json::from_str(&format!("\"{}\"", value)) {
+                Some(IdOrLatest::Id(id))
+            } else {
+                None
+            }
+        }
+    }
+}
+
 pub fn parse_query<T: DeserializeOwned>(
     query: PaginationQuery<String>,
 ) -> Option<PaginationQuery<IdOrLatest<T>>> {
-    let from = match query.from.as_str() {
-        "latest" => IdOrLatest::Latest(Latest::Latest),
-        _ => {
-            if let Ok(id) = serde_json::from_str(&query.from) {
-                IdOrLatest::Id(id)
-            } else {
-                return None;
-            }
-        }
-    };
+    let from = parse_from(&query.from)?;
     Some(PaginationQuery {
         from,
         limit: query.limit,

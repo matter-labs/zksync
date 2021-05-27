@@ -573,7 +573,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn v02_test_transaction_scope() -> anyhow::Result<()> {
+    async fn transactions_scope() -> anyhow::Result<()> {
         let (core_client, core_server) = submit_txs_loopback();
 
         let cfg = TestServerConfig::default();

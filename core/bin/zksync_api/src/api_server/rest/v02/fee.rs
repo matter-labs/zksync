@@ -82,7 +82,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn v02_test_fee_scope() -> anyhow::Result<()> {
+    async fn fee_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
 
         let shared_data = SharedData {

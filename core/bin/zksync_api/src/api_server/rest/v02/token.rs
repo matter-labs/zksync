@@ -193,9 +193,9 @@ async fn token_pagination(
     data: web::Data<ApiTokenData>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<ApiToken, TokenId>> {
-    let query = api_try!(
-        parse_query(query).ok_or(Error::from(InvalidDataError::QueryDeserializationError))
-    );
+    let query =
+        api_try!(parse_query(query)
+            .ok_or_else(|| Error::from(InvalidDataError::QueryDeserializationError)));
     data.token_page(query).await.into()
 }
 
@@ -298,7 +298,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn v02_test_token_scope() -> anyhow::Result<()> {
+    async fn tokens_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 

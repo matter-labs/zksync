@@ -243,7 +243,7 @@ export interface BatchFee {
 }
 
 export interface PaginationQuery<F> {
-    from: F;
+    from: F | 'latest';
     limit: number;
     direction: 'newer' | 'older';
 }
@@ -418,20 +418,4 @@ export interface ApiBatchData {
     transactionHashes: string[];
     createdAt: string;
     batchStatus: ApiBatchStatus;
-}
-
-export interface BlockAndTxHash {
-    blockNumber: number;
-    txHash: string;
-}
-
-export interface PendingOpsRequest {
-    address: Address;
-    accountId?: number;
-    serialId: number;
-}
-
-export interface AccountTxsRequest {
-    address: Address;
-    txHash: string;
 }
