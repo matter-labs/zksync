@@ -7,7 +7,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    Token, TokenId, TokenInfo, NewTokenEvent,
+    NewTokenEvent, Token, TokenId, TokenInfo,
     {block::Block, AccountUpdate, AccountUpdates},
 };
 
