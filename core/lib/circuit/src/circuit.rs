@@ -41,7 +41,7 @@ use crate::{
     utils::{
         allocate_numbers_vec, allocate_sum, boolean_or, calculate_empty_account_tree_hashes,
         calculate_empty_balance_tree_hashes, multi_and, pack_bits_to_element_strict,
-        resize_grow_only, sequences_equal, vectorized_compare,
+        resize_grow_only, sequences_equal, u8_into_bits_be, vectorized_compare,
     },
 };
 
@@ -1120,6 +1120,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &signer_key,
                 is_special_nft_storage_account,
                 is_special_nft_token,
+                &is_fungible_token,
             )?,
             self.noop(
                 cs.namespace(|| "noop"),
@@ -1853,6 +1854,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         signer_key: &AllocatedSignerPubkey<E>,
         _is_special_nft_storage_account: &Boolean,
         is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -1878,8 +1880,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         // Construct serialized tx
         let mut serialized_tx_bits = vec![];
-
-        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(reversed_tx_type_bits_be(ChangePubKeyOp::OP_CODE));
+        serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
         serialized_tx_bits.extend(cur.account_id.get_bits_be());
         serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
@@ -1888,26 +1890,41 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
         serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
         serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-
         assert_eq!(
             serialized_tx_bits.len(),
             params::SIGNED_CHANGE_PUBKEY_BIT_WIDTH
         );
 
         // Construct serialized tx
-        let mut serialized_tx_bits_old = vec![];
-
-        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account_id.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.new_pubkey_hash.get_bits_be());
-        serialized_tx_bits_old.extend(cur.token.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
-
+        let mut serialized_tx_bits_old1 = vec![];
+        serialized_tx_bits_old1.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.new_pubkey_hash.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old1.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account.nonce.get_bits_be());
         assert_eq!(
-            serialized_tx_bits_old.len(),
-            params::OLD_SIGNED_CHANGE_PUBKEY_BIT_WIDTH
+            serialized_tx_bits_old1.len(),
+            params::OLD1_SIGNED_CHANGE_PUBKEY_BIT_WIDTH
+        );
+
+        // Construct serialized tx
+        let mut serialized_tx_bits_old2 = vec![];
+        serialized_tx_bits_old2.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.new_pubkey_hash.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old2.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old2.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old2.len(),
+            params::OLD2_SIGNED_CHANGE_PUBKEY_BIT_WIDTH
         );
 
         let is_new_serialized_tx_correct = verify_signature_message_construction(
@@ -1915,15 +1932,34 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             serialized_tx_bits,
             &op_data,
         )?;
-        let is_old_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_old_serialized_tx_correct"),
-            serialized_tx_bits_old,
+
+        let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old1_serialized_tx_correct"),
+            serialized_tx_bits_old1,
             &op_data,
+        )?;
+        is_old1_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
+            &[is_old1_serialized_tx_correct, is_fungible_token.clone()],
+        )?;
+
+        let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old2_serialized_tx_correct"),
+            serialized_tx_bits_old2,
+            &op_data,
+        )?;
+        is_old2_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
+            &[is_old2_serialized_tx_correct, is_fungible_token.clone()],
         )?;
 
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
+            &[
+                is_new_serialized_tx_correct,
+                is_old1_serialized_tx_correct,
+                is_old2_serialized_tx_correct,
+            ],
         )?;
 
         let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
@@ -4751,4 +4787,11 @@ fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSyst
     let len_bits = (E::Fr::CAPACITY / 8 * 8) as usize;
 
     Ok(output_bits_le[..len_bits].to_vec())
+}
+
+fn reversed_tx_type_bits_be(tx_type: u8) -> Vec<Boolean> {
+    let reversed_tx_type = 255 - tx_type;
+    assert!(reversed_tx_type > tx_type);
+
+    u8_into_bits_be(reversed_tx_type)
 }

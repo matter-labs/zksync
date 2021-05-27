@@ -113,6 +113,8 @@ pub const LEGACY_TOKEN_BIT_WIDTH: usize = 16;
 pub const TOKEN_BIT_WIDTH: usize = 32;
 pub const TX_TYPE_BIT_WIDTH: usize = 8;
 
+pub const TX_VERSION_FOR_SIGNATURE_BIT_WIDTH: usize = 8;
+
 /// Account subtree hash width
 pub const SUBTREE_HASH_WIDTH: usize = 254; //seems to be equal to Bn256::NUM_BITS could be replaced
 pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
@@ -252,6 +254,7 @@ pub const SIGNED_WITHDRAW_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 
 /// Size of the data that is signed for change pubkey tx
 pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + NEW_PUBKEY_HASH_WIDTH
@@ -261,15 +264,26 @@ pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
-/// Size of the data that is signed for change pubkey tx, without timestamps
-pub const OLD_SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+/// Size of the data that is signed for change pubkey tx, without timestamps, and with 2-byte token representation
+pub const OLD1_SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + NEW_PUBKEY_HASH_WIDTH
-    + TOKEN_BIT_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
+
+/// Size of the data that is signed for change pubkey tx, with timestamps, but with 2-byte token representation
+pub const OLD2_SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + ADDRESS_WIDTH
+    + NEW_PUBKEY_HASH_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Number of inputs in the basic circuit that is aggregated by recursive circuit
 pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
