@@ -177,6 +177,7 @@ pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 
 /// Size of the data that is signed for withdraw tx
 pub const SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
     + TOKEN_BIT_WIDTH
@@ -186,18 +187,30 @@ pub const SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
-/// Size of the data that is signed for withdraw tx without timestamps
-pub const OLD_SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+/// Size of the data that is signed for withdraw tx, without timestamps, and with 2-byte token representation
+pub const OLD1_SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
-    + TOKEN_BIT_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
     + BALANCE_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
+
+/// Size of the data that is signed for withdraw tx, with timestamps, but with 2-byte token representation
+pub const OLD2_SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
+    + BALANCE_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Size of the data that is signed for transfer tx
 pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
     + TOKEN_BIT_WIDTH
@@ -208,16 +221,28 @@ pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
-/// Size of the data that is signed for transfer tx without timestamps
-pub const OLD_SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+/// Size of the data that is signed for transfer tx, without timestamps, and with 2-byte token representation
+pub const OLD1_SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
-    + TOKEN_BIT_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
     + AMOUNT_EXPONENT_BIT_WIDTH
     + AMOUNT_MANTISSA_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
+
+/// Size of the data that is signed for transfer tx, with timestamps, but with 2-byte token representation
+pub const OLD2_SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
+    + AMOUNT_EXPONENT_BIT_WIDTH
+    + AMOUNT_MANTISSA_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Size of the data that is signed for forced exit tx
 pub const SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
@@ -254,6 +279,7 @@ pub const SIGNED_MINT_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 
 /// Size of the data that is signed for withdraw nft tx
 pub const SIGNED_WITHDRAW_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + ADDRESS_WIDTH
