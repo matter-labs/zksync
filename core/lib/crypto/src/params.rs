@@ -242,6 +242,7 @@ pub const OLD_SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 
 /// Size of the data that is signed for mint nft tx
 pub const SIGNED_MINT_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + CONTENT_HASH_WIDTH

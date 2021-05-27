@@ -2296,7 +2296,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
 
             let mut serialized_tx_bits = vec![];
-            serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type
+            serialized_tx_bits.extend(reversed_tx_type_bits_be(MintNFTOp::OP_CODE)); // reversed_tx_type
+            serialized_tx_bits.extend(u8_into_bits_be(params::CURRENT_TX_VERSION)); // signature scheme identification
             serialized_tx_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_id
             serialized_tx_bits.extend(cur.account.address.get_bits_be()); // creator_address
             serialized_tx_bits.extend(
