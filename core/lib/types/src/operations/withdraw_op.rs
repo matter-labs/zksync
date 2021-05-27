@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use zksync_crypto::{
     params::{
         ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, LEGACY_CHUNK_BYTES, LEGACY_TOKEN_BIT_WIDTH,
+        TOKEN_BIT_WIDTH,
     },
     primitives::FromBytes,
 };
@@ -46,13 +47,25 @@ impl WithdrawOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, WithdrawOpError> {
-        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+        Self::parse_pub_data(bytes, TOKEN_BIT_WIDTH, CHUNK_BYTES)
+    }
+
+    pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, WithdrawOpError> {
+        Self::parse_pub_data(bytes, LEGACY_TOKEN_BIT_WIDTH, LEGACY_CHUNK_BYTES)
+    }
+
+    fn parse_pub_data(
+        bytes: &[u8],
+        token_bit_width: usize,
+        chunk_bytes: usize,
+    ) -> Result<Self, WithdrawOpError> {
+        if bytes.len() != Self::CHUNKS * chunk_bytes {
             return Err(WithdrawOpError::PubdataSizeMismatch);
         }
 
         let account_offset = 1;
         let token_id_offset = account_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let amount_offset = token_id_offset + TOKEN_BIT_WIDTH / 8;
+        let amount_offset = token_id_offset + token_bit_width / 8;
         let fee_offset = amount_offset + BALANCE_BIT_WIDTH / 8;
         let eth_address_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
@@ -60,7 +73,7 @@ impl WithdrawOp {
             u32::from_bytes(&bytes[account_offset..account_offset + ACCOUNT_ID_BIT_WIDTH / 8])
                 .ok_or(WithdrawOpError::CannotGetAccountId)?;
         let from = Address::zero(); // From pubdata it is unknown
-        let token = u32::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+        let token = u32::from_bytes(&bytes[token_id_offset..token_id_offset + token_bit_width / 8])
             .ok_or(WithdrawOpError::CannotGetTokenId)?;
         let to = Address::from_slice(
             &bytes[eth_address_offset..eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8],

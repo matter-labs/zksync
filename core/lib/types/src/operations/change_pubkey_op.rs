@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use zksync_crypto::{
     params::{
         ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, FEE_EXPONENT_BIT_WIDTH,
-        FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
+        FEE_MANTISSA_BIT_WIDTH, LEGACY_TOKEN_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
+        TOKEN_BIT_WIDTH,
     },
     primitives::FromBytes,
 };
@@ -49,12 +50,20 @@ impl ChangePubKeyOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, ChangePubkeyOpError> {
+        Self::parse_pub_data(bytes, TOKEN_BIT_WIDTH)
+    }
+
+    pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, ChangePubkeyOpError> {
+        Self::parse_pub_data(bytes, LEGACY_TOKEN_BIT_WIDTH)
+    }
+
+    fn parse_pub_data(bytes: &[u8], token_bit_width: usize) -> Result<Self, ChangePubkeyOpError> {
         let account_id_offset = 1;
         let pk_hash_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let account_offset = pk_hash_offset + NEW_PUBKEY_HASH_WIDTH / 8;
         let nonce_offset = account_offset + ADDRESS_WIDTH / 8;
         let fee_token_offset = nonce_offset + NONCE_BIT_WIDTH / 8;
-        let fee_offset = fee_token_offset + TOKEN_BIT_WIDTH / 8;
+        let fee_offset = fee_token_offset + token_bit_width / 8;
         let end = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
         if bytes.len() < end {
