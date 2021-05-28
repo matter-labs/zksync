@@ -98,10 +98,8 @@ fn test_withdraw_old_signature() {
             Default::default(),
             None,
         );
-        tx.signature = TxSignature::sign_musig(
-            &account.zksync_account.private_key,
-            &tx.get_old_bytes().expect("get_old_bytes fails"),
-        );
+        tx.signature =
+            TxSignature::sign_musig(&account.zksync_account.private_key, &tx.get_old_bytes());
         let withdraw_op = WithdrawOp {
             tx,
             account_id: account.id,
@@ -115,7 +113,7 @@ fn test_withdraw_old_signature() {
             .expect("signature serialize");
         let input = SigDataInput::new(
             &sign_packed,
-            &withdraw_op.tx.get_old_bytes().expect("get_old_bytes fails"),
+            &withdraw_op.tx.get_old_bytes(),
             &withdraw_op.tx.signature.pub_key,
         )
         .expect("input constructing fails");

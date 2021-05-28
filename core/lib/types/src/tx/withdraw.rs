@@ -19,7 +19,6 @@ use crate::{
 };
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
-use crate::tx::error::GetOldBytesError;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,9 +120,9 @@ impl Withdraw {
     }
 
     /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
-    pub fn get_old_bytes(&self) -> Result<Vec<u8>, GetOldBytesError> {
+    pub fn get_old_bytes(&self) -> Vec<u8> {
         if self.token.0 >= MIN_NFT_TOKEN_ID {
-            return Err(GetOldBytesError::TokenIdNotSupported);
+            return vec![];
         }
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
@@ -137,7 +136,7 @@ impl Withdraw {
         if let Some(time_range) = &self.time_range {
             out.extend_from_slice(&time_range.to_be_bytes());
         }
-        Ok(out)
+        out
     }
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
@@ -201,11 +200,7 @@ impl Withdraw {
             if self.token.0 < MIN_NFT_TOKEN_ID {
                 if let Some(res) = self
                     .signature
-                    .verify_musig(
-                        &self
-                            .get_old_bytes()
-                            .expect("We have checked this invariant earlier"),
-                    )
+                    .verify_musig(&self.get_old_bytes())
                     .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
                 {
                     return Some(res);

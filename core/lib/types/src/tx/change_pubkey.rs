@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
     AccountId, Nonce, TxFeeTypes,
@@ -263,7 +261,7 @@ impl ChangePubKey {
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
-        out.extend_from_slice(&(u16::try_from(self.fee_token.0).unwrap()).to_be_bytes());
+        out.extend_from_slice(&(self.fee_token.0 as u16).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         if let Some(time_range) = &self.time_range {
