@@ -5,7 +5,7 @@
 key_dir="keys/contracts-6"
 # Actual supported block chunks sizes by verifier contract (determined by circuit size on setup boundaries)
 # and setup power needed to proof block of this size
-supported_block_chunks_sizes=[26,78,184,392]
+supported_block_chunks_sizes=[26,78,182,390]
 supported_block_chunks_sizes_setup_powers=[23,24,25,26]
 # Actual
 supported_aggregated_proof_sizes=[1,4]
