@@ -9,7 +9,12 @@ async function main() {
         return;
     }
     const addresses = deployedAddressesFromEnv();
-    for (const address of [addresses.ZkSyncTarget, addresses.VerifierTarget, addresses.GovernanceTarget]) {
+    for (const address of [
+        addresses.ZkSyncTarget,
+        addresses.VerifierTarget,
+        addresses.GovernanceTarget,
+        addresses.AdditionalZkSync
+    ]) {
         try {
             await hre.run('verify:verify', { address });
         } catch (e) {
