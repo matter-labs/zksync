@@ -6,7 +6,7 @@ use web3::types::Address;
 use zksync_types::block::Block;
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
-    NewTokenEvent, Operation, Token, TokenId, TokenInfo, NFT,
+    NewTokenEvent, Operation, Token, TokenId, TokenInfo,
 };
 
 use crate::{
@@ -247,19 +247,19 @@ impl InMemoryStorageInteractor {
                     account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = *new_pub_key_hash;
                 }
-                AccountUpdate::MintNFT { token: NFT } => {
+                AccountUpdate::MintNFT { ref token } => {
                     self.tokens.insert(
                         token.id,
                         Token {
                             id: token.id,
                             address: token.address,
-                            symbol: token.symbol,
+                            symbol: token.symbol.clone(),
                             decimals: 0,
                             is_nft: true,
                         },
                     );
                 }
-                AccountUpdate::RemoveNFT { token: NFT } => {
+                AccountUpdate::RemoveNFT { ref token } => {
                     self.tokens.remove(&token.id);
                 }
             }

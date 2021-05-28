@@ -193,9 +193,8 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
             let try_insert_token = TokensSchema(&mut transaction).store_token(token).await;
 
-            match try_insert_token {
-                Err(StoreTokenError::Other(anyhow_err)) => return Err(anyhow_err),
-                _ => (),
+            if let Err(StoreTokenError::Other(anyhow_err)) = try_insert_token {
+                return Err(anyhow_err);
             }
         }
 
