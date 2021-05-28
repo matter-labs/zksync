@@ -93,7 +93,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
     step('should execute a getNFT', async () => {
         await tester.testGetNFT(alice, token);
-    }).timeout(5000);
+    }).timeout(500000);
 
     step('should execute a transfer to existing account', async () => {
         if (onlyBasic) {
