@@ -5,12 +5,14 @@ use zksync_state::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, TransferOutcome, ZkSyncState},
 };
-use zksync_types::account::Account;
 use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use zksync_types::operations::ZkSyncOp;
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::priority_ops::ZkSyncPriorityOp;
-use zksync_types::tx::{ChangePubKey, Close, ForcedExit, Swap, Transfer, Withdraw, ZkSyncTx};
+use zksync_types::tx::{
+    ChangePubKey, Close, ForcedExit, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx,
+};
+use zksync_types::{account::Account, MintNFT};
 use zksync_types::{AccountId, AccountMap, AccountUpdates, Address, BlockNumber, H256};
 
 /// Rollup accounts states
@@ -290,16 +292,26 @@ impl TreeState {
                         .ok_or_else(|| format_err!("Swap Fail: Nonexistent account"))?;
                     let account_0 = self
                         .state
-                        .get_account(op.submitter)
+                        .get_account(op.accounts.0)
                         .ok_or_else(|| format_err!("Swap Fail: Nonexistent account"))?;
                     let account_1 = self
                         .state
-                        .get_account(op.submitter)
+                        .get_account(op.accounts.1)
+                        .ok_or_else(|| format_err!("Swap Fail: Nonexistent account"))?;
+                    let recipient_0 = self
+                        .state
+                        .get_account(op.recipients.0)
+                        .ok_or_else(|| format_err!("Swap Fail: Nonexistent account"))?;
+                    let recipient_1 = self
+                        .state
+                        .get_account(op.recipients.1)
                         .ok_or_else(|| format_err!("Swap Fail: Nonexistent account"))?;
 
                     op.tx.submitter_address = submitter.address;
                     op.tx.orders.0.nonce = account_0.nonce;
+                    op.tx.orders.0.recipient_address = recipient_0.address;
                     op.tx.orders.1.nonce = account_1.nonce;
+                    op.tx.orders.1.recipient_address = recipient_1.address;
                     op.tx.nonce = submitter.nonce;
 
                     let tx = ZkSyncTx::Swap(Box::new(op.tx.clone()));
@@ -320,15 +332,64 @@ impl TreeState {
                         &mut ops,
                     );
                 }
+                ZkSyncOp::MintNFTOp(mut op) => {
+                    let creator = self
+                        .state
+                        .get_account(op.creator_account_id)
+                        .ok_or_else(|| format_err!("MintNFT Fail: Nonexistent creator account"))?;
+                    let recipient = self
+                        .state
+                        .get_account(op.recipient_account_id)
+                        .ok_or_else(|| format_err!("MintNFT Fail: Nonexistent recipient"))?;
+                    op.tx.creator_address = creator.address;
+                    op.tx.recipient = recipient.address;
+                    op.tx.nonce = creator.nonce;
+
+                    let tx = ZkSyncTx::MintNFT(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<MintNFT>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("MintNFT failed: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: ZkSyncOp::MintNFTOp(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                ZkSyncOp::WithdrawNFT(mut op) => {
+                    let account = self
+                        .state
+                        .get_account(op.tx.account_id)
+                        .ok_or_else(|| format_err!("WithdrawNFT fail: Nonexistent account"))?;
+                    op.tx.from = account.address;
+                    op.tx.nonce = account.nonce;
+
+                    let tx = ZkSyncTx::WithdrawNFT(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<WithdrawNFT>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("WithdrawNFT fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: ZkSyncOp::WithdrawNFT(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
                 ZkSyncOp::Noop(_) => {}
-                ZkSyncOp::MintNFTOp(_) => {
-                    todo!()
-                    // Implement data restorer for Minting NFT (ZKS-657)
-                }
-                ZkSyncOp::WithdrawNFT(_) => {
-                    todo!()
-                    // Implement data restorer for Minting NFT (ZKS-657)
-                }
             }
         }
 

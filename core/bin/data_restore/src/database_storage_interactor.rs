@@ -7,7 +7,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    NewTokenEvent, Token, TokenId, TokenInfo,
+    AccountId, NewTokenEvent, Token, TokenId, TokenInfo,
     {block::Block, AccountUpdate, AccountUpdates},
 };
 
@@ -159,7 +159,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .expect("Cant update events state");
     }
 
-    async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate) {
+    async fn save_genesis_tree_state(&mut self, genesis_updates: &[(AccountId, AccountUpdate)]) {
         let (_last_committed, mut _accounts) = self
             .storage
             .chain()
@@ -173,9 +173,17 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
         );
         self.storage
             .data_restore_schema()
-            .save_genesis_state(genesis_acc_update)
+            .save_genesis_state(genesis_updates)
             .await
             .expect("Cant update genesis state");
+    }
+
+    async fn save_special_token(&mut self, token: Token) {
+        self.storage
+            .tokens_schema()
+            .store_token(token)
+            .await
+            .expect("failed to store special token");
     }
 
     async fn get_block_events_state_from_storage(&mut self) -> EventsState {

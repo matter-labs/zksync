@@ -6,9 +6,12 @@ use web3::{
 };
 // Workspace deps
 use zksync_contracts::governance_contract;
-use zksync_crypto::Fr;
+use zksync_crypto::{
+    params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
+    Fr,
+};
+use zksync_types::{Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Token};
 
-use zksync_types::{AccountId, AccountMap, AccountUpdate, BlockNumber};
 // Local deps
 use crate::{
     contract::{get_genesis_account, ZkSyncDeployedContract},
@@ -166,13 +169,47 @@ where
             hex::encode(genesis_fee_account.address.as_ref())
         );
 
-        let account_update = AccountUpdate::Create {
-            address: genesis_fee_account.address,
-            nonce: genesis_fee_account.nonce,
-        };
+        interactor
+            .save_special_token(Token {
+                id: NFT_TOKEN_ID,
+                symbol: "SPECIAL".to_string(),
+                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
+                decimals: 18,
+                is_nft: true,
+            })
+            .await;
+        vlog::info!("Special token added");
 
+        let mut account_updates = Vec::with_capacity(3);
         let mut account_map = AccountMap::default();
+
+        account_updates.push((
+            AccountId(0),
+            AccountUpdate::Create {
+                address: genesis_fee_account.address,
+                nonce: genesis_fee_account.nonce,
+            },
+        ));
         account_map.insert(AccountId(0), genesis_fee_account);
+
+        let (mut special_account, special_account_create) =
+            Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
+        special_account.set_balance(NFT_TOKEN_ID, num::BigUint::from(MIN_NFT_TOKEN_ID));
+
+        account_updates.push(special_account_create[0].clone());
+        account_updates.push((
+            NFT_STORAGE_ACCOUNT_ID,
+            AccountUpdate::UpdateBalance {
+                old_nonce: special_account.nonce,
+                new_nonce: special_account.nonce,
+                balance_update: (
+                    NFT_TOKEN_ID,
+                    num::BigUint::from(0u64),
+                    num::BigUint::from(MIN_NFT_TOKEN_ID),
+                ),
+            },
+        ));
+        account_map.insert(NFT_STORAGE_ACCOUNT_ID, special_account);
 
         let current_block = BlockNumber(0);
         let current_unprocessed_priority_op = 0;
@@ -188,7 +225,7 @@ where
         vlog::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         vlog::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
-        interactor.save_genesis_tree_state(account_update).await;
+        interactor.save_genesis_tree_state(&account_updates).await;
 
         vlog::info!("Saved genesis tree state\n");
 

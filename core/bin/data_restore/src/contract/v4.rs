@@ -1,9 +1,7 @@
 use ethabi::{ParamType, Token};
 
-use crate::{
-    contract::default::{get_rollup_ops_from_data, get_rollup_ops_from_legacy_data},
-    rollup_ops::RollupOpsBlock,
-};
+use super::version::ZkSyncContractVersion;
+use crate::rollup_ops::RollupOpsBlock;
 use zksync_types::{AccountId, BlockNumber, H256};
 
 fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token>> {
@@ -39,13 +37,18 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
 }
 
 pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupOpsBlock>> {
-    rollup_ops_blocks_from_bytes_inner(data, true)
+    rollup_ops_blocks_from_bytes_inner(data, ZkSyncContractVersion::V4)
 }
 
-fn rollup_ops_blocks_from_bytes_inner(
+pub(super) fn rollup_ops_blocks_from_bytes_inner(
     data: Vec<u8>,
-    is_legacy: bool,
+    contract_version: ZkSyncContractVersion,
 ) -> anyhow::Result<Vec<RollupOpsBlock>> {
+    assert!(
+        i32::from(contract_version) >= 4,
+        "Contract version must be greater or equal to 4"
+    );
+
     let root_hash_argument_id = 0;
     let public_data_argument_id = 1;
     let timestamp_argument_id = 2;
@@ -94,10 +97,7 @@ fn rollup_ops_blocks_from_bytes_inner(
                     &operation[op_block_number_argument_id],
                     &operation[timestamp_argument_id],
                 ) {
-                    let ops = match is_legacy {
-                        true => get_rollup_ops_from_legacy_data(public_data.as_slice())?,
-                        false => get_rollup_ops_from_data(public_data.as_slice())?,
-                    };
+                    let ops = contract_version.get_rollup_ops_from_data(public_data.as_slice())?;
                     blocks.push(RollupOpsBlock {
                         block_num: BlockNumber(block_number.as_u32()),
                         ops,
@@ -131,7 +131,6 @@ fn rollup_ops_blocks_from_bytes_inner(
 mod test {
     use super::*;
     #[test]
-    // TODO Update input data, we need to use 4 bytes for token instead of 2 (ZKS-657)
     fn test_decode_commitment() {
         let input_data = hex::decode(
             "45269298000000000000000000000000000000000000000000\

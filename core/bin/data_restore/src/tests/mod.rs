@@ -446,8 +446,6 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 }
 
 #[tokio::test]
-#[ignore]
-// Fix FullExit (ZKS-657)
 async fn test_with_inmemory_storage() {
     let contract_addr = H160::from([1u8; 20]);
     // Start with V3, upgrade it after a couple of blocks to V4.
