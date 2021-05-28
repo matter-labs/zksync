@@ -15,7 +15,7 @@ use web3::{
 };
 
 use db_test_macro::test as db_test;
-use zksync_contracts::{governance_contract, upgrade_gatekeeper, zksync_contract};
+use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_crypto::Fr;
 use zksync_storage::{
     chain::account::AccountSchema, data_restore::DataRestoreSchema, StorageProcessor,
@@ -281,7 +281,8 @@ impl Transport for Web3Transport {
 #[db_test]
 async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let contract_addr = H160::from([1u8; 20]);
-    let upgrade_gatekeeper_addr = H160::from([2u8; 20]);
+    // No contract upgrades.
+    let contract_upgrade_eth_blocks = Vec::new();
     // Use old contract version.
     let init_contract_version: u32 = 3;
 
@@ -394,7 +395,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let mut driver = DataRestoreDriver::new(
         Web3::new(transport.clone()),
         contract_addr,
-        upgrade_gatekeeper_addr,
+        contract_upgrade_eth_blocks.clone(),
         init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
@@ -429,7 +430,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let mut driver = DataRestoreDriver::new(
         Web3::new(transport.clone()),
         contract_addr,
-        upgrade_gatekeeper_addr,
+        contract_upgrade_eth_blocks,
         init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
@@ -449,16 +450,15 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 // Fix FullExit (ZKS-657)
 async fn test_with_inmemory_storage() {
     let contract_addr = H160::from([1u8; 20]);
-    let upgrade_gatekeeper_addr = H160::from([2u8; 20]);
     // Start with V3, upgrade it after a couple of blocks to V4.
     let init_contract_version: u32 = 3;
+    let contract_upgrade_eth_blocks = vec![3];
 
     let mut transport = Web3Transport::new();
 
     let mut interactor = InMemoryStorageInteractor::new();
     let contract = zksync_contract();
     let gov_contract = governance_contract();
-    let upgrade_gatekeeper = upgrade_gatekeeper();
 
     let block_verified_topic = contract
         .event("BlockVerification")
@@ -502,23 +502,6 @@ async fn test_with_inmemory_storage() {
                 u32_to_32bytes(3).into(),
             ),
         ],
-    );
-    // Save the event about finished upgrade in Eth block number 3.
-    // Additional topics and data don't matter.
-    let upgrade_complete_topic = upgrade_gatekeeper
-        .event("UpgradeComplete")
-        .expect("Upgrade gatekeeper abi error")
-        .signature();
-    transport.insert_logs(
-        format!("{:?}", upgrade_complete_topic),
-        vec![create_log(
-            upgrade_gatekeeper_addr,
-            upgrade_complete_topic,
-            Vec::new(),
-            Bytes(Vec::new()),
-            3,
-            H256::zero(),
-        )],
     );
 
     let block_committed_topic = contract
@@ -637,7 +620,7 @@ async fn test_with_inmemory_storage() {
     let mut driver = DataRestoreDriver::new(
         web3.clone(),
         contract_addr,
-        upgrade_gatekeeper_addr,
+        contract_upgrade_eth_blocks.clone(),
         init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
@@ -665,7 +648,7 @@ async fn test_with_inmemory_storage() {
     let mut driver = DataRestoreDriver::new(
         web3.clone(),
         contract_addr,
-        upgrade_gatekeeper_addr,
+        contract_upgrade_eth_blocks,
         init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,

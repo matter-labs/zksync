@@ -19,6 +19,7 @@ pub struct ContractsConfig {
     pub forced_exit_addr: Address,
     pub genesis_tx_hash: H256,
     pub init_contract_version: u32,
+    pub upgrade_eth_blocks: Vec<u64>,
 }
 
 impl ContractsConfig {
@@ -47,6 +48,7 @@ mod tests {
                 "b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e",
             ),
             init_contract_version: 4,
+            upgrade_eth_blocks: vec![1, 4294967296, 1152921504606846976],
         }
     }
 
@@ -64,6 +66,7 @@ CONTRACTS_DEPLOY_FACTORY_ADDR="0xFC073319977e314F251EAE6ae6bE76B0B3BAeeCF"
 CONTRACTS_FORCED_EXIT_ADDR="0x9c7AeE886D6FcFc14e37784f143a6dAccEf50Db7"
 CONTRACTS_GENESIS_TX_HASH="0xb99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e"
 CONTRACTS_INIT_CONTRACT_VERSION=4
+CONTRACTS_UPGRADE_ETH_BLOCKS="1,4294967296,1152921504606846976"
         "#;
         set_env(config);
 

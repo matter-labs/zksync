@@ -4,5 +4,10 @@
     "upgrade_gatekeeper_addr": "0xd538fC97dDbfE6719f0E7EfA3948A38e3A2c6504",
     "genesis_tx_hash": "0x043a7662b0c747169d3700ea2ca9328e05f235a93223962d41eed7825d4aaf52",
     "contract_addr": "0x82F67958A5474e40E1485742d648C0b0686b6e5D",
-    "init_contract_version": 1
+    "init_contract_version": 1,
+    "upgrade_eth_blocks": [
+        7294659,
+        7754465,
+        8021450
+    ]
 }
