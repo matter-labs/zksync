@@ -137,11 +137,17 @@ impl Transfer {
         }
         out
     }
+
+    pub fn is_backwards_compatible(&self) -> bool {
+        return self.token.0 < MIN_NFT_TOKEN_ID;
+    }
+
     /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
     pub fn get_old_bytes(&self) -> Vec<u8> {
-        if self.token.0 >= MIN_NFT_TOKEN_ID {
+        if !self.is_backwards_compatible() {
             return vec![];
         }
+
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account_id.to_be_bytes());

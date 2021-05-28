@@ -165,6 +165,17 @@ impl ZkSyncTx {
         }
     }
 
+    pub fn is_backwards_compatible(&self) -> bool {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.is_backwards_compatible(),
+            ZkSyncTx::Withdraw(tx) => tx.is_backwards_compatible(),
+            ZkSyncTx::Close(_) => true,
+            ZkSyncTx::ChangePubKey(_) => true,
+            ZkSyncTx::ForcedExit(_) => true,
+            _ => false,
+        }
+    }
+
     /// Returns the token used to pay the transaction fee with.
     ///
     /// For `Close` we return 0 and expect the server to decline
