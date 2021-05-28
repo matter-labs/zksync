@@ -696,7 +696,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let chunk_number_bits = chunk_data
             .chunk_number
-            .into_bits_le(cs.namespace(|| "chunk number into bits"))?;
+            .into_bits_le_fixed(cs.namespace(|| "chunk number into bits"), 8)?;
         let chunk_number_last_bit = Expression::boolean::<CS>(chunk_number_bits[0].clone());
 
         let cur_side = Expression::select_ifeq(
