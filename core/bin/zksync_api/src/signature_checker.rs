@@ -223,6 +223,7 @@ async fn verify_eth_signature_txs_batch(
     // Cache for verified senders.
     let mut signers = HashSet::with_capacity(senders.len());
     // For every sender check whether there exists at least one signature that matches it.
+    let old_message = EthBatchSignData::get_old_ethereum_batch_message(txs.iter().map(|tx| &tx.tx));
     for sender in senders {
         if signers.contains(sender) {
             continue;
@@ -242,8 +243,6 @@ async fn verify_eth_signature_txs_batch(
             )
             .await;
             if !signature_correct {
-                let old_message =
-                    EthBatchSignData::get_old_ethereum_batch_message(txs.iter().map(|tx| &tx.tx));
                 signature_correct = verify_ethereum_signature(
                     signature,
                     old_message.as_slice(),
