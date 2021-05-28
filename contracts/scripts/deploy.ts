@@ -88,6 +88,12 @@ async function main() {
     if (args.contract === 'AdditionalZkSync') {
         await deployer.deployAdditionalZkSync({ gasPrice, nonce: args.nonce });
     }
+
+    // We don't deploy it by default as well, because the correct deployment
+    // takes a lot of parameters set explicitly in the env
+    if (args.contract === 'TokenGovernance') {
+        await deployer.deployTokenGovernance({ gasPrice, nonce: args.nonce });
+    }
 }
 
 main()

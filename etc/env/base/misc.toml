@@ -39,3 +39,18 @@ regenesis_partners="0xB991c776AedacfA5a7e8CF3e7aD6CB6C1AcB9227,0x093Cf8450c5eE50
 
 # The address of the new additional zkSync
 new_additional_zksync_address="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"
+
+# Token in which we want accept fees for permissionless token listing
+listing_fee_token="0x0000000000000000000000000000000000000000"
+
+# The number of token (in wei) we want to be payed for listing a token
+listing_fee=10000000000000000
+
+# Listing cap, the maximum number of tokens which can be listed (2^16 - 100 by default)
+listing_cap=65436
+
+# The address which will receive funds from permissionless token listings
+listing_treasury="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
+
+# The address of the token governance
+listing_governance="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
