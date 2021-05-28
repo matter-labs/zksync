@@ -231,7 +231,7 @@ mod tests {
         let expected_blocks: Paginated<BlockInfo, BlockNumber> = {
             let mut storage = cfg.pool.access_storage().await?;
             storage
-                .paginate(&query)
+                .paginate_checked(&query)
                 .await
                 .map_err(|err| anyhow::anyhow!(err.message))?
         };

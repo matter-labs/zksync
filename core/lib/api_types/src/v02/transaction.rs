@@ -93,12 +93,12 @@ pub struct Transaction {
 #[serde(untagged)]
 pub enum TransactionData {
     L1(L1Transaction),
-    L2(ApiZkSyncTx),
+    L2(L2Transaction),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum ApiZkSyncTx {
+pub enum L2Transaction {
     Transfer(Box<Transfer>),
     Withdraw(Box<WithdrawData>),
     #[doc(hidden)]

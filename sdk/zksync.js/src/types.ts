@@ -269,6 +269,8 @@ export interface ApiBlockInfo {
     status: 'committed' | 'finalized';
 }
 
+export type blockPosition = number | 'lastCommitted' | 'lastFinalized';
+
 export interface ApiAccountInfo {
     accountId: number;
     address: Address;
@@ -330,10 +332,12 @@ export interface ApiL1TxReceipt {
     id: number;
 }
 
+export type L2TxStatus = 'queued' | 'committed' | 'finalized' | 'rejected';
+
 export interface ApiL2TxReceipt {
     txHash: string;
     rollupBlock?: number;
-    status: 'queued' | 'committed' | 'finalized' | 'rejected';
+    status: L2TxStatus;
     failReason?: string;
 }
 
@@ -398,7 +402,7 @@ export interface ApiTransaction {
     txHash: string;
     blockNumber?: number;
     op: TransactionData;
-    status: 'queued' | 'committed' | 'finalized' | 'rejected';
+    status: L2TxStatus;
     failReason?: string;
     createdAt?: string;
 }
@@ -410,7 +414,7 @@ export interface ApiSignedTx {
 
 export interface ApiBatchStatus {
     updatedAt: string;
-    lastState: 'queued' | 'committed' | 'finalized' | 'rejected';
+    lastState: L2TxStatus;
 }
 
 export interface ApiBatchData {

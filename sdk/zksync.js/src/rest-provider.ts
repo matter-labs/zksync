@@ -28,7 +28,8 @@ import {
     Tokens,
     AccountState,
     TransactionReceipt,
-    PriorityOperationReceipt
+    PriorityOperationReceipt,
+    blockPosition
 } from './types';
 import { sleep, TokenSet } from './utils';
 
@@ -180,18 +181,16 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.blockPaginationDetailed(paginationQuery));
     }
 
-    async blockByPositionDetailed(
-        blockPosition: number | 'lastCommitted' | 'lastFinalized'
-    ): Promise<Response<ApiBlockInfo>> {
+    async blockByPositionDetailed(blockPosition: blockPosition): Promise<Response<ApiBlockInfo>> {
         return await this.get(`${this.address}/blocks/${blockPosition}`);
     }
 
-    async blockByPosition(blockPosition: number | 'lastCommitted' | 'lastFinalized'): Promise<ApiBlockInfo> {
+    async blockByPosition(blockPosition: blockPosition): Promise<ApiBlockInfo> {
         return this.parseResponse(await this.blockByPositionDetailed(blockPosition));
     }
 
     async blockTransactionsDetailed(
-        blockPosition: number | 'lastCommitted' | 'lastFinalized',
+        blockPosition: blockPosition,
         paginationQuery: PaginationQuery<string>
     ): Promise<Response<Paginated<ApiTransaction, string>>> {
         return await this.get(
@@ -201,7 +200,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async blockTransactions(
-        blockPosition: number | 'lastCommitted' | 'lastFinalized',
+        blockPosition: blockPosition,
         paginationQuery: PaginationQuery<string>
     ): Promise<Paginated<ApiTransaction, string>> {
         return this.parseResponse(await this.blockTransactionsDetailed(blockPosition, paginationQuery));

@@ -11,8 +11,8 @@ use actix_web::{
 
 // Workspace uses
 use zksync_api_types::v02::transaction::{
-    ApiTxBatch, ApiZkSyncTx, ForcedExitData, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction,
-    L2Receipt, Receipt, SubmitBatchResponse, Transaction, TransactionData, TxData,
+    ApiTxBatch, ForcedExitData, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, L2Receipt,
+    L2Transaction, Receipt, SubmitBatchResponse, Transaction, TransactionData, TxData,
     TxHashSerializeWrapper, TxInBlockStatus, WithdrawData,
 };
 use zksync_storage::{
@@ -143,27 +143,27 @@ pub async fn tx_data_from_zksync_tx(
     storage: &mut StorageProcessor<'_>,
 ) -> QueryResult<TransactionData> {
     let tx = match tx {
-        ZkSyncTx::ChangePubKey(tx) => ApiZkSyncTx::ChangePubKey(tx),
-        ZkSyncTx::Close(tx) => ApiZkSyncTx::Close(tx),
+        ZkSyncTx::ChangePubKey(tx) => L2Transaction::ChangePubKey(tx),
+        ZkSyncTx::Close(tx) => L2Transaction::Close(tx),
         ZkSyncTx::ForcedExit(tx) => {
             let complete_withdrawals_tx_hash = storage
                 .chain()
                 .operations_schema()
                 .eth_tx_for_withdrawal(&ZkSyncTx::ForcedExit(tx.clone()).hash())
                 .await?;
-            ApiZkSyncTx::ForcedExit(Box::new(ForcedExitData {
+            L2Transaction::ForcedExit(Box::new(ForcedExitData {
                 tx: *tx,
                 eth_tx_hash: complete_withdrawals_tx_hash,
             }))
         }
-        ZkSyncTx::Transfer(tx) => ApiZkSyncTx::Transfer(tx),
+        ZkSyncTx::Transfer(tx) => L2Transaction::Transfer(tx),
         ZkSyncTx::Withdraw(tx) => {
             let complete_withdrawals_tx_hash = storage
                 .chain()
                 .operations_schema()
                 .eth_tx_for_withdrawal(&ZkSyncTx::Withdraw(tx.clone()).hash())
                 .await?;
-            ApiZkSyncTx::Withdraw(Box::new(WithdrawData {
+            L2Transaction::Withdraw(Box::new(WithdrawData {
                 tx: *tx,
                 eth_tx_hash: complete_withdrawals_tx_hash,
             }))
