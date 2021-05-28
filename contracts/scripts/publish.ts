@@ -9,17 +9,19 @@ async function main() {
         return;
     }
     const addresses = deployedAddressesFromEnv();
-    for (const address of [
-        addresses.ZkSyncTarget,
-        addresses.VerifierTarget,
-        addresses.GovernanceTarget,
-        addresses.UpgradeGatekeeper
-    ]) {
+    for (const address of [addresses.ZkSyncTarget, addresses.VerifierTarget, addresses.GovernanceTarget]) {
         try {
-            await hre.run('verify', { address });
+            await hre.run('verify:verify', { address });
         } catch (e) {
             console.error(e);
         }
+    }
+
+    {
+        const address = addresses.UpgradeGatekeeper;
+        const constructorArguments = [addresses.ZkSync];
+
+        await hre.run('verify:verify', { address, constructorArguments });
     }
 
     {
@@ -32,7 +34,7 @@ async function main() {
         const constructorArguments = [addresses.ZkSyncTarget, zkSyncEncodedArguments];
 
         try {
-            await hre.run('verify', { address, constructorArguments });
+            await hre.run('verify:verify', { address, constructorArguments });
         } catch (e) {
             console.error(e);
         }
@@ -45,7 +47,7 @@ async function main() {
         const constructorArguments = [addresses.GovernanceTarget, governanceEncodedArguments];
 
         try {
-            await hre.run('verify', { address, constructorArguments });
+            await hre.run('verify:verify', { address, constructorArguments });
         } catch (e) {
             console.error(e);
         }
@@ -58,7 +60,7 @@ async function main() {
         const constructorArguments = [addresses.VerifierTarget, verifierEncodedArguments];
 
         try {
-            await hre.run('verify', { address, constructorArguments });
+            await hre.run('verify:verify', { address, constructorArguments });
         } catch (e) {
             console.error(e);
         }

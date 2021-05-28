@@ -45,6 +45,7 @@ export interface DeployedAddresses {
     ForcedExit: string;
     RegenesisMultisig: string;
     NFTFactory: string;
+    AdditionalZkSync: string;
 }
 
 export interface DeployerConfig {
@@ -87,7 +88,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
         ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
         ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
-        RegenesisMultisig: process.env.MISC_REGENESIS_MULTISIG_ADDRESS
+        RegenesisMultisig: process.env.MISC_REGENESIS_MULTISIG_ADDRESS,
+        AdditionalZkSync: process.env.MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS
     };
 }
 
