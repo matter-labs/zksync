@@ -9,7 +9,7 @@ use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::{Address, TokenId, H256};
 use zksync_crypto::{
-    params::{max_account_id, max_processable_token},
+    params::{max_account_id, max_processable_token, CURRENT_TX_VERSION},
     PrivateKey,
 };
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
@@ -241,16 +241,44 @@ impl ChangePubKey {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
+            if let Some(res) = self
+                .signature
+                .verify_musig(&self.get_old_bytes())
+                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+            {
+                return Some(res);
+            }
             self.signature
                 .verify_musig(&self.get_bytes())
                 .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
         }
     }
 
-    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
-    pub fn get_bytes(&self) -> Vec<u8> {
+    /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
+    pub fn get_old_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account_id.to_be_bytes());
+        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(&self.new_pk_hash.data);
+        out.extend_from_slice(&(self.fee_token.0 as u16).to_be_bytes());
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        if let Some(time_range) = &self.time_range {
+            out.extend_from_slice(&time_range.to_be_bytes());
+        }
+        out
+    }
+
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
+    pub fn get_bytes(&self) -> Vec<u8> {
+        self.get_bytes_with_version(CURRENT_TX_VERSION)
+    }
+
+    pub fn get_bytes_with_version(&self, version: u8) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);

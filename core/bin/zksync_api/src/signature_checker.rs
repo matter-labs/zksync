@@ -222,8 +222,14 @@ async fn verify_eth_signature_txs_batch(
     let start = Instant::now();
     // Cache for verified senders.
     let mut signers = HashSet::with_capacity(senders.len());
-    let old_message = EthBatchSignData::get_old_ethereum_batch_message(txs.iter().map(|tx| &tx.tx));
     // For every sender check whether there exists at least one signature that matches it.
+    let old_message = match txs.iter().all(|tx| tx.is_backwards_compatible()) {
+        true => Some(EthBatchSignData::get_old_ethereum_batch_message(
+            txs.iter().map(|tx| &tx.tx),
+        )),
+        false => None,
+    };
+
     for sender in senders {
         if signers.contains(sender) {
             continue;
@@ -243,13 +249,15 @@ async fn verify_eth_signature_txs_batch(
             )
             .await;
             if !signature_correct {
-                signature_correct = verify_ethereum_signature(
-                    signature,
-                    old_message.as_slice(),
-                    *sender,
-                    eth_checker,
-                )
-                .await;
+                if let Some(old_message) = &old_message {
+                    signature_correct = verify_ethereum_signature(
+                        signature,
+                        old_message.as_slice(),
+                        *sender,
+                        eth_checker,
+                    )
+                    .await;
+                }
             }
             if signature_correct {
                 signers.insert(sender);

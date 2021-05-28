@@ -473,3 +473,16 @@ pub fn sequences_equal<E: Engine, CS: ConstraintSystem<E>>(
         .collect::<Result<Vec<_>, SynthesisError>>()?;
     multi_and(cs, &equality_flags)
 }
+
+pub fn u8_into_bits_be(a: u8) -> Vec<Boolean> {
+    let mut res = Vec::new();
+    for i in 0..8 {
+        if (a & (1u8 << (7 - i))) != 0 {
+            res.push(Boolean::constant(true));
+        } else {
+            res.push(Boolean::constant(false));
+        }
+    }
+
+    res
+}
