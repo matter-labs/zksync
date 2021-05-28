@@ -51,9 +51,9 @@ pub struct DataRestoreDriver<T: Transport, I> {
     pub web3: Web3<T>,
     /// Provides Ethereum Governance contract interface
     pub governance_contract: (ethabi::Contract, Contract<T>),
-    /// Address of the Upgrade GateKeeper contract. Provides logs about
-    /// zkSync contract upgrades.
-    pub upgrade_gatekeeper_addr: H160,
+    /// Ethereum blocks that include correct UpgradeComplete events.
+    /// Should be provided via config.
+    pub contract_upgrade_eth_blocks: Vec<u64>,
     /// The initial version of the deployed zkSync contract.
     pub init_contract_version: u32,
     /// Provides Ethereum Rollup contract interface
@@ -87,8 +87,8 @@ where
     ///
     /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
-    /// * `upgrade_gatekeeper_addr` - Upgrade GateKeeper contract address
-    /// * `init_contract_version` - The initial version of the deployed zkSync contract.
+    /// * `upgrade_eth_blocks` - Ethereum blocks that include correct UpgradeComplete events
+    /// * `init_contract_version` - The initial version of the deployed zkSync contract
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     /// * `finite_mode` - Finite mode flag.
@@ -99,7 +99,7 @@ where
     pub fn new(
         web3: Web3<T>,
         governance_contract_eth_addr: H160,
-        upgrade_gatekeeper_addr: H160,
+        contract_upgrade_eth_blocks: Vec<u64>,
         init_contract_version: u32,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
@@ -121,7 +121,7 @@ where
         Self {
             web3,
             governance_contract,
-            upgrade_gatekeeper_addr,
+            contract_upgrade_eth_blocks,
             init_contract_version,
             zksync_contract,
             events_state,
@@ -311,7 +311,7 @@ where
                 &self.web3,
                 &self.zksync_contract,
                 &self.governance_contract,
-                self.upgrade_gatekeeper_addr,
+                &self.contract_upgrade_eth_blocks,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
                 self.init_contract_version,
