@@ -4,7 +4,11 @@ use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use zksync_state::state::CollectedFee;
 use zksync_state::{handler::TxHandler, state::ZkSyncState};
-use zksync_types::{operations::WithdrawOp, tx::Withdraw, AccountId, Address, TokenId};
+use zksync_types::{
+    operations::WithdrawOp,
+    tx::{TxSignature, Withdraw},
+    AccountId, Address, Nonce, TokenId,
+};
 // Local deps
 use crate::witness::{
     tests::test_utils::{
@@ -51,6 +55,70 @@ fn test_withdraw() {
         // Additional data required for performing the operation.
         let input =
             SigDataInput::from_withdraw_op(&withdraw_op).expect("SigDataInput creation failed");
+
+        generic_test_scenario::<WithdrawWitness<Bn256>, _>(
+            &accounts,
+            withdraw_op,
+            input,
+            |plasma_state, op| {
+                let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(plasma_state, &op)
+                    .expect("Operation failed")
+                    .0
+                    .unwrap();
+                vec![fee]
+            },
+        );
+    }
+}
+
+#[test]
+#[ignore]
+fn test_withdraw_old_signature() {
+    // Test vector of (initial_balance, transfer_amount, fee_amount).
+    let test_vector = vec![
+        (10u64, 7u64, 3u64),       // Basic transfer
+        (0, 0, 0),                 // Zero transfer
+        (std::u64::MAX, 1, 1),     // Small transfer from rich account,
+        (std::u64::MAX, 10000, 1), // Big transfer from rich account (too big values can't be used, since they're not packable),
+        (std::u64::MAX, 1, 10000), // Very big fee
+    ];
+
+    for (initial_balance, transfer_amount, fee_amount) in test_vector {
+        // Input data.
+        let accounts = vec![WitnessTestAccount::new(AccountId(1), initial_balance)];
+        let account = &accounts[0];
+        let mut tx = Withdraw::new(
+            AccountId(1),
+            account.zksync_account.address,
+            Address::zero(),
+            TokenId(0),
+            BigUint::from(transfer_amount),
+            BigUint::from(fee_amount),
+            Nonce(0),
+            Default::default(),
+            None,
+        );
+        tx.signature = TxSignature::sign_musig(
+            &account.zksync_account.private_key,
+            &tx.get_old_bytes().expect("get_old_bytes fails"),
+        );
+        let withdraw_op = WithdrawOp {
+            tx,
+            account_id: account.id,
+        };
+
+        let sign_packed = withdraw_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let input = SigDataInput::new(
+            &sign_packed,
+            &withdraw_op.tx.get_old_bytes().expect("get_old_bytes fails"),
+            &withdraw_op.tx.signature.pub_key,
+        )
+        .expect("input constructing fails");
 
         generic_test_scenario::<WithdrawWitness<Bn256>, _>(
             &accounts,
