@@ -19,7 +19,13 @@ GENESIS_ROOT="0x2d5ab622df708ab44944bb02377be85b6f27812e9ae520734873b7a193898ba4
 # setting correct available block chunk sizes.
 init_contract_version=4
 
+# Ethereum blocks that include UpgradeComplete events emitted by
+# the upgrade gatekeeper contract. We have to provide them from
+# config since obtaining them from Web3 node is not reliable.
+# (e.g. hot-fix upgrades, multiple contract version upgrades in
+# a single deploy etc. are not taken into account)
+upgrade_eth_blocks=[]
+
 [contracts.test]
 dummy_verifier=false
 easy_exodus=false
-
