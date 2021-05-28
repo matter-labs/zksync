@@ -229,6 +229,7 @@ async fn verify_eth_signature_txs_batch(
         )),
         false => None,
     };
+
     for sender in senders {
         if signers.contains(sender) {
             continue;
@@ -247,14 +248,16 @@ async fn verify_eth_signature_txs_batch(
                 eth_checker,
             )
             .await;
-            if !signature_correct && old_message.is_some() {
-                signature_correct = verify_ethereum_signature(
-                    signature,
-                    old_message.unwrap().as_slice(),
-                    *sender,
-                    eth_checker,
-                )
-                .await;
+            if !signature_correct {
+                if let Some(old_message) = &old_message {
+                    signature_correct = verify_ethereum_signature(
+                        signature,
+                        old_message.as_slice(),
+                        *sender,
+                        eth_checker,
+                    )
+                    .await;
+                }
             }
             if signature_correct {
                 signers.insert(sender);

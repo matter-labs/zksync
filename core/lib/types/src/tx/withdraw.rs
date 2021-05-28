@@ -120,7 +120,7 @@ impl Withdraw {
     }
 
     pub fn is_backwards_compatible(&self) -> bool {
-        return self.token.0 < MIN_NFT_TOKEN_ID;
+        self.token.0 < MIN_NFT_TOKEN_ID
     }
 
     /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
