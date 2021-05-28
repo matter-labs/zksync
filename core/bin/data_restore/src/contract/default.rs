@@ -36,7 +36,7 @@ pub fn rollup_ops_blocks_from_bytes(input_data: Vec<u8>) -> Result<RollupOpsBloc
         &decoded_commitment_parameters[fee_account_argument_id],
         &decoded_commitment_parameters[public_data_argument_id],
     ) {
-        let ops = get_rollup_ops_from_legacy_data(public_data.as_slice())?;
+        let ops = get_rollup_ops_from_data(public_data.as_slice())?;
         let fee_account = AccountId(fee_acc.as_u32());
 
         let block = RollupOpsBlock {
@@ -57,15 +57,9 @@ pub fn rollup_ops_blocks_from_bytes(input_data: Vec<u8>) -> Result<RollupOpsBloc
     }
 }
 
+/// Attempts to restore block operations from the public data.
+/// Should be used for contracts V1-V5.
 pub fn get_rollup_ops_from_data(data: &[u8]) -> Result<Vec<ZkSyncOp>, anyhow::Error> {
-    parse_pub_data(
-        data,
-        ZkSyncOp::from_public_data,
-        ZkSyncOp::public_data_length,
-    )
-}
-
-pub fn get_rollup_ops_from_legacy_data(data: &[u8]) -> Result<Vec<ZkSyncOp>, anyhow::Error> {
     parse_pub_data(
         data,
         ZkSyncOp::from_legacy_public_data,
@@ -73,23 +67,23 @@ pub fn get_rollup_ops_from_legacy_data(data: &[u8]) -> Result<Vec<ZkSyncOp>, any
     )
 }
 
-fn parse_pub_data<E1, E2, F, S>(
+pub(super) fn parse_pub_data<Parse, ParseErr, GetSize, GetSizeErr>(
     data: &[u8],
-    parse: F,
-    data_size: S,
+    parse: Parse,
+    get_data_size: GetSize,
 ) -> Result<Vec<ZkSyncOp>, anyhow::Error>
 where
-    E1: std::error::Error + Send + Sync + 'static,
-    E2: std::error::Error + Send + Sync + 'static,
-    F: Fn(&[u8]) -> Result<ZkSyncOp, E1>,
-    S: Fn(u8) -> Result<usize, E2>,
+    Parse: Fn(&[u8]) -> Result<ZkSyncOp, ParseErr>,
+    ParseErr: std::error::Error + Send + Sync + 'static,
+    GetSize: Fn(u8) -> Result<usize, GetSizeErr>,
+    GetSizeErr: std::error::Error + Send + Sync + 'static,
 {
     let mut current_pointer = 0;
     let mut ops = Vec::new();
     while current_pointer < data.len() {
         let op_type: u8 = data[current_pointer];
 
-        let pub_data_size = data_size(op_type)?;
+        let pub_data_size = get_data_size(op_type)?;
 
         let pre = current_pointer;
         let post = pre + pub_data_size;
@@ -113,7 +107,7 @@ mod test {
         TokenId, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp, ZkSyncOp,
     };
 
-    use super::*;
+    use crate::contract::v6;
 
     #[test]
     fn test_deposit() {
@@ -128,7 +122,7 @@ mod test {
             account_id: AccountId(6),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -154,7 +148,7 @@ mod test {
             account_id: AccountId(3),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -178,7 +172,7 @@ mod test {
             content_hash: None,
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -202,7 +196,7 @@ mod test {
             content_hash: None,
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -229,7 +223,7 @@ mod test {
             to: AccountId(12),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -256,7 +250,7 @@ mod test {
             to: AccountId(12),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -277,7 +271,7 @@ mod test {
             account_id: AccountId(11),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -303,7 +297,7 @@ mod test {
             account_id: AccountId(11),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");

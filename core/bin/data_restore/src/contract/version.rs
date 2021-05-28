@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 // Workspace uses
 use zksync_types::operations::ZkSyncOp;
 // Local uses
-use super::default::{get_rollup_ops_from_data, get_rollup_ops_from_legacy_data};
+use super::default;
 use crate::{contract, rollup_ops::RollupOpsBlock};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,8 +78,8 @@ impl ZkSyncContractVersion {
     pub fn get_rollup_ops_from_data(&self, data: &[u8]) -> Result<Vec<ZkSyncOp>, anyhow::Error> {
         use ZkSyncContractVersion::*;
         match self {
-            V0 | V1 | V2 | V3 | V4 | V5 => get_rollup_ops_from_legacy_data(data),
-            V6 => get_rollup_ops_from_data(data),
+            V0 | V1 | V2 | V3 | V4 | V5 => default::get_rollup_ops_from_data(data),
+            V6 => contract::v6::get_rollup_ops_from_data(data),
         }
     }
 

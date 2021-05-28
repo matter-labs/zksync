@@ -538,7 +538,7 @@ impl TreeState {
 
 #[cfg(test)]
 mod test {
-    use crate::contract::default::get_rollup_ops_from_data;
+    use crate::contract::v6::get_rollup_ops_from_data;
     use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
     use num::BigUint;
