@@ -13,6 +13,8 @@ use crate::{
 pub const ACCOUNT_TREE_DEPTH: usize = 32;
 /// Depth of the balance tree for each account.
 pub const BALANCE_TREE_DEPTH: usize = 32;
+/// Version of transactions.
+pub const CURRENT_TX_VERSION: u8 = 1;
 
 /// account_tree_depth.
 pub fn account_tree_depth() -> usize {
@@ -111,6 +113,8 @@ pub const LEGACY_TOKEN_BIT_WIDTH: usize = 16;
 pub const TOKEN_BIT_WIDTH: usize = 32;
 pub const TX_TYPE_BIT_WIDTH: usize = 8;
 
+pub const TX_VERSION_FOR_SIGNATURE_BIT_WIDTH: usize = 8;
+
 /// Account subtree hash width
 pub const SUBTREE_HASH_WIDTH: usize = 254; //seems to be equal to Bn256::NUM_BITS could be replaced
 pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
@@ -176,6 +180,7 @@ pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 
 /// Size of the data that is signed for withdraw tx
 pub const SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
     + TOKEN_BIT_WIDTH
@@ -185,18 +190,30 @@ pub const SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
-/// Size of the data that is signed for withdraw tx without timestamps
-pub const OLD_SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+/// Size of the data that is signed for withdraw tx, without timestamps, and with 2-byte token representation
+pub const OLD1_SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
-    + TOKEN_BIT_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
     + BALANCE_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
+
+/// Size of the data that is signed for withdraw tx, with timestamps, but with 2-byte token representation
+pub const OLD2_SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
+    + BALANCE_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Size of the data that is signed for transfer tx
 pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
     + TOKEN_BIT_WIDTH
@@ -207,19 +224,32 @@ pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
-/// Size of the data that is signed for transfer tx without timestamps
-pub const OLD_SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+/// Size of the data that is signed for transfer tx, without timestamps, and with 2-byte token representation
+pub const OLD1_SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
-    + TOKEN_BIT_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
     + AMOUNT_EXPONENT_BIT_WIDTH
     + AMOUNT_MANTISSA_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
 
+/// Size of the data that is signed for transfer tx, with timestamps, but with 2-byte token representation
+pub const OLD2_SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
+    + AMOUNT_EXPONENT_BIT_WIDTH
+    + AMOUNT_MANTISSA_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
+
 /// Size of the data that is signed for forced exit tx
 pub const SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + TOKEN_BIT_WIDTH
@@ -228,8 +258,19 @@ pub const SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
+/// Size of the data that is signed for forced exit tx with 2-byte token representation
+pub const OLD_SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + ADDRESS_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
+
 /// Size of the data that is signed for mint nft tx
 pub const SIGNED_MINT_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + CONTENT_HASH_WIDTH
@@ -241,6 +282,7 @@ pub const SIGNED_MINT_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 
 /// Size of the data that is signed for withdraw nft tx
 pub const SIGNED_WITHDRAW_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + ADDRESS_WIDTH
@@ -253,6 +295,7 @@ pub const SIGNED_WITHDRAW_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 
 /// Size of the data that is signed for change pubkey tx
 pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + TX_VERSION_FOR_SIGNATURE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + NEW_PUBKEY_HASH_WIDTH
@@ -262,15 +305,26 @@ pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
-/// Size of the data that is signed for change pubkey tx, without timestamps
-pub const OLD_SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+/// Size of the data that is signed for change pubkey tx, without timestamps, and with 2-byte token representation
+pub const OLD1_SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + ADDRESS_WIDTH
     + NEW_PUBKEY_HASH_WIDTH
-    + TOKEN_BIT_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
+
+/// Size of the data that is signed for change pubkey tx, with timestamps, but with 2-byte token representation
+pub const OLD2_SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + ADDRESS_WIDTH
+    + NEW_PUBKEY_HASH_WIDTH
+    + LEGACY_TOKEN_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Number of inputs in the basic circuit that is aggregated by recursive circuit
 pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;

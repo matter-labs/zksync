@@ -123,7 +123,7 @@ fn get_bits_le_fixed(fr: &Fr, size: usize) -> Vec<bool> {
 }
 
 pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
-    assert_eq!(msg.len(), 176);
+    assert_eq!(msg.len(), 178);
     let msg_bits = bytes_into_be_bits(msg);
     let hash_fr = rescue_hash_fr(msg_bits);
     let hash_bits = get_bits_le_fixed(&hash_fr, 248);

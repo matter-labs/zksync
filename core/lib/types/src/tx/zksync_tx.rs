@@ -165,6 +165,17 @@ impl ZkSyncTx {
         }
     }
 
+    pub fn is_backwards_compatible(&self) -> bool {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.is_backwards_compatible(),
+            ZkSyncTx::Withdraw(tx) => tx.is_backwards_compatible(),
+            ZkSyncTx::Close(_) => true,
+            ZkSyncTx::ChangePubKey(_) => true,
+            ZkSyncTx::ForcedExit(_) => true,
+            _ => false,
+        }
+    }
+
     /// Returns the token used to pay the transaction fee with.
     ///
     /// For `Close` we return 0 and expect the server to decline
@@ -270,6 +281,17 @@ impl ZkSyncTx {
         }
     }
 
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
+    pub fn get_old_bytes(&self) -> Vec<u8> {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.get_old_bytes(),
+            ZkSyncTx::Withdraw(tx) => tx.get_old_bytes(),
+            ZkSyncTx::Close(tx) => tx.get_bytes(),
+            ZkSyncTx::ChangePubKey(tx) => tx.get_old_bytes(),
+            ZkSyncTx::ForcedExit(tx) => tx.get_old_bytes(),
+            _ => vec![],
+        }
+    }
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         match self {

@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_processable_token, max_token_id, PRICE_BIT_WIDTH},
+    params::{
+        max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION, PRICE_BIT_WIDTH,
+    },
     primitives::rescue_hash_orders,
 };
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
@@ -60,8 +62,15 @@ impl Order {
     /// Unique identifier of the signed message, similar to TX_TYPE
     pub const MSG_TYPE: u8 = b'o'; // 'o' for "order"
 
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
-        let mut out = vec![Self::MSG_TYPE];
+        self.get_bytes_with_version(CURRENT_TX_VERSION)
+    }
+
+    pub fn get_bytes_with_version(&self, version: u8) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[Self::MSG_TYPE]);
+        out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.recipient_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -249,7 +258,9 @@ impl Swap {
     /// Encodes transaction data, using provided encoded data for orders.
     /// This function does not care how orders are encoded: is it data or hash.
     fn get_swap_bytes(&self, order_bytes: &[u8]) -> Vec<u8> {
-        let mut out = vec![Self::TX_TYPE];
+        let mut out = Vec::new();
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.submitter_id.to_be_bytes());
         out.extend_from_slice(&self.submitter_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());

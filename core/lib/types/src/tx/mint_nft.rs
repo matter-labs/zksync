@@ -5,7 +5,7 @@ use num::{BigUint, Zero};
 use zksync_crypto::{
     convert::FeConvert,
     franklin_crypto::bellman::pairing::bn256::{Bn256, Fr},
-    params::{max_account_id, max_processable_token},
+    params::{max_account_id, max_processable_token, CURRENT_TX_VERSION},
     rescue_poseidon::rescue_hash,
     PrivateKey,
 };
@@ -112,8 +112,13 @@ impl MintNFT {
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
+        self.get_bytes_with_version(CURRENT_TX_VERSION)
+    }
+
+    pub fn get_bytes_with_version(&self, version: u8) -> Vec<u8> {
         let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.creator_id.to_be_bytes());
         out.extend_from_slice(&self.creator_address.as_bytes());
         out.extend_from_slice(&self.content_hash.as_bytes());
