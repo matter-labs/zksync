@@ -46,6 +46,8 @@ library Operations {
     /// @dev Signature (for example full exit signature) bytes length
     uint8 internal constant SIGNATURE_BYTES = 64;
 
+    uint256 internal constant LEGACY_MAX_TOKEN = 65535; // 2^16 - 1
+
     // Deposit pubdata
     struct Deposit {
         // uint8 opType
@@ -94,9 +96,16 @@ library Operations {
 
     /// @notice Write deposit pubdata for priority queue check.
     function checkDepositInPriorityQueue(Deposit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        return
-            Utils.hashBytesToBytes20(writeDepositPubdataForPriorityQueue(op)) == hashedPubdata ||
-            Utils.hashBytesToBytes20(writeLegacyDepositPubdataForPriorityQueue(op)) == hashedPubdata;
+        if (Utils.hashBytesToBytes20(writeDepositPubdataForPriorityQueue(op)) == hashedPubdata) {
+            return true;
+        } else if (
+            op.tokenId <= LEGACY_MAX_TOKEN &&
+            Utils.hashBytesToBytes20(writeLegacyDepositPubdataForPriorityQueue(op)) == hashedPubdata
+        ) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     // FullExit pubdata
@@ -164,9 +173,16 @@ library Operations {
     }
 
     function checkFullExitInPriorityQueue(FullExit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        return
-            Utils.hashBytesToBytes20(writeFullExitPubdataForPriorityQueue(op)) == hashedPubdata ||
-            Utils.hashBytesToBytes20(writeLegacyFullExitPubdataForPriorityQueue(op)) == hashedPubdata;
+        if (Utils.hashBytesToBytes20(writeFullExitPubdataForPriorityQueue(op)) == hashedPubdata) {
+            return true;
+        } else if (
+            op.tokenId <= LEGACY_MAX_TOKEN &&
+            Utils.hashBytesToBytes20(writeLegacyFullExitPubdataForPriorityQueue(op)) == hashedPubdata
+        ) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     // PartialExit pubdata
