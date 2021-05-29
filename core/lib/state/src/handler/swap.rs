@@ -109,21 +109,28 @@ impl ZkSyncState {
         Ok(())
     }
 
-    fn verify_swap_accounts(&self, swap: &Swap) -> Result<(), SwapOpError> {
-        let submitter = self.get_account(swap.submitter_id).unwrap();
+    fn verify_swap_accounts(&self, op: &SwapOp) -> Result<(), SwapOpError> {
+        let tx = &op.tx;
+        let submitter = self.get_account(tx.submitter_id).unwrap();
 
-        invariant!(swap.nonce == submitter.nonce, SwapOpError::NonceMismatch);
-        invariant!(
-            submitter.get_balance(swap.fee_token) >= swap.fee,
-            SwapOpError::InsufficientBalance
-        );
+        invariant!(tx.nonce == submitter.nonce, SwapOpError::NonceMismatch);
+        let balance = submitter.get_balance(tx.fee_token);
+        let future_balance =
+            if tx.submitter_id == op.recipients.0 && tx.fee_token == tx.orders.0.token_buy {
+                balance + &tx.amounts.1
+            } else if tx.submitter_id == op.recipients.1 && tx.fee_token == tx.orders.1.token_buy {
+                balance + &tx.amounts.0
+            } else {
+                balance
+            };
+        invariant!(future_balance >= tx.fee, SwapOpError::InsufficientBalance);
 
         let verify_account = |order: &Order, amount: &BigUint| {
             let account = self.get_account(order.account_id).unwrap();
             invariant!(order.nonce == account.nonce, SwapOpError::NonceMismatch);
             let necessary_amount =
-                if swap.submitter_id == order.account_id && swap.fee_token == order.token_sell {
-                    amount + &swap.fee
+                if tx.submitter_id == order.account_id && tx.fee_token == order.token_sell {
+                    &tx.fee + amount
                 } else {
                     amount.clone()
                 };
@@ -134,8 +141,8 @@ impl ZkSyncState {
             Ok(())
         };
 
-        verify_account(&swap.orders.0, &swap.amounts.0)?;
-        verify_account(&swap.orders.1, &swap.amounts.1)
+        verify_account(&tx.orders.0, &tx.amounts.0)?;
+        verify_account(&tx.orders.1, &tx.amounts.1)
     }
 
     fn verify_swap(&self, swap: &Swap) -> Result<(), SwapOpError> {
@@ -181,7 +188,7 @@ impl ZkSyncState {
         let start = Instant::now();
 
         self.verify_swap(&op.tx)?;
-        self.verify_swap_accounts(&op.tx)?;
+        self.verify_swap_accounts(op)?;
 
         let increment_0 =
             (!op.tx.orders.0.amount.is_zero() && op.accounts.0 != op.submitter) as u32;
