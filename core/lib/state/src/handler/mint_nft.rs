@@ -82,6 +82,10 @@ impl TxHandler<MintNFT> for ZkSyncState {
             .ok_or(MintNFTOpError::CreatorAccountNotFound)?;
         let old_balance = creator_account.get_balance(op.tx.fee_token);
         let nonce = creator_account.nonce;
+        invariant!(
+            old_balance >= + &op.tx.fee,
+            MintNFTOpError::InsufficientBalance
+        );
         creator_account.sub_balance(op.tx.fee_token, &op.tx.fee);
         let new_balance = creator_account.get_balance(op.tx.fee_token);
         *creator_account.nonce += 1;
