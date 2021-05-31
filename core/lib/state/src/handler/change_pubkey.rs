@@ -32,10 +32,12 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
             tx.is_eth_auth_data_valid(),
             ChangePubKeyOpError::InvalidAuthData
         );
-        invariant!(
-            tx.verify_signature() == Some(tx.new_pk_hash),
-            ChangePubKeyOpError::InvalidZksyncSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != account.pub_key_hash {
+                return Err(ChangePubKeyOpError::InvalidZksyncSignature);
+            }
+        }
         invariant!(
             account_id == tx.account_id,
             ChangePubKeyOpError::InvalidAccountId

@@ -7,6 +7,7 @@ mod mint_nft;
 mod primitives;
 mod swap;
 mod transfer;
+mod version;
 mod withdraw;
 mod withdraw_nft;
 mod zksync_tx;
@@ -27,6 +28,7 @@ pub use self::{
     mint_nft::{calculate_token_address, calculate_token_data, calculate_token_hash, MintNFT},
     swap::{Order, Swap},
     transfer::Transfer,
+    version::TxVersion,
     withdraw::Withdraw,
     withdraw_nft::WithdrawNFT,
     zksync_tx::{EthSignData, SignedZkSyncTx, ZkSyncTx},

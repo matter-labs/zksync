@@ -33,10 +33,12 @@ impl TxHandler<Withdraw> for ZkSyncState {
             account.pub_key_hash != PubKeyHash::default(),
             WithdrawOpError::FromAccountLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(account.pub_key_hash),
-            WithdrawOpError::InvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != account.pub_key_hash {
+                return Err(WithdrawOpError::InvalidSignature);
+            }
+        }
         invariant!(
             account_id == tx.account_id,
             WithdrawOpError::FromAccountIncorrect

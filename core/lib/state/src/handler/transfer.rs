@@ -37,10 +37,11 @@ impl TxHandler<Transfer> for ZkSyncState {
             from_account.pub_key_hash != PubKeyHash::default(),
             TransferOpError::FromAccountLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(from_account.pub_key_hash),
-            TransferOpError::InvalidSignature
-        );
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != from_account.pub_key_hash {
+                return Err(TransferOpError::InvalidSignature);
+            }
+        }
         invariant!(
             from == tx.account_id,
             TransferOpError::TransferAccountIncorrect

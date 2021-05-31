@@ -21,6 +21,7 @@ use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRad
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::tx::error::TransactionSignatureError;
+use crate::tx::version::TxVersion;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -315,13 +316,13 @@ impl Swap {
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
-    pub fn verify_signature(&self) -> Option<PubKeyHash> {
+    pub fn verify_signature(&self) -> Option<(PubKeyHash, TxVersion)> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
             self.signature
                 .verify_musig(&self.get_sign_bytes())
-                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                .map(|pub_key| (PubKeyHash::from_pubkey(&pub_key), TxVersion::V1))
         }
     }
 

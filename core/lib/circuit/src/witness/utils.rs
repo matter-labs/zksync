@@ -30,7 +30,7 @@ use zksync_types::{
         ChangePubKeyOp, CloseOp, ForcedExitOp, MintNFTOp, SwapOp, TransferOp, TransferToNewOp,
         WithdrawNFTOp, WithdrawOp,
     },
-    tx::{Order, PackedPublicKey},
+    tx::{Order, PackedPublicKey, TxVersion},
     AccountId, BlockNumber, ZkSyncOp,
 };
 // Local deps
@@ -48,6 +48,18 @@ use crate::{
 
 use zksync_crypto::params::number_of_processable_tokens;
 
+macro_rules! get_bytes {
+    ($tx:ident) => {
+        if let Some((_, version)) = $tx.tx.verify_signature() {
+            match version {
+                TxVersion::Legacy => $tx.tx.get_old_bytes(),
+                TxVersion::V1 => $tx.tx.get_bytes(),
+            }
+        } else {
+            vec![]
+        }
+    };
+}
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
 /// used for testing
@@ -566,11 +578,10 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        SigDataInput::new(
-            &sign_packed,
-            &transfer_op.tx.get_bytes(),
-            &transfer_op.tx.signature.pub_key,
-        )
+
+        let tx_bytes = get_bytes!(transfer_op);
+
+        SigDataInput::new(&sign_packed, &tx_bytes, &transfer_op.tx.signature.pub_key)
     }
 
     pub fn from_transfer_to_new_op(transfer_op: &TransferToNewOp) -> Result<Self, anyhow::Error> {
@@ -580,11 +591,8 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        SigDataInput::new(
-            &sign_packed,
-            &transfer_op.tx.get_bytes(),
-            &transfer_op.tx.signature.pub_key,
-        )
+        let tx_bytes = get_bytes!(transfer_op);
+        SigDataInput::new(&sign_packed, &tx_bytes, &transfer_op.tx.signature.pub_key)
     }
 
     pub fn from_change_pubkey_op(change_pubkey_op: &ChangePubKeyOp) -> Result<Self, anyhow::Error> {
@@ -594,9 +602,10 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
+        let tx_bytes = get_bytes!(change_pubkey_op);
         SigDataInput::new(
             &sign_packed,
-            &change_pubkey_op.tx.get_bytes(),
+            &tx_bytes,
             &change_pubkey_op.tx.signature.pub_key,
         )
     }
@@ -608,11 +617,8 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        SigDataInput::new(
-            &sign_packed,
-            &withdraw_op.tx.get_bytes(),
-            &withdraw_op.tx.signature.pub_key,
-        )
+        let tx_bytes = get_bytes!(withdraw_op);
+        SigDataInput::new(&sign_packed, &tx_bytes, &withdraw_op.tx.signature.pub_key)
     }
 
     pub fn from_forced_exit_op(forced_exit_op: &ForcedExitOp) -> Result<Self, anyhow::Error> {
@@ -622,9 +628,10 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
+        let tx_bytes = get_bytes!(forced_exit_op);
         SigDataInput::new(
             &sign_packed,
-            &forced_exit_op.tx.get_bytes(),
+            &tx_bytes,
             &forced_exit_op.tx.signature.pub_key,
         )
     }
