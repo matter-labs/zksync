@@ -3,6 +3,7 @@ mod close;
 mod forced_exit;
 mod mint_nft;
 mod priority_ops;
+mod swap;
 mod transfer;
 mod withdraw;
 mod withdraw_nft;
