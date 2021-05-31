@@ -201,11 +201,11 @@ impl ZkSyncState {
         use crate::state::BalanceUpdate::*;
 
         let updates = vec![
-            self.update_account(op.submitter, op.tx.fee_token, Sub(op.tx.fee.clone()), 1),
             self.update_account(op.accounts.0, token_0, Sub(amounts.0.clone()), increment_0),
+            self.update_account(op.recipients.1, token_0, Add(amounts.0), 0),
             self.update_account(op.accounts.1, token_1, Sub(amounts.1.clone()), increment_1),
             self.update_account(op.recipients.0, token_1, Add(amounts.1), 0),
-            self.update_account(op.recipients.1, token_0, Add(amounts.0), 0),
+            self.update_account(op.submitter, op.tx.fee_token, Sub(op.tx.fee.clone()), 1),
         ];
 
         let fee = CollectedFee {
