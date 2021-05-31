@@ -113,7 +113,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= toProcess;
     }
 
-    function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
+    function withdrawPendingNFTBalance(uint32 _tokenId) external {
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
         require(op.creatorAddress != address(0), "op"); // No NFT to withdraw
         NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
@@ -129,5 +129,28 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         withdrawnNFTs[op.tokenId] = address(_factory);
         emit WithdrawalNFT(op.tokenId);
         delete pendingWithdrawnNFTs[_tokenId];
+    }
+
+    address internal constant SECURITY_COUNCIL_2_WEEKS_ADDRESS = address($$(SECURITY_COUNCIL_2_WEEKS_ADDRESS));
+    address internal constant SECURITY_COUNCIL_1_WEEK_ADDRESS = address($$(SECURITY_COUNCIL_1_WEEK_ADDRESS));
+    address internal constant SECURITY_COUNCIL_3_DAYS_ADDRESS = address($$(SECURITY_COUNCIL_3_DAYS_ADDRESS));
+
+    function cutNoticePeriod() external {
+        require(upgradeStartTimestamp != 0);
+        if (msg.sender == SECURITY_COUNCIL_2_WEEKS_ADDRESS) {
+            if (approvedUpgradeNoticePeriod > 2 weeks) {
+                approvedUpgradeNoticePeriod = 2 weeks;
+            }
+        }
+        if (msg.sender == SECURITY_COUNCIL_1_WEEK_ADDRESS) {
+            if (approvedUpgradeNoticePeriod > 1 weeks) {
+                approvedUpgradeNoticePeriod = 1 weeks;
+            }
+        }
+        if (msg.sender == SECURITY_COUNCIL_3_DAYS_ADDRESS) {
+            if (approvedUpgradeNoticePeriod > 3 days) {
+                approvedUpgradeNoticePeriod = 3 days;
+            }
+        }
     }
 }

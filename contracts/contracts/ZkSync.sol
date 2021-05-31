@@ -164,22 +164,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     address internal constant SECURITY_COUNCIL_3_DAYS_ADDRESS = address($$(SECURITY_COUNCIL_3_DAYS_ADDRESS));
 
     function cutNoticePeriod() external nonReentrant {
-        require(upgradeStartTimestamp != 0);
-        if (msg.sender == SECURITY_COUNCIL_2_WEEKS_ADDRESS) {
-            if (approvedUpgradeNoticePeriod > 2 weeks) {
-                approvedUpgradeNoticePeriod = 2 weeks;
-            }
-        }
-        if (msg.sender == SECURITY_COUNCIL_1_WEEK_ADDRESS) {
-            if (approvedUpgradeNoticePeriod > 1 weeks) {
-                approvedUpgradeNoticePeriod = 1 weeks;
-            }
-        }
-        if (msg.sender == SECURITY_COUNCIL_3_DAYS_ADDRESS) {
-            if (approvedUpgradeNoticePeriod > 3 days) {
-                approvedUpgradeNoticePeriod = 3 days;
-            }
-        }
+        delegateAdditional();
     }
 
     /// @notice Sends tokens
