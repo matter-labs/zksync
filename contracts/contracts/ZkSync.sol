@@ -74,7 +74,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Notification that upgrade notice period started
     /// @dev Can be external because Proxy contract intercepts illegal calls of this function
-    // solhint-disable-next-line no-empty-blocks
     function upgradeNoticePeriodStarted() external override {
         upgradeStartTimestamp = block.timestamp;
     }
