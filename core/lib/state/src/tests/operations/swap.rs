@@ -2,6 +2,7 @@ use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use num::{BigUint, Zero};
 use zksync_crypto::PrivateKey;
 use zksync_types::{Account, AccountId, AccountUpdate, Order, Swap, TokenId};
+use TestResult::*;
 
 type TestAccount = (AccountId, Account, PrivateKey);
 
@@ -25,10 +26,8 @@ enum TestResult {
     Failure(&'static str),
 }
 
-use TestResult::*;
-
 impl TestSwap {
-    fn test_success(&self, mut tb: PlasmaTestBuilder, outcome: TestResult) {
+    fn test(&self, mut tb: PlasmaTestBuilder, outcome: TestResult) {
         let (account_0_id, account_0, account_0_sk) = &self.test_accounts[self.accounts.0];
         let (account_1_id, account_1, account_1_sk) = &self.test_accounts[self.accounts.1];
         let (recipient_0_id, recipient_0, _) = &self.test_accounts[self.recipients.0];
@@ -206,13 +205,13 @@ fn swap_success() {
         test_accounts: vec![
             tb.add_account(Unlocked),
             tb.add_account(Unlocked),
-            tb.add_account(Unlocked),
+            tb.add_account(Locked),
             tb.add_account(Unlocked),
             tb.add_account(Unlocked),
         ],
     };
 
-    test_swap.test_success(
+    test_swap.test(
         tb,
         Success(vec![(100, 50), (0, 50), (200, 100), (0, 100), (50, 25)]),
     );
@@ -242,5 +241,181 @@ fn self_swap_fail() {
         ],
     };
 
-    test_swap.test_success(tb, Failure("Self-swap is not allowed"));
+    test_swap.test(tb, Failure("Self-swap is not allowed"));
+}
+
+#[test]
+fn equal_tokens_fail() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (2, 3),
+        submitter: 4,
+        tokens: (18, 18),
+        fee_token: 0,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 1),
+        second_price: (1, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(tb, Failure("Can't swap for the same token"));
+}
+
+#[test]
+fn not_enough_balance_fail() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (2, 3),
+        submitter: 4,
+        tokens: (18, 19),
+        fee_token: 0,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (49, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(tb, Failure("Not enough balance"));
+}
+
+#[test]
+fn wrong_prices_fail() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (2, 3),
+        submitter: 4,
+        tokens: (18, 19),
+        fee_token: 0,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (1, 2),
+        is_limit_order: (false, false),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(tb, Failure("Amounts are not compatible with prices"));
+}
+
+#[test]
+fn zero_swap_success() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (2, 3),
+        submitter: 4,
+        tokens: (18, 19),
+        fee_token: 0,
+        amounts: (0, 0),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Locked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(
+        tb,
+        Success(vec![(100, 100), (0, 0), (200, 200), (0, 0), (50, 25)]),
+    );
+}
+
+#[test]
+fn not_exact_prices_success() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (2, 3),
+        submitter: 4,
+        tokens: (18, 19),
+        fee_token: 0,
+        amounts: (100, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (100, 99),
+        second_price: (100, 99),
+        is_limit_order: (false, false),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Locked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(
+        tb,
+        Success(vec![(100, 0), (0, 100), (200, 100), (0, 100), (50, 25)]),
+    );
+}
+
+#[test]
+fn pay_with_received_success() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (2, 3),
+        submitter: 3,
+        tokens: (18, 19),
+        fee_token: 18,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 0),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Locked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(
+        tb,
+        Success(vec![(100, 50), (0, 50), (200, 100), (0, 100), (50, 25)]),
+    );
 }
