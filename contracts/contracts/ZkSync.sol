@@ -69,19 +69,26 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Notice period before activation preparation status of upgrade mode
     function getNoticePeriod() external pure override returns (uint256) {
-        return UPGRADE_NOTICE_PERIOD;
+        return 0;
     }
 
     /// @notice Notification that upgrade notice period started
     /// @dev Can be external because Proxy contract intercepts illegal calls of this function
     // solhint-disable-next-line no-empty-blocks
-    function upgradeNoticePeriodStarted() external override {}
+    function upgradeNoticePeriodStarted() external override {
+        upgradeStartTimestamp = block.timestamp;
+    }
 
     /// @notice Notification that upgrade preparation status is activated
     /// @dev Can be external because Proxy contract intercepts illegal calls of this function
     function upgradePreparationStarted() external override {
         upgradePreparationActive = true;
         upgradePreparationActivationTime = block.timestamp;
+
+        require(
+            block.timestamp >= upgradeStartTimestamp &&
+                block.timestamp - upgradeStartTimestamp >= approvedUpgradeNoticePeriod
+        );
     }
 
     /// @notice Notification that upgrade canceled
@@ -89,6 +96,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function upgradeCanceled() external override {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
+        approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+        upgradeStartTimestamp = 0;
     }
 
     /// @notice Notification that upgrade finishes
@@ -96,6 +105,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function upgradeFinishes() external override {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
+        approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+        upgradeStartTimestamp = 0;
     }
 
     /// @notice Checks that contract is ready for upgrade
@@ -123,6 +134,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, 0, _genesisStateHash, bytes32(0));
 
         storedBlockHashes[0] = hashStoredBlockInfo(storedBlockZero);
+
+        approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
     }
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -146,6 +159,31 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         lastBlockInfo.stateHash = newRootHash;
         storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(lastBlockInfo);
         additionalZkSync = address($$(NEW_ADDITIONAL_ZKSYNC_ADDRESS));
+
+        approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+    }
+
+    address internal constant SECURITY_COUNCIL_2_WEEKS_ADDRESS = address($$(SECURITY_COUNCIL_2_WEEKS_ADDRESS));
+    address internal constant SECURITY_COUNCIL_1_WEEK_ADDRESS = address($$(SECURITY_COUNCIL_1_WEEK_ADDRESS));
+    address internal constant SECURITY_COUNCIL_3_DAYS_ADDRESS = address($$(SECURITY_COUNCIL_3_DAYS_ADDRESS));
+
+    function cutNoticePeriod() external nonReentrant {
+        require(upgradeStartTimestamp != 0);
+        if (mgs.sender == SECURITY_COUNCIL_2_WEEKS_ADDRESS) {
+            if (approvedUpgradeNoticePeriod > 2 weeks) {
+                approvedUpgradeNoticePeriod = 2 weeks;
+            }
+        }
+        if (mgs.sender == SECURITY_COUNCIL_1_WEEKS_ADDRESS) {
+            if (approvedUpgradeNoticePeriod > 1 weeks) {
+                approvedUpgradeNoticePeriod = 1 weeks;
+            }
+        }
+        if (mgs.sender == SECURITY_COUNCIL_1_WEEKS_ADDRESS) {
+            if (approvedUpgradeNoticePeriod > 3 days) {
+                approvedUpgradeNoticePeriod = 3 days;
+            }
+        }
     }
 
     /// @notice Sends tokens
