@@ -1,4 +1,4 @@
-use ethabi::{Contract, Hash};
+use ethabi::Contract;
 use std::fs;
 use std::io;
 use std::str::FromStr;
