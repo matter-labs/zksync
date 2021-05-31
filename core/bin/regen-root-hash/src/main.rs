@@ -11,7 +11,7 @@ use account::{
 };
 
 use structopt::StructOpt;
-use utils::fr_to_hex;
+use utils::{fr_to_hex, get_tx_data};
 use zksync_circuit::witness::utils::fr_from_bytes;
 
 use hasher::{get_state, verify_accounts_equal, verify_identical_trees};
@@ -108,6 +108,12 @@ async fn main() -> anyhow::Result<()> {
     if params.db_migrate {
         println!("Migrating the database to enable NFTs");
         migrage_db_for_nft(old_hash, new_tree).await?;
+    } else {
+        let calldata = get_tx_data(old_hash, new_hash);
+        println!(
+            "The calldata of the call to regenesis multisig is 0x{}",
+            calldata
+        );
     }
 
     Ok(())

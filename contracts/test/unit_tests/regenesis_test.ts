@@ -55,35 +55,14 @@ describe('Regenesis test', function () {
             'PreparationStart'
         );
 
-        // Submitting signatures to the multisig
-        expect(await regenesisMultisigContract.numberOfPartners()).to.eq(4, 'The test is aimed at 4 partners');
-        expect(await regenesisMultisigContract.requiredNumberOfSignatures()).to.eq(
-            3,
-            'The test is aimed at 3 required signatures'
-        );
-
         const oldRootHash = process.env.CONTRACTS_GENESIS_ROOT;
         expect(oldRootHash).to.eq(
             '0x2d5ab622df708ab44944bb02377be85b6f27812e9ae520734873b7a193898ba4',
             'The test requires a specific GENESIS_ROOT'
         );
         const newRootHash = '0x2a9b50e17ece607c8c88b1833426fd9e60332685b94a1534fcf26948e373604c';
-        const signatures = [
-            // Correct signature for 0x374Ac2A10cBCaE93d2aBBe468f0EDEF6768e65eE
-            '0xeae499cb52c214e998ec9311e883f9362d8f0e2448e1c2275ebacd2ad92679751e79d8e9f7ed6ff513afc55ac5acf09bd4f1b6b893e0fb849c89cf3d25d091341c',
-            // Correct signature for 0xB991c776AedacfA5a7e8CF3e7aD6CB6C1AcB9227
-            '0x23e85b70fdbcb1eaeacf83a3a62c5bbfb604bd34f8ef9798f05fe915ad5d3cc6661c7f941dc7656c63ee28bbec760b32cbb893cc04560ff433eacc92aecec60a1c',
-            // Incorrect signature
-            '0x4843ef9f8e9bb01c883b4df5b99a5287d4602e6340f9d4207900af5a333b5d90186cb5267f8789e6364d2fa737778e13c129b295fdc5f220d4bfa03e948f262e1b',
-            // Correct signature for 0x093Cf8450c5eE506aB865F68F5f8EB8C4C2073C2
-            '0xb0b6e1efbca8abd97a4cb96c19ef59f6640c10b9369e2d89111a8f0622a0b0c249a0bef1d4479a98c85832926ef04072ff2e9f51fde53967ce235971995629001c'
-        ];
 
-        const submitSignaturesTx = await regenesisMultisigContract.submitSignatures(
-            oldRootHash,
-            newRootHash,
-            signatures
-        );
+        const submitSignaturesTx = await regenesisMultisigContract.submitHash(oldRootHash, newRootHash);
         await submitSignaturesTx.wait();
 
         // After the new root hash has been submitted to the multisig,
@@ -121,6 +100,41 @@ describe('Regenesis test', function () {
         expect(additionalZkSyncAddress.toLowerCase()).to.eq(
             newAdditionalZkSyncAddress.toLowerCase(),
             'The additional zkSync address has been changed wrongly'
+        );
+    });
+
+    it('Test data submission', async () => {
+        const [hardhatWallet]: ethers.Wallet[] = await hardhat.ethers.getSigners();
+        const fundingWalletTx = await hardhatWallet.sendTransaction({
+            to: wallet.address,
+            value: utils.parseEther('3.0')
+        });
+        await fundingWalletTx.wait();
+
+        const contracts = readProductionContracts();
+        const deployer = new Deployer({ deployWallet: wallet, contracts });
+        await deployer.deployRegenesisMultisig({ gasLimit: 6500000 });
+        await deployer.deployAll({ gasLimit: 6500000 });
+
+        const regenesisMultisigContract = RegenesisMultisigFactory.connect(
+            deployer.addresses.RegenesisMultisig,
+            wallet
+        );
+
+        const tx = await wallet.sendTransaction({
+            to: regenesisMultisigContract.address,
+            // The calldata was retrieved from the regen-root-hash tool
+            data: '0x905717402f59c906954c0445843de5e33ceb41d60b5ed5d3d78f0575bc345bd3514ea0910c0c243023dce4bb411344d572dcc24bd77d393ef5a02ef4f5ffd12649634d5e'
+        });
+        await tx.wait();
+
+        expect(await regenesisMultisigContract.oldRootHash()).to.eq(
+            '0x2f59c906954c0445843de5e33ceb41d60b5ed5d3d78f0575bc345bd3514ea091',
+            'The old root hash was not set correctly'
+        );
+        expect(await regenesisMultisigContract.newRootHash()).to.eq(
+            '0x0c0c243023dce4bb411344d572dcc24bd77d393ef5a02ef4f5ffd12649634d5e',
+            'The new root hash was not set correctly'
         );
     });
 });

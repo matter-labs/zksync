@@ -313,17 +313,10 @@ export class Deployer {
             console.log('Deploying Regenesis Multisig contract');
         }
 
-        const partners = process.env.MISC_REGENESIS_PARTNERS.split(',');
-        const numberOfNeededSignatures = +process.env.MISC_REGENESIS_NEEDED_SIGNATURES;
-
-        if (partners.length < numberOfNeededSignatures) {
-            throw new Error('Number of required signatures for Genesis is higher than the number of partners');
-        }
-
         const regenesisMultisigContract = await deployContract(
             this.deployWallet,
             this.contracts.regenesisMultisig,
-            [partners, numberOfNeededSignatures],
+            [process.env.MISC_REGENESIS_GNOSIS_ADDRESS],
             {
                 gasLimit: 6000000,
                 ...ethTxOptions

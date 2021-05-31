@@ -19,14 +19,11 @@ contract RegenesisMultisig is Ownable {
         gnosisAddress = _gnosisAddress;
     }
 
-    function submitHash(
-        bytes32 _oldRootHash,
-        bytes32 _newRootHash
-    ) external {
-        // Only gnosis multisig of the security council can submit 
+    function submitHash(bytes32 _oldRootHash, bytes32 _newRootHash) external {
+        // Only gnosis multisig of the security council can submit
         // the new root hash
-        require(msg.sender == gnosisAddress, "1"); 
-        
+        require(msg.sender == gnosisAddress, "1");
+
         oldRootHash = _oldRootHash;
         newRootHash = _newRootHash;
     }
