@@ -93,6 +93,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
         upgradeStartTimestamp = 0;
     }
 
@@ -102,6 +103,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
         upgradeStartTimestamp = 0;
     }
 
@@ -132,6 +134,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         storedBlockHashes[0] = hashStoredBlockInfo(storedBlockZero);
 
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
     }
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -157,6 +160,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         additionalZkSync = address($$(NEW_ADDITIONAL_ZKSYNC_ADDRESS));
 
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
     }
 
     function cutNoticePeriod() external nonReentrant {

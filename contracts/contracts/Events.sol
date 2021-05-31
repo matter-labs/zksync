@@ -58,6 +58,9 @@ interface Events {
         uint16 indexed tokenId,
         uint128 amount
     );
+
+    /// @notice Notice period changed
+    event NoticePeriodChange(uint256 newNoticePeriod);
 }
 
 /// @title Upgrade events
