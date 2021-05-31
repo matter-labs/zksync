@@ -85,10 +85,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         upgradePreparationActive = true;
         upgradePreparationActivationTime = block.timestamp;
 
-        require(
-            block.timestamp >= upgradeStartTimestamp &&
-                block.timestamp - upgradeStartTimestamp >= approvedUpgradeNoticePeriod
-        );
+        require(block.timestamp >= upgradeStartTimestamp.add(approvedUpgradeNoticePeriod));
     }
 
     /// @notice Notification that upgrade canceled
