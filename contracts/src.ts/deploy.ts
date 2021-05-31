@@ -265,7 +265,7 @@ export class Deployer {
 
         const governance = this.addresses.Governance;
         const listingFeeToken = process.env.MISC_LISTING_FEE_TOKEN;
-        const listingFee = process.env.MISC_LISTING_FEE_TOKEN;
+        const listingFee = process.env.MISC_LISTING_FEE;
         const listingCap = process.env.MISC_LISTING_CAP;
         const treasury = process.env.MISC_LISTING_TREASURY;
 

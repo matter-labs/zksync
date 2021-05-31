@@ -16,16 +16,18 @@ async function startUpgrade(wallet: ethers.Wallet, upgradeGatekeeper: Contract) 
         gasLimit: 6500000
     });
 
+    console.log(`CONTRACTS_GOVERNANCE_TARGET_ADDR=${newTargetGov.address}`);
     console.log('Deploying new Verifier target...');
     const newTargetVerifier = await deployContract(wallet, testContracts.verifier, [], {
         gasLimit: 6500000
     });
 
-    console.log('Deploying new zkSync target...');
+    console.log(`CONTRACTS_VERIFIER_TARGET_ADDR=${newTargetVerifier.address}`);
     const newTargetZkSync = await deployContract(wallet, testContracts.zkSync, [], {
         gasLimit: 6500000
     });
 
+    console.log(`CONTRACTS_CONTRACT_TARGET_ADDR=${newTargetZkSync.address}`);
     console.log('Starting upgrade...');
     await (
         await upgradeGatekeeper.startUpgrade(
