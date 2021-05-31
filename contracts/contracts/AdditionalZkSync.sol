@@ -153,4 +153,54 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             }
         }
     }
+
+    /// @notice Set data for changing pubkey hash using onchain authorization.
+    ///         Transaction author (msg.sender) should be L2 account address
+    /// @notice New pubkey hash can be reset, to do that user should send two transactions:
+    ///         1) First `setAuthPubkeyHash` transaction for already used `_nonce` will set timer.
+    ///         2) After `AUTH_FACT_RESET_TIMELOCK` time is passed second `setAuthPubkeyHash` transaction will reset pubkey hash for `_nonce`.
+    /// @param _pubkeyHash New pubkey hash
+    /// @param _nonce Nonce of the change pubkey L2 transaction
+    function setAuthPubkeyHash(bytes calldata _pubkeyHash, uint32 _nonce) external {
+        require(_pubkeyHash.length == PUBKEY_HASH_BYTES, "y"); // PubKeyHash should be 20 bytes.
+        if (authFacts[msg.sender][_nonce] == bytes32(0)) {
+            authFacts[msg.sender][_nonce] = keccak256(_pubkeyHash);
+        } else {
+            uint256 currentResetTimer = authFactsResetTimer[msg.sender][_nonce];
+            if (currentResetTimer == 0) {
+                authFactsResetTimer[msg.sender][_nonce] = block.timestamp;
+            } else {
+                require(block.timestamp.sub(currentResetTimer) >= AUTH_FACT_RESET_TIMELOCK, "z");
+                authFactsResetTimer[msg.sender][_nonce] = 0;
+                authFacts[msg.sender][_nonce] = keccak256(_pubkeyHash);
+            }
+        }
+    }
+
+    /// @notice Reverts unverified blocks
+    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external {
+        governance.requireActiveValidator(msg.sender);
+
+        uint32 blocksCommitted = totalBlocksCommitted;
+        uint32 blocksToRevert = Utils.minU32(uint32(_blocksToRevert.length), blocksCommitted - totalBlocksExecuted);
+        uint64 revertedPriorityRequests = 0;
+
+        for (uint32 i = 0; i < blocksToRevert; ++i) {
+            StoredBlockInfo memory storedBlockInfo = _blocksToRevert[i];
+            require(storedBlockHashes[blocksCommitted] == hashStoredBlockInfo(storedBlockInfo), "r"); // incorrect stored block info
+
+            delete storedBlockHashes[blocksCommitted];
+
+            --blocksCommitted;
+            revertedPriorityRequests += storedBlockInfo.priorityOperations;
+        }
+
+        totalBlocksCommitted = blocksCommitted;
+        totalCommittedPriorityRequests -= revertedPriorityRequests;
+        if (totalBlocksCommitted < totalBlocksProven) {
+            totalBlocksProven = totalBlocksCommitted;
+        }
+
+        emit BlocksRevert(totalBlocksExecuted, blocksCommitted);
+    }
 }
