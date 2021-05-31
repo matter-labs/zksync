@@ -2,20 +2,17 @@
 
 pragma solidity ^0.7.0;
 
-import "./Ownable.sol";
-import "./Utils.sol";
-
 pragma experimental ABIEncoderV2;
 
 /// @title Regenesis Multisig contract
 /// @author Matter Labs
-contract RegenesisMultisig is Ownable {
+contract RegenesisMultisig {
     address public gnosisAddress;
 
     bytes32 public oldRootHash;
     bytes32 public newRootHash;
 
-    constructor(address _gnosisAddress) Ownable(msg.sender) {
+    constructor(address _gnosisAddress) {
         gnosisAddress = _gnosisAddress;
     }
 
