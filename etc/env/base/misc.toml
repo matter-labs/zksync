@@ -28,6 +28,9 @@ log_format="plain"
 
 sentry_url="unset"
 
+# The address of the regenesis multisig smart contract
+regenesis_multisig_address="0xAA7113B9de498556dC76eDFEFc57681083c861C1"
+
 # The address of the regenesis gnosis smart contract
 regenesis_gnosis_address="0xbD5Ca6f189111A1befd4ffAa6F17f62D4535F254"
 
