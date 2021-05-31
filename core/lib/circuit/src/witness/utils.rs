@@ -50,13 +50,13 @@ use zksync_crypto::params::number_of_processable_tokens;
 
 macro_rules! get_bytes {
     ($tx:ident) => {
-        if let Some((_, version)) = $tx.tx.verify_signature() {
-            match version {
-                TxVersion::Legacy => $tx.tx.get_old_bytes(),
-                TxVersion::V1 => $tx.tx.get_bytes(),
-            }
-        } else {
-            vec![]
+        let (_, version) = $tx
+            .tx
+            .verify_signature()
+            .expect("Transaction signature should be correct");
+        match version {
+            TxVersion::Legacy => $tx.tx.get_old_bytes(),
+            TxVersion::V1 => $tx.tx.get_bytes(),
         }
     };
 }
