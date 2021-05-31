@@ -174,7 +174,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 approvedUpgradeNoticePeriod = 2 weeks;
             }
         }
-        if (msg.sender == SECURITY_COUNCIL_1_WEEKS_ADDRESS) {
+        if (msg.sender == SECURITY_COUNCIL_1_WEEK_ADDRESS) {
             if (approvedUpgradeNoticePeriod > 1 weeks) {
                 approvedUpgradeNoticePeriod = 1 weeks;
             }
