@@ -87,8 +87,9 @@ export class Provider {
     static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
@@ -101,8 +102,9 @@ export class Provider {
         if (pollIntervalMilliSecs) {
             provider.pollIntervalMilliSecs = pollIntervalMilliSecs;
         }
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
@@ -114,8 +116,9 @@ export class Provider {
         const transport = new DummyTransport(network, ethPrivateKey, getTokens);
         const provider = new Provider(transport);
 
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
