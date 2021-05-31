@@ -163,4 +163,11 @@ contract Storage {
     mapping(uint32 => Operations.WithdrawNFT) internal pendingWithdrawnNFTs;
 
     address internal additionalZkSync;
+
+    /// @dev Upgrade notice period, possibly shorten by the security council
+    uint256 internal approvedUpgradeNoticePeriod;
+
+    /// @dev Upgrade start timestamp (as seconds since unix epoch)
+    /// @dev Will be equal to zero in case of not active upgrade mode
+    uint256 internal upgradeStartTimestamp;
 }
