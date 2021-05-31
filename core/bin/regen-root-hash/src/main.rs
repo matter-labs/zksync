@@ -11,14 +11,14 @@ use account::{
 };
 
 use structopt::StructOpt;
-use utils::{fr_to_hex, sign_message};
+use utils::fr_to_hex;
 use zksync_circuit::witness::utils::fr_from_bytes;
 
 use hasher::{get_state, verify_accounts_equal, verify_identical_trees};
 use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
 
+use crate::db_migrate::read_accounts_from_db;
 use crate::db_migrate::{get_last_block_info, migrage_db_for_nft};
-use crate::{db_migrate::read_accounts_from_db, utils::get_message_to_sign};
 
 #[derive(Debug, StructOpt)]
 pub struct Params {
@@ -46,10 +46,6 @@ pub struct Params {
     /// The path to the JSON dump of the accounts table
     #[structopt(short = "b", env = "BALANCES_DUMP")]
     pub balances_dump: Option<String>,
-
-    /// The private key of the signer
-    #[structopt(short = "p", env = "PRIVATE_KEY")]
-    pub private_key: Option<String>,
 }
 
 #[tokio::main]
@@ -112,14 +108,6 @@ async fn main() -> anyhow::Result<()> {
     if params.db_migrate {
         println!("Migrating the database to enable NFTs");
         migrage_db_for_nft(old_hash, new_tree).await?;
-    } else {
-        let message_to_sign = get_message_to_sign(old_hash, new_hash);
-        println!("\nSigning prefixed message: {}", message_to_sign);
-
-        let private_key = params.private_key.expect("Private key should be supplied");
-        let private_key = private_key[2..].to_owned();
-        let signature = sign_message(private_key, message_to_sign);
-        println!("\nSignature: 0x{}", signature);
     }
 
     Ok(())

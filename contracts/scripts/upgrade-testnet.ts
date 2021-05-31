@@ -26,7 +26,8 @@ async function main() {
     });
     parser.addArgument('--initArgs', {
         required: false,
-        help: 'Upgrade function parameters comma-separated, RLP serialized in hex (Governance,Verifier,ZkSync): 0xaa..aa,0xbb..bb,0xcc..c or zero by default.',
+        help:
+            'Upgrade function parameters comma-separated, RLP serialized in hex (Governance,Verifier,ZkSync): 0xaa..aa,0xbb..bb,0xcc..c or zero by default.',
         defaultValue: '0x,0x,0x'
     });
     parser.addArgument('--cancelPreviousUpgrade', {
