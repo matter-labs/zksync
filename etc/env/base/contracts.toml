@@ -18,7 +18,7 @@ NFT_FACTORY_ADDR=""
 # The initial version of the deployed zkSync contract.
 # Data restore uses this variable for tracking contract updates and
 # setting correct available block chunk sizes.
-init_contract_version=4
+init_contract_version=6
 
 # Ethereum blocks that include UpgradeComplete events emitted by
 # the upgrade gatekeeper contract. We have to provide them from
