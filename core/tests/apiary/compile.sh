@@ -1,1 +1,1 @@
-aglio -i input.apib -o index.html
+aglio -i documentation.apib -o index.html

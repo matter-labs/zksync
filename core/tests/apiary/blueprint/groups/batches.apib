@@ -14,14 +14,14 @@ Submit batch of transactions.
     + Attributes
         + request (Request, required)
         + status: success (string, required)
-        + result (SubmitBatchResponse, required, nullable)
+        + result (SubmitBatchResponse, required{{isResultNullable}})
         + error (Error, required, nullable)
 
 
 ## api/v0.2/transactions/batches/:txBatchHash [/transactions/batches/{txBatchHash}]
 
 + Parameters
-    + txBatchHash (required, string, `0x6d6f7e07c85a770c6cb9f667c6b7d2d6335781f956a3a66503c87a56fd392e80`) ... the hash of the contents of the batch queried
+    + txBatchHash (required, string, `{{txBatchHash}}`) ... the hash of the contents of the batch queried
 
 ### Get transactions batch status [GET]
 Get transactions batch status (latest receipt)
@@ -30,6 +30,5 @@ Get transactions batch status (latest receipt)
     + Attributes
         + request (Request, required)
         + status: success (string, required)
-        + result (BatchStatus, nullable)
+        + result (BatchStatus, required{{isResultNullable}})
         + error (Error, required, nullable)
-

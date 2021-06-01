@@ -11,7 +11,8 @@
       "infrastructure/explorer",
       "infrastructure/zk",
       "infrastructure/reading-tool",
-      "core/tests/ts-tests"
+      "core/tests/ts-tests",
+      "core/tests/apiary"
     ],
     "nohoist": [
       "**/@vue/**",

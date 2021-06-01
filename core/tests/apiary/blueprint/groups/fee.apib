@@ -15,7 +15,7 @@ Request fee for a single transaction.
     + Attributes
         + request (Request, required)
         + status: success (string, required)
-        + result (Fee.Single, required, nullable)
+        + result (Fee.Single, required{{isResultNullable}})
         + error (Error, required, nullable)
 
 ## api/v0.2/fee/batch [/fee/batch]
@@ -33,5 +33,5 @@ Request fee for a transactions batch.
     + Attributes
         + request (Request, required)
         + status: success (string, required)
-        + result (Fee.Batch, required, nullable)
+        + result (Fee.Batch, required{{isResultNullable}})
         + error (Error, required, nullable)

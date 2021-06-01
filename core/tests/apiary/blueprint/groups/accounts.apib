@@ -3,7 +3,7 @@
 ## api/v0.2/accounts [/accounts/{accountIdOrAddress}/{stateType}]
 
 + Parameters
-    + accountIdOrAddress (required, string, `2319`) ... Account Id or address in the zkSync network
+    + accountIdOrAddress (required, string, `1`) ... Account Id or address in the zkSync network
     + stateType (required, "committed" | "finalized", `committed`) ... The type of account state which we want to get
 
 ### Get account state [GET]
@@ -13,13 +13,13 @@ Returns the account state for a particular block
     + Attributes
         + request (Request, required)
         + status: success (string, required)
-        + result (Account, required, nullable)
+        + result (Account, required{{isResultNullable}})
         + error (Error, required, nullable)
 
-## api/v0.2/accounts/{account_id}/transactions [/accounts/{accountIdOrAddress}/transactions{?from,limit,direction}]
+## api/v0.2/accounts/{accountIdOrAddress}/transactions [/accounts/{accountIdOrAddress}/transactions{?from,limit,direction}]
 
 + Parameters
-    + accountIdOrAddress (required, string, `2319`) ... Account Id or address in the zkSync network
+    + accountIdOrAddress (required, string, `1`) ... Account Id or address in the zkSync network
     + from (required, "latest" | string, `latest`) ... From which transaction to show
     + limit (required, number, `2`) ... The limit of transactions to be shown
     + direction (required, "newer" | "older", `older`) ... newer or older than the id of the `from`
@@ -32,15 +32,15 @@ Returns the transactions for a particular account according to the query params
     + Attributes
         + request (Request, required)
         + status: success (string, required)
-        + result (object, required, nullable)
+        + result (object, required{{isResultNullable}})
             + pagination (PaginationFromHash, required)
             + list (array[Transaction.InBlock], required)
         + error (Error, required, nullable)
 
-## api/v0.2/accounts/{account_id}/transactions/pending [/accounts/{accountIdOrAddress}/transactions/pending{?from,limit,direction}]
+## api/v0.2/accounts/{accountIdOrAddress}/transactions/pending [/accounts/{accountIdOrAddress}/transactions/pending{?from,limit,direction}]
 
 + Parameters
-    + accountIdOrAddress (required, string, `2319`) ... Account Id or address in the zkSync network
+    + accountIdOrAddress (required, string, `1`) ... Account Id or address in the zkSync network
     + from (required, "latest" | number, `100`) ... From which transaction to show
     + limit (required, number, `2`) ... The limit of transactions to be shown
     + direction (required, "newer" | "older", `older`) ... newer or older than the id of the `from`
@@ -52,7 +52,7 @@ Get account pending priority operations.
     + Attributes
         + request (Request, required)
         + status: success (string, required)
-        + result (object, required, nullable)
+        + result (object, required{{isResultNullable}})
             + pagination (PaginationFromNumber, required)
             + list (array[Transaction.InBlock.L1], required)
         + error (Error, required, nullable)
