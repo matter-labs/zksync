@@ -171,7 +171,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
     }
 
-    function cutNoticePeriod() external {
+    function cutUpgradeNoticePeriod() external {
         /// All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
