@@ -1,0 +1,58 @@
+# Group Accounts
+
+## api/v0.2/accounts [/accounts/{accountIdOrAddress}/{stateType}]
+
++ Parameters
+    + accountIdOrAddress (required, string, `2319`) ... Account Id or address in the zkSync network
+    + stateType (required, "committed" | "finalized", `committed`) ... The type of account state which we want to get
+
+### Get account state [GET]
+Returns the account state for a particular block
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Account, required, nullable)
+        + error (Error, required, nullable)
+
+## api/v0.2/accounts/{account_id}/transactions [/accounts/{accountIdOrAddress}/transactions{?from,limit,direction}]
+
++ Parameters
+    + accountIdOrAddress (required, string, `2319`) ... Account Id or address in the zkSync network
+    + from (required, "latest" | string, `latest`) ... From which transaction to show
+    + limit (required, number, `2`) ... The limit of transactions to be shown
+    + direction (required, "newer" | "older", `older`) ... newer or older than the id of the `from`
+
+
+### Get account transactions [GET]
+Returns the transactions for a particular account according to the query params
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (object, required, nullable)
+            + pagination (PaginationFromHash, required)
+            + list (array[Transaction.InBlock], required)
+        + error (Error, required, nullable)
+
+## api/v0.2/accounts/{account_id}/transactions/pending [/accounts/{accountIdOrAddress}/transactions/pending{?from,limit,direction}]
+
++ Parameters
+    + accountIdOrAddress (required, string, `2319`) ... Account Id or address in the zkSync network
+    + from (required, "latest" | number, `100`) ... From which transaction to show
+    + limit (required, number, `2`) ... The limit of transactions to be shown
+    + direction (required, "newer" | "older", `older`) ... newer or older than the id of the `from`
+
+### Get pending priority operations [GET]
+Get account pending priority operations.
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (object, required, nullable)
+            + pagination (PaginationFromNumber, required)
+            + list (array[Transaction.InBlock.L1], required)
+        + error (Error, required, nullable)

@@ -1,0 +1,35 @@
+# Group Batches
+
+## api/v0.2/transactions/batches [/transactions/batches]
+
+### Submit batch of transactions [POST]
+Submit batch of transactions.
+
++ Request (application/json)
+    + Attributes
+        + txs (array[Transaction.Incoming], required)
+        + signature (BatchSignature, required)
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (SubmitBatchResponse, required, nullable)
+        + error (Error, required, nullable)
+
+
+## api/v0.2/transactions/batches/:txBatchHash [/transactions/batches/{txBatchHash}]
+
++ Parameters
+    + txBatchHash (required, string, `0x6d6f7e07c85a770c6cb9f667c6b7d2d6335781f956a3a66503c87a56fd392e80`) ... the hash of the contents of the batch queried
+
+### Get transactions batch status [GET]
+Get transactions batch status (latest receipt)
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (BatchStatus, nullable)
+        + error (Error, required, nullable)
+
