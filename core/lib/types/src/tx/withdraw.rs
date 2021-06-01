@@ -19,6 +19,7 @@ use crate::{
 };
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
+use crate::tx::version::TxVersion;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,7 +198,7 @@ impl Withdraw {
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
-    pub fn verify_signature(&self) -> Option<PubKeyHash> {
+    pub fn verify_signature(&self) -> Option<(PubKeyHash, TxVersion)> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
@@ -207,12 +208,12 @@ impl Withdraw {
                     .verify_musig(&self.get_old_bytes())
                     .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
                 {
-                    return Some(res);
+                    return Some((res, TxVersion::Legacy));
                 }
             }
             self.signature
                 .verify_musig(&self.get_bytes())
-                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                .map(|pub_key| (PubKeyHash::from_pubkey(&pub_key), TxVersion::V1))
         }
     }
 

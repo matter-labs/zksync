@@ -22,6 +22,7 @@ use crate::{
 };
 
 use crate::tx::error::TransactionSignatureError;
+use crate::tx::version::TxVersion;
 use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
 
 /// `Transfer` transaction performs a move of funds from one zkSync account to another.
@@ -196,7 +197,7 @@ impl Transfer {
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
-    pub fn verify_signature(&self) -> Option<PubKeyHash> {
+    pub fn verify_signature(&self) -> Option<(PubKeyHash, TxVersion)> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
@@ -206,12 +207,12 @@ impl Transfer {
                     .verify_musig(&self.get_old_bytes())
                     .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
                 {
-                    return Some(res);
+                    return Some((res, TxVersion::Legacy));
                 }
             }
             self.signature
                 .verify_musig(&self.get_bytes())
-                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                .map(|pub_key| (PubKeyHash::from_pubkey(&pub_key), TxVersion::V1))
         }
     }
 

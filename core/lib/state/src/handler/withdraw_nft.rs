@@ -24,14 +24,18 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
         let (account_id, account) = self
             .get_account_by_address(&tx.from)
             .ok_or(WithdrawNFTOpError::FromAccountIncorrect)?;
+
         invariant!(
             account.pub_key_hash != PubKeyHash::default(),
             WithdrawNFTOpError::FromAccountLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(account.pub_key_hash),
-            WithdrawNFTOpError::InvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != account.pub_key_hash {
+                return Err(WithdrawNFTOpError::InvalidSignature);
+            }
+        }
+
         invariant!(
             account_id == tx.account_id,
             WithdrawNFTOpError::FromAccountIncorrect

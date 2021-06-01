@@ -38,10 +38,12 @@ impl TxHandler<MintNFT> for ZkSyncState {
             creator.pub_key_hash != PubKeyHash::default(),
             MintNFTOpError::CreatorAccountIsLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(creator.pub_key_hash),
-            MintNFTOpError::InvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != creator.pub_key_hash {
+                return Err(MintNFTOpError::InvalidSignature);
+            }
+        }
 
         let (recipient, _) = self
             .get_account_by_address(&tx.recipient)
