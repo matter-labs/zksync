@@ -22,7 +22,10 @@ struct TestSwap {
 }
 
 enum TestResult {
-    Success(Vec<(u64, u64)>),
+    Success {
+        nonce_changes: Vec<(u32, u32)>,
+        balance_changes: Vec<(u64, u64)>,
+    },
     Failure(&'static str),
 }
 
@@ -106,7 +109,10 @@ impl TestSwap {
         .expect("swap creation failed");
 
         match outcome {
-            Success(balance_changes) => {
+            Success {
+                nonce_changes,
+                balance_changes,
+            } => {
                 let balance_changes: Vec<_> = balance_changes
                     .iter()
                     .map(|(a, b)| (BigUint::from(*a), BigUint::from(*b)))
@@ -118,8 +124,8 @@ impl TestSwap {
                         (
                             *account_0_id,
                             AccountUpdate::UpdateBalance {
-                                old_nonce: account_0.nonce,
-                                new_nonce: account_0.nonce + 1,
+                                old_nonce: account_0.nonce + nonce_changes[0].0,
+                                new_nonce: account_0.nonce + nonce_changes[0].1,
                                 balance_update: (
                                     token_0,
                                     balance_changes[0].0.clone(),
@@ -130,8 +136,8 @@ impl TestSwap {
                         (
                             *recipient_1_id,
                             AccountUpdate::UpdateBalance {
-                                old_nonce: recipient_1.nonce,
-                                new_nonce: recipient_1.nonce,
+                                old_nonce: recipient_1.nonce + nonce_changes[1].0,
+                                new_nonce: recipient_1.nonce + nonce_changes[1].1,
                                 balance_update: (
                                     token_0,
                                     balance_changes[1].0.clone(),
@@ -142,8 +148,8 @@ impl TestSwap {
                         (
                             *account_1_id,
                             AccountUpdate::UpdateBalance {
-                                old_nonce: account_1.nonce,
-                                new_nonce: account_1.nonce + 1,
+                                old_nonce: account_1.nonce + nonce_changes[2].0,
+                                new_nonce: account_1.nonce + nonce_changes[2].1,
                                 balance_update: (
                                     token_1,
                                     balance_changes[2].0.clone(),
@@ -154,8 +160,8 @@ impl TestSwap {
                         (
                             *recipient_0_id,
                             AccountUpdate::UpdateBalance {
-                                old_nonce: recipient_0.nonce,
-                                new_nonce: recipient_0.nonce,
+                                old_nonce: recipient_0.nonce + nonce_changes[3].0,
+                                new_nonce: recipient_0.nonce + nonce_changes[3].1,
                                 balance_update: (
                                     token_1,
                                     balance_changes[3].0.clone(),
@@ -166,8 +172,8 @@ impl TestSwap {
                         (
                             *submitter_id,
                             AccountUpdate::UpdateBalance {
-                                old_nonce: submitter.nonce,
-                                new_nonce: submitter.nonce + 1,
+                                old_nonce: submitter.nonce + nonce_changes[4].0,
+                                new_nonce: submitter.nonce + nonce_changes[4].1,
                                 balance_update: (
                                     fee_token,
                                     balance_changes[4].0.clone(),
@@ -187,7 +193,7 @@ impl TestSwap {
 }
 
 #[test]
-fn swap_success() {
+fn regular_swap() {
     let mut tb = PlasmaTestBuilder::new();
 
     let test_swap = TestSwap {
@@ -213,12 +219,15 @@ fn swap_success() {
 
     test_swap.test(
         tb,
-        Success(vec![(100, 50), (0, 50), (200, 100), (0, 100), (50, 25)]),
+        Success {
+            nonce_changes: vec![(0, 1), (0, 0), (0, 1), (0, 0), (0, 1)],
+            balance_changes: vec![(100, 50), (0, 50), (200, 100), (0, 100), (50, 25)],
+        },
     );
 }
 
 #[test]
-fn self_swap_fail() {
+fn self_swap() {
     let mut tb = PlasmaTestBuilder::new();
 
     let test_swap = TestSwap {
@@ -245,7 +254,7 @@ fn self_swap_fail() {
 }
 
 #[test]
-fn equal_tokens_fail() {
+fn equal_tokens() {
     let mut tb = PlasmaTestBuilder::new();
 
     let test_swap = TestSwap {
@@ -273,7 +282,7 @@ fn equal_tokens_fail() {
 }
 
 #[test]
-fn not_enough_balance_fail() {
+fn not_enough_balance() {
     let mut tb = PlasmaTestBuilder::new();
 
     let test_swap = TestSwap {
@@ -301,7 +310,7 @@ fn not_enough_balance_fail() {
 }
 
 #[test]
-fn wrong_prices_fail() {
+fn wrong_prices() {
     let mut tb = PlasmaTestBuilder::new();
 
     let test_swap = TestSwap {
@@ -329,38 +338,7 @@ fn wrong_prices_fail() {
 }
 
 #[test]
-fn zero_swap_success() {
-    let mut tb = PlasmaTestBuilder::new();
-
-    let test_swap = TestSwap {
-        accounts: (0, 1),
-        recipients: (2, 3),
-        submitter: 4,
-        tokens: (18, 19),
-        fee_token: 0,
-        amounts: (0, 0),
-        fee: 25,
-        balances: (100, 200, 50),
-        first_price: (1, 2),
-        second_price: (2, 1),
-        is_limit_order: (false, false),
-        test_accounts: vec![
-            tb.add_account(Unlocked),
-            tb.add_account(Unlocked),
-            tb.add_account(Locked),
-            tb.add_account(Unlocked),
-            tb.add_account(Unlocked),
-        ],
-    };
-
-    test_swap.test(
-        tb,
-        Success(vec![(100, 100), (0, 0), (200, 200), (0, 0), (50, 25)]),
-    );
-}
-
-#[test]
-fn not_exact_prices_success() {
+fn not_exact_prices() {
     let mut tb = PlasmaTestBuilder::new();
 
     let test_swap = TestSwap {
@@ -386,12 +364,15 @@ fn not_exact_prices_success() {
 
     test_swap.test(
         tb,
-        Success(vec![(100, 0), (0, 100), (200, 100), (0, 100), (50, 25)]),
+        Success {
+            nonce_changes: vec![(0, 1), (0, 0), (0, 1), (0, 0), (0, 1)],
+            balance_changes: vec![(100, 0), (0, 100), (200, 100), (0, 100), (50, 25)],
+        },
     );
 }
 
 #[test]
-fn pay_with_received_success() {
+fn pay_fee_with_received() {
     let mut tb = PlasmaTestBuilder::new();
 
     let test_swap = TestSwap {
@@ -416,6 +397,108 @@ fn pay_with_received_success() {
 
     test_swap.test(
         tb,
-        Success(vec![(100, 50), (0, 50), (200, 100), (0, 100), (50, 25)]),
+        Success {
+            nonce_changes: vec![(0, 1), (0, 0), (0, 1), (0, 0), (0, 1)],
+            balance_changes: vec![(100, 50), (0, 50), (200, 100), (0, 100), (50, 25)],
+        },
+    );
+}
+
+#[test]
+fn default_recipients() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (0, 1),
+        submitter: 2,
+        tokens: (18, 19),
+        fee_token: 0,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(
+        tb,
+        Success {
+            nonce_changes: vec![(0, 1), (0, 0), (0, 1), (1, 1), (0, 1)],
+            balance_changes: vec![(100, 50), (0, 50), (200, 100), (0, 100), (50, 25)],
+        },
+    );
+}
+
+#[test]
+fn sign_and_submit() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (2, 3),
+        submitter: 0,
+        tokens: (18, 19),
+        fee_token: 18,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (200, 200, 200),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(
+        tb,
+        Success {
+            nonce_changes: vec![(0, 0), (0, 0), (0, 1), (0, 0), (0, 1)],
+            balance_changes: vec![(200, 150), (0, 50), (200, 100), (0, 100), (150, 125)],
+        },
+    );
+}
+
+#[test]
+fn limit_orders() {
+    let mut tb = PlasmaTestBuilder::new();
+
+    let test_swap = TestSwap {
+        accounts: (0, 1),
+        recipients: (2, 3),
+        submitter: 4,
+        tokens: (18, 19),
+        fee_token: 0,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (true, true),
+        test_accounts: vec![
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+            tb.add_account(Locked),
+            tb.add_account(Unlocked),
+            tb.add_account(Unlocked),
+        ],
+    };
+
+    test_swap.test(
+        tb,
+        Success {
+            nonce_changes: vec![(0, 0), (0, 0), (0, 0), (0, 0), (0, 1)],
+            balance_changes: vec![(100, 50), (0, 50), (200, 100), (0, 100), (50, 25)],
+        },
     );
 }
