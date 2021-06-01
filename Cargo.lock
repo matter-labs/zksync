@@ -4084,6 +4084,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "bigdecimal",
+ "ethabi",
  "hex",
  "num",
  "once_cell",

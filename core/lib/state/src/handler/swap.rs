@@ -33,10 +33,12 @@ impl TxHandler<Swap> for ZkSyncState {
             submitter_account.pub_key_hash != PubKeyHash::default(),
             SwapOpError::AccountLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(submitter_account.pub_key_hash),
-            SwapOpError::SwapInvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != submitter_account.pub_key_hash {
+                return Err(SwapOpError::SwapInvalidSignature);
+            }
+        }
         invariant!(
             submitter == tx.submitter_id,
             SwapOpError::SubmitterAccountIncorrect

@@ -14,6 +14,7 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
+use crate::tx::version::TxVersion;
 use crate::tx::{error::TransactionSignatureError, TimeRange};
 
 /// `ForcedExit` transaction is used to withdraw funds from an unowned
@@ -166,7 +167,7 @@ impl ForcedExit {
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
-    pub fn verify_signature(&self) -> Option<PubKeyHash> {
+    pub fn verify_signature(&self) -> Option<(PubKeyHash, TxVersion)> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
@@ -175,11 +176,11 @@ impl ForcedExit {
                 .verify_musig(&self.get_old_bytes())
                 .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
             {
-                return Some(res);
+                return Some((res, TxVersion::Legacy));
             }
             self.signature
                 .verify_musig(&self.get_bytes())
-                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                .map(|pub_key| (PubKeyHash::from_pubkey(&pub_key), TxVersion::V1))
         }
     }
 

@@ -19,10 +19,12 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         let initiator_account = self
             .get_account(tx.initiator_account_id)
             .ok_or(ForcedExitOpError::InitiatorAccountNotFound)?;
-        invariant!(
-            tx.verify_signature() == Some(initiator_account.pub_key_hash),
-            ForcedExitOpError::InvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != initiator_account.pub_key_hash {
+                return Err(ForcedExitOpError::InvalidSignature);
+            }
+        }
 
         // Check the token ID correctness.
         invariant!(

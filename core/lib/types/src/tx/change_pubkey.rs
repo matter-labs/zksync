@@ -15,6 +15,7 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{PackedEthSignature, TimeRange, TxSignature, VerifiedSignatureCache};
+use crate::tx::version::TxVersion;
 use crate::{
     tokens::ChangePubKeyFeeTypeArg,
     tx::error::{ChangePubkeySignedDataError, TransactionSignatureError},
@@ -237,7 +238,7 @@ impl ChangePubKey {
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
-    pub fn verify_signature(&self) -> Option<PubKeyHash> {
+    pub fn verify_signature(&self) -> Option<(PubKeyHash, TxVersion)> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
@@ -246,11 +247,11 @@ impl ChangePubKey {
                 .verify_musig(&self.get_old_bytes())
                 .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
             {
-                return Some(res);
+                return Some((res, TxVersion::Legacy));
             }
             self.signature
                 .verify_musig(&self.get_bytes())
-                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                .map(|pub_key| (PubKeyHash::from_pubkey(&pub_key), TxVersion::V1))
         }
     }
 
@@ -394,15 +395,22 @@ impl ChangePubKey {
     /// - `fee_token` field must be within supported range.
     /// - `fee` field must represent a packable value.
     pub fn check_correctness(&self) -> bool {
-        self.is_eth_auth_data_valid()
-            && self.verify_signature() == Some(self.new_pk_hash)
+        let mut valid = self.is_eth_auth_data_valid()
             && self.account_id <= max_account_id()
             && self.fee_token <= max_processable_token()
             && is_fee_amount_packable(&self.fee)
             && self
                 .time_range
                 .map(|t| t.check_correctness())
-                .unwrap_or(true)
+                .unwrap_or(true);
+        if valid {
+            if let Some((pub_key_hash, _)) = self.verify_signature() {
+                valid = pub_key_hash == self.new_pk_hash;
+            } else {
+                valid = false;
+            }
+        }
+        valid
     }
 
     pub fn is_ecdsa(&self) -> bool {

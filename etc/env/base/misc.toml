@@ -31,11 +31,8 @@ sentry_url="unset"
 # The address of the regenesis multisig smart contract
 regenesis_multisig_address="0xAA7113B9de498556dC76eDFEFc57681083c861C1"
 
-# The number of signatures needed for the regenesis to complete
-regenesis_needed_signatures=3
-
-# The list of partners signatures of which will be collected for the regenesis
-regenesis_partners="0xB991c776AedacfA5a7e8CF3e7aD6CB6C1AcB9227,0x093Cf8450c5eE506aB865F68F5f8EB8C4C2073C2,0x0d2200E8Ff14516397E86Ad63670516D371Dc862,0x374Ac2A10cBCaE93d2aBBe468f0EDEF6768e65eE"
+# The address of the regenesis gnosis smart contract
+regenesis_gnosis_address="0xbD5Ca6f189111A1befd4ffAa6F17f62D4535F254"
 
 # The address of the new additional zkSync
 new_additional_zksync_address="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"
@@ -54,3 +51,11 @@ listing_treasury="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
 
 # The address of the token governance
 listing_governance="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
+
+# Security council parameters
+security_council_members_number=3
+security_council_members=["0xaFe6A91979021206ad79F58562Eef4204720E2A3","0xbD5Ca6f189111A1befd4ffAa6F17f62D4535F254","0xAA7113B9de498556dC76eDFEFc57681083c861C1"]
+
+security_council_2_weeks_threshold=1
+security_council_1_week_threshold=2
+security_council_3_days_threshold=3

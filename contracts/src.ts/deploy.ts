@@ -195,7 +195,7 @@ export class Deployer {
                 this.governorAddress,
                 process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
             ],
-            { gasLimit: 5000000, ...ethTxOptions }
+            { gasLimit: 6000000, ...ethTxOptions }
         );
         const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
         const deployFactoryInterface = new Interface(this.deployFactoryCode.abi);
@@ -265,7 +265,7 @@ export class Deployer {
 
         const governance = this.addresses.Governance;
         const listingFeeToken = process.env.MISC_LISTING_FEE_TOKEN;
-        const listingFee = process.env.MISC_LISTING_FEE_TOKEN;
+        const listingFee = process.env.MISC_LISTING_FEE;
         const listingCap = process.env.MISC_LISTING_CAP;
         const treasury = process.env.MISC_LISTING_TREASURY;
 
@@ -353,17 +353,10 @@ export class Deployer {
             console.log('Deploying Regenesis Multisig contract');
         }
 
-        const partners = process.env.MISC_REGENESIS_PARTNERS.split(',');
-        const numberOfNeededSignatures = +process.env.MISC_REGENESIS_NEEDED_SIGNATURES;
-
-        if (partners.length < numberOfNeededSignatures) {
-            throw new Error('Number of required signatures for Genesis is higher than the number of partners');
-        }
-
         const regenesisMultisigContract = await deployContract(
             this.deployWallet,
             this.contracts.regenesisMultisig,
-            [partners, numberOfNeededSignatures],
+            [process.env.MISC_REGENESIS_GNOSIS_ADDRESS],
             {
                 gasLimit: 6000000,
                 ...ethTxOptions

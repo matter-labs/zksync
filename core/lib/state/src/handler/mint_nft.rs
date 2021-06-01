@@ -38,10 +38,12 @@ impl TxHandler<MintNFT> for ZkSyncState {
             creator.pub_key_hash != PubKeyHash::default(),
             MintNFTOpError::CreatorAccountIsLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(creator.pub_key_hash),
-            MintNFTOpError::InvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != creator.pub_key_hash {
+                return Err(MintNFTOpError::InvalidSignature);
+            }
+        }
 
         let (recipient, _) = self
             .get_account_by_address(&tx.recipient)
@@ -82,6 +84,10 @@ impl TxHandler<MintNFT> for ZkSyncState {
             .ok_or(MintNFTOpError::CreatorAccountNotFound)?;
         let old_balance = creator_account.get_balance(op.tx.fee_token);
         let nonce = creator_account.nonce;
+        invariant!(
+            old_balance >= op.tx.fee,
+            MintNFTOpError::InsufficientBalance
+        );
         creator_account.sub_balance(op.tx.fee_token, &op.tx.fee);
         let new_balance = creator_account.get_balance(op.tx.fee_token);
         *creator_account.nonce += 1;

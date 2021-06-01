@@ -113,21 +113,91 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= toProcess;
     }
 
-    function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
-        Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
-        require(op.creatorAddress != address(0), "op"); // No NFT to withdraw
-        NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
-        _factory.mintNFTFromZkSync(
-            op.creatorAddress,
-            op.receiver,
-            op.creatorAccountId,
-            op.serialId,
-            op.contentHash,
-            op.tokenId
-        );
-        // Save withdrawn nfts for future deposits
-        withdrawnNFTs[op.tokenId] = address(_factory);
-        emit WithdrawalNFT(op.tokenId);
-        delete pendingWithdrawnNFTs[_tokenId];
+    uint256 internal constant SECURITY_COUNCIL_2_WEEKS_THRESHOLD = $$(SECURITY_COUNCIL_2_WEEKS_THRESHOLD);
+    uint256 internal constant SECURITY_COUNCIL_1_WEEK_THRESHOLD = $$(SECURITY_COUNCIL_1_WEEK_THRESHOLD);
+    uint256 internal constant SECURITY_COUNCIL_3_DAYS_THRESHOLD = $$(SECURITY_COUNCIL_3_DAYS_THRESHOLD);
+
+    function cutUpgradeNoticePeriod() external {
+        address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS =
+            [$(SECURITY_COUNCIL_MEMBERS)];
+        for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
+            if (SECURITY_COUNCIL_MEMBERS[id] == msg.sender) {
+                require(upgradeStartTimestamp != 0);
+                require(securityCouncilApproves[id] == false);
+                securityCouncilApproves[id] = true;
+                numberOfApprovalsFromSecurityCouncil++;
+
+                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_2_WEEKS_THRESHOLD) {
+                    if (approvedUpgradeNoticePeriod > 2 weeks) {
+                        approvedUpgradeNoticePeriod = 2 weeks;
+                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                    }
+                }
+                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_1_WEEK_THRESHOLD) {
+                    if (approvedUpgradeNoticePeriod > 1 weeks) {
+                        approvedUpgradeNoticePeriod = 1 weeks;
+                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                    }
+                }
+                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_3_DAYS_THRESHOLD) {
+                    if (approvedUpgradeNoticePeriod > 3 days) {
+                        approvedUpgradeNoticePeriod = 3 days;
+                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                    }
+                }
+
+                break;
+            }
+        }
+    }
+
+    /// @notice Set data for changing pubkey hash using onchain authorization.
+    ///         Transaction author (msg.sender) should be L2 account address
+    /// @notice New pubkey hash can be reset, to do that user should send two transactions:
+    ///         1) First `setAuthPubkeyHash` transaction for already used `_nonce` will set timer.
+    ///         2) After `AUTH_FACT_RESET_TIMELOCK` time is passed second `setAuthPubkeyHash` transaction will reset pubkey hash for `_nonce`.
+    /// @param _pubkeyHash New pubkey hash
+    /// @param _nonce Nonce of the change pubkey L2 transaction
+    function setAuthPubkeyHash(bytes calldata _pubkeyHash, uint32 _nonce) external {
+        require(_pubkeyHash.length == PUBKEY_HASH_BYTES, "y"); // PubKeyHash should be 20 bytes.
+        if (authFacts[msg.sender][_nonce] == bytes32(0)) {
+            authFacts[msg.sender][_nonce] = keccak256(_pubkeyHash);
+        } else {
+            uint256 currentResetTimer = authFactsResetTimer[msg.sender][_nonce];
+            if (currentResetTimer == 0) {
+                authFactsResetTimer[msg.sender][_nonce] = block.timestamp;
+            } else {
+                require(block.timestamp.sub(currentResetTimer) >= AUTH_FACT_RESET_TIMELOCK, "z");
+                authFactsResetTimer[msg.sender][_nonce] = 0;
+                authFacts[msg.sender][_nonce] = keccak256(_pubkeyHash);
+            }
+        }
+    }
+
+    /// @notice Reverts unverified blocks
+    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external {
+        governance.requireActiveValidator(msg.sender);
+
+        uint32 blocksCommitted = totalBlocksCommitted;
+        uint32 blocksToRevert = Utils.minU32(uint32(_blocksToRevert.length), blocksCommitted - totalBlocksExecuted);
+        uint64 revertedPriorityRequests = 0;
+
+        for (uint32 i = 0; i < blocksToRevert; ++i) {
+            StoredBlockInfo memory storedBlockInfo = _blocksToRevert[i];
+            require(storedBlockHashes[blocksCommitted] == hashStoredBlockInfo(storedBlockInfo), "r"); // incorrect stored block info
+
+            delete storedBlockHashes[blocksCommitted];
+
+            --blocksCommitted;
+            revertedPriorityRequests += storedBlockInfo.priorityOperations;
+        }
+
+        totalBlocksCommitted = blocksCommitted;
+        totalCommittedPriorityRequests -= revertedPriorityRequests;
+        if (totalBlocksCommitted < totalBlocksProven) {
+            totalBlocksProven = totalBlocksCommitted;
+        }
+
+        emit BlocksRevert(totalBlocksExecuted, blocksCommitted);
     }
 }
