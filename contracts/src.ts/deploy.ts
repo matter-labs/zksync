@@ -356,7 +356,7 @@ export class Deployer {
         const regenesisMultisigContract = await deployContract(
             this.deployWallet,
             this.contracts.regenesisMultisig,
-            [process.env.MISC_REGENESIS_GNOSIS_ADDRESS],
+            [process.env.MISC_REGENESIS_THRESHOLD],
             {
                 gasLimit: 6000000,
                 ...ethTxOptions

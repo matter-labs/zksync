@@ -14,6 +14,19 @@ describe('Regenesis test', function () {
     const walletPrivateKey = '0x6878e5113d9fae7eec373bd9f7975e692c1c4ace22b536c63aa2c818ef92ef00';
     const wallet = new ethers.Wallet(walletPrivateKey).connect(hardhat.ethers.provider);
 
+    // These are the private keys of the default security council members
+    const securityCouncil: ethers.Wallet[] = [
+        new ethers.Wallet('0xa5a9359481bd7926b11f66ba584415fb7c2a254429bb6465f09a0af6afc4e7ad').connect(
+            hardhat.ethers.provider
+        ),
+        new ethers.Wallet('0xa1fd94d61050530de6bc46253d90012e3ae30c53fec0870d004d7b937a89c645').connect(
+            hardhat.ethers.provider
+        ),
+        new ethers.Wallet('0x125f11e79ce6ac43caa6f6845b6d1bf8ef0494007fa72f6295f315ed91cb2a1f').connect(
+            hardhat.ethers.provider
+        )
+    ];
+
     it('Test that regenesis upgrade works', async () => {
         // Fund the deployer wallet
         const hardhatWallets = await hardhat.ethers.getSigners();
@@ -24,6 +37,14 @@ describe('Regenesis test', function () {
             value: utils.parseEther('10')
         });
         await supplyMultisigCreatorTx.wait();
+
+        for (let councilMember of securityCouncil) {
+            const supplyCouncilMemberTx = await hardhatWallet.sendTransaction({
+                to: councilMember.address,
+                value: utils.parseEther('10')
+            });
+            await supplyCouncilMemberTx.wait();
+        }
 
         // Deploying the contracts
         const contracts = readProductionContracts();
@@ -65,6 +86,34 @@ describe('Regenesis test', function () {
         const submitSignaturesTx = await regenesisMultisigContract.submitHash(oldRootHash, newRootHash);
         await submitSignaturesTx.wait();
 
+        expect(await regenesisMultisigContract.candidateNewRootHash()).to.eq(
+            newRootHash,
+            'Candidate new root hash was not set correctly'
+        );
+        expect(await regenesisMultisigContract.candidateOldRootHash()).to.eq(
+            oldRootHash,
+            'Candidate old root hash was not set correctly'
+        );
+        expect(await regenesisMultisigContract.oldRootHash()).to.eq(
+            ethers.constants.HashZero,
+            'New temporary root hash was not set correctly'
+        );
+        expect(await regenesisMultisigContract.newRootHash()).to.eq(
+            ethers.constants.HashZero,
+            'Old temporary root hash was not set correctly'
+        );
+
+        for (let i = 0; i < +process.env.MISC_REGENESIS_THRESHOLD; i++) {
+            const councilMember = securityCouncil[i];
+
+            const regenesisMultisigContract = RegenesisMultisigFactory.connect(
+                deployer.addresses.RegenesisMultisig,
+                councilMember
+            );
+
+            await (await regenesisMultisigContract.approveHash()).wait();
+        }
+
         // After the new root hash has been submitted to the multisig,
         // we need to finish regenesis
         const genesisBlock = {
@@ -100,41 +149,6 @@ describe('Regenesis test', function () {
         expect(additionalZkSyncAddress.toLowerCase()).to.eq(
             newAdditionalZkSyncAddress.toLowerCase(),
             'The additional zkSync address has been changed wrongly'
-        );
-    });
-
-    it('Test data submission', async () => {
-        const [hardhatWallet]: ethers.Wallet[] = await hardhat.ethers.getSigners();
-        const fundingWalletTx = await hardhatWallet.sendTransaction({
-            to: wallet.address,
-            value: utils.parseEther('3.0')
-        });
-        await fundingWalletTx.wait();
-
-        const contracts = readProductionContracts();
-        const deployer = new Deployer({ deployWallet: wallet, contracts });
-        await deployer.deployRegenesisMultisig({ gasLimit: 6500000 });
-        await deployer.deployAll({ gasLimit: 6500000 });
-
-        const regenesisMultisigContract = RegenesisMultisigFactory.connect(
-            deployer.addresses.RegenesisMultisig,
-            wallet
-        );
-
-        const tx = await wallet.sendTransaction({
-            to: regenesisMultisigContract.address,
-            // The calldata was retrieved from the regen-root-hash tool
-            data: '0x905717402f59c906954c0445843de5e33ceb41d60b5ed5d3d78f0575bc345bd3514ea0910c0c243023dce4bb411344d572dcc24bd77d393ef5a02ef4f5ffd12649634d5e'
-        });
-        await tx.wait();
-
-        expect(await regenesisMultisigContract.oldRootHash()).to.eq(
-            '0x2f59c906954c0445843de5e33ceb41d60b5ed5d3d78f0575bc345bd3514ea091',
-            'The old root hash was not set correctly'
-        );
-        expect(await regenesisMultisigContract.newRootHash()).to.eq(
-            '0x0c0c243023dce4bb411344d572dcc24bd77d393ef5a02ef4f5ffd12649634d5e',
-            'The new root hash was not set correctly'
         );
     });
 });
