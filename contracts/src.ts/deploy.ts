@@ -18,7 +18,9 @@ import {
     ZkSync,
     ZkSyncFactory,
     ForcedExit,
-    ForcedExitFactory
+    ForcedExitFactory,
+    TokenGovernanceFactory,
+    TokenGovernance
 } from '../typechain';
 
 export interface Contracts {
@@ -450,6 +452,10 @@ export class Deployer {
 
     public governanceContract(signerOrProvider: Signer | providers.Provider): Governance {
         return GovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
+    }
+
+    public tokenGovernanceContract(signerOrProvider: Signer | providers.Provider): TokenGovernance {
+        return TokenGovernanceFactory.connect(this.addresses.TokenGovernance, signerOrProvider);
     }
 
     public zkSyncContract(signerOrProvider: Signer | providers.Provider): ZkSync {

@@ -18,7 +18,7 @@ async function governanceAddToken(address: string) {
     console.log('Adding new ERC20 token to network: ', address);
 
     const tx = await deployer
-        .governanceContract(governorWallet)
+        .tokenGovernanceContract(governorWallet)
         .addToken(address, { gasLimit: BigNumber.from('1000000') });
     console.log('tx hash: ', tx.hash);
     const receipt = await tx.wait();
