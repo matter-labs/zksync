@@ -120,35 +120,33 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     function cutUpgradeNoticePeriod() external {
         address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS =
             [$(SECURITY_COUNCIL_MEMBERS)];
-        uint256 securityCouncilMemberID = SECURITY_COUNCIL_MEMBERS_NUMBER;
-        for (uint256 i = 0; i < SECURITY_COUNCIL_MEMBERS_NUMBER; ++i) {
-            if (SECURITY_COUNCIL_MEMBERS[i] == msg.sender) {
-                securityCouncilMemberID = i;
-            }
-        }
-        require(securityCouncilMemberID != SECURITY_COUNCIL_MEMBERS_NUMBER);
+        for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
+            if (SECURITY_COUNCIL_MEMBERS[id] == msg.sender) {
+                require(upgradeStartTimestamp != 0);
+                require(securityCouncilApproves[id] == false);
+                securityCouncilApproves[id] = true;
+                numberOfApprovalsFromSecurityCouncil++;
 
-        require(upgradeStartTimestamp != 0);
-        require(securityCouncilApproves[securityCouncilMemberID] == false);
-        securityCouncilApproves[securityCouncilMemberID] = true;
-        numberOfApprovalsFromSecurityCouncil++;
+                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_2_WEEKS_THRESHOLD) {
+                    if (approvedUpgradeNoticePeriod > 2 weeks) {
+                        approvedUpgradeNoticePeriod = 2 weeks;
+                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                    }
+                }
+                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_1_WEEK_THRESHOLD) {
+                    if (approvedUpgradeNoticePeriod > 1 weeks) {
+                        approvedUpgradeNoticePeriod = 1 weeks;
+                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                    }
+                }
+                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_3_DAYS_THRESHOLD) {
+                    if (approvedUpgradeNoticePeriod > 3 days) {
+                        approvedUpgradeNoticePeriod = 3 days;
+                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                    }
+                }
 
-        if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_2_WEEKS_THRESHOLD) {
-            if (approvedUpgradeNoticePeriod > 2 weeks) {
-                approvedUpgradeNoticePeriod = 2 weeks;
-                emit NoticePeriodChange(approvedUpgradeNoticePeriod);
-            }
-        }
-        if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_1_WEEK_THRESHOLD) {
-            if (approvedUpgradeNoticePeriod > 1 weeks) {
-                approvedUpgradeNoticePeriod = 1 weeks;
-                emit NoticePeriodChange(approvedUpgradeNoticePeriod);
-            }
-        }
-        if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_3_DAYS_THRESHOLD) {
-            if (approvedUpgradeNoticePeriod > 3 days) {
-                approvedUpgradeNoticePeriod = 3 days;
-                emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                break;
             }
         }
     }
