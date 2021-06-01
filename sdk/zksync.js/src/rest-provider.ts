@@ -13,7 +13,7 @@ import {
     ApiConfig,
     ChangePubKeyFee,
     LegacyChangePubKeyFee,
-    ApiFee,
+    FeeRest,
     NetworkStatus,
     TokenAddress,
     TokenInfo,
@@ -26,10 +26,10 @@ import {
     ApiTransaction,
     ContractAddress,
     Tokens,
-    AccountState,
     TransactionReceipt,
     PriorityOperationReceipt,
-    blockPosition
+    blockPosition,
+    AccountStateRest
 } from './types';
 import { sleep, TokenSet } from './utils';
 
@@ -218,13 +218,13 @@ export class RestProvider extends SyncProvider {
         txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
-    ): Promise<Response<ApiFee>> {
+    ): Promise<Response<FeeRest>> {
         const rawFee = await this.post<{ gasFee: string; zkpFee: string; totalFee: string }>(`${this.address}/fee`, {
             txType,
             address,
             tokenLike
         });
-        let fee: Response<ApiFee>;
+        let fee: Response<FeeRest>;
         if (rawFee.status === 'success') {
             fee = {
                 request: rawFee.request,
@@ -251,7 +251,7 @@ export class RestProvider extends SyncProvider {
         txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
-    ): Promise<ApiFee> {
+    ): Promise<FeeRest> {
         return this.parseResponse(await this.getTransactionFeeDetailed(txType, address, tokenLike));
     }
 
@@ -261,12 +261,12 @@ export class RestProvider extends SyncProvider {
             address: Address;
         }[],
         tokenLike: TokenLike
-    ): Promise<Response<ApiFee>> {
+    ): Promise<Response<FeeRest>> {
         const rawFee = await this.post<{ gasFee: string; zkpFee: string; totalFee: string }>(
             `${this.address}/fee/batch`,
             { transactions, tokenLike }
         );
-        let fee: Response<ApiFee>;
+        let fee: Response<FeeRest>;
         if (rawFee.status === 'success') {
             fee = {
                 request: rawFee.request,
@@ -295,7 +295,7 @@ export class RestProvider extends SyncProvider {
             address: Address;
         }[],
         tokenLike: TokenLike
-    ): Promise<ApiFee> {
+    ): Promise<FeeRest> {
         return this.parseResponse(await this.getBatchFullFeeDetailed(transactions, tokenLike));
     }
 
@@ -480,9 +480,10 @@ export class RestProvider extends SyncProvider {
         return tokens;
     }
 
-    async getState(address: Address): Promise<AccountState> {
-        const committedFullInfo = await this.accountInfo(address, 'committed');
-        const finalizedFullInfo = await this.accountInfo(address, 'finalized');
+    async getState(address: Address): Promise<AccountStateRest> {
+        const committedHandle = this.accountInfo(address, 'committed');
+        const finalizedHandle = this.accountInfo(address, 'finalized');
+        const [committedFullInfo, finalizedFullInfo] = await Promise.all([committedHandle, finalizedHandle]);
 
         if (finalizedFullInfo) {
             return {

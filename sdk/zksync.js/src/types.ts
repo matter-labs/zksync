@@ -24,11 +24,33 @@ export interface Create2Data {
     codeHash: string;
 }
 
-export interface AccountState {
+export type AccountState = AccountStateRest | AccountStateRpc;
+
+export interface AccountStateRest {
     address: Address;
     id?: number;
-    // This field will be presented only if using RPC API.
-    depositing?: {
+    committed: {
+        balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
+            [token: string]: BigNumberish;
+        };
+        nonce: number;
+        pubKeyHash: PubKeyHash;
+    };
+    verified: {
+        balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
+            [token: string]: BigNumberish;
+        };
+        nonce: number;
+        pubKeyHash: PubKeyHash;
+    };
+}
+
+export interface AccountStateRpc {
+    address: Address;
+    id?: number;
+    depositing: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: {
@@ -213,16 +235,15 @@ export interface LegacyChangePubKeyFee {
     };
 }
 
-export interface Fee {
+export type Fee = FeeRpc | FeeRest;
+
+export interface FeeRpc {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    // This field will be presented only if using RPC API.
-    feeType?: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee;
+    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee;
     // Amount of gas used by transaction
-    // This field will be presented only if using RPC API.
-    gasTxAmount?: BigNumber;
+    gasTxAmount: BigNumber;
     // Gas price (in wei)
-    // This field will be presented only if using RPC API.
-    gasPriceWei?: BigNumber;
+    gasPriceWei: BigNumber;
     // Ethereum gas part of fee (in wei)
     gasFee: BigNumber;
     // Zero-knowledge proof part of fee (in wei)
@@ -231,13 +252,9 @@ export interface Fee {
     totalFee: BigNumber;
 }
 
-export interface BatchFee {
-    // Ethereum gas part of fee (in wei)
-    // This field will be presented only if using REST API.
-    gasFee?: BigNumber;
-    // Zero-knowledge proof part of fee (in wei)
-    // This field will be presented only if using REST API.
-    zkpFee?: BigNumber;
+export type BatchFee = BatchFeeRpc | FeeRest;
+
+export interface BatchFeeRpc {
     // Total fee amount (in wei)
     totalFee: BigNumber;
 }
@@ -291,7 +308,7 @@ export interface ApiConfig {
     // TODO: server_version (ZKS-627)
 }
 
-export interface ApiFee {
+export interface FeeRest {
     gasFee: BigNumber;
     zkpFee: BigNumber;
     totalFee: BigNumber;
