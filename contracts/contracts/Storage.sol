@@ -170,4 +170,9 @@ contract Storage {
     /// @dev Upgrade start timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
     uint256 internal upgradeStartTimestamp;
+
+    /// @dev Stores boolean flags which means the confirmations of the upgrade for each member of security council
+    /// @dev Will store zeroes in case of not active upgrade mode
+    mapping(uint256 => bool) internal securityCouncilApproves;
+    uint256 internal numberOfApprovalsFromSecurityCouncil;
 }

@@ -107,4 +107,6 @@ contract Config {
     uint32 internal constant SPECIAL_NFT_TOKEN_ID = $$((2**31) - 2);
 
     uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
+
+    uint256 internal constant SECURITY_COUNCIL_MEMBERS_NUMBER = $$(SECURITY_COUNCIL_MEMBERS_NUMBER);
 }

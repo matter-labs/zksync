@@ -95,6 +95,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
         upgradeStartTimestamp = 0;
+        for (uint256 i = 0; i < SECURITY_COUNCIL_MEMBERS_NUMBER; ++i) {
+            securityCouncilApproves[i] = false;
+        }
+        numberOfApprovalsFromSecurityCouncil = 0;
     }
 
     /// @notice Notification that upgrade finishes
@@ -105,6 +109,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
         upgradeStartTimestamp = 0;
+        for (uint256 i = 0; i < SECURITY_COUNCIL_MEMBERS_NUMBER; ++i) {
+            securityCouncilApproves[i] = false;
+        }
+        numberOfApprovalsFromSecurityCouncil = 0;
     }
 
     /// @notice Checks that contract is ready for upgrade
@@ -163,7 +171,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
     }
 
-    function cutNoticePeriod() external nonReentrant {
+    function cutNoticePeriod() external {
+        /// All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 
@@ -195,7 +204,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev WARNING: Only for Exodus mode
     /// @dev Canceling may take several separate transactions to be completed
     /// @param _n number of requests to process
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external nonReentrant {
+    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
+        /// All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 
@@ -273,7 +283,21 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice  Withdraws NFT from zkSync contract to the owner
     /// @param _tokenId Id of NFT token
     function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
-        delegateAdditional();
+        Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
+        require(op.creatorAddress != address(0), "op"); // No NFT to withdraw
+        NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
+        _factory.mintNFTFromZkSync(
+            op.creatorAddress,
+            op.receiver,
+            op.creatorAccountId,
+            op.serialId,
+            op.contentHash,
+            op.tokenId
+        );
+        // Save withdrawn nfts for future deposits
+        withdrawnNFTs[op.tokenId] = address(_factory);
+        emit WithdrawalNFT(op.tokenId);
+        delete pendingWithdrawnNFTs[_tokenId];
     }
 
     /// @notice Register full exit request - pack pubdata, add priority request
@@ -556,7 +580,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Reverts unverified blocks
-    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external nonReentrant {
+    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external {
+        /// All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 
@@ -601,7 +626,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 _nftSerialId,
         bytes32 _nftContentHash,
         uint256[] memory _proof
-    ) external nonReentrant {
+    ) external {
+        /// All functions delegated to additional should NOT be nonReentrant
         delegateAdditional();
     }
 
@@ -613,6 +639,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _pubkeyHash New pubkey hash
     /// @param _nonce Nonce of the change pubkey L2 transaction
     function setAuthPubkeyHash(bytes calldata _pubkeyHash, uint32 _nonce) external {
+        /// All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 

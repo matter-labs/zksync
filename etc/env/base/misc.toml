@@ -52,7 +52,10 @@ listing_treasury="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
 # The address of the token governance
 listing_governance="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
 
-# The addresses of the security council gnosis smart contracts
-security_council_2_weeks_address="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"
-security_council_1_week_address="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"
-security_council_3_days_address="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"
+# Security council parameters
+security_council_members_number=3
+security_council_members=["0xaFe6A91979021206ad79F58562Eef4204720E2A3","0xbD5Ca6f189111A1befd4ffAa6F17f62D4535F254","0xAA7113B9de498556dC76eDFEFc57681083c861C1"]
+
+security_council_2_weeks_threshold=1
+security_council_1_week_threshold=2
+security_council_3_days_threshold=3

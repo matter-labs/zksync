@@ -113,43 +113,39 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= toProcess;
     }
 
-    function withdrawPendingNFTBalance(uint32 _tokenId) external {
-        Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
-        require(op.creatorAddress != address(0), "op"); // No NFT to withdraw
-        NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
-        _factory.mintNFTFromZkSync(
-            op.creatorAddress,
-            op.receiver,
-            op.creatorAccountId,
-            op.serialId,
-            op.contentHash,
-            op.tokenId
-        );
-        // Save withdrawn nfts for future deposits
-        withdrawnNFTs[op.tokenId] = address(_factory);
-        emit WithdrawalNFT(op.tokenId);
-        delete pendingWithdrawnNFTs[_tokenId];
-    }
+    uint256 internal constant SECURITY_COUNCIL_2_WEEKS_THRESHOLD = $$(SECURITY_COUNCIL_2_WEEKS_THRESHOLD);
+    uint256 internal constant SECURITY_COUNCIL_1_WEEK_THRESHOLD = $$(SECURITY_COUNCIL_1_WEEK_THRESHOLD);
+    uint256 internal constant SECURITY_COUNCIL_3_DAYS_THRESHOLD = $$(SECURITY_COUNCIL_3_DAYS_THRESHOLD);
 
-    address internal constant SECURITY_COUNCIL_2_WEEKS_ADDRESS = address($$(SECURITY_COUNCIL_2_WEEKS_ADDRESS));
-    address internal constant SECURITY_COUNCIL_1_WEEK_ADDRESS = address($$(SECURITY_COUNCIL_1_WEEK_ADDRESS));
-    address internal constant SECURITY_COUNCIL_3_DAYS_ADDRESS = address($$(SECURITY_COUNCIL_3_DAYS_ADDRESS));
+    function cutUpgradeNoticePeriod() external {
+        address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS =
+            [$(SECURITY_COUNCIL_MEMBERS)];
+        uint256 securityCouncilMemberID = SECURITY_COUNCIL_MEMBERS_NUMBER;
+        for (uint256 i = 0; i < SECURITY_COUNCIL_MEMBERS_NUMBER; ++i) {
+            if (SECURITY_COUNCIL_MEMBERS[i] == msg.sender) {
+                securityCouncilMemberID = i;
+            }
+        }
+        require(securityCouncilMemberID != SECURITY_COUNCIL_MEMBERS_NUMBER);
 
-    function cutNoticePeriod() external {
         require(upgradeStartTimestamp != 0);
-        if (msg.sender == SECURITY_COUNCIL_2_WEEKS_ADDRESS) {
+        require(securityCouncilApproves[securityCouncilMemberID] == false);
+        securityCouncilApproves[securityCouncilMemberID] = true;
+        numberOfApprovalsFromSecurityCouncil++;
+
+        if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_2_WEEKS_THRESHOLD) {
             if (approvedUpgradeNoticePeriod > 2 weeks) {
                 approvedUpgradeNoticePeriod = 2 weeks;
                 emit NoticePeriodChange(approvedUpgradeNoticePeriod);
             }
         }
-        if (msg.sender == SECURITY_COUNCIL_1_WEEK_ADDRESS) {
+        if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_1_WEEK_THRESHOLD) {
             if (approvedUpgradeNoticePeriod > 1 weeks) {
                 approvedUpgradeNoticePeriod = 1 weeks;
                 emit NoticePeriodChange(approvedUpgradeNoticePeriod);
             }
         }
-        if (msg.sender == SECURITY_COUNCIL_3_DAYS_ADDRESS) {
+        if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_3_DAYS_THRESHOLD) {
             if (approvedUpgradeNoticePeriod > 3 days) {
                 approvedUpgradeNoticePeriod = 3 days;
                 emit NoticePeriodChange(approvedUpgradeNoticePeriod);
