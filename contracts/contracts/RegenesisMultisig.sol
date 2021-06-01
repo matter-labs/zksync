@@ -5,6 +5,7 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./Ownable.sol";
+import "./Config.sol";
 
 /// @title Regenesis Multisig contract
 /// @author Matter Labs
@@ -19,12 +20,10 @@ contract RegenesisMultisig is Ownable, Config {
     mapping(uint256 => bool) internal securityCouncilApproves;
     uint256 internal numberOfApprovalsFromSecurityCouncil;
 
-    // @dev The number of security council confirmatiosn needed is the same as for setting the upgrade for 1 week
-    uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_1_WEEK_THRESHOLD);
+    // @dev The number of security council confirmatiosn needed is the same as for setting the upgrade for 3 days
+    uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_3_DAYS_THRESHOLD);
 
-    constructor(uint256 _numberOfApprovals) Ownable(msg.sender) {
-        numberOfApprovalsFromSecurityCouncil = _numberOfApprovals;
-    }
+    constructor() Ownable(msg.sender) {}
 
     function submitHash(bytes32 _oldRootHash, bytes32 _newRootHash) external {
         // Only zkSync team can submit the hashes
