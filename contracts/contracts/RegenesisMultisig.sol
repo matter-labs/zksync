@@ -42,7 +42,10 @@ contract RegenesisMultisig is Ownable, Config {
         numberOfApprovalsFromSecurityCouncil = 0;
     }
 
-    function approveHash() external {
+    function approveHash(bytes32 oldRootHash, bytes32, newRootHash) external {
+        require(newRootHash == candidateNewRootHash, "2");
+        require(oldRootHash == candidateOldRootHash, "3");
+
         address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS =
             [$(SECURITY_COUNCIL_MEMBERS)];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
