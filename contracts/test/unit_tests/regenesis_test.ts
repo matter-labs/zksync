@@ -111,7 +111,7 @@ describe('Regenesis test', function () {
                 councilMember
             );
 
-            await (await regenesisMultisigContract.approveHash()).wait();
+            await (await regenesisMultisigContract.approveHash(oldRootHash, newRootHash)).wait();
         }
 
         // After the new root hash has been submitted to the multisig,
