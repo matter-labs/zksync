@@ -17,7 +17,6 @@ async function main() {
     });
     parser.addArgument('--masterPrivateKey');
     parser.addArgument('--contractAddress');
-    parser.addArgument('--pathToSignatures');
     parser.addArgument('--oldRootHash');
     parser.addArgument('--newRootHash');
 
@@ -31,9 +30,6 @@ async function main() {
 
     const contractAddress = args.contractAddress || process.env.MISC_REGENESIS_MULTISIG_ADDRESS;
 
-    const rawSignatures = fs.readFileSync(args.pathToSignatures).toString();
-    const signatures = JSON.parse(rawSignatures);
-
     const contract = new ethers.Contract(contractAddress, testContracts.regenesisMultisig.abi, wallet);
 
     const oldRootHash = args.oldRootHash;
@@ -43,14 +39,13 @@ async function main() {
     console.log('Contract address: ', contractAddress);
     console.log('OldHash: ', oldRootHash);
     console.log('NewHash: ', newRootHash);
-    console.log('Signatures: ', signatures);
-    const tx = await contract.submitSignatures(oldRootHash, newRootHash, signatures, {
+    const tx = await contract.submitHash(oldRootHash, newRootHash, {
         gasLimit: 500000
     });
 
     await tx.wait();
 
-    console.log('Signatures submitted successfully');
+    console.log('New hash submitted successfully');
 }
 
 main()
