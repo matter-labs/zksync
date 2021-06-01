@@ -15,6 +15,7 @@ use zksync_types::{network::Network, Address};
 use super::response::ApiResult;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiConfigData {
     network: Network,
     contract: Address,
