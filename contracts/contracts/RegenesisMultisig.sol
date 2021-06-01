@@ -20,10 +20,11 @@ contract RegenesisMultisig is Ownable, Config {
     mapping(uint256 => bool) internal securityCouncilApproves;
     uint256 internal numberOfApprovalsFromSecurityCouncil;
 
-    // @dev The number of security council confirmatiosn needed is the same as for setting the upgrade for 3 days
-    uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_3_DAYS_THRESHOLD);
+    uint256 securityCouncilThreshold;
 
-    constructor() Ownable(msg.sender) {}
+    constructor(uint256 threshold) Ownable(msg.sender) {
+        securityCouncilThreshold = threshold;
+    }
 
     function submitHash(bytes32 _oldRootHash, bytes32 _newRootHash) external {
         // Only zkSync team can submit the hashes
@@ -50,7 +51,7 @@ contract RegenesisMultisig is Ownable, Config {
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil++;
 
-                if (numberOfApprovalsFromSecurityCouncil >= SECURITY_COUNCIL_THRESHOLD) {
+                if (numberOfApprovalsFromSecurityCouncil >= securityCouncilThreshold) {
                     oldRootHash = candidateOldRootHash;
                     newRootHash = candidateNewRootHash;
                 }
