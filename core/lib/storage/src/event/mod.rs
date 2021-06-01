@@ -290,29 +290,27 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Fetch rejected transactions for the given block and store corresponding
-    /// events in the database. Unlike `store_transaction_event`, this method is called
-    /// when the block is not yet committed on the chain.
-    pub async fn store_rejected_transaction_event(
+    /// Fetch executed transactions for the given block and store corresponding
+    /// `Queued` or `Rejected` events in the database. This method is called when
+    /// the `committer` saves the block in the database.
+    pub async fn store_queued_transaction_event(
         &mut self,
         block_number: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        // Load all failed block operations.
+        // Load all operations executed in the given block.
         let block_operations = transaction
             .chain()
             .block_schema()
             .get_block_executed_ops(block_number)
-            .await?
-            .into_iter()
-            .filter(|op| !op.is_successful());
+            .await?;
 
-        let mut events = Vec::new();
-        for rejected_tx in block_operations {
+        let mut events = Vec::with_capacity(block_operations.len());
+        for executed_tx in block_operations {
             let account_id = match transaction
                 .event_schema()
-                .account_id_from_op(&rejected_tx)
+                .account_id_from_op(&executed_tx)
                 .await
             {
                 Ok(account_id) => account_id,
@@ -320,17 +318,17 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                     vlog::warn!(
                         "Couldn't create transaction event, no account id exists \
                         in the database. Operation: {:?}",
-                        rejected_tx
+                        executed_tx
                     );
                     continue;
                 }
             };
 
             let transaction_event = TransactionEvent::from_executed_operation(
-                rejected_tx,
+                executed_tx,
                 block_number,
                 account_id,
-                TransactionStatus::Rejected,
+                TransactionStatus::Queued,
             );
 
             let event_data = serde_json::to_value(transaction_event)
@@ -345,10 +343,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .await?;
         transaction.commit().await?;
 
-        metrics::histogram!(
-            "sql.event.store_rejected_transaction_event",
-            start.elapsed()
-        );
+        metrics::histogram!("sql.event.store_queued_transaction_event", start.elapsed());
         Ok(())
     }
 }

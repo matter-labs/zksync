@@ -714,7 +714,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         // Notify about rejected transactions right away without waiting for the block commit.
         transaction
             .event_schema()
-            .store_rejected_transaction_event(block.block_number)
+            .store_queued_transaction_event(block.block_number)
             .await?;
 
         let new_block = StorageBlock {
