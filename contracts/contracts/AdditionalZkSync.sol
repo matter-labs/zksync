@@ -94,7 +94,6 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
         require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
-        require(toProcess == _depositsPubdata.length, "A");
         require(toProcess > 0, "9"); // no deposits to process
         uint64 currentDepositIdx = 0;
         for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
