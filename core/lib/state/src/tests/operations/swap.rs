@@ -192,6 +192,7 @@ impl TestSwap {
     }
 }
 
+/// Regular swap scenario: all participants are different accounts, should succeed
 #[test]
 fn regular_swap() {
     let mut tb = PlasmaTestBuilder::new();
@@ -226,6 +227,7 @@ fn regular_swap() {
     );
 }
 
+/// One account tries to perform a self-swap, should fail
 #[test]
 fn self_swap() {
     let mut tb = PlasmaTestBuilder::new();
@@ -253,6 +255,7 @@ fn self_swap() {
     test_swap.test(tb, Failure("Self-swap is not allowed"));
 }
 
+/// Accounts try to swap using same tokens, should fail
 #[test]
 fn equal_tokens() {
     let mut tb = PlasmaTestBuilder::new();
@@ -278,9 +281,10 @@ fn equal_tokens() {
         ],
     };
 
-    test_swap.test(tb, Failure("Can't swap for the same token"));
+    test_swap.test(tb, Failure("Can't swap the same tokens"));
 }
 
+/// Accounts try to swap, one of them hasn't enough balance, should fail
 #[test]
 fn not_enough_balance() {
     let mut tb = PlasmaTestBuilder::new();
@@ -309,6 +313,7 @@ fn not_enough_balance() {
     test_swap.test(tb, Failure("Not enough balance"));
 }
 
+/// Prices in orders are not compatible with amounts, should fail
 #[test]
 fn wrong_prices() {
     let mut tb = PlasmaTestBuilder::new();
@@ -337,6 +342,7 @@ fn wrong_prices() {
     test_swap.test(tb, Failure("Amounts are not compatible with prices"));
 }
 
+/// Prices are not exactly equal, but compatible, should succeed
 #[test]
 fn not_exact_prices() {
     let mut tb = PlasmaTestBuilder::new();
@@ -371,6 +377,7 @@ fn not_exact_prices() {
     );
 }
 
+/// Submitter can pay fees with the token that they just received from the swap
 #[test]
 fn pay_fee_with_received() {
     let mut tb = PlasmaTestBuilder::new();
@@ -404,6 +411,7 @@ fn pay_fee_with_received() {
     );
 }
 
+/// Default recipients used (accounts themselves), should succeed
 #[test]
 fn default_recipients() {
     let mut tb = PlasmaTestBuilder::new();
@@ -436,6 +444,7 @@ fn default_recipients() {
     );
 }
 
+/// One of the swapping accounts also submits the swap, should succeed
 #[test]
 fn sign_and_submit() {
     let mut tb = PlasmaTestBuilder::new();
@@ -469,6 +478,7 @@ fn sign_and_submit() {
     );
 }
 
+/// Limit orders should not increase nonces of accounts
 #[test]
 fn limit_orders() {
     let mut tb = PlasmaTestBuilder::new();
