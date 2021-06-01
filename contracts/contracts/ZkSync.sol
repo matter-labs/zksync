@@ -965,6 +965,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Delegates the call to the additional part of the main contract.
     /// @notice Should be only use to delegate the external calls as it passes the calldata
+    /// @notice All functions delegated to additional contract should NOT be nonReentrant
     function delegateAdditional() internal {
         address _target = additionalZkSync;
         assembly {
