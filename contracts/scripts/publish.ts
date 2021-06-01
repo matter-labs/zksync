@@ -70,6 +70,18 @@ async function main() {
             console.error(e);
         }
     }
+
+    {
+        const address = addresses.RegenesisMultisig;
+
+        const constructorArguments = [process.env.MISC_REGENESIS_THRESHOLD];
+
+        try {
+            await hre.run('verify:verify', { address, constructorArguments });
+        } catch (e) {
+            console.error(e);
+        }
+    }
 }
 
 main()
