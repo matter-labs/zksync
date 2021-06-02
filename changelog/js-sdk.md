@@ -2,15 +2,16 @@
 
 All notable changes to `zksync.js` will be documented in this file.
 
-## Unreleased
+## Version 0.11.0
 
 ### Added
 
+- Methods for working with NFTs. You can read more [here](https://zksync.io/dev/nfts.html).
+- Methods for working with atomic swaps/limit orders. You can read more [here](https://zksync.io/dev/swaps.html).
+
 ### Changed
 
-### Deprecated
-
-### Fixed
+- `zksync-crypto` to support atomic swaps/limit orders functionality.
 
 ## Version 0.10.9 (13.04.2021)
 
