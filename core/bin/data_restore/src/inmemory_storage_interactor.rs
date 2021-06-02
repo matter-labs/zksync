@@ -107,8 +107,12 @@ impl StorageInteractor for InMemoryStorageInteractor {
         self.storage_state = StorageUpdateState::Events;
     }
 
-    async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate) {
-        self.commit_state_update(0, vec![(AccountId(0), genesis_acc_update)]);
+    async fn save_genesis_tree_state(&mut self, genesis_updates: &[(AccountId, AccountUpdate)]) {
+        self.commit_state_update(0, genesis_updates.to_vec());
+    }
+
+    async fn save_special_token(&mut self, token: Token) {
+        self.tokens.insert(token.id, token);
     }
 
     async fn get_block_events_state_from_storage(&mut self) -> EventsState {
@@ -243,9 +247,21 @@ impl InMemoryStorageInteractor {
                     account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = *new_pub_key_hash;
                 }
-                AccountUpdate::MintNFT { .. } => todo!(), // Implement data restorer for Minting NFT (ZKS-657)
-
-                AccountUpdate::RemoveNFT { .. } => todo!(), // Implement data restorer for Minting NFT (ZKS-657
+                AccountUpdate::MintNFT { ref token } => {
+                    self.tokens.insert(
+                        token.id,
+                        Token {
+                            id: token.id,
+                            address: token.address,
+                            symbol: token.symbol.clone(),
+                            decimals: 0,
+                            is_nft: true,
+                        },
+                    );
+                }
+                AccountUpdate::RemoveNFT { ref token } => {
+                    self.tokens.remove(&token.id);
+                }
             }
         }
     }

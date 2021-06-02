@@ -26,7 +26,7 @@ pub async fn verify_restore(
     let mut driver = DataRestoreDriver::new(
         web3,
         contracts.governance,
-        testkit_config.upgrade_gatekeeper_addr,
+        testkit_config.contract_upgrade_eth_blocks.clone(),
         testkit_config.init_contract_version,
         ETH_BLOCKS_STEP,
         0,

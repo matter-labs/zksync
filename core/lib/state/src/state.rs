@@ -287,10 +287,10 @@ impl ZkSyncState {
                     account.nonce = new_nonce;
                     self.insert_account(account_id, account);
                 }
-                AccountUpdate::RemoveNFT { token } => {
+                AccountUpdate::MintNFT { token } => {
                     self.nfts.insert(token.id, token);
                 }
-                AccountUpdate::MintNFT { token } => {
+                AccountUpdate::RemoveNFT { token } => {
                     self.nfts.remove(&token.id);
                 }
             }

@@ -7,7 +7,7 @@ use zksync_storage::data_restore::records::{
 };
 use zksync_types::{
     block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
-    TokenId, TokenInfo,
+    Token, TokenId, TokenInfo,
 };
 
 use crate::{
@@ -67,13 +67,21 @@ pub trait StorageInteractor {
         last_watched_eth_block_number: u64,
     );
 
-    /// Saves genesis account state in storage
+    /// Saves genesis accounts state in storage
     ///
     /// # Arguments
     ///
-    /// * `genesis_acc_update` - Genesis account update
+    /// * `genesis_updates` - Genesis account updates
     ///
-    async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate);
+    async fn save_genesis_tree_state(&mut self, genesis_updates: &[(AccountId, AccountUpdate)]);
+
+    /// Saves special NFT token in storage
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - Special token to be stored
+    ///
+    async fn save_special_token(&mut self, token: Token);
 
     /// Returns Rollup contract events state from storage
     async fn get_block_events_state_from_storage(&mut self) -> EventsState;

@@ -4,7 +4,7 @@ use super::ZkSyncTx;
 use crate::ZkSyncPriorityOp;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::AccountId;
-use zksync_crypto::params::CHUNK_BYTES;
+use zksync_crypto::params::{CHUNK_BYTES, LEGACY_CHUNK_BYTES};
 
 mod change_pubkey_op;
 mod close_op;
@@ -160,6 +160,42 @@ impl ZkSyncOp {
         }
     }
 
+    /// Attempts to restore the operation from the public data committed on the Ethereum smart contract
+    /// prior to v6 upgrade. The token id bit width is 2 bytes instead of 4.
+    ///
+    /// Used by the data restore module for recovering old operations.
+    pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, PublicDataDecodeError> {
+        let op_type: u8 = *bytes.first().ok_or(PublicDataDecodeError::EmptyData)?;
+        match op_type {
+            NoopOp::OP_CODE => Ok(ZkSyncOp::Noop(NoopOp::from_legacy_public_data(&bytes)?)),
+            DepositOp::OP_CODE => Ok(ZkSyncOp::Deposit(Box::new(
+                DepositOp::from_legacy_public_data(&bytes)?,
+            ))),
+            TransferToNewOp::OP_CODE => Ok(ZkSyncOp::TransferToNew(Box::new(
+                TransferToNewOp::from_legacy_public_data(&bytes)?,
+            ))),
+            WithdrawOp::OP_CODE => Ok(ZkSyncOp::Withdraw(Box::new(
+                WithdrawOp::from_legacy_public_data(&bytes)?,
+            ))),
+            CloseOp::OP_CODE => Ok(ZkSyncOp::Close(Box::new(CloseOp::from_legacy_public_data(
+                &bytes,
+            )?))),
+            TransferOp::OP_CODE => Ok(ZkSyncOp::Transfer(Box::new(
+                TransferOp::from_legacy_public_data(&bytes)?,
+            ))),
+            FullExitOp::OP_CODE => Ok(ZkSyncOp::FullExit(Box::new(
+                FullExitOp::from_legacy_public_data(&bytes)?,
+            ))),
+            ChangePubKeyOp::OP_CODE => Ok(ZkSyncOp::ChangePubKeyOffchain(Box::new(
+                ChangePubKeyOp::from_legacy_public_data(&bytes)?,
+            ))),
+            ForcedExitOp::OP_CODE => Ok(ZkSyncOp::ForcedExit(Box::new(
+                ForcedExitOp::from_legacy_public_data(&bytes)?,
+            ))),
+            _ => Err(PublicDataDecodeError::UnknownOperationType),
+        }
+    }
+
     /// Returns the expected number of chunks for a certain type of operation.
     pub fn public_data_length(op_type: u8) -> Result<usize, UnexpectedOperationType> {
         match op_type {
@@ -178,6 +214,24 @@ impl ZkSyncOp {
             _ => Err(UnexpectedOperationType()),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
+    }
+
+    /// Returns the expected number of chunks for a certain type of operation
+    /// prior to v6 upgrade.
+    pub fn legacy_public_data_length(op_type: u8) -> Result<usize, UnexpectedOperationType> {
+        match op_type {
+            NoopOp::OP_CODE => Ok(NoopOp::CHUNKS),
+            DepositOp::OP_CODE => Ok(DepositOp::CHUNKS),
+            TransferToNewOp::OP_CODE => Ok(TransferToNewOp::CHUNKS),
+            WithdrawOp::OP_CODE => Ok(WithdrawOp::CHUNKS),
+            CloseOp::OP_CODE => Ok(CloseOp::CHUNKS),
+            TransferOp::OP_CODE => Ok(TransferOp::CHUNKS),
+            FullExitOp::OP_CODE => Ok(FullExitOp::LEGACY_CHUNKS),
+            ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
+            ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
+            _ => Err(UnexpectedOperationType()),
+        }
+        .map(|chunks| chunks * LEGACY_CHUNK_BYTES)
     }
 
     /// Attempts to interpret the operation as the L2 transaction.

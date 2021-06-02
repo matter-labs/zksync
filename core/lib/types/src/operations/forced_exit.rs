@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use zksync_crypto::{
     params::{
         ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, LEGACY_CHUNK_BYTES, LEGACY_TOKEN_BIT_WIDTH,
+        TOKEN_BIT_WIDTH,
     },
     primitives::FromBytes,
 };
@@ -58,13 +59,25 @@ impl ForcedExitOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, ForcedExitOpError> {
-        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+        Self::parse_pub_data(bytes, TOKEN_BIT_WIDTH, CHUNK_BYTES)
+    }
+
+    pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, ForcedExitOpError> {
+        Self::parse_pub_data(bytes, LEGACY_TOKEN_BIT_WIDTH, LEGACY_CHUNK_BYTES)
+    }
+
+    fn parse_pub_data(
+        bytes: &[u8],
+        token_bit_width: usize,
+        chunk_bytes: usize,
+    ) -> Result<Self, ForcedExitOpError> {
+        if bytes.len() != Self::CHUNKS * chunk_bytes {
             return Err(ForcedExitOpError::PubdataSizeMismatch);
         }
         let initiator_account_id_offset = 1;
         let target_account_id_offset = initiator_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let token_id_offset = target_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let amount_offset = token_id_offset + TOKEN_BIT_WIDTH / 8;
+        let amount_offset = token_id_offset + token_bit_width / 8;
         let fee_offset = amount_offset + BALANCE_BIT_WIDTH / 8;
         let eth_address_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
         let eth_address_end = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;

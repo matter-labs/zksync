@@ -80,12 +80,12 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
     pub async fn save_genesis_state(
         &mut self,
-        genesis_acc_update: AccountUpdate,
+        genesis_updates: &[(AccountId, AccountUpdate)],
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         StateSchema(&mut transaction)
-            .commit_state_update(BlockNumber(0), &[(AccountId(0), genesis_acc_update)], 0)
+            .commit_state_update(BlockNumber(0), genesis_updates, 0)
             .await?;
         StateSchema(&mut transaction)
             .apply_state_update(BlockNumber(0))
@@ -193,12 +193,8 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
             let try_insert_token = TokensSchema(&mut transaction).store_token(token).await;
 
-            match try_insert_token {
-                Err(StoreTokenError::TokenAlreadyExistsError(err)) => {
-                    anyhow::bail!("failed to insert token to database: {}", err)
-                }
-                Err(StoreTokenError::Other(anyhow_err)) => return Err(anyhow_err),
-                _ => (),
+            if let Err(StoreTokenError::Other(anyhow_err)) = try_insert_token {
+                return Err(anyhow_err);
             }
         }
 
