@@ -63,7 +63,7 @@ async function setupWallet() {
     });
     await depositHandle.awaitReceipt();
 
-    if (!syncWallet.isSigningKeySet()) {
+    if (!(await syncWallet.isSigningKeySet())) {
         const changePubkeyHandle = await syncWallet.setSigningKey({
             feeToken: 'ETH',
             ethAuthType: 'ECDSA'
@@ -144,11 +144,7 @@ export async function compileForTest() {
 }
 
 if (process.argv.length > 2 && process.argv[2] == 'docs') {
-    compileForDocumentation()
-        .then(() => console.log('documentation.apib successfully created'))
-        .catch((e) => console.log(e));
+    compileForDocumentation().then(() => console.log('documentation.apib successfully created'));
 } else if (process.argv.length > 2 && process.argv[2] == 'test') {
-    compileForTest()
-        .then(() => console.log('test.apib successfully created'))
-        .catch((e) => console.log(e));
+    compileForTest().then(() => console.log('test.apib successfully created'));
 }
