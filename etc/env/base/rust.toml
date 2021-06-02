@@ -10,6 +10,7 @@ zksync_core=debug,\
 zksync_eth_sender=debug,\
 zksync_event_listener=info,\
 zksync_witness_generator=debug,\
+zksync_gateway_watcher=info,\
 zksync_server=debug,\
 zksync_prover=debug,\
 dummy_prover=info,\
