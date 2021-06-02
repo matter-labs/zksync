@@ -45,6 +45,7 @@ impl StreamHandler<NotifyResult> for EventListener {
         let pool = self.db_pool.clone();
         let last_processed_event_id = self.last_processed_event_id;
         async move {
+            // Try to fetch and deserialize new events.
             Ok(pool
                 .access_storage()
                 .await?
@@ -86,8 +87,6 @@ impl StreamHandler<NotifyResult> for EventListener {
                         err
                     );
                 }
-                // The server monitor doesn't have a timeout on its
-                // mailbox, thus, stop the context no matter what.
                 if shutdown {
                     ctx.stop();
                 }

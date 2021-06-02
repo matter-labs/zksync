@@ -155,6 +155,7 @@ impl Handler<Shutdown> for Subscriber {
             description: Some("internal server error".to_string()),
         });
         ctx.close(reason);
+        // No need to notify the monitor, stop the context right away.
         ctx.stop();
     }
 }
