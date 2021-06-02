@@ -61,7 +61,7 @@ contract RegenesisMultisig is Ownable, Config {
                 if (numberOfApprovalsFromSecurityCouncil >= securityCouncilThreshold) {
                     oldRootHash = candidateOldRootHash;
                     newRootHash = candidateNewRootHash;
-                    CandidateAccepted(oldRootHash, newRootHash);
+                    emit CandidateAccepted(oldRootHash, newRootHash);
                 }
             }
         }
