@@ -89,7 +89,7 @@ async function main() {
         await deployer.deployAdditionalZkSync({ gasPrice, nonce: args.nonce });
     }
 
-    if (args.contract === 'TokenGovernance'|| args.contract == null) {
+    if (args.contract === 'TokenGovernance' || args.contract == null) {
         await deployer.deployTokenGovernance({ gasPrice, nonce: args.nonce });
     }
 }
