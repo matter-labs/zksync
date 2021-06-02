@@ -498,13 +498,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             if (opType == Operations.OpType.PartialExit) {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
                 // Circuit guarantee that partial exits are available only for fungible tokens
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "pm");
+                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf1");
                 withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
                 // Circuit guarantee that forced exits are available only for fungible tokens
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "pm");
-                withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
+                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf2");
+                withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
