@@ -11,7 +11,7 @@ import "./Utils.sol";
 /// @notice Contract is used to allow anyone to add new ERC20 tokens to zkSync given sufficient payment
 contract TokenGovernance {
     /// @notice Token lister added or removed (see `tokenLister`)
-    event TokenListerUpdate(address, bool);
+    event TokenListerUpdate(address indexed, bool);
 
     /// @notice zkSync governance contract
     Governance public governance;
@@ -19,7 +19,7 @@ contract TokenGovernance {
     /// @notice Token used to collect listing fee for addition of new token to zkSync network
     IERC20 public listingFeeToken;
 
-    /// @notice Size of the listing fee amount
+    /// @notice Token listing fee
     uint256 public listingFee;
 
     /// @notice Max number of tokens that can be listed using this contract
@@ -44,9 +44,10 @@ contract TokenGovernance {
         listingCap = _listingCap;
         treasury = _treasury;
 
+        address governor = governance.networkGovernor();
         // We add zkSync governor as a first token lister.
-        tokenLister[governance.networkGovernor()] = true;
-        emit TokenListerUpdate(governance.networkGovernor(), true);
+        tokenLister[governor] = true;
+        emit TokenListerUpdate(governor, true);
     }
 
     /// @notice Adds new ERC20 token to zkSync network.

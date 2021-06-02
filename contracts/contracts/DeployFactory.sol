@@ -92,7 +92,7 @@ contract DeployFactory is TokenDeployInit {
         for (uint256 i = 0; i < tokens.length; ++i) {
             _governance.addToken(tokens[i]);
         }
-        _governance.changeTokenGovernance(_finalGovernor);
+        _governance.changeTokenGovernance(TokenGovernance(_finalGovernor));
         _governance.setValidator(_validator, true);
         _governance.changeGovernor(_finalGovernor);
     }

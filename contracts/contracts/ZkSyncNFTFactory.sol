@@ -6,14 +6,14 @@ import "./NFTFactory.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 contract ZkSyncNFTFactory is ERC721, NFTFactory {
-    uint16 constant ADDRESS_FOOTPRINT_OFFSET = 0;
-    uint16 constant ADDRESS_SIZE_BITS = 160;
+    uint8 constant ADDRESS_FOOTPRINT_OFFSET = 0;
+    uint8 constant ADDRESS_SIZE_BITS = 160;
 
-    uint16 constant CREATOR_ID_FOOTPRINT_OFFSET = ADDRESS_FOOTPRINT_OFFSET + ADDRESS_SIZE_BITS;
-    uint16 constant CREATOR_ID_SIZE_BITS = 32;
+    uint8 constant CREATOR_ID_FOOTPRINT_OFFSET = ADDRESS_FOOTPRINT_OFFSET + ADDRESS_SIZE_BITS;
+    uint8 constant CREATOR_ID_SIZE_BITS = 32;
 
-    uint16 constant SERIAL_ID_FOOTPRINT_OFFSET = CREATOR_ID_FOOTPRINT_OFFSET + CREATOR_ID_SIZE_BITS;
-    uint16 constant SERIAL_ID_SIZE_BITS = 32;
+    uint8 constant SERIAL_ID_FOOTPRINT_OFFSET = CREATOR_ID_FOOTPRINT_OFFSET + CREATOR_ID_SIZE_BITS;
+    uint8 constant SERIAL_ID_SIZE_BITS = 32;
 
     /// @notice Packs address and token ID into single word to use as a key in balances mapping
     function packCreatorFingerprint(

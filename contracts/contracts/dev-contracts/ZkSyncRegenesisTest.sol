@@ -5,6 +5,7 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "../ZkSync.sol";
+import "../AdditionalZkSync.sol";
 
 contract ZkSyncRegenesisTest is ZkSync {
     function getStoredBlockHash() external view returns (bytes32) {
@@ -14,7 +15,7 @@ contract ZkSyncRegenesisTest is ZkSync {
         return storedBlockHashes[totalBlocksExecuted];
     }
 
-    function getAdditionalZkSync() external view returns (address) {
+    function getAdditionalZkSync() external view returns (AdditionalZkSync) {
         return additionalZkSync;
     }
 }
