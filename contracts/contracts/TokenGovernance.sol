@@ -84,7 +84,7 @@ contract TokenGovernance {
         listingFeeToken = _newListingFeeToken;
         listingFee = _newListingFee;
 
-        emit ListingFeeTokenSet(_newListingFeeToken);
+        emit ListingFeeTokenUpdate(_newListingFeeToken);
     }
 
     /// @notice Set new listing fee
