@@ -134,7 +134,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
-        additionalZkSync = _additionalZkSync;
+        additionalZkSync = AdditionalZkSync(_additionalZkSync);
 
         StoredBlockInfo memory storedBlockZero =
             StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, 0, _genesisStateHash, bytes32(0));
@@ -149,8 +149,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param upgradeParameters Encoded representation of upgrade parameters
     // solhint-disable-next-line no-empty-blocks
     function upgrade(bytes calldata upgradeParameters) external nonReentrant {
-        require(totalBlocksCommitted == totalBlocksProven, "wq1"); // All the blocks must be processed
-        require(totalBlocksCommitted == totalBlocksExecuted, "w12"); // All the blocks must be processed
+        require(totalBlocksCommitted == totalBlocksProven, "wq1"); // All the blocks must be proven
+        require(totalBlocksCommitted == totalBlocksExecuted, "w12"); // All the blocks must be executed
 
         StoredBlockInfo memory lastBlockInfo;
         (lastBlockInfo) = abi.decode(upgradeParameters, (StoredBlockInfo));
@@ -165,7 +165,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Overriding the old block's root hash with the new one
         lastBlockInfo.stateHash = newRootHash;
         storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(lastBlockInfo);
-        additionalZkSync = address($$(NEW_ADDITIONAL_ZKSYNC_ADDRESS));
+        additionalZkSync = AdditionalZkSync(address($$(NEW_ADDITIONAL_ZKSYNC_ADDRESS)));
 
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
@@ -320,7 +320,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             Operations.FullExit({
                 accountId: _accountId,
                 owner: msg.sender,
-                tokenId: uint32(tokenId),
+                tokenId: tokenId,
                 amount: 0, // unknown at this point
                 nftCreatorAccountId: uint32(0), // unknown at this point
                 nftCreatorAddress: address(0), // unknown at this point
@@ -497,9 +497,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             if (opType == Operations.OpType.PartialExit) {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
+                // Circuit guarantee that partial exits are available only for fungible tokens
+                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "pm");
                 withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
+                // Circuit guarantee that forced exits are available only for fungible tokens
+                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "pm");
                 withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
@@ -657,7 +661,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             Operations.Deposit({
                 accountId: 0, // unknown at this point
                 owner: _owner,
-                tokenId: uint32(_tokenId),
+                tokenId: _tokenId,
                 amount: _amount
             });
         bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);
@@ -967,7 +971,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Should be only use to delegate the external calls as it passes the calldata
     /// @notice All functions delegated to additional contract should NOT be nonReentrant
     function delegateAdditional() internal {
-        address _target = additionalZkSync;
+        address _target = address(additionalZkSync);
         assembly {
             // The pointer to the free memory slot
             let ptr := mload(0x40)

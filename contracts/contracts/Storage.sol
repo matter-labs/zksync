@@ -11,6 +11,7 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./Operations.sol";
 import "./NFTFactory.sol";
+import "./AdditionalZkSync.sol";
 
 /// @title zkSync storage contract
 /// @author Matter Labs
@@ -162,7 +163,7 @@ contract Storage {
 
     mapping(uint32 => Operations.WithdrawNFT) internal pendingWithdrawnNFTs;
 
-    address internal additionalZkSync;
+    AdditionalZkSync internal additionalZkSync;
 
     /// @dev Upgrade notice period, possibly shorten by the security council
     uint256 internal approvedUpgradeNoticePeriod;

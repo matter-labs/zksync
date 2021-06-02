@@ -5,12 +5,16 @@ pragma solidity ^0.7.0;
 import "./Config.sol";
 import "./Utils.sol";
 import "./NFTFactory.sol";
+import "./TokenGovernance.sol";
 
 /// @title Governance Contract
 /// @author Matter Labs
 contract Governance is Config {
     /// @notice Token added to Franklin net
     event NewToken(address indexed token, uint16 indexed tokenId);
+
+    /// @notice Default nft factory has set
+    event SetDefaultNFTFactory(address indexed factory);
 
     /// @notice NFT factory registered new creator account
     event NFTFactoryRegisteredCreator(
@@ -23,7 +27,7 @@ contract Governance is Config {
     event NewGovernor(address newGovernor);
 
     /// @notice Token Governance changed
-    event NewTokenGovernance(address newTokenGovernance);
+    event NewTokenGovernance(TokenGovernance newTokenGovernance);
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
@@ -49,7 +53,7 @@ contract Governance is Config {
     mapping(uint16 => bool) public pausedTokens;
 
     /// @notice Address that is authorized to add tokens to the Governance.
-    address public tokenGovernance;
+    TokenGovernance public tokenGovernance;
 
     /// @notice NFT Creator address to factory address mapping
     mapping(uint32 => mapping(address => NFTFactory)) public nftFactories;
@@ -83,7 +87,7 @@ contract Governance is Config {
 
     /// @notice Change current token governance
     /// @param _newTokenGovernance Address of the new token governor
-    function changeTokenGovernance(address _newTokenGovernance) external {
+    function changeTokenGovernance(TokenGovernance _newTokenGovernance) external {
         requireGovernor(msg.sender);
         if (tokenGovernance != _newTokenGovernance) {
             tokenGovernance = _newTokenGovernance;
@@ -94,7 +98,7 @@ contract Governance is Config {
     /// @notice Add token to the list of networks tokens
     /// @param _token Token address
     function addToken(address _token) external {
-        require(msg.sender == tokenGovernance, "1E");
+        require(msg.sender == address(tokenGovernance), "1E");
         require(tokenIds[_token] == 0, "1e"); // token exists
         require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "1f"); // no free identifiers for tokens
 
@@ -197,13 +201,16 @@ contract Governance is Config {
     //@param _factory Address of NFT factory
     function setDefaultNFTFactory(address _factory) external {
         requireGovernor(msg.sender);
-        require(address(defaultFactory) == address(0), "mb");
+        require(address(_factory) != address(0), "mb1"); // Factory should be non zero
+        require(address(defaultFactory) == address(0), "mb2"); // NFTFactory is already set
         defaultFactory = NFTFactory(_factory);
+        emit SetDefaultNFTFactory(_factory);
     }
 
     function getNFTFactory(uint32 _creatorAccountId, address _creatorAddress) external view returns (NFTFactory) {
         NFTFactory _factory = nftFactories[_creatorAccountId][_creatorAddress];
         if (address(_factory) == address(0)) {
+            require(address(defaultFactory) != address(0), "fs"); // NFTFactory does not set
             return defaultFactory;
         } else {
             return _factory;
