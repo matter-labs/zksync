@@ -5,11 +5,11 @@ import * as zksync from 'zksync';
 import * as ethers from 'ethers';
 
 function getDirPath() {
-    return path.join(process.env['ZKSYNC_HOME'] as string, 'core/tests/apiary');
+    return path.join(process.env['ZKSYNC_HOME'] as string, 'core/tests/api-docs');
 }
 
-export function pasteAllFilesInOne() {
-    let template = handlebars.compile(fs.readFileSync(path.join(getDirPath(), 'template.apib'), 'utf-8'), {
+function pasteAllFilesInOne() {
+    let template = handlebars.compile(fs.readFileSync(path.join(getDirPath(), 'blueprint/template.apib'), 'utf-8'), {
         noEscape: true
     });
 
@@ -30,7 +30,7 @@ export function pasteAllFilesInOne() {
     return template(replaceObject);
 }
 
-export async function compileCommon() {
+async function compileCommon() {
     const data = pasteAllFilesInOne();
     let template = handlebars.compile(data, { noEscape: true });
 
@@ -40,7 +40,7 @@ export async function compileCommon() {
     return template(replaceObject);
 }
 
-export async function setupWallet() {
+async function setupWallet() {
     const ethTestConfig = JSON.parse(
         fs.readFileSync(path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant/eth.json`), {
             encoding: 'utf-8'
@@ -74,7 +74,7 @@ export async function setupWallet() {
     return syncWallet;
 }
 
-export async function getHashesAndSignatures() {
+async function getHashesAndSignatures() {
     let result: any = {};
     let syncWallet = await setupWallet();
 
@@ -128,7 +128,7 @@ export async function compileForDocumentation() {
 
     const after = template(replaceObject);
 
-    fs.writeFileSync(path.join(getDirPath(), 'documentation.apib'), after);
+    fs.writeFileSync(path.join(getDirPath(), 'blueprint/documentation.apib'), after);
 }
 
 export async function compileForTest() {
@@ -140,9 +140,5 @@ export async function compileForTest() {
 
     const after = template(replaceObject);
 
-    fs.writeFileSync(path.join(getDirPath(), 'test.apib'), after);
+    fs.writeFileSync(path.join(getDirPath(), 'blueprint/test.apib'), after);
 }
-
-compileForTest()
-    .then(() => console.log('ok'))
-    .catch((err) => console.log(err));

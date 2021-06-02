@@ -52,6 +52,7 @@ export async function tokenInfo(address: string) {
 export async function yarn() {
     await utils.spawn('yarn');
     await utils.spawn('yarn reading-tool build');
+    await utils.spawn('yarn api-docs build');
     await utils.spawn('yarn zksync prepublish');
 }
 
