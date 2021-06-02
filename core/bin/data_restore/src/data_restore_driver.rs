@@ -1,11 +1,11 @@
 // External deps
 use web3::{
     contract::Contract,
-    types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H160, H256},
+    types::{H160, H256},
     Transport, Web3,
 };
 // Workspace deps
-use zksync_contracts::{governance_contract, upgrade_gatekeeper};
+use zksync_contracts::governance_contract;
 use zksync_crypto::Fr;
 
 use zksync_types::{AccountId, AccountMap, AccountUpdate, BlockNumber};
@@ -18,7 +18,6 @@ use crate::{
     storage_interactor::StorageInteractor,
     tree_state::TreeState,
 };
-use ethabi::Address;
 
 use std::marker::PhantomData;
 
@@ -50,9 +49,14 @@ pub enum StorageUpdateState {
 pub struct DataRestoreDriver<T: Transport, I> {
     /// Web3 provider endpoint
     pub web3: Web3<T>,
-    /// Provides Ethereum Governance contract unterface
+    /// Provides Ethereum Governance contract interface
     pub governance_contract: (ethabi::Contract, Contract<T>),
-    /// Provides Ethereum Rollup contract unterface
+    /// Address of the Upgrade GateKeeper contract. Provides logs about
+    /// zkSync contract upgrades.
+    pub upgrade_gatekeeper_addr: H160,
+    /// The initial version of the deployed zkSync contract.
+    pub init_contract_version: u32,
+    /// Provides Ethereum Rollup contract interface
     pub zksync_contract: ZkSyncDeployedContract<T>,
     /// Rollup contract events state
     pub events_state: EventsState,
@@ -69,7 +73,6 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// Expected root hash to be observed after restoring process. Only
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
-    pub available_block_chunk_sizes: Vec<usize>,
     phantom_data: PhantomData<I>,
 }
 
@@ -84,6 +87,8 @@ where
     ///
     /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
+    /// * `upgrade_gatekeeper_addr` - Upgrade GateKeeper contract address
+    /// * `init_contract_version` - The initial version of the deployed zkSync contract.
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     /// * `finite_mode` - Finite mode flag.
@@ -94,12 +99,13 @@ where
     pub fn new(
         web3: Web3<T>,
         governance_contract_eth_addr: H160,
+        upgrade_gatekeeper_addr: H160,
+        init_contract_version: u32,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         finite_mode: bool,
         final_hash: Option<Fr>,
         zksync_contract: ZkSyncDeployedContract<T>,
-        available_block_chunk_sizes: Vec<usize>,
     ) -> Self {
         let governance_contract = {
             let abi = governance_contract();
@@ -115,6 +121,8 @@ where
         Self {
             web3,
             governance_contract,
+            upgrade_gatekeeper_addr,
+            init_contract_version,
             zksync_contract,
             events_state,
             tree_state,
@@ -123,34 +131,7 @@ where
             finite_mode,
             final_hash,
             phantom_data: Default::default(),
-            available_block_chunk_sizes,
         }
-    }
-
-    pub async fn get_gatekeeper_logs(
-        &self,
-        upgrade_gatekeeper_contract_address: Address,
-    ) -> anyhow::Result<Vec<Log>> {
-        let gatekeeper_abi = upgrade_gatekeeper();
-        let upgrade_contract_event = gatekeeper_abi
-            .event("UpgradeComplete")
-            .expect("Upgrade Gatekeeper contract abi error")
-            .signature();
-
-        let filter = FilterBuilder::default()
-            .address(vec![upgrade_gatekeeper_contract_address])
-            .from_block(Web3BlockNumber::Earliest)
-            .to_block(Web3BlockNumber::Latest)
-            .topics(Some(vec![upgrade_contract_event]), None, None, None)
-            .build();
-
-        let result = self
-            .web3
-            .eth()
-            .logs(filter)
-            .await
-            .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
-        Ok(result)
     }
 
     /// Sets the 'genesis' state.
@@ -330,8 +311,10 @@ where
                 &self.web3,
                 &self.zksync_contract,
                 &self.governance_contract,
+                self.upgrade_gatekeeper_addr,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
+                self.init_contract_version,
             )
             .await
             .expect("Updating events state: cant update events state");
@@ -357,9 +340,14 @@ where
         let mut updates = vec![];
         let mut count = 0;
         for op_block in new_ops_blocks {
+            // Take the contract version into account when choosing block chunk sizes.
+            let available_block_chunk_sizes = op_block
+                .contract_version
+                .expect("contract version must be set")
+                .available_block_chunk_sizes();
             let (block, acc_updates) = self
                 .tree_state
-                .update_tree_states_from_ops_block(&op_block, &self.available_block_chunk_sizes)
+                .update_tree_states_from_ops_block(&op_block, available_block_chunk_sizes)
                 .expect("Updating tree state: cant update tree from operations");
             blocks.push(block);
             updates.push(acc_updates);

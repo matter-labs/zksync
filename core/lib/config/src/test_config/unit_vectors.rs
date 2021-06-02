@@ -3,7 +3,7 @@
 use num::BigUint;
 use serde::Deserialize;
 // Workspace uses
-use zksync_types::{AccountId, Address, Nonce, PubKeyHash, TokenId};
+use zksync_types::{AccountId, Address, Nonce, PubKeyHash, TokenId, H256};
 use zksync_utils::{
     BigUintSerdeAsRadix10Str, OptionBytesToHexSerde, ZeroPrefixHexSerde, ZeroxPrefix,
 };
@@ -85,6 +85,44 @@ pub enum TxData {
     },
     #[serde(rename_all = "camelCase")]
     ForcedExit { data: Box<ForcedExit> },
+    #[serde(rename_all = "camelCase")]
+    WithdrawNFT {
+        data: Box<WithdrawNFT>,
+        eth_sign_data: WithdrawNFTSignatureInputs,
+    },
+    #[serde(rename_all = "camelCase")]
+    MintNFT {
+        data: Box<MintNFT>,
+        eth_sign_data: MintNFTSignatureInputs,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawNFT {
+    pub account_id: AccountId,
+    pub from: Address,
+    pub to: Address,
+    pub token_id: TokenId,
+    pub fee_token_id: TokenId,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub fee: BigUint,
+    pub nonce: Nonce,
+    #[serde(flatten)]
+    pub time_range: TimeRange,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MintNFT {
+    pub creator_id: AccountId,
+    pub creator_address: Address,
+    pub recipient: Address,
+    pub content_hash: H256,
+    pub fee_token_id: TokenId,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub fee: BigUint,
+    pub nonce: Nonce,
 }
 
 #[derive(Debug, Deserialize)]
@@ -145,6 +183,25 @@ pub struct ForcedExit {
     pub nonce: Nonce,
     #[serde(flatten)]
     pub time_range: TimeRange,
+}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawNFTSignatureInputs {
+    pub token: TokenId,
+    pub to: Address,
+    pub string_fee: String,
+    pub string_fee_token: String,
+    pub nonce: Nonce,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MintNFTSignatureInputs {
+    pub string_fee_token: String,
+    pub string_fee: String,
+    pub recipient: Address,
+    pub content_hash: H256,
+    pub nonce: Nonce,
 }
 
 #[derive(Debug, Deserialize)]

@@ -16,7 +16,10 @@ pub use zksync_api_client::rest::v1::{
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, BatchFee, BlockNumber, Fee, SignedZkSyncTx};
+use zksync_types::{
+    tx::{TxEthSignatureVariant, TxHash},
+    BatchFee, BlockNumber, Fee, SignedZkSyncTx,
+};
 // Local uses
 use super::{Error as ApiError, JsonResult, Pagination, PaginationQuery};
 use crate::api_server::rpc_server::types::TxWithSignature;
@@ -257,7 +260,7 @@ async fn submit_tx_batch(
         .into_iter()
         .map(|tx| TxWithSignature {
             tx,
-            signature: None,
+            signature: TxEthSignatureVariant::Single(None),
         })
         .collect();
 
@@ -643,12 +646,17 @@ mod tests {
         // Submit correct transaction.
         let tx = TestServerConfig::gen_zk_txs(1_00).txs[0].0.clone();
         let expected_tx_hash = tx.hash();
-        assert_eq!(client.submit_tx(tx, None, None).await?, expected_tx_hash);
+        assert_eq!(
+            client
+                .submit_tx(tx, TxEthSignatureVariant::Single(None), None)
+                .await?,
+            expected_tx_hash
+        );
 
         // Submit transaction without fee.
         let tx = TestServerConfig::gen_zk_txs(0).txs[0].0.clone();
         assert!(client
-            .submit_tx(tx, None, None)
+            .submit_tx(tx, TxEthSignatureVariant::Single(None), None)
             .await
             .unwrap_err()
             .to_string()
@@ -718,7 +726,7 @@ mod tests {
         assert!(client
             .submit_tx(
                 transfer_bad_token.clone(),
-                eth_sig.map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(eth_sig.map(TxEthSignature::EthereumSignature)),
                 None
             )
             .await
@@ -832,7 +840,7 @@ mod tests {
         client
             .submit_tx(
                 transfer1.clone(),
-                eth_sig1.map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(eth_sig1.map(TxEthSignature::EthereumSignature)),
                 None,
             )
             .await
@@ -857,7 +865,7 @@ mod tests {
         client
             .submit_tx(
                 transfer2.clone(),
-                eth_sig2.map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(eth_sig2.map(TxEthSignature::EthereumSignature)),
                 None,
             )
             .await
@@ -895,7 +903,9 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Transfer(Box::new(tx.clone())),
-                eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(
+                    eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                ),
                 Some(true),
             )
             .await
@@ -904,7 +914,9 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Transfer(Box::new(tx.clone())),
-                eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(
+                    eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                ),
                 Some(false),
             )
             .await?;
@@ -912,7 +924,9 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Transfer(Box::new(tx)),
-                eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(
+                    eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                ),
                 None,
             )
             .await?;
@@ -931,7 +945,9 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Withdraw(Box::new(tx.clone())),
-                eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(
+                    eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                ),
                 Some(true),
             )
             .await?;
@@ -939,7 +955,9 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Withdraw(Box::new(tx.clone())),
-                eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(
+                    eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                ),
                 Some(false),
             )
             .await?;
@@ -947,7 +965,9 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Withdraw(Box::new(tx)),
-                eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                TxEthSignatureVariant::Single(
+                    eth_sig.clone().map(TxEthSignature::EthereumSignature),
+                ),
                 None,
             )
             .await?;

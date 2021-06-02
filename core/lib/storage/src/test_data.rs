@@ -4,10 +4,11 @@
 use std::ops::Deref;
 
 // External imports
-use lazy_static::lazy_static;
-use num::BigUint;
+use num::{BigUint, Zero};
+use once_cell::sync::Lazy;
 use parity_crypto::publickey::{Generator, Random};
 // Workspace imports
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
 use zksync_crypto::{ff::PrimeField, rand::Rng, Fr};
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
@@ -18,7 +19,7 @@ use zksync_types::{
         BlocksCreateProofOperation, BlocksExecuteOperation, BlocksProofOperation,
     },
     tx::{EthSignData, PackedEthSignature, TxEthSignature},
-    Action, Address, Operation, H256,
+    Action, Address, Operation, H256, NFT,
     {
         block::{Block, ExecutedOperations},
         AccountId, AccountUpdate, BlockNumber, Nonce, PubKeyHash, TokenId,
@@ -26,9 +27,8 @@ use zksync_types::{
 };
 // Local imports
 
-lazy_static! {
-    static ref SAMPLE_PROOF: PrecomputedSampleProofs = load_precomputed_proofs().unwrap();
-}
+static SAMPLE_PROOF: Lazy<PrecomputedSampleProofs> =
+    Lazy::new(|| load_precomputed_proofs().unwrap());
 
 pub fn get_sample_single_proof() -> SingleProof {
     SAMPLE_PROOF.single_proofs[0].0.clone()
@@ -53,12 +53,13 @@ pub fn gen_acc_random_updates<R: Rng>(
 
     let mut a = Account::default_with_address(&address);
     let old_nonce = nonce;
-    a.nonce = old_nonce + 2;
+    a.nonce = old_nonce + 3;
     a.pub_key_hash = pub_key_hash;
 
     let old_balance = a.get_balance(TokenId(0));
     a.set_balance(TokenId(0), BigUint::from(balance));
     let new_balance = a.get_balance(TokenId(0));
+
     vec![
         (
             id,
@@ -88,6 +89,37 @@ pub fn gen_acc_random_updates<R: Rng>(
     .into_iter()
 }
 
+/// Generates one nft.
+pub fn generate_nft(
+    account_id: AccountId,
+    account: &Account,
+    number: u32,
+) -> Vec<(AccountId, AccountUpdate)> {
+    let nft = NFT::new(
+        TokenId(MIN_NFT_TOKEN_ID + number),
+        number,
+        account_id,
+        account.address,
+        Address::random(),
+        None,
+        H256::random(),
+    );
+    vec![
+        (account_id, AccountUpdate::MintNFT { token: nft }),
+        (
+            account_id,
+            AccountUpdate::UpdateBalance {
+                old_nonce: account.nonce,
+                new_nonce: account.nonce,
+                balance_update: (
+                    TokenId(MIN_NFT_TOKEN_ID + number),
+                    BigUint::zero(),
+                    BigUint::from(1u32),
+                ),
+            },
+        ),
+    ]
+}
 /// Generates EthSignData for testing (not a valid signature)
 pub fn gen_eth_sign_data(message: String) -> EthSignData {
     let keypair = Random.generate();

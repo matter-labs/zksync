@@ -40,6 +40,10 @@ fn gen_aggregated_operation(
             op: ZkSyncOp::FullExit(Box::new(FullExitOp {
                 priority_op,
                 withdraw_amount: None,
+                creator_account_id: None,
+                creator_address: None,
+                serial_id: None,
+                content_hash: None,
             })),
             block_index: 0,
             created_at: DateTime::from(SystemTime::UNIX_EPOCH),

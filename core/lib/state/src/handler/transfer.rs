@@ -1,4 +1,6 @@
+use num::{BigUint, Zero};
 use std::time::Instant;
+
 use zksync_crypto::params::{self, max_account_id};
 use zksync_types::{
     Account, AccountUpdate, AccountUpdates, Address, PubKeyHash, Transfer, TransferOp,
@@ -20,6 +22,13 @@ impl TxHandler<Transfer> for ZkSyncState {
             tx.token <= params::max_token_id(),
             TransferOpError::InvalidTokenId
         );
+        if tx.fee != BigUint::zero() {
+            // Fee can only be paid in processable tokens
+            invariant!(
+                tx.token <= params::max_processable_token(),
+                TransferOpError::InvalidFeeTokenId
+            );
+        }
         invariant!(tx.to != Address::zero(), TransferOpError::TargetAccountZero);
         let (from, from_account) = self
             .get_account_by_address(&tx.from)
@@ -28,10 +37,11 @@ impl TxHandler<Transfer> for ZkSyncState {
             from_account.pub_key_hash != PubKeyHash::default(),
             TransferOpError::FromAccountLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(from_account.pub_key_hash),
-            TransferOpError::InvalidSignature
-        );
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != from_account.pub_key_hash {
+                return Err(TransferOpError::InvalidSignature);
+            }
+        }
         invariant!(
             from == tx.account_id,
             TransferOpError::TransferAccountIncorrect

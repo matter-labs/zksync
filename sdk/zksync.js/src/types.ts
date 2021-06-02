@@ -6,7 +6,7 @@ export type Address = string;
 export type PubKeyHash = string;
 
 // Symbol like "ETH" or "FAU" or token contract address(zero address is implied for "ETH").
-export type TokenLike = TokenSymbol | TokenAddress;
+export type TokenLike = TokenSymbol | TokenAddress | number;
 // Token symbol (e.g. "ETH", "FAU", etc.)
 export type TokenSymbol = string;
 // Token address (e.g. 0xde..ad for ERC20, or 0x00.00 for "ETH")
@@ -22,6 +22,16 @@ export interface Create2Data {
     creatorAddress: string;
     saltArg: string;
     codeHash: string;
+}
+
+export interface NFT {
+    id: number;
+    symbol: string;
+    creatorId: number;
+    serialId: number;
+    address: string;
+    creatorAddress: string;
+    contentHash: string;
 }
 
 export interface AccountState {
@@ -44,6 +54,14 @@ export interface AccountState {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
         };
+        nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
+        mintedNfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
         nonce: number;
         pubKeyHash: PubKeyHash;
     };
@@ -51,6 +69,14 @@ export interface AccountState {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
+        };
+        nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
+        mintedNfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
         };
         nonce: number;
         pubKeyHash: PubKeyHash;
@@ -74,6 +100,48 @@ export interface Signature {
     signature: string;
 }
 
+export type Ratio = [BigNumberish, BigNumberish];
+
+/// represents ratio between tokens themself
+export type TokenRatio = {
+    type: 'Token';
+    [token: string]: string | number;
+    [token: number]: string | number;
+};
+
+/// represents ratio between lowest token denominations (wei, satoshi, etc.)
+export type WeiRatio = {
+    type: 'Wei';
+    [token: string]: BigNumberish;
+    [token: number]: BigNumberish;
+};
+
+export interface Order {
+    accountId: number;
+    recipient: Address;
+    nonce: number;
+    tokenSell: number;
+    tokenBuy: number;
+    ratio: Ratio;
+    amount: BigNumberish;
+    signature?: Signature;
+    ethSignature?: TxEthSignature;
+    validFrom: number;
+    validUntil: number;
+}
+
+export interface Swap {
+    type: 'Swap';
+    orders: [Order, Order];
+    amounts: [BigNumberish, BigNumberish];
+    submitterId: number;
+    submitterAddress: Address;
+    nonce: number;
+    signature?: Signature;
+    feeToken: number;
+    fee: BigNumberish;
+}
+
 export interface Transfer {
     type: 'Transfer';
     accountId: number;
@@ -95,6 +163,32 @@ export interface Withdraw {
     to: Address;
     token: number;
     amount: BigNumberish;
+    fee: BigNumberish;
+    nonce: number;
+    signature?: Signature;
+    validFrom: number;
+    validUntil: number;
+}
+
+export interface MintNFT {
+    type: 'MintNFT';
+    creatorId: number;
+    creatorAddress: Address;
+    recipient: Address;
+    contentHash: string;
+    fee: BigNumberish;
+    feeToken: number;
+    nonce: number;
+    signature?: Signature;
+}
+
+export interface WithdrawNFT {
+    type: 'WithdrawNFT';
+    accountId: number;
+    from: Address;
+    to: Address;
+    token: number;
+    feeToken: number;
     fee: BigNumberish;
     nonce: number;
     signature?: Signature;
@@ -155,9 +249,11 @@ export interface CloseAccount {
     signature: Signature;
 }
 
+export type TxEthSignatureVariant = null | TxEthSignature | (TxEthSignature | null)[];
+
 export interface SignedTransaction {
-    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit;
-    ethereumSignature?: TxEthSignature;
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT | Swap;
+    ethereumSignature?: TxEthSignatureVariant;
 }
 
 export interface BlockInfo {
@@ -214,7 +310,15 @@ export interface LegacyChangePubKeyFee {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee;
+    feeType:
+        | 'Withdraw'
+        | 'Transfer'
+        | 'TransferToNew'
+        | 'FastWithdraw'
+        | ChangePubKeyFee
+        | 'MintNFT'
+        | 'WithdrawNFT'
+        | 'Swap';
     // Amount of gas used by transaction
     gasTxAmount: BigNumber;
     // Gas price (in wei)

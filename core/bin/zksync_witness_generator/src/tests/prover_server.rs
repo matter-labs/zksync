@@ -194,7 +194,7 @@ pub async fn get_test_block() -> Block {
         validator_account_id,
         ops,
         (0, 1),
-        &[6],
+        &[10],
         1_000_000.into(),
         1_500_000.into(),
         old_hash,

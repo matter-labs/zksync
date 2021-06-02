@@ -9,6 +9,7 @@ use crate::{
     tokens::{TokensSchema, STORED_USD_PRICE_PRECISION},
     QueryResult, StorageProcessor,
 };
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 
 /// Verifies the token save & load mechanism.
 #[db_test]
@@ -25,6 +26,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000000".parse().unwrap(),
         symbol: "ETH".into(),
         decimals: 18,
+        is_nft: false,
     };
     assert_eq!(tokens[&TokenId(0)], eth_token);
 
@@ -34,13 +36,27 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000001".parse().unwrap(),
         symbol: "ABC".into(),
         decimals: 9,
+        is_nft: false,
     };
     let token_b = Token {
         id: TokenId(2),
         address: "0000000000000000000000000000000000000002".parse().unwrap(),
         symbol: "DEF".into(),
         decimals: 6,
+        is_nft: false,
     };
+    let nft = Token {
+        id: TokenId(MIN_NFT_TOKEN_ID),
+        address: "0000000000000000000000000000000000000005".parse().unwrap(),
+        symbol: "NFT".into(),
+        decimals: 0,
+        is_nft: true,
+    };
+
+    TokensSchema(&mut storage)
+        .store_or_update_token(nft.clone())
+        .await
+        .expect("Store tokens query failed");
 
     TokensSchema(&mut storage)
         .store_or_update_token(token_a.clone())
@@ -85,6 +101,12 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .expect("token by symbol not found");
     assert_eq!(token_b, token_b_by_symbol);
 
+    let db_nft_token = TokensSchema(&mut storage)
+        .get_token(TokenLike::Id(nft.id))
+        .await
+        .expect("Get nft failed")
+        .expect("Token not found");
+    assert_eq!(db_nft_token, nft);
     Ok(())
 }
 

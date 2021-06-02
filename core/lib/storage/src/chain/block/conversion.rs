@@ -147,7 +147,7 @@ impl NewExecutedTransaction {
 
         let (from_account_hex, to_account_hex): (String, Option<String>) =
             match exec_tx.signed_tx.tx {
-                ZkSyncTx::Withdraw(_) | ZkSyncTx::Transfer(_) => (
+                ZkSyncTx::Withdraw(_) | ZkSyncTx::Transfer(_) | ZkSyncTx::WithdrawNFT(_) => (
                     serde_json::from_value(tx["from"].clone()).unwrap(),
                     serde_json::from_value(tx["to"].clone()).unwrap(),
                 ),
@@ -163,9 +163,13 @@ impl NewExecutedTransaction {
                     serde_json::from_value(tx["target"].clone()).unwrap(),
                     serde_json::from_value(tx["target"].clone()).unwrap(),
                 ),
+                ZkSyncTx::MintNFT(_) => (
+                    serde_json::from_value(tx["creatorAddress"].clone()).unwrap(),
+                    serde_json::from_value(tx["recipientAddress"].clone()).unwrap(),
+                ),
                 ZkSyncTx::Swap(_) => (
-                    serde_json::from_value(tx["submitter_address"].clone()).unwrap(),
-                    serde_json::from_value(tx["submitter_address"].clone()).unwrap(),
+                    serde_json::from_value(tx["submitterAddress"].clone()).unwrap(),
+                    serde_json::from_value(tx["submitterAddress"].clone()).unwrap(),
                 ),
             };
 

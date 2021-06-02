@@ -11,7 +11,19 @@ import "./Utils.sol";
 /// @notice Contract is used to allow anyone to add new ERC20 tokens to zkSync given sufficient payment
 contract TokenGovernance {
     /// @notice Token lister added or removed (see `tokenLister`)
-    event TokenListerUpdate(address, bool);
+    event TokenListerUpdate(address indexed tokenLister, bool isActive);
+
+    /// @notice Listing fee token set
+    event ListingFeeTokenUpdate(IERC20 indexed newListingFeeToken);
+
+    /// @notice Listing fee set
+    event ListingFeeUpdate(uint256 newListingFee);
+
+    /// @notice Maximum number of listed tokens updated
+    event ListingCapUpdate(uint16 newListingCap);
+
+    /// @notice The treasury (the account which will receive the fee) was updated
+    event TreasuryUpdate(address newTreasury);
 
     /// @notice zkSync governance contract
     Governance public governance;
@@ -19,7 +31,7 @@ contract TokenGovernance {
     /// @notice Token used to collect listing fee for addition of new token to zkSync network
     IERC20 public listingFeeToken;
 
-    /// @notice Size of the listing fee amount
+    /// @notice Token listing fee
     uint256 public listingFee;
 
     /// @notice Max number of tokens that can be listed using this contract
@@ -44,9 +56,10 @@ contract TokenGovernance {
         listingCap = _listingCap;
         treasury = _treasury;
 
+        address governor = governance.networkGovernor();
         // We add zkSync governor as a first token lister.
-        tokenLister[governance.networkGovernor()] = true;
-        emit TokenListerUpdate(governance.networkGovernor(), true);
+        tokenLister[governor] = true;
+        emit TokenListerUpdate(governor, true);
     }
 
     /// @notice Adds new ERC20 token to zkSync network.
@@ -70,6 +83,8 @@ contract TokenGovernance {
         governance.requireGovernor(msg.sender);
         listingFeeToken = _newListingFeeToken;
         listingFee = _newListingFee;
+
+        emit ListingFeeTokenUpdate(_newListingFeeToken);
     }
 
     /// @notice Set new listing fee
@@ -77,6 +92,8 @@ contract TokenGovernance {
     function setListingFee(uint256 _newListingFee) external {
         governance.requireGovernor(msg.sender);
         listingFee = _newListingFee;
+
+        emit ListingFeeUpdate(_newListingFee);
     }
 
     /// @notice Enable or disable token lister. If enabled new tokens can be added by that address without payment
@@ -94,6 +111,8 @@ contract TokenGovernance {
     function setListingCap(uint16 _newListingCap) external {
         governance.requireGovernor(msg.sender);
         listingCap = _newListingCap;
+
+        emit ListingCapUpdate(_newListingCap);
     }
 
     /// @notice Change address that collects payments for listing tokens.
@@ -101,5 +120,7 @@ contract TokenGovernance {
     function setTreasury(address _newTreasury) external {
         governance.requireGovernor(msg.sender);
         treasury = _newTreasury;
+
+        emit TreasuryUpdate(_newTreasury);
     }
 }

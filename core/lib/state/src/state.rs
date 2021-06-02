@@ -1,11 +1,12 @@
 use num::BigUint;
 use std::collections::{HashMap, HashSet};
-use zksync_crypto::{params, Fr};
+
+use zksync_crypto::{params, params::NFT_STORAGE_ACCOUNT_ID, Fr};
 use zksync_types::{
     helpers::reverse_updates,
     operations::{TransferOp, TransferToNewOp, ZkSyncOp},
     Account, AccountId, AccountMap, AccountTree, AccountUpdate, AccountUpdates, Address,
-    BlockNumber, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
+    BlockNumber, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx, NFT,
 };
 
 use crate::{
@@ -26,6 +27,8 @@ pub struct ZkSyncState {
     balance_tree: AccountTree,
 
     account_id_by_address: HashMap<Address, AccountId>,
+
+    pub nfts: HashMap<TokenId, NFT>,
 
     /// Current block number
     pub block_number: BlockNumber,
@@ -70,21 +73,23 @@ impl ZkSyncState {
             block_number: BlockNumber(0),
             account_id_by_address: HashMap::new(),
             next_free_id: AccountId(0),
+            nfts: HashMap::new(),
         }
     }
 
     pub fn from_acc_map(accounts: AccountMap, current_block: BlockNumber) -> Self {
         let mut empty = Self::empty();
-        let sorted_accounts = {
-            let mut sorted_accounts: Vec<_> = accounts.into_iter().collect();
-            sorted_accounts.sort_by(|a, b| a.0.cmp(&b.0));
-            sorted_accounts
-        };
-        if !sorted_accounts.is_empty() {
-            empty.next_free_id = AccountId(*sorted_accounts.last().unwrap().0 + 1);
+
+        let mut next_free_id = 0;
+        for account in &accounts {
+            if account.0 != &NFT_STORAGE_ACCOUNT_ID {
+                next_free_id = std::cmp::max(next_free_id, **account.0 + 1);
+            }
         }
+        empty.next_free_id = AccountId(next_free_id as u32);
+
         empty.block_number = current_block;
-        for (id, account) in sorted_accounts {
+        for (id, account) in accounts {
             empty.insert_account(id, account);
         }
         empty
@@ -94,18 +99,21 @@ impl ZkSyncState {
         balance_tree: AccountTree,
         account_id_by_address: HashMap<Address, AccountId>,
         current_block: BlockNumber,
+        nfts: HashMap<TokenId, NFT>,
     ) -> Self {
-        let next_free_id = if balance_tree.items.is_empty() {
-            AccountId(0)
-        } else {
-            AccountId(*balance_tree.items.keys().max().unwrap() as u32 + 1)
-        };
+        let mut next_free_id = 0;
+        for index in balance_tree.items.keys() {
+            if *index != NFT_STORAGE_ACCOUNT_ID.0 as u64 {
+                next_free_id = std::cmp::max(next_free_id, *index + 1);
+            }
+        }
 
         Self {
             balance_tree,
             block_number: current_block,
             account_id_by_address,
-            next_free_id,
+            next_free_id: AccountId(next_free_id as u32),
+            nfts,
         }
     }
 
@@ -113,7 +121,13 @@ impl ZkSyncState {
         self.balance_tree
             .items
             .iter()
-            .map(|a| (*a.0 as u32, a.1.clone()))
+            .filter_map(|a| {
+                if a.1 == &Account::default() {
+                    None
+                } else {
+                    Some((*a.0 as u32, a.1.clone()))
+                }
+            })
             .collect()
     }
 
@@ -127,11 +141,10 @@ impl ZkSyncState {
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
 
-        let account = if account_id < self.next_free_id {
-            self.balance_tree.get(*account_id).cloned()
-        } else {
-            None
-        };
+        let mut account = self.balance_tree.get(*account_id).cloned();
+        if account == Some(Account::default()) {
+            account = None;
+        }
 
         vlog::trace!(
             "Get account (id {}) execution time: {}ms",
@@ -274,6 +287,12 @@ impl ZkSyncState {
                     account.nonce = new_nonce;
                     self.insert_account(account_id, account);
                 }
+                AccountUpdate::RemoveNFT { token } => {
+                    self.nfts.insert(token.id, token);
+                }
+                AccountUpdate::MintNFT { token } => {
+                    self.nfts.remove(&token.id);
+                }
             }
         }
     }
@@ -320,14 +339,16 @@ impl ZkSyncState {
     }
 
     pub fn execute_tx(&mut self, tx: ZkSyncTx) -> Result<OpSuccess, OpError> {
-        Ok(match tx {
-            ZkSyncTx::Transfer(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::Withdraw(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::Close(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::ChangePubKey(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::Swap(tx) => self.apply_tx(*tx)?,
-        })
+        match tx {
+            ZkSyncTx::Transfer(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::Withdraw(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::Close(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::ChangePubKey(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::ForcedExit(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::Swap(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::MintNFT(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::WithdrawNFT(tx) => Ok(self.apply_tx(*tx)?),
+        }
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {
@@ -380,8 +401,7 @@ impl ZkSyncState {
 
     #[doc(hidden)] // Public for benches.
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
-        assert!(id <= self.next_free_id);
-
+        assert!(id == NFT_STORAGE_ACCOUNT_ID || id <= self.next_free_id);
         self.account_id_by_address.insert(account.address, id);
         self.balance_tree.insert(*id, account);
         if id == self.next_free_id {
@@ -411,6 +431,8 @@ impl ZkSyncState {
             }
             ZkSyncTx::ForcedExit(tx) => Into::into(self.create_op(*tx)?),
             ZkSyncTx::Swap(tx) => Into::into(self.create_op(*tx)?),
+            ZkSyncTx::MintNFT(tx) => Into::into(self.create_op(*tx)?),
+            ZkSyncTx::WithdrawNFT(tx) => Into::into(self.create_op(*tx)?),
         })
     }
 
@@ -481,6 +503,12 @@ impl ZkSyncState {
                     account.nonce = *new_nonce;
 
                     self.insert_account(*account_id, account);
+                }
+                AccountUpdate::MintNFT { token } => {
+                    self.nfts.insert(token.id, token.clone());
+                }
+                AccountUpdate::RemoveNFT { token } => {
+                    self.nfts.remove(&token.id);
                 }
             }
         }
@@ -1031,12 +1059,20 @@ mod tests {
         account_id_by_address.insert(random_addresses[2], AccountId(3));
         account_id_by_address.insert(random_addresses[3], AccountId(8));
         account_id_by_address.insert(random_addresses[4], AccountId(9));
-        let state = ZkSyncState::new(balance_tree, account_id_by_address, BlockNumber(5));
+
+        let state = ZkSyncState::new(
+            balance_tree,
+            account_id_by_address,
+            BlockNumber(5),
+            HashMap::new(),
+        );
         assert_eq!(*state.next_free_id, 10);
     }
 
     /// Checks if insert_account panics if account has id greater that next_free_id.
-    #[should_panic(expected = "assertion failed: id <= self.next_free_id")]
+    #[should_panic(
+        expected = "assertion failed: id == NFT_STORAGE_ACCOUNT_ID || id <= self.next_free_id"
+    )]
     #[test]
     fn insert_account_with_bigger_id() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

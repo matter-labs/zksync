@@ -27,6 +27,9 @@ use super::{
 };
 
 pub(super) mod convert {
+    use std::collections::HashMap;
+    use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
+
     use super::*;
 
     pub async fn account_state_from_storage(
@@ -35,17 +38,43 @@ pub(super) mod convert {
         account: &Account,
     ) -> QueryResult<AccountState> {
         let mut balances = BTreeMap::new();
+        let mut nfts = HashMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
-            let token_symbol = tokens
-                .token_symbol(storage, token_id)
-                .await?
-                .ok_or_else(|| unable_to_find_token(token_id))?;
-
-            balances.insert(token_symbol, balance);
+            match token_id.0 {
+                NFT_TOKEN_ID_VAL => {
+                    // Don't include special token to balances or nfts
+                }
+                MIN_NFT_TOKEN_ID..=NFT_TOKEN_ID_VAL => {
+                    // https://github.com/rust-lang/rust/issues/37854
+                    // Exclusive range is an experimental feature, but we have already checked the last value in the previous step
+                    nfts.insert(
+                        token_id,
+                        tokens
+                            .get_nft_by_id(storage, token_id)
+                            .await?
+                            .ok_or_else(|| unable_to_find_token(token_id))?
+                            .into(),
+                    );
+                }
+                _ => {
+                    let token_symbol = tokens
+                        .token_symbol(storage, token_id)
+                        .await?
+                        .ok_or_else(|| unable_to_find_token(token_id))?;
+                    balances.insert(token_symbol, balance);
+                }
+            }
         }
+        let minted_nfts = account
+            .minted_nfts
+            .iter()
+            .map(|(id, nft)| (*id, nft.clone().into()))
+            .collect();
 
         Ok(AccountState {
             balances,
+            nfts,
+            minted_nfts,
             nonce: account.nonce,
             pub_key_hash: account.pub_key_hash,
         })

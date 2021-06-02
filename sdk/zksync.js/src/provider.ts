@@ -1,5 +1,5 @@
 import { AbstractJSONRPCTransport, DummyTransport, HTTPTransport, WSTransport } from './transport';
-import { BigNumber, Contract, ethers } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import {
     AccountState,
     Address,
@@ -8,14 +8,24 @@ import {
     Fee,
     LegacyChangePubKeyFee,
     Network,
+    NFT,
     PriorityOperationReceipt,
     TokenAddress,
     TokenLike,
     Tokens,
     TransactionReceipt,
-    TxEthSignature
+    TxEthSignature,
+    TxEthSignatureVariant
 } from './types';
-import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
+import { isTokenETH, sleep, TokenSet, isNFT } from './utils';
+import {
+    Governance,
+    GovernanceFactory,
+    ZkSync,
+    ZkSyncFactory,
+    ZkSyncNFTFactory,
+    ZkSyncNFTFactoryFactory
+} from './typechain';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
     if (transport === 'WS') {
@@ -110,14 +120,14 @@ export class Provider {
     }
 
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
+    async submitTx(tx: any, signature?: TxEthSignatureVariant, fastProcessing?: boolean): Promise<string> {
         return await this.transport.request('tx_submit', [tx, signature, fastProcessing]);
     }
 
     // Requests `zkSync` server to execute several transactions together.
     // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTxsBatch(
-        transactions: { tx: any; signature?: TxEthSignature }[],
+        transactions: { tx: any; signature?: TxEthSignatureVariant }[],
         ethSignatures?: TxEthSignature | TxEthSignature[]
     ): Promise<string[]> {
         let signatures: TxEthSignature[] = [];
@@ -165,6 +175,18 @@ export class Provider {
 
     async getEthTxForWithdrawal(withdrawal_hash: string): Promise<string> {
         return await this.transport.request('get_eth_tx_for_withdrawal', [withdrawal_hash]);
+    }
+
+    async getNFT(id: number): Promise<NFT> {
+        return await this.transport.request('get_nft', [id]);
+    }
+
+    async getTokenSymbol(token: TokenLike): Promise<string> {
+        if (isNFT(token)) {
+            const nft = await this.getNFT(token as number);
+            return nft.symbol || `NFT-${token}`;
+        }
+        return this.tokenSet.resolveTokenSymbol(token);
     }
 
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {
@@ -225,7 +247,16 @@ export class Provider {
     }
 
     async getTransactionFee(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
+        txType:
+            | 'Withdraw'
+            | 'Transfer'
+            | 'FastWithdraw'
+            | 'MintNFT'
+            | 'Swap'
+            | ChangePubKeyFee
+            | 'WithdrawNFT'
+            | 'FastWithdrawNFT'
+            | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {
@@ -241,7 +272,17 @@ export class Provider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee)[],
+        txTypes: (
+            | 'Withdraw'
+            | 'Transfer'
+            | 'FastWithdraw'
+            | 'MintNFT'
+            | 'WithdrawNFT'
+            | 'FastWithdrawNFT'
+            | ChangePubKeyFee
+            | LegacyChangePubKeyFee
+            | 'Swap'
+        )[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {
@@ -260,14 +301,47 @@ export class Provider {
 }
 
 export class ETHProxy {
-    private governanceContract: Contract;
+    private governanceContract: Governance;
+    private zkSyncContract: ZkSync;
+    private zksyncNFTFactory: ZkSyncNFTFactory;
+    // Needed for typechain to work
+    private dummySigner: ethers.VoidSigner;
 
     constructor(private ethersProvider: ethers.providers.Provider, public contractAddress: ContractAddress) {
-        this.governanceContract = new Contract(
-            this.contractAddress.govContract,
-            SYNC_GOV_CONTRACT_INTERFACE,
-            this.ethersProvider
-        );
+        this.dummySigner = new ethers.VoidSigner(ethers.constants.AddressZero, this.ethersProvider);
+
+        const governanceFactory = new GovernanceFactory(this.dummySigner);
+        this.governanceContract = governanceFactory.attach(contractAddress.govContract);
+
+        const zkSyncFactory = new ZkSyncFactory(this.dummySigner);
+        this.zkSyncContract = zkSyncFactory.attach(contractAddress.mainContract);
+    }
+
+    getGovernanceContract(): Governance {
+        return this.governanceContract;
+    }
+
+    getZkSyncContract(): ZkSync {
+        return this.zkSyncContract;
+    }
+
+    // This method is very helpful for those who have already fetched the
+    // default factory and want to avoid asynchorouns execution from now on
+    getCachedNFTDefaultFactory(): ZkSyncNFTFactory | undefined {
+        return this.zksyncNFTFactory;
+    }
+
+    async getDefaultNFTFactory(): Promise<ZkSyncNFTFactory> {
+        if (this.zksyncNFTFactory) {
+            return this.zksyncNFTFactory;
+        }
+
+        const nftFactoryAddress = await this.governanceContract.defaultFactory();
+
+        const nftFactory = new ZkSyncNFTFactoryFactory(this.dummySigner);
+        this.zksyncNFTFactory = nftFactory.attach(nftFactoryAddress);
+
+        return this.zksyncNFTFactory;
     }
 
     async resolveTokenId(token: TokenAddress): Promise<number> {

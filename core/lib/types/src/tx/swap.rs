@@ -10,25 +10,34 @@ use crate::{
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
-use zksync_crypto::params::{max_account_id, max_token_id};
+use zksync_crypto::{
+    franklin_crypto::eddsa::PrivateKey,
+    params::{
+        max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION, PRICE_BIT_WIDTH,
+    },
+    primitives::rescue_hash_orders,
+};
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::tx::error::TransactionSignatureError;
+use crate::tx::version::TxVersion;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Order {
     pub account_id: AccountId,
-    pub recipient_id: AccountId,
+    #[serde(rename = "recipient")]
+    pub recipient_address: Address,
     pub nonce: Nonce,
     pub token_buy: TokenId,
     pub token_sell: TokenId,
+    #[serde(rename = "ratio")]
     #[serde(with = "BigUintPairSerdeAsRadix10Str")]
     pub price: (BigUint, BigUint),
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub amount: BigUint,
+    #[serde(flatten)]
     pub time_range: TimeRange,
     pub signature: TxSignature,
 }
@@ -51,15 +60,25 @@ pub struct Swap {
 }
 
 impl Order {
+    /// Unique identifier of the signed message, similar to TX_TYPE
+    pub const MSG_TYPE: u8 = b'o'; // 'o' for "order"
+
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
+        self.get_bytes_with_version(CURRENT_TX_VERSION)
+    }
+
+    pub fn get_bytes_with_version(&self, version: u8) -> Vec<u8> {
         let mut out = Vec::new();
+        out.extend_from_slice(&[Self::MSG_TYPE]);
+        out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.recipient_id.to_be_bytes());
+        out.extend_from_slice(&self.recipient_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.token_buy.to_be_bytes());
         out.extend_from_slice(&self.token_sell.to_be_bytes());
-        out.extend_from_slice(&self.price.0.to_bytes_be());
-        out.extend_from_slice(&self.price.1.to_bytes_be());
+        out.extend_from_slice(&self.token_buy.to_be_bytes());
+        out.extend_from_slice(&pad_front(&self.price.0.to_bytes_be(), PRICE_BIT_WIDTH / 8));
+        out.extend_from_slice(&pad_front(&self.price.1.to_bytes_be(), PRICE_BIT_WIDTH / 8));
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&self.time_range.to_be_bytes());
         out
@@ -72,19 +91,78 @@ impl Order {
     }
 
     pub fn check_correctness(&self) -> bool {
-        self.price.0 <= BigUint::from(u128::max_value())
-            && self.price.1 <= BigUint::from(u128::max_value())
+        self.price.0.bits() as usize <= PRICE_BIT_WIDTH
+            && self.price.1.bits() as usize <= PRICE_BIT_WIDTH
             && self.account_id <= max_account_id()
-            && self.recipient_id <= max_account_id()
+            && self.recipient_address != Address::zero()
             && self.token_buy <= max_token_id()
             && self.token_sell <= max_token_id()
             && self.time_range.check_correctness()
+    }
+
+    pub fn get_ethereum_sign_message(
+        &self,
+        token_sell: &str,
+        token_buy: &str,
+        decimals: u8,
+    ) -> String {
+        let mut message = if self.amount.is_zero() {
+            format!("Limit order for {} -> {}\n", token_sell, token_buy)
+        } else {
+            format!(
+                "Order for {} {} -> {}\n",
+                format_units(&self.amount, decimals),
+                token_sell,
+                token_buy
+            )
+        };
+        message += format!(
+            "Ratio: {sell}:{buy}\n\
+            Address: {recipient:?}\n\
+            Nonce: {nonce}",
+            sell = self.price.0.to_string(),
+            buy = self.price.1.to_string(),
+            recipient = self.recipient_address,
+            nonce = self.nonce
+        )
+        .as_str();
+        message
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_signed(
+        account_id: AccountId,
+        recipient_address: Address,
+        nonce: Nonce,
+        token_sell: TokenId,
+        token_buy: TokenId,
+        price: (BigUint, BigUint),
+        amount: BigUint,
+        time_range: TimeRange,
+        private_key: &PrivateKey<Engine>,
+    ) -> Result<Self, TransactionSignatureError> {
+        let mut tx = Self {
+            account_id,
+            recipient_address,
+            nonce,
+            token_buy,
+            token_sell,
+            price,
+            amount,
+            time_range,
+            signature: Default::default(),
+        };
+        tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
+        if !tx.check_correctness() {
+            return Err(TransactionSignatureError);
+        }
+        Ok(tx)
     }
 }
 
 impl Swap {
     /// Unique identifier of the transaction type in zkSync network.
-    pub const TX_TYPE: u8 = 10;
+    pub const TX_TYPE: u8 = 11;
 
     /// Creates transaction from all the required fields.
     ///
@@ -141,7 +219,7 @@ impl Swap {
             fee_token,
             None,
         );
-        tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
+        tx.signature = TxSignature::sign_musig(private_key, &tx.get_sign_bytes());
         if !tx.check_correctness() {
             return Err(TransactionSignatureError);
         }
@@ -150,13 +228,44 @@ impl Swap {
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
+        let mut first_order_bytes = self.orders.0.get_bytes();
+        let mut second_order_bytes = self.orders.1.get_bytes();
+        let order_byte_size = first_order_bytes.len();
+
+        let mut orders_bytes = Vec::with_capacity(order_byte_size * 2);
+        orders_bytes.append(&mut first_order_bytes);
+        orders_bytes.append(&mut second_order_bytes);
+
+        self.get_swap_bytes(&orders_bytes)
+    }
+
+    /// Constructs the byte sequence to be signed for swap.
+    /// It differs from `get_bytes`, because there we include all the data, including orders data,
+    /// and here we represent orders by their hashes. This is required due to limited message size
+    /// for which signatures can be verified in circuit.
+    pub fn get_sign_bytes(&self) -> Vec<u8> {
+        let mut first_order_bytes = self.orders.0.get_bytes();
+        let mut second_order_bytes = self.orders.1.get_bytes();
+        let order_byte_size = first_order_bytes.len();
+
+        let mut orders_bytes = Vec::with_capacity(order_byte_size * 2);
+        orders_bytes.append(&mut first_order_bytes);
+        orders_bytes.append(&mut second_order_bytes);
+
+        let orders_hash = rescue_hash_orders(&orders_bytes);
+        self.get_swap_bytes(&orders_hash)
+    }
+
+    /// Encodes transaction data, using provided encoded data for orders.
+    /// This function does not care how orders are encoded: is it data or hash.
+    fn get_swap_bytes(&self, order_bytes: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.submitter_id.to_be_bytes());
         out.extend_from_slice(&self.submitter_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.orders.0.get_bytes());
-        out.extend_from_slice(&self.orders.1.get_bytes());
+        out.extend_from_slice(order_bytes);
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&pack_token_amount(&self.amounts.0));
@@ -194,7 +303,7 @@ impl Swap {
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.check_amounts()
             && self.submitter_id <= max_account_id()
-            && self.fee_token <= max_token_id()
+            && self.fee_token <= max_processable_token()
             && self.orders.0.check_correctness()
             && self.orders.1.check_correctness()
             && self.time_range().check_correctness();
@@ -207,13 +316,13 @@ impl Swap {
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
-    pub fn verify_signature(&self) -> Option<PubKeyHash> {
+    pub fn verify_signature(&self) -> Option<(PubKeyHash, TxVersion)> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
             self.signature
-                .verify_musig(&self.get_bytes())
-                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                .verify_musig(&self.get_sign_bytes())
+                .map(|pub_key| (PubKeyHash::from_pubkey(&pub_key), TxVersion::V1))
         }
     }
 
@@ -241,4 +350,11 @@ impl Swap {
         message.push_str(format!("Nonce: {}", self.nonce).as_str());
         message
     }
+}
+
+fn pad_front(bytes: &[u8], size: usize) -> Vec<u8> {
+    assert!(size >= bytes.len());
+    let mut result = vec![0u8; size];
+    result[size - bytes.len()..].copy_from_slice(bytes);
+    result
 }

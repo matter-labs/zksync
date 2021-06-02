@@ -3,6 +3,9 @@
 pragma solidity ^0.7.0;
 
 import "./Config.sol";
+import "./Utils.sol";
+import "./NFTFactory.sol";
+import "./TokenGovernance.sol";
 
 /// @title Governance Contract
 /// @author Matter Labs
@@ -10,11 +13,21 @@ contract Governance is Config {
     /// @notice Token added to Franklin net
     event NewToken(address indexed token, uint16 indexed tokenId);
 
+    /// @notice Default nft factory has set
+    event SetDefaultNFTFactory(address indexed factory);
+
+    /// @notice NFT factory registered new creator account
+    event NFTFactoryRegisteredCreator(
+        uint32 indexed creatorAccountId,
+        address indexed creatorAddress,
+        address factoryAddress
+    );
+
     /// @notice Governor changed
     event NewGovernor(address newGovernor);
 
     /// @notice Token Governance changed
-    event NewTokenGovernance(address newTokenGovernance);
+    event NewTokenGovernance(TokenGovernance newTokenGovernance);
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
@@ -40,7 +53,13 @@ contract Governance is Config {
     mapping(uint16 => bool) public pausedTokens;
 
     /// @notice Address that is authorized to add tokens to the Governance.
-    address public tokenGovernance;
+    TokenGovernance public tokenGovernance;
+
+    /// @notice NFT Creator address to factory address mapping
+    mapping(uint32 => mapping(address => NFTFactory)) public nftFactories;
+
+    /// @notice Address which will be used if NFT token has no factories
+    NFTFactory public defaultFactory;
 
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
@@ -68,7 +87,7 @@ contract Governance is Config {
 
     /// @notice Change current token governance
     /// @param _newTokenGovernance Address of the new token governor
-    function changeTokenGovernance(address _newTokenGovernance) external {
+    function changeTokenGovernance(TokenGovernance _newTokenGovernance) external {
         requireGovernor(msg.sender);
         if (tokenGovernance != _newTokenGovernance) {
             tokenGovernance = _newTokenGovernance;
@@ -79,7 +98,7 @@ contract Governance is Config {
     /// @notice Add token to the list of networks tokens
     /// @param _token Token address
     function addToken(address _token) external {
-        require(msg.sender == tokenGovernance, "1E");
+        require(msg.sender == address(tokenGovernance), "1E");
         require(tokenIds[_token] == 0, "1e"); // token exists
         require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "1f"); // no free identifiers for tokens
 
@@ -141,5 +160,60 @@ contract Governance is Config {
         uint16 tokenId = tokenIds[_tokenAddr];
         require(tokenId != 0, "1i"); // 0 is not a valid token
         return tokenId;
+    }
+
+    function packRegisterNFTFactoryMsg(
+        uint32 _creatorAccountId,
+        address _creatorAddress,
+        address _factoryAddress
+    ) internal pure returns (bytes memory) {
+        return
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n141",
+                "\nCreator's account ID in zkSync: ",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAccountId))),
+                "\nCreator: ",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAddress))),
+                "\nFactory: ",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked((_factoryAddress)))
+            );
+    }
+
+    /// @notice Register creator corresponding to the factory
+    /// @param _creatorAccountId Creator's zkSync account ID
+    /// @param _creatorAddress NFT creator address
+    /// @param _signature Creator's signature
+    function registerNFTFactoryCreator(
+        uint32 _creatorAccountId,
+        address _creatorAddress,
+        bytes memory _signature
+    ) external {
+        require(address(nftFactories[_creatorAccountId][_creatorAddress]) == address(0), "Q");
+        bytes32 messageHash = keccak256(packRegisterNFTFactoryMsg(_creatorAccountId, _creatorAddress, msg.sender));
+
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
+        require(recoveredAddress == _creatorAddress && recoveredAddress != address(0), "ws");
+        nftFactories[_creatorAccountId][_creatorAddress] = NFTFactory(msg.sender);
+        emit NFTFactoryRegisteredCreator(_creatorAccountId, _creatorAddress, msg.sender);
+    }
+
+    //@notice Set default factory for our contract. This factory will be used to mint an NFT token that has no factory
+    //@param _factory Address of NFT factory
+    function setDefaultNFTFactory(address _factory) external {
+        requireGovernor(msg.sender);
+        require(address(_factory) != address(0), "mb1"); // Factory should be non zero
+        require(address(defaultFactory) == address(0), "mb2"); // NFTFactory is already set
+        defaultFactory = NFTFactory(_factory);
+        emit SetDefaultNFTFactory(_factory);
+    }
+
+    function getNFTFactory(uint32 _creatorAccountId, address _creatorAddress) external view returns (NFTFactory) {
+        NFTFactory _factory = nftFactories[_creatorAccountId][_creatorAddress];
+        if (address(_factory) == address(0)) {
+            require(address(defaultFactory) != address(0), "fs"); // NFTFactory does not set
+            return defaultFactory;
+        } else {
+            return _factory;
+        }
     }
 }

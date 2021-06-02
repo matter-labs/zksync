@@ -55,7 +55,7 @@ impl TransferToNewOp {
             .ok_or(TransferOpError::CannotGetToAccountId)?;
         let from = Address::zero(); // It is unknown from pubdata;
         let to = Address::from_slice(&bytes[to_address_offset..to_address_offset + FR_ADDRESS_LEN]);
-        let token = u16::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+        let token = u32::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
             .ok_or(TransferOpError::CannotGetTokenId)?;
         let amount = unpack_token_amount(
             &bytes[amount_offset

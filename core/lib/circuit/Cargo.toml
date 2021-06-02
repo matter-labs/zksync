@@ -22,6 +22,7 @@ num = { version = "0.3.1", features = ["serde"] }
 serde = "1.0.90"
 anyhow = "1.0"
 vlog = { path = "../../lib/vlog", version = "1.0" }
+hex = "0.4"
 
 [dev-dependencies]
 zksync_test_account = { path = "../../tests/test_account", version = "1.0" }

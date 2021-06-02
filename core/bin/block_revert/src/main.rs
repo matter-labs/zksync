@@ -59,6 +59,13 @@ async fn revert_blocks_in_storage(
 
     transaction
         .chain()
+        .state_schema()
+        .remove_mint_nft_updates(last_block)
+        .await?;
+    println!("`mint_nft_updates` table is cleaned");
+
+    transaction
+        .chain()
         .operations_schema()
         .remove_eth_unprocessed_aggregated_ops()
         .await?;

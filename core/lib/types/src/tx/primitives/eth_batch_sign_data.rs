@@ -101,7 +101,7 @@ impl EthBatchSignData {
         I: Iterator<Item = &'a ZkSyncTx>,
     {
         tiny_keccak::keccak256(
-            txs.flat_map(ZkSyncTx::get_bytes)
+            txs.flat_map(ZkSyncTx::get_old_bytes)
                 .collect::<Vec<u8>>()
                 .as_slice(),
         )

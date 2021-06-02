@@ -24,6 +24,7 @@ pub struct InMemoryStorageInteractor {
     tokens: HashMap<TokenId, Token>,
     events_state: Vec<BlockEvent>,
     last_watched_block: u64,
+    #[allow(dead_code)]
     last_committed_block: BlockNumber,
     last_verified_block: BlockNumber,
     accounts: AccountMap,
@@ -71,6 +72,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
             symbol: token.symbol,
             address: token.address,
             decimals: token.decimals,
+            is_nft: false,
         };
         self.tokens.insert(token_id, token);
     }
@@ -96,6 +98,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
                     address,
                     symbol: format!("ERC20-{}", *id),
                     decimals: 18,
+                    is_nft: false,
                 },
             );
         }
@@ -240,6 +243,9 @@ impl InMemoryStorageInteractor {
                     account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = *new_pub_key_hash;
                 }
+                AccountUpdate::MintNFT { .. } => todo!(), // Implement data restorer for Minting NFT (ZKS-657)
+
+                AccountUpdate::RemoveNFT { .. } => todo!(), // Implement data restorer for Minting NFT (ZKS-657
             }
         }
     }

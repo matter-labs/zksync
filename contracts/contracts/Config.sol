@@ -8,8 +8,11 @@ contract Config {
     /// @dev ERC20 tokens and ETH withdrawals gas limit, used only for complete withdrawals
     uint256 internal constant WITHDRAWAL_GAS_LIMIT = 100000;
 
+    /// @dev NFT withdrawals gas limit, used only for complete withdrawals
+    uint256 internal constant WITHDRAWAL_NFT_GAS_LIMIT = 300000;
+
     /// @dev Bytes in one chunk
-    uint8 internal constant CHUNK_BYTES = 9;
+    uint8 internal constant CHUNK_BYTES = 10;
 
     /// @dev zkSync address length
     uint8 internal constant ADDRESS_BYTES = 20;
@@ -29,7 +32,7 @@ contract Config {
     uint16 internal constant MAX_AMOUNT_OF_REGISTERED_TOKENS = $(MAX_AMOUNT_OF_REGISTERED_TOKENS);
 
     /// @dev Max account id that could be registered in the network
-    uint32 internal constant MAX_ACCOUNT_ID = (2**24) - 1;
+    uint32 internal constant MAX_ACCOUNT_ID = $$((2**24) - 1);
 
     /// @dev Expected average period of block creation
     uint256 internal constant BLOCK_PERIOD = 15 seconds;
@@ -41,13 +44,15 @@ contract Config {
 
     uint256 internal constant NOOP_BYTES = 1 * CHUNK_BYTES;
     uint256 internal constant DEPOSIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 internal constant MINT_NFT_BYTES = 5 * CHUNK_BYTES;
     uint256 internal constant TRANSFER_TO_NEW_BYTES = 6 * CHUNK_BYTES;
     uint256 internal constant PARTIAL_EXIT_BYTES = 6 * CHUNK_BYTES;
     uint256 internal constant TRANSFER_BYTES = 2 * CHUNK_BYTES;
     uint256 internal constant FORCED_EXIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 internal constant WITHDRAW_NFT_BYTES = 10 * CHUNK_BYTES;
 
     /// @dev Full exit operation length
-    uint256 internal constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 internal constant FULL_EXIT_BYTES = 11 * CHUNK_BYTES;
 
     /// @dev ChangePubKey operation length
     uint256 internal constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
@@ -96,4 +101,12 @@ contract Config {
 
     /// @dev Max deposit of ERC20 token that is possible to deposit
     uint128 internal constant MAX_DEPOSIT_AMOUNT = $$((2**104) - 1);
+
+    uint32 internal constant SPECIAL_ACCOUNT_ID = $$((2**24) - 1);
+    address internal constant SPECIAL_ACCOUNT_ADDRESS = address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF);
+    uint32 internal constant SPECIAL_NFT_TOKEN_ID = $$((2**31) - 2);
+
+    uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
+
+    uint256 internal constant SECURITY_COUNCIL_MEMBERS_NUMBER = $$(SECURITY_COUNCIL_MEMBERS_NUMBER);
 }

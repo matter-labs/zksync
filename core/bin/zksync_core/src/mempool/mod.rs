@@ -402,6 +402,9 @@ impl MempoolBlocksHandler {
                                     }
                                 }
                             }
+                            AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveNFT { .. } => {
+                                // Minting nft affects only tokens, mempool doesn't contain them
+                            }
                         }
                     }
                 }

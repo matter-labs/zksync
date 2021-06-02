@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum ChangePubKeyOpError {
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Account does not exist")]
     AccountNotFound,
     #[error("Account address is incorrect")]
@@ -48,6 +50,8 @@ pub enum ForcedExitOpError {
     TargetAccountNotFound,
     #[error("ForcedExit signature is incorrect")]
     InvalidSignature,
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Token id is not supported")]
     InvalidTokenId,
     #[error("Target account is not locked; forced exit is forbidden")]
@@ -62,6 +66,8 @@ pub enum ForcedExitOpError {
 
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum TransferOpError {
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Token id is not supported")]
     InvalidTokenId,
     #[error("Transfer to Account with address 0 is not allowed")]
@@ -87,7 +93,59 @@ pub enum TransferOpError {
 }
 
 #[derive(Clone, Debug, Error, PartialEq)]
+pub enum MintNFTOpError {
+    #[error("Token id is not supported")]
+    InvalidTokenId,
+    #[error("Creator account is locked")]
+    CreatorAccountIsLocked,
+    #[error("Creator account does not exist")]
+    CreatorAccountNotFound,
+    #[error("Account is locked")]
+    CreatorAccountLocked,
+    #[error("MintNFT signature is incorrect")]
+    InvalidSignature,
+    #[error("Recipient account id is incorrect")]
+    RecipientAccountIncorrect,
+    #[error("Recipient account not found")]
+    RecipientAccountNotFound,
+    #[error("Nonce mismatch")]
+    NonceMismatch,
+    #[error("Not enough balance")]
+    InsufficientBalance,
+    #[error("NFT token is already in account")]
+    TokenIsAlreadyInAccount,
+}
+
+#[derive(Clone, Debug, Error, PartialEq)]
+pub enum WithdrawNFTOpError {
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
+    #[error("Token id is not supported")]
+    InvalidTokenId,
+    #[error("From account does not exist")]
+    FromAccountNotFound,
+    #[error("Account is locked")]
+    FromAccountLocked,
+    #[error("Withdraw signature is incorrect")]
+    InvalidSignature,
+    #[error("Withdraw account id is incorrect")]
+    FromAccountIncorrect,
+    #[error("Creator account id is incorrect")]
+    CreatorAccountIncorrect,
+    #[error("Nonce mismatch")]
+    NonceMismatch,
+    #[error("Not enough balance")]
+    InsufficientBalance,
+    #[error("Not enough nft balance")]
+    InsufficientNFTBalance,
+    #[error("NFT was not found")]
+    NFTNotFound,
+}
+
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum WithdrawOpError {
+    #[error("FeeToken id is not supported")]
+    InvalidFeeTokenId,
     #[error("Token id is not supported")]
     InvalidTokenId,
     #[error("From account does not exist")]
@@ -139,4 +197,6 @@ pub enum SwapOpError {
     AmountsNotMatched,
     #[error("Amounts are not compatible with prices")]
     AmountsNotCompatible,
+    #[error("Self-swap is not allowed")]
+    SelfSwap,
 }

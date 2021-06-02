@@ -1,6 +1,6 @@
 use num::{BigUint, Zero};
 use std::time::Instant;
-use zksync_crypto::params::{max_account_id, max_token_id};
+use zksync_crypto::params::{max_account_id, max_processable_token, max_token_id};
 use zksync_types::{AccountUpdates, Order, PubKeyHash, Swap, SwapOp};
 
 use crate::handler::error::SwapOpError;
@@ -20,7 +20,10 @@ impl TxHandler<Swap> for ZkSyncState {
             tx.submitter_id <= max_account_id(),
             SwapOpError::AccountIncorrect
         );
-        invariant!(tx.fee_token <= max_token_id(), SwapOpError::InvalidTokenId);
+        invariant!(
+            tx.fee_token <= max_processable_token(),
+            SwapOpError::InvalidTokenId
+        );
 
         let (submitter, submitter_account) = self
             .get_account_by_address(&tx.submitter_address)
@@ -30,20 +33,29 @@ impl TxHandler<Swap> for ZkSyncState {
             submitter_account.pub_key_hash != PubKeyHash::default(),
             SwapOpError::AccountLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(submitter_account.pub_key_hash),
-            SwapOpError::SwapInvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != submitter_account.pub_key_hash {
+                return Err(SwapOpError::SwapInvalidSignature);
+            }
+        }
         invariant!(
             submitter == tx.submitter_id,
             SwapOpError::SubmitterAccountIncorrect
         );
 
+        let (recipient_0, _) = self
+            .get_account_by_address(&tx.orders.0.recipient_address)
+            .ok_or(SwapOpError::RecipientAccountNotFound)?;
+        let (recipient_1, _) = self
+            .get_account_by_address(&tx.orders.1.recipient_address)
+            .ok_or(SwapOpError::RecipientAccountNotFound)?;
+
         Ok(SwapOp {
             tx: tx.clone(),
             submitter,
             accounts: (tx.orders.0.account_id, tx.orders.1.account_id),
-            recipients: (tx.orders.0.recipient_id, tx.orders.1.recipient_id),
+            recipients: (recipient_0, recipient_1),
         })
     }
 
@@ -80,16 +92,12 @@ impl ZkSyncState {
             order.account_id <= max_account_id(),
             SwapOpError::AccountIncorrect
         );
-        invariant!(
-            order.recipient_id <= max_account_id(),
-            SwapOpError::AccountIncorrect
-        );
 
         let account = self
             .get_account(order.account_id)
             .ok_or(SwapOpError::AccountIncorrect)?;
         let _recipient = self
-            .get_account(order.recipient_id)
+            .get_account_by_address(&order.recipient_address)
             .ok_or(SwapOpError::RecipientAccountNotFound)?;
 
         invariant!(
@@ -152,6 +160,10 @@ impl ZkSyncState {
         invariant!(
             swap.orders.1.amount.is_zero() || swap.orders.1.amount == swap.amounts.1,
             SwapOpError::AmountsNotMatched
+        );
+        invariant!(
+            swap.orders.0.account_id != swap.orders.1.account_id,
+            SwapOpError::SelfSwap
         );
 
         let sold = &swap.amounts.0 * &swap.orders.0.price.1;

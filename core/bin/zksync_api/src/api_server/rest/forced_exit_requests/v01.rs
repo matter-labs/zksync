@@ -390,7 +390,7 @@ mod tests {
 
         let price_per_token = forced_exit_requests_config.price_per_token;
         // 6 tokens:
-        let tokens: Vec<u16> = vec![0, 1, 2, 3, 4, 5];
+        let tokens: Vec<u32> = vec![0, 1, 2, 3, 4, 5];
         let tokens: Vec<TokenId> = tokens.iter().map(|t| TokenId(*t)).collect();
         let price_in_wei = BigUint::from_i64(price_per_token)
             .unwrap()
@@ -430,7 +430,7 @@ mod tests {
         let status = client.get_forced_exit_requests_status().await?;
         assert!(matches!(status, ForcedExitRequestStatus::Enabled(_)));
 
-        let tokens: Vec<u16> = vec![0, 1, 2];
+        let tokens: Vec<u32> = vec![0, 1, 2];
         let tokens: Vec<TokenId> = tokens.iter().map(|t| TokenId(*t)).collect();
 
         let price_in_wei = BigUint::from_i64(price_per_token)

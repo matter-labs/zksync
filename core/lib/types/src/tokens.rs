@@ -8,7 +8,7 @@ use thiserror::Error;
 pub use zksync_crypto::params::ETH_TOKEN_ID;
 use zksync_utils::{parse_env, UnsignedRatioSerializeAsDecimal};
 
-use crate::{tx::ChangePubKeyType, Address, Log, TokenId, U256};
+use crate::{tx::ChangePubKeyType, AccountId, Address, Log, TokenId, H256, U256};
 
 #[derive(Debug, Error)]
 pub enum NewTokenEventParseError {
@@ -66,7 +66,7 @@ impl fmt::Display for TokenLike {
 impl TokenLike {
     pub fn parse(value: &str) -> Self {
         // Try to interpret an address as the token ID.
-        if let Ok(id) = u16::from_str(value) {
+        if let Ok(id) = u32::from_str(value) {
             return Self::Id(TokenId(id));
         }
         // Try to interpret a token as the token address with or without a prefix.
@@ -103,6 +103,7 @@ pub struct Token {
     pub symbol: String,
     /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
     pub decimals: u8,
+    pub is_nft: bool,
 }
 
 impl Token {
@@ -112,6 +113,17 @@ impl Token {
             address,
             symbol: symbol.to_string(),
             decimals,
+            is_nft: false,
+        }
+    }
+
+    pub fn new_nft(id: TokenId, symbol: &str) -> Self {
+        Self {
+            id,
+            address: Default::default(),
+            symbol: symbol.to_string(),
+            decimals: 0,
+            is_nft: true,
         }
     }
 }
@@ -165,9 +177,7 @@ impl TryFrom<Log> for NewTokenEvent {
         Ok(NewTokenEvent {
             eth_block_number,
             address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
-            id: TokenId(
-                U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
-            ),
+            id: TokenId(U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32()),
         })
     }
 }
@@ -212,6 +222,10 @@ pub enum ChangePubKeyFeeTypeArg {
 /// Type of transaction fees that exist in the zkSync network.
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum TxFeeTypes {
+    /// Fee for the `WithdrawNFT` transaction.
+    WithdrawNFT,
+    /// Fee for the `WithdrawNFT` operation that requires fast processing.
+    FastWithdrawNFT,
     /// Fee for the `Withdraw` or `ForcedExit` transaction.
     Withdraw,
     /// Fee for the `Withdraw` operation that requires fast processing.
@@ -222,6 +236,50 @@ pub enum TxFeeTypes {
     ChangePubKey(ChangePubKeyFeeTypeArg),
     /// Fee for the `Swap` operation
     Swap,
+    /// Fee for the `MintNFT` operation.
+    MintNFT,
+}
+
+/// NFT supported in zkSync protocol
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct NFT {
+    /// id is used for tx signature and serialization
+    pub id: TokenId,
+    /// id for enforcing uniqueness token address
+    pub serial_id: u32,
+    /// id of nft creator
+    pub creator_address: Address,
+    /// id of nft creator
+    pub creator_id: AccountId,
+    /// L2 token address
+    pub address: Address,
+    /// token symbol
+    pub symbol: String,
+    /// hash of content for nft token
+    pub content_hash: H256,
+}
+
+impl NFT {
+    pub fn new(
+        token_id: TokenId,
+        serial_id: u32,
+        creator_id: AccountId,
+        creator_address: Address,
+        address: Address,
+        symbol: Option<String>,
+        content_hash: H256,
+    ) -> Self {
+        let symbol = symbol.unwrap_or_else(|| format!("NFT-{}", token_id));
+        Self {
+            id: token_id,
+            serial_id,
+            creator_address,
+            creator_id,
+            address,
+            symbol,
+            content_hash,
+        }
+    }
 }
 
 #[derive(Debug, Error, PartialEq)]

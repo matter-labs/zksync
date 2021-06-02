@@ -43,10 +43,10 @@
           }
         },
         "outputs": {
-          "signBytes": "0x050000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df00004a817c80027d030000000c000000000000000000000000ffffffff",
+          "signBytes": "0xfa010000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000000004a817c80027d030000000c000000000000000000000000ffffffff",
           "signature": {
             "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
-            "signature": "849281ea1b3a97b3fe30fbd25184db3e7860db96e3be9d53cf643bd5cf7805a30dbf685c1e63fd75968a61bd83d3a1fb3a0b1c68c71fe87d96f1c1cb7de45b05"
+            "signature": "b3211c7e15d31d64619e0c7f65fce8c6e45637b5cfc8711478c5a151e6568d875ec7f48e040225fe3cc7f1e7294625cad6d98b4595d007d36ef62122de16ae01"
           },
           "ethSignMessage": "0x5472616e7366657220313030303030303030303030302e302045544820746f3a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
           "ethSignature": "0x4684a8f03c5da84676ff4eae89984f20057ce288b3a072605cbf93ef4bcc8a021306b13a88c6d3adc68347f4b68b1cbdf967861005e934afa50ce2e0c5bced791b"
@@ -76,10 +76,10 @@
           }
         },
         "outputs": {
-          "signBytes": "0x0700000037ede35562d3555e61120a151b3c8e8e91d83a378a18e8446d7748f2de52b28345bdbc76160e6b35eb00007d060000000d000000000000000000000000ffffffff",
+          "signBytes": "0xf80100000037ede35562d3555e61120a151b3c8e8e91d83a378a18e8446d7748f2de52b28345bdbc76160e6b35eb000000007d060000000d000000000000000000000000ffffffff",
           "signature": {
             "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
-            "signature": "3c206b2d9b6dc055aba53ccbeca6c1620a42fc45bdd66282618fd1f055fdf90c00101973507694fb66edaa5d4591a2b4f56bbab876dc7579a17c7fe309c80301"
+            "signature": "85782959384c1728192b0fe9466a4273b6d0e78e913eea894b780e0236fc4c9d673d3833e895bce992fc113a4d16bba47ef73fed9c4fca2af09ed06cd6885802"
           },
           "ethSignMessage": "0x18e8446d7748f2de52b28345bdbc76160e6b35eb0000000d000000370000000000000000000000000000000000000000000000000000000000000000",
           "ethSignature": "0xba3fab6cd1ecebe7249f99138c5c804e23553bda91134a77eee02f577419606e33f5b2451c56e7fae80996a21f63b8ee15bb09ecbce84cbdad3158792705aa3c1c"
@@ -110,10 +110,10 @@
           }
         },
         "outputs": {
-          "signBytes": "0x030000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df00000000000000000000000000e8d4a510007d030000000c000000000000000000000000ffffffff",
+          "signBytes": "0xfc010000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000000000000000000000000000000e8d4a510007d030000000c000000000000000000000000ffffffff",
           "signature": {
             "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
-            "signature": "ee8b58e252ecdf76fc4275e87c88072d0c4d50b53c40ac3fd83a396f0989d108d92983a943f08c7ca5a63d9be891185867b89c2450f4d9b73526e1c35c4bf600"
+            "signature": "11dc47fced9e6ffabe33112a4280c02d0c1ffa649ba3843eec256d427b90ed82e495c0cee2138d5a9e20328d31cb97b70d7e2ede0d8d967678803f4b5896f701"
           },
           "ethSignMessage": "0x576974686472617720313030303030303030303030302e302045544820746f3a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
           "ethSignature": "0xa87d458c96f2b78c8b615c7703540d5af0c0b5266b12dbd648d8f6824958ed907f40cae683fa77e7a8a5780381cae30a94acf67f880ed30483c5a8480816fc9d1c"
@@ -136,13 +136,77 @@
           "ethSignData": null
         },
         "outputs": {
-          "signBytes": "0x080000002c19aa2ed8712072e918632259780e587698ef58df00007d030000000c000000000000000000000000ffffffff",
+          "signBytes": "0xf7010000002c19aa2ed8712072e918632259780e587698ef58df000000007d030000000c000000000000000000000000ffffffff",
           "signature": {
             "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
-            "signature": "5e5089771f94222d64ad7d4a8853bf83d53bf3c063b91250ece46ccefd45d19a1313aee79f19e73dcf11f12ae0fb8c3fdb83bf4fa704384c5c82b4de0831ea03"
+            "signature": "b1b82f7ac37e2d4bd675e4a5cd5e48d9fad1739282db8a979c3e4d9e39d794915667ee2c125ba24f4fe81ad6d19491eef0be849a823ea6567517b7e207214705"
           },
           "ethSignMessage": null,
           "ethSignature": null
+        }
+      },
+      {
+        "inputs": {
+          "type": "MintNFT",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "creatorId": 44,
+            "creatorAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "fee": "1000000",
+            "feeTokenId": 0,
+            "nonce": 12
+          },
+          "ethSignData": {
+            "stringFeeToken": "ETH",
+            "stringFee": "1000000.0",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "signBytes": "0xf6010000002cede35562d3555e61120a151b3c8e8e91d83a378a000000000000000000000000000000000000000000000000000000000000012319aa2ed8712072e918632259780e587698ef58df000000007d030000000c",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "5cf4ef4680d58e23ede08cc2f8dd33123c339788721e307a813cdf82bc0bac1c10bc861c68d0b5328e4cb87b610e4dfdc13ddf8a444a4a2ac374ac3c73dbec05"
+          },
+          "ethSignMessage": "0x4d696e744e46542030783030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303031323320666f723a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
+          "ethSignature": "0xac4f8b1ad65ea143dd2a940c72dd778ba3e07ee766355ed237a89a0b7e925fe76ead0a04e23db1cc1593399ee69faeb31b2e7e0c6fbec70d5061d6fbc431d64a1b"
+        }
+      },
+      {
+        "inputs": {
+          "type": "WithdrawNFT",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "accountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "tokenId": 100000,
+            "feeTokenId": 0,
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          },
+          "ethSignData": {
+            "token": 100000,
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "stringFee": "1000000.0",
+            "stringFeeToken": "ETH",
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "signBytes": "0xf5010000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000186a0000000007d030000000c000000000000000000000000ffffffff",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "1236180fe01b42c0c3c084d152b0582e714fa19da85900777e811f484a5b3ea434af320f66c7c657a33024d7be22cea44b7406d0af88c097a9d7d6b5d7154d02"
+          },
+          "ethSignMessage": "0x57697468647261774e46542031303030303020746f3a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
+          "ethSignature": "0x4a50341da6d2b1f0b64a4e37f753c02c43623e89cb0a291026c37fdcc723da9665453ce622f4dd6237bd98430ef0d75755694b1968f3b2d0ea8598f8bc43accf1b"
         }
       }
     ]
@@ -343,7 +407,7 @@
           }
         },
         "outputs": {
-          "hash": "sync-tx:9aa2460771722dfc15fc371e11d8412b63acdd0a483b888336234fc4b825b00b"
+          "hash": "sync-tx:cece8340367ab65fa489ba877443f43750dbd06355e7a023b7fd27dd13bb4272"
         }
       },
       {
@@ -362,7 +426,7 @@
           }
         },
         "outputs": {
-          "hash": "sync-tx:84365ebb70259b8f6d6d9729e660f1ea9ecb2dbeeefd449bed54ac144d80a315"
+          "hash": "sync-tx:e148131aa7426b7e0d561d19cdca201cda8b86233c9aa9b04f745c09519f5b44"
         }
       },
       {
@@ -380,7 +444,7 @@
           }
         },
         "outputs": {
-          "hash": "sync-tx:486629437f43e9d9383431e2d075ba194d9e549c08b03db234ca4edaebb2200f"
+          "hash": "sync-tx:b4585b31ac55c017cc8d98e69b05e7ac6b93f76dc12a08f5e9c2d9a1b2ce01a9"
         }
       },
       {
@@ -397,9 +461,46 @@
           }
         },
         "outputs": {
-          "hash": "sync-tx:0f5cba03550d1ab984d6f478c79aeb6f6961873df7a5876c9af4502364163d03"
+          "hash": "sync-tx:69ffbd4dbd2ab32fbafd7702c71ad9c95c883258468c77eb1435c33d29a99a26"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "MintNFT",
+            "creatorId": 44,
+            "creatorAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "fee": "1000000",
+            "feeToken": 0,
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:3fd8d3ac3231407900d157d60d392e32293ea0f9bb216559fd31e25e2e7bc28b"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "WithdrawNFT",
+            "accountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "token": 100000,
+            "feeToken": 0,
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:4733d4c84fab86520f1e6d217ef0fb9247079257cda40a26a398d18a66cfec16"
         }
       }
     ]
   }
 }
+

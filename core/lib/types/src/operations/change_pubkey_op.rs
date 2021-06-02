@@ -67,7 +67,7 @@ impl ChangePubKeyOp {
         let account = Address::from_slice(&bytes[account_offset..nonce_offset]);
         let nonce = u32::from_bytes(&bytes[nonce_offset..fee_token_offset])
             .ok_or(ChangePubkeyOpError::CannotGetNonce)?;
-        let fee_token = u16::from_bytes(&bytes[fee_token_offset..fee_offset])
+        let fee_token = u32::from_bytes(&bytes[fee_token_offset..fee_offset])
             .ok_or(ChangePubkeyOpError::CannotGetFeeTokenId)?;
         let fee =
             unpack_fee_amount(&bytes[fee_offset..end]).ok_or(ChangePubkeyOpError::CannotGetFee)?;

@@ -1,4 +1,4 @@
-export { Wallet } from './wallet';
+export { Wallet, Transaction, ETHOperation, submitSignedTransaction, submitSignedTransactionsBatch } from './wallet';
 export { Provider, ETHProxy, getDefaultProvider } from './provider';
 export { Signer, Create2WalletSigner } from './signer';
 export { closestPackableTransactionAmount, closestPackableTransactionFee } from './utils';

@@ -60,7 +60,7 @@ impl WithdrawOp {
             u32::from_bytes(&bytes[account_offset..account_offset + ACCOUNT_ID_BIT_WIDTH / 8])
                 .ok_or(WithdrawOpError::CannotGetAccountId)?;
         let from = Address::zero(); // From pubdata it is unknown
-        let token = u16::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+        let token = u32::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
             .ok_or(WithdrawOpError::CannotGetTokenId)?;
         let to = Address::from_slice(
             &bytes[eth_address_offset..eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8],

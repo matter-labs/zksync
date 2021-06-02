@@ -1,5 +1,7 @@
 use num::BigUint;
+use std::convert::Infallible;
 use std::time::Instant;
+
 use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, FullExit, FullExitOp, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
@@ -8,7 +10,6 @@ use crate::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
-use std::convert::Infallible;
 
 impl TxHandler<FullExit> for ZkSyncState {
     type Op = FullExitOp;
@@ -21,17 +22,33 @@ impl TxHandler<FullExit> for ZkSyncState {
             priority_op.token <= params::max_token_id(),
             "Full exit token is out of range, this should be enforced by contract"
         );
-        vlog::debug!("Processing {:?}", priority_op);
         let account_balance = self
             .get_account(priority_op.account_id)
             .filter(|account| account.address == priority_op.eth_address)
             .map(|acccount| acccount.get_balance(priority_op.token))
             .map(BigUintSerdeWrapper);
 
-        vlog::debug!("Balance: {:?}", account_balance);
-        let op = FullExitOp {
-            priority_op,
-            withdraw_amount: account_balance,
+        let op = if priority_op.token > params::max_fungible_token_id()
+            && self.nfts.get(&priority_op.token).is_some()
+        {
+            let nft = self.nfts.get(&priority_op.token).unwrap();
+            FullExitOp {
+                priority_op,
+                withdraw_amount: account_balance,
+                creator_account_id: Some(nft.creator_id),
+                creator_address: Some(nft.creator_address),
+                serial_id: Some(nft.serial_id),
+                content_hash: Some(nft.content_hash),
+            }
+        } else {
+            FullExitOp {
+                priority_op,
+                withdraw_amount: account_balance,
+                creator_account_id: None,
+                creator_address: None,
+                serial_id: None,
+                content_hash: None,
+            }
         };
 
         Ok(op)

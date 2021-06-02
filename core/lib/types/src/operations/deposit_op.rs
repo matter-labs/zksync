@@ -43,7 +43,7 @@ impl DepositOp {
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
         .ok_or(DepositOpError::CannotGetAccountId)?;
-        let token = u16::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+        let token = u32::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
             .ok_or(DepositOpError::CannotGetTokenId)?;
         let amount = BigUint::from(
             u128::from_bytes(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])

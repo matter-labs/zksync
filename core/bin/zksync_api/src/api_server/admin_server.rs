@@ -121,6 +121,7 @@ async fn add_token(
         address: token_request.address,
         symbol: token_request.symbol.clone(),
         decimals: token_request.decimals,
+        is_nft: false,
     };
 
     storage

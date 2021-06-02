@@ -6,10 +6,11 @@ use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
-use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
+use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
-use self::records::{DBMarketVolume, DbTickerPrice, DbToken};
+use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageNFT};
+
 use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
 use zksync_types::tokens::TokenMarketVolume;
@@ -44,7 +45,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             WHERE id = $1 OR address = $2 OR symbol = $3
             LIMIT 1
             "#,
-            i32::from(*token.id),
+            *token.id as i32,
             address_to_stored_string(&token.address),
             token.symbol,
         )
@@ -76,13 +77,14 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
 
         sqlx::query!(
             r#"
-            INSERT INTO tokens ( id, address, symbol, decimals )
-            VALUES ( $1, $2, $3, $4 )
+            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
+            VALUES ( $1, $2, $3, $4, $5 )
             "#,
-            i32::from(*token.id),
+            token.id.0 as i32,
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
+            token.is_nft
         )
         .execute(self.0.conn())
         .await
@@ -98,16 +100,17 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let start = Instant::now();
         sqlx::query!(
             r#"
-            INSERT INTO tokens ( id, address, symbol, decimals )
-            VALUES ( $1, $2, $3, $4 )
+            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
+            VALUES ( $1, $2, $3, $4, $5 )
             ON CONFLICT (id)
             DO
               UPDATE SET address = $2, symbol = $3, decimals = $4
             "#,
-            i32::from(*token.id),
+            *token.id as i32,
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
+            token.is_nft
         )
         .execute(self.0.conn())
         .await?;
@@ -124,7 +127,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT * FROM tokens
+            SELECT * FROM tokens WHERE is_nft = false
             ORDER BY id ASC
             "#,
         )
@@ -153,11 +156,12 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT id, address, symbol, decimals
+            SELECT id, address, symbol, decimals, is_nft
             FROM tokens
             INNER JOIN ticker_market_volume
             ON tokens.id = ticker_market_volume.token_id
             WHERE ticker_market_volume.market_volume >= $1
+            AND is_nft = false
             ORDER BY id ASC
             "#,
             ratio_to_big_decimal(&min_market_volume, STORED_USD_PRICE_PRECISION)
@@ -182,16 +186,32 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let start = Instant::now();
         let last_token_id = sqlx::query!(
             r#"
-            SELECT max(id) as "id!" FROM tokens
+            SELECT max(id) as "id!" FROM tokens WHERE is_nft = false
             "#,
         )
         .fetch_optional(self.0.conn())
         .await?
-        .map(|token| token.id as u16)
+        .map(|token| token.id as u32)
         .unwrap_or(0);
 
         metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
         Ok(TokenId(last_token_id))
+    }
+    pub async fn get_nft(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
+        let start = Instant::now();
+        let db_token = sqlx::query_as!(
+            StorageNFT,
+            r#"
+                SELECT * FROM nft
+                WHERE token_id = $1
+                LIMIT 1
+            "#,
+            *token_id as i32
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.token.get_nft", start.elapsed());
+        Ok(db_token.map(|t| t.into()))
     }
 
     /// Given the numeric token ID, symbol or address, returns token.
@@ -206,7 +226,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                     WHERE id = $1
                     LIMIT 1
                     "#,
-                    i32::from(*token_id)
+                    *token_id as i32
                 )
                 .fetch_optional(self.0.conn())
                 .await?
@@ -255,7 +275,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             WHERE token_id = $1
             LIMIT 1
             "#,
-            i32::from(*token_id)
+            *token_id as i32
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -280,7 +300,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             DO
               UPDATE SET market_volume = $2, last_updated = $3
             "#,
-            i32::from(*token_id),
+            *token_id as i32,
             market_volume_rounded.clone(),
             market_volume.last_updated
         )
@@ -290,6 +310,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         metrics::histogram!("sql.token.update_market_volume", start.elapsed());
         Ok(())
     }
+
     /// Given token id, returns its price in USD and a timestamp of the last update.
     pub async fn get_historical_ticker_price(
         &mut self,
@@ -303,7 +324,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             WHERE token_id = $1
             LIMIT 1
             "#,
-            i32::from(*token_id)
+            *token_id as i32
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -331,7 +352,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             DO
               UPDATE SET usd_price = $2, last_updated = $3
             "#,
-            i32::from(*token_id),
+            *token_id as i32,
             usd_price_rounded.clone(),
             price.last_updated
         )
@@ -339,6 +360,32 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.token.update_historical_ticker_price", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn store_nft_factory(
+        &mut self,
+        creator_id: AccountId,
+        creator_address: Address,
+        factory_address: Address,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            r#"
+            INSERT INTO nft_factory ( creator_id, factory_address, creator_address )
+            VALUES ( $1, $2, $3 )
+            ON CONFLICT ( creator_id ) 
+            DO UPDATE 
+            SET factory_address = $2 
+            "#,
+            creator_id.0 as i32,
+            address_to_stored_string(&factory_address),
+            address_to_stored_string(&creator_address),
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.token.store_nft_factory", start.elapsed());
         Ok(())
     }
 }
