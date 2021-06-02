@@ -58,7 +58,10 @@ contract RegenesisMultisig is Ownable, Config {
                 numberOfApprovalsFromSecurityCouncil++;
                 emit CandidateApproval(numberOfApprovalsFromSecurityCouncil);
 
-                if (numberOfApprovalsFromSecurityCouncil >= securityCouncilThreshold) {
+                // It is ok to check for strict equality since the numberOfApprovalsFromSecurityCouncil
+                // is increased by one at a time. It is better to do so not to emit the
+                // CandidateAccepted event more than once
+                if (numberOfApprovalsFromSecurityCouncil == securityCouncilThreshold) {
                     oldRootHash = candidateOldRootHash;
                     newRootHash = candidateNewRootHash;
                     emit CandidateAccepted(oldRootHash, newRootHash);
