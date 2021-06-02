@@ -2,16 +2,14 @@
 
 All notable changes to the contracts will be documented in this file.
 
-## 2021-31-05
+## 2021-02-06
 
-**Version 6** is scheduled for upgrade.
+**Version 5.1** is scheduled for upgrade.
 
 ### Added
 
-- `MintNFT`, `WithdrawNFT` operations, which enable native NFT support. More on the NFT structure can be read
-  [here](https://zksync.io/dev/nfts.html).
-- `Swap` operation, which depending on the implementation may serve either order book or atomic swaps functionality. You
-  can read more [here](https://zksync.io/dev/swaps.html).
+- `MintNFT`, `WithdrawNFT` operations, which enable native NFT support.
+- `Swap` operation, which depending on the implementation may serve either order book or atomic swaps functionality.
 - The security council, which is able to shorten the upgrade notice period. More on that
   [here](https://medium.com/matter-labs/keeping-funds-safe-a-3-factor-approach-to-security-in-zksync-2-0-a70b0f53f360).
 - `RegeneisMultisig.sol` to handle submissions of the new root hash by the security council during the upgrade.
