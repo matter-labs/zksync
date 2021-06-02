@@ -11,8 +11,8 @@
       "infrastructure/explorer",
       "infrastructure/zk",
       "infrastructure/reading-tool",
-      "core/tests/ts-tests",
-      "core/tests/api-docs"
+      "infrastructure/api-docs",
+      "core/tests/ts-tests"
     ],
     "nohoist": [
       "**/@vue/**",

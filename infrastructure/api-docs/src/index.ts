@@ -5,7 +5,7 @@ import * as zksync from 'zksync';
 import * as ethers from 'ethers';
 
 function getDirPath() {
-    return path.join(process.env['ZKSYNC_HOME'] as string, 'core/tests/api-docs');
+    return path.join(process.env['ZKSYNC_HOME'] as string, 'infrastructure/api-docs');
 }
 
 function pasteAllFilesInOne() {
