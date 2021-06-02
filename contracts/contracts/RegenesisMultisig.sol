@@ -10,6 +10,9 @@ import "./Config.sol";
 /// @title Regenesis Multisig contract
 /// @author Matter Labs
 contract RegenesisMultisig is Ownable, Config {
+    event CandidateAccepted(bytes32 oldRootHash, bytes32 newRootHash);
+    event CandidateApproval(uint256 currentApproval);
+
     bytes32 public oldRootHash;
     bytes32 public newRootHash;
 
@@ -53,10 +56,15 @@ contract RegenesisMultisig is Ownable, Config {
                 require(securityCouncilApproves[id] == false);
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil++;
+                emit CandidateApproval(numberOfApprovalsFromSecurityCouncil);
 
-                if (numberOfApprovalsFromSecurityCouncil >= securityCouncilThreshold) {
+                // It is ok to check for strict equality since the numberOfApprovalsFromSecurityCouncil
+                // is increased by one at a time. It is better to do so not to emit the
+                // CandidateAccepted event more than once
+                if (numberOfApprovalsFromSecurityCouncil == securityCouncilThreshold) {
                     oldRootHash = candidateOldRootHash;
                     newRootHash = candidateNewRootHash;
+                    emit CandidateAccepted(oldRootHash, newRootHash);
                 }
             }
         }
