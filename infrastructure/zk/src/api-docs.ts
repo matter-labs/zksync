@@ -1,9 +1,9 @@
 import { Command } from 'commander';
 import * as utils from './utils';
-import { compileForDocumentation } from 'api-docs';
 
 export async function build_docs() {
-    await compileForDocumentation();
+    await utils.spawn('yarn api-docs build');
+    await utils.spawn('yarn api-docs compile-for-docs');
     await utils.spawn('yarn api-docs build-docs');
 }
 

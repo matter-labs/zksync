@@ -4,7 +4,6 @@ import fs from 'fs';
 import * as dummyProver from '../dummy-prover';
 import * as contract from '../contract';
 import * as run from '../run/run';
-import { compileForDocumentation, compileForTest } from 'api-docs';
 
 export async function withServer(testSuite: () => Promise<void>, timeout: number) {
     if (!(await dummyProver.status())) {
@@ -105,11 +104,12 @@ export async function all() {
 }
 
 export async function apiDocs() {
+    await utils.spawn('yarn api-docs build');
     // Checks that documentation can be built successfully.
-    await compileForDocumentation();
+    await utils.spawn('yarn api-docs compile-for-docs');
     await utils.spawn('yarn api-docs build-docs');
     // Checks that response structures of endpoints match structures defined in the documentation.
-    await compileForTest();
+    await utils.spawn('yarn api-docs compile-for-test');
     await utils.spawn('yarn api-docs test');
 }
 

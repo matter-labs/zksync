@@ -142,3 +142,13 @@ export async function compileForTest() {
 
     fs.writeFileSync(path.join(getDirPath(), 'blueprint/test.apib'), after);
 }
+
+if (process.argv.length > 2 && process.argv[2] == 'docs') {
+    compileForDocumentation()
+        .then(() => console.log('documentation.apib successfully created'))
+        .catch((e) => console.log(e));
+} else if (process.argv.length > 2 && process.argv[2] == 'test') {
+    compileForTest()
+        .then(() => console.log('test.apib successfully created'))
+        .catch((e) => console.log(e));
+}

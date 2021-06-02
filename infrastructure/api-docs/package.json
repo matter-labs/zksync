@@ -14,6 +14,8 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "test": "dredd",
-    "build-docs": "aglio -i ./blueprint/documentation.apib -o index.html"
+    "build-docs": "aglio -i ./blueprint/documentation.apib -o index.html",
+    "compile-for-docs": "node build/index.js docs",
+    "compile-for-test": "node build/index.js test"
   }
 }
