@@ -503,7 +503,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
 
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf1");
+                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf2");
                 withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
