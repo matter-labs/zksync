@@ -191,7 +191,7 @@ pub enum SwapOpError {
     InsufficientBalance,
     #[error("Buy/Sell tokens do not match")]
     BuySellNotMatched,
-    #[error("Can't swap for the same token")]
+    #[error("Can't swap the same tokens")]
     SwapSameToken,
     #[error("Amounts do not match")]
     AmountsNotMatched,

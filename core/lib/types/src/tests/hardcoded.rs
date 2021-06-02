@@ -18,8 +18,8 @@ use crate::{
     },
     priority_ops::{Deposit, FullExit},
     tx::{
-        ChangePubKey, ForcedExit, Order, PackedEthSignature, Swap, TimeRange, Transfer, Withdraw,
-        WithdrawNFT,
+        ChangePubKey, ForcedExit, MintNFT, Order, PackedEthSignature, Swap, TimeRange, Transfer,
+        Withdraw, WithdrawNFT,
     },
     Log, PriorityOp,
 };
@@ -363,12 +363,17 @@ pub mod operations_test {
 #[cfg(test)]
 pub mod tx_conversion_test {
     use super::*;
-    use crate::MintNFT;
 
     // General configuration parameters for all types of operations
     const ACCOUNT_ID: AccountId = AccountId(100);
+    const ACCOUNT_ID_2: AccountId = AccountId(200);
+    const ACCOUNT_ID_3: AccountId = AccountId(300);
     const TOKEN_ID: TokenId = TokenId(5);
+    const TOKEN_ID_2: TokenId = TokenId(6);
+    const FEE_TOKEN_ID: TokenId = TokenId(18);
     const NONCE: Nonce = Nonce(20);
+    const NONCE_2: Nonce = Nonce(30);
+    const NONCE_3: Nonce = Nonce(40);
     const VALID_FROM: u64 = 0;
     const VALID_UNTIL: u64 = 1612201680;
 
@@ -376,17 +381,54 @@ pub mod tx_conversion_test {
         Lazy::new(|| Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap());
     static BOB: Lazy<Address> =
         Lazy::new(|| Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap());
+    static CARL: Lazy<Address> =
+        Lazy::new(|| Address::from_str("002b598a1fc2f0d8240fbd8b13131b9eab0165a3").unwrap());
     static PK_HASH: Lazy<PubKeyHash> = Lazy::new(|| {
         PubKeyHash::from_hex("sync:3cfb9a39096d9e02b24187355f628f9a6331511b").unwrap()
     });
     static AMOUNT: Lazy<BigUint> = Lazy::new(|| BigUint::from(12345678u64));
+    static AMOUNT_2: Lazy<BigUint> = Lazy::new(|| BigUint::from(87654321u64));
     static FEE: Lazy<BigUint> = Lazy::new(|| BigUint::from(1000000u32));
     static TIME_RANGE: Lazy<TimeRange> = Lazy::new(|| TimeRange::new(VALID_FROM, VALID_UNTIL));
 
-    #[ignore]
     #[test]
     fn test_convert_to_bytes_swap() {
-        todo!(); // Part of (ZKS-593)
+        let swap = Swap::new(
+            ACCOUNT_ID,
+            *ALICE,
+            NONCE,
+            (
+                Order {
+                    account_id: ACCOUNT_ID_2,
+                    nonce: NONCE_2,
+                    recipient_address: *BOB,
+                    token_buy: TOKEN_ID,
+                    token_sell: TOKEN_ID_2,
+                    amount: AMOUNT.clone(),
+                    price: (&*AMOUNT + BigUint::from(2u8), AMOUNT_2.clone()),
+                    time_range: *TIME_RANGE,
+                    signature: Default::default(),
+                },
+                Order {
+                    account_id: ACCOUNT_ID_3,
+                    nonce: NONCE_3,
+                    recipient_address: *CARL,
+                    token_buy: TOKEN_ID_2,
+                    token_sell: TOKEN_ID,
+                    amount: AMOUNT_2.clone(),
+                    price: (&*AMOUNT_2 + BigUint::from(2u8), AMOUNT.clone()),
+                    time_range: *TIME_RANGE,
+                    signature: Default::default(),
+                },
+            ),
+            (AMOUNT.clone(), AMOUNT_2.clone()),
+            FEE.clone(),
+            FEE_TOKEN_ID,
+            None,
+        );
+
+        let bytes = swap.get_bytes();
+        assert_eq!(hex::encode(bytes), "f401000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd026000000146f01000000c821abaed8712072e918632259780e587698ef58da0000001e0000000600000005000000000000000000000000bc6150000000000000000000000005397fb100178c29c000000000000000000000000060183ed06f010000012c002b598a1fc2f0d8240fbd8b13131b9eab0165a3000000280000000500000006000000000000000000000005397fb3000000000000000000000000bc614e00a72ff62000000000000000000000000060183ed0000000127d0300178c29c000a72ff620");
     }
 
     #[test]
