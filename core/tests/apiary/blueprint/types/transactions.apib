@@ -21,12 +21,12 @@
 ## Transaction.L2.Transfer (object)
 - type: Transfer (string, fixed)
 - to: 0xD3c62D2F7b6d4A63577F2415E55A6Aa6E1DbB9CA (string, required)
-- fee: 1200000000 (string, required)
-- from: 0xD3c62D2F7b6d4A63577F2415E55A6Aa6E1DbB9CA (string, required)
+- fee: 12000000000000000000 (string, required)
+- from: {{Address}} (string, required)
 - nonce: 12123 (number, required)
 - token: 0 (number, required)
 - amount: 17500000000000000 (string, required)
-- accountId: 12123 (number, required)
+- accountId: {{AccountId}} (number, required)
 - validFrom: 0 (number, required, nullable)
 - validUntil: 1239213821 (number, required, nullable)
 - signature (L2Signature, required)
@@ -141,8 +141,8 @@
 - (Transaction.L1.FullExit)
 
 ## L2Signature (object)
-- pubKey: f70ec54646352161ae26f9126853419797a5adafbbc53fbb675e6ba4663d568d (string, required)
-- signature: 9460c0877e523b5606674ee0bc5a77431296d070a4ebe2c6ee943cd657433e1d637066a7e6985e381740425607e97ac602f5d870717dba1d4b9ba62d3c956d03 (string, required)
+- pubKey: {{PubKey}} (string, required)
+- signature: {{L2Signature}} (string, required)
 
 ## ECDSAAuthType (object)
 - type: `ECDSA` (string, fixed)
@@ -163,7 +163,7 @@
 
 ## EthereumSignature (object)
 - type: `EthereumSignature` (string, fixed)
-- signature: `0xc9eb71b736ef69192d90a6516c5d66af883f6bc9a1749ed98edff106bcd49594618644860be89b08725de834d3a312d409810ecb39e9e7a5a5a9d8d870b166ab1c` (string, required)
+- signature: `{{EthereumSignature}}` (string, required)
 
 ## EIP1271Signature (object)
 - type: `EIP1271Signature` (string, fixed)
@@ -172,7 +172,3 @@
 ## TxEthSignature (enum)
 - (EthereumSignature)
 - (EIP1271Signature)
-
-## BatchSignature (enum)
-- (TxEthSignature)
-- (array[TxEthSignature])

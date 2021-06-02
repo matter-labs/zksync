@@ -25,9 +25,8 @@ Request fee for a transactions batch.
 
 + Request (application/json)
     + Attributes
-        + transactions (array[Fee.Type.with.Address])
-        + tokenLike: ETH (Token.TokenLike)
-        + error (Error, required, nullable)
+        + transactions (array[Fee.Type.with.Address], required)
+        + tokenLike: ETH (Token.TokenLike, required)
 
 + Response 200 (application/json)
     + Attributes

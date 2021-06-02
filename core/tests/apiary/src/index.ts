@@ -101,6 +101,21 @@ export async function getHashesAndSignatures() {
     );
     result['txBatchHash'] = submitBatchResponse.batchHash;
 
+    const signedTransfer = await syncWallet.signSyncTransfer({
+        to: '0xD3c62D2F7b6d4A63577F2415E55A6Aa6E1DbB9CA',
+        token: 'ETH',
+        amount: '17500000000000000',
+        fee: '12000000000000000000',
+        nonce: 12123,
+        validFrom: 0,
+        validUntil: 1239213821
+    });
+    result['Address'] = syncWallet.address();
+    result['AccountId'] = await syncWallet.getAccountId();
+    result['PubKey'] = signedTransfer.tx.signature!.pubKey;
+    result['L2Signature'] = signedTransfer.tx.signature!.signature;
+    result['EthereumSignature'] = signedTransfer.ethereumSignature!.signature;
+
     return result;
 }
 
