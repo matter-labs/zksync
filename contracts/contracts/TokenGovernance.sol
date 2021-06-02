@@ -11,7 +11,19 @@ import "./Utils.sol";
 /// @notice Contract is used to allow anyone to add new ERC20 tokens to zkSync given sufficient payment
 contract TokenGovernance {
     /// @notice Token lister added or removed (see `tokenLister`)
-    event TokenListerUpdate(address indexed, bool);
+    event TokenListerUpdate(address indexed tokenLister, bool isActive);
+
+    /// @notice Listing fee token set
+    event ListingFeeTokenUpdate(IERC20 indexed newListingFeeToken);
+
+    /// @notice Listing fee set
+    event ListingFeeUpdate(uint256 newListingFee);
+
+    /// @notice Maximum number of listed tokens updated 
+    event ListingCapUpdate(uint16 newListingCap);
+
+    /// @notice The treasury (the account which will receive the fee) was updated
+    event TreasuryUpdate(address newTreasury);
 
     /// @notice zkSync governance contract
     Governance public governance;
@@ -71,6 +83,8 @@ contract TokenGovernance {
         governance.requireGovernor(msg.sender);
         listingFeeToken = _newListingFeeToken;
         listingFee = _newListingFee;
+
+        emit ListingFeeTokenSet(_newListingFeeToken);
     }
 
     /// @notice Set new listing fee
@@ -78,6 +92,8 @@ contract TokenGovernance {
     function setListingFee(uint256 _newListingFee) external {
         governance.requireGovernor(msg.sender);
         listingFee = _newListingFee;
+
+        emit ListingFeeUpdate(_newListingFee);
     }
 
     /// @notice Enable or disable token lister. If enabled new tokens can be added by that address without payment
@@ -95,6 +111,8 @@ contract TokenGovernance {
     function setListingCap(uint16 _newListingCap) external {
         governance.requireGovernor(msg.sender);
         listingCap = _newListingCap;
+
+        emit ListingCapUpdate(_newListingCap);
     }
 
     /// @notice Change address that collects payments for listing tokens.
@@ -102,5 +120,7 @@ contract TokenGovernance {
     function setTreasury(address _newTreasury) external {
         governance.requireGovernor(msg.sender);
         treasury = _newTreasury;
+
+        emit TreasuryUpdate(_newTreasury);
     }
 }
