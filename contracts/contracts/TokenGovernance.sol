@@ -19,7 +19,7 @@ contract TokenGovernance {
     /// @notice Listing fee set
     event ListingFeeUpdate(uint256 newListingFee);
 
-    /// @notice Maximum number of listed tokens updated 
+    /// @notice Maximum number of listed tokens updated
     event ListingCapUpdate(uint16 newListingCap);
 
     /// @notice The treasury (the account which will receive the fee) was updated

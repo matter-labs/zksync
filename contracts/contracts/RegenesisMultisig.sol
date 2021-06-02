@@ -10,8 +10,8 @@ import "./Config.sol";
 /// @title Regenesis Multisig contract
 /// @author Matter Labs
 contract RegenesisMultisig is Ownable, Config {
-
     event CandidateAccepted(bytes32 oldRootHash, bytes32 newRootHash);
+    event CandidateApproval(uint256 currentApproval);
 
     bytes32 public oldRootHash;
     bytes32 public newRootHash;
@@ -56,11 +56,11 @@ contract RegenesisMultisig is Ownable, Config {
                 require(securityCouncilApproves[id] == false);
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil++;
+                emit CandidateApproval(numberOfApprovalsFromSecurityCouncil);
 
                 if (numberOfApprovalsFromSecurityCouncil >= securityCouncilThreshold) {
                     oldRootHash = candidateOldRootHash;
                     newRootHash = candidateNewRootHash;
-
                     CandidateAccepted(oldRootHash, newRootHash);
                 }
             }
