@@ -49,9 +49,6 @@ listing_cap=65436
 # The address which will receive funds from permissionless token listings
 listing_treasury="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
 
-# The address of the token governance
-listing_governance="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
-
 # Security council parameters
 security_council_members_number=3
 security_council_members=["0x22C3F9177F485bF9a058cE4C7253Da81a59495Db","0x56dF84566a67e87808A73dA0Be61a40bda3e2AFA","0xCE004d039cD86b08274FC453bd5536E6e9F6Fac7"]

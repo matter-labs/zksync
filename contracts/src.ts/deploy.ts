@@ -95,7 +95,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
         RegenesisMultisig: process.env.MISC_REGENESIS_MULTISIG_ADDRESS,
         AdditionalZkSync: process.env.MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS,
-        TokenGovernance: process.env.MISC_LISTING_GOVERNANCE
+        TokenGovernance: process.env.CONTRACTS_LISTING_GOVERNANCE
     };
 }
 
@@ -284,7 +284,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         const gasPrice = tokenGovernanceContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`MISC_LISTING_GOVERNANCE=${tokenGovernanceContract.address}`);
+            console.log(`\nCONTRACTS_LISTING_GOVERNANCE=${tokenGovernanceContract.address}\n`);
             console.log(
                 `Token governance contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
                     zksGasUsed.mul(gasPrice)
