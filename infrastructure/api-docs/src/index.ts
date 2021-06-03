@@ -41,11 +41,11 @@ async function compileCommon() {
 }
 
 async function setupWallet() {
-    const ethTestConfig = JSON.parse(
-        fs.readFileSync(path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant/eth.json`), {
-            encoding: 'utf-8'
-        })
-    );
+    const pathToConfig = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant/eth.json`);
+    const config = fs.readFileSync(pathToConfig, {
+        encoding: 'utf-8'
+    });
+    const ethTestConfig = JSON.parse(config);
     let web3Url = (process.env.ETH_CLIENT_WEB3_URL as string).split(',')[0];
     const ethProvider = new ethers.providers.JsonRpcProvider(web3Url);
     ethProvider.pollingInterval = 100;
@@ -147,4 +147,6 @@ if (process.argv.length > 2 && process.argv[2] == 'docs') {
     compileForDocumentation().then(() => console.log('documentation.apib successfully created'));
 } else if (process.argv.length > 2 && process.argv[2] == 'test') {
     compileForTest().then(() => console.log('test.apib successfully created'));
+} else {
+    throw new Error('Unknown command');
 }
