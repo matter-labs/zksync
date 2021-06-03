@@ -12,7 +12,6 @@ const REGEN_MULTISIG_CONTRACT: &str =
 
 fn read_file_to_json_value(path: &str) -> io::Result<serde_json::Value> {
     let zksync_home = std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| ".".into());
-    println!("{}", zksync_home);
     let path = std::path::Path::new(&zksync_home).join(path);
     let contents = fs::read_to_string(path).unwrap();
     let val = serde_json::Value::from_str(&contents).unwrap();
@@ -49,7 +48,7 @@ pub fn get_tx_data(old_hash: Fr, new_hash: Fr) -> String {
     let regen_multisig_contract = regen_multisig_contract();
 
     let function = regen_multisig_contract
-        .function("submitHash")
+        .function("approveHash")
         .expect("no submitHash function");
 
     let input_tokens = vec![
