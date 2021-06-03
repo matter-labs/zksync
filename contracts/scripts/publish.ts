@@ -82,6 +82,40 @@ async function main() {
             console.error(e);
         }
     }
+
+    {
+        const address = addresses.NFTFactory;
+
+        const name = process.env.NFT_FACTORY_NAME;
+        const symbol = process.env.NFT_FACTORY_SYMBOL;
+        const zksyncAddress = addresses.ZkSync;
+
+        const constructorArguments = [name, symbol, zksyncAddress];
+
+        try {
+            await hre.run('verify:verify', { address, constructorArguments });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    {
+        const address = addresses.TokenGovernance;
+
+        const governance = addresses.Governance;
+        const listingFeeToken = process.env.MISC_LISTING_FEE_TOKEN;
+        const listingFee = process.env.MISC_LISTING_FEE;
+        const listingCap = process.env.MISC_LISTING_CAP;
+        const treasury = process.env.MISC_LISTING_TREASURY;
+
+        const constructorArguments = [governance, listingFeeToken, listingFee, listingCap, treasury];
+
+        try {
+            await hre.run('verify:verify', { address, constructorArguments });
+        } catch (e) {
+            console.error(e);
+        }
+    }
 }
 
 main()
