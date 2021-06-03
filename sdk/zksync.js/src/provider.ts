@@ -181,11 +181,8 @@ export class Provider {
         const nft = await this.transport.request('get_nft', [id]);
 
         // If the NFT does not exist, throw an exception
-        if (!nft) {
-            throw new Error(
-                'Requested NFT not found. Tip: mintNFT operation must be verified ' +
-                    'before the token can be transfered.'
-            );
+        if (nft == null) {
+            throw new Error(`Requested NFT doesn't exist or the corresponding mintNFT operation is not verified yet`);
         }
 
         return nft;

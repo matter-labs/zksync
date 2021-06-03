@@ -71,8 +71,15 @@ Tester.prototype.testGetNFT = async function (wallet: Wallet, feeToken: TokenLik
     this.runningFee = this.runningFee.add(fee);
     const state = await wallet.getAccountState();
     const nft = Object.values(state.committed.nfts)[0];
-    const nft1 = await wallet.provider.getNFT(nft.id);
-    expect(nft1).eq(null, 'NFT does not exist yet');
+
+    let wasException = false;
+    try {
+        await wallet.provider.getNFT(nft.id);
+    } catch {
+        wasException = true;
+    }
+    expect(wasException).to.eq(true, 'NFT does not exist yet');
+
     await handle.awaitVerifyReceipt();
     const nft2 = await wallet.provider.getNFT(nft.id);
     expect(nft2.id).eq(nft.id);
