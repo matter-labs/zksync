@@ -3,7 +3,7 @@ use std::collections::HashMap;
 // External imports
 // Workspace imports
 use zksync_api_types::v02::{
-    pagination::{AccountTxsRequest, PaginationDirection, PaginationQuery},
+    pagination::{AccountTxsRequest, ApiEither, PaginationDirection, PaginationQuery},
     transaction::TxInBlockStatus,
 };
 use zksync_types::{
@@ -328,7 +328,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                tx_hash: setup.get_tx_hash(0, 0),
+                tx_hash: ApiEither::from(setup.get_tx_hash(0, 0)),
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -454,7 +454,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
             .get_account_transactions(&PaginationQuery {
                 from: AccountTxsRequest {
                     address: from,
-                    tx_hash: request.tx_hash,
+                    tx_hash: ApiEither::from(request.tx_hash),
                 },
                 limit: request.limit,
                 direction: request.direction,
@@ -471,7 +471,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                tx_hash: setup.get_tx_hash(1, 2),
+                tx_hash: ApiEither::from(setup.get_tx_hash(1, 2)),
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -487,7 +487,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                tx_hash: setup.get_tx_hash(0, 6),
+                tx_hash: ApiEither::from(setup.get_tx_hash(0, 6)),
             },
             limit: 2,
             direction: PaginationDirection::Newer,
@@ -504,7 +504,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                tx_hash: setup.get_tx_hash(0, 2),
+                tx_hash: ApiEither::from(setup.get_tx_hash(0, 2)),
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -517,7 +517,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: to,
-                tx_hash: setup.get_tx_hash(0, 2),
+                tx_hash: ApiEither::from(setup.get_tx_hash(0, 2)),
             },
             limit: 1,
             direction: PaginationDirection::Newer,

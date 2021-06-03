@@ -32,6 +32,7 @@ itertools = "0.8"
 hex = "0.4"
 metrics = "=0.13.0-alpha.8"
 parity-crypto = { version = "0.6.2", features = ["publickey"] }
+either = "1.6.1"
 
 vlog = { path = "../../lib/vlog", version = "1.0" }
 

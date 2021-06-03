@@ -21,3 +21,5 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 hex = "0.4"
 num = "0.3"
 bigdecimal = { version = "0.2.0", features = ["serde"]}
+either = "1.6.1"
+thiserror = "1.0"

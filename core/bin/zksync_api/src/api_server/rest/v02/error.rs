@@ -7,7 +7,7 @@ use serde_repr::Serialize_repr;
 use thiserror::Error;
 
 // Workspace uses
-use zksync_api_types::v02::pagination::MAX_LIMIT;
+use zksync_api_types::v02::pagination::{UnknownFromParamater, MAX_LIMIT};
 
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
@@ -96,10 +96,8 @@ pub enum InvalidDataError {
     InvalidCurrency,
     #[error("Transaction is not found")]
     TransactionNotFound,
-    #[error("Limit for pagination should be less or equal than {}", MAX_LIMIT)]
+    #[error("Limit for pagination should be less than or equal to {}", MAX_LIMIT)]
     PaginationLimitTooBig,
-    #[error("Cannot parse query parameters")]
-    QueryDeserializationError,
 }
 
 impl ApiError for InvalidDataError {
@@ -116,7 +114,6 @@ impl ApiError for InvalidDataError {
             Self::InvalidCurrency => ErrorCode::InvalidCurrency,
             Self::TransactionNotFound => ErrorCode::TransactionNotFound,
             Self::PaginationLimitTooBig => ErrorCode::PaginationLimitTooBig,
-            Self::QueryDeserializationError => ErrorCode::QueryDeserializationError,
         }
     }
 }
@@ -202,5 +199,15 @@ impl ApiError for PriceError {
             Self::ApiError(_) => ErrorCode::ExternalApiError,
             Self::DBError(_) => ErrorCode::StorageError,
         }
+    }
+}
+
+impl ApiError for UnknownFromParamater {
+    fn error_type(&self) -> String {
+        String::from("invalidDataError")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::QueryDeserializationError
     }
 }

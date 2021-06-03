@@ -1,6 +1,8 @@
 // External imports
 // Workspace imports
-use zksync_api_types::v02::pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery};
+use zksync_api_types::v02::pagination::{
+    ApiEither, BlockAndTxHash, PaginationDirection, PaginationQuery,
+};
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
@@ -1179,7 +1181,7 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
             .get_block_transactions_page(&PaginationQuery {
                 from: BlockAndTxHash {
                     block_number: BlockNumber(1),
-                    tx_hash,
+                    tx_hash: ApiEither::from(tx_hash),
                 },
                 limit,
                 direction,
@@ -1200,7 +1202,7 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         .get_block_transactions_page(&PaginationQuery {
             from: BlockAndTxHash {
                 block_number: BlockNumber(3),
-                tx_hash: setup.get_tx_hash(2, 0),
+                tx_hash: ApiEither::from(setup.get_tx_hash(2, 0)),
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -1215,7 +1217,7 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         .get_block_transactions_page(&PaginationQuery {
             from: BlockAndTxHash {
                 block_number: BlockNumber(2),
-                tx_hash: setup.get_tx_hash(0, 0),
+                tx_hash: ApiEither::from(setup.get_tx_hash(0, 0)),
             },
             limit: 1,
             direction: PaginationDirection::Newer,

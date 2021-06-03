@@ -3,6 +3,7 @@ use std::time::Instant;
 
 // External imports
 use chrono::{DateTime, Utc};
+use either::Either;
 
 // Workspace imports
 use zksync_api_types::v02::{
@@ -687,10 +688,25 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     ) -> QueryResult<Option<Vec<Transaction>>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
+        let tx_hash = match query.from.tx_hash.inner {
+            Either::Left(tx_hash) => tx_hash,
+            Either::Right(_) => {
+                if let Some(tx_hash) = transaction
+                    .chain()
+                    .operations_ext_schema()
+                    .get_account_last_tx_hash(query.from.address)
+                    .await?
+                {
+                    tx_hash
+                } else {
+                    return Ok(Some(Vec::new()));
+                }
+            }
+        };
         let created_at_and_block = transaction
             .chain()
             .operations_ext_schema()
-            .get_tx_created_at_and_block_number(query.from.tx_hash)
+            .get_tx_created_at_and_block_number(tx_hash)
             .await?;
         let txs = if let Some((time_from, _)) = created_at_and_block {
             let raw_txs: Vec<TransactionItem> = match query.direction {

@@ -17,13 +17,14 @@ use futures::{
     SinkExt, StreamExt,
 };
 
+use either::Either;
 use itertools::Itertools;
 use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
 
 // Workspace deps
 use zksync_api_types::v02::{
-    pagination::{IdOrLatest, Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
+    pagination::{Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
     transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
 };
 use zksync_crypto::params::PRIORITY_EXPIRATION;
@@ -288,9 +289,9 @@ impl<W: EthClient> EthWatch<W> {
                     .unwrap_or(false),
             });
         let count = all_ops.clone().count();
-        let from_serial_id = match query.from.serial_id {
-            IdOrLatest::Id(id) => id,
-            IdOrLatest::Latest(_) => {
+        let from_serial_id = match query.from.serial_id.inner {
+            Either::Left(id) => id,
+            Either::Right(_) => {
                 if let Some(op) = all_ops.clone().max_by_key(|op| op.serial_id) {
                     op.serial_id
                 } else {

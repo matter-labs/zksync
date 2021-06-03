@@ -1,7 +1,7 @@
 use crate::rest::client::{Client, Result};
 
 use zksync_api_types::v02::{
-    pagination::{IdOrLatest, PaginationQuery},
+    pagination::{ApiEither, PaginationQuery},
     Response,
 };
 use zksync_types::{tx::TxHash, BlockNumber};
@@ -15,7 +15,7 @@ impl Client {
 
     pub async fn block_transactions(
         &self,
-        pagination_query: &PaginationQuery<IdOrLatest<TxHash>>,
+        pagination_query: &PaginationQuery<ApiEither<TxHash>>,
         block_position: &str,
     ) -> Result<Response> {
         self.get_with_scope(
@@ -29,7 +29,7 @@ impl Client {
 
     pub async fn block_pagination(
         &self,
-        pagination_query: &PaginationQuery<IdOrLatest<BlockNumber>>,
+        pagination_query: &PaginationQuery<ApiEither<BlockNumber>>,
     ) -> Result<Response> {
         self.get_with_scope(super::API_V02_SCOPE, "blocks")
             .query(pagination_query)

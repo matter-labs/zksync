@@ -14,9 +14,9 @@ use futures::{
     sink::SinkExt,
 };
 use serde::Deserialize;
-use std::thread;
+use std::{str::FromStr, thread};
 use zksync_api_types::v02::pagination::{
-    parse_from, PaginationDirection, PaginationQuery, PendingOpsRequest,
+    ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest,
 };
 use zksync_config::configs::api::PrivateApi;
 use zksync_types::{
@@ -121,8 +121,8 @@ async fn unconfirmed_ops(
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
     // Serializing enum query parameters doesn't work, so parse it separately.
-    let serial_id = parse_from(&params.serial_id)
-        .ok_or_else(|| HttpResponse::InternalServerError().finish())?;
+    let serial_id = ApiEither::from_str(&params.serial_id)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
     let query = PaginationQuery {
         from: PendingOpsRequest {
             address: params.address,

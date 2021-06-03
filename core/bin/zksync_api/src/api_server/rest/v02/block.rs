@@ -9,7 +9,7 @@ use actix_web::{web, Scope};
 // Workspace uses
 use zksync_api_types::v02::{
     block::{BlockInfo, BlockStatus},
-    pagination::{parse_query, BlockAndTxHashOrLatest, IdOrLatest, Paginated, PaginationQuery},
+    pagination::{parse_query, ApiEither, BlockAndTxHash, Paginated, PaginationQuery},
     transaction::{Transaction, TxHashSerializeWrapper},
 };
 use zksync_crypto::{convert::FeConvert, Fr};
@@ -25,7 +25,7 @@ use super::{
 use crate::{api_try, utils::block_details_cache::BlockDetailsCache};
 
 pub fn block_info_from_details(details: StorageBlockDetails) -> BlockInfo {
-    let status = if details.verified_at.is_some() {
+    let status = if details.is_verified() {
         BlockStatus::Finalized
     } else {
         BlockStatus::Committed
@@ -101,7 +101,7 @@ impl ApiBlockData {
 
     async fn block_page(
         &self,
-        query: PaginationQuery<IdOrLatest<BlockNumber>>,
+        query: PaginationQuery<ApiEither<BlockNumber>>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         storage.paginate_checked(&query).await
@@ -110,12 +110,12 @@ impl ApiBlockData {
     async fn transaction_page(
         &self,
         block_number: BlockNumber,
-        query: PaginationQuery<IdOrLatest<TxHash>>,
+        query: PaginationQuery<ApiEither<TxHash>>,
     ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
 
         let new_query = PaginationQuery {
-            from: BlockAndTxHashOrLatest {
+            from: BlockAndTxHash {
                 block_number,
                 tx_hash: query.from,
             },
@@ -151,9 +151,7 @@ async fn block_pagination(
     data: web::Data<ApiBlockData>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<BlockInfo, BlockNumber>> {
-    let query =
-        api_try!(parse_query(query)
-            .ok_or_else(|| Error::from(InvalidDataError::QueryDeserializationError)));
+    let query = api_try!(parse_query(query).map_err(Error::from));
     data.block_page(query).await.into()
 }
 
@@ -174,9 +172,7 @@ async fn block_transactions(
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
-    let query =
-        api_try!(parse_query(query)
-            .ok_or_else(|| Error::from(InvalidDataError::QueryDeserializationError)));
+    let query = api_try!(parse_query(query).map_err(Error::from));
 
     data.transaction_page(block_number, query).await.into()
 }
@@ -224,7 +220,7 @@ mod tests {
         );
 
         let query = PaginationQuery {
-            from: IdOrLatest::Id(BlockNumber(1)),
+            from: ApiEither::from(BlockNumber(1)),
             limit: 3,
             direction: PaginationDirection::Newer,
         };
@@ -258,7 +254,7 @@ mod tests {
         let tx_hash = TxHash::from_str(tx_hash_str).unwrap();
 
         let query = PaginationQuery {
-            from: IdOrLatest::Id(tx_hash),
+            from: ApiEither::from(tx_hash),
             limit: 2,
             direction: PaginationDirection::Older,
         };

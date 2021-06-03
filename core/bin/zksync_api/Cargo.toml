@@ -72,6 +72,7 @@ metrics = "=0.13.0-alpha.8"
 lru-cache = "0.1.2"
 once_cell = "1.4"
 regex = "1"
+either = "1.6.1"
 
 [dev-dependencies]
 zksync_test_account = { path = "../../tests/test_account" }
