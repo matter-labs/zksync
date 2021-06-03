@@ -721,3 +721,52 @@ async fn account_transactions_count(mut storage: StorageProcessor<'_>) -> QueryR
 
     Ok(())
 }
+
+/// Test `get_account_last_tx_hash` method
+#[db_test]
+async fn account_last_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+
+    let last_tx_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_last_tx_hash(setup.from_zksync_account.address)
+        .await?;
+    assert!(last_tx_hash.is_none());
+
+    setup.add_block(1);
+    commit_schema_data(&mut storage, &setup).await?;
+
+    let last_tx_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_last_tx_hash(setup.from_zksync_account.address)
+        .await?;
+    assert_eq!(last_tx_hash, Some(setup.get_tx_hash(0, 6)));
+
+    Ok(())
+}
+
+/// Test `get_block_last_tx_hash` method
+#[db_test]
+async fn block_last_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+
+    let last_tx_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .get_block_last_tx_hash(BlockNumber(1))
+        .await?;
+    assert!(last_tx_hash.is_none());
+
+    setup.add_block(1);
+    commit_schema_data(&mut storage, &setup).await?;
+
+    let last_tx_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .get_block_last_tx_hash(BlockNumber(1))
+        .await?;
+    assert_eq!(last_tx_hash, Some(setup.get_tx_hash(0, 6)));
+    Ok(())
+}
