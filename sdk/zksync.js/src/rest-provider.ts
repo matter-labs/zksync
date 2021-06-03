@@ -1,39 +1,10 @@
 import Axios from 'axios';
 import { BigNumber } from 'ethers';
 import { SyncProvider } from './provider-interface';
-import {
-    Network,
-    TokenLike,
-    TxEthSignature,
-    PaginationQuery,
-    Paginated,
-    ApiBlockInfo,
-    ApiAccountInfo,
-    Address,
-    ApiConfig,
-    ChangePubKeyFee,
-    LegacyChangePubKeyFee,
-    FeeRest,
-    NetworkStatus,
-    TokenAddress,
-    TokenInfo,
-    TokenPriceInfo,
-    SubmitBatchResponse,
-    ApiTxReceipt,
-    ApiSignedTx,
-    ApiBatchData,
-    L2Tx,
-    ApiTransaction,
-    ContractAddress,
-    Tokens,
-    TransactionReceipt,
-    PriorityOperationReceipt,
-    blockPosition,
-    AccountStateRest
-} from './types';
+import * as types from './types';
 import { sleep, TokenSet } from './utils';
 
-export async function getDefaultRestProvider(network: Network): Promise<RestProvider> {
+export async function getDefaultRestProvider(network: types.Network): Promise<RestProvider> {
     if (network === 'localhost') {
         return await RestProvider.newProvider('http://127.0.0.1:3001/api/v0.2');
     } else if (network === 'ropsten') {
@@ -52,7 +23,7 @@ export async function getDefaultRestProvider(network: Network): Promise<RestProv
 }
 
 export interface Request {
-    network: Network;
+    network: types.Network;
     apiVersion: 'v02';
     resource: string;
     args: any;
@@ -124,20 +95,23 @@ export class RestProvider extends SyncProvider {
     }
 
     async accountInfoDetailed(
-        idOrAddress: number | Address,
+        idOrAddress: number | types.Address,
         infoType: 'committed' | 'finalized'
-    ): Promise<Response<ApiAccountInfo>> {
+    ): Promise<Response<types.ApiAccountInfo>> {
         return await this.get(`${this.address}/accounts/${idOrAddress}/${infoType}`);
     }
 
-    async accountInfo(idOrAddress: number | Address, infoType: 'committed' | 'finalized'): Promise<ApiAccountInfo> {
+    async accountInfo(
+        idOrAddress: number | types.Address,
+        infoType: 'committed' | 'finalized'
+    ): Promise<types.ApiAccountInfo> {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
     async accountTxsDetailed(
-        idOrAddress: number | Address,
-        paginationQuery: PaginationQuery<string>
-    ): Promise<Response<Paginated<ApiTransaction, string>>> {
+        idOrAddress: number | types.Address,
+        paginationQuery: types.PaginationQuery<string>
+    ): Promise<Response<types.Paginated<types.ApiTransaction, string>>> {
         return await this.get(
             `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -145,16 +119,16 @@ export class RestProvider extends SyncProvider {
     }
 
     async accountTxs(
-        idOrAddress: number | Address,
-        paginationQuery: PaginationQuery<string>
-    ): Promise<Paginated<ApiTransaction, string>> {
+        idOrAddress: number | types.Address,
+        paginationQuery: types.PaginationQuery<string>
+    ): Promise<types.Paginated<types.ApiTransaction, string>> {
         return this.parseResponse(await this.accountTxsDetailed(idOrAddress, paginationQuery));
     }
 
     async accountPendingTxsDetailed(
-        idOrAddress: number | Address,
-        paginationQuery: PaginationQuery<number>
-    ): Promise<Response<Paginated<ApiTransaction, number>>> {
+        idOrAddress: number | types.Address,
+        paginationQuery: types.PaginationQuery<number>
+    ): Promise<Response<types.Paginated<types.ApiTransaction, number>>> {
         return await this.get(
             `${this.address}/accounts/${idOrAddress}/transactions/pending?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -162,37 +136,39 @@ export class RestProvider extends SyncProvider {
     }
 
     async accountPendingTxs(
-        idOrAddress: number | Address,
-        paginationQuery: PaginationQuery<number>
-    ): Promise<Paginated<ApiTransaction, number>> {
+        idOrAddress: number | types.Address,
+        paginationQuery: types.PaginationQuery<number>
+    ): Promise<types.Paginated<types.ApiTransaction, number>> {
         return this.parseResponse(await this.accountPendingTxsDetailed(idOrAddress, paginationQuery));
     }
 
     async blockPaginationDetailed(
-        paginationQuery: PaginationQuery<number>
-    ): Promise<Response<Paginated<ApiBlockInfo, number>>> {
+        paginationQuery: types.PaginationQuery<number>
+    ): Promise<Response<types.Paginated<types.ApiBlockInfo, number>>> {
         return await this.get(
             `${this.address}/blocks?from=${paginationQuery.from}&limit=${paginationQuery.limit}` +
                 `&direction=${paginationQuery.direction}`
         );
     }
 
-    async blockPagination(paginationQuery: PaginationQuery<number>): Promise<Paginated<ApiBlockInfo, number>> {
+    async blockPagination(
+        paginationQuery: types.PaginationQuery<number>
+    ): Promise<types.Paginated<types.ApiBlockInfo, number>> {
         return this.parseResponse(await this.blockPaginationDetailed(paginationQuery));
     }
 
-    async blockByPositionDetailed(blockPosition: blockPosition): Promise<Response<ApiBlockInfo>> {
+    async blockByPositionDetailed(blockPosition: types.blockPosition): Promise<Response<types.ApiBlockInfo>> {
         return await this.get(`${this.address}/blocks/${blockPosition}`);
     }
 
-    async blockByPosition(blockPosition: blockPosition): Promise<ApiBlockInfo> {
+    async blockByPosition(blockPosition: types.blockPosition): Promise<types.ApiBlockInfo> {
         return this.parseResponse(await this.blockByPositionDetailed(blockPosition));
     }
 
     async blockTransactionsDetailed(
-        blockPosition: blockPosition,
-        paginationQuery: PaginationQuery<string>
-    ): Promise<Response<Paginated<ApiTransaction, string>>> {
+        blockPosition: types.blockPosition,
+        paginationQuery: types.PaginationQuery<string>
+    ): Promise<Response<types.Paginated<types.ApiTransaction, string>>> {
         return await this.get(
             `${this.address}/blocks/${blockPosition}/transactions?from=${paginationQuery.from}` +
                 `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
@@ -200,31 +176,31 @@ export class RestProvider extends SyncProvider {
     }
 
     async blockTransactions(
-        blockPosition: blockPosition,
-        paginationQuery: PaginationQuery<string>
-    ): Promise<Paginated<ApiTransaction, string>> {
+        blockPosition: types.blockPosition,
+        paginationQuery: types.PaginationQuery<string>
+    ): Promise<types.Paginated<types.ApiTransaction, string>> {
         return this.parseResponse(await this.blockTransactionsDetailed(blockPosition, paginationQuery));
     }
 
-    async configDetailed(): Promise<Response<ApiConfig>> {
+    async configDetailed(): Promise<Response<types.ApiConfig>> {
         return await this.get(`${this.address}/config`);
     }
 
-    async config(): Promise<ApiConfig> {
+    async config(): Promise<types.ApiConfig> {
         return this.parseResponse(await this.configDetailed());
     }
 
     async getTransactionFeeDetailed(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
-        address: Address,
-        tokenLike: TokenLike
-    ): Promise<Response<FeeRest>> {
+        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee,
+        address: types.Address,
+        tokenLike: types.TokenLike
+    ): Promise<Response<types.FeeRest>> {
         const rawFee = await this.post<{ gasFee: string; zkpFee: string; totalFee: string }>(`${this.address}/fee`, {
             txType,
             address,
             tokenLike
         });
-        let fee: Response<FeeRest>;
+        let fee: Response<types.FeeRest>;
         if (rawFee.status === 'success') {
             fee = {
                 request: rawFee.request,
@@ -248,25 +224,25 @@ export class RestProvider extends SyncProvider {
     }
 
     async getTransactionFee(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
-        address: Address,
-        tokenLike: TokenLike
-    ): Promise<FeeRest> {
+        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee,
+        address: types.Address,
+        tokenLike: types.TokenLike
+    ): Promise<types.FeeRest> {
         return this.parseResponse(await this.getTransactionFeeDetailed(txType, address, tokenLike));
     }
 
     async getBatchFullFeeDetailed(
         transactions: {
-            txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee;
-            address: Address;
+            txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee;
+            address: types.Address;
         }[],
-        tokenLike: TokenLike
-    ): Promise<Response<FeeRest>> {
+        tokenLike: types.TokenLike
+    ): Promise<Response<types.FeeRest>> {
         const rawFee = await this.post<{ gasFee: string; zkpFee: string; totalFee: string }>(
             `${this.address}/fee/batch`,
             { transactions, tokenLike }
         );
-        let fee: Response<FeeRest>;
+        let fee: Response<types.FeeRest>;
         if (rawFee.status === 'success') {
             fee = {
                 request: rawFee.request,
@@ -291,66 +267,71 @@ export class RestProvider extends SyncProvider {
 
     async getBatchFullFee(
         transactions: {
-            txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee;
-            address: Address;
+            txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee;
+            address: types.Address;
         }[],
-        tokenLike: TokenLike
-    ): Promise<FeeRest> {
+        tokenLike: types.TokenLike
+    ): Promise<types.FeeRest> {
         return this.parseResponse(await this.getBatchFullFeeDetailed(transactions, tokenLike));
     }
 
-    async networkStatusDetailed(): Promise<Response<NetworkStatus>> {
+    async networkStatusDetailed(): Promise<Response<types.NetworkStatus>> {
         return await this.get(`${this.address}/networkStatus`);
     }
 
-    async networkStatus(): Promise<NetworkStatus> {
+    async networkStatus(): Promise<types.NetworkStatus> {
         return this.parseResponse(await this.networkStatusDetailed());
     }
 
     async tokenPaginationDetailed(
-        paginationQuery: PaginationQuery<number>
-    ): Promise<Response<Paginated<TokenInfo, number>>> {
+        paginationQuery: types.PaginationQuery<number>
+    ): Promise<Response<types.Paginated<types.TokenInfo, number>>> {
         return await this.get(
             `${this.address}/tokens?from=${paginationQuery.from}&limit=${paginationQuery.limit}` +
                 `&direction=${paginationQuery.direction}`
         );
     }
 
-    async tokenPagination(paginationQuery: PaginationQuery<number>): Promise<Paginated<TokenInfo, number>> {
+    async tokenPagination(
+        paginationQuery: types.PaginationQuery<number>
+    ): Promise<types.Paginated<types.TokenInfo, number>> {
         return this.parseResponse(await this.tokenPaginationDetailed(paginationQuery));
     }
 
-    async tokenByIdOrAddressDetailed(idOrAddress: number | TokenAddress): Promise<Response<TokenInfo>> {
+    async tokenByIdOrAddressDetailed(idOrAddress: number | types.TokenAddress): Promise<Response<types.TokenInfo>> {
         return await this.get(`${this.address}/tokens/${idOrAddress}`);
     }
 
-    async tokenByIdOrAddress(idOrAddress: number | TokenAddress): Promise<TokenInfo> {
+    async tokenByIdOrAddress(idOrAddress: number | types.TokenAddress): Promise<types.TokenInfo> {
         return this.parseResponse(await this.tokenByIdOrAddressDetailed(idOrAddress));
     }
 
     async tokenPriceInfoDetailed(
-        idOrAddress: number | TokenAddress,
+        idOrAddress: number | types.TokenAddress,
         tokenIdOrUsd: number | 'usd'
-    ): Promise<Response<TokenPriceInfo>> {
+    ): Promise<Response<types.TokenPriceInfo>> {
         return await this.get(`${this.address}/tokens/${idOrAddress}/priceIn/${tokenIdOrUsd}`);
     }
 
-    async tokenPriceInfo(idOrAddress: number | TokenAddress, tokenIdOrUsd: number | 'usd'): Promise<TokenPriceInfo> {
+    async tokenPriceInfo(
+        idOrAddress: number | types.TokenAddress,
+        tokenIdOrUsd: number | 'usd'
+    ): Promise<types.TokenPriceInfo> {
         return this.parseResponse(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
     }
 
-    async submitTxNewDetailed(tx: L2Tx, signature?: TxEthSignature): Promise<Response<string>> {
+    async submitTxNewDetailed(tx: types.L2Tx, signature?: types.TxEthSignature): Promise<Response<string>> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
-    async submitTxNew(tx: L2Tx, signature?: TxEthSignature): Promise<string> {
+    async submitTxNew(tx: types.L2Tx, signature?: types.TxEthSignature): Promise<string> {
         return this.parseResponse(await this.submitTxNewDetailed(tx, signature));
     }
 
     /**
      * @deprecated Use submitTxNew method instead
      */
-    async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
+    async submitTx(tx: any, signature?: types.TxEthSignature, fastProcessing?: boolean): Promise<string> {
         if (fastProcessing) {
             tx.fastProcessing = fastProcessing;
         }
@@ -359,36 +340,42 @@ export class RestProvider extends SyncProvider {
         return txHash;
     }
 
-    async txStatusDetailed(txHash: string): Promise<Response<ApiTxReceipt>> {
+    async txStatusDetailed(txHash: string): Promise<Response<types.ApiTxReceipt>> {
         return await this.get(`${this.address}/transactions/${txHash}`);
     }
 
-    async txStatus(txHash: string): Promise<ApiTxReceipt> {
+    async txStatus(txHash: string): Promise<types.ApiTxReceipt> {
         return this.parseResponse(await this.txStatusDetailed(txHash));
     }
 
-    async txDataDetailed(txHash: string): Promise<Response<ApiSignedTx>> {
+    async txDataDetailed(txHash: string): Promise<Response<types.ApiSignedTx>> {
         return await this.get(`${this.address}/transactions/${txHash}/data`);
     }
 
-    async txData(txHash: string): Promise<ApiSignedTx> {
+    async txData(txHash: string): Promise<types.ApiSignedTx> {
         return this.parseResponse(await this.txDataDetailed(txHash));
     }
 
     async submitTxsBatchNewDetailed(
-        txs: L2Tx[],
-        signature: TxEthSignature | TxEthSignature[]
-    ): Promise<Response<SubmitBatchResponse>> {
+        txs: types.L2Tx[],
+        signature: types.TxEthSignature | types.TxEthSignature[]
+    ): Promise<Response<types.SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
-    async submitTxsBatchNew(txs: L2Tx[], signature: TxEthSignature | TxEthSignature[]): Promise<SubmitBatchResponse> {
+    async submitTxsBatchNew(
+        txs: types.L2Tx[],
+        signature: types.TxEthSignature | types.TxEthSignature[]
+    ): Promise<types.SubmitBatchResponse> {
         return this.parseResponse(await this.submitTxsBatchNewDetailed(txs, signature));
     }
 
+    /**
+     * @deprecated Use submitTxsBatchNew method instead.
+     */
     async submitTxsBatch(
-        transactions: { tx: any; signature?: TxEthSignature }[],
-        ethSignatures?: TxEthSignature | TxEthSignature[]
+        transactions: { tx: any; signature?: types.TxEthSignature }[],
+        ethSignatures?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<string[]> {
         let txs = [];
         for (const signedTx of transactions) {
@@ -400,15 +387,15 @@ export class RestProvider extends SyncProvider {
         return (await this.submitTxsBatchNew(txs, ethSignatures)).transactionHashes;
     }
 
-    async getBatchDetailed(batchHash: string): Promise<Response<ApiBatchData>> {
+    async getBatchDetailed(batchHash: string): Promise<Response<types.ApiBatchData>> {
         return await this.get(`${this.address}/transactions/batches/${batchHash}`);
     }
 
-    async getBatch(batchHash: string): Promise<ApiBatchData> {
+    async getBatch(batchHash: string): Promise<types.ApiBatchData> {
         return this.parseResponse(await this.getBatchDetailed(batchHash));
     }
 
-    async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<ApiTxReceipt> {
+    async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.ApiTxReceipt> {
         while (true) {
             let transactionStatus = await this.txStatus(hash);
             let notifyDone;
@@ -437,17 +424,17 @@ export class RestProvider extends SyncProvider {
         }
     }
 
-    async notifyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<TransactionReceipt> {
+    async notifyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.TransactionReceipt> {
         await this.notifyAnyTransaction(hash, action);
         return await this.getTxReceipt(hash);
     }
 
-    async notifyPriorityOp(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {
+    async notifyPriorityOp(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.PriorityOperationReceipt> {
         await this.notifyAnyTransaction(hash, action);
         return await this.getPriorityOpStatus(hash);
     }
 
-    async getContractAddress(): Promise<ContractAddress> {
+    async getContractAddress(): Promise<types.ContractAddress> {
         const config = await this.config();
         return {
             mainContract: config.contract,
@@ -455,11 +442,11 @@ export class RestProvider extends SyncProvider {
         };
     }
 
-    async getTokens(limit?: number): Promise<Tokens> {
+    async getTokens(limit?: number): Promise<types.Tokens> {
         let tokens = {};
         let tmpId = 0;
         limit = limit ? limit : RestProvider.MAX_LIMIT;
-        let tokenPage: Paginated<TokenInfo, number>;
+        let tokenPage: types.Paginated<types.TokenInfo, number>;
         do {
             tokenPage = await this.tokenPagination({
                 from: tmpId,
@@ -480,7 +467,7 @@ export class RestProvider extends SyncProvider {
         return tokens;
     }
 
-    async getState(address: Address): Promise<AccountStateRest> {
+    async getState(address: types.Address): Promise<types.AccountStateRest> {
         const committedHandle = this.accountInfo(address, 'committed');
         const finalizedHandle = this.accountInfo(address, 'finalized');
         const [committedFullInfo, finalizedFullInfo] = await Promise.all([committedHandle, finalizedHandle]);
@@ -538,9 +525,9 @@ export class RestProvider extends SyncProvider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee)[],
-        addresses: Address[],
-        tokenLike: TokenLike
+        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee)[],
+        addresses: types.Address[],
+        tokenLike: types.TokenLike
     ): Promise<BigNumber> {
         let transactions = [];
         for (let i = 0; i < txTypes.length; ++i) {
@@ -550,12 +537,12 @@ export class RestProvider extends SyncProvider {
         return fee.totalFee;
     }
 
-    async getTokenPrice(tokenLike: TokenLike): Promise<number> {
+    async getTokenPrice(tokenLike: types.TokenLike): Promise<number> {
         const price = await this.tokenPriceInfo(tokenLike, 'usd');
         return price.price.toNumber();
     }
 
-    async getTxReceipt(txHash: string): Promise<TransactionReceipt> {
+    async getTxReceipt(txHash: string): Promise<types.TransactionReceipt> {
         const receipt = await this.txStatus(txHash);
         if (!receipt || !receipt.rollupBlock) {
             return {
@@ -589,7 +576,7 @@ export class RestProvider extends SyncProvider {
         }
     }
 
-    async getPriorityOpStatus(hash: string): Promise<PriorityOperationReceipt> {
+    async getPriorityOpStatus(hash: string): Promise<types.PriorityOperationReceipt> {
         const receipt = await this.txStatus(hash);
         if (!receipt || !receipt.rollupBlock) {
             return {

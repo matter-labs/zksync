@@ -103,7 +103,11 @@ describe('ZkSync REST API V0.2 tests', () => {
             limit: 10,
             direction: 'older'
         });
-        expect(txs.list.length > 1, 'Endpoint did not return all txs').to.be.true;
+        const expected = 4;
+        expect(
+            txs.list.length,
+            `Endpoint returned incorrect number of transactions: ${txs.list.length}, expected ${expected}`
+        ).to.eql(expected);
         expect(txs.list[0].txHash, 'Endpoint did not return first tx correctly').to.be.eql(lastTxHash);
 
         const accTxs = await provider.accountPendingTxs(alice.accountId!, {
@@ -118,19 +122,27 @@ describe('ZkSync REST API V0.2 tests', () => {
         const lastCommittedBlock = await provider.blockByPosition('lastCommitted');
         expect(lastCommittedBlock).to.exist;
 
+        const expectedBlocks = 3;
         const blocks = await provider.blockPagination({
             from: lastCommittedBlock.blockNumber,
-            limit: 10,
+            limit: 3,
             direction: 'older'
         });
-        expect(blocks.list.length > 0, 'Endpoint did not return all blocks').to.be.true;
+        expect(
+            blocks.list.length,
+            `Endpoint returned incorrect number of blocks: ${blocks.list.length}, expected ${expectedBlocks}`
+        ).to.eql(expectedBlocks);
 
+        const expectedTxs = 1;
         const blockTxs = await provider.blockTransactions(lastTxReceipt.block!.blockNumber, {
             from: lastTxHash,
             limit: 10,
             direction: 'newer'
         });
-        expect(blockTxs.list.length > 0, 'Endpoint did not return all txs').to.be.true;
+        expect(
+            blockTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${blockTxs.list.length}, expected ${expectedTxs}`
+        ).to.eql(expectedTxs);
     });
 
     it('should check api v0.2 config endpoint', async () => {

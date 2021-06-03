@@ -266,8 +266,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             // here we have a signle eth signature for the whole batch
             await tester.testCreate2SignedBatchFail(hilda, david, token, TX_AMOUNT);
             if(providerType === 'RPC') {
-                // here the only each individual transaction is signed
-                // this test is useless for REST API because it receives batch txs without signature
+                // REST provider always expects Ethereum signed message for the whole batch, skip this test.
                 await tester.testCreate2BatchFail(hilda, david, token, TX_AMOUNT);
             }
         });
