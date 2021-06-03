@@ -385,7 +385,11 @@ export class TokenSet {
 
     public formatToken(tokenLike: TokenOrId, amount: BigNumberish): string {
         const decimals = this.resolveTokenDecimals(tokenLike);
-        return utils.formatUnits(amount, decimals);
+        const value = utils.formatUnits(amount, decimals);
+
+        // We need to add this check to support broader versions of ethers
+        // since the `formatUnits` function behaves differently within ^5.0.0 versions
+        return value.includes('.') ? value : value + '.0';
     }
 
     public parseToken(tokenLike: TokenOrId, amount: string): BigNumber {

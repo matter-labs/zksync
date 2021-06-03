@@ -178,7 +178,14 @@ export class Provider {
     }
 
     async getNFT(id: number): Promise<NFT> {
-        return await this.transport.request('get_nft', [id]);
+        const nft = await this.transport.request('get_nft', [id]);
+
+        // If the NFT does not exist, throw an exception
+        if (nft == null) {
+            throw new Error(`Requested NFT doesn't exist or the corresponding mintNFT operation is not verified yet`);
+        }
+
+        return nft;
     }
 
     async getTokenSymbol(token: TokenLike): Promise<string> {
