@@ -8,7 +8,10 @@ use either::Either;
 // Workspace imports
 use zksync_api_types::v02::{
     pagination::{AccountTxsRequest, PaginationDirection, PaginationQuery},
-    transaction::{ApiTxBatch, BatchStatus, Transaction, TxHashSerializeWrapper, TxInBlockStatus},
+    transaction::{
+        ApiTxBatch, BatchStatus, Receipt, Transaction, TxData, TxHashSerializeWrapper,
+        TxInBlockStatus,
+    },
 };
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
@@ -17,8 +20,8 @@ use zksync_types::{
 
 // Local imports
 use self::records::{
-    AccountCreatedAt, InBlockBatchTx, PriorityOpReceiptResponse, TransactionsHistoryItem,
-    TxByHashResponse, TxReceiptResponse,
+    AccountCreatedAt, InBlockBatchTx, PriorityOpReceiptResponse, StorageTxData, StorageTxReceipt,
+    TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
 };
 use crate::{
     chain::{
@@ -29,6 +32,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
+pub(crate) mod conversion;
 pub mod records;
 
 /// Direction to perform search of transactions to.
@@ -79,6 +83,208 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.operations_ext.tx_receipt", start.elapsed());
         result
+    }
+
+    pub async fn tx_receipt_api_v02(&mut self, hash: &[u8]) -> QueryResult<Option<Receipt>> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        let hash_str = hex::encode(hash);
+        let receipt: Option<StorageTxReceipt> = sqlx::query_as!(
+            StorageTxReceipt,
+            r#"
+                WITH transaction AS (
+                    SELECT
+                        tx_hash,
+                        block_number,
+                        success,
+                        fail_reason,
+                        Null::bigint as eth_block,
+                        Null::bigint as priority_op_serialid
+                    FROM executed_transactions
+                    WHERE tx_hash = $1
+                ), priority_op AS (
+                    SELECT
+                        tx_hash,
+                        block_number,
+                        true as success,
+                        Null as fail_reason,
+                        eth_block,
+                        priority_op_serialid
+                    FROM executed_priority_operations
+                    WHERE tx_hash = $1 OR eth_hash = $1
+                ), mempool_tx AS (
+                    SELECT
+                        decode(tx_hash, 'hex'),
+                        Null::bigint as block_number,
+                        Null::boolean as success,
+                        Null as fail_reason,
+                        Null::bigint as eth_block,
+                        Null::bigint as priority_op_serialid
+                    FROM mempool_txs
+                    WHERE tx_hash = $2
+                ),
+                everything AS (
+                    SELECT * FROM transaction
+                    UNION ALL
+                    SELECT * FROM priority_op
+                    UNION ALL
+                    SELECT * FROM mempool_tx
+                )
+                SELECT
+                    tx_hash as "tx_hash!",
+                    block_number as "block_number?",
+                    success as "success?",
+                    fail_reason as "fail_reason?",
+                    eth_block as "eth_block?",
+                    priority_op_serialid as "priority_op_serialid?"
+                FROM everything
+            "#,
+            hash,
+            &hash_str
+        )
+        .fetch_optional(transaction.conn())
+        .await?;
+
+        let result = if let Some(receipt) = receipt {
+            let is_block_finalized = if let Some(block_number) = receipt.block_number {
+                Some(
+                    transaction
+                        .chain()
+                        .block_schema()
+                        .is_block_finalized(BlockNumber(block_number as u32))
+                        .await?,
+                )
+            } else {
+                None
+            };
+            Some(StorageTxReceipt::receipt_from_storage_receipt(
+                receipt,
+                is_block_finalized,
+            ))
+        } else {
+            None
+        };
+
+        transaction.commit().await?;
+        metrics::histogram!(
+            "sql.chain.operations_ext.tx_receipt_api_v02",
+            start.elapsed()
+        );
+        Ok(result)
+    }
+
+    pub async fn tx_data_api_v02(&mut self, hash: &[u8]) -> QueryResult<Option<TxData>> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        let hash_str = hex::encode(hash);
+        let data: Option<StorageTxData> = sqlx::query_as!(
+            StorageTxData,
+            r#"
+                WITH transaction AS (
+                    SELECT
+                        tx_hash,
+                        tx as op,
+                        block_number,
+                        created_at,
+                        success,
+                        fail_reason,
+                        Null::bytea as eth_hash,
+                        Null::bigint as priority_op_serialid,
+                        eth_sign_data
+                    FROM executed_transactions
+                    WHERE tx_hash = $1
+                ), priority_op AS (
+                    SELECT
+                        tx_hash,
+                        operation as op,
+                        block_number,
+                        created_at,
+                        true as success,
+                        Null as fail_reason,
+                        eth_hash,
+                        priority_op_serialid,
+                        Null::jsonb as eth_sign_data
+                    FROM executed_priority_operations
+                    WHERE tx_hash = $1 OR eth_hash = $1
+                ), mempool_tx AS (
+                    SELECT
+                        decode(tx_hash, 'hex'),
+                        tx as op,
+                        Null::bigint as block_number,
+                        created_at,
+                        Null::boolean as success,
+                        Null as fail_reason,
+                        Null::bytea as eth_hash,
+                        Null::bigint as priority_op_serialid,
+                        eth_sign_data
+                    FROM mempool_txs
+                    WHERE tx_hash = $2
+                ),
+                everything AS (
+                    SELECT * FROM transaction
+                    UNION ALL
+                    SELECT * FROM priority_op
+                    UNION ALL
+                    SELECT * FROM mempool_tx
+                )
+                SELECT
+                    tx_hash as "tx_hash!",
+                    op as "op!",
+                    block_number as "block_number?",
+                    created_at as "created_at!",
+                    success as "success?",
+                    fail_reason as "fail_reason?",
+                    eth_hash as "eth_hash?",
+                    priority_op_serialid as "priority_op_serialid?",
+                    eth_sign_data as "eth_sign_data?"
+                FROM everything
+            "#,
+            hash,
+            &hash_str
+        )
+        .fetch_optional(transaction.conn())
+        .await?;
+
+        let result = if let Some(data) = data {
+            let complete_withdrawals_tx_hash = if let Some(tx_type) = data.op.get("type") {
+                let tx_type = tx_type.as_str().unwrap();
+                if tx_type == "Withdraw" || tx_type == "ForcedExit" {
+                    transaction
+                        .chain()
+                        .operations_schema()
+                        .eth_tx_for_withdrawal(&TxHash::from_slice(&data.tx_hash).unwrap())
+                        .await?
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let is_block_finalized = if let Some(block_number) = data.block_number {
+                Some(
+                    transaction
+                        .chain()
+                        .block_schema()
+                        .is_block_finalized(BlockNumber(block_number as u32))
+                        .await?,
+                )
+            } else {
+                None
+            };
+
+            Some(StorageTxData::data_from_storage_data(
+                data,
+                is_block_finalized,
+                complete_withdrawals_tx_hash,
+            ))
+        } else {
+            None
+        };
+
+        transaction.commit().await?;
+        metrics::histogram!("sql.chain.operations_ext.tx_data_api_v02", start.elapsed());
+        Ok(result)
     }
 
     pub async fn get_priority_op_receipt(

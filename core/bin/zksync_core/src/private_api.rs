@@ -165,6 +165,9 @@ async fn unconfirmed_op(
             tx_hash,
             resp: sender,
         },
+        PriorityOpLookupQuery::ByAnyHash(hash) => {
+            EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp: sender }
+        }
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
     eth_watch_sender

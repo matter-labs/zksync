@@ -148,3 +148,25 @@ pub struct InBlockBatchTx {
     pub success: bool,
     pub block_number: i64,
 }
+
+#[derive(Debug, FromRow, PartialEq)]
+pub struct StorageTxReceipt {
+    pub tx_hash: Vec<u8>,
+    pub block_number: Option<i64>,
+    pub success: Option<bool>,
+    pub fail_reason: Option<String>,
+    pub eth_block: Option<i64>,
+    pub priority_op_serialid: Option<i64>,
+}
+
+pub struct StorageTxData {
+    pub tx_hash: Vec<u8>,
+    pub block_number: Option<i64>,
+    pub op: Value,
+    pub success: Option<bool>,
+    pub fail_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub eth_hash: Option<Vec<u8>>,
+    pub priority_op_serialid: Option<i64>,
+    pub eth_sign_data: Option<serde_json::Value>,
+}

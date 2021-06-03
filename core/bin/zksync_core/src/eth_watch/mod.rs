@@ -98,6 +98,10 @@ pub enum EthWatchRequest {
         tx_hash: TxHash,
         resp: oneshot::Sender<Option<PriorityOp>>,
     },
+    GetUnconfirmedOpByAnyHash {
+        hash: TxHash,
+        resp: oneshot::Sender<Option<PriorityOp>>,
+    },
 }
 
 pub struct EthWatch<W: EthClient> {
@@ -251,6 +255,14 @@ impl<W: EthClient> EthWatch<W> {
             .unconfirmed_queue()
             .iter()
             .find(|op| op.tx_hash() == tx_hash)
+            .cloned()
+    }
+
+    fn find_ongoing_op_by_any_hash(&self, hash: TxHash) -> Option<PriorityOp> {
+        self.eth_state
+            .unconfirmed_queue()
+            .iter()
+            .find(|op| op.tx_hash() == hash || op.eth_hash.as_ref() == hash.as_ref())
             .cloned()
     }
 
@@ -466,6 +478,10 @@ impl<W: EthClient> EthWatch<W> {
                 }
                 EthWatchRequest::GetUnconfirmedOpByTxHash { tx_hash, resp } => {
                     let unconfirmed_op = self.find_ongoing_op_by_tx_hash(tx_hash);
+                    resp.send(unconfirmed_op).unwrap_or_default();
+                }
+                EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp } => {
+                    let unconfirmed_op = self.find_ongoing_op_by_any_hash(hash);
                     resp.send(unconfirmed_op).unwrap_or_default();
                 }
                 EthWatchRequest::IsPubkeyChangeAuthorized {

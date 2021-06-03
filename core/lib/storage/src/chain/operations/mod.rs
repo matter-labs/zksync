@@ -136,27 +136,6 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(op)
     }
 
-    /// Retrieves priority operation from the database by its tx_hash.
-    pub async fn get_executed_priority_operation_by_tx_hash(
-        &mut self,
-        tx_hash: &[u8],
-    ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
-        let start = Instant::now();
-        let op = sqlx::query_as!(
-            StoredExecutedPriorityOperation,
-            "SELECT * FROM executed_priority_operations WHERE tx_hash = $1",
-            tx_hash
-        )
-        .fetch_optional(self.0.conn())
-        .await?;
-
-        metrics::histogram!(
-            "sql.chain.operations.get_executed_priority_operation_by_hash",
-            start.elapsed()
-        );
-        Ok(op)
-    }
-
     pub async fn confirm_aggregated_operations(
         &mut self,
         first_block: BlockNumber,

@@ -375,7 +375,7 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
     Ok(())
 }
 
-/// Checks that getting executed priority operation by `eth_hash` or `tx_hash` is working correctly.
+/// Checks that getting executed priority operation by `eth_hash` is working correctly.
 #[db_test]
 async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let executed_priority_op = NewExecutedPriorityOperation {
@@ -392,7 +392,7 @@ async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<(
         tx_hash: vec![0xBB, 0xBB, 0xBB, 0xBB],
         eth_block_index: Some(1),
     };
-    // Store executed priority op and try to get it by `eth_hash` and `tx_hash`.
+    // Store executed priority op and try to get it by `eth_hash`.
     storage
         .chain()
         .operations_schema()
@@ -403,12 +403,6 @@ async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<(
         .operations_schema()
         .get_executed_priority_operation_by_eth_hash(&executed_priority_op.eth_hash)
         .await?;
-    let op_by_tx_hash = storage
-        .chain()
-        .operations_schema()
-        .get_executed_priority_operation_by_tx_hash(&executed_priority_op.tx_hash)
-        .await?;
-    assert_eq!(op_by_eth_hash, op_by_tx_hash);
     assert_eq!(
         op_by_eth_hash.unwrap().priority_op_serialid,
         executed_priority_op.priority_op_serialid
@@ -418,7 +412,7 @@ async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<(
     let op = storage
         .chain()
         .operations_schema()
-        .get_executed_priority_operation_by_tx_hash(&[0xDE, 0xAD, 0xBE, 0xEF])
+        .get_executed_priority_operation_by_eth_hash(&[0xDE, 0xAD, 0xBE, 0xEF])
         .await?;
     assert!(op.is_none());
 
