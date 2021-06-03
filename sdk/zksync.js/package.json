@@ -1,6 +1,6 @@
 {
     "name": "@teamnumio/zksync",
-    "version": "0.0.11",
+    "version": "0.0.12",
     "license": "MIT",
     "publishConfig": {
         "registry": "https://npm.pkg.github.com/TeamNumio"
@@ -14,7 +14,7 @@
     "dependencies": {
         "@ethersproject/shims": "^5.0.5",
         "@teamnumio/zksync-crypto": "0.0.6",
-        "axios": "^0.19.0",
+        "axios": "^0.21.1",
         "ethers": "^5.0.14",
         "websocket": "^1.0.32",
         "websocket-as-promised": "^0.10.1"

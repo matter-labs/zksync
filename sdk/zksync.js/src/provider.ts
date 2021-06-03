@@ -10,7 +10,7 @@ import {
     Tokens,
     TokenAddress,
     TxEthSignature,
-    Fee,
+    Fee
 } from "./types";
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from "./utils";
 
@@ -85,7 +85,7 @@ export class Provider {
 
     // Requests `zkSync` server to execute several transactions together.
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTxsBatch(transactions: { tx: any, signature?: TxEthSignature }[]): Promise<string[]> {
+    async submitTxsBatch(transactions: { tx: any; signature?: TxEthSignature }[]): Promise<string[]> {
         return await this.transport.request("submit_txs_batch", [transactions]);
     }
 
@@ -116,15 +116,15 @@ export class Provider {
 
     async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
-            return await new Promise((resolve) => {
+            return await new Promise(resolve => {
                 const subscribe = this.transport.subscribe(
                     "ethop_subscribe",
                     [serialId, action],
                     "ethop_unsubscribe",
-                    (resp) => {
+                    resp => {
                         subscribe
-                            .then((sub) => sub.unsubscribe())
-                            .catch((err) => console.log(`WebSocket connection closed with reason: ${err}`));
+                            .then(sub => sub.unsubscribe())
+                            .catch(err => console.log(`WebSocket connection closed with reason: ${err}`));
                         resolve(resp);
                     }
                 );
@@ -147,11 +147,11 @@ export class Provider {
 
     async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<TransactionReceipt> {
         if (this.transport.subscriptionsSupported()) {
-            return await new Promise((resolve) => {
-                const subscribe = this.transport.subscribe("tx_subscribe", [hash, action], "tx_unsubscribe", (resp) => {
+            return await new Promise(resolve => {
+                const subscribe = this.transport.subscribe("tx_subscribe", [hash, action], "tx_unsubscribe", resp => {
                     subscribe
-                        .then((sub) => sub.unsubscribe())
-                        .catch((err) => console.log(`WebSocket connection closed with reason: ${err}`));
+                        .then(sub => sub.unsubscribe())
+                        .catch(err => console.log(`WebSocket connection closed with reason: ${err}`));
                     resolve(resp);
                 });
             });
@@ -183,7 +183,7 @@ export class Provider {
             gasPriceWei: BigNumber.from(transactionFee.gasPriceWei),
             gasFee: BigNumber.from(transactionFee.gasFee),
             zkpFee: BigNumber.from(transactionFee.zkpFee),
-            totalFee: BigNumber.from(transactionFee.totalFee),
+            totalFee: BigNumber.from(transactionFee.totalFee)
         };
     }
 
