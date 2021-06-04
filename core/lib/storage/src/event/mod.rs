@@ -228,7 +228,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     }
 
     /// Create new transaction events and store them in the database.
-    pub async fn store_transaction_event(
+    /// The block is expected to be either committed or finalized.
+    pub async fn store_confirmed_transaction_event(
         &mut self,
         block_number: BlockNumber,
         status: TransactionStatus,
@@ -293,7 +294,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     /// Fetch executed transactions for the given block and store corresponding
     /// `Queued` or `Rejected` events in the database. This method is called when
     /// the `committer` saves the block in the database.
-    pub async fn store_queued_transaction_event(
+    pub async fn store_executed_transaction_event(
         &mut self,
         block_number: BlockNumber,
     ) -> QueryResult<()> {

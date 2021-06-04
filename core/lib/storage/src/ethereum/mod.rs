@@ -542,7 +542,10 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                         .await?;
                     transaction
                         .event_schema()
-                        .store_transaction_event(BlockNumber(block_number), block_operations_status)
+                        .store_confirmed_transaction_event(
+                            BlockNumber(block_number),
+                            block_operations_status,
+                        )
                         .await?;
                 }
             }
