@@ -243,7 +243,7 @@ async fn main() -> anyhow::Result<()> {
     let last_commited_block = storage
         .chain()
         .block_schema()
-        .get_last_committed_block()
+        .get_last_committed_confirmed_block()
         .await?;
     let last_verified_block = storage
         .chain()

@@ -128,7 +128,7 @@ async fn heartbeat_future_handle<CLIENT>(
         };
         tokio::time::delay_for(timeout_value).await;
 
-        vlog::info!("Starting sending heartbeats for job with ID: {}", job_id);
+        vlog::debug!("Starting sending heartbeats for job with ID: {}", job_id);
 
         client
             .working_on(job_id, &prover_name)
