@@ -4,7 +4,7 @@ use std::collections::HashMap;
 // Workspace imports
 use zksync_api_types::v02::{
     pagination::{AccountTxsRequest, ApiEither, PaginationDirection, PaginationQuery},
-    transaction::TxInBlockStatus,
+    transaction::{Receipt, TxInBlockStatus},
 };
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
@@ -727,6 +727,7 @@ async fn account_transactions_count(mut storage: StorageProcessor<'_>) -> QueryR
 async fn account_last_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let mut setup = TransactionsHistoryTestSetup::new();
 
+    // Checks that it returns None for unexisting account
     let last_tx_hash = storage
         .chain()
         .operations_ext_schema()
@@ -752,6 +753,7 @@ async fn account_last_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<
 async fn block_last_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let mut setup = TransactionsHistoryTestSetup::new();
 
+    // Checks that it returns None for unexisting block
     let last_tx_hash = storage
         .chain()
         .operations_ext_schema()
@@ -768,5 +770,169 @@ async fn block_last_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .get_block_last_tx_hash(BlockNumber(1))
         .await?;
     assert_eq!(last_tx_hash, Some(setup.get_tx_hash(0, 6)));
+    Ok(())
+}
+
+/// Test `tx_receipt_api_v02` method
+#[db_test]
+async fn tx_receipt(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+
+    // Checks that it returns None for unexisting tx
+    let receipt = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_receipt_api_v02(&[0xDE, 0xAD, 0xBE, 0xEF])
+        .await?;
+    assert!(receipt.is_none());
+
+    setup.add_block(1);
+    commit_schema_data(&mut storage, &setup).await?;
+
+    // Test receipt for L1 op.
+    let (expected_id, eth_hash) = match setup.blocks[0].block_transactions[0].clone() {
+        ExecutedOperations::PriorityOp(op) => (op.priority_op.serial_id, op.priority_op.eth_hash),
+        ExecutedOperations::Tx(_) => {
+            panic!("Should be L1 op")
+        }
+    };
+
+    let l1_receipt_by_tx_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_receipt_api_v02(setup.get_tx_hash(0, 0).as_ref())
+        .await?;
+    match l1_receipt_by_tx_hash.unwrap() {
+        Receipt::L1(receipt) => {
+            assert_eq!(receipt.id, expected_id);
+        }
+        Receipt::L2(_) => {
+            panic!("Should be L1 receipt");
+        }
+    }
+
+    let l1_receipt_by_eth_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_receipt_api_v02(eth_hash.as_ref())
+        .await?;
+    match l1_receipt_by_eth_hash.unwrap() {
+        Receipt::L1(receipt) => {
+            assert_eq!(receipt.id, expected_id);
+        }
+        Receipt::L2(_) => {
+            panic!("Should be L1 receipt");
+        }
+    }
+
+    // Test receipt for executed L2 tx.
+    let l2_receipt = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_receipt_api_v02(setup.get_tx_hash(0, 2).as_ref())
+        .await?;
+    match l2_receipt.unwrap() {
+        Receipt::L2(receipt) => {
+            assert_eq!(receipt.tx_hash, setup.get_tx_hash(0, 2));
+        }
+        Receipt::L1(_) => {
+            panic!("Should be L2 receipt");
+        }
+    }
+
+    // Test receipt for tx from mempool.
+    setup.add_block(2);
+    let tx = match setup.blocks[1].block_transactions[2].clone() {
+        ExecutedOperations::Tx(tx) => tx.signed_tx,
+        ExecutedOperations::PriorityOp(_) => {
+            panic!("Should be L2 tx")
+        }
+    };
+    storage.chain().mempool_schema().insert_tx(&tx).await?;
+    let l2_receipt = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_receipt_api_v02(tx.hash().as_ref())
+        .await?;
+    match l2_receipt.unwrap() {
+        Receipt::L2(receipt) => {
+            assert_eq!(receipt.tx_hash, tx.hash());
+        }
+        Receipt::L1(_) => {
+            panic!("Should be L2 receipt");
+        }
+    }
+
+    Ok(())
+}
+
+/// Test `tx_data_api_v02` method
+#[db_test]
+async fn tx_data(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+
+    // Checks that it returns None for unexisting tx
+    let data = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_api_v02(&[0xDE, 0xAD, 0xBE, 0xEF])
+        .await?;
+    assert!(data.is_none());
+
+    setup.add_block(1);
+    commit_schema_data(&mut storage, &setup).await?;
+
+    // Test data for L1 op.
+    let eth_hash = match setup.blocks[0].block_transactions[0].clone() {
+        ExecutedOperations::PriorityOp(op) => op.priority_op.eth_hash,
+        ExecutedOperations::Tx(_) => {
+            panic!("Should be L1 op")
+        }
+    };
+
+    let l1_data_by_tx_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_api_v02(setup.get_tx_hash(0, 0).as_ref())
+        .await?;
+    assert_eq!(
+        l1_data_by_tx_hash.unwrap().tx.tx_hash,
+        setup.get_tx_hash(0, 0)
+    );
+
+    let l1_data_by_eth_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_api_v02(eth_hash.as_ref())
+        .await?;
+    assert_eq!(
+        l1_data_by_eth_hash.unwrap().tx.tx_hash,
+        setup.get_tx_hash(0, 0)
+    );
+
+    // Test data for executed L2 tx.
+    let l2_data = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_api_v02(setup.get_tx_hash(0, 2).as_ref())
+        .await?;
+    assert_eq!(l2_data.unwrap().tx.tx_hash, setup.get_tx_hash(0, 2));
+
+    // Test data for tx from mempool.
+    setup.add_block(2);
+    let tx = match setup.blocks[1].block_transactions[2].clone() {
+        ExecutedOperations::Tx(tx) => tx.signed_tx,
+        ExecutedOperations::PriorityOp(_) => {
+            panic!("Should be L2 tx")
+        }
+    };
+    storage.chain().mempool_schema().insert_tx(&tx).await?;
+    let l2_data = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_api_v02(tx.hash().as_ref())
+        .await?;
+    assert_eq!(l2_data.unwrap().tx.tx_hash, tx.hash());
+
     Ok(())
 }
