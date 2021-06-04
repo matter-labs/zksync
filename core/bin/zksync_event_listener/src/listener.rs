@@ -41,6 +41,13 @@ impl StreamHandler<NotifyResult> for EventListener {
         if self.last_processed_event_id >= new_event.0 {
             return;
         }
+        // - Try to fetch latest events from the database.
+        // - If any of the storage methods returned an error, or we couldn't
+        // deserialize new events, send `Shutdown` message to the monitor.
+        // - Otherwise, wrap new events into `Arc`, send them to the monitor
+        // and update the offset.
+        // - Depending on the outcome of the second step, either log an error
+        // or stop the actor's context.
         let pool = self.db_pool.clone();
         let last_processed_event_id = self.last_processed_event_id;
         async move {
@@ -149,6 +156,13 @@ impl EventListener {
         })
     }
 
+    /// Returns the future that can be spawned on the actor's context
+    /// in order to initiate the shutdown of the event server.
+    ///
+    /// # Arguments
+    ///
+    /// * `err` - human-readable reason for the shutdown
+    ///
     fn shutdown<E: Display>(&mut self, err: E) -> impl ContextFutureSpawner<Self> {
         vlog::error!(
             "An error ocurred: {}, shutting down the EventListener actor",
