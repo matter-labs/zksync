@@ -11,8 +11,8 @@ RUN apt-get install -y nodejs
 RUN npm install -g yarn
 
 # Install required node packages
-RUN npm install -g aglio
-RUN npm install -g dredd
+RUN yarn global add aglio
+RUN yarn global add dredd
 
 # Install Rust and required cargo packages
 ENV RUSTUP_HOME=/usr/local/rustup \
@@ -20,7 +20,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     PATH=/usr/local/cargo/bin:$PATH
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN cargo install diesel_cli --no-default-features --features postgres
-RUN cargo install --version=0.2.0 sqlx-cli
+RUN cargo install sqlx-cli
 
 # Install `solc`
 RUN curl -LO https://github.com/ethereum/solidity/releases/download/v0.5.16/solc-static-linux
