@@ -22,11 +22,11 @@
 - type: Transfer (string, fixed)
 - to: 0xD3c62D2F7b6d4A63577F2415E55A6Aa6E1DbB9CA (string, required)
 - fee: 12000000000000000000 (string, required)
-- from: {{Address}} (string, required)
+- from: {{address}} (string, required)
 - nonce: 12123 (number, required)
 - token: 0 (number, required)
 - amount: 17500000000000000 (string, required)
-- accountId: {{AccountId}} (number, required)
+- accountId: {{accountId}} (number, required)
 - validFrom: 0 (number, required, nullable)
 - validUntil: 1239213821 (number, required, nullable)
 - signature (L2Signature, required)
@@ -141,8 +141,8 @@
 - (Transaction.L1.FullExit)
 
 ## L2Signature (object)
-- pubKey: {{PubKey}} (string, required)
-- signature: {{L2Signature}} (string, required)
+- pubKey: {{pubKey}} (string, required)
+- signature: {{l2Signature}} (string, required)
 
 ## ECDSAAuthType (object)
 - type: `ECDSA` (string, fixed)
@@ -163,7 +163,7 @@
 
 ## EthereumSignature (object)
 - type: `EthereumSignature` (string, fixed)
-- signature: `{{EthereumSignature}}` (string, required)
+- signature: `{{ethereumSignature}}` (string, required)
 
 ## EIP1271Signature (object)
 - type: `EIP1271Signature` (string, fixed)

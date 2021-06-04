@@ -201,6 +201,15 @@ Required by `binaryen` to build C++ sources. In order to speed it up, you might 
 sudo apt-get install cmake clang lld
 ```
 
+## `aglio` and `dredd`
+
+`aglio` is required for api documentation building. `dredd` is required for api documentation testing.
+
+```bash
+npm install -g aglio
+npm install -g dredd
+```
+
 ## Environment
 
 Edit the lines below and add them to your shell profile file (e.g. `~/.bash_profile`):

@@ -11,7 +11,6 @@
       "infrastructure/explorer",
       "infrastructure/zk",
       "infrastructure/reading-tool",
-      "infrastructure/api-docs",
       "core/tests/ts-tests"
     ],
     "nohoist": [
@@ -30,8 +29,7 @@
     "ts-tests": "yarn workspace ts-tests",
     "explorer": "yarn workspace sync-explorer",
     "zk": "yarn workspace zk",
-    "reading-tool": "yarn workspace reading-tool",
-    "api-docs": "yarn workspace api-docs"
+    "reading-tool": "yarn workspace reading-tool"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.10.0",
