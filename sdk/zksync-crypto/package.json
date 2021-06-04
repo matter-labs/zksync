@@ -1,6 +1,6 @@
 {
 	"name": "zksync-crypto",
-	"version": "0.6.0-beta.0",
+	"version": "0.6.0-beta.1",
 	"browser": "dist/zksync-crypto-web.js",
 	"main": "dist/zksync-crypto-node.js",
 	"files": [
