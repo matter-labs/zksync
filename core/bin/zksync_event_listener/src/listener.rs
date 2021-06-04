@@ -1,6 +1,5 @@
-use std::fmt::Display;
 // Built-in uses
-use std::{convert::TryFrom, sync::Arc};
+use std::{convert::TryFrom, fmt::Display, sync::Arc};
 // External uses
 use actix::prelude::*;
 use futures_util::{future::Either, stream::StreamExt};
@@ -155,10 +154,9 @@ impl EventListener {
             "An error ocurred: {}, shutting down the EventListener actor",
             err.to_string()
         );
-        return self
-            .server_monitor
+        self.server_monitor
             .send(Shutdown)
             .into_actor(self)
-            .map(|_, _, ctx| ctx.stop());
+            .map(|_, _, ctx| ctx.stop())
     }
 }
