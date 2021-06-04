@@ -277,7 +277,7 @@ describe(txVectors.description, function () {
                     type: 'MintNFT',
                     feeToken: mintNFTData.feeTokenId
                 };
-                const signBytes = serializeTx(tx);
+                const signBytes = await serializeTx(tx);
                 const { signature } = await signer.signMintNFT(mintNFTData);
 
                 const { signature: ethSignature } = await ethMessageSigner.ethSignMintNFT(ethSignData);
@@ -308,7 +308,7 @@ describe(txVectors.description, function () {
                     token: withdrawNFTData.tokenId,
                     feeToken: withdrawNFTData.feeTokenId
                 };
-                const signBytes = serializeTx(tx);
+                const signBytes = await serializeTx(tx);
                 const { signature } = await signer.signWithdrawNFT(withdrawNFTData);
 
                 const { signature: ethSignature } = await ethMessageSigner.ethSignWithdrawNFT(ethSignData);
@@ -331,7 +331,7 @@ describe(txHashVectors.description, function () {
         for (const item of txHashVectors.items) {
             const tx = item.inputs.tx;
             const expectedHash = item.outputs.hash;
-            const hash = getTxHash(tx);
+            const hash = await getTxHash(tx);
             expect(hash).to.eql(expectedHash, 'Hash does not match');
         }
     });

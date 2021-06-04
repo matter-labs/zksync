@@ -601,6 +601,55 @@
         "outputs": {
           "hash": "sync-tx:4733d4c84fab86520f1e6d217ef0fb9247079257cda40a26a398d18a66cfec16"
         }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "Swap",
+            "orders": [
+              {
+                "accountId": 6,
+                "nonce": 18,
+                "tokenSell": 1,
+                "tokenBuy": 2,
+                "ratio": [
+                  "1",
+                  "2"
+                ],
+                "amount": "1000000",
+                "recipient": "0x823b6a996cea19e0c41e250b20e2e804ea72ccdf",
+                "validFrom": 0,
+                "validUntil": 4294967295
+              },
+              {
+                "accountId": 44,
+                "nonce": 101,
+                "tokenSell": 2,
+                "tokenBuy": 1,
+                "ratio": [
+                  "3",
+                  "1"
+                ],
+                "amount": "2500000",
+                "recipient": "0x63adbb48d1bc2cf54562910ce54b7ca06b87f319",
+                "validFrom": 0,
+                "validUntil": 4294967295
+              }
+            ],
+            "nonce": 1,
+            "amounts": [
+              "1000000",
+              "2500000"
+            ],
+            "submitterId": 5,
+            "submitterAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "feeToken": 3,
+            "fee": "123"
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:a6c8e66c6d86351d8ed820f2dff2de148146e4d9a1b193bc35ebb7f045119a0f"
+        }
       }
     ]
   }
