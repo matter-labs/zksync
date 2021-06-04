@@ -1,6 +1,6 @@
 import { ArgumentParser } from 'argparse';
 import { deployContract } from 'ethereum-waffle';
-import { Contract, ethers } from 'ethers';
+import { Contract, ethers, Wallet } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { web3Provider, storedBlockInfoParam } from './utils';
@@ -82,9 +82,12 @@ async function main() {
     const args = parser.parseArgs(process.argv.slice(2));
 
     const provider = web3Provider();
-    const wallet = args.masterPrivateKey
-        ? new ethers.Wallet(args.masterPrivateKey).connect(provider)
-        : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+    const wallet = args.deployerPrivateKey
+        ? new Wallet(args.deployerPrivateKey, provider)
+        : Wallet.fromMnemonic(
+              process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+              "m/44'/60'/0'/0/1"
+          ).connect(provider);
 
     const upgradeGatekeeper = new ethers.Contract(
         args.upgradeGatekeeperAddress,

@@ -1,5 +1,5 @@
 import { ArgumentParser } from 'argparse';
-import { ethers } from 'ethers';
+import { ethers, Wallet } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { web3Provider } from './utils';
@@ -24,9 +24,12 @@ async function main() {
 
     const provider = web3Provider();
 
-    const wallet = args.masterPrivateKey
-        ? new ethers.Wallet(args.masterPrivateKey).connect(provider)
-        : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+    const wallet = args.deployerPrivateKey
+        ? new Wallet(args.deployerPrivateKey, provider)
+        : Wallet.fromMnemonic(
+              process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+              "m/44'/60'/0'/0/1"
+          ).connect(provider);
 
     const contractAddress = args.contractAddress || process.env.MISC_REGENESIS_MULTISIG_ADDRESS;
 
