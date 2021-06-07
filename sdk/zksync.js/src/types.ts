@@ -349,16 +349,16 @@ export interface ApiL1TxReceipt {
     id: number;
 }
 
-export type zkSyncTxStatus = 'queued' | 'committed' | 'finalized' | 'rejected';
+export type L2TxStatus = 'queued' | 'committed' | 'finalized' | 'rejected';
 
-export interface ApiZkSyncTxReceipt {
+export interface ApiL2TxReceipt {
     txHash: string;
     rollupBlock?: number;
-    status: zkSyncTxStatus;
+    status: L2TxStatus;
     failReason?: string;
 }
 
-export type ApiTxReceipt = ApiL1TxReceipt | ApiZkSyncTxReceipt;
+export type ApiTxReceipt = ApiL1TxReceipt | ApiL2TxReceipt;
 
 export interface WithdrawAndEthHash {
     type: 'Withdraw';
@@ -409,17 +409,17 @@ export interface ApiFullExit {
     txHash: string;
 }
 
-export type zkSyncTx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount;
+export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount;
 
-export type zkSyncTxData = Transfer | WithdrawAndEthHash | ChangePubKey | ForcedExitAndEthHash | CloseAccount;
+export type L2TxData = Transfer | WithdrawAndEthHash | ChangePubKey | ForcedExitAndEthHash | CloseAccount;
 
-export type TransactionData = zkSyncTxData | ApiDeposit | ApiFullExit;
+export type TransactionData = L2TxData | ApiDeposit | ApiFullExit;
 
 export interface ApiTransaction {
     txHash: string;
     blockNumber?: number;
     op: TransactionData;
-    status: zkSyncTxStatus;
+    status: L2TxStatus;
     failReason?: string;
     createdAt?: string;
 }
@@ -431,7 +431,7 @@ export interface ApiSignedTx {
 
 export interface ApiBatchStatus {
     updatedAt: string;
-    lastState: zkSyncTxStatus;
+    lastState: L2TxStatus;
 }
 
 export interface ApiBatchData {

@@ -320,11 +320,11 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
     }
 
-    async submitTxNewDetailed(tx: types.zkSyncTx, signature?: types.TxEthSignature): Promise<Response<string>> {
+    async submitTxNewDetailed(tx: types.L2Tx, signature?: types.TxEthSignature): Promise<Response<string>> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
-    async submitTxNew(tx: types.zkSyncTx, signature?: types.TxEthSignature): Promise<string> {
+    async submitTxNew(tx: types.L2Tx, signature?: types.TxEthSignature): Promise<string> {
         return this.parseResponse(await this.submitTxNewDetailed(tx, signature));
     }
 
@@ -357,14 +357,14 @@ export class RestProvider extends SyncProvider {
     }
 
     async submitTxsBatchNewDetailed(
-        txs: types.zkSyncTx[],
+        txs: types.L2Tx[],
         signature: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<Response<types.SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
     async submitTxsBatchNew(
-        txs: types.zkSyncTx[],
+        txs: types.L2Tx[],
         signature: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<types.SubmitBatchResponse> {
         return this.parseResponse(await this.submitTxsBatchNewDetailed(txs, signature));
