@@ -206,8 +206,8 @@ sudo apt-get install cmake clang lld
 `aglio` is required for api documentation building. `dredd` is required for api documentation testing.
 
 ```bash
-npm install -g aglio
-npm install -g dredd
+yarn global add aglio
+yarn global add dredd
 ```
 
 ## Environment
