@@ -10,7 +10,7 @@ use zksync_types::event::{
     },
     block::{BlockEvent, BlockStatus},
     transaction::{TransactionEvent, TransactionStatus},
-    EventId, ZkSyncEvent,
+    EventId,
 };
 use zksync_types::{block::ExecutedOperations, priority_ops::ZkSyncPriorityOp};
 // Local uses
@@ -68,8 +68,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     }
 
     /// Load all events from the database with the `id` greater than `from`.
-    pub async fn fetch_new_events(&mut self, from: EventId) -> QueryResult<Vec<ZkSyncEvent>> {
+    pub async fn fetch_new_events(&mut self, from: EventId) -> QueryResult<Vec<StoredEvent>> {
         let start = Instant::now();
+        // Don't deserialize JSONs, the event server is responsible for handling
+        // possible errors.
         let events = sqlx::query_as!(
             StoredEvent,
             r#"
@@ -84,10 +86,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             *from as i64
         )
         .fetch_all(self.0.conn())
-        .await?
-        .into_iter()
-        .map(ZkSyncEvent::from)
-        .collect();
+        .await?;
 
         metrics::histogram!("sql.event.fetch_new_events", start.elapsed());
         Ok(events)

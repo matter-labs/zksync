@@ -11,6 +11,7 @@ use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
 // Local uses
 use listener::EventListener;
+use messages::RegisterServerHandle;
 use monitor::ServerMonitor;
 use subscriber::Subscriber;
 
@@ -33,15 +34,17 @@ async fn ws_index(
 }
 
 pub async fn run_event_server(config: ZkSyncConfig) {
-    let server_monitor = ServerMonitor::new().start();
-    EventListener::new(server_monitor.clone(), &config)
+    let monitor = ServerMonitor::new().start();
+    EventListener::new(monitor.clone(), &config)
         .await
         .unwrap()
         .start();
 
-    let state = web::Data::new(AppState { server_monitor });
+    let state = web::Data::new(AppState {
+        server_monitor: monitor.clone(),
+    });
 
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
             .wrap(vlog::actix_middleware())
@@ -49,7 +52,11 @@ pub async fn run_event_server(config: ZkSyncConfig) {
     })
     .bind(config.event_listener.ws_bind_addr())
     .unwrap()
-    .run()
-    .await
-    .unwrap();
+    .run();
+    // Send the server handle to the monitor.
+    monitor
+        .send(RegisterServerHandle(server.clone()))
+        .await
+        .unwrap();
+    server.await.unwrap();
 }
