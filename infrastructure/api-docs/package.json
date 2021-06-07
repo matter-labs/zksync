@@ -13,8 +13,6 @@
     },
     "scripts": {
       "build": "tsc",
-      "watch": "tsc --watch",
-      "test": "dredd",
-      "generate-docs": "aglio -i ./blueprint/documentation.apib -o index.html"
+      "watch": "tsc --watch"
     }
 }
