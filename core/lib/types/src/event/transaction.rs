@@ -11,6 +11,7 @@ use crate::{block::ExecutedOperations, AccountId, BlockNumber, TokenId};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransactionStatus {
+    Queued,
     Committed,
     Finalized,
     Rejected,
@@ -63,7 +64,11 @@ impl TransactionEvent {
                 token_id: exec_tx.signed_tx.token_id(),
                 block_number,
                 tx: serde_json::to_value(exec_tx.signed_tx.tx).unwrap(),
-                status,
+                status: if exec_tx.success {
+                    status
+                } else {
+                    TransactionStatus::Rejected
+                },
                 fail_reason: exec_tx.fail_reason,
                 created_at: exec_tx.created_at,
                 tx_type: OnceCell::default(),
