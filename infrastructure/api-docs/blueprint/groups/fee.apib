@@ -1,0 +1,36 @@
+# Group Fees
+
+## api/v0.2/fee [/fee]
+
+### Get fee for a single transaction [POST]
+Request fee for a single transaction.
+
++ Request (application/json)
+    + Attributes
+        + txType: Transfer (Fee.Type, required)
+        + address: 0xf33A2D61DD09541A8C9897D7236aDcCCC14Cf769 (string, required)
+        + tokenLike: ETH (Token.TokenLike, required)
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Fee.Single, required{{isResultNullable}})
+        + error (Error, required, nullable)
+
+## api/v0.2/fee/batch [/fee/batch]
+
+### Get fee for a transactions batch [POST]
+Request fee for a transactions batch.
+
++ Request (application/json)
+    + Attributes
+        + transactions (array[Fee.Type.with.Address], required)
+        + tokenLike: ETH (Token.TokenLike, required)
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Fee.Batch, required{{isResultNullable}})
+        + error (Error, required, nullable)
