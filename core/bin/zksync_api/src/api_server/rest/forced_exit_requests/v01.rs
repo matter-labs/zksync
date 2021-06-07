@@ -473,6 +473,6 @@ pub fn check_address_space_overflow(id: i64, digits_in_id: u8) {
 
     metrics::histogram!(
         "forced_exit_requests.address_space_overflow",
-        exceeding_rate
+        exceeding_rate as f64
     );
 }

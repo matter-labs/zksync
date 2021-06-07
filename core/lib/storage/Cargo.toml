@@ -29,7 +29,7 @@ anyhow = "1.0"
 once_cell = "1.4"
 itertools = "0.8"
 hex = "0.4"
-metrics = "=0.13.0-alpha.8"
+metrics = "=0.16.0"
 parity-crypto = { version = "0.6.2", features = ["publickey"] }
 
 vlog = { path = "../../lib/vlog", version = "1.0" }

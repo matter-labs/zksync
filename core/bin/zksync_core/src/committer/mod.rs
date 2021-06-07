@@ -151,7 +151,7 @@ async fn commit_block(
         .count();
     metrics::histogram!(
         "committer.priority_ops_per_block",
-        total_priority_ops as u64
+        total_priority_ops as f64
     );
 
     transaction

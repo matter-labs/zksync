@@ -19,4 +19,4 @@ futures = "0.3"
 vlog = { path = "../../lib/vlog", version = "1.0" }
 web3 = "0.13.0"
 tokio = { version = "0.2", features = ["rt-core"] }
-metrics = "=0.13.0-alpha.8"
+metrics = "=0.16.0"

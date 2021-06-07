@@ -11,5 +11,5 @@ categories = ["cryptography"]
 
 [dependencies]
 futures = "0.3"
-metrics = "=0.13.0-alpha.8"
+metrics = "=0.16.0"
 tokio = { version = "0.2", features = ["full"] }
