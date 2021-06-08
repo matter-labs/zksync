@@ -20,9 +20,9 @@ export async function contract() {
     const governanceAddress = process.env.CONTRACTS_GOVERNANCE_ADDR;
     const nftFactoryAddress = process.env.NFT_FACTORY_ADDR;
     await utils.exec(`${SQL()} "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr)
-					 VALUES ('${contractAddress}', '${governanceAddress}')
+					 VALUES ('${contractAddress}', '${governanceAddress}', '${nftFactoryAddress}')
 					 ON CONFLICT (id) DO UPDATE
-					 SET (contract_addr, gov_contract_addr) 
+					 SET (contract_addr, gov_contract_addr, nft_factory_addr) 
                         = ('${contractAddress}', '${governanceAddress}', '${nftFactoryAddress}')"`);
     console.log('Successfully inserted contract address into the database');
 }
