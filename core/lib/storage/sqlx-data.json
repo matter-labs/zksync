@@ -2701,6 +2701,11 @@
           "ordinal": 2,
           "name": "gov_contract_addr",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "nft_factory_addr",
+          "type_info": "Text"
         }
       ],
       "parameters": {
@@ -2708,6 +2713,7 @@
       },
       "nullable": [
         false,
+        true,
         true,
         true
       ]
