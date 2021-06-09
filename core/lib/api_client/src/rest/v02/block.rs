@@ -4,7 +4,7 @@ use zksync_api_types::v02::{pagination::PaginationQuery, Response};
 use zksync_types::{tx::TxHash, BlockNumber};
 
 impl Client {
-    pub async fn block_by_number(&self, block_position: &str) -> Result<Response> {
+    pub async fn block_by_position(&self, block_position: &str) -> Result<Response> {
         self.get_with_scope(super::API_V02_SCOPE, &format!("blocks/{}", block_position))
             .send()
             .await

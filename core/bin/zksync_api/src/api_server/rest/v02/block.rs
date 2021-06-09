@@ -241,7 +241,7 @@ mod tests {
                 .map_err(|err| anyhow::anyhow!(err.message))?
         };
 
-        let response = client.block_by_number("2").await?;
+        let response = client.block_by_position("2").await?;
         let block: BlockInfo = deserialize_response_result(response)?;
         assert_eq!(block, expected_blocks.list[1]);
 
