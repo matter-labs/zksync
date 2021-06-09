@@ -29,3 +29,4 @@ not_subsidized_tokens=[
 
 subsidized_tokens=[]
 subsidized_tokens_limits=[]
+scale_fee_percent=100
