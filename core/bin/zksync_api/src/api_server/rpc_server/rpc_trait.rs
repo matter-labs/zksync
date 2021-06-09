@@ -6,7 +6,7 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 
 // Workspace uses
-use zksync_api_client::rest::v1::accounts::NFT;
+use zksync_api_client::rest::v1::accounts::NFTWithFactories;
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
@@ -81,8 +81,8 @@ pub trait Rpc {
     #[rpc(name = "get_zksync_version", returns = "String")]
     fn get_zksync_version(&self) -> Result<String, Error>;
 
-    #[rpc(name = "get_nft", returns = "Option<NFT>")]
-    fn get_nft(&self, id: TokenId) -> FutureResp<Option<NFT>>;
+    #[rpc(name = "get_nft", returns = "Option<NFTWithFactories>")]
+    fn get_nft(&self, id: TokenId) -> FutureResp<Option<NFTWithFactories>>;
 }
 
 impl Rpc for RpcApp {
@@ -233,7 +233,7 @@ impl Rpc for RpcApp {
         Ok(String::from(ZKSYNC_VERSION))
     }
 
-    fn get_nft(&self, id: TokenId) -> FutureResp<Option<NFT>> {
+    fn get_nft(&self, id: TokenId) -> FutureResp<Option<NFTWithFactories>> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_get_nft(id)).await.unwrap() };

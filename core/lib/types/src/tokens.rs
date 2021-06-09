@@ -282,6 +282,21 @@ impl NFT {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct NFTWithFactories {
+    pub id: TokenId,
+    pub serial_id: u32,
+    pub creator_address: Address,
+    pub creator_id: AccountId,
+    pub address: Address,
+    pub symbol: String,
+    pub content_hash: H256,
+    /// current factory of nft creator
+    pub current_factory: Address,
+    /// factory which was used for withdrawing nft
+    pub withdrawn_factory: Option<Address>,
+}
+
 #[derive(Debug, Error, PartialEq)]
 #[error("Incorrect ProverJobStatus number: {0}")]
 pub struct IncorrectProverJobStatus(pub i32);

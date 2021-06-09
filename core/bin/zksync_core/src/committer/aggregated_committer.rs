@@ -1,17 +1,22 @@
 use chrono::{DateTime, Utc};
-use std::cmp::max;
-use std::time::Duration;
+use std::{cmp::max, time::Duration};
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::AggregatedProof;
-use zksync_storage::chain::block::BlockSchema;
-use zksync_storage::chain::operations::OperationsSchema;
-use zksync_storage::prover::ProverSchema;
-use zksync_storage::StorageProcessor;
-use zksync_types::aggregated_operations::{
-    AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksCreateProofOperation,
-    BlocksExecuteOperation, BlocksProofOperation,
+use zksync_storage::{
+    chain::{block::BlockSchema, operations::OperationsSchema},
+    prover::ProverSchema,
+    tokens::TokensSchema,
+    StorageProcessor,
 };
-use zksync_types::{block::Block, gas_counter::GasCounter, BlockNumber, U256};
+use zksync_types::{
+    aggregated_operations::{
+        AggregatedActionType, AggregatedOperation, BlocksCommitOperation,
+        BlocksCreateProofOperation, BlocksExecuteOperation, BlocksProofOperation,
+    },
+    block::Block,
+    gas_counter::GasCounter,
+    BlockNumber, ExecutedOperations, ZkSyncTx, U256,
+};
 
 fn create_new_commit_operation(
     last_committed_block: &Block,
@@ -434,6 +439,20 @@ async fn create_aggregated_execute_operation_storage(
         config.chain.state_keeper.max_aggregated_tx_gas.into(),
         fast_processing_requested,
     );
+
+    let mut withdrawn_nfts = Vec::new();
+    for block in blocks.iter() {
+        for tx in &block.block_transactions {
+            if let ExecutedOperations::Tx(tx) = tx {
+                if let ZkSyncTx::WithdrawNFT(withdraw_nft) = &tx.signed_tx.tx {
+                    withdrawn_nfts.push(withdraw_nft.token);
+                }
+            }
+        }
+    }
+    TokensSchema(&mut transaction)
+        .store_factories_for_withdrawn_nfts(withdrawn_nfts)
+        .await?;
 
     let result = if let Some(operation) = execute_operation {
         let aggregated_op = operation.into();

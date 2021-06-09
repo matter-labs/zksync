@@ -59,6 +59,37 @@ impl From<zksync_types::NFT> for NFT {
         }
     }
 }
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct NFTWithFactories {
+    id: TokenId,
+    content_hash: H256,
+    creator_id: AccountId,
+    creator_address: Address,
+    serial_id: u32,
+    address: Address,
+    symbol: String,
+    current_factory: Address,
+    withdrawn_factory: Option<Address>,
+}
+
+impl From<zksync_types::tokens::NFTWithFactories> for NFTWithFactories {
+    fn from(val: zksync_types::tokens::NFTWithFactories) -> Self {
+        Self {
+            id: val.id,
+            content_hash: val.content_hash,
+            creator_id: val.creator_id,
+            creator_address: val.creator_address,
+            serial_id: val.serial_id,
+            address: val.address,
+            symbol: val.symbol,
+            current_factory: val.current_factory,
+            withdrawn_factory: val.withdrawn_factory,
+        }
+    }
+}
+
 /// Account state at the time of the zkSync block commit or verification.
 /// This means that each account has various states.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Default)]
