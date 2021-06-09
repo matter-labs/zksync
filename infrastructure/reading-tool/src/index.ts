@@ -46,7 +46,6 @@ export function loadTestVectorsConfig() {
 
 export function getTokens(network: string) {
     const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
-    console.log(configPath);
     return JSON.parse(
         fs.readFileSync(configPath, {
             encoding: 'utf-8'

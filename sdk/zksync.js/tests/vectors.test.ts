@@ -19,14 +19,14 @@ import { loadTestVectorsConfig } from 'reading-tool';
 import { MintNFT, WithdrawNFT } from '../src/types';
 
 const vectors = loadTestVectorsConfig();
-const cryptoPrimitivesVectors = vectors['cryptoPrimitivesTest'];
-const utilsVectors = vectors['utils'];
-const txVectors = vectors['txTest'];
-const txHashVectors = vectors['txHashTest'];
+const cryptoVectors = vectors.cryptoPrimitivesTest;
+const utilsVectors = vectors.utils;
+const txVectors = vectors.txTest;
+const txHashVectors = vectors.txHashTest;
 
-describe(cryptoPrimitivesVectors['description'], function () {
-    it('Keys and signatures', async function () {
-        for (const item of cryptoPrimitivesVectors['items']) {
+describe('Crypto tests', function () {
+    it(cryptoVectors.description, async function () {
+        for (const item of cryptoVectors.items) {
             const seed = parseHexWithPrefix(item.inputs.seed);
             const privateKey = await privateKeyFromSeed(seed);
             const message = parseHexWithPrefix(item.inputs.message);
@@ -40,10 +40,13 @@ describe(cryptoPrimitivesVectors['description'], function () {
     });
 });
 
-const amountPackingVectors = utilsVectors['amountPacking'];
-describe(amountPackingVectors['description'], function () {
-    it('Token packing', function () {
-        for (const item of amountPackingVectors['items']) {
+const amountPackingVectors = utilsVectors.amountPacking;
+const feePackingVectors = utilsVectors.feePacking;
+const tokenFormattingVectors = utilsVectors.tokenFormatting;
+
+describe('Utils tests', function () {
+    it(amountPackingVectors.description, function () {
+        for (const item of amountPackingVectors.items) {
             const tokenAmount = BigNumber.from(item.inputs.value);
 
             assert.equal(
@@ -64,12 +67,9 @@ describe(amountPackingVectors['description'], function () {
             }
         }
     });
-});
 
-const feePackingVectors = utilsVectors['feePacking'];
-describe(feePackingVectors['description'], function () {
-    it('Fee packing', function () {
-        for (const item of feePackingVectors['items']) {
+    it(feePackingVectors.description, function () {
+        for (const item of feePackingVectors.items) {
             const feeAmount = BigNumber.from(item.inputs.value);
 
             assert.equal(isTransactionFeePackable(feeAmount), item.outputs.packable, `Fee '${feeAmount}' not packable`);
@@ -86,13 +86,10 @@ describe(feePackingVectors['description'], function () {
             }
         }
     });
-});
 
-const tokenFormattingVectors = utilsVectors['tokenFormatting'];
-describe(tokenFormattingVectors['description'], function () {
     const tokens = {};
     let id = 0;
-    for (const item of tokenFormattingVectors['items']) {
+    for (const item of tokenFormattingVectors.items) {
         const token = item.inputs.token;
         tokens[token] = {
             address: '0x0000000000000000000000000000000000000000',
@@ -103,20 +100,19 @@ describe(tokenFormattingVectors['description'], function () {
         id++;
     }
 
-    it('Formatting tokens', function () {
+    it(tokenFormattingVectors.description, function () {
         const tokenCache = new TokenSet(tokens);
 
-        for (const item of tokenFormattingVectors['items']) {
+        for (const item of tokenFormattingVectors.items) {
             const unitsStr = tokenCache.formatToken(item.inputs.token, item.inputs.amount);
             expect(`${unitsStr} ${item.inputs.token}`).to.eql(item.outputs.formatted);
         }
     });
 });
 
-describe(txVectors['description'], function () {
+describe(txVectors.description, function () {
     async function getSigner(ethPrivateKey) {
         const ethWallet = new Wallet(ethPrivateKey);
-        //const fromAddress = ethWallet.address;
         const { signer } = await zksync.Signer.fromETHSignature(ethWallet);
         const ethMessageSigner = new zksync.EthMessageSigner(ethWallet, {
             verificationMethod: 'ECDSA',
@@ -139,6 +135,56 @@ describe(txVectors['description'], function () {
 
                 const { signature: ethSignature } = await ethMessageSigner.ethSignTransfer(ethSignData);
                 const ethSignMessage = ethMessageSigner.getTransferEthSignMessage(ethSignData);
+
+                expect(utils.hexlify(signBytes)).to.eql(expected.signBytes, 'Sign bytes do not match');
+                expect(signature).to.eql(expected.signature, 'Signature does not match');
+                expect(ethSignature).to.eql(expected.ethSignature, 'Ethereum signature does not match');
+                expect(utils.hexlify(utils.toUtf8Bytes(ethSignMessage))).to.eql(
+                    expected.ethSignMessage,
+                    'Ethereum signature message does not match'
+                );
+            }
+        }
+    });
+
+    it('Order signature', async function () {
+        for (const item of txVectors.items) {
+            const { type: txType, ethPrivateKey, data: order, ethSignData } = item.inputs;
+            const expected = item.outputs;
+            const privateKey = parseHexWithPrefix(ethPrivateKey);
+            const { signer, ethMessageSigner } = await getSigner(privateKey);
+
+            if (txType === 'Order') {
+                const signBytes = zksync.utils.serializeOrder(order);
+                const { signature } = await signer.signSyncOrder(order);
+
+                const { signature: ethSignature } = await ethMessageSigner.ethSignOrder(ethSignData);
+                const ethSignMessage = ethMessageSigner.getOrderEthSignMessage(ethSignData);
+
+                expect(utils.hexlify(signBytes)).to.eql(expected.signBytes, 'Sign bytes do not match');
+                expect(signature).to.eql(expected.signature, 'Signature does not match');
+                expect(ethSignature).to.eql(expected.ethSignature, 'Ethereum signature does not match');
+                expect(utils.hexlify(utils.toUtf8Bytes(ethSignMessage))).to.eql(
+                    expected.ethSignMessage,
+                    'Ethereum signature message does not match'
+                );
+            }
+        }
+    });
+
+    it('Swap signature', async function () {
+        for (const item of txVectors.items) {
+            const { type: txType, ethPrivateKey, data: order, ethSignData } = item.inputs;
+            const expected = item.outputs;
+            const privateKey = parseHexWithPrefix(ethPrivateKey);
+            const { signer, ethMessageSigner } = await getSigner(privateKey);
+
+            if (txType === 'Swap') {
+                const signBytes = await zksync.utils.serializeSwap(order);
+                const { signature } = await signer.signSyncSwap(order);
+
+                const { signature: ethSignature } = await ethMessageSigner.ethSignSwap(ethSignData);
+                const ethSignMessage = ethMessageSigner.getSwapEthSignMessage(ethSignData);
 
                 expect(utils.hexlify(signBytes)).to.eql(expected.signBytes, 'Sign bytes do not match');
                 expect(signature).to.eql(expected.signature, 'Signature does not match');
@@ -231,7 +277,7 @@ describe(txVectors['description'], function () {
                     type: 'MintNFT',
                     feeToken: mintNFTData.feeTokenId
                 };
-                const signBytes = serializeTx(tx);
+                const signBytes = await serializeTx(tx);
                 const { signature } = await signer.signMintNFT(mintNFTData);
 
                 const { signature: ethSignature } = await ethMessageSigner.ethSignMintNFT(ethSignData);
@@ -262,7 +308,7 @@ describe(txVectors['description'], function () {
                     token: withdrawNFTData.tokenId,
                     feeToken: withdrawNFTData.feeTokenId
                 };
-                const signBytes = serializeTx(tx);
+                const signBytes = await serializeTx(tx);
                 const { signature } = await signer.signWithdrawNFT(withdrawNFTData);
 
                 const { signature: ethSignature } = await ethMessageSigner.ethSignWithdrawNFT(ethSignData);
@@ -280,12 +326,12 @@ describe(txVectors['description'], function () {
     });
 });
 
-describe(txHashVectors['description'], function () {
+describe(txHashVectors.description, function () {
     it('Transaction hash', async function () {
         for (const item of txHashVectors.items) {
             const tx = item.inputs.tx;
             const expectedHash = item.outputs.hash;
-            const hash = getTxHash(tx);
+            const hash = await getTxHash(tx);
             expect(hash).to.eql(expectedHash, 'Hash does not match');
         }
     });

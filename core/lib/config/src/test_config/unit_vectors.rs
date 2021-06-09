@@ -5,7 +5,8 @@ use serde::Deserialize;
 // Workspace uses
 use zksync_types::{AccountId, Address, Nonce, PubKeyHash, TokenId, H256};
 use zksync_utils::{
-    BigUintSerdeAsRadix10Str, OptionBytesToHexSerde, ZeroPrefixHexSerde, ZeroxPrefix,
+    BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str, OptionBytesToHexSerde,
+    ZeroPrefixHexSerde, ZeroxPrefix,
 };
 // Local uses
 use super::{config_path, load_json};
@@ -95,6 +96,47 @@ pub enum TxData {
         data: Box<MintNFT>,
         eth_sign_data: MintNFTSignatureInputs,
     },
+    #[serde(rename_all = "camelCase")]
+    Order {
+        data: Box<Order>,
+        eth_sign_data: OrderSignatureInputs,
+    },
+    #[serde(rename_all = "camelCase")]
+    Swap {
+        data: Box<Swap>,
+        eth_sign_data: SwapSignatureInputs,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Order {
+    pub account_id: AccountId,
+    #[serde(rename = "recipient")]
+    pub recipient_address: Address,
+    pub nonce: Nonce,
+    pub token_buy: TokenId,
+    pub token_sell: TokenId,
+    #[serde(with = "BigUintPairSerdeAsRadix10Str")]
+    pub ratio: (BigUint, BigUint),
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub amount: BigUint,
+    #[serde(flatten)]
+    pub time_range: TimeRange,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Swap {
+    pub submitter_id: AccountId,
+    pub submitter_address: Address,
+    pub nonce: Nonce,
+    pub orders: (Order, Order),
+    #[serde(with = "BigUintPairSerdeAsRadix10Str")]
+    pub amounts: (BigUint, BigUint),
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub fee: BigUint,
+    pub fee_token: TokenId,
 }
 
 #[derive(Debug, Deserialize)]
@@ -231,6 +273,26 @@ pub struct WithdrawSignatureInputs {
 pub struct ChangePubKeySignatureInputs {
     pub pub_key_hash: PubKeyHash,
     pub account_id: AccountId,
+    pub nonce: Nonce,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderSignatureInputs {
+    pub token_sell: String,
+    pub token_buy: String,
+    pub recipient: Address,
+    pub amount: String,
+    pub nonce: Nonce,
+    #[serde(with = "BigUintPairSerdeAsRadix10Str")]
+    pub ratio: (BigUint, BigUint),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwapSignatureInputs {
+    pub fee: String,
+    pub fee_token: String,
     pub nonce: Nonce,
 }
 
