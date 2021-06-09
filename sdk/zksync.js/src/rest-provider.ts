@@ -191,7 +191,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async getTransactionFeeDetailed(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee,
+        txType: types.IncomingTxFeeType,
         address: types.Address,
         tokenLike: types.TokenLike
     ): Promise<Response<types.FeeRest>> {
@@ -224,7 +224,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async getTransactionFee(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee,
+        txType: types.IncomingTxFeeType,
         address: types.Address,
         tokenLike: types.TokenLike
     ): Promise<types.FeeRest> {
@@ -233,7 +233,7 @@ export class RestProvider extends SyncProvider {
 
     async getBatchFullFeeDetailed(
         transactions: {
-            txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee;
+            txType: types.IncomingTxFeeType;
             address: types.Address;
         }[],
         tokenLike: types.TokenLike
@@ -267,7 +267,7 @@ export class RestProvider extends SyncProvider {
 
     async getBatchFullFee(
         transactions: {
-            txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee;
+            txType: types.IncomingTxFeeType;
             address: types.Address;
         }[],
         tokenLike: types.TokenLike
@@ -525,7 +525,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | types.ChangePubKeyFee | types.LegacyChangePubKeyFee)[],
+        txTypes: types.IncomingTxFeeType[],
         addresses: types.Address[],
         tokenLike: types.TokenLike
     ): Promise<BigNumber> {

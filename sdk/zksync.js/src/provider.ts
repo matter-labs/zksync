@@ -3,10 +3,9 @@ import { BigNumber, Contract, ethers } from 'ethers';
 import {
     AccountState,
     Address,
-    ChangePubKeyFee,
+    IncomingTxFeeType,
     ContractAddress,
     Fee,
-    LegacyChangePubKeyFee,
     Network,
     PriorityOperationReceipt,
     TokenAddress,
@@ -217,11 +216,7 @@ export class Provider extends SyncProvider {
         }
     }
 
-    async getTransactionFee(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
-        address: Address,
-        tokenLike: TokenLike
-    ): Promise<Fee> {
+    async getTransactionFee(txType: IncomingTxFeeType, address: Address, tokenLike: TokenLike): Promise<Fee> {
         const transactionFee = await this.transport.request('get_tx_fee', [txType, address.toString(), tokenLike]);
         return {
             feeType: transactionFee.feeType,
@@ -234,7 +229,7 @@ export class Provider extends SyncProvider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee)[],
+        txTypes: IncomingTxFeeType[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {

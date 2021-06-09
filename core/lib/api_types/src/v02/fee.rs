@@ -1,6 +1,6 @@
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-use zksync_types::{Address, BatchFee, Fee, TokenLike, TxFeeTypes};
+use zksync_types::{tokens::ChangePubKeyFeeTypeArg, Address, BatchFee, Fee, TokenLike, TxFeeTypes};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -35,9 +35,34 @@ impl From<BatchFee> for ApiFee {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ApiTxFeeTypes {
+    /// Fee for the `Withdraw` transaction.
+    Withdraw,
+    /// Fee for the `Withdraw` operation that requires fast processing.
+    FastWithdraw,
+    /// Fee for the `Transfer` operation.
+    Transfer,
+    /// Fee for the `ChangePubKey` operation.
+    ChangePubKey(ChangePubKeyFeeTypeArg),
+    /// Fee for the `ForcedExit` transaction.
+    ForcedExit,
+}
+
+impl From<ApiTxFeeTypes> for TxFeeTypes {
+    fn from(fee_type: ApiTxFeeTypes) -> TxFeeTypes {
+        match fee_type {
+            ApiTxFeeTypes::Withdraw | ApiTxFeeTypes::ForcedExit => TxFeeTypes::Withdraw,
+            ApiTxFeeTypes::FastWithdraw => TxFeeTypes::FastWithdraw,
+            ApiTxFeeTypes::Transfer => TxFeeTypes::Transfer,
+            ApiTxFeeTypes::ChangePubKey(cpk_arg) => TxFeeTypes::ChangePubKey(cpk_arg),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TxFeeRequest {
-    pub tx_type: TxFeeTypes,
+    pub tx_type: ApiTxFeeTypes,
     pub address: Address,
     pub token_like: TokenLike,
 }
@@ -45,7 +70,7 @@ pub struct TxFeeRequest {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TxInBatchFeeRequest {
-    pub tx_type: TxFeeTypes,
+    pub tx_type: ApiTxFeeTypes,
     pub address: Address,
 }
 

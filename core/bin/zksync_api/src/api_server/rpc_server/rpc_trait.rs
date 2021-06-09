@@ -6,10 +6,11 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 
 // Workspace uses
+use zksync_api_types::v02::fee::ApiTxFeeTypes;
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, Fee, Token, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
+    Address, Fee, Token, TokenLike, TotalFee, ZkSyncTx,
 };
 
 // Local uses
@@ -54,7 +55,7 @@ pub trait Rpc {
     #[rpc(name = "get_tx_fee", returns = "Fee")]
     fn get_tx_fee(
         &self,
-        tx_type: TxFeeTypes,
+        tx_type: ApiTxFeeTypes,
         _address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee>;
@@ -63,7 +64,7 @@ pub trait Rpc {
     #[rpc(name = "get_txs_batch_fee_in_wei", returns = "TotalFee")]
     fn get_txs_batch_fee_in_wei(
         &self,
-        tx_types: Vec<TxFeeTypes>,
+        tx_types: Vec<ApiTxFeeTypes>,
         _addresses: Vec<Address>,
         token_like: TokenLike,
     ) -> FutureResp<TotalFee>;
@@ -157,7 +158,7 @@ impl Rpc for RpcApp {
 
     fn get_tx_fee(
         &self,
-        tx_type: TxFeeTypes,
+        tx_type: ApiTxFeeTypes,
         address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee> {
@@ -174,7 +175,7 @@ impl Rpc for RpcApp {
 
     fn get_txs_batch_fee_in_wei(
         &self,
-        tx_types: Vec<TxFeeTypes>,
+        tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token_like: TokenLike,
     ) -> FutureResp<TotalFee> {

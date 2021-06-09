@@ -32,7 +32,7 @@ async fn get_tx_fee(
     Json(body): Json<TxFeeRequest>,
 ) -> ApiResult<ApiFee> {
     data.tx_sender
-        .get_txs_fee_in_wei(body.tx_type, body.address, body.token_like)
+        .get_txs_fee_in_wei(body.tx_type.into(), body.address, body.token_like)
         .await
         .map_err(Error::from)
         .map(ApiFee::from)
@@ -45,7 +45,7 @@ async fn get_batch_fee(
 ) -> ApiResult<ApiFee> {
     let mut txs = Vec::new();
     for tx in body.transactions {
-        txs.push((tx.tx_type, tx.address));
+        txs.push((tx.tx_type.into(), tx.address));
     }
     data.tx_sender
         .get_txs_batch_fee_in_wei(txs, body.token_like)
@@ -74,8 +74,11 @@ mod tests {
         SharedData,
     };
     use num::BigUint;
-    use zksync_api_types::v02::{fee::TxInBatchFeeRequest, ApiVersion};
-    use zksync_types::{tokens::TokenLike, Address, TokenId, TxFeeTypes};
+    use zksync_api_types::v02::{
+        fee::{ApiTxFeeTypes, TxInBatchFeeRequest},
+        ApiVersion,
+    };
+    use zksync_types::{tokens::TokenLike, Address, TokenId};
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -101,7 +104,7 @@ mod tests {
             Some(shared_data),
         );
 
-        let tx_type = TxFeeTypes::Withdraw;
+        let tx_type = ApiTxFeeTypes::Withdraw;
         let address = Address::default();
         let token_like = TokenLike::Id(TokenId(1));
 
@@ -114,7 +117,7 @@ mod tests {
         assert_eq!(api_fee.total_fee, BigUint::from(2u32));
 
         let tx = TxInBatchFeeRequest {
-            tx_type: TxFeeTypes::Withdraw,
+            tx_type: ApiTxFeeTypes::Withdraw,
             address: Address::default(),
         };
         let txs = vec![tx.clone(), tx.clone(), tx];
