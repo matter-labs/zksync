@@ -132,7 +132,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
     }
 
     /// @dev Converts hex string to base 58
-    function toBase58(bytes memory source) internal view returns (string memory) {
+    function toBase58(bytes memory source) internal pure returns (string memory) {
         uint8[] memory digits = new uint8[](46);
         digits[0] = 0;
         uint8 digitLength = 1;
@@ -153,11 +153,11 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         return toAlphabet(reverse(digits));
     }
 
-    function ipfsCID(bytes32 source) public view returns (string memory) {
+    function ipfsCID(bytes32 source) public pure returns (string memory) {
         return toBase58(abi.encodePacked(sha256MultiHash, source));
     }
 
-    function reverse(uint8[] memory input) internal view returns (uint8[] memory) {
+    function reverse(uint8[] memory input) internal pure returns (uint8[] memory) {
         uint8[] memory output = new uint8[](input.length);
         for (uint8 i = 0; i < input.length; i++) {
             output[i] = input[input.length - 1 - i];
@@ -165,7 +165,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         return output;
     }
 
-    function toAlphabet(uint8[] memory indices) internal view returns (string memory) {
+    function toAlphabet(uint8[] memory indices) internal pure returns (string memory) {
         bytes memory output = new bytes(indices.length);
         for (uint32 i = 0; i < indices.length; i++) {
             output[i] = ALPHABET[indices[i]];
