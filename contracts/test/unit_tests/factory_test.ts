@@ -1,6 +1,6 @@
 import { expect, use } from 'chai';
 import { solidity } from 'ethereum-waffle';
-import { BigNumber, BigNumberish, ethers, Signer, utils } from 'ethers';
+import { BigNumber, BigNumberish, ethers, Signer } from 'ethers';
 const { getCallRevertReason } = require('./common');
 import { ZkSyncNFTFactory } from '../../typechain/ZkSyncNFTFactory';
 import { ZkSyncNFTFactoryFactory } from '../../typechain/ZkSyncNFTFactoryFactory';
@@ -102,13 +102,13 @@ describe('NFTFactory unit tests', function () {
         // Taking all the bits
         await oneTest(two_pow_191.add(two_pow_200), 0, 256, two_pow_191.add(two_pow_200));
     });
-    it('ipfsCid', async () => {
+    it('ipfsCID', async () => {
         // The test checks the ability to mint NFT from allowed contract
         const contentHash = '0x218145f24cb870cc72ec7f0cc734b86f3e9a744666282f99023f022be77aaea6';
 
         nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet1);
         const expectedCid = 'QmQbSVaG7DUjQ9ktPtMnSXReJ29XHezBghcxJeZDsGG7wB';
-        const cid = await nftFactory.ipfsCid(contentHash);
+        const cid = await nftFactory.ipfsCID(contentHash);
         expect(cid).to.equal(expectedCid);
     });
 });

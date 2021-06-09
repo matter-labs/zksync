@@ -127,7 +127,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         require(_exists(tokenId), "ne");
         string memory base = "ipfs://";
-        string memory tokenContentHash = ipfsCid(_contentHashes[tokenId]);
+        string memory tokenContentHash = ipfsCID(_contentHashes[tokenId]);
         return string(abi.encodePacked(base, tokenContentHash));
     }
 
@@ -153,7 +153,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         return toAlphabet(reverse(digits));
     }
 
-    function ipfsCid(bytes32 source) public view returns (string memory) {
+    function ipfsCID(bytes32 source) public view returns (string memory) {
         return toBase58(abi.encodePacked(sha256MultiHash, source));
     }
 
