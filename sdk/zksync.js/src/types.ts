@@ -29,9 +29,21 @@ export interface NFT {
     symbol: string;
     creatorId: number;
     serialId: number;
-    address: string;
-    creatorAddress: string;
+    address: Address;
+    creatorAddress: Address;
     contentHash: string;
+}
+
+export interface NFTWithFactories {
+    id: number;
+    symbol: string;
+    creatorId: number;
+    serialId: number;
+    address: Address;
+    creatorAddress: Address;
+    contentHash: string;
+    currentFactory: Address;
+    withdrawnFactory?: Address;
 }
 
 export interface AccountState {
