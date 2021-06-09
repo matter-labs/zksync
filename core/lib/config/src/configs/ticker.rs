@@ -24,9 +24,9 @@ pub struct TickerConfig {
     pub coinmarketcap_base_url: String,
     /// URL of CoinGecko API. Can be set to the mock server for local development.
     pub coingecko_base_url: String,
-    /// coefficient for scaling all fees in percent.
+    /// Coefficient for scaling all fees in percent.
     pub scale_fee_percent: u32,
-    /// coefficient for the fee price for fast withdrawal requests.
+    /// Coefficient for the fee price for fast withdrawal requests.
     pub fast_processing_coeff: f64,
     /// Url to uniswap api
     pub uniswap_url: String,
