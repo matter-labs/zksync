@@ -21,11 +21,34 @@ impl<'a, 'c> ConfigSchema<'a, 'c> {
     /// Loads the server configuration.
     pub async fn load_config(&mut self) -> QueryResult<ServerConfig> {
         let start = Instant::now();
-        let config = sqlx::query_as!(ServerConfig, "SELECT * FROM server_config",)
+        let config = sqlx::query_as!(ServerConfig, "SELECT * FROM server_config")
             .fetch_one(self.0.conn())
             .await?;
 
         metrics::histogram!("sql.load_config", start.elapsed());
         Ok(config)
+    }
+
+    // Stores the server configuration for tests.
+    #[doc(hidden)]
+    pub async fn store_config(
+        &mut self,
+        contract_addr: &str,
+        gov_contract_addr: &str,
+        nft_factory_addr: &str,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3)",
+            contract_addr,
+            gov_contract_addr,
+            nft_factory_addr
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.store_config", start.elapsed());
+        Ok(())
     }
 }

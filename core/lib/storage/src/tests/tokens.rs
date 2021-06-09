@@ -1,11 +1,17 @@
+// Built-in deps
+use std::str::FromStr;
 // External imports
 use num::{rational::Ratio, BigUint};
 // Workspace imports
-use zksync_types::{tokens::TokenMarketVolume, Token, TokenId, TokenLike, TokenPrice};
+use zksync_types::{
+    tokens::TokenMarketVolume, AccountId, Address, Token, TokenId, TokenLike, TokenPrice, H256,
+};
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 // Local imports
 use crate::tests::db_test;
 use crate::{
+    chain::account::records::StorageMintNFTUpdate,
+    diff::StorageAccountDiff,
     tokens::{TokensSchema, STORED_USD_PRICE_PRECISION},
     QueryResult, StorageProcessor,
 };
@@ -193,6 +199,84 @@ async fn test_market_volume(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await
         .expect("Load tokens by market volume query failed");
     assert_eq!(tokens.len(), 1);
+
+    Ok(())
+}
+
+/// Checks the store/load factories for nft
+#[db_test]
+async fn test_nfts_with_factories(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let token_id = 10;
+    let creator_account_id = 5;
+    let symbol = String::from("SYMBOL");
+    let diff = StorageAccountDiff::MintNFT(StorageMintNFTUpdate {
+        token_id,
+        serial_id: 0,
+        creator_account_id,
+        creator_address: Address::default().as_bytes().to_vec(),
+        address: Address::from_str("2222222222222222222222222222222222222222")
+            .unwrap()
+            .as_bytes()
+            .to_vec(),
+        content_hash: H256::default().as_bytes().to_vec(),
+        update_order_id: 0,
+        block_number: 0,
+        symbol: symbol.clone(),
+    });
+    storage
+        .chain()
+        .state_schema()
+        .apply_storage_account_diff(diff)
+        .await?;
+
+    let default_factory_address_str = "1111111111111111111111111111111111111111";
+    let default_factory_address = Address::from_str(default_factory_address_str).unwrap();
+    storage
+        .config_schema()
+        .store_config("", "", &format!("0x{}", default_factory_address_str))
+        .await?;
+
+    let token_id = TokenId(token_id as u32);
+    let nft = storage
+        .tokens_schema()
+        .get_nft_with_factories(token_id)
+        .await?
+        .unwrap();
+    assert_eq!(nft.symbol, symbol);
+    assert_eq!(nft.current_factory, default_factory_address);
+    assert!(nft.withdrawn_factory.is_none());
+
+    storage
+        .tokens_schema()
+        .store_factories_for_withdrawn_nfts(vec![token_id])
+        .await?;
+
+    let nft = storage
+        .tokens_schema()
+        .get_nft_with_factories(token_id)
+        .await?
+        .unwrap();
+    assert_eq!(nft.current_factory, default_factory_address);
+    assert_eq!(nft.withdrawn_factory.unwrap(), default_factory_address);
+
+    let new_factory_address =
+        Address::from_str("51f610535ab3c695e0bcef6b7827f8d4a3472f01").unwrap();
+    storage
+        .tokens_schema()
+        .store_nft_factory(
+            AccountId(creator_account_id as u32),
+            Default::default(),
+            new_factory_address,
+        )
+        .await?;
+
+    let nft = storage
+        .tokens_schema()
+        .get_nft_with_factories(token_id)
+        .await?
+        .unwrap();
+    assert_eq!(nft.current_factory, default_factory_address);
+    assert_eq!(nft.withdrawn_factory.unwrap(), new_factory_address);
 
     Ok(())
 }

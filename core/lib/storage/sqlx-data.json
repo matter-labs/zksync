@@ -2461,6 +2461,20 @@
       ]
     }
   },
+  "6e99e599875e2567cc2f280fda3dbb0ae6a13fcc065dca1f6e96204bd14c27d1": {
+    "query": "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {
     "query": "SELECT * FROM accounts",
     "describe": {
