@@ -284,8 +284,7 @@ export class Wallet {
     }): Promise<Transaction> {
         forcedExit.nonce = forcedExit.nonce != null ? await this.getNonce(forcedExit.nonce) : await this.getNonce();
         if (forcedExit.fee == null) {
-            // Fee for forced exit is defined by `Withdraw` transaction type (as it's essentially just a forced withdraw).
-            const fullFee = await this.provider.getTransactionFee('Withdraw', forcedExit.target, forcedExit.token);
+            const fullFee = await this.provider.getTransactionFee('ForcedExit', forcedExit.target, forcedExit.token);
             forcedExit.fee = fullFee.totalFee;
         }
 

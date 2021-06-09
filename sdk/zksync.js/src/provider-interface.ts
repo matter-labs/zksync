@@ -1,10 +1,9 @@
 import {
     AccountState,
     Address,
-    ChangePubKeyFee,
     ContractAddress,
     Fee,
-    LegacyChangePubKeyFee,
+    IncomingTxFeeType,
     PriorityOperationReceipt,
     TokenLike,
     Tokens,
@@ -37,13 +36,9 @@ export abstract class SyncProvider {
         action: 'COMMIT' | 'VERIFY'
     ): Promise<PriorityOperationReceipt>;
     abstract notifyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<TransactionReceipt>;
-    abstract getTransactionFee(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
-        address: Address,
-        tokenLike: TokenLike
-    ): Promise<Fee>;
+    abstract getTransactionFee(txType: IncomingTxFeeType, address: Address, tokenLike: TokenLike): Promise<Fee>;
     abstract getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee)[],
+        txTypes: IncomingTxFeeType[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber>;

@@ -259,6 +259,14 @@ export interface BatchFeeRpc {
     totalFee: BigNumber;
 }
 
+export type IncomingTxFeeType =
+    | 'Withdraw'
+    | 'Transfer'
+    | 'FastWithdraw'
+    | 'ForcedExit'
+    | ChangePubKeyFee
+    | LegacyChangePubKeyFee;
+
 export interface PaginationQuery<F> {
     from: F | 'latest';
     limit: number;
