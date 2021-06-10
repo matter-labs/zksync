@@ -1,8 +1,24 @@
+## ChangePubKeyType (enum)
+- Onchain
+- ECDSA
+- CREATE2
+
+## ChangePubKeyFee (object)
++ ChangePubKey (ChangePubKeyType, required)
+
+## LegacyChangePubKeyFeeType (object)
++ onchainPubkeyAuth (boolean, required)
+
+## LegacyChangePubKeyFee (object)
++ ChangePubKey (LegacyChangePubKeyFeeType, required)
+
 ## Fee.Type (enum)
-+ Transfer
-+ ChangePubKey
-+ Withdraw
-+ FastWithdraw
+- Transfer
+- Withdraw
+- FastWithdraw
+- ForcedExit
+- (ChangePubKeyFee)
+- (LegacyChangePubKeyFee)
 
 ## Fee.Single (object)
 + gasFee: `12000000000` (string, required),
