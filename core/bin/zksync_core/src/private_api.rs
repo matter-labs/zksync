@@ -209,6 +209,7 @@ pub fn start_private_core_api(
                         .wrap(actix_web::middleware::Logger::default())
                         .wrap(vlog::actix_middleware())
                         .app_data(web::Data::new(app_state))
+                        .app_data(web::JsonConfig::default().limit(2usize.pow(32)))
                         .service(new_tx)
                         .service(new_txs_batch)
                         .service(unconfirmed_op)
