@@ -15,7 +15,7 @@ import {
     TransactionReceipt,
     TxEthSignature,
     TxEthSignatureVariant,
-    NFTWithFactories
+    NFTInfo
 } from './types';
 import { isTokenETH, sleep, TokenSet, isNFT } from './utils';
 import {
@@ -180,7 +180,7 @@ export class Provider {
         return await this.transport.request('get_eth_tx_for_withdrawal', [withdrawal_hash]);
     }
 
-    async getNFT(id: number): Promise<NFTWithFactories> {
+    async getNFT(id: number): Promise<NFTInfo> {
         const nft = await this.transport.request('get_nft', [id]);
 
         // If the NFT does not exist, throw an exception

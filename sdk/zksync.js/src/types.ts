@@ -34,7 +34,7 @@ export interface NFT {
     contentHash: string;
 }
 
-export interface NFTWithFactories {
+export interface NFTInfo {
     id: number;
     symbol: string;
     creatorId: number;

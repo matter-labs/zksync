@@ -1,8 +1,8 @@
 // Built-in deps
 use std::time::Instant;
 // External imports
-
 // Workspace imports
+use zksync_types::Address;
 // Local imports
 use self::records::ServerConfig;
 use crate::{QueryResult, StorageProcessor};
@@ -31,19 +31,20 @@ impl<'a, 'c> ConfigSchema<'a, 'c> {
 
     // Stores the server configuration for tests.
     #[doc(hidden)]
+    #[allow(dead_code)]
     pub(crate) async fn store_config(
         &mut self,
-        contract_addr: &str,
-        gov_contract_addr: &str,
-        nft_factory_addr: &str,
+        contract_addr: Address,
+        gov_contract_addr: Address,
+        nft_factory_addr: Address,
     ) -> QueryResult<()> {
         let start = Instant::now();
 
         sqlx::query!(
             "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3)",
-            contract_addr,
-            gov_contract_addr,
-            nft_factory_addr
+            &format!("{:?}", contract_addr),
+            &format!("{:?}", gov_contract_addr),
+            &format!("{:?}", nft_factory_addr)
         )
         .execute(self.0.conn())
         .await?;

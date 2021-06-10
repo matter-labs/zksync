@@ -229,11 +229,15 @@ async fn test_nfts_with_factories(mut storage: StorageProcessor<'_>) -> QueryRes
         .apply_storage_account_diff(diff)
         .await?;
 
-    let default_factory_address_str = "1111111111111111111111111111111111111111";
-    let default_factory_address = Address::from_str(default_factory_address_str).unwrap();
+    let default_factory_address =
+        Address::from_str("1111111111111111111111111111111111111111").unwrap();
     storage
         .config_schema()
-        .store_config("", "", &format!("0x{}", default_factory_address_str))
+        .store_config(
+            Default::default(),
+            Default::default(),
+            default_factory_address,
+        )
         .await?;
 
     let token_id = TokenId(token_id as u32);

@@ -282,7 +282,7 @@ impl NFT {
     }
 }
 
-// TODO: move this file to `api_types` crate (ZKD-67)
+// TODO: move this struct to `api_types` crate (ZKD-67)
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiNFT {
     pub id: TokenId,
