@@ -57,7 +57,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let start = Instant::now();
         let result = sqlx::query_as!(
             StoredAggregatedOperation,
-            "SELECT * FROM aggregate_operations WHERE from_block >= $1 AND to_block <= $1 AND action_type = $2",
+            "SELECT * FROM aggregate_operations WHERE $1 BETWEEN from_block AND to_block
+                AND action_type = $2",
             i64::from(*block_number),
             aggregated_action_type.to_string()
         )

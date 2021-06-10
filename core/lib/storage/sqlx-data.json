@@ -124,11 +124,6 @@
           "ordinal": 3,
           "name": "decimals",
           "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -137,7 +132,6 @@
         ]
       },
       "nullable": [
-        false,
         false,
         false,
         false,
@@ -214,18 +208,6 @@
   },
   "0929e7b917ff45833b2f36a0b987e2efa6ab3a22c04b0aacb06a97e8269e442f": {
     "query": "DELETE FROM block_witness WHERE block > $1",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "095e24b8638392c33840516e84d9526783511d14a3405ab8e5302b9396b2986f": {
-    "query": "DELETE FROM mint_nft_updates WHERE block_number > $1",
     "describe": {
       "columns": [],
       "parameters": {
@@ -528,72 +510,6 @@
       "nullable": []
     }
   },
-  "1453c487619584da255ac032a521e5813934324f443d07d77cbf894e071202b5": {
-    "query": "SELECT * FROM mint_nft_updates",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "update_order_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 8,
-          "name": "symbol",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -695,6 +611,22 @@
       ]
     }
   },
+  "17fc469643c2d885502a9f3e5d44c2b7032e03f694c663215fe9160fc8db38df": {
+    "query": "\n                        INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )\n                        VALUES ( $1, $2, $3, $4, $5 )\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Bytea",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "18923147a9a9f03dae77d31f106ac53ca69321df1194c921baef8f48ff963c12": {
     "query": "WITH aggregate_ops AS (\n                SELECT aggregate_operations.id FROM aggregate_operations\n                   WHERE confirmed = $1 and action_type != $2 and aggregate_operations.id != ANY(SELECT id from eth_aggregated_ops_binding)\n                ORDER BY aggregate_operations.id ASC\n              )\n              INSERT INTO eth_unprocessed_aggregated_ops (op_id)\n              SELECT id from aggregate_ops\n              ON CONFLICT (op_id)\n              DO NOTHING",
     "describe": {
@@ -788,75 +720,6 @@
         true,
         true,
         true
-      ]
-    }
-  },
-  "1a8ff6100bfc7521b3728c817a4014355e09d6ca1c251bbcee6f7cf013b6800d": {
-    "query": "SELECT * FROM mint_nft_updates WHERE block_number > $1 AND block_number <= $2 ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "update_order_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 8,
-          "name": "symbol",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
       ]
     }
   },
@@ -1025,52 +888,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "263931af0450d194a1369bb58e1f8584bf7706f5fba29bd58a8d9b31e2cb675e": {
-    "query": "\n            SELECT * FROM tokens\n            WHERE id = $1 OR address = $2 OR symbol = $3\n            LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "273c7371b1a13bbb03490e874b7f2eab969defa6aa9f2b416e4f9e8a135aa97c": {
@@ -1271,6 +1088,44 @@
       ]
     }
   },
+  "2d70c5906b5c17523afd243c8be132f5b1724482e2f9d2795085455cafa0d6ce": {
+    "query": "\n            SELECT id, address, symbol, decimals\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Numeric"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "2e92926816053cda2de6d571867a625fab5bb9668840db94bd18c411f96dc39b": {
     "query": "SELECT * FROM blocks WHERE number = $1",
     "describe": {
@@ -1393,20 +1248,6 @@
       "nullable": []
     }
   },
-  "35e0fd96463a3f958241fd62ef8bd6536f3f084908fa299f2efb09459be6b38c": {
-    "query": "\n                    INSERT INTO balances ( account_id, coin_id, balance )\n                    VALUES ( $1, $2, $3 )\n                    ON CONFLICT (account_id, coin_id)\n                    DO UPDATE\n                      SET balance = $3\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int4",
-          "Numeric"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
     "query": "SELECT * FROM balances WHERE account_id = ANY($1)",
     "describe": {
@@ -1447,6 +1288,20 @@
         "Left": [
           "Int8",
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "39f351e0d79171f20e82f0df7ea9fd34069c69915f96d4496242d35d6bd22a1b": {
+    "query": "\n                        INSERT INTO balances ( account_id, coin_id, balance )\n                        VALUES ( $1, $2, $3 )\n                        ON CONFLICT (account_id, coin_id)\n                        DO UPDATE\n                          SET balance = $3\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Numeric"
         ]
       },
       "nullable": []
@@ -1536,6 +1391,18 @@
       "nullable": []
     }
   },
+  "437c7b571b9be4bfbb677acff6b6b4393c7f8fd8c035264052e782bfd89c67ff": {
+    "query": "\n                        DELETE FROM accounts\n                        WHERE id = $1\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "439d0083a3b98066071cde5909969b4e9ce744bc1bfa761116c6fb5bcc356075": {
     "query": "DELETE FROM account_balance_updates WHERE block_number > $1",
     "describe": {
@@ -1560,54 +1427,6 @@
       "nullable": []
     }
   },
-  "44946f944f3c496ba90d5843084acf36aa3db3dd9d90f72a9bbeee862af056e4": {
-    "query": "SELECT blocks.block_num AS block_num, ops, fee_account,\n            timestamp, previous_block_root_hash, contract_version\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN data_restore_events_state as events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "block_num",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "ops",
-          "type_info": "JsonbArray"
-        },
-        {
-          "ordinal": 2,
-          "name": "fee_account",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "timestamp",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "previous_block_root_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "contract_version",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        null,
-        false,
-        true,
-        true,
-        false
-      ]
-    }
-  },
   "44b276fda62734e9c9d9853f493340265116ab7f13599674d27aafe3d3887391": {
     "query": "UPDATE eth_operations \n            SET last_used_gas_price = $1, last_deadline_block = $2\n            WHERE id = $3",
     "describe": {
@@ -1617,20 +1436,6 @@
           "Numeric",
           "Int8",
           "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "44c99a84f28659435e9cae90670179cf2e49b789abeee4754a8f830a2eead483": {
-    "query": "\n            INSERT INTO nft_factory ( creator_id, factory_address, creator_address )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT ( creator_id ) \n            DO UPDATE \n            SET factory_address = $2 \n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text"
         ]
       },
       "nullable": []
@@ -2145,22 +1950,6 @@
       ]
     }
   },
-  "578f732b2a605d3af17189dc0c1c72d3f6f1921672098c2a81bccb695843f745": {
-    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2",
-          "Bool"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "58b251c3fbdf9be9b62f669f8cdc2d98940026c831e02a53337474d36a5224f0": {
     "query": "UPDATE aggregate_operations\n                SET confirmed = $1\n                WHERE from_block >= $2 AND to_block <= $3 AND action_type = $4",
     "describe": {
@@ -2404,19 +2193,6 @@
       ]
     }
   },
-  "6c25f6955c7381b5ed9bf4f2eb233adbd2923baafc688f36b66b86f44b456668": {
-    "query": "UPDATE blocks\n                SET root_hash = $1\n                WHERE number = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
     "query": "SELECT max(number) FROM blocks",
     "describe": {
@@ -2424,6 +2200,24 @@
         {
           "ordinal": 0,
           "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "6e4c5231bdde779bdf1e714557b6763e244ff62edfcbcdfc7166c9f561d7f670": {
+    "query": "\n            SELECT count(*) as \"count!\" FROM tokens\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
           "type_info": "Int8"
         }
       ],
@@ -2487,56 +2281,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "72e7f8ffef6a594e659f5d0eb02e7463612d2ff4c2b6d4db120b94ebde1c314b": {
-    "query": "\n                SELECT * FROM nft\n                WHERE token_id = $1\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 3,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "73eedd4444ef5bfbfd526c319f97d75609a65517d63e88add0a864a9f7141a02": {
@@ -3019,74 +2763,6 @@
       ]
     }
   },
-  "8c2b6d94cb84616a33ecfb94be7153b3d760b456fa24af058076a69a6f4f204c": {
-    "query": "\n            SELECT * FROM mint_nft_updates \n            WHERE token_id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "update_order_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 8,
-          "name": "symbol",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "8eb8865ba9f727bf86cbb3713903241b60e61b02b200fcf60483c99ff7cdc57c": {
     "query": "INSERT INTO data_restore_rollup_block_ops (block_num, operation)\n                SELECT $1, u.operation\n                    FROM UNNEST ($2::jsonb[])\n                    AS u(operation)",
     "describe": {
@@ -3127,26 +2803,6 @@
           "Int8",
           "Int8",
           "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "8fa8f2151ca29683db10c67186c397d6d86cd2322431a5915bc187114fa7bcd8": {
-    "query": "\n                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, symbol )\n                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9)\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4",
-          "Bytea",
-          "Int4",
-          "Bytea",
-          "Bytea",
-          "Int8",
-          "Int4",
-          "Text"
         ]
       },
       "nullable": []
@@ -3202,72 +2858,6 @@
       "columns": [],
       "parameters": {
         "Left": []
-      },
-      "nullable": []
-    }
-  },
-  "9600a226f271e0939eb5fd0327a48e3f1dbbdfb673e91287c474c827cdea83ee": {
-    "query": "\n                    SELECT * FROM nft \n                    WHERE creator_account_id = $1\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 3,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "961bbd13b54a7d53a58dfef2e60ce77752ff30807226edc69a47487b994b1468": {
-    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2",
-          "Bool"
-        ]
       },
       "nullable": []
     }
@@ -3353,6 +2943,21 @@
         true,
         false
       ]
+    }
+  },
+  "9c07c9ffe26fede6ef1954c873c7ff392a908489147f4954df45dd941e97aa20": {
+    "query": "\n                        UPDATE accounts \n                        SET last_block = $1, nonce = $2, pubkey_hash = $3\n                        WHERE id = $4\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "9c0a30a24bb6c2481323effc74b01db6163f9e9a368da85ceda727b6e547f087": {
@@ -3476,6 +3081,42 @@
         ]
       },
       "nullable": [
+        false
+      ]
+    }
+  },
+  "a270c88373710266a4904a7e5e1e418edebed57af308cf8233f6a7331331c5e4": {
+    "query": "\n            SELECT * FROM tokens\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
         false
       ]
     }
@@ -3606,11 +3247,6 @@
           "ordinal": 3,
           "name": "decimals",
           "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -3619,7 +3255,6 @@
         ]
       },
       "nullable": [
-        false,
         false,
         false,
         false,
@@ -3849,50 +3484,6 @@
         "Left": []
       },
       "nullable": [
-        false,
-        false
-      ]
-    }
-  },
-  "bc246679e533069cc7fbdf248e62c3e649f32b8019b48a94d074a95a09777069": {
-    "query": "\n            SELECT id, address, symbol, decimals, is_nft\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            AND is_nft = false\n            ORDER BY id ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Numeric"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
         false,
         false
       ]
@@ -4242,21 +3833,6 @@
       ]
     }
   },
-  "c23bc5ab7c6f6148d1e12d408d4c8842d80cca11e3eb539fd9153ae808a11f28": {
-    "query": "\n                    UPDATE accounts \n                    SET last_block = $1, nonce = $2, pubkey_hash = $3\n                    WHERE id = $4\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "c2b72cb3aeb4b448b240edef3988a1026577a82fb4ae1c416fcaf4622afa4ac0": {
     "query": "INSERT INTO aggregate_operations (action_type, arguments, from_block, to_block)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (id)\n            DO NOTHING\n            RETURNING id",
     "describe": {
@@ -4340,40 +3916,6 @@
         false,
         false
       ]
-    }
-  },
-  "c7045d75468ecf0b89dadcb4edeb0a55eb65a175fa101c42011ca24c89036803": {
-    "query": "\n            SELECT max(id) as \"id!\" FROM tokens WHERE is_nft = false\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id!",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
-  "c7459e7624c46417d3a91fc39b05128cf3e88097ae114d8aad6e22b9b2cd84e9": {
-    "query": "\n                    INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )\n                    VALUES ( $1, $2, $3, $4, $5 )\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Bytea",
-          "Bytea"
-        ]
-      },
-      "nullable": []
     }
   },
   "c7bc91425f35b3a77be36fe8ba80030445051a0bc2536fa4a0def7ac498fc5c2": {
@@ -4514,6 +4056,21 @@
       ]
     }
   },
+  "cdc6f84e5eee67e085706daa75f69a498adcedd7093288bd7ec84813e5066075": {
+    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals )\n            VALUES ( $1, $2, $3, $4 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "ceb8e4656aa76e1918a03707a1f047aed19ffcb3c70dbde61a6353b26b5a2493": {
     "query": "\n            INSERT INTO ticker_market_volume ( token_id, market_volume, last_updated )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT (token_id)\n            DO\n              UPDATE SET market_volume = $2, last_updated = $3\n            ",
     "describe": {
@@ -4546,20 +4103,6 @@
       ]
     }
   },
-  "d32a820014652b70f2035bccb22df070dc98c416813520de6b20157ed670756e": {
-    "query": "\n                    UPDATE accounts \n                    SET last_block = $1, nonce = $2\n                    WHERE id = $3\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "d3b822a6639901acd986e82d2779a7318c3805385a7772db83063d9507c049a7": {
     "query": "INSERT INTO eth_parameters (nonce, gas_price_limit, last_committed_block, last_verified_block, last_executed_block)\n                VALUES ($1, $2, $3, $4, $5)",
     "describe": {
@@ -4574,6 +4117,63 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "d3e53b1048d02ee3d09da9961172861c54fced836e266a9178befeddae3ef51e": {
+    "query": "SELECT * FROM aggregate_operations WHERE $1 BETWEEN from_block AND to_block\n                AND action_type = $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "d71db9de5e4ec2dc9a511d4a1247d912b15250bbd8f834f11b252de653c73176": {
@@ -4630,132 +4230,6 @@
         ]
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "d919ccb745fc350cc9885fe5cda9a5c9fc0b966852a308fbb24c2cc20c4216e2": {
-    "query": "\n                SELECT * FROM mint_nft_updates\n                WHERE creator_account_id = $1 AND block_number > $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "update_order_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 8,
-          "name": "symbol",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "d9e266ce374cc7d12511a61ca81cd167b59493ee74e44b26c4baf92f4a4152e4": {
-    "query": "SELECT * FROM aggregate_operations WHERE from_block >= $1 AND to_block <= $1 AND action_type = $2",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "arguments",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "from_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "to_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
         false,
         false,
         false,
@@ -4850,6 +4324,54 @@
       ]
     }
   },
+  "dcd0381b0098d3223ff90cb4a02f73b1107329f1e046eced766361cef5cf8e0d": {
+    "query": "SELECT blocks.block_num AS block_num, ops, fee_account,\n            timestamp, previous_block_root_hash, contract_version\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN (\n                SELECT DISTINCT block_num, contract_version\n                FROM data_restore_events_state\n            ) events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_num",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "ops",
+          "type_info": "JsonbArray"
+        },
+        {
+          "ordinal": 2,
+          "name": "fee_account",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "timestamp",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "previous_block_root_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "contract_version",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        null,
+        false,
+        true,
+        true,
+        false
+      ]
+    }
+  },
   "dcef2a0727cc074e66d5d5ac5c0d65e7581d0c4d635452950f1704859b06a94b": {
     "query": "DELETE FROM prover_job_queue WHERE first_block > $1",
     "describe": {
@@ -4910,18 +4432,6 @@
         true,
         false
       ]
-    }
-  },
-  "e10f37a3c41cf1446b91605ffdeef37da79d7d3a77d47fb3dfab764831509536": {
-    "query": "\n                    DELETE FROM accounts\n                    WHERE id = $1\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "e295fe3cf4138c1dfd76fc7b4f5e72ab981229c036c46fb937cd6fc974af843d": {
@@ -5041,11 +4551,6 @@
           "ordinal": 3,
           "name": "decimals",
           "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -5054,7 +4559,6 @@
         ]
       },
       "nullable": [
-        false,
         false,
         false,
         false,
@@ -5212,136 +4716,6 @@
       "parameters": {
         "Left": [
           "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "eb9480426aebcc7679526858296f555bb4d3e1ccf488a942de6d0b2dd1ed4720": {
-    "query": "\n                    INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n                    VALUES ( $1, $2, $3, $4, true )\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "ed39b22ac81b690c2102487ae3351915eec23b00a9cf9e409de08662c42fa20d": {
-    "query": "SELECT * FROM balances",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "account_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "coin_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "balance",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "ed4f6300995e13af62d0263cad9dfce76ae5aa8d2a5bc2be8e2f4b7de32fa2f6": {
-    "query": "\n                SELECT * FROM mint_nft_updates\n                WHERE block_number = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "update_order_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 8,
-          "name": "symbol",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "ee0c7b261773695aac26c4c3ca0da12077ab71b8487a04ffc436828a3fcc74d3": {
-    "query": "\n                    INSERT INTO nft ( token_id, creator_address, creator_account_id, serial_id, address, content_hash )\n                    VALUES ( $1, $2, $3, $4, $5, $6)\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Bytea",
-          "Int4",
-          "Int4",
-          "Bytea",
-          "Bytea"
         ]
       },
       "nullable": []
@@ -5575,6 +4949,20 @@
       ]
     }
   },
+  "f132881fb1b1eaedb15991e64c7040c6f368271fc306780395cf6214f88b294b": {
+    "query": "\n                        UPDATE accounts \n                        SET last_block = $1, nonce = $2\n                        WHERE id = $3\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "f1f2c5311487585c29e51db49cac9706d0a48e563aef71381c81a2d0d61da422": {
     "query": "SELECT * FROM aggregate_operations\n                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $1)",
     "describe": {
@@ -5623,48 +5011,6 @@
       "nullable": [
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "f491f570438dd3a3ecd5988d0682751448723b41f1bd17198cc60d7f5d9aeb11": {
-    "query": "\n            SELECT * FROM tokens WHERE is_nft = false\n            ORDER BY id ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
         false,
         false,
         false,
@@ -5744,18 +5090,6 @@
       ]
     }
   },
-  "f5bb5886974577c7f43179f77638507511ffbe1462bb75844a1f1c72414a4d83": {
-    "query": "\n            DELETE FROM account_tree_cache \n            WHERE block = $1\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
     "query": "SELECT pg_notify($1, $2)",
     "describe": {
@@ -5774,74 +5108,6 @@
       },
       "nullable": [
         null
-      ]
-    }
-  },
-  "fabb011dfd474fd56c71b7fb1707bbe586e66f9a45deac15b486845ba5c87979": {
-    "query": "SELECT * FROM mint_nft_updates WHERE block_number <= $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "update_order_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 8,
-          "name": "symbol",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
       ]
     }
   },
@@ -5911,19 +5177,6 @@
         false,
         false
       ]
-    }
-  },
-  "fe0256b27116eafc9a83d0f9eff341751c6022a13d0bc3625c8c8f8b9001309e": {
-    "query": "\n                        DELETE FROM mint_nft_updates\n                        WHERE token_id = $1 and block_number = $2\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   }
 }

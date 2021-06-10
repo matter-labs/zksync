@@ -401,11 +401,15 @@ impl ZkSyncState {
 
     #[doc(hidden)] // Public for benches.
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
-        assert!(id == NFT_STORAGE_ACCOUNT_ID || id <= self.next_free_id);
+        // Even though account ids are expected to be sequential,
+        // we have to allow gaps between them since such data
+        // is already published on chain. Otherwise, restore would not
+        // be possible.
+
         self.account_id_by_address.insert(account.address, id);
         self.balance_tree.insert(*id, account);
-        if id == self.next_free_id {
-            *self.next_free_id += 1;
+        if id != NFT_STORAGE_ACCOUNT_ID && id >= self.next_free_id {
+            self.next_free_id = id + 1;
         }
     }
 
@@ -1074,6 +1078,7 @@ mod tests {
         expected = "assertion failed: id == NFT_STORAGE_ACCOUNT_ID || id <= self.next_free_id"
     )]
     #[test]
+    #[ignore = "non-sequential ids are allowed to make data_restore possible"]
     fn insert_account_with_bigger_id() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
         let mut random_addresses = Vec::new();

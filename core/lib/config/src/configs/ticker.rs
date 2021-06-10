@@ -24,6 +24,8 @@ pub struct TickerConfig {
     pub coinmarketcap_base_url: String,
     /// URL of CoinGecko API. Can be set to the mock server for local development.
     pub coingecko_base_url: String,
+    /// Coefficient for scaling all fees in percent.
+    pub scale_fee_percent: u32,
     /// Coefficient for the fee price for fast withdrawal requests.
     pub fast_processing_coeff: f64,
     /// Url to uniswap api
@@ -90,6 +92,7 @@ mod tests {
             token_price_source: TokenPriceSource::CoinGecko,
             coinmarketcap_base_url: "http://127.0.0.1:9876".into(),
             coingecko_base_url: "http://127.0.0.1:9876".into(),
+            scale_fee_percent: 100,
             fast_processing_coeff: 10.0f64,
             uniswap_url: "http://127.0.0.1:9975/graphql".to_string(),
             liquidity_volume: 100.0,
@@ -122,6 +125,7 @@ FEE_TICKER_LIQUIDITY_VOLUME=100
 FEE_TICKER_NUMBER_OF_TICKER_ACTORS="4"
 FEE_TICKER_SUBSIDIZED_TOKENS="0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e"
 FEE_TICKER_SUBSIDIZED_TOKENS_LIMITS=156
+FEE_TICKER_SCALE_FEE_PERCENT=100
         "#;
         set_env(config);
 
