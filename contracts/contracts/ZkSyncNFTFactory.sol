@@ -14,6 +14,8 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
 
     uint8 constant SERIAL_ID_FOOTPRINT_OFFSET = CREATOR_ID_FOOTPRINT_OFFSET + CREATOR_ID_SIZE_BITS;
     uint8 constant SERIAL_ID_SIZE_BITS = 32;
+    bytes constant sha256MultiHash = hex"1220";
+    bytes constant ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
     /// @notice Packs address and token ID into single word to use as a key in balances mapping
     function packCreatorFingerprint(
@@ -120,5 +122,54 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
 
         return
             uint32(getBits(fingerPrint, SERIAL_ID_FOOTPRINT_OFFSET, SERIAL_ID_FOOTPRINT_OFFSET + SERIAL_ID_SIZE_BITS));
+    }
+
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        require(_exists(tokenId), "ne");
+        string memory base = "ipfs://";
+        string memory tokenContentHash = ipfsCID(_contentHashes[tokenId]);
+        return string(abi.encodePacked(base, tokenContentHash));
+    }
+
+    /// @dev Converts hex string to base 58
+    function toBase58(bytes memory source) internal pure returns (string memory) {
+        uint8[] memory digits = new uint8[](46);
+        digits[0] = 0;
+        uint8 digitLength = 1;
+        for (uint8 i = 0; i < source.length; ++i) {
+            uint256 carry = uint8(source[i]);
+            for (uint32 j = 0; j < digitLength; ++j) {
+                carry += uint256(digits[j]) * 256;
+                digits[j] = uint8(carry % 58);
+                carry = carry / 58;
+            }
+
+            while (carry > 0) {
+                digits[digitLength] = uint8(carry % 58);
+                digitLength++;
+                carry = carry / 58;
+            }
+        }
+        return toAlphabet(reverse(digits));
+    }
+
+    function ipfsCID(bytes32 source) public pure returns (string memory) {
+        return toBase58(abi.encodePacked(sha256MultiHash, source));
+    }
+
+    function reverse(uint8[] memory input) internal pure returns (uint8[] memory) {
+        uint8[] memory output = new uint8[](input.length);
+        for (uint8 i = 0; i < input.length; i++) {
+            output[i] = input[input.length - 1 - i];
+        }
+        return output;
+    }
+
+    function toAlphabet(uint8[] memory indices) internal pure returns (string memory) {
+        bytes memory output = new bytes(indices.length);
+        for (uint32 i = 0; i < indices.length; i++) {
+            output[i] = ALPHABET[indices[i]];
+        }
+        return string(output);
     }
 }

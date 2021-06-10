@@ -36,7 +36,7 @@ describe('NFTFactory unit tests', function () {
     it('Success', async () => {
         // The test checks the ability to mint NFT from allowed contract
         const address = await wallet2.getAddress();
-        const contentHash = '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996';
+        const contentHash = '0x218145f24cb870cc72ec7f0cc734b86f3e9a744666282f99023f022be77aaea6';
         nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet1);
         await nftFactory.mintNFTFromZkSync(address, address, 1, 10, contentHash, 10);
         const owner = await nftFactory.ownerOf(10);
@@ -47,6 +47,10 @@ describe('NFTFactory unit tests', function () {
         expect(await nftFactory.getCreatorAddress(10)).to.eq(address, 'Address is incorrect');
         expect(await nftFactory.getCreatorAccountId(10)).to.eq(1, 'Account Id is incorrect');
         expect(await nftFactory.getSerialId(10)).to.eq(10, 'Serial Id is incorrect');
+        expect(await nftFactory.tokenURI(10)).to.eq(
+            'ipfs://QmQbSVaG7DUjQ9ktPtMnSXReJ29XHezBghcxJeZDsGG7wB',
+            'tokenUri is incorrect'
+        );
     });
     it('Error', async () => {
         // The test checks the ability to mint NFT from allowed contract
@@ -97,5 +101,14 @@ describe('NFTFactory unit tests', function () {
         const two_pow_200 = BigNumber.from(2).pow(200);
         // Taking all the bits
         await oneTest(two_pow_191.add(two_pow_200), 0, 256, two_pow_191.add(two_pow_200));
+    });
+    it('ipfsCID', async () => {
+        // The test checks the ability to mint NFT from allowed contract
+        const contentHash = '0x218145f24cb870cc72ec7f0cc734b86f3e9a744666282f99023f022be77aaea6';
+
+        nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet1);
+        const expectedCid = 'QmQbSVaG7DUjQ9ktPtMnSXReJ29XHezBghcxJeZDsGG7wB';
+        const cid = await nftFactory.ipfsCID(contentHash);
+        expect(cid).to.equal(expectedCid);
     });
 });
