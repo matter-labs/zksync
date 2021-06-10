@@ -250,6 +250,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(db_token.map(|t| t.into()))
     }
 
+    /// Stores nft factory addresses that are used for each of given nfts withdrawings
     pub async fn store_factories_for_withdrawn_nfts(
         &mut self,
         nfts: Vec<TokenId>,
@@ -257,13 +258,18 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
+        // 1. Get creator_account_id for each nft
+        // 2. Get factory_address for each creator_account_id
+        // 3. Match nfts with factory addresses
+        // 4. Insert nfts and factory addresses
+
         let config = transaction.config_schema().load_config().await?;
         let default_factory_address = config
             .nft_factory_addr
             .ok_or_else(|| anyhow::anyhow!("Default nft factory is not stored in storage"))?;
 
         let nfts: Vec<i32> = nfts.into_iter().map(|id| *id as i32).collect();
-        let nfts_with_creators: Vec<StorageNFTCreator> = sqlx::query_as!(
+        let nft_creators: Vec<StorageNFTCreator> = sqlx::query_as!(
             StorageNFTCreator,
             r#"
                 SELECT token_id, creator_account_id FROM nft
@@ -274,11 +280,11 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_all(transaction.conn())
         .await?;
 
-        let creators_ids: Vec<i32> = nfts_with_creators
+        let creators_ids: Vec<i32> = nft_creators
             .iter()
             .map(|nft| nft.creator_account_id)
             .collect();
-        let creators_with_factories: Vec<StorageNFTFactory> = sqlx::query_as!(
+        let nft_factories: Vec<StorageNFTFactory> = sqlx::query_as!(
             StorageNFTFactory,
             r#"
                 SELECT creator_id, factory_address FROM nft_factory
@@ -290,7 +296,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .await?;
 
         let mut address_by_creator = HashMap::new();
-        for creator_with_factory in creators_with_factories {
+        for creator_with_factory in nft_factories {
             address_by_creator.insert(
                 creator_with_factory.creator_id,
                 creator_with_factory.factory_address,
@@ -299,7 +305,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
 
         let mut token_ids = Vec::new();
         let mut factories = Vec::new();
-        for nft_with_creator in nfts_with_creators {
+        for nft_with_creator in nft_creators {
             token_ids.push(nft_with_creator.token_id);
             factories.push(
                 address_by_creator
