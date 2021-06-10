@@ -123,6 +123,7 @@ fn get_test_ticker_config() -> TickerConfig {
         ]
         .into_iter()
         .collect(),
+        scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
     }
 }
 
