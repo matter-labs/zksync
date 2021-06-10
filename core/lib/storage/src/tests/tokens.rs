@@ -275,8 +275,8 @@ async fn test_nfts_with_factories(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_nft_with_factories(token_id)
         .await?
         .unwrap();
-    assert_eq!(nft.current_factory, default_factory_address);
-    assert_eq!(nft.withdrawn_factory.unwrap(), new_factory_address);
+    assert_eq!(nft.current_factory, new_factory_address);
+    assert_eq!(nft.withdrawn_factory.unwrap(), default_factory_address);
 
     Ok(())
 }

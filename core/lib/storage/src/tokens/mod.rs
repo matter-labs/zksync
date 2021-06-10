@@ -320,6 +320,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .execute(transaction.conn())
         .await?;
 
+        transaction.commit().await?;
         metrics::histogram!(
             "sql.token.store_factories_for_withdrawn_nfts",
             start.elapsed()
