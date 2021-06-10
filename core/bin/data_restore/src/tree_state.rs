@@ -147,7 +147,7 @@ impl TreeState {
                     let tx = ZkSyncTx::Transfer(Box::new(op.tx.clone()));
                     let (fee, updates) =
                         <ZkSyncState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
-                            .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                            .map_err(|e| format_err!("Transfer fail: {}", e))?;
                     let tx_result = OpSuccess {
                         fee,
                         updates,
