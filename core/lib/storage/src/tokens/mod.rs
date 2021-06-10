@@ -12,8 +12,8 @@ use zksync_types::{
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{
-    DBMarketVolume, DbTickerPrice, DbToken, StorageNFT, StorageNFTCreator, StorageNFTFactory,
-    StorageNFTWithFactories,
+    DBMarketVolume, DbTickerPrice, DbToken, StorageApiNFT, StorageNFT, StorageNFTCreator,
+    StorageNFTFactory,
 };
 
 use crate::utils::address_to_stored_string;
@@ -226,7 +226,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     ) -> QueryResult<Option<ApiNFT>> {
         let start = Instant::now();
         let db_token = sqlx::query_as!(
-            StorageNFTWithFactories,
+            StorageApiNFT,
             r#"
                 SELECT nft.*, tokens.symbol, withdrawn_nfts_factories.factory_address as "withdrawn_factory?",
                     COALESCE(nft_factory.factory_address, server_config.nft_factory_addr) as "current_factory!"
@@ -258,7 +258,9 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         let config = transaction.config_schema().load_config().await?;
-        let default_factory_address = config.nft_factory_addr.unwrap();
+        let default_factory_address = config
+            .nft_factory_addr
+            .ok_or_else(|| anyhow::anyhow!("Default nft factory is not stored in storage"))?;
 
         let nfts: Vec<i32> = nfts.into_iter().map(|id| *id as i32).collect();
         let nfts_with_creators: Vec<StorageNFTCreator> = sqlx::query_as!(

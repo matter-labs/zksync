@@ -31,7 +31,7 @@ impl<'a, 'c> ConfigSchema<'a, 'c> {
 
     // Stores the server configuration for tests.
     #[doc(hidden)]
-    pub async fn store_config(
+    pub(crate) async fn store_config(
         &mut self,
         contract_addr: &str,
         gov_contract_addr: &str,

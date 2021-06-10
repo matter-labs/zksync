@@ -67,7 +67,7 @@ pub struct StorageNFT {
 }
 
 #[derive(Debug, FromRow)]
-pub struct StorageNFTWithFactories {
+pub struct StorageApiNFT {
     pub token_id: i32,
     pub serial_id: i32,
     pub creator_account_id: i32,
@@ -114,8 +114,8 @@ impl From<StorageNFT> for NFT {
     }
 }
 
-impl From<StorageNFTWithFactories> for ApiNFT {
-    fn from(val: StorageNFTWithFactories) -> Self {
+impl From<StorageApiNFT> for ApiNFT {
+    fn from(val: StorageApiNFT) -> Self {
         let current_factory = val.current_factory.strip_prefix("0x").unwrap();
         let withdrawn_factory = val
             .withdrawn_factory
