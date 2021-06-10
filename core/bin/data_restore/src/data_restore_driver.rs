@@ -340,9 +340,9 @@ where
         let mut updates = vec![];
         let mut count = 0;
 
+        // TODO Fix event state and delete this code (ZKS-722)
         let new_ops_blocks: Vec<RollupOpsBlock> = new_ops_blocks
-            .iter()
-            .cloned()
+            .into_iter()
             .filter(|bl| bl.block_num > self.tree_state.state.block_number)
             .collect();
         for op_block in new_ops_blocks {
