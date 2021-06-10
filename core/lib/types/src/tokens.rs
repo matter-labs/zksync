@@ -282,8 +282,9 @@ impl NFT {
     }
 }
 
+// TODO: move this file to `api_types` crate (ZKD-67)
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct NFTWithFactories {
+pub struct ApiNFT {
     pub id: TokenId,
     pub serial_id: u32,
     pub creator_address: Address,
@@ -291,9 +292,9 @@ pub struct NFTWithFactories {
     pub address: Address,
     pub symbol: String,
     pub content_hash: H256,
-    /// current factory of nft creator
+    /// Current factory address of nft creator
     pub current_factory: Address,
-    /// factory which was used for withdrawing nft
+    /// Factory address which was used for withdrawing nft
     pub withdrawn_factory: Option<Address>,
 }
 

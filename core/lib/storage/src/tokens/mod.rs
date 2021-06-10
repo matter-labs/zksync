@@ -7,12 +7,12 @@ use num::{rational::Ratio, BigUint};
 use thiserror::Error;
 // Workspace imports
 use zksync_types::{
-    tokens::NFTWithFactories, AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT,
+    tokens::ApiNFT, AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT,
 };
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{
-    CreatorWithFactory, DBMarketVolume, DbTickerPrice, DbToken, NFTWithCreator, StorageNFT,
+    DBMarketVolume, DbTickerPrice, DbToken, StorageNFT, StorageNFTCreator, StorageNFTFactory,
     StorageNFTWithFactories,
 };
 
@@ -223,7 +223,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     pub async fn get_nft_with_factories(
         &mut self,
         token_id: TokenId,
-    ) -> QueryResult<Option<NFTWithFactories>> {
+    ) -> QueryResult<Option<ApiNFT>> {
         let start = Instant::now();
         let db_token = sqlx::query_as!(
             StorageNFTWithFactories,
@@ -261,8 +261,8 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let default_factory_address = config.nft_factory_addr.unwrap();
 
         let nfts: Vec<i32> = nfts.into_iter().map(|id| *id as i32).collect();
-        let nfts_with_creators: Vec<NFTWithCreator> = sqlx::query_as!(
-            NFTWithCreator,
+        let nfts_with_creators: Vec<StorageNFTCreator> = sqlx::query_as!(
+            StorageNFTCreator,
             r#"
                 SELECT token_id, creator_account_id FROM nft
                 WHERE token_id = ANY($1)
@@ -276,8 +276,8 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             .iter()
             .map(|nft| nft.creator_account_id)
             .collect();
-        let creators_with_factories: Vec<CreatorWithFactory> = sqlx::query_as!(
-            CreatorWithFactory,
+        let creators_with_factories: Vec<StorageNFTFactory> = sqlx::query_as!(
+            StorageNFTFactory,
             r#"
                 SELECT creator_id, factory_address FROM nft_factory
                 WHERE creator_id = ANY($1)

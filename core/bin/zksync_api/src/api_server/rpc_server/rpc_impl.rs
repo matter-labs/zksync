@@ -4,7 +4,7 @@ use std::time::Instant;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
-use zksync_api_client::rest::v1::accounts::NFTWithFactories;
+use zksync_api_client::rest::v1::accounts::ApiNFT;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
     Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
@@ -154,7 +154,7 @@ impl RpcApp {
         })
     }
 
-    pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<NFTWithFactories>> {
+    pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<ApiNFT>> {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let result = storage

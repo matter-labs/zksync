@@ -62,7 +62,7 @@ impl From<zksync_types::NFT> for NFT {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct NFTWithFactories {
+pub struct ApiNFT {
     id: TokenId,
     content_hash: H256,
     creator_id: AccountId,
@@ -74,8 +74,8 @@ pub struct NFTWithFactories {
     withdrawn_factory: Option<Address>,
 }
 
-impl From<zksync_types::tokens::NFTWithFactories> for NFTWithFactories {
-    fn from(val: zksync_types::tokens::NFTWithFactories) -> Self {
+impl From<zksync_types::tokens::ApiNFT> for ApiNFT {
+    fn from(val: zksync_types::tokens::ApiNFT) -> Self {
         Self {
             id: val.id,
             content_hash: val.content_hash,

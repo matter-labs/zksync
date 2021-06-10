@@ -1,4 +1,4 @@
-// Built-in deps
+// Built-in imports
 use std::str::FromStr;
 // External imports
 use num::{rational::Ratio, BigUint};

@@ -1,4 +1,4 @@
-// Built-in deps
+// Built-in imports
 use std::str::FromStr;
 // External imports
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use sqlx::{types::BigDecimal, FromRow};
 use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
 use zksync_types::{
-    tokens::{NFTWithFactories, TokenMarketVolume, TokenPrice},
+    tokens::{ApiNFT, TokenMarketVolume, TokenPrice},
     AccountId, Address, Token, TokenId, H256, NFT,
 };
 use zksync_utils::big_decimal_to_ratio;
@@ -80,12 +80,13 @@ pub struct StorageNFTWithFactories {
 }
 
 #[derive(Debug, FromRow)]
-pub struct NFTWithCreator {
+pub struct StorageNFTCreator {
     pub token_id: i32,
     pub creator_account_id: i32,
 }
 
-pub struct CreatorWithFactory {
+#[derive(Debug, FromRow)]
+pub struct StorageNFTFactory {
     pub creator_id: i32,
     pub factory_address: String,
 }
@@ -113,7 +114,7 @@ impl From<StorageNFT> for NFT {
     }
 }
 
-impl From<StorageNFTWithFactories> for NFTWithFactories {
+impl From<StorageNFTWithFactories> for ApiNFT {
     fn from(val: StorageNFTWithFactories) -> Self {
         let current_factory = val.current_factory.strip_prefix("0x").unwrap();
         let withdrawn_factory = val
