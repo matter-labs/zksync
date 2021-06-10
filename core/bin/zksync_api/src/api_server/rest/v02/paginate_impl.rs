@@ -1,42 +1,66 @@
 // Built-in uses
 
 // External uses
+use either::Either;
 
 // Workspace uses
 use zksync_api_types::v02::{
-    block::{BlockInfo, BlockStatus},
+    block::BlockInfo,
     pagination::{
-        AccountTxsRequest, BlockAndTxHash, Paginated, PaginationQuery, PendingOpsRequest,
+        AccountTxsRequest, ApiEither, BlockAndTxHash, Paginated, PaginationQuery, PendingOpsRequest,
     },
-    transaction::Transaction,
+    transaction::{Transaction, TxHashSerializeWrapper},
 };
 use zksync_storage::StorageProcessor;
-use zksync_types::{BlockNumber, Token, TokenId};
+use zksync_types::{BlockNumber, SerialId, Token, TokenId};
 
 // Local uses
 use super::{
-    block::block_info_from_details_and_status,
+    block::block_info_from_details,
     error::{Error, InvalidDataError},
     paginate_trait::Paginate,
 };
 use crate::core_api_client::CoreApiClient;
 
 #[async_trait::async_trait]
-impl Paginate<Token, TokenId> for StorageProcessor<'_> {
+impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
+    type OutputObj = Token;
+    type OutputId = TokenId;
+
     async fn paginate(
         &mut self,
-        query: &PaginationQuery<TokenId>,
+        query: &PaginationQuery<ApiEither<TokenId>>,
     ) -> Result<Paginated<Token, TokenId>, Error> {
-        let tokens = self
+        let mut transaction = self.start_transaction().await.map_err(Error::storage)?;
+
+        let token_id = match query.from.inner {
+            Either::Left(token_id) => token_id,
+            Either::Right(_) => transaction
+                .tokens_schema()
+                .get_last_token_id()
+                .await
+                .map_err(Error::storage)?,
+        };
+
+        let query = PaginationQuery {
+            from: token_id,
+            limit: query.limit,
+            direction: query.direction,
+        };
+
+        let tokens = transaction
             .tokens_schema()
-            .load_token_page(query)
+            .load_token_page(&query)
             .await
             .map_err(Error::storage)?;
-        let count = self
+        let count = transaction
             .tokens_schema()
             .get_count()
             .await
             .map_err(Error::storage)? as u32;
+
+        transaction.commit().await.map_err(Error::storage)?;
+
         Ok(Paginated::new(
             tokens,
             query.from,
@@ -48,80 +72,116 @@ impl Paginate<Token, TokenId> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<BlockInfo, BlockNumber> for StorageProcessor<'_> {
+impl Paginate<ApiEither<BlockNumber>> for StorageProcessor<'_> {
+    type OutputObj = BlockInfo;
+    type OutputId = BlockNumber;
+
     async fn paginate(
         &mut self,
-        query: &PaginationQuery<BlockNumber>,
+        query: &PaginationQuery<ApiEither<BlockNumber>>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
-        let blocks = self
-            .chain()
-            .block_schema()
-            .load_block_page(query)
-            .await
-            .map_err(Error::storage)?;
-        let last_committed = self
+        let mut transaction = self.start_transaction().await.map_err(Error::storage)?;
+
+        let last_block = transaction
             .chain()
             .block_schema()
             .get_last_committed_confirmed_block()
             .await
             .map_err(Error::storage)?;
-        let last_finalized = self
+
+        let block_number = match query.from.inner {
+            Either::Left(block_number) => block_number,
+            Either::Right(_) => last_block,
+        };
+
+        let query = PaginationQuery {
+            from: block_number,
+            limit: query.limit,
+            direction: query.direction,
+        };
+
+        let blocks = transaction
             .chain()
             .block_schema()
-            .get_last_verified_confirmed_block()
+            .load_block_page(&query)
             .await
             .map_err(Error::storage)?;
-        let blocks: Vec<BlockInfo> = blocks
-            .into_iter()
-            .map(|details| {
-                let status = if details.block_number as u32 <= *last_finalized {
-                    BlockStatus::Finalized
-                } else if details.block_number as u32 <= *last_committed {
-                    BlockStatus::Committed
-                } else {
-                    BlockStatus::Queued
-                };
-                block_info_from_details_and_status(details, status)
-            })
-            .collect();
-        let count = *self
-            .chain()
-            .block_schema()
-            .get_last_committed_block()
-            .await
-            .map_err(Error::storage)?;
+        let blocks: Vec<BlockInfo> = blocks.into_iter().map(block_info_from_details).collect();
+
+        transaction.commit().await.map_err(Error::storage)?;
+
         Ok(Paginated::new(
             blocks,
             query.from,
             query.limit,
             query.direction,
-            count,
+            *last_block,
         ))
     }
 }
 
 #[async_trait::async_trait]
-impl Paginate<Transaction, BlockAndTxHash> for StorageProcessor<'_> {
+impl Paginate<BlockAndTxHash> for StorageProcessor<'_> {
+    type OutputObj = Transaction;
+    type OutputId = TxHashSerializeWrapper;
+
     async fn paginate(
         &mut self,
         query: &PaginationQuery<BlockAndTxHash>,
-    ) -> Result<Paginated<Transaction, BlockAndTxHash>, Error> {
-        let txs = self
+    ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
+        let mut transaction = self.start_transaction().await.map_err(Error::storage)?;
+
+        let tx_hash = match query.from.tx_hash.inner {
+            Either::Left(tx_hash) => tx_hash,
+            Either::Right(_) => {
+                if let Some(tx_hash) = transaction
+                    .chain()
+                    .operations_ext_schema()
+                    .get_block_last_tx_hash(query.from.block_number)
+                    .await
+                    .map_err(Error::storage)?
+                {
+                    tx_hash
+                } else {
+                    return Ok(Paginated::new(
+                        Vec::new(),
+                        Default::default(),
+                        query.limit,
+                        query.direction,
+                        0,
+                    ));
+                }
+            }
+        };
+
+        let query = PaginationQuery {
+            from: BlockAndTxHash {
+                block_number: query.from.block_number,
+                tx_hash: ApiEither::from(tx_hash),
+            },
+            limit: query.limit,
+            direction: query.direction,
+        };
+
+        let txs = transaction
             .chain()
             .block_schema()
-            .get_block_transactions_page(query)
+            .get_block_transactions_page(&query)
             .await
             .map_err(Error::storage)?
             .ok_or_else(|| Error::from(InvalidDataError::TransactionNotFound))?;
-        let count = self
+        let count = transaction
             .chain()
             .block_schema()
             .get_block_transactions_count(query.from.block_number)
             .await
             .map_err(Error::storage)?;
+
+        transaction.commit().await.map_err(Error::storage)?;
+
         Ok(Paginated::new(
             txs,
-            query.from,
+            TxHashSerializeWrapper(tx_hash),
             query.limit,
             query.direction,
             count,
@@ -130,27 +190,67 @@ impl Paginate<Transaction, BlockAndTxHash> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<Transaction, AccountTxsRequest> for StorageProcessor<'_> {
+impl Paginate<AccountTxsRequest> for StorageProcessor<'_> {
+    type OutputObj = Transaction;
+    type OutputId = TxHashSerializeWrapper;
+
     async fn paginate(
         &mut self,
         query: &PaginationQuery<AccountTxsRequest>,
-    ) -> Result<Paginated<Transaction, AccountTxsRequest>, Error> {
-        let txs = self
+    ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
+        let mut transaction = self.start_transaction().await.map_err(Error::storage)?;
+
+        let tx_hash = match query.from.tx_hash.inner {
+            Either::Left(tx_hash) => tx_hash,
+            Either::Right(_) => {
+                if let Some(tx_hash) = transaction
+                    .chain()
+                    .operations_ext_schema()
+                    .get_account_last_tx_hash(query.from.address)
+                    .await
+                    .map_err(Error::storage)?
+                {
+                    tx_hash
+                } else {
+                    return Ok(Paginated::new(
+                        Vec::new(),
+                        Default::default(),
+                        query.limit,
+                        query.direction,
+                        0,
+                    ));
+                }
+            }
+        };
+
+        let query = PaginationQuery {
+            from: AccountTxsRequest {
+                address: query.from.address,
+                tx_hash: ApiEither::from(tx_hash),
+            },
+            limit: query.limit,
+            direction: query.direction,
+        };
+
+        let txs = transaction
             .chain()
             .operations_ext_schema()
-            .get_account_transactions(query)
+            .get_account_transactions(&query)
             .await
             .map_err(Error::storage)?
             .ok_or_else(|| Error::from(InvalidDataError::TransactionNotFound))?;
-        let count = self
+        let count = transaction
             .chain()
             .operations_ext_schema()
             .get_account_transactions_count(query.from.address)
             .await
             .map_err(Error::storage)?;
+
+        transaction.commit().await.map_err(Error::storage)?;
+
         Ok(Paginated::new(
             txs,
-            query.from,
+            TxHashSerializeWrapper(tx_hash),
             query.limit,
             query.direction,
             count,
@@ -159,13 +259,16 @@ impl Paginate<Transaction, AccountTxsRequest> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<Transaction, PendingOpsRequest> for CoreApiClient {
+impl Paginate<PendingOpsRequest> for CoreApiClient {
+    type OutputObj = Transaction;
+    type OutputId = SerialId;
+
     async fn paginate(
         &mut self,
         query: &PaginationQuery<PendingOpsRequest>,
-    ) -> Result<Paginated<Transaction, PendingOpsRequest>, Error> {
+    ) -> Result<Paginated<Transaction, SerialId>, Error> {
         let result = self
-            .get_unconfirmed_ops(query)
+            .get_unconfirmed_ops(&query)
             .await
             .map_err(Error::core_api)?;
         Ok(result)

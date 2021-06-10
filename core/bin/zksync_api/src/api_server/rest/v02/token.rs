@@ -17,7 +17,7 @@ use num::{rational::Ratio, BigUint, FromPrimitive};
 
 // Workspace uses
 use zksync_api_types::v02::{
-    pagination::{Paginated, PaginationQuery},
+    pagination::{parse_query, ApiEither, Paginated, PaginationQuery},
     token::{ApiToken, TokenPrice},
 };
 use zksync_config::ZkSyncConfig;
@@ -78,11 +78,11 @@ impl ApiTokenData {
 
     async fn token_page(
         &self,
-        query: PaginationQuery<TokenId>,
+        query: PaginationQuery<ApiEither<TokenId>>,
     ) -> Result<Paginated<ApiToken, TokenId>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let paginated_tokens: Result<Paginated<Token, TokenId>, Error> =
-            storage.paginate(&query).await;
+            storage.paginate_checked(&query).await;
         match paginated_tokens {
             Ok(paginated_tokens) => {
                 let mut list = Vec::new();
@@ -191,12 +191,13 @@ impl ApiTokenData {
 
 async fn token_pagination(
     data: web::Data<ApiTokenData>,
-    web::Query(query): web::Query<PaginationQuery<TokenId>>,
+    web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<ApiToken, TokenId>> {
+    let query = api_try!(parse_query(query).map_err(Error::from));
     data.token_page(query).await.into()
 }
 
-async fn token_by_id(
+async fn token_by_id_or_address(
     data: web::Data<ApiTokenData>,
     web::Path(token_like_string): web::Path<String>,
 ) -> ApiResult<ApiToken> {
@@ -255,8 +256,14 @@ pub fn api_scope(
     web::scope("tokens")
         .data(data)
         .route("", web::get().to(token_pagination))
-        .route("{token_id}", web::get().to(token_by_id))
-        .route("{token_id}/priceIn/{currency}", web::get().to(token_price))
+        .route(
+            "{token_id_or_address}",
+            web::get().to(token_by_id_or_address),
+        )
+        .route(
+            "{token_id_or_address}/priceIn/{currency}",
+            web::get().to(token_price),
+        )
 }
 
 #[cfg(test)]
@@ -289,7 +296,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn v02_test_token_scope() -> anyhow::Result<()> {
+    async fn tokens_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
@@ -337,7 +344,7 @@ mod tests {
         assert_eq!(api_token, expected_api_token);
 
         let query = PaginationQuery {
-            from: TokenId(15),
+            from: ApiEither::from(TokenId(15)),
             limit: 2,
             direction: PaginationDirection::Older,
         };
@@ -347,7 +354,7 @@ mod tests {
         let expected_pagination = {
             let mut storage = cfg.pool.access_storage().await?;
             let paginated_tokens: Paginated<Token, TokenId> = storage
-                .paginate(&query)
+                .paginate_checked(&query)
                 .await
                 .map_err(|err| anyhow::anyhow!(err.message))?;
             let mut list = Vec::new();

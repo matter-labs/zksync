@@ -1,11 +1,14 @@
 use crate::rest::client::{Client, Result};
-use zksync_api_types::v02::{pagination::PaginationQuery, Response};
+use zksync_api_types::v02::{
+    pagination::{ApiEither, PaginationQuery},
+    Response,
+};
 use zksync_types::{TokenId, TokenLike};
 
 impl Client {
     pub async fn token_pagination(
         &self,
-        pagination_query: &PaginationQuery<TokenId>,
+        pagination_query: &PaginationQuery<ApiEither<TokenId>>,
     ) -> Result<Response> {
         self.get_with_scope(super::API_V02_SCOPE, "tokens")
             .query(&pagination_query)

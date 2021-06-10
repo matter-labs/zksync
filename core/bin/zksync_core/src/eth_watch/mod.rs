@@ -17,6 +17,7 @@ use futures::{
     SinkExt, StreamExt,
 };
 
+use either::Either;
 use itertools::Itertools;
 use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
@@ -87,7 +88,7 @@ pub enum EthWatchRequest {
     },
     GetUnconfirmedOps {
         query: PaginationQuery<PendingOpsRequest>,
-        resp: oneshot::Sender<Paginated<Transaction, PendingOpsRequest>>,
+        resp: oneshot::Sender<Paginated<Transaction, u64>>,
     },
     GetUnconfirmedOpByEthHash {
         eth_hash: H256,
@@ -95,6 +96,10 @@ pub enum EthWatchRequest {
     },
     GetUnconfirmedOpByTxHash {
         tx_hash: TxHash,
+        resp: oneshot::Sender<Option<PriorityOp>>,
+    },
+    GetUnconfirmedOpByAnyHash {
+        hash: TxHash,
         resp: oneshot::Sender<Option<PriorityOp>>,
     },
 }
@@ -253,6 +258,14 @@ impl<W: EthClient> EthWatch<W> {
             .cloned()
     }
 
+    fn find_ongoing_op_by_any_hash(&self, hash: TxHash) -> Option<PriorityOp> {
+        self.eth_state
+            .unconfirmed_queue()
+            .iter()
+            .find(|op| op.tx_hash() == hash || op.eth_hash.as_ref() == hash.as_ref())
+            .cloned()
+    }
+
     fn get_ongoing_deposits_for(&self, address: Address) -> Vec<PriorityOp> {
         self.eth_state
             .unconfirmed_queue()
@@ -271,7 +284,7 @@ impl<W: EthClient> EthWatch<W> {
     fn get_ongoing_ops_for(
         &self,
         query: PaginationQuery<PendingOpsRequest>,
-    ) -> Paginated<Transaction, PendingOpsRequest> {
+    ) -> Paginated<Transaction, u64> {
         let all_ops = self
             .eth_state
             .unconfirmed_queue()
@@ -288,16 +301,32 @@ impl<W: EthClient> EthWatch<W> {
                     .unwrap_or(false),
             });
         let count = all_ops.clone().count();
+        let from_serial_id = match query.from.serial_id.inner {
+            Either::Left(id) => id,
+            Either::Right(_) => {
+                if let Some(op) = all_ops.clone().max_by_key(|op| op.serial_id) {
+                    op.serial_id
+                } else {
+                    return Paginated::new(
+                        Vec::new(),
+                        Default::default(),
+                        query.limit,
+                        query.direction,
+                        0,
+                    );
+                }
+            }
+        };
         let ops: Vec<PriorityOp> = match query.direction {
             PaginationDirection::Newer => all_ops
                 .sorted_by_key(|op| op.serial_id)
-                .filter(|op| op.serial_id >= query.from.serial_id)
+                .filter(|op| op.serial_id >= from_serial_id)
                 .take(query.limit as usize)
                 .cloned()
                 .collect(),
             PaginationDirection::Older => all_ops
                 .sorted_by(|a, b| b.serial_id.cmp(&a.serial_id))
-                .filter(|op| op.serial_id <= query.from.serial_id)
+                .filter(|op| op.serial_id <= from_serial_id)
                 .take(query.limit as usize)
                 .cloned()
                 .collect(),
@@ -322,7 +351,13 @@ impl<W: EthClient> EthWatch<W> {
                 }
             })
             .collect();
-        Paginated::new(txs, query.from, query.limit, query.direction, count as u32)
+        Paginated::new(
+            txs,
+            from_serial_id,
+            query.limit,
+            query.direction,
+            count as u32,
+        )
     }
 
     async fn poll_eth_node(&mut self) -> anyhow::Result<()> {
@@ -443,6 +478,10 @@ impl<W: EthClient> EthWatch<W> {
                 }
                 EthWatchRequest::GetUnconfirmedOpByTxHash { tx_hash, resp } => {
                     let unconfirmed_op = self.find_ongoing_op_by_tx_hash(tx_hash);
+                    resp.send(unconfirmed_op).unwrap_or_default();
+                }
+                EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp } => {
+                    let unconfirmed_op = self.find_ongoing_op_by_any_hash(hash);
                     resp.send(unconfirmed_op).unwrap_or_default();
                 }
                 EthWatchRequest::IsPubkeyChangeAuthorized {

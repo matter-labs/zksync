@@ -1,10 +1,9 @@
 // Built-in deps
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External imports
-use chrono::{DateTime, Utc};
+use either::Either;
 // Workspace imports
 use zksync_api_types::v02::{
-    block::BlockStatus as ApiBlockStatus,
     pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
     transaction::Transaction,
 };
@@ -645,6 +644,16 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
+    pub async fn is_block_finalized(&mut self, block_number: BlockNumber) -> QueryResult<bool> {
+        let last_finalized_block = self
+            .0
+            .chain()
+            .block_schema()
+            .get_last_verified_confirmed_block()
+            .await?;
+        Ok(block_number <= last_finalized_block)
+    }
+
     /// Helper method for retrieving pending blocks from the database.
     async fn load_storage_pending_block(&mut self) -> QueryResult<Option<StoragePendingBlock>> {
         let start = Instant::now();
@@ -976,39 +985,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(self.save_block(block).await?)
     }
 
-    /// Returns status and last time it was updated of block that exists in `blocks` table.
-    pub async fn get_status_and_last_updated_of_existing_block(
-        &mut self,
-        block_number: BlockNumber,
-    ) -> QueryResult<(ApiBlockStatus, DateTime<Utc>)> {
-        let mut transaction = self.0.start_transaction().await?;
-        let (is_finalized_confirmed, finalized_at) = transaction
-            .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
-            .await
-            .map(|operation| (operation.confirmed, operation.created_at))
-            .unwrap_or((false, chrono::MIN_DATETIME));
-        let result = if is_finalized_confirmed {
-            (ApiBlockStatus::Finalized, finalized_at)
-        } else {
-            let (is_committed_confirmed, committed_at) = transaction
-                .chain()
-                .operations_schema()
-                .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
-                .await
-                .map(|operation| (operation.confirmed, operation.created_at))
-                .unwrap_or((false, chrono::MIN_DATETIME));
-            if is_committed_confirmed {
-                (ApiBlockStatus::Committed, committed_at)
-            } else {
-                (ApiBlockStatus::Queued, chrono::MIN_DATETIME)
-            }
-        };
-        transaction.commit().await?;
-        Ok(result)
-    }
-
     /// Retrieves both L1 and L2 operations stored in the block for the given pagination query
     pub async fn get_block_transactions_page(
         &mut self,
@@ -1017,10 +993,25 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
+        let tx_hash = match query.from.tx_hash.inner {
+            Either::Left(tx_hash) => tx_hash,
+            Either::Right(_) => {
+                if let Some(tx_hash) = transaction
+                    .chain()
+                    .operations_ext_schema()
+                    .get_block_last_tx_hash(query.from.block_number)
+                    .await?
+                {
+                    tx_hash
+                } else {
+                    return Ok(Some(Vec::new()));
+                }
+            }
+        };
         let created_at_and_block = transaction
             .chain()
             .operations_ext_schema()
-            .get_tx_created_at_and_block_number(query.from.tx_hash)
+            .get_tx_created_at_and_block_number(tx_hash)
             .await?;
         let block_txs = if let Some((time_from, block_number)) = created_at_and_block {
             if block_number == query.from.block_number {
@@ -1132,15 +1123,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         .await?
                     }
                 };
-                let block_status = transaction
+                let is_block_finalized = transaction
                     .chain()
                     .block_schema()
-                    .get_status_and_last_updated_of_existing_block(block_number)
-                    .await?
-                    .0;
+                    .is_block_finalized(block_number)
+                    .await?;
                 let txs: Vec<Transaction> = raw_txs
                     .into_iter()
-                    .map(|tx| TransactionItem::transaction_from_item_and_status(tx, block_status))
+                    .map(|tx| TransactionItem::transaction_from_item(tx, is_block_finalized))
                     .collect();
                 Some(txs)
             } else {

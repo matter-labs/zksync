@@ -1,8 +1,7 @@
 // External imports
 // Workspace imports
-use zksync_api_types::v02::{
-    block::BlockStatus,
-    pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
+use zksync_api_types::v02::pagination::{
+    ApiEither, BlockAndTxHash, PaginationDirection, PaginationQuery,
 };
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
@@ -1006,35 +1005,33 @@ async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResu
 
 /// Checks that `get_block_status_and_last_updated` method works correctly.
 #[db_test]
-async fn test_get_block_status_and_last_updated(
-    mut storage: StorageProcessor<'_>,
-) -> QueryResult<()> {
+async fn test_is_block_finalized(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let block_number = BlockNumber(1);
 
     let result = storage
         .chain()
         .block_schema()
-        .get_status_and_last_updated_of_existing_block(BlockNumber(1))
+        .is_block_finalized(BlockNumber(1))
         .await?;
-    assert_eq!(result.0, BlockStatus::Queued);
+    assert!(!result);
 
     commit_block(&mut storage, block_number).await?;
 
     let result = storage
         .chain()
         .block_schema()
-        .get_status_and_last_updated_of_existing_block(BlockNumber(1))
+        .is_block_finalized(BlockNumber(1))
         .await?;
-    assert_eq!(result.0, BlockStatus::Committed);
+    assert!(!result);
 
     verify_block(&mut storage, block_number).await?;
 
     let result = storage
         .chain()
         .block_schema()
-        .get_status_and_last_updated_of_existing_block(BlockNumber(1))
+        .is_block_finalized(BlockNumber(1))
         .await?;
-    assert_eq!(result.0, BlockStatus::Finalized);
+    assert!(result);
 
     Ok(())
 }
@@ -1184,7 +1181,7 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
             .get_block_transactions_page(&PaginationQuery {
                 from: BlockAndTxHash {
                     block_number: BlockNumber(1),
-                    tx_hash,
+                    tx_hash: ApiEither::from(tx_hash),
                 },
                 limit,
                 direction,
@@ -1205,7 +1202,7 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         .get_block_transactions_page(&PaginationQuery {
             from: BlockAndTxHash {
                 block_number: BlockNumber(3),
-                tx_hash: setup.get_tx_hash(2, 0),
+                tx_hash: ApiEither::from(setup.get_tx_hash(2, 0)),
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -1220,7 +1217,7 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         .get_block_transactions_page(&PaginationQuery {
             from: BlockAndTxHash {
                 block_number: BlockNumber(2),
-                tx_hash: setup.get_tx_hash(0, 0),
+                tx_hash: ApiEither::from(setup.get_tx_hash(0, 0)),
             },
             limit: 1,
             direction: PaginationDirection::Newer,

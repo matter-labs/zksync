@@ -2,14 +2,16 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use ethabi::Address;
 use reqwest::{blocking::Client, StatusCode};
 
-use zksync_api_types::v02::fee::{BatchFeeRequest, TxFeeRequest, TxInBatchFeeRequest};
-use zksync_types::{TokenId, TokenLike, TxFeeTypes};
+use zksync_api_types::v02::fee::{
+    ApiTxFeeTypes, BatchFeeRequest, TxFeeRequest, TxInBatchFeeRequest,
+};
+use zksync_types::{TokenId, TokenLike};
 
 fn generate_transactions(number: usize) -> BatchFeeRequest {
     let mut transactions = Vec::new();
     for _ in 0..number {
         transactions.push(TxInBatchFeeRequest {
-            tx_type: TxFeeTypes::Withdraw,
+            tx_type: ApiTxFeeTypes::Withdraw,
             address: Address::random(),
         });
     }
@@ -30,7 +32,7 @@ fn get_txs_batch_fee(client: Client, url: String, batch_fee_request: BatchFeeReq
 
 fn get_txs_fee(client: Client, url: String) {
     let transaction = TxFeeRequest {
-        tx_type: TxFeeTypes::Withdraw,
+        tx_type: ApiTxFeeTypes::Withdraw,
         address: Address::random(),
         token_like: TokenLike::Id(TokenId(2)), // id of wBTC on localhost
     };

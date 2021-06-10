@@ -59,13 +59,15 @@ impl CoreApiClient {
     pub async fn get_unconfirmed_ops(
         &self,
         query: &PaginationQuery<PendingOpsRequest>,
-    ) -> anyhow::Result<Paginated<Transaction, PendingOpsRequest>> {
+    ) -> anyhow::Result<Paginated<Transaction, u64>> {
         let endpoint = format!(
             "{}/unconfirmed_ops?address=0x{}&account_id={}&serial_id={}&limit={}&direction={}",
             self.addr,
             hex::encode(query.from.address),
             serde_json::to_string(&query.from.account_id).unwrap(),
-            query.from.serial_id,
+            serde_json::to_string(&query.from.serial_id)
+                .unwrap()
+                .replace("\"", ""),
             query.limit,
             serde_json::to_string(&query.direction)
                 .unwrap()

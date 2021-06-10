@@ -1,7 +1,7 @@
 import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from 'ethers';
 import { ErrorCode } from '@ethersproject/logger';
 import { EthMessageSigner } from './eth-message-signer';
-import { Provider } from './provider';
+import { SyncProvider } from './provider-interface';
 import { Create2WalletSigner, Signer } from './signer';
 import { BatchBuilder } from './batch-builder';
 import {
@@ -51,7 +51,7 @@ export class ZKSyncTxError extends Error {
 }
 
 export class Wallet {
-    public provider: Provider;
+    public provider: SyncProvider;
 
     private constructor(
         public ethSigner: ethers.Signer,
@@ -62,14 +62,14 @@ export class Wallet {
         public ethSignerType?: EthSignerType
     ) {}
 
-    connect(provider: Provider) {
+    connect(provider: SyncProvider) {
         this.provider = provider;
         return this;
     }
 
     static async fromEthSigner(
         ethWallet: ethers.Signer,
-        provider: Provider,
+        provider: SyncProvider,
         signer?: Signer,
         accountId?: number,
         ethSignerType?: EthSignerType
@@ -98,7 +98,7 @@ export class Wallet {
 
     static async fromCreate2Data(
         syncSigner: Signer,
-        provider: Provider,
+        provider: SyncProvider,
         create2Data: Create2Data,
         accountId?: number
     ): Promise<Wallet> {
@@ -111,7 +111,7 @@ export class Wallet {
 
     static async fromEthSignerNoKeys(
         ethWallet: ethers.Signer,
-        provider: Provider,
+        provider: SyncProvider,
         accountId?: number,
         ethSignerType?: EthSignerType
     ): Promise<Wallet> {
@@ -284,8 +284,7 @@ export class Wallet {
     }): Promise<Transaction> {
         forcedExit.nonce = forcedExit.nonce != null ? await this.getNonce(forcedExit.nonce) : await this.getNonce();
         if (forcedExit.fee == null) {
-            // Fee for forced exit is defined by `Withdraw` transaction type (as it's essentially just a forced withdraw).
-            const fullFee = await this.provider.getTransactionFee('Withdraw', forcedExit.target, forcedExit.token);
+            const fullFee = await this.provider.getTransactionFee('ForcedExit', forcedExit.target, forcedExit.token);
             forcedExit.fee = fullFee.totalFee;
         }
 
@@ -978,7 +977,7 @@ export class ETHOperation {
     error?: ZKSyncTxError;
     priorityOpId?: BigNumber;
 
-    constructor(public ethTx: ContractTransaction, public zkSyncProvider: Provider) {
+    constructor(public ethTx: ContractTransaction, public zkSyncProvider: SyncProvider) {
         this.state = 'Sent';
     }
 
@@ -1007,7 +1006,14 @@ export class ETHOperation {
 
         await this.awaitEthereumTxCommit();
         if (this.state !== 'Mined') return;
-        const receipt = await this.zkSyncProvider.notifyPriorityOp(this.priorityOpId.toNumber(), 'COMMIT');
+
+        let query: number | string;
+        if (this.zkSyncProvider.providerType === 'RPC') {
+            query = this.priorityOpId.toNumber();
+        } else {
+            query = this.ethTx.hash;
+        }
+        const receipt = await this.zkSyncProvider.notifyPriorityOp(query, 'COMMIT');
 
         if (!receipt.executed) {
             this.setErrorState(new ZKSyncTxError('Priority operation failed', receipt));
@@ -1022,7 +1028,13 @@ export class ETHOperation {
         await this.awaitReceipt();
         if (this.state !== 'Committed') return;
 
-        const receipt = await this.zkSyncProvider.notifyPriorityOp(this.priorityOpId.toNumber(), 'VERIFY');
+        let query: number | string;
+        if (this.zkSyncProvider.providerType === 'RPC') {
+            query = this.priorityOpId.toNumber();
+        } else {
+            query = this.ethTx.hash;
+        }
+        const receipt = await this.zkSyncProvider.notifyPriorityOp(query, 'VERIFY');
 
         this.state = 'Verified';
 
@@ -1043,7 +1055,7 @@ export class Transaction {
     state: 'Sent' | 'Committed' | 'Verified' | 'Failed';
     error?: ZKSyncTxError;
 
-    constructor(public txData, public txHash: string, public sidechainProvider: Provider) {
+    constructor(public txData, public txHash: string, public sidechainProvider: SyncProvider) {
         this.state = 'Sent';
     }
 
@@ -1083,7 +1095,7 @@ export class Transaction {
 
 export async function submitSignedTransaction(
     signedTx: SignedTransaction,
-    provider: Provider,
+    provider: SyncProvider,
     fastProcessing?: boolean
 ): Promise<Transaction> {
     const transactionHash = await provider.submitTx(signedTx.tx, signedTx.ethereumSignature, fastProcessing);
@@ -1091,7 +1103,7 @@ export async function submitSignedTransaction(
 }
 
 export async function submitSignedTransactionsBatch(
-    provider: Provider,
+    provider: SyncProvider,
     signedTxs: SignedTransaction[],
     ethSignatures?: TxEthSignature[]
 ): Promise<Transaction[]> {

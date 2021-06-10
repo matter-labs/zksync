@@ -1,15 +1,15 @@
 // Local uses
 use crate::rest::client::{Client, Result};
 use zksync_api_types::v02::{
-    fee::{BatchFeeRequest, TxFeeRequest, TxInBatchFeeRequest},
+    fee::{ApiTxFeeTypes, BatchFeeRequest, TxFeeRequest, TxInBatchFeeRequest},
     Response,
 };
-use zksync_types::{Address, TokenLike, TxFeeTypes};
+use zksync_types::{Address, TokenLike};
 
 impl Client {
     pub async fn get_txs_fee(
         &self,
-        tx_type: TxFeeTypes,
+        tx_type: ApiTxFeeTypes,
         address: Address,
         token_like: TokenLike,
     ) -> Result<Response> {

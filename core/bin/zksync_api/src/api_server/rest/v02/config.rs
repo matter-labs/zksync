@@ -15,6 +15,7 @@ use zksync_types::{network::Network, Address};
 use super::response::ApiResult;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiConfigData {
     network: Network,
     contract: Address,
@@ -64,7 +65,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn v02_test_config_scope() -> anyhow::Result<()> {
+    async fn config_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
 
         let shared_data = SharedData {

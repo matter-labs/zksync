@@ -6,7 +6,6 @@ use zksync_types::{BlockNumber, H256};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum BlockStatus {
-    Queued,
     Committed,
     Finalized,
 }
@@ -20,7 +19,7 @@ pub struct BlockInfo {
     pub block_size: u64,
     pub commit_tx_hash: Option<H256>,
     pub verify_tx_hash: Option<H256>,
-    pub committed_at: Option<DateTime<Utc>>,
+    pub committed_at: DateTime<Utc>,
     pub finalized_at: Option<DateTime<Utc>>,
     pub status: BlockStatus,
 }

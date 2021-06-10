@@ -119,7 +119,9 @@ jobs:
         run: ci_run zk test i server
 
       - name: integration-api
-        run: ci_run zk test i api
+        run: |
+          ci_run zk test i api
+          ci_run zk test i api-docs
 
       - name: integration-zcli
         run: ci_run zk test i zcli

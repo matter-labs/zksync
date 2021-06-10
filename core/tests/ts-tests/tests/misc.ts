@@ -10,14 +10,32 @@ type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testWrongSignature(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
-        testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testMultipleWalletsWrongSignature(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
         testBackwardCompatibleEthMessages(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
-Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber) {
+Tester.prototype.testWrongSignature = async function (
+    from: Wallet,
+    to: Wallet,
+    token: TokenLike,
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
+) {
     const signedTransfer = await from.signSyncTransfer({
         to: to.address(),
         token: token,
@@ -37,7 +55,11 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet, 
         await from.provider.submitTx(signedTransfer.tx, fakeEthSignature);
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
+        } else {
+            expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        }
     }
     expect(thrown, 'Sending tx with incorrect ETH signature must throw').to.be.true;
 
@@ -55,7 +77,11 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet, 
         await from.provider.submitTx(signedWithdraw.tx, fakeEthSignature);
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
+        } else {
+            expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        }
     }
     expect(thrown, 'Sending tx with incorrect ETH signature must throw').to.be.true;
 };
@@ -117,7 +143,8 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
     from: Wallet,
     to: Wallet,
     token: TokenLike,
-    amount: BigNumber
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
 ) {
     const fee = await this.syncProvider.getTransactionsBatchFee(
         ['Transfer', 'Transfer'],
@@ -157,7 +184,11 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
         await submitSignedTransactionsBatch(from.provider, batch, [ethSignature]);
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
+        } else {
+            expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        }
     }
     expect(thrown, 'Sending batch with incorrect ETH signature must throw').to.be.true;
 };

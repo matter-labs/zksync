@@ -14,8 +14,10 @@ use futures::{
     sink::SinkExt,
 };
 use serde::Deserialize;
-use std::thread;
-use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest};
+use std::{str::FromStr, thread};
+use zksync_api_types::v02::pagination::{
+    ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest,
+};
 use zksync_config::configs::api::PrivateApi;
 use zksync_types::{
     priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, AccountId, Address, SignedZkSyncTx,
@@ -102,7 +104,7 @@ async fn unconfirmed_deposits(
 struct PendingOpsFlattenRequest {
     pub address: Address,
     pub account_id: Option<AccountId>,
-    pub serial_id: u64,
+    pub serial_id: String,
     pub limit: u32,
     pub direction: PaginationDirection,
 }
@@ -118,11 +120,14 @@ async fn unconfirmed_ops(
     web::Query(params): web::Query<PendingOpsFlattenRequest>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
+    // Serializing enum query parameters doesn't work, so parse it separately.
+    let serial_id = ApiEither::from_str(&params.serial_id)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
     let query = PaginationQuery {
         from: PendingOpsRequest {
             address: params.address,
             account_id: params.account_id,
-            serial_id: params.serial_id,
+            serial_id,
         },
         limit: params.limit,
         direction: params.direction,
@@ -160,6 +165,9 @@ async fn unconfirmed_op(
             tx_hash,
             resp: sender,
         },
+        PriorityOpLookupQuery::ByAnyHash(hash) => {
+            EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp: sender }
+        }
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
     eth_watch_sender

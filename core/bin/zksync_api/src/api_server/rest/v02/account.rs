@@ -10,8 +10,10 @@ use actix_web::{web, Scope};
 // Workspace uses
 use zksync_api_types::v02::{
     account::{Account, AccountAddressOrId, AccountStateType},
-    pagination::{AccountTxsRequest, Paginated, PaginationQuery, PendingOpsRequest},
-    transaction::Transaction,
+    pagination::{
+        parse_query, AccountTxsRequest, ApiEither, Paginated, PaginationQuery, PendingOpsRequest,
+    },
+    transaction::{Transaction, TxHashSerializeWrapper},
 };
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
@@ -166,9 +168,10 @@ impl ApiAccountData {
 
     async fn account_txs(
         &self,
-        query: PaginationQuery<TxHash>,
+        query: PaginationQuery<ApiEither<TxHash>>,
         address: Address,
-    ) -> Result<Paginated<Transaction, AccountTxsRequest>, Error> {
+    ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let new_query = PaginationQuery {
             from: AccountTxsRequest {
                 address,
@@ -177,8 +180,7 @@ impl ApiAccountData {
             limit: query.limit,
             direction: query.direction,
         };
-        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        storage.paginate(&new_query).await
+        storage.paginate_checked(&new_query).await
     }
 
     /// Pending deposits can be matched only with addresses,
@@ -187,10 +189,10 @@ impl ApiAccountData {
     /// but we can still find pending deposits for its address that is why account_id is Option.
     async fn account_pending_txs(
         &self,
-        query: PaginationQuery<SerialId>,
+        query: PaginationQuery<ApiEither<SerialId>>,
         address: Address,
         account_id: Option<AccountId>,
-    ) -> Result<Paginated<Transaction, PendingOpsRequest>, Error> {
+    ) -> Result<Paginated<Transaction, SerialId>, Error> {
         let new_query = PaginationQuery {
             from: PendingOpsRequest {
                 address,
@@ -201,7 +203,7 @@ impl ApiAccountData {
             direction: query.direction,
         };
         let mut client = self.core_api_client.clone();
-        client.paginate(&new_query).await
+        client.paginate_checked(&new_query).await
     }
 }
 
@@ -210,11 +212,14 @@ async fn account_committed_info(
     web::Path(account_id_or_address): web::Path<String>,
 ) -> ApiResult<Option<Account>> {
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
-    let account_id = api_try!(api_try!(data.get_id_by_address_or_id(address_or_id).await)
-        .ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
-    data.account_info(account_id, AccountStateType::Committed)
-        .await
-        .into()
+    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    if let Some(account_id) = account_id {
+        data.account_info(account_id, AccountStateType::Committed)
+            .await
+            .into()
+    } else {
+        ApiResult::Ok(None)
+    }
 }
 
 async fn account_finalized_info(
@@ -222,18 +227,22 @@ async fn account_finalized_info(
     web::Path(account_id_or_address): web::Path<String>,
 ) -> ApiResult<Option<Account>> {
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
-    let account_id = api_try!(api_try!(data.get_id_by_address_or_id(address_or_id).await)
-        .ok_or_else(|| Error::from(InvalidDataError::AccountNotFound)));
-    data.account_info(account_id, AccountStateType::Finalized)
-        .await
-        .into()
+    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    if let Some(account_id) = account_id {
+        data.account_info(account_id, AccountStateType::Finalized)
+            .await
+            .into()
+    } else {
+        ApiResult::Ok(None)
+    }
 }
 
 async fn account_txs(
     data: web::Data<ApiAccountData>,
     web::Path(account_id_or_address): web::Path<String>,
-    web::Query(query): web::Query<PaginationQuery<TxHash>>,
-) -> ApiResult<Paginated<Transaction, AccountTxsRequest>> {
+    web::Query(query): web::Query<PaginationQuery<String>>,
+) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
+    let query = api_try!(parse_query(query).map_err(Error::from));
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(data.get_address_by_address_or_id(address_or_id).await);
     data.account_txs(query, address).await.into()
@@ -242,8 +251,9 @@ async fn account_txs(
 async fn account_pending_txs(
     data: web::Data<ApiAccountData>,
     web::Path(account_id_or_address): web::Path<String>,
-    web::Query(query): web::Query<PaginationQuery<SerialId>>,
-) -> ApiResult<Paginated<Transaction, PendingOpsRequest>> {
+    web::Query(query): web::Query<PaginationQuery<String>>,
+) -> ApiResult<Paginated<Transaction, SerialId>> {
+    let query = api_try!(parse_query(query).map_err(Error::from));
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(
         data.get_address_by_address_or_id(address_or_id.clone())
@@ -310,14 +320,10 @@ mod tests {
         Arc::new(Mutex::new(json!({
             "list": [],
             "pagination": {
-                "from": {
-                    "address": Address::default(),
-                    "accountId": AccountId::default(),
-                    "serialId": 1
-                },
+                "from": 1,
                 "limit": 1,
                 "direction": "newer",
-                "count": 0,
+                "count": 0
             }
         })))
     }
@@ -326,7 +332,7 @@ mod tests {
     struct PendingOpsFlattenRequest {
         pub address: Address,
         pub account_id: Option<AccountId>,
-        pub serial_id: u64,
+        pub serial_id: String,
         pub limit: u32,
         pub direction: PaginationDirection,
     }
@@ -422,13 +428,12 @@ mod tests {
     )]
     async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
         let (client, server) = get_unconfirmed_ops_loopback(create_pending_ops_handle());
-
         client
             .get_unconfirmed_ops(&PaginationQuery {
                 from: PendingOpsRequest {
                     address: Address::default(),
                     account_id: Some(AccountId::default()),
-                    serial_id: 0,
+                    serial_id: ApiEither::from(0),
                 },
                 limit: 0,
                 direction: PaginationDirection::Newer,
@@ -467,12 +472,12 @@ mod tests {
         assert_eq!(account_info_by_id, account_info_by_address);
 
         let query = PaginationQuery {
-            from: tx_hash,
+            from: ApiEither::from(tx_hash),
             limit: 1,
             direction: PaginationDirection::Newer,
         };
         let response = client.account_txs(&query, &account_id.to_string()).await?;
-        let txs: Paginated<Transaction, AccountTxsRequest> = deserialize_response_result(response)?;
+        let txs: Paginated<Transaction, TxHash> = deserialize_response_result(response)?;
         assert_eq!(txs.list[0].tx_hash, tx_hash);
         // Provide unconfirmed pending ops.
         *server.pending_ops.lock().await = json!({
@@ -494,14 +499,10 @@ mod tests {
                     "status": "queued",
                     "failReason": Option::<String>::None,
                     "createdAt": Utc::now()
-                },
+                }
             ],
             "pagination": {
-                "from": {
-                    "serialId": 1,
-                    "address": address,
-                    "accountId": account_id
-                },
+                "from": 1,
                 "limit": 1,
                 "count": 1,
                 "direction": "newer"
@@ -509,14 +510,14 @@ mod tests {
         });
 
         let query = PaginationQuery {
-            from: 1,
+            from: ApiEither::from(1),
             limit: 1,
             direction: PaginationDirection::Newer,
         };
         let response = client
             .account_pending_txs(&query, &account_id.to_string())
             .await?;
-        let txs: Paginated<Transaction, PendingOpsRequest> = deserialize_response_result(response)?;
+        let txs: Paginated<Transaction, SerialId> = deserialize_response_result(response)?;
         match &txs.list[0].op {
             TransactionData::L1(tx) => match tx {
                 L1Transaction::Deposit(deposit) => {

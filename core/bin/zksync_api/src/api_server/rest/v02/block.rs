@@ -9,8 +9,8 @@ use actix_web::{web, Scope};
 // Workspace uses
 use zksync_api_types::v02::{
     block::{BlockInfo, BlockStatus},
-    pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    transaction::Transaction,
+    pagination::{parse_query, ApiEither, BlockAndTxHash, Paginated, PaginationQuery},
+    transaction::{Transaction, TxHashSerializeWrapper},
 };
 use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records::StorageBlockDetails, ConnectionPool, QueryResult};
@@ -24,14 +24,11 @@ use super::{
 };
 use crate::{api_try, utils::block_details_cache::BlockDetailsCache};
 
-pub fn block_info_from_details_and_status(
-    details: StorageBlockDetails,
-    status: BlockStatus,
-) -> BlockInfo {
-    let (committed_at, finalized_at) = match status {
-        BlockStatus::Queued => (None, None),
-        BlockStatus::Committed => (Some(details.committed_at), None),
-        BlockStatus::Finalized => (Some(details.committed_at), details.verified_at),
+pub fn block_info_from_details(details: StorageBlockDetails) -> BlockInfo {
+    let status = if details.is_verified() {
+        BlockStatus::Finalized
+    } else {
+        BlockStatus::Committed
     };
     BlockInfo {
         block_number: BlockNumber(details.block_number as u32),
@@ -44,8 +41,8 @@ pub fn block_info_from_details_and_status(
         block_size: details.block_size as u64,
         commit_tx_hash: details.commit_tx_hash.map(|bytes| H256::from_slice(&bytes)),
         verify_tx_hash: details.verify_tx_hash.map(|bytes| H256::from_slice(&bytes)),
-        committed_at,
-        finalized_at,
+        committed_at: details.committed_at,
+        finalized_at: details.verified_at,
         status,
     }
 }
@@ -75,15 +72,7 @@ impl ApiBlockData {
             .await
             .map_err(Error::storage)?;
         if let Some(details) = details {
-            let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-            let status = storage
-                .chain()
-                .block_schema()
-                .get_status_and_last_updated_of_existing_block(block_number)
-                .await
-                .map_err(Error::storage)?
-                .0;
-            Ok(Some(block_info_from_details_and_status(details, status)))
+            Ok(Some(block_info_from_details(details)))
         } else {
             Ok(None)
         }
@@ -112,17 +101,17 @@ impl ApiBlockData {
 
     async fn block_page(
         &self,
-        query: PaginationQuery<BlockNumber>,
+        query: PaginationQuery<ApiEither<BlockNumber>>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        storage.paginate(&query).await
+        storage.paginate_checked(&query).await
     }
 
     async fn transaction_page(
         &self,
         block_number: BlockNumber,
-        query: PaginationQuery<TxHash>,
-    ) -> Result<Paginated<Transaction, BlockAndTxHash>, Error> {
+        query: PaginationQuery<ApiEither<TxHash>>,
+    ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
 
         let new_query = PaginationQuery {
@@ -134,7 +123,7 @@ impl ApiBlockData {
             direction: query.direction,
         };
 
-        storage.paginate(&new_query).await
+        storage.paginate_checked(&new_query).await
     }
 
     async fn get_last_committed_block_number(&self) -> QueryResult<BlockNumber> {
@@ -142,7 +131,7 @@ impl ApiBlockData {
         storage
             .chain()
             .block_schema()
-            .get_last_committed_block()
+            .get_last_committed_confirmed_block()
             .await
     }
 
@@ -160,8 +149,9 @@ impl ApiBlockData {
 
 async fn block_pagination(
     data: web::Data<ApiBlockData>,
-    web::Query(query): web::Query<PaginationQuery<BlockNumber>>,
+    web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<BlockInfo, BlockNumber>> {
+    let query = api_try!(parse_query(query).map_err(Error::from));
     data.block_page(query).await.into()
 }
 
@@ -179,9 +169,10 @@ async fn block_by_position(
 async fn block_transactions(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
-    web::Query(query): web::Query<PaginationQuery<TxHash>>,
-) -> ApiResult<Paginated<Transaction, BlockAndTxHash>> {
+    web::Query(query): web::Query<PaginationQuery<String>>,
+) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
+    let query = api_try!(parse_query(query).map_err(Error::from));
 
     data.transaction_page(block_number, query).await.into()
 }
@@ -215,7 +206,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn v02_test_block_scope() -> anyhow::Result<()> {
+    async fn blocks_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
@@ -229,14 +220,14 @@ mod tests {
         );
 
         let query = PaginationQuery {
-            from: BlockNumber(1),
+            from: ApiEither::from(BlockNumber(1)),
             limit: 3,
             direction: PaginationDirection::Newer,
         };
         let expected_blocks: Paginated<BlockInfo, BlockNumber> = {
             let mut storage = cfg.pool.access_storage().await?;
             storage
-                .paginate(&query)
+                .paginate_checked(&query)
                 .await
                 .map_err(|err| anyhow::anyhow!(err.message))?
         };
@@ -263,7 +254,7 @@ mod tests {
         let tx_hash = TxHash::from_str(tx_hash_str).unwrap();
 
         let query = PaginationQuery {
-            from: tx_hash,
+            from: ApiEither::from(tx_hash),
             limit: 2,
             direction: PaginationDirection::Older,
         };
@@ -271,14 +262,12 @@ mod tests {
         let response = client
             .block_transactions(&query, &*block_number.to_string())
             .await?;
-        let paginated: Paginated<Transaction, BlockAndTxHash> =
-            deserialize_response_result(response)?;
+        let paginated: Paginated<Transaction, TxHash> = deserialize_response_result(response)?;
         assert_eq!(paginated.pagination.count as usize, expected_txs.len());
         assert_eq!(paginated.pagination.limit, query.limit);
         assert_eq!(paginated.list.len(), query.limit as usize);
         assert_eq!(paginated.pagination.direction, PaginationDirection::Older);
-        assert_eq!(paginated.pagination.from.tx_hash, tx_hash);
-        assert_eq!(paginated.pagination.from.block_number, block_number);
+        assert_eq!(paginated.pagination.from, tx_hash);
 
         for (tx, expected_tx) in paginated.list.into_iter().zip(expected_txs) {
             assert_eq!(

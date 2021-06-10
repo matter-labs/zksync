@@ -3,8 +3,10 @@ use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use zksync_types::{
-    tx::TxHash,
-    tx::{EthBatchSignatures, TxEthSignature},
+    tx::{
+        ChangePubKey, Close, EthBatchSignatures, ForcedExit, Transfer, TxEthSignature, TxHash,
+        Withdraw,
+    },
     AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
     ZkSyncTx, H256,
 };
@@ -36,7 +38,6 @@ pub enum TxInBlockStatus {
 impl From<BlockStatus> for TxInBlockStatus {
     fn from(status: BlockStatus) -> Self {
         match status {
-            BlockStatus::Queued => TxInBlockStatus::Queued,
             BlockStatus::Committed => TxInBlockStatus::Committed,
             BlockStatus::Finalized => TxInBlockStatus::Finalized,
         }
@@ -53,7 +54,7 @@ pub struct TxData {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct L1Receipt {
-    pub status: BlockStatus,
+    pub status: TxInBlockStatus,
     pub eth_block: EthBlockId,
     pub rollup_block: Option<BlockNumber>,
     pub id: SerialId,
@@ -92,7 +93,34 @@ pub struct Transaction {
 #[serde(untagged)]
 pub enum TransactionData {
     L1(L1Transaction),
-    L2(ZkSyncTx),
+    L2(L2Transaction),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum L2Transaction {
+    Transfer(Box<Transfer>),
+    Withdraw(Box<WithdrawData>),
+    #[doc(hidden)]
+    Close(Box<Close>),
+    ChangePubKey(Box<ChangePubKey>),
+    ForcedExit(Box<ForcedExitData>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForcedExitData {
+    #[serde(flatten)]
+    pub tx: ForcedExit,
+    pub eth_tx_hash: Option<H256>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawData {
+    #[serde(flatten)]
+    pub tx: Withdraw,
+    pub eth_tx_hash: Option<H256>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]

@@ -4,6 +4,7 @@ use std::time::Instant;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
+use zksync_api_types::v02::fee::ApiTxFeeTypes;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
     Address, Fee, Token, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
@@ -186,7 +187,7 @@ impl RpcApp {
 
     pub async fn _impl_get_tx_fee(
         self,
-        tx_type: TxFeeTypes,
+        tx_type: ApiTxFeeTypes,
         address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
@@ -196,7 +197,8 @@ impl RpcApp {
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
-        let result = Self::ticker_request(ticker.clone(), tx_type, address, token.clone()).await?;
+        let result =
+            Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
         let token = self.tx_sender.token_info_from_id(token).await?;
         let allowed_subsidy = self
@@ -215,7 +217,7 @@ impl RpcApp {
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
         self,
-        tx_types: Vec<TxFeeTypes>,
+        tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
     ) -> Result<TotalFee> {
@@ -234,8 +236,12 @@ impl RpcApp {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let transactions: Vec<(TxFeeTypes, Address)> =
-            (tx_types.iter().cloned().zip(addresses.iter().cloned())).collect();
+        let transactions: Vec<(TxFeeTypes, Address)> = (tx_types
+            .iter()
+            .cloned()
+            .map(|fee_type| fee_type.into())
+            .zip(addresses.iter().cloned()))
+        .collect();
         let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
         let token = self.tx_sender.token_info_from_id(token).await?;

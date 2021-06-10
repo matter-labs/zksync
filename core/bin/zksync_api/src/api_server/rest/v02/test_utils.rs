@@ -94,7 +94,8 @@ impl TestServerConfig {
         let this = self.clone();
         let server = actix_web::test::start(move || {
             let app = App::new();
-            let app = if let Some(shared_data) = shared_data.clone() {
+            let shared_data = shared_data.clone();
+            let app = if let Some(shared_data) = shared_data {
                 app.data(shared_data)
             } else {
                 app

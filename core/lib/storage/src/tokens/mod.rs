@@ -357,4 +357,17 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         metrics::histogram!("sql.token.update_historical_ticker_price", start.elapsed());
         Ok(())
     }
+
+    pub async fn get_last_token_id(&mut self) -> QueryResult<TokenId> {
+        let start = Instant::now();
+
+        let token_id = sqlx::query!("SELECT MAX(id) FROM tokens")
+            .fetch_one(self.0.conn())
+            .await?
+            .max
+            .unwrap_or(0);
+
+        metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
+        Ok(TokenId(token_id as u16))
+    }
 }

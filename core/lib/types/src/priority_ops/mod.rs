@@ -313,4 +313,6 @@ pub enum PriorityOpLookupQuery {
     BySyncHash(TxHash),
     /// Query priority operation using the corresponding Ethereum transaction hash.
     ByEthHash(H256),
+    /// Query priority operation using any of both hashes.
+    ByAnyHash(TxHash),
 }

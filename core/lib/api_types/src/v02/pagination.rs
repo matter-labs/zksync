@@ -1,12 +1,78 @@
-use serde::{Deserialize, Serialize};
+use either::Either;
+use serde::{Deserialize, Serialize, Serializer};
+use std::str::FromStr;
+use thiserror::Error;
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
-use zksync_utils::ZeroPrefixHexSerde;
+
+pub const MAX_LIMIT: u32 = 100;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum PaginationDirection {
     Newer,
     Older,
+}
+
+/// The struct for defining `latest` option in pagination query
+#[derive(Debug)]
+pub struct Latest;
+
+impl Serialize for Latest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        String::serialize(&"latest".to_string(), serializer)
+    }
+}
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Cannot parse `from` query parameter: {0}")]
+pub struct UnknownFromParamater(pub String);
+
+#[derive(Debug, Serialize)]
+#[serde(transparent)]
+pub struct ApiEither<T: Serialize> {
+    #[serde(with = "either::serde_untagged")]
+    pub inner: Either<T, Latest>,
+}
+
+impl<T: FromStr + Serialize> FromStr for ApiEither<T> {
+    type Err = UnknownFromParamater;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "latest" => Ok(ApiEither {
+                inner: Either::Right(Latest),
+            }),
+            _ => {
+                if let Ok(value) = T::from_str(s) {
+                    Ok(ApiEither::from(value))
+                } else {
+                    Err(UnknownFromParamater(s.to_string()))
+                }
+            }
+        }
+    }
+}
+
+impl<T: Serialize> From<T> for ApiEither<T> {
+    fn from(value: T) -> ApiEither<T> {
+        ApiEither {
+            inner: Either::Left(value),
+        }
+    }
+}
+
+pub fn parse_query<T: FromStr + Serialize>(
+    query: PaginationQuery<String>,
+) -> Result<PaginationQuery<ApiEither<T>>, UnknownFromParamater> {
+    let from = FromStr::from_str(&query.from)?;
+    Ok(PaginationQuery {
+        from,
+        limit: query.limit,
+        direction: query.direction,
+    })
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,26 +119,21 @@ impl<T: Sized + Serialize, F: Serialize> Paginated<T, F> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize)]
 pub struct BlockAndTxHash {
     pub block_number: BlockNumber,
-    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
-    pub tx_hash: TxHash,
+    pub tx_hash: ApiEither<TxHash>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize)]
 pub struct PendingOpsRequest {
     pub address: Address,
     pub account_id: Option<AccountId>,
-    pub serial_id: SerialId,
+    pub serial_id: ApiEither<SerialId>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize)]
 pub struct AccountTxsRequest {
     pub address: Address,
-    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
-    pub tx_hash: TxHash,
+    pub tx_hash: ApiEither<TxHash>,
 }
