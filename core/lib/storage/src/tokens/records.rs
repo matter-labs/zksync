@@ -79,18 +79,6 @@ pub struct StorageApiNFT {
     pub withdrawn_factory: Option<String>,
 }
 
-#[derive(Debug, FromRow)]
-pub struct StorageNFTCreator {
-    pub token_id: i32,
-    pub creator_account_id: i32,
-}
-
-#[derive(Debug, FromRow)]
-pub struct StorageNFTFactory {
-    pub creator_id: i32,
-    pub factory_address: String,
-}
-
 impl From<DbTickerPrice> for TokenPrice {
     fn from(val: DbTickerPrice) -> Self {
         Self {

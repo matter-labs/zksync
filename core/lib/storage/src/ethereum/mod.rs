@@ -549,6 +549,17 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                         .await?;
                 }
             }
+
+            if matches!(action_type, AggregatedActionType::ExecuteBlocks) {
+                transaction
+                    .chain()
+                    .block_schema()
+                    .store_factories_for_block_withdraw_nfts(
+                        BlockNumber(from_block),
+                        BlockNumber(to_block),
+                    )
+                    .await?;
+            }
         }
 
         transaction.commit().await?;

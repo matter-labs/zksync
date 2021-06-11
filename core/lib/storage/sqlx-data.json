@@ -675,6 +675,105 @@
       "nullable": []
     }
   },
+  "16d7337923ab5145323d345a333c849255cd59588c73d47676e0d68af624caea": {
+    "query": "SELECT * FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "operation",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 4,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "from_account",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "to_account",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 7,
+          "name": "success",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "fail_reason",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 9,
+          "name": "primary_account_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 10,
+          "name": "nonce",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 11,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 12,
+          "name": "eth_sign_data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 13,
+          "name": "batch_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "17626aba706502252ba06108c8b1563732a3e85094f8d76ce55f1d3487fc605b": {
     "query": "\n            select \n                created_at as \"created_at!\"\n            from (\n                    select\n                        created_at\n                    from\n                        executed_transactions\n                    where\n                        from_account = $1\n                        or\n                        to_account = $1\n                        or\n                        primary_account_address = $1\n                    union all\n                    select\n                        created_at\n                    from \n                        executed_priority_operations\n                    where \n                        from_account = $1\n                        or\n                        to_account = $1\n            ) t\n            order by\n                created_at asc\n            limit \n                1\n            ",
     "describe": {
@@ -3560,6 +3659,18 @@
       "parameters": {
         "Left": [
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a35474b8ed25c6265defe4e7621f11eae0deedc08a9cbc9780773c5be5697fcc": {
+    "query": "\n                INSERT INTO withdrawn_nfts_factories (token_id, factory_address)\n                SELECT token_id, \n                    COALESCE(nft_factory.factory_address, server_config.nft_factory_addr) as factory_address\n                FROM nft\n                INNER JOIN server_config ON server_config.id = true\n                LEFT JOIN nft_factory ON nft_factory.creator_id = nft.creator_account_id\n                WHERE nft.token_id = ANY($1)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4Array"
         ]
       },
       "nullable": []

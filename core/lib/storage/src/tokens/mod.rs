@@ -11,10 +11,7 @@ use zksync_types::{
 };
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
-use self::records::{
-    DBMarketVolume, DbTickerPrice, DbToken, StorageApiNFT, StorageNFT, StorageNFTCreator,
-    StorageNFTFactory,
-};
+use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageApiNFT, StorageNFT};
 
 use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
@@ -248,92 +245,6 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .await?;
         metrics::histogram!("sql.token.get_nft_with_factories", start.elapsed());
         Ok(db_token.map(|t| t.into()))
-    }
-
-    /// Stores nft factory addresses that are used for each of given nfts withdrawings
-    pub async fn store_factories_for_withdrawn_nfts(
-        &mut self,
-        nfts: Vec<TokenId>,
-    ) -> QueryResult<()> {
-        let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
-
-        // 1. Get creator_account_id for each nft
-        // 2. Get factory_address for each creator_account_id
-        // 3. Match nfts with factory addresses
-        // 4. Insert nfts and factory addresses
-
-        let config = transaction.config_schema().load_config().await?;
-        let default_factory_address = config
-            .nft_factory_addr
-            .ok_or_else(|| anyhow::anyhow!("Default nft factory is not stored in storage"))?;
-
-        let nfts: Vec<i32> = nfts.into_iter().map(|id| *id as i32).collect();
-        let nft_creators: Vec<StorageNFTCreator> = sqlx::query_as!(
-            StorageNFTCreator,
-            r#"
-                SELECT token_id, creator_account_id FROM nft
-                WHERE token_id = ANY($1)
-            "#,
-            &nfts
-        )
-        .fetch_all(transaction.conn())
-        .await?;
-
-        let creators_ids: Vec<i32> = nft_creators
-            .iter()
-            .map(|nft| nft.creator_account_id)
-            .collect();
-        let nft_factories: Vec<StorageNFTFactory> = sqlx::query_as!(
-            StorageNFTFactory,
-            r#"
-                SELECT creator_id, factory_address FROM nft_factory
-                WHERE creator_id = ANY($1)
-            "#,
-            &creators_ids
-        )
-        .fetch_all(transaction.conn())
-        .await?;
-
-        let mut address_by_creator = HashMap::new();
-        for creator_with_factory in nft_factories {
-            address_by_creator.insert(
-                creator_with_factory.creator_id,
-                creator_with_factory.factory_address,
-            );
-        }
-
-        let mut token_ids = Vec::new();
-        let mut factories = Vec::new();
-        for nft_with_creator in nft_creators {
-            token_ids.push(nft_with_creator.token_id);
-            factories.push(
-                address_by_creator
-                    .get(&nft_with_creator.creator_account_id)
-                    .unwrap_or(&default_factory_address)
-                    .clone(),
-            );
-        }
-
-        sqlx::query!(
-            r#"
-                INSERT INTO withdrawn_nfts_factories (token_id, factory_address)
-                SELECT u.token_id, u.factory_address
-                    FROM UNNEST ($1::int[], $2::text[])
-                    AS u(token_id, factory_address)
-            "#,
-            &token_ids,
-            &factories
-        )
-        .execute(transaction.conn())
-        .await?;
-
-        transaction.commit().await?;
-        metrics::histogram!(
-            "sql.token.store_factories_for_withdrawn_nfts",
-            start.elapsed()
-        );
-        Ok(())
     }
 
     /// Given the numeric token ID, symbol or address, returns token.
