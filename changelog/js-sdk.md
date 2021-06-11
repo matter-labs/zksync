@@ -6,7 +6,14 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Added
 
+- `RestProvider` class, that is used for queriing REST API v0.2.
+- `SyncProvider` interface: common interface for API v0.2 `RestProvider` and JSON RPC `Provider`.
+- Types for REST API v0.2.
+
 ### Changed
+
+- Changed type of `provider` field in `Wallet` class from `Provider` to `SyncProvider`.
+- `ForcedExit` fee type is used for `ForcedExit` transactions instead of `Withdraw` fee type.
 
 ### Deprecated
 
