@@ -1,5 +1,5 @@
 // Built-in deps
-use std::{collections::VecDeque, convert::TryFrom, time::Instant};
+use std::{collections::VecDeque, convert::TryFrom, str::FromStr, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
@@ -441,7 +441,9 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             let created_at = batch_data[0].created_at;
             let transaction_hashes: Vec<TxHashSerializeWrapper> = batch_data
                 .iter()
-                .map(|tx| serde_json::from_str(&format!("\"0x{}\"", tx.tx_hash)).unwrap())
+                .map(|tx| {
+                    TxHashSerializeWrapper(TxHash::from_str(&format!("0x{}", tx.tx_hash)).unwrap())
+                })
                 .collect();
             Some(ApiTxBatch {
                 batch_hash,

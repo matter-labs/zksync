@@ -29,7 +29,7 @@ use crate::{
     utils::token_db_cache::TokenDBCache,
 };
 
-/// Shared data between `api/v1/accounts` endpoints.
+/// Shared data between `api/v02/accounts` endpoints.
 #[derive(Clone)]
 struct ApiAccountData {
     pool: ConnectionPool,

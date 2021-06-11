@@ -43,10 +43,11 @@ async fn get_batch_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<BatchFeeRequest>,
 ) -> ApiResult<ApiFee> {
-    let mut txs = Vec::new();
-    for tx in body.transactions {
-        txs.push((tx.tx_type.into(), tx.address));
-    }
+    let txs = body
+        .transactions
+        .into_iter()
+        .map(|tx| (tx.tx_type.into(), tx.address))
+        .collect();
     data.tx_sender
         .get_txs_batch_fee_in_wei(txs, body.token_like)
         .await

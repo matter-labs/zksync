@@ -14,6 +14,7 @@ use zksync_types::{network::Network, Address};
 // Local uses
 use super::response::ApiResult;
 
+/// Shared data between `api/v0.2/config` endpoints.
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiConfigData {

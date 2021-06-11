@@ -20,7 +20,7 @@ use zksync_types::{priority_ops::PriorityOpLookupQuery, tx::TxHash, EthBlockId};
 use super::{error::Error, response::ApiResult};
 use crate::api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender};
 
-/// Shared data between `api/v0.2/transaction` endpoints.
+/// Shared data between `api/v0.2/transactions` endpoints.
 #[derive(Clone)]
 struct ApiTransactionData {
     tx_sender: TxSender,

@@ -13,6 +13,7 @@ use zksync_storage::ConnectionPool;
 use super::{error::Error, response::ApiResult};
 use crate::api_try;
 
+/// Shared data between `api/v0.2/networkStatus` endpoints.
 #[derive(Debug, Clone)]
 pub struct ApiStatusData {
     pool: ConnectionPool,
@@ -28,30 +29,34 @@ impl ApiStatusData {
 
 async fn get_status(data: web::Data<ApiStatusData>) -> ApiResult<NetworkStatus> {
     let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
-    let last_committed = api_try!(storage
+    let mut transaction = api_try!(storage.start_transaction().await.map_err(Error::storage));
+
+    let last_committed = api_try!(transaction
         .chain()
         .block_schema()
-        .get_last_committed_block()
+        .get_last_committed_confirmed_block()
         .await
         .map_err(Error::storage));
-    let finalized = api_try!(storage
+    let finalized = api_try!(transaction
         .chain()
         .block_schema()
         .get_last_verified_confirmed_block()
         .await
         .map_err(Error::storage));
-    let total_transactions = api_try!(storage
+    let total_transactions = api_try!(transaction
         .chain()
         .stats_schema()
         .count_total_transactions()
         .await
         .map_err(Error::storage));
-    let mempool_size = api_try!(storage
+    let mempool_size = api_try!(transaction
         .chain()
         .mempool_schema()
         .get_mempool_size()
         .await
         .map_err(Error::storage));
+    api_try!(transaction.commit().await.map_err(Error::storage));
+
     Ok(NetworkStatus {
         last_committed,
         finalized,

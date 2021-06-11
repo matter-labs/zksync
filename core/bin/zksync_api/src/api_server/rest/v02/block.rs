@@ -47,7 +47,7 @@ pub fn block_info_from_details(details: StorageBlockDetails) -> BlockInfo {
     }
 }
 
-/// Shared data between `api/v0.2/block` endpoints.
+/// Shared data between `api/v0.2/blocks` endpoints.
 #[derive(Debug, Clone)]
 struct ApiBlockData {
     pool: ConnectionPool,
@@ -162,7 +162,6 @@ async fn block_by_position(
     web::Path(block_position): web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
-
     data.block_info(block_number).await.into()
 }
 
@@ -173,7 +172,6 @@ async fn block_transactions(
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
     let query = api_try!(parse_query(query).map_err(Error::from));
-
     data.transaction_page(block_number, query).await.into()
 }
 

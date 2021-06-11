@@ -85,7 +85,6 @@ impl ApiTokenData {
             storage.paginate_checked(&query).await;
         match paginated_tokens {
             Ok(paginated_tokens) => {
-                let mut list = Vec::new();
                 let tokens_to_check: Vec<TokenId> =
                     paginated_tokens.list.iter().map(|token| token.id).collect();
                 let tokens_enabled_for_fees = storage
@@ -93,13 +92,14 @@ impl ApiTokenData {
                     .filter_tokens_by_market_volume(tokens_to_check, &self.min_market_volume)
                     .await
                     .map_err(Error::storage)?;
-                for token in paginated_tokens.list {
-                    let enabled_for_fees = tokens_enabled_for_fees.contains(&token.id);
-                    list.push(ApiToken::from_token_and_eligibility(
-                        token,
-                        enabled_for_fees,
-                    ));
-                }
+                let list = paginated_tokens
+                    .list
+                    .into_iter()
+                    .map(|token| {
+                        let eligibility = tokens_enabled_for_fees.contains(&token.id);
+                        ApiToken::from_token_and_eligibility(token, eligibility)
+                    })
+                    .collect();
                 Ok(Paginated::new(
                     list,
                     paginated_tokens.pagination.from,
