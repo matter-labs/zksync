@@ -134,7 +134,8 @@ async function loadAllConfigs(environment?: string) {
 
 export async function printAllConfigs(environment?: string) {
     const config = await loadAllConfigs(environment);
-    console.log(`${JSON.stringify(config, null, 2)}`);
+    const json = JSON.stringify(config, (_key, value) => (typeof value === 'bigint' ? value.toString() : value), 2);
+    console.log(json);
 }
 
 export async function compileConfig(environment?: string) {

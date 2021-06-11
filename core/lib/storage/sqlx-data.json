@@ -1560,54 +1560,6 @@
       "nullable": []
     }
   },
-  "44946f944f3c496ba90d5843084acf36aa3db3dd9d90f72a9bbeee862af056e4": {
-    "query": "SELECT blocks.block_num AS block_num, ops, fee_account,\n            timestamp, previous_block_root_hash, contract_version\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN data_restore_events_state as events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "block_num",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "ops",
-          "type_info": "JsonbArray"
-        },
-        {
-          "ordinal": 2,
-          "name": "fee_account",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "timestamp",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "previous_block_root_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "contract_version",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        null,
-        false,
-        true,
-        true,
-        false
-      ]
-    }
-  },
   "44b276fda62734e9c9d9853f493340265116ab7f13599674d27aafe3d3887391": {
     "query": "UPDATE eth_operations \n            SET last_used_gas_price = $1, last_deadline_block = $2\n            WHERE id = $3",
     "describe": {
@@ -4582,6 +4534,63 @@
       "nullable": []
     }
   },
+  "d3e53b1048d02ee3d09da9961172861c54fced836e266a9178befeddae3ef51e": {
+    "query": "SELECT * FROM aggregate_operations WHERE $1 BETWEEN from_block AND to_block\n                AND action_type = $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "d71db9de5e4ec2dc9a511d4a1247d912b15250bbd8f834f11b252de653c73176": {
     "query": "DELETE FROM account_creates WHERE block_number > $1",
     "describe": {
@@ -4712,63 +4721,6 @@
       ]
     }
   },
-  "d9e266ce374cc7d12511a61ca81cd167b59493ee74e44b26c4baf92f4a4152e4": {
-    "query": "SELECT * FROM aggregate_operations WHERE from_block >= $1 AND to_block <= $1 AND action_type = $2",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "arguments",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "from_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "to_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "db91278dbc648e1c7ebf4775d7927104e887c0bb338ed51c9aff21cfdecb2f27": {
     "query": "\n            INSERT INTO blocks (number, root_hash, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit, commitment, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n            ",
     "describe": {
@@ -4853,6 +4805,54 @@
         false,
         true,
         true
+      ]
+    }
+  },
+  "dcd0381b0098d3223ff90cb4a02f73b1107329f1e046eced766361cef5cf8e0d": {
+    "query": "SELECT blocks.block_num AS block_num, ops, fee_account,\n            timestamp, previous_block_root_hash, contract_version\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN (\n                SELECT DISTINCT block_num, contract_version\n                FROM data_restore_events_state\n            ) events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_num",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "ops",
+          "type_info": "JsonbArray"
+        },
+        {
+          "ordinal": 2,
+          "name": "fee_account",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "timestamp",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "previous_block_root_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "contract_version",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        null,
+        false,
+        true,
+        true,
+        false
       ]
     }
   },

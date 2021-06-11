@@ -112,7 +112,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 GROUP BY block_num
             ) ops
                 ON blocks.block_num = ops.block_num
-            JOIN data_restore_events_state as events
+            JOIN (
+                SELECT DISTINCT block_num, contract_version
+                FROM data_restore_events_state
+            ) events
                 ON blocks.block_num = events.block_num
             ORDER BY blocks.block_num ASC"
         )

@@ -220,6 +220,7 @@ pub struct TickerConfig {
     gas_cost_tx: GasOperationsCost,
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
     not_subsidized_tokens: HashSet<Address>,
+    scale_fee_coefficient: Ratio<BigUint>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -384,6 +385,10 @@ pub fn run_ticker_task(
         gas_cost_tx: GasOperationsCost::from_constants(config.ticker.fast_processing_coeff),
         tokens_risk_factors: HashMap::new(),
         not_subsidized_tokens: HashSet::from_iter(config.ticker.not_subsidized_tokens.clone()),
+        scale_fee_coefficient: Ratio::new(
+            BigUint::from(config.ticker.scale_fee_percent),
+            BigUint::from(100u32),
+        ),
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
@@ -566,6 +571,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
         let normal_gas_fee =
             (&wei_price_usd * normal_gas_tx_amount.clone() * scale_gas_price.clone())
+                * self.config.scale_fee_coefficient.clone()
                 * &token_usd_risk;
         let subsidy_gas_fee =
             (wei_price_usd * subsidy_gas_tx_amount.clone() * scale_gas_price.clone())
@@ -622,8 +628,9 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         }
 
         let total_zkp_fee = (zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
-        let total_normal_gas_fee =
-            (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price) * &token_usd_risk;
+        let total_normal_gas_fee = (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price)
+            * &token_usd_risk
+            * self.config.scale_fee_coefficient.clone();
         let total_subsidy_gas_fee =
             (wei_price_usd * total_subsidy_gas_tx_amount * scale_gas_price) * &token_usd_risk;
         let normal_fee = BatchFee::new(&total_zkp_fee, &total_normal_gas_fee);
