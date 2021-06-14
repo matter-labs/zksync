@@ -28,7 +28,7 @@ impl Serialize for Latest {
 
 #[derive(Debug, Error, PartialEq)]
 #[error("Cannot parse `from` query parameter: {0}")]
-pub struct UnknownFromParamater(pub String);
+pub struct UnknownFromParameter(pub String);
 
 #[derive(Debug, Serialize)]
 #[serde(transparent)]
@@ -38,7 +38,7 @@ pub struct ApiEither<T: Serialize> {
 }
 
 impl<T: FromStr + Serialize> FromStr for ApiEither<T> {
-    type Err = UnknownFromParamater;
+    type Err = UnknownFromParameter;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -49,7 +49,7 @@ impl<T: FromStr + Serialize> FromStr for ApiEither<T> {
                 if let Ok(value) = T::from_str(s) {
                     Ok(ApiEither::from(value))
                 } else {
-                    Err(UnknownFromParamater(s.to_string()))
+                    Err(UnknownFromParameter(s.to_string()))
                 }
             }
         }
@@ -66,7 +66,7 @@ impl<T: Serialize> From<T> for ApiEither<T> {
 
 pub fn parse_query<T: FromStr + Serialize>(
     query: PaginationQuery<String>,
-) -> Result<PaginationQuery<ApiEither<T>>, UnknownFromParamater> {
+) -> Result<PaginationQuery<ApiEither<T>>, UnknownFromParameter> {
     let from = FromStr::from_str(&query.from)?;
     Ok(PaginationQuery {
         from,

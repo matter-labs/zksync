@@ -30,9 +30,8 @@ All notable changes to the core components will be documented in this file.
 - Added `BlockMetadata` structure and corresponding table to track block data that is not related to protocol.
 - (`block_revert`): CLI that calls `revertBlocks` smart contract function and updates the database respectively.
 - (`api_server`): Added REST API v0.2.
-- (`storage`): Added and refactored some methods for API v0.2.
 - (`api_client`): Client for REST API v0.2.
-- (`api_types`): Created crate for storing types that are used in API.
+- (`api_types`): Crate for storing types that are used in API.
 - Added hashes for batches and additional hashes for priority operations.
 - Added `ForcedExit` fee type to REST API v0.2 and JSON RPC API.
 

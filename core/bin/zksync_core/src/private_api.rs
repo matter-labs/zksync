@@ -15,13 +15,12 @@ use futures::{
 };
 use serde::Deserialize;
 use std::{str::FromStr, thread};
-use zksync_api_types::v02::pagination::{
-    ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest,
+use zksync_api_types::{
+    v02::pagination::{ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest},
+    PriorityOpLookupQuery,
 };
 use zksync_config::configs::api::PrivateApi;
-use zksync_types::{
-    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, AccountId, Address, SignedZkSyncTx,
-};
+use zksync_types::{tx::TxEthSignature, AccountId, Address, SignedZkSyncTx};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
@@ -149,7 +148,7 @@ async fn unconfirmed_ops(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Returns information about unconfirmed operation by its eth_hash.
+/// Returns information about unconfirmed operation.
 #[actix_web::post("/unconfirmed_op")]
 async fn unconfirmed_op(
     data: web::Data<AppState>,

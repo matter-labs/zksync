@@ -9,12 +9,15 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_api_types::v02::transaction::{
-    ApiTxBatch, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, Receipt,
-    SubmitBatchResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
-    TxInBlockStatus,
+use zksync_api_types::{
+    v02::transaction::{
+        ApiTxBatch, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, Receipt,
+        SubmitBatchResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
+        TxInBlockStatus,
+    },
+    PriorityOpLookupQuery,
 };
-use zksync_types::{priority_ops::PriorityOpLookupQuery, tx::TxHash, EthBlockId};
+use zksync_types::{tx::TxHash, EthBlockId};
 
 // Local uses
 use super::{error::Error, response::ApiResult};

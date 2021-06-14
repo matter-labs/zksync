@@ -7,7 +7,7 @@ use serde_repr::Serialize_repr;
 use thiserror::Error;
 
 // Workspace uses
-use zksync_api_types::v02::pagination::{UnknownFromParamater, MAX_LIMIT};
+use zksync_api_types::v02::pagination::{UnknownFromParameter, MAX_LIMIT};
 
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
@@ -202,7 +202,7 @@ impl ApiError for PriceError {
     }
 }
 
-impl ApiError for UnknownFromParamater {
+impl ApiError for UnknownFromParameter {
     fn error_type(&self) -> String {
         String::from("invalidDataError")
     }

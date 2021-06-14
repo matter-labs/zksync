@@ -9,6 +9,7 @@ use crate::{
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
+use zksync_api_types::PriorityOpLookupQuery;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::{
@@ -17,10 +18,7 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{
-    block::ExecutedOperations, priority_ops::PriorityOpLookupQuery, BlockNumber, PriorityOp, H160,
-    H256,
-};
+use zksync_types::{block::ExecutedOperations, BlockNumber, PriorityOp, H160, H256};
 
 /// `ApiV01` structure contains the implementation of `/api/v0.1` endpoints set.
 /// It is considered (somewhat) stable and will be supported for a while.
