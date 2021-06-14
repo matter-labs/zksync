@@ -191,7 +191,7 @@ struct ErrorTickerApi;
 
 #[async_trait::async_trait]
 impl TokenPriceAPI for ErrorTickerApi {
-    async fn get_price(&self, _token_symbol: &str) -> Result<TokenPrice, PriceError> {
+    async fn get_price(&self, _token: &Token) -> Result<TokenPrice, PriceError> {
         Err(PriceError::token_not_found("Wrong token"))
     }
 }
@@ -211,9 +211,14 @@ fn run_server() -> (String, AbortHandle) {
                     })),
                 )
                 .service(web::resource("/api/v3/coins/list").to(|| {
+                    let mut platforms = HashMap::new();
+                    platforms.insert(
+                        String::from("ethereum"),
+                        String::from("0x6b175474e89094c44da98b954eedeac495271d0f"),
+                    );
                     HttpResponse::Ok().json(CoinGeckoTokenList(vec![CoinGeckoTokenInfo {
-                        id: "DAI".to_string(),
-                        symbol: "DAI".to_string(),
+                        id: "dai".to_string(),
+                        platforms,
                     }]))
                 }))
         })
