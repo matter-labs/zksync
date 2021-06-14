@@ -295,6 +295,7 @@ impl PriorityOp {
 
     pub fn tx_hash(&self) -> TxHash {
         let mut bytes = Vec::new();
+        bytes.reserve(48);
         bytes.extend_from_slice(self.eth_hash.as_bytes());
         bytes.extend_from_slice(&self.eth_block.to_be_bytes());
         bytes.extend_from_slice(&self.eth_block_index.unwrap_or(0).to_be_bytes());

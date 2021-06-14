@@ -267,7 +267,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let start = Instant::now();
 
         sqlx::query!(
-            "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, eth_block_index, tx_hash)
+            "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account,
+                priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, eth_block_index, tx_hash)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (priority_op_serialid)
             DO NOTHING",

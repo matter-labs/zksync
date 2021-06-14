@@ -1,15 +1,18 @@
 // Built-in uses
 
 // External uses
-use either::Either;
 
 // Workspace uses
-use zksync_api_types::v02::{
-    block::BlockInfo,
-    pagination::{
-        AccountTxsRequest, ApiEither, BlockAndTxHash, Paginated, PaginationQuery, PendingOpsRequest,
+use zksync_api_types::{
+    v02::{
+        block::BlockInfo,
+        pagination::{
+            AccountTxsRequest, ApiEither, BlockAndTxHash, Paginated, PaginationQuery,
+            PendingOpsRequest,
+        },
+        transaction::{Transaction, TxHashSerializeWrapper},
     },
-    transaction::{Transaction, TxHashSerializeWrapper},
+    Either,
 };
 use zksync_storage::StorageProcessor;
 use zksync_types::{BlockNumber, SerialId, Token, TokenId};

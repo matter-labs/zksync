@@ -17,15 +17,17 @@ use futures::{
     SinkExt, StreamExt,
 };
 
-use either::Either;
 use itertools::Itertools;
 use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
 
 // Workspace deps
-use zksync_api_types::v02::{
-    pagination::{Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
-    transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
+use zksync_api_types::{
+    v02::{
+        pagination::{Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
+        transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
+    },
+    Either,
 };
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_types::{tx::TxHash, Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp, H256};

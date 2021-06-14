@@ -1,3 +1,4 @@
+pub use either::Either;
 use serde::{Deserialize, Serialize};
 use zksync_types::{tx::TxHash, H256};
 

@@ -1,11 +1,13 @@
 // Built-in deps
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External imports
-use either::Either;
 // Workspace imports
-use zksync_api_types::v02::{
-    pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
-    transaction::Transaction,
+use zksync_api_types::{
+    v02::{
+        pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
+        transaction::Transaction,
+    },
+    Either,
 };
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;

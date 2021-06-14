@@ -3,15 +3,17 @@ use std::time::Instant;
 
 // External imports
 use chrono::{DateTime, Utc};
-use either::Either;
 
 // Workspace imports
-use zksync_api_types::v02::{
-    pagination::{AccountTxsRequest, PaginationDirection, PaginationQuery},
-    transaction::{
-        ApiTxBatch, BatchStatus, Receipt, Transaction, TxData, TxHashSerializeWrapper,
-        TxInBlockStatus,
+use zksync_api_types::{
+    v02::{
+        pagination::{AccountTxsRequest, PaginationDirection, PaginationQuery},
+        transaction::{
+            ApiTxBatch, BatchStatus, Receipt, Transaction, TxData, TxHashSerializeWrapper,
+            TxInBlockStatus,
+        },
     },
+    Either,
 };
 use zksync_types::{
     aggregated_operations::AggregatedActionType,

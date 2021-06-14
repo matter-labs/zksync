@@ -45,7 +45,6 @@ anyhow = "1.0"
 thiserror = "1.0"
 tiny-keccak = "1.4.2"
 async-trait = "0.1"
-either = "1.6.1"
 
 [dev-dependencies]
 num = { version = "0.3.1", features = ["serde"] }
