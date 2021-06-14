@@ -992,7 +992,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         let executed_txs: Vec<StoredExecutedTransaction> = sqlx::query_as!(
             StoredExecutedTransaction,
-            "SELECT * FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
+            "SELECT * FROM executed_transactions WHERE block_number BETWEEN $1 AND $2 AND success = true",
             i64::from(*from_block),
             i64::from(*to_block)
         )
