@@ -71,6 +71,11 @@ jobs:
       - name: liquidity-token
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
 
+      - name: change dev-ticker
+        run: |
+          docker-compose -f docker-compose-runner.yml down dev-liquidity-token-watcher
+          zk f cargo run --bin dev-ticker-server
+
       - name: contracts-unit-tests
         run: ci_run zk test contracts
 
@@ -97,6 +102,11 @@ jobs:
           docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
           ci_run sccache --start-server
+
+      - name: change dev-ticker
+        run: |
+          docker-compose -f docker-compose-runner.yml down dev-liquidity-token-watcher
+          zk f cargo run --bin dev-ticker-server
 
       - name: init
         run: |
