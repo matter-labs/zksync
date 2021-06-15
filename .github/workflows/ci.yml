@@ -74,7 +74,7 @@ jobs:
       - name: change dev-ticker
         run: |
           docker-compose -f docker-compose-runner.yml stop dev-ticker
-          zk f cargo run --bin dev-ticker-server
+          ci_run zk f cargo run --bin dev-ticker-server
 
       - name: contracts-unit-tests
         run: ci_run zk test contracts
@@ -116,7 +116,7 @@ jobs:
       - name: change dev-ticker
         run: |
           docker-compose -f docker-compose-runner.yml stop dev-ticker
-          zk f cargo run --bin dev-ticker-server
+          ci_run zk f cargo run --bin dev-ticker-server
 
       - name: run-services
         run: |
