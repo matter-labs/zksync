@@ -28,7 +28,7 @@ BEGIN
             agg_hash = '';
             FOR rec in SELECT tx_hash FROM executed_transactions
                         WHERE batch_id = i
-                        ORDER BY created_at
+                        ORDER BY created_at ASC, block_index ASC
             LOOP
                 agg_hash = agg_hash || rec.tx_hash;
             END LOOP;

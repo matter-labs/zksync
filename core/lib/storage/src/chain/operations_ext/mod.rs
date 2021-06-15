@@ -931,7 +931,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     success,
                                     fail_reason,
                                     Null::bytea as eth_hash,
-                                    Null::bigint as priority_op_serialid
+                                    Null::bigint as priority_op_serialid,
+                                    block_index
                                 FROM executed_transactions
                                 WHERE (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
                                     AND created_at >= $2
@@ -944,7 +945,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     true as success,
                                     Null as fail_reason,
                                     eth_hash,
-                                    priority_op_serialid
+                                    priority_op_serialid,
+                                    block_index
                                 FROM executed_priority_operations
                                 WHERE (from_account = $1 OR to_account = $1) AND created_at >= $2
                             ), everything AS (
@@ -962,7 +964,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 eth_hash as "eth_hash?",
                                 priority_op_serialid as "priority_op_serialid?"
                             FROM everything
-                            ORDER BY created_at ASC
+                            ORDER BY created_at ASC, block_index ASC
                             LIMIT $3
                         "#,
                         query.from.address.as_bytes(),
@@ -985,7 +987,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     success,
                                     fail_reason,
                                     Null::bytea as eth_hash,
-                                    Null::bigint as priority_op_serialid
+                                    Null::bigint as priority_op_serialid,
+                                    block_index
                                 FROM executed_transactions
                                 WHERE (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
                                     AND created_at <= $2
@@ -998,7 +1001,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     true as success,
                                     Null as fail_reason,
                                     eth_hash,
-                                    priority_op_serialid
+                                    priority_op_serialid,
+                                    block_index
                                 FROM executed_priority_operations
                                 WHERE (from_account = $1 OR to_account = $1) AND created_at <= $2
                             ), everything AS (
@@ -1016,7 +1020,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 eth_hash as "eth_hash?",
                                 priority_op_serialid as "priority_op_serialid?"
                             FROM everything
-                            ORDER BY created_at DESC
+                            ORDER BY created_at DESC, block_index DESC
                             LIMIT $3
                         "#,
                         query.from.address.as_bytes(),
@@ -1063,11 +1067,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let record = sqlx::query!(
             r#"
                 WITH transactions AS (
-                    SELECT tx_hash, created_at
+                    SELECT tx_hash, created_at, block_index
                     FROM executed_transactions
                     WHERE from_account = $1 OR to_account = $1 OR primary_account_address = $1
                 ), priority_ops AS (
-                    SELECT tx_hash, created_at
+                    SELECT tx_hash, created_at, block_index
                     FROM executed_priority_operations
                     WHERE from_account = $1 OR to_account = $1
                 ), everything AS (
@@ -1078,7 +1082,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 SELECT
                     tx_hash as "tx_hash!"
                 FROM everything
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, block_index DESC
                 LIMIT 1
             "#,
             address.as_bytes(),
@@ -1101,11 +1105,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let record = sqlx::query!(
             r#"
                 WITH transactions AS (
-                    SELECT tx_hash, created_at
+                    SELECT tx_hash, created_at, block_index
                     FROM executed_transactions
                     WHERE block_number = $1
                 ), priority_ops AS (
-                    SELECT tx_hash, created_at
+                    SELECT tx_hash, created_at, block_index
                     FROM executed_priority_operations
                     WHERE block_number = $1
                 ), everything AS (
@@ -1116,7 +1120,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 SELECT
                     tx_hash as "tx_hash!"
                 FROM everything
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, block_index DESC
                 LIMIT 1
             "#,
             i64::from(*block_number)
@@ -1224,7 +1228,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 INNER JOIN txs_batches_hashes
                 ON txs_batches_hashes.batch_id = COALESCE(executed_transactions.batch_id, 0)
                 WHERE batch_hash = $1
-                ORDER BY created_at ASC
+                ORDER BY created_at ASC, block_index ASC
             "#,
             batch_hash.as_ref()
         )

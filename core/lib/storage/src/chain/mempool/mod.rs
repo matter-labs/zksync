@@ -431,7 +431,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 INNER JOIN txs_batches_hashes
                 ON txs_batches_hashes.batch_id = mempool_txs.batch_id
                 WHERE batch_hash = $1
-                ORDER BY created_at ASC
+                ORDER BY id ASC
             "#,
             batch_hash.as_ref()
         )
