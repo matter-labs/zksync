@@ -57,7 +57,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
         let token_lowercase_symbol = token_symbol.to_lowercase();
         let token_id = self
             .token_ids
-            .get(&format!("{:?}", token.address.to_lowercase()))
+            .get(&format!("{:?}", token.address))
             .unwrap_or(&token_lowercase_symbol);
         // TODO ZKS-595. Uncomment this code
         // .ok_or_else(|| {
