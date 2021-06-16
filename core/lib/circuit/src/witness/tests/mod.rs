@@ -165,6 +165,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
             account_id: account.id,
             eth_address: account.account.address,
             token: TokenId(0),
+            is_legacy: false,
         },
         withdraw_amount: Some(BigUint::from(900u32).into()),
         creator_account_id: None,

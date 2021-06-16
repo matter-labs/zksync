@@ -46,6 +46,11 @@ pub struct FullExit {
     pub account_id: AccountId,
     pub eth_address: Address,
     pub token: TokenId,
+    /// A flag that indicates whether the operation was performed
+    /// before the NFT upgrade with an old number of required block chunks.
+    /// Required by the `data_restore`, `false` by default.
+    #[serde(default = "bool::default")]
+    pub is_legacy: bool,
 }
 
 /// A set of L1 priority operations supported by the zkSync network.
@@ -177,6 +182,7 @@ impl ZkSyncPriorityOp {
                     account_id: AccountId(account_id),
                     eth_address,
                     token: TokenId(token as u32),
+                    is_legacy: false,
                 }))
             }
             _ => Err(LogParseError::UnsupportedPriorityOpType),
@@ -298,6 +304,7 @@ impl ZkSyncPriorityOp {
                     account_id: AccountId(account_id),
                     eth_address,
                     token: TokenId(token),
+                    is_legacy: false,
                 }))
             }
             _ => Err(LogParseError::UnsupportedPriorityOpType),

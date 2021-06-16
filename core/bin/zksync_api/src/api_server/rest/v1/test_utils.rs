@@ -682,6 +682,7 @@ pub fn dummy_full_exit_op(
             account_id,
             eth_address,
             token: TokenId(0),
+            is_legacy: false,
         },
         withdraw_amount: None,
         creator_account_id: None,

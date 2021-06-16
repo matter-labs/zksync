@@ -177,6 +177,7 @@ pub mod operations_test {
                 eth_address: Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
                 account_id: AccountId(42),
                 token: TokenId(42),
+                is_legacy: false,
             };
 
             FullExitOp {

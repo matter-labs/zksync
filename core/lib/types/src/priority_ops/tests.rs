@@ -23,6 +23,7 @@ mod backward_compatibility {
             account_id: AccountId(155),
             eth_address: Address::default(),
             token: TokenId(1000),
+            is_legacy: false,
         };
         OldPriorityOp {
             serial_id: 12345,

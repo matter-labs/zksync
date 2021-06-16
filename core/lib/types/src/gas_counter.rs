@@ -344,6 +344,7 @@ mod tests {
                 account_id: AccountId(0),
                 eth_address: Default::default(),
                 token: TokenId(0),
+                is_legacy: false,
             },
             withdraw_amount: None,
             creator_account_id: None,

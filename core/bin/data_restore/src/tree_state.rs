@@ -689,6 +689,7 @@ mod test {
             account_id: AccountId(1),
             eth_address: [8u8; 20].into(),
             token: TokenId(1),
+            is_legacy: false,
         };
         let op6 = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op: tx6,
@@ -895,6 +896,7 @@ mod test {
             account_id: AccountId(1),
             eth_address: [8u8; 20].into(),
             token: TokenId(1),
+            is_legacy: false,
         };
         let op6 = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op: tx6,

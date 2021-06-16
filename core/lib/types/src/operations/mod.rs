@@ -63,7 +63,7 @@ impl ZkSyncOp {
             ZkSyncOp::Withdraw(_) => WithdrawOp::CHUNKS,
             ZkSyncOp::Close(_) => CloseOp::CHUNKS,
             ZkSyncOp::Transfer(_) => TransferOp::CHUNKS,
-            ZkSyncOp::FullExit(_) => FullExitOp::CHUNKS,
+            ZkSyncOp::FullExit(full_exit_op) => full_exit_op.chunks(),
             ZkSyncOp::ChangePubKeyOffchain(_) => ChangePubKeyOp::CHUNKS,
             ZkSyncOp::ForcedExit(_) => ForcedExitOp::CHUNKS,
             ZkSyncOp::Swap(_) => SwapOp::CHUNKS,
