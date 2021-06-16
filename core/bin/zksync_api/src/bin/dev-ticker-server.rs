@@ -95,7 +95,7 @@ fn load_tokens(path: impl AsRef<Path>) -> Vec<TokenData> {
     let file = File::open(path).unwrap();
     let reader = BufReader::new(file);
 
-    let values: Vec<HashMap<String, Value>> = serde_json::from_reader(reader).unwrap();
+    let values: Vec<HashMap<String, serde_json::Value>> = serde_json::from_reader(reader).unwrap();
     let tokens: Vec<TokenData> = values
         .into_iter()
         .map(|value| {
@@ -123,7 +123,7 @@ fn load_tokens(path: impl AsRef<Path>) -> Vec<TokenData> {
 
 async fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> {
     let data = load_tokens(&"etc/tokens/localhost.json");
-    Ok(HttpResponse::Ok().json(resp))
+    Ok(HttpResponse::Ok().json(data))
 }
 
 async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResponse> {
