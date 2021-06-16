@@ -9,6 +9,7 @@ use bigdecimal::BigDecimal;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 use std::{convert::TryFrom, time::Duration};
 use structopt::StructOpt;
 use zksync_crypto::rand::{thread_rng, Rng};
@@ -82,36 +83,46 @@ async fn handle_coinmarketcap_token_price_query(
     Ok(HttpResponse::Ok().json(resp))
 }
 
-async fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> {
-    // Some tokens may appear more than one time because they have different addresses on testnets.
-    let resp = json!([
-        {"id": "ethereum", "symbol": "eth", "name": "Ethereum", "platforms": {}},
-        {"id": "dai", "symbol": "dai", "name": "Dai", "platforms": {"ethereum": "0x7eBAb6CBe1AAfc22c1877FEaa1D552b80CA91A09"}},
-        {"id": "dai", "symbol": "dai", "name": "Dai", "platforms": {"ethereum": "0x351714Df444b8213f2C46aaA28829Fc5a8921304"}},
-        {"id": "tglm", "symbol": "tglm", "name": "Golem", "platforms": {"ethereum": "0xd94e3DC39d4Cad1DAd634e7eb585A57A19dC7EFE"}},
-        {"id": "usdc", "symbol": "usdc", "name": "usdc", "platforms": {"ethereum": "0xeb8f08a975Ab53E34D8a0330E0D34de942C95926"}},
-        {"id": "usdt", "symbol": "usdt", "name": "usdt", "platforms": {"ethereum": "0x3B00Ef435fA4FcFF5C209a37d1f3dcff37c705aD"}},
-        {"id": "tusd", "symbol": "tusd", "name": "tusd", "platforms": {"ethereum": "0x6856eC11F56267e3326f536D0e9F36eC7f7D1498"}},
-        {"id": "tusd", "symbol": "tusd", "name": "tusd", "platforms": {"ethereum": "0xd2255612F9b045e9c81244bB874aBb413Ca139a3"}},
-        {"id": "link", "symbol": "link", "name": "link", "platforms": {"ethereum": "0x4da8d0795830f75BE471F072a034d42c369B5d0A"}},
-        {"id": "link", "symbol": "link", "name": "link", "platforms": {"ethereum": "0x793f38AE147852C37071684CdffC1FF7c87f7d07"}},
-        {"id": "ht", "symbol": "ht", "name": "ht", "platforms": {"ethereum": "0x14700Cae8B2943bad34C70bB76AE27ECF5bC5013"}},
-        {"id": "omg", "symbol": "omg", "name": "omg", "platforms": {"ethereum": "0x2B203de02AD6109521e09985b3aF9B8c62541Cd6"}},
-        {"id": "trb", "symbol": "trb", "name": "trb", "platforms": {"ethereum": "0x2655F3a9eEB7F960be83098457144813ffaD07a4"}},
-        {"id": "zrx", "symbol": "zrx", "name": "zrx", "platforms": {"ethereum": "0xC865bCBe4b6eF4B58a790052f2B51B4f06f586aC"}},
-        {"id": "zrx", "symbol": "zrx", "name": "zrx", "platforms": {"ethereum": "0xDB7F2B9f6a0cB35FE5D236e5ed871D3aD4184290"}},
-        {"id": "rep", "symbol": "rep", "name": "rep", "platforms": {"ethereum": "0x9Cac8508b9ff26501439590a24893D80e7E84D21"}},
-        {"id": "storj", "symbol": "storj", "name": "storj", "platforms": {"ethereum": "0x8098165d982765097E4aa17138816e5b95f9fDb5"}},
-        {"id": "nexo", "symbol": "nexo", "name": "nexo", "platforms": {"ethereum": "0x02d01f0835B7FDfa5d801A8f5f74c37F2BB1aE6a"}},
-        {"id": "mco", "symbol": "mco", "name": "mco", "platforms": {"ethereum": "0xd93adDB2921b8061B697C2Ab055979BbEFE2B7AC"}},
-        {"id": "knc", "symbol": "knc", "name": "knc", "platforms": {"ethereum": "0x290EBa6EC56EcC9fF81C72E8eccc77D2c2BF63eB"}},
-        {"id": "lamb", "symbol": "lamb", "name": "lamb", "platforms": {"ethereum": "0x9ecec4d48Efdd96aE377aF3AB868f99De865CfF8"}},
-        {"id": "basic-attention-token", "symbol": "bat", "name": "Basic Attention Token", "platforms": {"ethereum": "0xD2084eA2AE4bBE1424E4fe3CDE25B713632fb988"}},
-        {"id": "basic-attention-token", "symbol": "bat", "name": "Basic Attention Token", "platforms": {"ethereum": "0x657aE665459c37483221C6a0c145a2DC197bD210"}},
-        {"id": "basic-attention-token", "symbol": "bat", "name": "Basic Attention Token", "platforms": {"ethereum": "0x1B46bd2FC40030B6959A2d407f7D16f66aFaDD52"}},
-        {"id": "wrapped-bitcoin", "symbol": "wbtc", "name": "Wrapped Bitcoin", "platforms": {"ethereum": "0x3bdFbbFDCF051C6EC5a741CC0fDe89e30Ff2F824"}},
-    ]);
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct TokenData {
+    id: String,
+    symbol: String,
+    name: String,
+    platforms: HashMap<String, String>,
+}
 
+fn load_tokens(path: impl AsRef<Path>) -> Vec<TokenData> {
+    let file = File::open(path).unwrap();
+    let reader = BufReader::new(file);
+
+    let values: Vec<HashMap<String, Value>> = serde_json::from_reader(reader).unwrap();
+    let tokens: Vec<TokenData> = values
+        .into_iter()
+        .map(|value| {
+            let symbol = value["symbol"].as_str().unwrap().to_ascii_lowercase();
+            let address = value["address"].as_str().unwrap().to_ascii_lowercase();
+            let mut platforms = HashMap::new();
+            platforms.insert(String::from("ethereum"), address);
+            let id = match symbol.as_str() {
+                "eth" => String::from("ethereum"),
+                "wbtc" => String::from("wrapped-bitcoin"),
+                "bat" => String::from("basic-attention-token"),
+                _ => symbol.clone(),
+            };
+
+            TokenData {
+                id,
+                symbol: symbol.clone(),
+                name: symbol,
+                platforms,
+            }
+        })
+        .collect();
+    tokens
+}
+
+async fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> {
+    let data = load_tokens(&"etc/tokens/localhost.json");
     Ok(HttpResponse::Ok().json(resp))
 }
 

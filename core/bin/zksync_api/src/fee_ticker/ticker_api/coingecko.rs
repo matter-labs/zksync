@@ -31,7 +31,7 @@ impl CoinGeckoAPI {
         let mut token_ids = HashMap::new();
         for token in token_list.0 {
             if let Some(address) = token.platforms.get("ethereum") {
-                token_ids.insert(address.clone(), token.id);
+                token_ids.insert(address.to_lowercase(), token.id);
             }
         }
 
@@ -57,7 +57,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
         let token_lowercase_symbol = token_symbol.to_lowercase();
         let token_id = self
             .token_ids
-            .get(&format!("{:?}", token.address))
+            .get(&format!("{:?}", token.address.to_lowercase()))
             .unwrap_or(&token_lowercase_symbol);
         // TODO ZKS-595. Uncomment this code
         // .ok_or_else(|| {
