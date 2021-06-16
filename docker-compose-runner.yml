@@ -11,7 +11,7 @@ services:
       - PLUGIN_CONFIG
 
   dev-ticker:
-    image: "matterlabs/dev-ticker:latest"
+    build: ./docker/dev-ticker
 
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
