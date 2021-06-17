@@ -29,7 +29,6 @@ export async function init() {
     await contract.redeploy();
     if (!process.env.CI) {
         await docker.restart('dev-liquidity-token-watcher');
-        await docker.restart('dev-ticker');
     }
 }
 
