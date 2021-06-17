@@ -7,9 +7,10 @@ use num::BigUint;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::time::Instant;
 use zksync_types::{Address, Token, TokenPrice};
-use zksync_utils::UnsignedRatioSerializeAsDecimal;
+use zksync_utils::{remove_prefix, UnsignedRatioSerializeAsDecimal};
 
 #[derive(Debug, Clone)]
 pub struct CoinGeckoAPI {
@@ -30,8 +31,13 @@ impl CoinGeckoAPI {
 
         let mut token_ids = HashMap::new();
         for token in token_list.0 {
-            if let Some(address) = token.platforms.get("ethereum") {
-                token_ids.insert(*address, token.id);
+            if let Some(address_value) = token.platforms.get("ethereum") {
+                if let Some(address_str) = address_value.as_str() {
+                    let address_str = remove_prefix(address_str);
+                    if let Ok(address) = Address::from_str(address_str) {
+                        token_ids.insert(address, token.id);
+                    }
+                }
             }
         }
 
@@ -123,7 +129,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoinGeckoTokenInfo {
     pub(crate) id: String,
-    pub(crate) platforms: HashMap<String, Address>,
+    pub(crate) platforms: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -212,7 +212,10 @@ fn run_server(token_address: Address) -> (String, AbortHandle) {
                 )
                 .service(web::resource("/api/v3/coins/list").to(move || {
                     let mut platforms = HashMap::new();
-                    platforms.insert(String::from("ethereum"), token_address);
+                    platforms.insert(
+                        String::from("ethereum"),
+                        serde_json::Value::String(serde_json::to_string(&token_address).unwrap()),
+                    );
                     HttpResponse::Ok().json(CoinGeckoTokenList(vec![CoinGeckoTokenInfo {
                         id: "dai".to_string(),
                         platforms,
