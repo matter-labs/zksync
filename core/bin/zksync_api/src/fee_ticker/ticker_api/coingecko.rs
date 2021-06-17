@@ -15,7 +15,7 @@ use zksync_utils::UnsignedRatioSerializeAsDecimal;
 pub struct CoinGeckoAPI {
     base_url: Url,
     client: reqwest::Client,
-    token_ids: HashMap<String, String>,
+    token_ids: HashMap<Address, String>,
 }
 
 impl CoinGeckoAPI {
@@ -31,15 +31,12 @@ impl CoinGeckoAPI {
         let mut token_ids = HashMap::new();
         for token in token_list.0 {
             if let Some(address) = token.platforms.get("ethereum") {
-                token_ids.insert(address.to_lowercase(), token.id);
+                token_ids.insert(*address, token.id);
             }
         }
 
         // Add ETH manually because coingecko API doesn't return address for it.
-        token_ids.insert(
-            format!("{:?}", Address::default()),
-            String::from("ethereum"),
-        );
+        token_ids.insert(Address::default(), String::from("ethereum"));
 
         Ok(Self {
             base_url,
@@ -57,7 +54,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
         let token_lowercase_symbol = token_symbol.to_lowercase();
         let token_id = self
             .token_ids
-            .get(&format!("{:?}", token.address))
+            .get(&token.address)
             .unwrap_or(&token_lowercase_symbol);
         // TODO ZKS-595. Uncomment this code
         // .ok_or_else(|| {
@@ -126,7 +123,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoinGeckoTokenInfo {
     pub(crate) id: String,
-    pub(crate) platforms: HashMap<String, String>,
+    pub(crate) platforms: HashMap<String, Address>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
