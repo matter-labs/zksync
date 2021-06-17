@@ -48,8 +48,9 @@ pub struct FullExit {
     pub token: TokenId,
     /// A flag that indicates whether the operation was performed
     /// before the NFT upgrade with an old number of required block chunks.
-    /// Required by the `data_restore`, `false` by default.
-    #[serde(default = "bool::default")]
+    /// Only serialized manually by the `data_restore`, `false` by default.
+    #[serde(default)]
+    #[serde(skip_serializing)]
     pub is_legacy: bool,
 }
 
