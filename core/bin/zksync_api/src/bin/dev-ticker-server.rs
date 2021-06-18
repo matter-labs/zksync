@@ -158,7 +158,14 @@ async fn handle_coingecko_token_price_query(
 }
 
 fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
-    let data = load_tokens(&"etc/tokens/localhost.json");
+    let localhost_tokens = load_tokens(&"etc/tokens/localhost.json");
+    let rinkeby_tokens = load_tokens(&"etc/tokens/rinkeby.json");
+    let ropsten_tokens = load_tokens(&"etc/tokens/ropsten.json");
+    let data: Vec<TokenData> = localhost_tokens
+        .into_iter()
+        .chain(rinkeby_tokens.into_iter())
+        .chain(ropsten_tokens.into_iter())
+        .collect();
     if sloppy_mode {
         web::scope("/")
             .data(data)
