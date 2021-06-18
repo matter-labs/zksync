@@ -108,6 +108,14 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
+    async getStateDetailed(idOrAddress: number | types.Address): Promise<Response<types.AccountStateRest>> {
+        return await this.get(`${this.address}/accounts/${idOrAddress}`);
+    }
+
+    async getState(idOrAddress: number | types.Address): Promise<types.AccountStateRest> {
+        return this.parseResponse(await this.getStateDetailed(idOrAddress));
+    }
+
     async accountTxsDetailed(
         idOrAddress: number | types.Address,
         paginationQuery: types.PaginationQuery<string>
@@ -465,58 +473,6 @@ export class RestProvider extends SyncProvider {
         } while (tokenPage.list.length == limit);
 
         return tokens;
-    }
-
-    async getState(address: types.Address): Promise<types.AccountStateRest> {
-        const committedHandle = this.accountInfo(address, 'committed');
-        const finalizedHandle = this.accountInfo(address, 'finalized');
-        const [committedFullInfo, finalizedFullInfo] = await Promise.all([committedHandle, finalizedHandle]);
-
-        if (finalizedFullInfo) {
-            return {
-                address,
-                id: committedFullInfo.accountId,
-                committed: {
-                    balances: committedFullInfo.balances,
-                    nonce: committedFullInfo.nonce,
-                    pubKeyHash: committedFullInfo.pubKeyHash
-                },
-                verified: {
-                    balances: finalizedFullInfo.balances,
-                    nonce: finalizedFullInfo.nonce,
-                    pubKeyHash: finalizedFullInfo.pubKeyHash
-                }
-            };
-        } else if (committedFullInfo) {
-            return {
-                address,
-                id: committedFullInfo.accountId,
-                committed: {
-                    balances: committedFullInfo.balances,
-                    nonce: committedFullInfo.nonce,
-                    pubKeyHash: committedFullInfo.pubKeyHash
-                },
-                verified: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                }
-            };
-        } else {
-            return {
-                address,
-                committed: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                },
-                verified: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                }
-            };
-        }
     }
 
     async getConfirmationsForEthOpAmount(): Promise<number> {

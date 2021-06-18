@@ -202,7 +202,7 @@ impl NotifierState {
                 storage
                     .chain()
                     .account_schema()
-                    .last_committed_state_for_account(id)
+                    .last_committed_state_for_account(id, None)
                     .await?
             }
             ActionType::VERIFY => {

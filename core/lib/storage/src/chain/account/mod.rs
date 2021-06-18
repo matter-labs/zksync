@@ -75,21 +75,24 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         account_id: AccountId,
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
-
         // Load committed & verified states, and return them.
-        let committed = self
-            .last_committed_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
-        let verified = self
-            .last_verified_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
+        let mut transaction = self.0.start_transaction().await?;
+        let verified_state = transaction
+            .chain()
+            .account_schema()
+            .account_and_last_block(account_id)
+            .await?;
+        let committed_state = transaction
+            .chain()
+            .account_schema()
+            .last_committed_state_for_account(account_id, Some(verified_state.clone()))
+            .await?;
+        transaction.commit().await?;
 
         metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
         Ok(StoredAccountState {
-            committed,
-            verified,
+            committed: committed_state.map(|a| (account_id, a)),
+            verified: verified_state.1.map(|a| (account_id, a)),
         })
     }
 
@@ -121,16 +124,21 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     pub async fn last_committed_state_for_account(
         &mut self,
         account_id: AccountId,
+        verified_state: Option<(i64, Option<Account>)>,
     ) -> QueryResult<Option<Account>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
-        // Get the last certain state of the account.
-        // Note that `account` can be `None` here (if it wasn't verified yet), since
-        // we will update the committed changes below.
-        let (last_block, account) = AccountSchema(&mut transaction)
-            .account_and_last_block(account_id)
-            .await?;
+        let (last_block, account) = if let Some(verified_state) = verified_state {
+            verified_state
+        } else {
+            // Get the last certain state of the account.
+            // Note that `account` can be `None` here (if it wasn't verified yet), since
+            // we will update the committed changes below.
+            AccountSchema(&mut transaction)
+                .account_and_last_block(account_id)
+                .await?
+        };
 
         let account_balance_diff = sqlx::query_as!(
             StorageAccountUpdate,
