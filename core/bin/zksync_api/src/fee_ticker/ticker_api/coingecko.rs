@@ -57,18 +57,12 @@ impl TokenPriceAPI for CoinGeckoAPI {
     async fn get_price(&self, token: &Token) -> Result<TokenPrice, PriceError> {
         let start = Instant::now();
         let token_symbol = token.symbol.as_str();
-        let token_lowercase_symbol = token_symbol.to_lowercase();
-        let token_id = self
-            .token_ids
-            .get(&token.address)
-            .unwrap_or(&token_lowercase_symbol);
-        // TODO ZKS-595. Uncomment this code
-        // .ok_or_else(|| {
-        //     PriceError::token_not_found(format!(
-        //         "Token '{}' is not listed on CoinGecko",
-        //         token_symbol
-        //     ))
-        // })?;
+        let token_id = self.token_ids.get(&token.address).ok_or_else(|| {
+            PriceError::token_not_found(format!(
+                "Token '{}, {:?}' is not listed on CoinGecko",
+                token.symbol, token.address
+            ))
+        })?;
 
         let market_chart_url = self
             .base_url
