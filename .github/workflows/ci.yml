@@ -69,9 +69,7 @@ jobs:
           ci_run zk run yarn
 
       - name: restart dev-liquidity-token-watcher and dev-ticker
-        run: |
-          docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
-          docker-compose -f docker-compose-runner.yml restart dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
       - name: contracts-unit-tests
         run: ci_run zk test contracts
@@ -108,9 +106,7 @@ jobs:
           ci_run zk init
 
       - name: restart dev-liquidity-token-watcher and dev-ticker
-        run: |
-          docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
-          docker-compose -f docker-compose-runner.yml restart dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
       - name: run-services
         run: |
