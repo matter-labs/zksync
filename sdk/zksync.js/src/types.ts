@@ -29,7 +29,7 @@ export type AccountState = AccountStateRest | AccountStateRpc;
 export interface AccountStateRest {
     address: Address;
     id?: number;
-    committed?: {
+    committed: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
@@ -37,7 +37,7 @@ export interface AccountStateRest {
         nonce: number;
         pubKeyHash: PubKeyHash;
     };
-    verified?: {
+    verified: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
@@ -305,6 +305,11 @@ export interface ApiAccountInfo {
     balances: {
         [token: string]: BigNumber;
     };
+}
+
+export interface ApiAccountFullInfo {
+    committed: ApiAccountInfo;
+    finalized: ApiAccountInfo;
 }
 
 export interface ApiConfig {

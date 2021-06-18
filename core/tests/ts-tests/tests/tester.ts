@@ -84,7 +84,7 @@ export class Tester {
         const operatorAddress = process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR as string;
         const accountState = await this.syncProvider.getState(operatorAddress);
         const tokenSymbol = this.syncProvider.tokenSet.resolveTokenSymbol(token);
-        const balance = accountState.committed!.balances[tokenSymbol] || '0';
+        const balance = accountState.committed.balances[tokenSymbol] || '0';
         return ethers.BigNumber.from(balance);
     }
 
