@@ -5,7 +5,7 @@ use crate::{
         helpers::*,
         v01::{caches::Caches, network_status::SharedNetworkStatus},
     },
-    core_api_client::{CoreApiClient, EthBlockId},
+    core_api_client::CoreApiClient,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
@@ -274,7 +274,7 @@ impl ApiV01 {
     pub(crate) async fn get_unconfirmed_op_by_hash(
         &self,
         eth_tx_hash: H256,
-    ) -> Result<Option<(EthBlockId, PriorityOp)>, anyhow::Error> {
+    ) -> Result<Option<PriorityOp>, anyhow::Error> {
         self.api_client.get_unconfirmed_op(eth_tx_hash).await
     }
 }

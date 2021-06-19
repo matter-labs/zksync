@@ -59,7 +59,7 @@ impl CoreApiClient {
     pub async fn get_unconfirmed_op(
         &self,
         eth_tx_hash: H256,
-    ) -> anyhow::Result<Option<(EthBlockId, PriorityOp)>> {
+    ) -> anyhow::Result<Option<PriorityOp>> {
         let endpoint = format!(
             "{}/unconfirmed_op/0x{}",
             self.addr,
