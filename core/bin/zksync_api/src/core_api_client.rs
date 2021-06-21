@@ -81,7 +81,7 @@ impl CoreApiClient {
     pub async fn get_unconfirmed_op(
         &self,
         query: PriorityOpLookupQuery,
-    ) -> anyhow::Result<Option<(EthBlockId, PriorityOp)>> {
+    ) -> anyhow::Result<Option<PriorityOp>> {
         let endpoint = format!("{}/unconfirmed_op", self.addr,);
         self.post(&endpoint, query).await
     }
