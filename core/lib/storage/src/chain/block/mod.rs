@@ -981,4 +981,53 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         metrics::histogram!("sql.chain.block.remove_account_tree_cache", start.elapsed());
         Ok(())
     }
+
+    pub async fn store_factories_for_block_withdraw_nfts(
+        &mut self,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let executed_txs: Vec<StoredExecutedTransaction> = sqlx::query_as!(
+            StoredExecutedTransaction,
+            "SELECT * FROM executed_transactions WHERE block_number BETWEEN $1 AND $2 AND success = true",
+            i64::from(*from_block),
+            i64::from(*to_block)
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+
+        let mut token_ids = Vec::new();
+        for executed_tx in executed_txs {
+            if executed_tx.tx.get("type")
+                == Some(&serde_json::Value::String("WithdrawNFT".to_string()))
+            {
+                token_ids.push(executed_tx.tx.get("token").unwrap().as_i64().unwrap() as i32);
+            }
+        }
+
+        sqlx::query!(
+            r#"
+                INSERT INTO withdrawn_nfts_factories (token_id, factory_address)
+                SELECT token_id, 
+                    COALESCE(nft_factory.factory_address, server_config.nft_factory_addr) as factory_address
+                FROM nft
+                INNER JOIN server_config ON server_config.id = true
+                LEFT JOIN nft_factory ON nft_factory.creator_id = nft.creator_account_id
+                WHERE nft.token_id = ANY($1)
+            "#,
+            &token_ids
+        )
+        .execute(transaction.conn())
+        .await?;
+        transaction.commit().await?;
+
+        metrics::histogram!(
+            "sql.chain.block.store_factories_for_block_withdraw_nfts",
+            start.elapsed()
+        );
+        Ok(())
+    }
 }

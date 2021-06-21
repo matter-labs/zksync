@@ -2387,6 +2387,20 @@
       ]
     }
   },
+  "6e99e599875e2567cc2f280fda3dbb0ae6a13fcc065dca1f6e96204bd14c27d1": {
+    "query": "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {
     "query": "SELECT * FROM accounts",
     "describe": {
@@ -3464,6 +3478,18 @@
       "nullable": []
     }
   },
+  "a35474b8ed25c6265defe4e7621f11eae0deedc08a9cbc9780773c5be5697fcc": {
+    "query": "\n                INSERT INTO withdrawn_nfts_factories (token_id, factory_address)\n                SELECT token_id, \n                    COALESCE(nft_factory.factory_address, server_config.nft_factory_addr) as factory_address\n                FROM nft\n                INNER JOIN server_config ON server_config.id = true\n                LEFT JOIN nft_factory ON nft_factory.creator_id = nft.creator_account_id\n                WHERE nft.token_id = ANY($1)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "a4969ac155106f1d8dd9b305e71ce36b3ee39adf75574d40e123a617a502ffe4": {
     "query": "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data, batch_id)\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)\n                ON CONFLICT (tx_hash)\n                DO NOTHING",
     "describe": {
@@ -3526,6 +3552,74 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "aafe4eaa64fd1b3ab1205f64329460b9a5f354e41c4ddc8a1f39f4661e7f9040": {
+    "query": "\n                SELECT nft.*, tokens.symbol, withdrawn_nfts_factories.factory_address as \"withdrawn_factory?\",\n                    COALESCE(nft_factory.factory_address, server_config.nft_factory_addr) as \"current_factory!\"\n                FROM nft\n                INNER JOIN server_config\n                    ON server_config.id = true\n                INNER JOIN tokens\n                    ON tokens.id = nft.token_id\n                LEFT JOIN nft_factory\n                    ON nft_factory.creator_id = nft.creator_account_id\n                LEFT JOIN withdrawn_nfts_factories\n                    ON withdrawn_nfts_factories.token_id = nft.token_id\n                WHERE nft.token_id = $1\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "withdrawn_factory?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 8,
+          "name": "current_factory!",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        null
+      ]
     }
   },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {
@@ -5078,6 +5172,105 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "e56b7f4f240fe2ad368efb9cd845b0e7bca4a3c8f2f91b00a120a3e6dfc91a6e": {
+    "query": "SELECT * FROM executed_transactions WHERE block_number BETWEEN $1 AND $2 AND success = true",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "operation",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 4,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "from_account",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "to_account",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 7,
+          "name": "success",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "fail_reason",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 9,
+          "name": "primary_account_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 10,
+          "name": "nonce",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 11,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 12,
+          "name": "eth_sign_data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 13,
+          "name": "batch_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
     }
   },
   "e7b1a3e830945cfe5c876255bbaa97dae409e1f642539ec898fd5dc3bb991bfc": {

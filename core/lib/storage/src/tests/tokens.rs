@@ -1,11 +1,20 @@
+// Built-in imports
+use std::str::FromStr;
 // External imports
+use chrono::Utc;
 use num::{rational::Ratio, BigUint};
 // Workspace imports
-use zksync_types::{tokens::TokenMarketVolume, Token, TokenId, TokenLike, TokenPrice};
+use zksync_test_account::ZkSyncAccount;
+use zksync_types::{
+    tokens::TokenMarketVolume, AccountId, Address, BlockNumber, ExecutedOperations, ExecutedTx,
+    Token, TokenId, TokenLike, TokenPrice, WithdrawNFTOp, ZkSyncOp, H256,
+};
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 // Local imports
 use crate::tests::db_test;
 use crate::{
+    chain::account::records::StorageMintNFTUpdate,
+    diff::StorageAccountDiff,
     tokens::{TokensSchema, STORED_USD_PRICE_PRECISION},
     QueryResult, StorageProcessor,
 };
@@ -193,6 +202,126 @@ async fn test_market_volume(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await
         .expect("Load tokens by market volume query failed");
     assert_eq!(tokens.len(), 1);
+
+    Ok(())
+}
+
+/// Checks the store/load factories for nft
+#[db_test]
+async fn test_nfts_with_factories(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let token_id = TokenId(2u32.pow(16) + 10);
+    let creator_account_id = 5;
+    let symbol = String::from("SYMBOL");
+    let diff = StorageAccountDiff::MintNFT(StorageMintNFTUpdate {
+        token_id: *token_id as i32,
+        serial_id: 0,
+        creator_account_id,
+        creator_address: Address::default().as_bytes().to_vec(),
+        address: Address::from_str("2222222222222222222222222222222222222222")
+            .unwrap()
+            .as_bytes()
+            .to_vec(),
+        content_hash: H256::default().as_bytes().to_vec(),
+        update_order_id: 0,
+        block_number: 0,
+        symbol: symbol.clone(),
+    });
+    storage
+        .chain()
+        .state_schema()
+        .apply_storage_account_diff(diff)
+        .await?;
+
+    let zksync_account = ZkSyncAccount::rand();
+    zksync_account.set_account_id(Some(AccountId(123)));
+    let op = ZkSyncOp::WithdrawNFT(Box::new(WithdrawNFTOp {
+        tx: zksync_account
+            .sign_withdraw_nft(
+                token_id,
+                TokenId(0),
+                &symbol,
+                Default::default(),
+                &Default::default(),
+                None,
+                false,
+                Default::default(),
+            )
+            .0,
+        creator_id: Default::default(),
+        creator_address: Default::default(),
+        serial_id: Default::default(),
+        content_hash: Default::default(),
+    }));
+
+    let executed_tx = ExecutedTx {
+        signed_tx: op.try_get_tx().unwrap().into(),
+        success: true,
+        op: Some(op),
+        fail_reason: None,
+        block_index: Some(0),
+        created_at: Utc::now(),
+        batch_id: None,
+    };
+    let executed_op = ExecutedOperations::Tx(Box::new(executed_tx));
+    let block_number = BlockNumber(1);
+    storage
+        .chain()
+        .block_schema()
+        .save_block_transactions(block_number, vec![executed_op])
+        .await?;
+
+    let default_factory_address =
+        Address::from_str("1111111111111111111111111111111111111111").unwrap();
+    storage
+        .config_schema()
+        .store_config(
+            Default::default(),
+            Default::default(),
+            default_factory_address,
+        )
+        .await?;
+
+    let nft = storage
+        .tokens_schema()
+        .get_nft_with_factories(token_id)
+        .await?
+        .unwrap();
+    assert_eq!(nft.symbol, symbol);
+    assert_eq!(nft.current_factory, default_factory_address);
+    assert!(nft.withdrawn_factory.is_none());
+
+    storage
+        .chain()
+        .block_schema()
+        .store_factories_for_block_withdraw_nfts(block_number, block_number)
+        .await?;
+
+    let nft = storage
+        .tokens_schema()
+        .get_nft_with_factories(token_id)
+        .await?
+        .unwrap();
+    assert_eq!(nft.current_factory, default_factory_address);
+    assert_eq!(nft.withdrawn_factory.unwrap(), default_factory_address);
+
+    let new_factory_address =
+        Address::from_str("51f610535ab3c695e0bcef6b7827f8d4a3472f01").unwrap();
+    storage
+        .tokens_schema()
+        .store_nft_factory(
+            AccountId(creator_account_id as u32),
+            Default::default(),
+            new_factory_address,
+        )
+        .await?;
+
+    let nft = storage
+        .tokens_schema()
+        .get_nft_with_factories(token_id)
+        .await?
+        .unwrap();
+    assert_eq!(nft.current_factory, new_factory_address);
+    assert_eq!(nft.withdrawn_factory.unwrap(), default_factory_address);
 
     Ok(())
 }

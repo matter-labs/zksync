@@ -1,17 +1,21 @@
 use chrono::{DateTime, Utc};
-use std::cmp::max;
-use std::time::Duration;
+use std::{cmp::max, time::Duration};
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::AggregatedProof;
-use zksync_storage::chain::block::BlockSchema;
-use zksync_storage::chain::operations::OperationsSchema;
-use zksync_storage::prover::ProverSchema;
-use zksync_storage::StorageProcessor;
-use zksync_types::aggregated_operations::{
-    AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksCreateProofOperation,
-    BlocksExecuteOperation, BlocksProofOperation,
+use zksync_storage::{
+    chain::{block::BlockSchema, operations::OperationsSchema},
+    prover::ProverSchema,
+    StorageProcessor,
 };
-use zksync_types::{block::Block, gas_counter::GasCounter, BlockNumber, U256};
+use zksync_types::{
+    aggregated_operations::{
+        AggregatedActionType, AggregatedOperation, BlocksCommitOperation,
+        BlocksCreateProofOperation, BlocksExecuteOperation, BlocksProofOperation,
+    },
+    block::Block,
+    gas_counter::GasCounter,
+    BlockNumber, U256,
+};
 
 fn create_new_commit_operation(
     last_committed_block: &Block,

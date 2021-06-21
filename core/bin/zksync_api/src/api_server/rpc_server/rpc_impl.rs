@@ -4,7 +4,7 @@ use std::time::Instant;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
-use zksync_api_client::rest::v1::accounts::NFT;
+use zksync_api_client::rest::v1::accounts::ApiNFT;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
     Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
@@ -154,13 +154,17 @@ impl RpcApp {
         })
     }
 
-    pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<NFT>> {
+    pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<ApiNFT>> {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
-        let result = storage.tokens_schema().get_nft(id).await.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
-            Error::internal_error()
-        })?;
+        let result = storage
+            .tokens_schema()
+            .get_nft_with_factories(id)
+            .await
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
+                Error::internal_error()
+            })?;
 
         metrics::histogram!("api.rpc.get_nft", start.elapsed());
         Ok(result.map(|nft| nft.into()))

@@ -1,3 +1,5 @@
+// Built-in imports
+use std::str::FromStr;
 // External imports
 use serde::{Deserialize, Serialize};
 use sqlx::{types::BigDecimal, FromRow};
@@ -5,8 +7,10 @@ use sqlx::{types::BigDecimal, FromRow};
 // Local imports
 use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
-use zksync_types::tokens::{TokenMarketVolume, TokenPrice};
-use zksync_types::{AccountId, Address, Token, TokenId, H256, NFT};
+use zksync_types::{
+    tokens::{ApiNFT, TokenMarketVolume, TokenPrice},
+    AccountId, Address, Token, TokenId, H256, NFT,
+};
 use zksync_utils::big_decimal_to_ratio;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, FromRow)]
@@ -62,6 +66,19 @@ pub struct StorageNFT {
     pub content_hash: Vec<u8>,
 }
 
+#[derive(Debug, FromRow)]
+pub struct StorageApiNFT {
+    pub token_id: i32,
+    pub serial_id: i32,
+    pub creator_account_id: i32,
+    pub creator_address: Vec<u8>,
+    pub address: Vec<u8>,
+    pub content_hash: Vec<u8>,
+    pub symbol: String,
+    pub current_factory: String,
+    pub withdrawn_factory: Option<String>,
+}
+
 impl From<DbTickerPrice> for TokenPrice {
     fn from(val: DbTickerPrice) -> Self {
         Self {
@@ -81,6 +98,26 @@ impl From<StorageNFT> for NFT {
             address: Address::from_slice(val.address.as_slice()),
             symbol: "".to_string(),
             content_hash: H256::from_slice(val.content_hash.as_slice()),
+        }
+    }
+}
+
+impl From<StorageApiNFT> for ApiNFT {
+    fn from(val: StorageApiNFT) -> Self {
+        let current_factory = val.current_factory.strip_prefix("0x").unwrap();
+        let withdrawn_factory = val
+            .withdrawn_factory
+            .map(|t| t.strip_prefix("0x").unwrap().to_string());
+        Self {
+            id: TokenId(val.token_id as u32),
+            serial_id: val.serial_id as u32,
+            creator_address: Address::from_slice(val.creator_address.as_slice()),
+            creator_id: AccountId(val.creator_account_id as u32),
+            address: Address::from_slice(val.address.as_slice()),
+            symbol: val.symbol,
+            content_hash: H256::from_slice(val.content_hash.as_slice()),
+            current_factory: Address::from_str(current_factory).unwrap(),
+            withdrawn_factory: withdrawn_factory.map(|t| Address::from_str(&t).unwrap()),
         }
     }
 }

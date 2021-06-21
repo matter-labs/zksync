@@ -6,10 +6,12 @@ use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
-use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT};
+use zksync_types::{
+    tokens::ApiNFT, AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT,
+};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
-use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageNFT};
+use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageApiNFT, StorageNFT};
 
 use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
@@ -197,6 +199,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
         Ok(TokenId(last_token_id))
     }
+
     pub async fn get_nft(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
         let start = Instant::now();
         let db_token = sqlx::query_as!(
@@ -211,6 +214,36 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
         metrics::histogram!("sql.token.get_nft", start.elapsed());
+        Ok(db_token.map(|t| t.into()))
+    }
+
+    pub async fn get_nft_with_factories(
+        &mut self,
+        token_id: TokenId,
+    ) -> QueryResult<Option<ApiNFT>> {
+        let start = Instant::now();
+        let db_token = sqlx::query_as!(
+            StorageApiNFT,
+            r#"
+                SELECT nft.*, tokens.symbol, withdrawn_nfts_factories.factory_address as "withdrawn_factory?",
+                    COALESCE(nft_factory.factory_address, server_config.nft_factory_addr) as "current_factory!"
+                FROM nft
+                INNER JOIN server_config
+                    ON server_config.id = true
+                INNER JOIN tokens
+                    ON tokens.id = nft.token_id
+                LEFT JOIN nft_factory
+                    ON nft_factory.creator_id = nft.creator_account_id
+                LEFT JOIN withdrawn_nfts_factories
+                    ON withdrawn_nfts_factories.token_id = nft.token_id
+                WHERE nft.token_id = $1
+                LIMIT 1
+            "#,
+            *token_id as i32
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.token.get_nft_with_factories", start.elapsed());
         Ok(db_token.map(|t| t.into()))
     }
 
