@@ -49,7 +49,7 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(receipt))
-        } else if let Some((_, op)) = self
+        } else if let Some(op) = self
             .tx_sender
             .core_api_client
             .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
@@ -82,7 +82,7 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(data))
-        } else if let Some((_, op)) = self
+        } else if let Some(op) = self
             .tx_sender
             .core_api_client
             .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
