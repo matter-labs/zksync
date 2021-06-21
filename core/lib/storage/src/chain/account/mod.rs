@@ -121,6 +121,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
     /// Loads the last committed (e.g. just added but no necessarily verified) state for
     /// account given its ID.
+    /// You can provide `verified_state` if you already know it and don't want to get it from storage.
     pub async fn last_committed_state_for_account(
         &mut self,
         account_id: AccountId,
@@ -129,12 +130,12 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
+        // Get the last certain state of the account.
+        // Note that `account` can be `None` here (if it wasn't verified yet), since
+        // we will update the committed changes below.
         let (last_block, account) = if let Some(verified_state) = verified_state {
             verified_state
         } else {
-            // Get the last certain state of the account.
-            // Note that `account` can be `None` here (if it wasn't verified yet), since
-            // we will update the committed changes below.
             AccountSchema(&mut transaction)
                 .account_and_last_block(account_id)
                 .await?

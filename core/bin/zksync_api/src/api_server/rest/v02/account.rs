@@ -137,14 +137,21 @@ impl ApiAccountData {
         &self,
         account_id: AccountId,
     ) -> Result<Option<Account>, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let mut transaction = self
+            .pool
+            .access_storage()
+            .await
+            .map_err(Error::storage)?
+            .start_transaction()
+            .await
+            .map_err(Error::storage)?;
         let account = storage
             .chain()
             .account_schema()
             .last_committed_state_for_account(account_id, None)
             .await
             .map_err(Error::storage)?;
-        if let Some(account) = account {
+        let result = if let Some(account) = account {
             let last_block = storage
                 .chain()
                 .account_schema()
@@ -157,21 +164,30 @@ impl ApiAccountData {
             ))
         } else {
             Ok(None)
-        }
+        };
+        transaction.commit().await.map_err(Error::storage)?;
+        result
     }
 
     async fn account_finalized_info(
         &self,
         account_id: AccountId,
     ) -> Result<Option<Account>, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let mut transaction = self
+            .pool
+            .access_storage()
+            .await
+            .map_err(Error::storage)?
+            .start_transaction()
+            .await
+            .map_err(Error::storage)?;
         let (last_block, account) = storage
             .chain()
             .account_schema()
             .account_and_last_block(account_id)
             .await
             .map_err(Error::storage)?;
-        if let Some(account) = account {
+        let result = if let Some(account) = account {
             Ok(Some(
                 self.api_account(
                     account,
@@ -183,18 +199,27 @@ impl ApiAccountData {
             ))
         } else {
             Ok(None)
-        }
+        };
+        transaction.commit().await.map_err(Error::storage)?;
+        result
     }
 
     async fn account_full_info(&self, account_id: AccountId) -> Result<AccountState, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        let finalized_state = storage
+        let mut transaction = self
+            .pool
+            .access_storage()
+            .await
+            .map_err(Error::storage)?
+            .start_transaction()
+            .await
+            .map_err(Error::storage)?;
+        let finalized_state = transaction
             .chain()
             .account_schema()
             .account_and_last_block(account_id)
             .await
             .map_err(Error::storage)?;
-        let committed_state = storage
+        let committed_state = transaction
             .chain()
             .account_schema()
             .last_committed_state_for_account(account_id, Some(finalized_state.clone()))
@@ -206,7 +231,7 @@ impl ApiAccountData {
                     account,
                     account_id,
                     BlockNumber(finalized_state.0 as u32),
-                    &mut storage,
+                    &mut transaction,
                 )
                 .await?,
             )
@@ -214,19 +239,20 @@ impl ApiAccountData {
             None
         };
         let committed = if let Some(account) = committed_state {
-            let last_block = storage
+            let last_block = transaction
                 .chain()
                 .account_schema()
                 .last_committed_block_with_update_for_acc(account_id)
                 .await
                 .map_err(Error::storage)?;
             Some(
-                self.api_account(account, account_id, last_block, &mut storage)
+                self.api_account(account, account_id, last_block, &mut transaction)
                     .await?,
             )
         } else {
             None
         };
+        transaction.commit().await.map_err(Error::storage)?;
         Ok(AccountState {
             committed,
             finalized,
