@@ -137,14 +137,8 @@ impl ApiAccountData {
         &self,
         account_id: AccountId,
     ) -> Result<Option<Account>, Error> {
-        let mut transaction = self
-            .pool
-            .access_storage()
-            .await
-            .map_err(Error::storage)?
-            .start_transaction()
-            .await
-            .map_err(Error::storage)?;
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
         let account = storage
             .chain()
             .account_schema()
@@ -173,14 +167,8 @@ impl ApiAccountData {
         &self,
         account_id: AccountId,
     ) -> Result<Option<Account>, Error> {
-        let mut transaction = self
-            .pool
-            .access_storage()
-            .await
-            .map_err(Error::storage)?
-            .start_transaction()
-            .await
-            .map_err(Error::storage)?;
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
         let (last_block, account) = storage
             .chain()
             .account_schema()
@@ -205,14 +193,8 @@ impl ApiAccountData {
     }
 
     async fn account_full_info(&self, account_id: AccountId) -> Result<AccountState, Error> {
-        let mut transaction = self
-            .pool
-            .access_storage()
-            .await
-            .map_err(Error::storage)?
-            .start_transaction()
-            .await
-            .map_err(Error::storage)?;
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
         let finalized_state = transaction
             .chain()
             .account_schema()
