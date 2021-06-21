@@ -165,6 +165,9 @@ impl<W: EthClient> EthWatch<W> {
 
         // Extend the existing priority operations with the new ones.
         let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
+        let new_priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
+        vlog::debug!("New priority ops added: {:?}", new_priority_op_ids);
+
         for (serial_id, op) in received_priority_queue {
             priority_queue.insert(serial_id, op);
         }
