@@ -139,21 +139,21 @@ impl ApiAccountData {
     ) -> Result<Option<Account>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
-        let account = storage
+        let account = transaction
             .chain()
             .account_schema()
             .last_committed_state_for_account(account_id, None)
             .await
             .map_err(Error::storage)?;
         let result = if let Some(account) = account {
-            let last_block = storage
+            let last_block = transaction
                 .chain()
                 .account_schema()
                 .last_committed_block_with_update_for_acc(account_id)
                 .await
                 .map_err(Error::storage)?;
             Ok(Some(
-                self.api_account(account, account_id, last_block, &mut storage)
+                self.api_account(account, account_id, last_block, &mut transaction)
                     .await?,
             ))
         } else {
@@ -169,7 +169,7 @@ impl ApiAccountData {
     ) -> Result<Option<Account>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
-        let (last_block, account) = storage
+        let (last_block, account) = transaction
             .chain()
             .account_schema()
             .account_and_last_block(account_id)
@@ -181,7 +181,7 @@ impl ApiAccountData {
                     account,
                     account_id,
                     BlockNumber(last_block as u32),
-                    &mut storage,
+                    &mut transaction,
                 )
                 .await?,
             ))
