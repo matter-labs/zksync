@@ -84,6 +84,7 @@ fn full_exit_non_existent() {
         token,
         eth_address,
         account_id: AccountId(145),
+        is_legacy: false,
     };
 
     tb.test_priority_op_success(ZkSyncPriorityOp::FullExit(full_exit), &[])
@@ -102,6 +103,7 @@ fn full_exit_success() {
         token,
         eth_address: account.address,
         account_id,
+        is_legacy: false,
     };
 
     tb.test_priority_op_success(

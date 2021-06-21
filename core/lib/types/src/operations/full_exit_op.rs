@@ -27,6 +27,14 @@ impl FullExitOp {
     pub const OP_CODE: u8 = 0x06;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 
+    pub fn chunks(&self) -> usize {
+        if self.priority_op.is_legacy {
+            Self::LEGACY_CHUNKS
+        } else {
+            Self::CHUNKS
+        }
+    }
+
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
         let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.priority_op.account_id.to_be_bytes());
@@ -113,6 +121,7 @@ impl FullExitOp {
                 account_id: AccountId(account_id),
                 eth_address,
                 token: TokenId(token),
+                is_legacy: false,
             },
             withdraw_amount: Some(amount.into()),
             creator_address: Some(creator_address),
@@ -123,7 +132,7 @@ impl FullExitOp {
     }
 
     pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, FullExitOpError> {
-        if bytes.len() != Self::CHUNKS * LEGACY_CHUNK_BYTES {
+        if bytes.len() != Self::LEGACY_CHUNKS * LEGACY_CHUNK_BYTES {
             return Err(FullExitOpError::PubdataSizeMismatch);
         }
 
@@ -148,6 +157,7 @@ impl FullExitOp {
                 account_id: AccountId(account_id),
                 eth_address,
                 token: TokenId(token),
+                is_legacy: true,
             },
             withdraw_amount: Some(amount.into()),
             creator_account_id: None,
