@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use web3::types::H256;
 
@@ -7,7 +7,7 @@ use zksync_storage::data_restore::records::{
 };
 use zksync_types::{
     block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
-    Token, TokenId, TokenInfo,
+    Token, TokenId, TokenInfo, NFT,
 };
 
 use crate::{
@@ -23,6 +23,13 @@ pub struct StoredTreeState {
     pub account_map: AccountMap,
     pub unprocessed_prior_ops: u64,
     pub fee_acc_id: AccountId,
+}
+
+pub struct CachedTreeState {
+    pub tree_cache: serde_json::Value,
+    pub account_map: AccountMap,
+    pub current_block: Block,
+    pub nfts: HashMap<TokenId, NFT>,
 }
 
 #[async_trait::async_trait]
@@ -98,6 +105,20 @@ pub trait StorageInteractor {
 
     /// Returns last recovery state update step from storage
     async fn get_storage_state(&mut self) -> StorageUpdateState;
+
+    /// Returns cached tree state from storage. It's expected to be valid
+    /// after completing `finite` restore mode and may be used to speed up the
+    /// `continue` mode.
+    async fn get_cached_tree_state(&mut self) -> Option<CachedTreeState>;
+
+    /// Saves the tree cache in the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - The corresponding block number
+    /// * `tree_cache` - Merkle tree cache
+    ///
+    async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: serde_json::Value);
 }
 
 /// Returns Rollup contract event from its stored representation
