@@ -58,9 +58,10 @@ impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
             .map_err(Error::storage)?;
         let count = transaction
             .tokens_schema()
-            .get_count()
+            .get_last_token_id()
             .await
-            .map_err(Error::storage)? as u32;
+            .map_err(Error::storage)?
+            .0;
 
         transaction.commit().await.map_err(Error::storage)?;
 

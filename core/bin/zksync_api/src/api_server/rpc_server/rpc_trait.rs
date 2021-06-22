@@ -6,17 +6,11 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 
 // Workspace uses
-use zksync_api_client::rest::v1::accounts::ApiNFT;
-use zksync_api_types::v02::fee::ApiTxFeeTypes;
+use zksync_api_types::v02::{fee::ApiTxFeeTypes, token::ApiNFT};
 use zksync_crypto::params::ZKSYNC_VERSION;
-use zksync_crypto::params::ZKSYNC_VERSION;
-use zksync_types::{
-    tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, Fee, Token, TokenLike, TotalFee, ZkSyncTx,
-};
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
-    Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, Fee, Token, TokenId, TokenLike, TotalFee, ZkSyncTx,
 };
 
 // Local uses

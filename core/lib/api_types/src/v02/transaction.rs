@@ -4,8 +4,8 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 use zksync_types::{
     tx::{
-        ChangePubKey, Close, EthBatchSignatures, ForcedExit, Transfer, TxEthSignature, TxHash,
-        Withdraw,
+        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
+        TxEthSignatureVariant, TxHash, Withdraw, WithdrawNFT,
     },
     AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
     ZkSyncTx, H256,
@@ -23,7 +23,7 @@ pub struct IncomingTxBatch {
 #[serde(rename_all = "camelCase")]
 pub struct IncomingTx {
     pub tx: ZkSyncTx,
-    pub signature: Option<TxEthSignature>,
+    pub signature: TxEthSignatureVariant,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
@@ -105,6 +105,9 @@ pub enum L2Transaction {
     Close(Box<Close>),
     ChangePubKey(Box<ChangePubKey>),
     ForcedExit(Box<ForcedExitData>),
+    MintNFT(Box<MintNFT>),
+    Swap(Box<Swap>),
+    WithdrawNFT(Box<WithdrawNFT>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

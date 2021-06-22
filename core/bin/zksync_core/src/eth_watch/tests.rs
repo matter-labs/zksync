@@ -165,6 +165,7 @@ async fn test_operation_queues() {
                 account_id: AccountId(1),
                 eth_address: from_addr,
                 token: TokenId(0),
+                is_legacy: false,
             }),
             deadline_block: 0,
             eth_block: 4,

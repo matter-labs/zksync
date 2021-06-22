@@ -163,7 +163,7 @@ impl ApiTokenData {
         first_token: TokenLike,
         currency: &str,
     ) -> Result<BigDecimal, Error> {
-        if let Ok(second_token_id) = u16::from_str(currency) {
+        if let Ok(second_token_id) = u32::from_str(currency) {
             let second_token = TokenLike::from(TokenId(second_token_id));
             let first_usd_price = self.token_price_usd(first_token).await;
             let second_usd_price = self.token_price_usd(second_token).await;

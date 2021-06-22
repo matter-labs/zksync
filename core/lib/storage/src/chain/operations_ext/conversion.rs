@@ -74,6 +74,9 @@ impl StorageTxData {
                 tx: *tx,
                 eth_tx_hash: complete_withdrawals_tx_hash,
             })),
+            ZkSyncTx::MintNFT(tx) => L2Transaction::MintNFT(tx),
+            ZkSyncTx::WithdrawNFT(tx) => L2Transaction::WithdrawNFT(tx),
+            ZkSyncTx::Swap(tx) => L2Transaction::Swap(tx),
         };
         TransactionData::L2(tx)
     }

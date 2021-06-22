@@ -6,15 +6,14 @@ use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_api_types::v02::token::NFT;
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     tx::TxEthSignatureVariant, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
     ZkSyncPriorityOp, ZkSyncTx,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
-
-// This wrong dependency, but the whole data about account info stored in this place
-use zksync_api_client::rest::v1::accounts::NFT;
 
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
@@ -73,11 +72,16 @@ impl ResponseAccountState {
                 }
             }
         }
+        let minted_nfts = account
+            .minted_nfts
+            .iter()
+            .map(|(id, nft)| (*id, nft.clone().into()))
+            .collect();
 
         Ok(Self {
             balances,
             nfts,
-            minted_nfts: account.minted_nfts,
+            minted_nfts,
             nonce: account.nonce,
             pub_key_hash: account.pub_key_hash,
         })

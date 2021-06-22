@@ -7,8 +7,9 @@ use sqlx::{types::BigDecimal, FromRow};
 // Local imports
 use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
+use zksync_api_types::v02::token::ApiNFT;
 use zksync_types::{
-    tokens::{ApiNFT, TokenMarketVolume, TokenPrice},
+    tokens::{TokenMarketVolume, TokenPrice},
     AccountId, Address, Token, TokenId, H256, NFT,
 };
 use zksync_utils::big_decimal_to_ratio;

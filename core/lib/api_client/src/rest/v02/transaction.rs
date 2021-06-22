@@ -3,13 +3,13 @@ use zksync_api_types::v02::{
     transaction::{IncomingTx, IncomingTxBatch},
     Response,
 };
-use zksync_types::tx::{EthBatchSignatures, TxEthSignature, TxHash, ZkSyncTx};
+use zksync_types::tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash, ZkSyncTx};
 
 impl Client {
     pub async fn submit_tx(
         &self,
         tx: ZkSyncTx,
-        signature: Option<TxEthSignature>,
+        signature: TxEthSignatureVariant,
     ) -> Result<Response> {
         self.post_with_scope(super::API_V02_SCOPE, "transactions")
             .body(&IncomingTx { tx, signature })

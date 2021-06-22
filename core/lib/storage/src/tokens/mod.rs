@@ -6,10 +6,11 @@ use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
-use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery};
-use zksync_types::{
-    tokens::ApiNFT, AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT,
+use zksync_api_types::v02::{
+    pagination::{PaginationDirection, PaginationQuery},
+    token::ApiNFT,
 };
+use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageApiNFT, StorageNFT};
@@ -138,7 +139,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             ORDER BY id ASC
             LIMIT $2
             "#,
-            i32::from(*from),
+            *from as i32,
             limit
         )
         .fetch_all(self.0.conn())
@@ -166,7 +167,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             ORDER BY id DESC
             LIMIT $2
             "#,
-            i32::from(*from),
+            *from as i32,
             limit
         )
         .fetch_all(self.0.conn())
@@ -260,7 +261,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
 
         let result = Ok(tokens
             .into_iter()
-            .map(|t| TokenId(t.token_id as u16))
+            .map(|t| TokenId(t.token_id as u32))
             .collect());
 
         metrics::histogram!(

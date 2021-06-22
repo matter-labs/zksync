@@ -28,8 +28,7 @@ use zksync_api_types::{
 };
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_types::{
-    tx::TxHash, NewTokenEvent, Nonce, PriorityOp, PubKeyHash, RegisterNFTFactoryEvent,
-    ZkSyncPriorityOp, H256,
+    tx::TxHash, NewTokenEvent, PriorityOp, RegisterNFTFactoryEvent, ZkSyncPriorityOp, H256,
 };
 
 // Local deps
@@ -302,18 +301,12 @@ impl<W: EthClient> EthWatch<W> {
         result
     }
 
-    async fn is_new_pubkey_hash_authorized(
-        &self,
-        address: Address,
-        nonce: Nonce,
-        pub_key_hash: &PubKeyHash,
-    ) -> anyhow::Result<bool> {
-        let auth_fact_reset_time = self.client.get_auth_fact_reset_time(address, nonce).await?;
-        if auth_fact_reset_time != 0 {
-            return Ok(false);
-        }
-        let auth_fact = self.client.get_auth_fact(address, nonce).await?;
-        Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
+    fn find_ongoing_op_by_eth_hash(&self, eth_hash: H256) -> Option<PriorityOp> {
+        self.eth_state
+            .unconfirmed_queue()
+            .iter()
+            .find(|op| op.eth_hash == eth_hash)
+            .cloned()
     }
 
     fn find_ongoing_op_by_tx_hash(&self, tx_hash: TxHash) -> Option<PriorityOp> {

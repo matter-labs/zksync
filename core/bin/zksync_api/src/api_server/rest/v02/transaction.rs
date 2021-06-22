@@ -17,7 +17,10 @@ use zksync_api_types::{
     },
     PriorityOpLookupQuery,
 };
-use zksync_types::{tx::TxHash, EthBlockId};
+use zksync_types::{
+    tx::{TxEthSignatureVariant, TxHash},
+    EthBlockId,
+};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
@@ -167,7 +170,7 @@ async fn submit_batch(
         .into_iter()
         .map(|tx| TxWithSignature {
             tx,
-            signature: None,
+            signature: TxEthSignatureVariant::Single(None),
         })
         .collect();
 
@@ -281,7 +284,9 @@ mod tests {
         );
 
         let tx = TestServerConfig::gen_zk_txs(100_u64).txs[0].0.clone();
-        let response = client.submit_tx(tx.clone(), None).await?;
+        let response = client
+            .submit_tx(tx.clone(), TxEthSignatureVariant::Single(None))
+            .await?;
         let tx_hash: TxHash = deserialize_response_result(response)?;
         assert_eq!(tx.hash(), tx_hash);
 
