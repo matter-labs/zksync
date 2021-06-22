@@ -69,7 +69,11 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .client
             .get(market_chart_url)
             .timeout(REQUEST_TIMEOUT)
-            .query(&[("vs_currency", "usd"), ("days", "2")])
+            .query(&[
+                ("vs_currency", "usd"),
+                ("days", "1"),
+                ("interval", "hourly"),
+            ])
             .send()
             .await
             .map_err(|err| PriceError::api_error(format!("CoinGecko API request failed: {}", err)))?
@@ -86,20 +90,16 @@ impl TokenPriceAPI for CoinGeckoAPI {
         let usd_prices = market_chart
             .prices
             .into_iter()
+            .rev()
+            .take(6)
             .map(|token_price| token_price.1);
 
-        // We use max price for ETH token because we spend ETH with each commit and collect token
-        // so it is in our interest to assume highest price for ETH.
-        // Theoretically we should use min and max price for ETH in our ticker formula when we
-        // calculate fee for tx with ETH token. Practically if we use only max price foe ETH it is fine because
-        // we don't need to sell this token lnd price only affects ZKP cost of such tx which is negligible.
-        let usd_price = if token_symbol == "ETH" {
-            usd_prices.max()
+        let len = usd_prices.len();
+        let usd_price = if len == 0 {
+            return Err(PriceError::api_error("CoinGecko returned empty price data"));
         } else {
-            usd_prices.min()
+            usd_prices.sum::<Ratio<BigUint>>() / BigUint::from(len)
         };
-        let usd_price = usd_price
-            .ok_or_else(|| PriceError::api_error("CoinGecko returned empty price data"))?;
 
         let naive_last_updated = NaiveDateTime::from_timestamp(
             last_updated_timestamp_ms / 1_000,                      // ms to s
