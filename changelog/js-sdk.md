@@ -8,9 +8,14 @@ All notable changes to `zksync.js` will be documented in this file.
 
 - Methods for working with NFTs. You can read more [here](https://zksync.io/dev/nfts.html).
 - Methods for working with atomic swaps/limit orders. You can read more [here](https://zksync.io/dev/swaps.html).
+- `RestProvider` class, that is used for querying REST API v0.2.
+- `SyncProvider` interface: common interface for API v0.2 `RestProvider` and JSON RPC `Provider`.
+- Types for REST API v0.2.
 
 ### Changed
 
+- Changed type of `provider` field in `Wallet` class from `Provider` to `SyncProvider`.
+- `ForcedExit` fee type is used for `ForcedExit` transactions instead of `Withdraw` fee type.
 - `zksync-crypto` to support atomic swaps/limit orders functionality.
 
 ## Version 0.10.9 (13.04.2021)

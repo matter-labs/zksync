@@ -172,6 +172,7 @@ pub async fn get_test_block() -> Block {
                 deadline_block: 2,
                 eth_hash: H256::zero(),
                 eth_block: 10,
+                eth_block_index: Some(1),
             },
             block_index: 1,
             created_at: chrono::Utc::now(),

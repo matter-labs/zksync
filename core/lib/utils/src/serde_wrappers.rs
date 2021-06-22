@@ -150,7 +150,7 @@ pub struct BytesToHexSerde<P> {
 }
 
 impl<P: Prefix> BytesToHexSerde<P> {
-    pub fn serialize<S>(value: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(value: impl AsRef<[u8]>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {

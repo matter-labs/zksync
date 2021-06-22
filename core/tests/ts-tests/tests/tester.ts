@@ -28,7 +28,7 @@ export class Tester {
     constructor(
         public network: Network,
         public ethProvider: ethers.providers.Provider,
-        public syncProvider: zksync.Provider,
+        public syncProvider: zksync.SyncProvider,
         public ethWallet: ethers.Wallet,
         public syncWallet: zksync.Wallet
     ) {
@@ -37,7 +37,10 @@ export class Tester {
     }
 
     // prettier-ignore
-    static async init(network: Network, transport: 'WS' | 'HTTP') {
+    static async init(network: Network, transport: 'WS' | 'HTTP', providerType: 'REST' | 'RPC') {
+        if(transport === 'WS' && providerType === 'REST') {
+            throw new Error('REST provider supports only HTTP transport');
+        }
         // @ts-ignore
         let web3Url = process.env.ETH_CLIENT_WEB3_URL.split(",")[0];
         const ethProvider = network == 'localhost'
@@ -46,7 +49,9 @@ export class Tester {
         if (network == 'localhost') {
             ethProvider.pollingInterval = 100;
         }
-        const syncProvider = await zksync.getDefaultProvider(network, transport);
+        const syncProvider = providerType === 'REST' 
+            ? await zksync.getDefaultRestProvider(network) 
+            : await zksync.getDefaultProvider(network, transport);
         const ethWallet = ethers.Wallet.fromMnemonic(
             ethTestConfig.test_mnemonic as string, 
             "m/44'/60'/0'/0/0"

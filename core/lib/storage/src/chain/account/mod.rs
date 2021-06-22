@@ -3,7 +3,7 @@ use std::time::Instant;
 // External imports
 use sqlx::Acquire;
 // Workspace imports
-use zksync_types::{Account, AccountId, AccountUpdates, Address, TokenId};
+use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;
@@ -238,7 +238,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     }
 
     /// Obtains the last verified state of the account.
-    async fn account_and_last_block(
+    pub async fn account_and_last_block(
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
@@ -363,5 +363,40 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .await?;
 
         Ok(result)
+    }
+
+    /// Obtains the last committed block that affects the account.
+    pub async fn last_committed_block_with_update_for_acc(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+
+        let block_number = sqlx::query!(
+            "
+                SELECT MAX(block_number)
+                FROM(
+                    SELECT block_number FROM account_balance_updates
+                    WHERE account_id = $1
+                    UNION ALL
+                    SELECT block_number FROM account_creates
+                    WHERE account_id = $1
+                    UNION ALL
+                    SELECT block_number FROM account_pubkey_updates
+                    WHERE account_id = $1
+                ) as subquery
+            ",
+            i64::from(*account_id),
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max
+        .unwrap_or(0);
+
+        metrics::histogram!(
+            "sql.chain.account.last_committed_block_with_update_for_acc",
+            start.elapsed()
+        );
+        Ok(BlockNumber(block_number as u32))
     }
 }

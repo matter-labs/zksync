@@ -1,11 +1,19 @@
 // External imports
 // Workspace imports
+use zksync_api_types::v02::pagination::{
+    ApiEither, BlockAndTxHash, PaginationDirection, PaginationQuery,
+};
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, helpers::apply_updates, tx::ChangePubKeyType,
+    aggregated_operations::AggregatedActionType,
+    helpers::apply_updates,
+    tx::{ChangePubKeyType, TxHash},
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
 };
 // Local imports
+use super::operations_ext::{
+    commit_block, commit_schema_data, setup::TransactionsHistoryTestSetup, verify_block,
+};
 use crate::{
     chain::{
         block::{records::StorageBlockDetails, BlockSchema},
@@ -328,12 +336,12 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
     Ok(())
 }
 
-/// Checks that `load_block_range` method loads the range of blocks correctly.
+/// Checks that `load_block_page` method loads the range of blocks correctly.
 #[db_test]
-async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    /// Loads the block range and checks that every block in the response is
+async fn test_block_page(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    /// Loads the block range in desc order and checks that every block in the response is
     /// equal to the one obtained from `find_block_by_height_or_hash` method.
-    async fn check_block_range(
+    async fn check_block_range_desc(
         storage: &mut StorageProcessor<'_>,
         max_block: BlockNumber,
         limit: u32,
@@ -344,10 +352,59 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
             BlockNumber(1)
         };
         let block_range = BlockSchema(storage)
-            .load_block_range(max_block, limit)
+            .load_block_range_desc(max_block, limit)
             .await?;
+        let block_page = BlockSchema(storage)
+            .load_block_page(&PaginationQuery {
+                from: max_block,
+                limit,
+                direction: PaginationDirection::Older,
+            })
+            .await?;
+        assert_eq!(block_range, block_page);
         // Go in the reversed order, since the blocks themselves are ordered backwards.
         for (idx, block_number) in (*start_block..=*max_block).rev().enumerate() {
+            let expected = BlockSchema(storage)
+                .find_block_by_height_or_hash(block_number.to_string())
+                .await
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Can't load the existing block with the index {}",
+                        block_number
+                    )
+                });
+            let got = &block_range[idx];
+            assert_eq!(got, &expected);
+        }
+
+        Ok(())
+    }
+
+    /// Loads the block range in asc order and checks that every block in the response is
+    /// equal to the one obtained from `find_block_by_height_or_hash` method.
+    async fn check_block_range_asc(
+        storage: &mut StorageProcessor<'_>,
+        min_block: BlockNumber,
+        limit: u32,
+        max_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let last_block = if *max_block >= *min_block + limit {
+            min_block + limit - 1
+        } else {
+            max_block
+        };
+        let block_range = BlockSchema(storage)
+            .load_block_range_asc(min_block, limit)
+            .await?;
+        let block_page = BlockSchema(storage)
+            .load_block_page(&PaginationQuery {
+                from: min_block,
+                limit,
+                direction: PaginationDirection::Newer,
+            })
+            .await?;
+        assert_eq!(block_range, block_page);
+        for (idx, block_number) in (*min_block..=*last_block).enumerate() {
             let expected = BlockSchema(storage)
                 .find_block_by_height_or_hash(block_number.to_string())
                 .await
@@ -469,10 +526,26 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         (n_commited_block_number, 1),
         (n_commited_block_number, 0),
         (n_commited_block_number, 100),
+        (n_verified_block_number + 1, n_verified),
     ];
 
     for (max_block, limit) in test_vector {
-        check_block_range(&mut storage, max_block, limit).await?;
+        check_block_range_desc(&mut storage, max_block, limit).await?;
+    }
+
+    let test_vector = vec![
+        (BlockNumber(1), n_committed),
+        (BlockNumber(1), n_verified + 1),
+        (BlockNumber(2), n_verified + 1),
+        (n_verified_block_number + 1, n_committed - n_verified),
+        (BlockNumber(2), 0),
+        (BlockNumber(2), 1),
+        (BlockNumber(2), 3),
+        (BlockNumber(2), 10),
+    ];
+
+    for (max_block, limit) in test_vector {
+        check_block_range_asc(&mut storage, max_block, limit, n_commited_block_number).await?;
     }
 
     Ok(())
@@ -592,7 +665,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
         .is_none());
 
     let block_range = BlockSchema(&mut storage)
-        .load_block_range(BlockNumber(n_committed), 100)
+        .load_block_range_desc(BlockNumber(n_committed), 100)
         .await?;
 
     assert_eq!(block_range.len(), n_commited_confirmed as usize);
@@ -930,6 +1003,39 @@ async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResu
     Ok(())
 }
 
+/// Checks that `get_block_status_and_last_updated` method works correctly.
+#[db_test]
+async fn test_is_block_finalized(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let block_number = BlockNumber(1);
+
+    let result = storage
+        .chain()
+        .block_schema()
+        .is_block_finalized(BlockNumber(1))
+        .await?;
+    assert!(!result);
+
+    commit_block(&mut storage, block_number).await?;
+
+    let result = storage
+        .chain()
+        .block_schema()
+        .is_block_finalized(BlockNumber(1))
+        .await?;
+    assert!(!result);
+
+    verify_block(&mut storage, block_number).await?;
+
+    let result = storage
+        .chain()
+        .block_schema()
+        .is_block_finalized(BlockNumber(1))
+        .await?;
+    assert!(result);
+
+    Ok(())
+}
+
 /// Check that blocks are removed correctly.
 #[db_test]
 async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
@@ -989,6 +1095,135 @@ async fn test_remove_pending_block(mut storage: StorageProcessor<'_>) -> QueryRe
         .await?;
     BlockSchema(&mut storage).remove_pending_block().await?;
     assert!(!BlockSchema(&mut storage).pending_block_exists().await?);
+
+    Ok(())
+}
+
+/// Checks that `get_block_transactions_page` method works correctly.
+#[db_test]
+async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+    setup.add_block(1);
+    setup.add_block(2);
+    commit_schema_data(&mut storage, &setup).await?;
+
+    let tx_hashes = vec![
+        setup.get_tx_hash(0, 0),
+        setup.get_tx_hash(0, 1),
+        setup.get_tx_hash(0, 2),
+        setup.get_tx_hash(0, 3),
+        setup.get_tx_hash(0, 4),
+        setup.get_tx_hash(0, 5),
+        setup.get_tx_hash(0, 6),
+    ];
+
+    for (tx_hash, limit, direction, expected, test_name) in vec![
+        (
+            tx_hashes[0],
+            5,
+            PaginationDirection::Newer,
+            tx_hashes[0..5].to_vec(),
+            "First 5 txs",
+        ),
+        (
+            tx_hashes[0],
+            1,
+            PaginationDirection::Newer,
+            tx_hashes[0..1].to_vec(),
+            "1 tx (newer)",
+        ),
+        (
+            tx_hashes[1],
+            5,
+            PaginationDirection::Newer,
+            tx_hashes[1..6].to_vec(),
+            "Middle 5 txs (newer)",
+        ),
+        (
+            tx_hashes[5],
+            100,
+            PaginationDirection::Newer,
+            tx_hashes[5..].to_vec(),
+            "Big limit (newer)",
+        ),
+        (
+            tx_hashes[6],
+            5,
+            PaginationDirection::Older,
+            tx_hashes[2..=6].iter().rev().cloned().collect(),
+            "Last 5 txs",
+        ),
+        (
+            tx_hashes[6],
+            1,
+            PaginationDirection::Older,
+            tx_hashes[6..=6].iter().rev().cloned().collect(),
+            "1 tx (older)",
+        ),
+        (
+            tx_hashes[5],
+            5,
+            PaginationDirection::Older,
+            tx_hashes[1..=5].iter().rev().cloned().collect(),
+            "Middle 5 txs (older)",
+        ),
+        (
+            tx_hashes[5],
+            100,
+            PaginationDirection::Older,
+            tx_hashes[..=5].iter().rev().cloned().collect(),
+            "Big limit (older)",
+        ),
+    ] {
+        let actual: Vec<TxHash> = storage
+            .chain()
+            .block_schema()
+            .get_block_transactions_page(&PaginationQuery {
+                from: BlockAndTxHash {
+                    block_number: BlockNumber(1),
+                    tx_hash: ApiEither::from(tx_hash),
+                },
+                limit,
+                direction,
+            })
+            .await?
+            .unwrap()
+            .into_iter()
+            .map(|tx| tx.tx_hash)
+            .collect();
+        assert_eq!(actual, expected, "\"{}\", failed", test_name);
+    }
+
+    // Check that it returns None for unknown tx_hash
+    setup.add_block(3);
+    let result = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions_page(&PaginationQuery {
+            from: BlockAndTxHash {
+                block_number: BlockNumber(3),
+                tx_hash: ApiEither::from(setup.get_tx_hash(2, 0)),
+            },
+            limit: 1,
+            direction: PaginationDirection::Newer,
+        })
+        .await?;
+    assert!(result.is_none());
+
+    // Check that it returns None if block of `from` tx differs from `block_number`
+    let result = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions_page(&PaginationQuery {
+            from: BlockAndTxHash {
+                block_number: BlockNumber(2),
+                tx_hash: ApiEither::from(setup.get_tx_hash(0, 0)),
+            },
+            limit: 1,
+            direction: PaginationDirection::Newer,
+        })
+        .await?;
+    assert!(result.is_none());
 
     Ok(())
 }

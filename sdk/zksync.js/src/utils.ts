@@ -1,5 +1,5 @@
 import { utils, constants, ethers, BigNumber, BigNumberish, Contract } from 'ethers';
-import { Provider } from '.';
+import { SyncProvider } from './provider-interface';
 import {
     PubKeyHash,
     TokenAddress,
@@ -880,7 +880,7 @@ export function getCREATE2AddressAndSalt(
 
 export async function getEthereumBalance(
     ethProvider: ethers.providers.Provider,
-    syncProvider: Provider,
+    syncProvider: SyncProvider,
     address: Address,
     token: TokenLike
 ): Promise<BigNumber> {
@@ -901,7 +901,7 @@ export async function getEthereumBalance(
 
 export async function getPendingBalance(
     ethProvider: ethers.providers.Provider,
-    syncProvider: Provider,
+    syncProvider: SyncProvider,
     address: Address,
     token: TokenLike
 ): Promise<BigNumberish> {

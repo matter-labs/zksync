@@ -1,0 +1,49 @@
+# Group Transactions
+
+## api/v0.2/transactions [/transactions]
+
+### Submit transaction [POST]
+Submit single transaction
+
++ Request (application/json)
+    + Attributes
+        + tx (Transaction.Incoming, required)
+        + signature (TxEthSignature, optional)
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result: 0xb092a0a2eabbf0b5b57d18e70d929899676cf3c0ad4df0f9492c3094ec4a8b19 (string, required{{isResultNullable}})
+        + error (Error, required, nullable)
+
+## api/v0.2/transactions/:txHash [/transactions/{txHash}]
+
++ Parameters
+    + txHash (required, string, `{{txHash}}`) ... hash of the transaction in the zkSync network
+
+### Get transaction receipt [GET]
+Get transaction receipt
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Receipt, required{{isResultNullable}})
+        + error (Error, required, nullable)
+
+
+## api/v0.2/transactions/:txHash/data [/transactions/{txHash}/data]
+
++ Parameters
+    + txHash (required, string, `{{txHash}}`) ... hash of the transaction in the zkSync network
+
+### Get transaction data [GET]
+Get transaction data
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Transaction.Signed, required{{isResultNullable}})
+        + error (Error, required, nullable)

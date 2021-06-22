@@ -1,5 +1,12 @@
+use zksync_api_types::{
+    v02::{
+        pagination::{Paginated, PaginationQuery, PendingOpsRequest},
+        transaction::Transaction,
+    },
+    PriorityOpLookupQuery,
+};
 pub use zksync_types::EthBlockId;
-use zksync_types::{tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx, H256};
+use zksync_types::{tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx};
 
 use crate::tx_error::TxAddError;
 
@@ -49,23 +56,34 @@ impl CoreApiClient {
         self.get(&endpoint).await
     }
 
-    /// Queries information about unconfirmed priority operations for a certain address from a Core.
-    pub async fn get_unconfirmed_ops(&self, address: Address) -> anyhow::Result<Vec<PriorityOp>> {
-        let endpoint = format!("{}/unconfirmed_ops/0x{}", self.addr, hex::encode(address));
+    /// Queries information about unconfirmed priority operations for a certain account from a Core.
+    pub async fn get_unconfirmed_ops(
+        &self,
+        query: &PaginationQuery<PendingOpsRequest>,
+    ) -> anyhow::Result<Paginated<Transaction, u64>> {
+        let endpoint = format!(
+            "{}/unconfirmed_ops?address=0x{}&account_id={}&serial_id={}&limit={}&direction={}",
+            self.addr,
+            hex::encode(query.from.address),
+            serde_json::to_string(&query.from.account_id).unwrap(),
+            serde_json::to_string(&query.from.serial_id)
+                .unwrap()
+                .replace("\"", ""),
+            query.limit,
+            serde_json::to_string(&query.direction)
+                .unwrap()
+                .replace("\"", "")
+        );
         self.get(&endpoint).await
     }
 
     /// Queries information about unconfirmed priority operation from a Core.
     pub async fn get_unconfirmed_op(
         &self,
-        eth_tx_hash: H256,
-    ) -> anyhow::Result<Option<(EthBlockId, PriorityOp)>> {
-        let endpoint = format!(
-            "{}/unconfirmed_op/0x{}",
-            self.addr,
-            hex::encode(eth_tx_hash)
-        );
-        self.get(&endpoint).await
+        query: PriorityOpLookupQuery,
+    ) -> anyhow::Result<Option<PriorityOp>> {
+        let endpoint = format!("{}/unconfirmed_op", self.addr,);
+        self.post(&endpoint, query).await
     }
 
     async fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> anyhow::Result<T> {

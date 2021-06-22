@@ -1,11 +1,12 @@
 // Built-in deps
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 // External imports
 use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
+use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery};
 use zksync_types::{
     tokens::ApiNFT, AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT,
 };
@@ -121,31 +122,85 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Loads all the stored tokens from the database.
-    /// Alongside with the tokens added via `store_token` method, the default `ETH` token
-    /// is returned.
-    pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
+    /// Loads tokens from the database starting from the given id with the given limit in the ascending order.
+    pub async fn load_tokens_asc(
+        &mut self,
+        from: TokenId,
+        limit: Option<u32>,
+    ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
+        let limit = limit.map(i64::from);
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT * FROM tokens WHERE is_nft = false
+            SELECT * FROM tokens
+            WHERE id >= $1 AND is_nft = false
             ORDER BY id ASC
+            LIMIT $2
             "#,
+            i32::from(*from),
+            limit
         )
         .fetch_all(self.0.conn())
         .await?;
 
-        let result = tokens
-            .into_iter()
-            .map(|t| {
-                let token: Token = t.into();
-                (token.id, token)
-            })
-            .collect();
+        let result = Ok(tokens.into_iter().map(Token::from).collect());
 
-        metrics::histogram!("sql.token.load_tokens", start.elapsed());
-        Ok(result)
+        metrics::histogram!("sql.token.load_tokens_asc", start.elapsed());
+        result
+    }
+
+    /// Loads tokens from the database starting from the given id with the given limit in the descending order.
+    pub async fn load_tokens_desc(
+        &mut self,
+        from: TokenId,
+        limit: Option<u32>,
+    ) -> QueryResult<Vec<Token>> {
+        let start = Instant::now();
+        let limit = limit.map(i64::from);
+        let tokens = sqlx::query_as!(
+            DbToken,
+            r#"
+            SELECT * FROM tokens
+            WHERE id <= $1 AND is_nft = false
+            ORDER BY id DESC
+            LIMIT $2
+            "#,
+            i32::from(*from),
+            limit
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = Ok(tokens.into_iter().map(Token::from).collect());
+
+        metrics::histogram!("sql.token.load_tokens_desc", start.elapsed());
+        result
+    }
+
+    /// Loads all the stored tokens from the database.
+    /// Alongside with the tokens added via `store_token` method, the default `ETH` token
+    /// is returned.
+    pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
+        let tokens = self.load_tokens_asc(TokenId(0), None).await?;
+
+        Ok(tokens.into_iter().map(|token| (token.id, token)).collect())
+    }
+
+    /// Loads tokens for the given pagination query
+    pub async fn load_token_page(
+        &mut self,
+        query: &PaginationQuery<TokenId>,
+    ) -> QueryResult<Vec<Token>> {
+        let tokens = match query.direction {
+            PaginationDirection::Newer => {
+                self.load_tokens_asc(query.from, Some(query.limit)).await?
+            }
+            PaginationDirection::Older => {
+                self.load_tokens_desc(query.from, Some(query.limit)).await?
+            }
+        };
+        Ok(tokens)
     }
 
     /// Loads all the stored tokens, which have market_volume (ticker_market_volume table)
@@ -180,6 +235,38 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             .collect());
 
         metrics::histogram!("sql.token.load_tokens_by_market_volume", start.elapsed());
+        result
+    }
+
+    /// Filters out tokens whose market volume is less than the specified limit (min_market_volume).
+    pub async fn filter_tokens_by_market_volume(
+        &mut self,
+        tokens_to_check: Vec<TokenId>,
+        min_market_volume: &Ratio<BigUint>,
+    ) -> QueryResult<HashSet<TokenId>> {
+        let start = Instant::now();
+        let tokens_to_check: Vec<i32> = tokens_to_check.into_iter().map(|id| *id as i32).collect();
+        let tokens = sqlx::query!(
+            r#"
+            SELECT token_id
+            FROM ticker_market_volume
+            WHERE token_id = ANY($1) AND market_volume >= $2
+            "#,
+            &tokens_to_check,
+            ratio_to_big_decimal(min_market_volume, STORED_USD_PRICE_PRECISION)
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = Ok(tokens
+            .into_iter()
+            .map(|t| TokenId(t.token_id as u16))
+            .collect());
+
+        metrics::histogram!(
+            "sql.token.load_token_ids_that_enabled_for_fees",
+            start.elapsed()
+        );
         result
     }
 

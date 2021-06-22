@@ -18,6 +18,7 @@ import { command as fmt } from './fmt';
 import { command as lint } from './lint';
 import { command as completion } from './completion';
 import { command as config } from './config';
+import { command as apiDocs } from './api-docs';
 import * as env from './env';
 
 const COMMANDS = [
@@ -36,6 +37,7 @@ const COMMANDS = [
     lint,
     docker,
     config,
+    apiDocs,
     env.command,
     completion(program as Command)
 ];

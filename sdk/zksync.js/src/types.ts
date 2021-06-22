@@ -46,7 +46,30 @@ export interface NFTInfo {
     withdrawnFactory?: Address;
 }
 
-export interface AccountState {
+export type AccountState = AccountStateRest | AccountStateRpc;
+
+export interface AccountStateRest {
+    address: Address;
+    id?: number;
+    committed: {
+        balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
+            [token: string]: BigNumberish;
+        };
+        nonce: number;
+        pubKeyHash: PubKeyHash;
+    };
+    verified: {
+        balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
+            [token: string]: BigNumberish;
+        };
+        nonce: number;
+        pubKeyHash: PubKeyHash;
+    };
+}
+
+export interface AccountStateRpc {
     address: Address;
     id?: number;
     depositing: {
@@ -320,7 +343,9 @@ export interface LegacyChangePubKeyFee {
     };
 }
 
-export interface Fee {
+export type Fee = FeeRpc | FeeRest;
+
+export interface FeeRpc {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
     feeType:
         | 'Withdraw'
@@ -343,7 +368,199 @@ export interface Fee {
     totalFee: BigNumber;
 }
 
-export interface BatchFee {
+export type BatchFee = BatchFeeRpc | FeeRest;
+
+export interface BatchFeeRpc {
     // Total fee amount (in wei)
     totalFee: BigNumber;
+}
+
+export type IncomingTxFeeType =
+    | 'Withdraw'
+    | 'Transfer'
+    | 'FastWithdraw'
+    | 'ForcedExit'
+    | ChangePubKeyFee
+    | LegacyChangePubKeyFee;
+
+export interface PaginationQuery<F> {
+    from: F | 'latest';
+    limit: number;
+    direction: 'newer' | 'older';
+}
+
+export interface Paginated<T, F> {
+    list: T[];
+    pagination: {
+        from: F;
+        limit: number;
+        direction: 'newer' | 'older';
+        count: number;
+    };
+}
+
+export interface ApiBlockInfo {
+    blockNumber: number;
+    newStateRoot: string;
+    blockSize: number;
+    commitTxHash?: string;
+    verifyTxHash?: string;
+    committedAt: string;
+    finalizedAt?: string;
+    status: 'committed' | 'finalized';
+}
+
+export type blockPosition = number | 'lastCommitted' | 'lastFinalized';
+
+export interface ApiAccountInfo {
+    accountId: number;
+    address: Address;
+    nonce: number;
+    pubKeyHash: PubKeyHash;
+    lastUpdateInBlock: number;
+    balances: {
+        [token: string]: BigNumber;
+    };
+}
+
+export interface ApiConfig {
+    network: Network;
+    contract: Address;
+    govContract: Address;
+    depositConfirmations: number;
+    zksyncVersion: 'contractV4';
+    // TODO: server_version (ZKS-627)
+}
+
+export interface FeeRest {
+    gasFee: BigNumber;
+    zkpFee: BigNumber;
+    totalFee: BigNumber;
+}
+
+export interface NetworkStatus {
+    lastCommitted: number;
+    finalized: number;
+    totalTransactions: number;
+    mempoolSize: number;
+}
+
+export interface TokenInfo {
+    id: number;
+    address: Address;
+    symbol: string;
+    decimals: number;
+    enabledForFees: boolean;
+}
+
+export interface TokenPriceInfo {
+    tokenId: number;
+    tokenSymbol: string;
+    priceIn: string;
+    decimals: number;
+    price: BigNumber;
+}
+
+export interface SubmitBatchResponse {
+    transactionHashes: string[];
+    batchHash: string;
+}
+
+export interface ApiL1TxReceipt {
+    status: 'queued' | 'committed' | 'finalized';
+    ethBlock: number;
+    rollupBlock?: number;
+    id: number;
+}
+
+export type L2TxStatus = 'queued' | 'committed' | 'finalized' | 'rejected';
+
+export interface ApiL2TxReceipt {
+    txHash: string;
+    rollupBlock?: number;
+    status: L2TxStatus;
+    failReason?: string;
+}
+
+export type ApiTxReceipt = ApiL1TxReceipt | ApiL2TxReceipt;
+
+export interface WithdrawAndEthHash {
+    type: 'Withdraw';
+    accountId: number;
+    from: Address;
+    to: Address;
+    token: number;
+    amount: BigNumberish;
+    fee: BigNumberish;
+    nonce: number;
+    signature?: Signature;
+    validFrom: number;
+    validUntil: number;
+    ethTxHash?: string;
+}
+
+export interface ForcedExitAndEthHash {
+    type: 'ForcedExit';
+    initiatorAccountId: number;
+    target: Address;
+    token: number;
+    fee: BigNumberish;
+    nonce: number;
+    signature?: Signature;
+    validFrom: number;
+    validUntil: number;
+    ethTxHash?: string;
+}
+
+export interface ApiDeposit {
+    type: 'Deposit';
+    from: Address;
+    tokenId: number;
+    amount: BigNumber;
+    to: Address;
+    accountId?: number;
+    ethHash: string;
+    id: number;
+    txHash: string;
+}
+
+export interface ApiFullExit {
+    type: 'FullExit';
+    accountId: number;
+    tokenId: number;
+    ethHash: string;
+    id: number;
+    txHash: string;
+}
+
+export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount;
+
+export type L2TxData = Transfer | WithdrawAndEthHash | ChangePubKey | ForcedExitAndEthHash | CloseAccount;
+
+export type TransactionData = L2TxData | ApiDeposit | ApiFullExit;
+
+export interface ApiTransaction {
+    txHash: string;
+    blockNumber?: number;
+    op: TransactionData;
+    status: L2TxStatus;
+    failReason?: string;
+    createdAt?: string;
+}
+
+export interface ApiSignedTx {
+    tx: ApiTransaction;
+    ethSignature?: string;
+}
+
+export interface ApiBatchStatus {
+    updatedAt: string;
+    lastState: L2TxStatus;
+}
+
+export interface ApiBatchData {
+    batchHash: string;
+    transactionHashes: string[];
+    createdAt: string;
+    batchStatus: ApiBatchStatus;
 }

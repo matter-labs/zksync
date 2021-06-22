@@ -2,7 +2,7 @@ use num::rational::Ratio;
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 
-use crate::helpers::{closest_packable_fee_amount, pack_fee_amount, unpack_fee_amount};
+use crate::helpers::{pack_fee_amount, unpack_fee_amount};
 use crate::tokens::ChangePubKeyFeeTypeArg;
 use zksync_utils::{round_precision, BigUintSerdeAsRadix10Str};
 
@@ -43,14 +43,28 @@ pub struct Fee {
 #[serde(rename_all = "camelCase")]
 pub struct BatchFee {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub gas_fee: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub zkp_fee: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub total_fee: BigUint,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TotalFee {
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub total_fee: BigUint,
 }
 
 impl BatchFee {
-    pub fn new(zkp_fee: &Ratio<BigUint>, gas_fee: &Ratio<BigUint>) -> BatchFee {
-        let (_, _, mut total_fee) = total_fee(zkp_fee, gas_fee);
-        total_fee = closest_packable_fee_amount(&total_fee);
-        BatchFee { total_fee }
+    pub fn new(zkp_fee: Ratio<BigUint>, gas_fee: Ratio<BigUint>) -> Self {
+        let (zkp_fee, gas_fee, total_fee) = total_fee(&zkp_fee, &gas_fee);
+        Self {
+            gas_fee,
+            zkp_fee,
+            total_fee,
+        }
     }
 }
 

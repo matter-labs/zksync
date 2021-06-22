@@ -1,0 +1,48 @@
+FORMAT: 1A
+
+# zkSync API v0.2
+
+{{accountsEndpoints}}
+{{batchesEndpoints}}
+{{blocksEndpoints}}
+{{configEndpoints}}
+{{feeEndpoints}}
+{{statusEndpoints}}
+{{tokensEndpoints}}
+{{transactionsEndpoints}}
+
+# Data Structures
+
+{{accountsTypes}}
+{{batchesTypes}}
+{{blocksTypes}}
+{{configTypes}}
+{{feeTypes}}
+{{statusTypes}}
+{{paginationTypes}}
+{{receiptTypes}}
+{{tokensTypes}}
+{{transactionsTypes}}
+
+## TxState (enum)
++ queued
++ committed
++ finalized
++ rejected
+
+## BlockNumber (enum)
++ (number)
++ lastCommitted
++ lastFinalized
+
+## Request
++ network: localhost (Network, required)
++ apiVersion: v02 (fixed, required)
++ resource: /api/v0.2/... (string, required)
++ args (object, required)
++ timestamp: `2021-05-31T14:17:24.112536900Z` (string, required)
+
+## Error
++ errorType: errorType (string, required)
++ code: 0 (number, required)
++ message: message (string, required)

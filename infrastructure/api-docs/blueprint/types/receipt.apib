@@ -1,0 +1,20 @@
+## Receipt.L2 (object)
++ txHash: `0x466a9432e5337ee85deb9092526bb96377d316b9a1f0717ae4027798837fb85b` (string, required),
++ rollupBlock: 99812 (number, required, nullable),
++ status: committed (TxState, required),
++ failReason: null (string, required, nullable)
+
+## Receipt.L1 (object)
++ status: committed (L1Status, required),
++ ethBlock: 134300 (number, required),
++ rollupBlock: 99812 (number, required, nullable),
++ id: 12001 (number, required)
+
+## Receipt (enum)
+- (Receipt.L1)
+- (Receipt.L2)
+
+## L1Status (enum)
++ committed
++ finalized
++ queued
