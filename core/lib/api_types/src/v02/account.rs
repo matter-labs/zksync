@@ -1,6 +1,7 @@
+use super::token::NFT;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use zksync_types::{AccountId, Address, BlockNumber, Nonce, PubKeyHash};
+use zksync_types::{AccountId, Address, BlockNumber, Nonce, PubKeyHash, TokenId};
 use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -12,6 +13,8 @@ pub struct Account {
     pub pub_key_hash: PubKeyHash,
     pub last_update_in_block: BlockNumber,
     pub balances: BTreeMap<String, BigUintSerdeWrapper>,
+    pub nfts: BTreeMap<TokenId, NFT>,
+    pub minted_nfts: BTreeMap<TokenId, NFT>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]

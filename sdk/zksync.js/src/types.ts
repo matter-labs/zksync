@@ -56,6 +56,14 @@ export interface AccountStateRest {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
         };
+        nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
+        mintedNfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
         nonce: number;
         pubKeyHash: PubKeyHash;
     };
@@ -63,6 +71,14 @@ export interface AccountStateRest {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
+        };
+        nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
+        mintedNfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
         };
         nonce: number;
         pubKeyHash: PubKeyHash;
@@ -424,6 +440,12 @@ export interface ApiAccountInfo {
     lastUpdateInBlock: number;
     balances: {
         [token: string]: BigNumber;
+    };
+    nfts: {
+        [tokenId: number]: NFT;
+    };
+    mintedNfts: {
+        [tokenId: number]: NFT;
     };
 }
 

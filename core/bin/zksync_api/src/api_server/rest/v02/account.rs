@@ -15,6 +15,7 @@ use zksync_api_types::v02::{
     },
     transaction::{Transaction, TxHashSerializeWrapper},
 };
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
 
@@ -146,16 +147,42 @@ impl ApiAccountData {
             }
         };
         let mut balances = BTreeMap::new();
+        let mut nfts = BTreeMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
-            let token_symbol = self
-                .tokens
-                .token_symbol(&mut storage, token_id)
-                .await
-                .map_err(Error::storage)?
-                .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?;
-
-            balances.insert(token_symbol, balance);
+            match token_id.0 {
+                NFT_TOKEN_ID_VAL => {
+                    // Don't include special token to balances or nfts
+                }
+                MIN_NFT_TOKEN_ID..=NFT_TOKEN_ID_VAL => {
+                    // https://github.com/rust-lang/rust/issues/37854
+                    // Exclusive range is an experimental feature, but we have already checked the last value in the previous step
+                    nfts.insert(
+                        token_id,
+                        self.tokens
+                            .get_nft_by_id(&mut storage, token_id)
+                            .await
+                            .map_err(Error::storage)?
+                            .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?
+                            .into(),
+                    );
+                }
+                _ => {
+                    let token_symbol = self
+                        .tokens
+                        .token_symbol(&mut storage, token_id)
+                        .await
+                        .map_err(Error::storage)?
+                        .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?;
+                    balances.insert(token_symbol, balance);
+                }
+            }
         }
+        let minted_nfts = account
+            .minted_nfts
+            .iter()
+            .map(|(id, nft)| (*id, nft.clone().into()))
+            .collect();
+
         Ok(Some(Account {
             account_id,
             address: account.address,
@@ -163,6 +190,8 @@ impl ApiAccountData {
             pub_key_hash: account.pub_key_hash,
             last_update_in_block,
             balances,
+            nfts,
+            minted_nfts,
         }))
     }
 
