@@ -177,6 +177,20 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(result)
     }
 
+    /// Loads all finalized NFTs.
+    pub async fn load_nfts(&mut self) -> QueryResult<HashMap<TokenId, NFT>> {
+        let start = Instant::now();
+        let nfts = sqlx::query_as!(StorageNFT, "SELECT * FROM nft",)
+            .fetch_all(self.0.conn())
+            .await?
+            .into_iter()
+            .map(|nft| (TokenId(nft.token_id as u32), nft.into()))
+            .collect();
+
+        metrics::histogram!("sql.token.load_nfts", start.elapsed());
+        Ok(nfts)
+    }
+
     /// Loads all the stored tokens from the database.
     /// Alongside with the tokens added via `store_token` method, the default `ETH` token
     /// is returned.
@@ -479,19 +493,6 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
 
         metrics::histogram!("sql.token.update_historical_ticker_price", start.elapsed());
         Ok(())
-    }
-
-    pub async fn get_last_token_id(&mut self) -> QueryResult<TokenId> {
-        let start = Instant::now();
-
-        let token_id = sqlx::query!("SELECT MAX(id) FROM tokens WHERE is_nft = false")
-            .fetch_one(self.0.conn())
-            .await?
-            .max
-            .unwrap_or(0);
-
-        metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
-        Ok(TokenId(token_id as u32))
     }
 
     pub async fn store_nft_factory(
