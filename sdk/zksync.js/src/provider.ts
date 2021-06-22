@@ -16,7 +16,7 @@ import {
     TxEthSignatureVariant,
     NFTInfo
 } from './types';
-import { isTokenETH, sleep, TokenSet, isNFT } from './utils';
+import { isTokenETH, sleep, TokenSet } from './utils';
 import {
     Governance,
     GovernanceFactory,
@@ -181,14 +181,6 @@ export class Provider extends SyncProvider {
         }
 
         return nft;
-    }
-
-    async getTokenSymbol(token: TokenLike): Promise<string> {
-        if (isNFT(token)) {
-            const nft = await this.getNFT(token as number);
-            return nft.symbol || `NFT-${token}`;
-        }
-        return this.tokenSet.resolveTokenSymbol(token);
     }
 
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {

@@ -320,18 +320,18 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
     }
 
-    async submitTxNewDetailed(tx: types.L2Tx, signature?: types.TxEthSignature): Promise<Response<string>> {
+    async submitTxNewDetailed(tx: types.L2Tx, signature?: types.TxEthSignatureVariant): Promise<Response<string>> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
-    async submitTxNew(tx: types.L2Tx, signature?: types.TxEthSignature): Promise<string> {
+    async submitTxNew(tx: types.L2Tx, signature?: types.TxEthSignatureVariant): Promise<string> {
         return this.parseResponse(await this.submitTxNewDetailed(tx, signature));
     }
 
     /**
      * @deprecated Use submitTxNew method instead
      */
-    async submitTx(tx: any, signature?: types.TxEthSignature, fastProcessing?: boolean): Promise<string> {
+    async submitTx(tx: any, signature?: types.TxEthSignatureVariant, fastProcessing?: boolean): Promise<string> {
         if (fastProcessing) {
             tx.fastProcessing = fastProcessing;
         }
@@ -374,7 +374,7 @@ export class RestProvider extends SyncProvider {
      * @deprecated Use submitTxsBatchNew method instead.
      */
     async submitTxsBatch(
-        transactions: { tx: any; signature?: types.TxEthSignature }[],
+        transactions: { tx: any; signature?: types.TxEthSignatureVariant }[],
         ethSignatures?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<string[]> {
         let txs = [];
@@ -393,6 +393,20 @@ export class RestProvider extends SyncProvider {
 
     async getBatch(batchHash: string): Promise<types.ApiBatchData> {
         return this.parseResponse(await this.getBatchDetailed(batchHash));
+    }
+
+    async getNFTDetailed(id: number): Promise<Response<types.NFTInfo>> {
+        return await this.get(`${this.address}/tokens/nft/${id}`);
+    }
+
+    async getNFT(id: number): Promise<types.NFTInfo> {
+        const nft = this.parseResponse(await this.getNFTDetailed(id));
+
+        // If the NFT does not exist, throw an exception
+        if (nft == null) {
+            throw new Error(`Requested NFT doesn't exist or the corresponding mintNFT operation is not verified yet`);
+        }
+        return nft;
     }
 
     async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.ApiTxReceipt> {

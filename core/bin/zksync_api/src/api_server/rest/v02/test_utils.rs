@@ -587,6 +587,11 @@ impl TestServerConfig {
                     .ethereum_schema()
                     .confirm_eth_tx(&eth_tx_hash)
                     .await?;
+                storage
+                    .chain()
+                    .state_schema()
+                    .apply_state_update(block_number)
+                    .await?;
             }
         }
 

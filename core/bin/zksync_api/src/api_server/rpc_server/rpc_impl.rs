@@ -164,7 +164,7 @@ impl RpcApp {
     pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<ApiNFT>> {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
-        let result = storage
+        let nft = storage
             .tokens_schema()
             .get_nft_with_factories(id)
             .await
@@ -174,7 +174,7 @@ impl RpcApp {
             })?;
 
         metrics::histogram!("api.rpc.get_nft", start.elapsed());
-        Ok(result.map(|nft| nft.into()))
+        Ok(nft)
     }
 
     pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {

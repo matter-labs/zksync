@@ -380,6 +380,10 @@ export type IncomingTxFeeType =
     | 'Transfer'
     | 'FastWithdraw'
     | 'ForcedExit'
+    | 'MintNFT'
+    | 'WithdrawNFT'
+    | 'FastWithdrawNFT'
+    | 'Swap'
     | ChangePubKeyFee
     | LegacyChangePubKeyFee;
 
