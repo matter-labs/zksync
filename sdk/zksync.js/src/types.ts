@@ -559,9 +559,17 @@ export interface ApiFullExit {
     txHash: string;
 }
 
-export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount;
+export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount | MintNFT | WithdrawNFT | Swap;
 
-export type L2TxData = Transfer | WithdrawAndEthHash | ChangePubKey | ForcedExitAndEthHash | CloseAccount;
+export type L2TxData =
+    | Transfer
+    | WithdrawAndEthHash
+    | ChangePubKey
+    | ForcedExitAndEthHash
+    | CloseAccount
+    | MintNFT
+    | WithdrawNFT
+    | Swap;
 
 export type TransactionData = L2TxData | ApiDeposit | ApiFullExit;
 
