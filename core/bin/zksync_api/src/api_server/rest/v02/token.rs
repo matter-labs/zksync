@@ -421,7 +421,7 @@ mod tests {
         let response = client.token_price(&token_like, "333").await?;
         assert!(response.error.is_some());
 
-        let id = TokenId(MIN_NFT_TOKEN_ID + 2);
+        let id = TokenId(MIN_NFT_TOKEN_ID + 1);
         let response = client.nft_by_id(id).await?;
         let nft: ApiNFT = deserialize_response_result(response)?;
         assert_eq!(nft.id, id);

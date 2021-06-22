@@ -485,6 +485,13 @@ export class RestProvider extends SyncProvider {
         const committedHandle = this.accountInfo(address, 'committed');
         const finalizedHandle = this.accountInfo(address, 'finalized');
         const [committedFullInfo, finalizedFullInfo] = await Promise.all([committedHandle, finalizedHandle]);
+        const defaultInfo = {
+            balances: {},
+            nonce: 0,
+            pubKeyHash: 'sync:0000000000000000000000000000000000000000',
+            nfts: {},
+            mintedNfts: {}
+        };
 
         if (finalizedFullInfo) {
             return {
@@ -493,12 +500,16 @@ export class RestProvider extends SyncProvider {
                 committed: {
                     balances: committedFullInfo.balances,
                     nonce: committedFullInfo.nonce,
-                    pubKeyHash: committedFullInfo.pubKeyHash
+                    pubKeyHash: committedFullInfo.pubKeyHash,
+                    nfts: committedFullInfo.nfts,
+                    mintedNfts: committedFullInfo.mintedNfts
                 },
                 verified: {
                     balances: finalizedFullInfo.balances,
                     nonce: finalizedFullInfo.nonce,
-                    pubKeyHash: finalizedFullInfo.pubKeyHash
+                    pubKeyHash: finalizedFullInfo.pubKeyHash,
+                    nfts: finalizedFullInfo.nfts,
+                    mintedNfts: finalizedFullInfo.mintedNfts
                 }
             };
         } else if (committedFullInfo) {
@@ -508,27 +519,17 @@ export class RestProvider extends SyncProvider {
                 committed: {
                     balances: committedFullInfo.balances,
                     nonce: committedFullInfo.nonce,
-                    pubKeyHash: committedFullInfo.pubKeyHash
+                    pubKeyHash: committedFullInfo.pubKeyHash,
+                    nfts: committedFullInfo.nfts,
+                    mintedNfts: committedFullInfo.mintedNfts
                 },
-                verified: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                }
+                verified: defaultInfo
             };
         } else {
             return {
                 address,
-                committed: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                },
-                verified: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                }
+                committed: defaultInfo,
+                verified: defaultInfo
             };
         }
     }

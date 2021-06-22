@@ -46,6 +46,14 @@ pub enum ApiTxFeeTypes {
     ChangePubKey(ChangePubKeyFeeTypeArg),
     /// Fee for the `ForcedExit` transaction.
     ForcedExit,
+    /// Fee for the `MintNFT` transaction.
+    MintNFT,
+    /// Fee for the `WithdrawNFT` transaction.
+    WithdrawNFT,
+    /// Fee for the `WithdrawNFT` operation that requires fast processing.
+    FastWithdrawNFT,
+    /// Fee for the `Swap` operation
+    Swap,
 }
 
 impl From<ApiTxFeeTypes> for TxFeeTypes {
@@ -55,6 +63,10 @@ impl From<ApiTxFeeTypes> for TxFeeTypes {
             ApiTxFeeTypes::FastWithdraw => TxFeeTypes::FastWithdraw,
             ApiTxFeeTypes::Transfer => TxFeeTypes::Transfer,
             ApiTxFeeTypes::ChangePubKey(cpk_arg) => TxFeeTypes::ChangePubKey(cpk_arg),
+            ApiTxFeeTypes::MintNFT => TxFeeTypes::MintNFT,
+            ApiTxFeeTypes::WithdrawNFT => TxFeeTypes::WithdrawNFT,
+            ApiTxFeeTypes::FastWithdrawNFT => TxFeeTypes::FastWithdrawNFT,
+            ApiTxFeeTypes::Swap => TxFeeTypes::Swap,
         }
     }
 }
