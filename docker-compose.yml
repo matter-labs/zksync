@@ -33,7 +33,7 @@ services:
     ports:
       - "9876:9876"
     volumes:
-      - ./etc/tokens/:/etc/tokens
+      - ./etc/tokens/localhost.json:/etc/tokens/localhost.json
   tesseracts:
     image: "adria0/tesseracts"
     command: --cfg /tesseracts.toml -vvv

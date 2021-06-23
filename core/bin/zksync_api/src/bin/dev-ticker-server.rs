@@ -101,29 +101,33 @@ struct TokenData {
 }
 
 fn load_tokens(path: impl AsRef<Path>) -> Vec<TokenData> {
-    let tokens: Vec<Token> = serde_json::from_str(&read_to_string(path).unwrap()).unwrap();
-    let tokens_data: Vec<TokenData> = tokens
-        .into_iter()
-        .map(|token| {
-            let symbol = token.symbol.to_lowercase();
-            let mut platforms = HashMap::new();
-            platforms.insert(String::from("ethereum"), token.address);
-            let id = match symbol.as_str() {
-                "eth" => String::from("ethereum"),
-                "wbtc" => String::from("wrapped-bitcoin"),
-                "bat" => String::from("basic-attention-token"),
-                _ => symbol.clone(),
-            };
+    if let Ok(text) = read_to_string(path) {
+        let tokens: Vec<Token> = serde_json::from_str(&text).unwrap();
+        let tokens_data: Vec<TokenData> = tokens
+            .into_iter()
+            .map(|token| {
+                let symbol = token.symbol.to_lowercase();
+                let mut platforms = HashMap::new();
+                platforms.insert(String::from("ethereum"), token.address);
+                let id = match symbol.as_str() {
+                    "eth" => String::from("ethereum"),
+                    "wbtc" => String::from("wrapped-bitcoin"),
+                    "bat" => String::from("basic-attention-token"),
+                    _ => symbol.clone(),
+                };
 
-            TokenData {
-                id,
-                symbol: symbol.clone(),
-                name: symbol,
-                platforms,
-            }
-        })
-        .collect();
-    tokens_data
+                TokenData {
+                    id,
+                    symbol: symbol.clone(),
+                    name: symbol,
+                    platforms,
+                }
+            })
+            .collect();
+        tokens_data
+    } else {
+        Vec::new()
+    }
 }
 
 async fn handle_coingecko_token_list(
