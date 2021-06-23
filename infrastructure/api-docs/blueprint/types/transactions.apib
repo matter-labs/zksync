@@ -145,6 +145,21 @@
 - validFrom: 0 (number, required)
 - validUntil: 1239213821 (number, required)
 
+## Transaction.L2.WithdrawNFTWithEthHash (object)
+- type: `WithdrawNFT` (string, fixed)
+- accountId: 12 (number, required)
+- from: 0x38de1b4a24548d6ff66fa8e56448d9de09955b08 (string, required)
+- to: 0x38de1b4a24548d6ff66fa8e56448d9de09955b08 (string, required)
+- token: 100000 (number, required)
+- feeToken: 5 (number, required)
+- fee: `12000000000` (string, required)
+- nonce: 1001 (number, required)
+- signature (L2Signature, required)
+- fast: false (boolean, required)
+- validFrom: 0 (number, required)
+- validUntil: 1239213821 (number, required)
+- ethTxHash: `0xdda1287002282e1804af40a7c7373bd77cc99a2a27c88bf7908be45398e93148` (string, required, nullable)
+
 ## Transaction.Incoming (enum)
 - (Transaction.L2.Transfer)
 - (Transaction.L2.Withdraw)
@@ -161,7 +176,7 @@
 - (Transaction.L2.ForcedExitWithEthHash)
 - (Transaction.L2.Swap)
 - (Transaction.L2.MintNFT)
-- (Transaction.L2.WithdrawNFT)
+- (Transaction.L2.WithdrawNFTWithEthHash)
 
 ## Transaction.L1.Deposit
 - type: `Deposit` (string, fixed)

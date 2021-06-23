@@ -100,7 +100,7 @@ pub enum L2Transaction {
     ForcedExit(Box<ForcedExitData>),
     MintNFT(Box<MintNFT>),
     Swap(Box<Swap>),
-    WithdrawNFT(Box<WithdrawNFT>),
+    WithdrawNFT(Box<WithdrawNFTData>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,6 +116,14 @@ pub struct ForcedExitData {
 pub struct WithdrawData {
     #[serde(flatten)]
     pub tx: Withdraw,
+    pub eth_tx_hash: Option<H256>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawNFTData {
+    #[serde(flatten)]
+    pub tx: WithdrawNFT,
     pub eth_tx_hash: Option<H256>,
 }
 
