@@ -4,7 +4,10 @@ use std::time::Instant;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
-use zksync_api_types::v02::{fee::ApiTxFeeTypes, token::ApiNFT};
+use zksync_api_types::{
+    v02::{fee::ApiTxFeeTypes, token::ApiNFT},
+    TxWithSignature,
+};
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
     Address, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,

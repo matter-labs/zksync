@@ -1,7 +1,7 @@
 use crate::rest::client::{Client, Result};
-use zksync_api_types::v02::{
-    transaction::{IncomingTx, IncomingTxBatch},
-    Response,
+use zksync_api_types::{
+    v02::{transaction::IncomingTxBatch, Response},
+    TxWithSignature,
 };
 use zksync_types::tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash, ZkSyncTx};
 
@@ -12,15 +12,15 @@ impl Client {
         signature: TxEthSignatureVariant,
     ) -> Result<Response> {
         self.post_with_scope(super::API_V02_SCOPE, "transactions")
-            .body(&IncomingTx { tx, signature })
+            .body(&TxWithSignature { tx, signature })
             .send()
             .await
     }
 
     pub async fn submit_batch(
         &self,
-        txs: Vec<ZkSyncTx>,
-        signature: EthBatchSignatures,
+        txs: Vec<TxWithSignature>,
+        signature: Option<EthBatchSignatures>,
     ) -> Result<Response> {
         self.post_with_scope(super::API_V02_SCOPE, "transactions/batches")
             .body(&IncomingTxBatch { txs, signature })

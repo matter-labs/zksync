@@ -1,29 +1,22 @@
-use super::block::BlockStatus;
+use crate::{v02::block::BlockStatus, TxWithSignature};
 use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use zksync_types::{
     tx::{
-        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
-        TxEthSignatureVariant, TxHash, Withdraw, WithdrawNFT,
+        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer, TxHash,
+        Withdraw, WithdrawNFT,
     },
     AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
-    ZkSyncTx, H256,
+    H256,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, ZeroPrefixHexSerde};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomingTxBatch {
-    pub txs: Vec<ZkSyncTx>,
-    pub signature: EthBatchSignatures,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct IncomingTx {
-    pub tx: ZkSyncTx,
-    pub signature: TxEthSignatureVariant,
+    pub txs: Vec<TxWithSignature>,
+    pub signature: Option<EthBatchSignatures>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]

@@ -89,7 +89,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
     });
 
     step('should execute a mintNFT', async () => {
-        nft =  await tester.testMintNFT(alice, chuck,  token);
+        nft = await tester.testMintNFT(alice, chuck, token);
     });
     step('should execute a getNFT', async () => {
         if (onlyBasic) {
@@ -355,24 +355,24 @@ if (process.env.TEST_TRANSPORT) {
 } else {
     // Default case: run HTTP&ETH / HTTP&wBTC.
     tokenAndTransport = [
-        {
-            transport: 'HTTP',
-            token: 'ETH',
-            providerType: 'RPC',
-            onlyBasic: true
-        },
-        {
-            transport: 'HTTP',
-            token: defaultERC20,
-            providerType: 'RPC',
-            onlyBasic: false
-        },
-        {
-            transport: 'HTTP',
-            token: 'ETH',
-            providerType: 'REST',
-            onlyBasic: true
-        },
+        // {
+        //     transport: 'HTTP',
+        //     token: 'ETH',
+        //     providerType: 'RPC',
+        //     onlyBasic: true
+        // },
+        // {
+        //     transport: 'HTTP',
+        //     token: defaultERC20,
+        //     providerType: 'RPC',
+        //     onlyBasic: false
+        // },
+        // {
+        //     transport: 'HTTP',
+        //     token: 'ETH',
+        //     providerType: 'REST',
+        //     onlyBasic: true
+        // },
         {
             transport: 'HTTP',
             token: defaultERC20,

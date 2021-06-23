@@ -21,7 +21,10 @@ use num::{bigint::ToBigInt, rational::Ratio, BigUint, CheckedSub, Zero};
 use thiserror::Error;
 
 // Workspace uses
-use zksync_api_types::v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper};
+use zksync_api_types::{
+    v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper},
+    TxWithSignature,
+};
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
@@ -36,7 +39,6 @@ use zksync_utils::ratio_to_big_decimal;
 // Local uses
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
-    api_server::rpc_server::types::TxWithSignature,
     core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
     signature_checker::{
