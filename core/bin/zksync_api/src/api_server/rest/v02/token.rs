@@ -287,7 +287,6 @@ mod tests {
         SharedData,
     };
     use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
-    use zksync_crypto::params::MIN_NFT_TOKEN_ID;
     use zksync_types::Address;
 
     async fn is_token_enabled_for_fees(
@@ -421,7 +420,7 @@ mod tests {
         let response = client.token_price(&token_like, "333").await?;
         assert!(response.error.is_some());
 
-        let id = TokenId(MIN_NFT_TOKEN_ID + 1);
+        let id = TokenId(65542);
         let response = client.nft_by_id(id).await?;
         let nft: ApiNFT = deserialize_response_result(response)?;
         assert_eq!(nft.id, id);

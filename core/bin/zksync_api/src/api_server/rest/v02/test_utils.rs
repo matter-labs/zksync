@@ -351,6 +351,11 @@ impl TestServerConfig {
         // Required since we use `EthereumSchema` in this test.
         storage.ethereum_schema().initialize_eth_data().await?;
 
+        storage
+            .config_schema()
+            .store_config(Address::default(), Address::default(), Address::default())
+            .await?;
+
         // Insert PHNX token
         storage
             .tokens_schema()
