@@ -13,7 +13,7 @@ services:
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
     volumes:
-      - ./etc/tokens/localhost.json:/etc/tokens/localhost.json
+      - ./etc/tokens/:/etc/tokens
 
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
