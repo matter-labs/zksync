@@ -11,7 +11,7 @@ services:
       - PLUGIN_CONFIG
 
   dev-ticker:
-    build: .
+    image: "matterlabs/dev-ticker:latest"
     volumes:
       - ./etc/tokens/:/etc/tokens
 

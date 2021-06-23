@@ -29,7 +29,7 @@ services:
       - ./etc/tokens/:/etc/tokens
 
   dev-ticker:
-    build: .
+    image: "matterlabs/dev-ticker:latest"
     ports:
       - "9876:9876"
     volumes:
