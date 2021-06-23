@@ -95,13 +95,9 @@ async function getHashesAndSignatures() {
         .batchBuilder()
         .addTransfer({ to: syncWallet.address(), token: 'ETH', amount: 0 })
         .build('ETH');
-    let txs = [];
-    for (const signedTx of batch.txs) {
-        txs.push(signedTx.tx);
-    }
 
     const submitBatchResponse = await (syncWallet.provider as zksync.RestProvider).submitTxsBatchNew(
-        txs,
+        batch.txs,
         batch.signature
     );
     await syncWallet.provider.notifyTransaction(submitBatchResponse.transactionHashes[0], 'COMMIT');
@@ -120,7 +116,7 @@ async function getHashesAndSignatures() {
     const accountId = (await syncWallet.getAccountId())!;
     const pubKey = signedTransfer.tx.signature!.pubKey;
     const l2Signature = signedTransfer.tx.signature!.signature;
-    const ethereumSignature = signedTransfer.ethereumSignature!.signature;
+    const ethereumSignature = (signedTransfer.ethereumSignature! as zksync.types.TxEthSignature).signature;
 
     let result: Parameters = {
         txHash,
