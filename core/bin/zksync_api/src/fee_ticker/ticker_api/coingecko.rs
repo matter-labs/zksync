@@ -90,6 +90,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .ok_or_else(|| PriceError::api_error("CoinGecko returned empty price data"))?
             .0;
 
+        // Take prices over the last 6 hours
         let usd_prices = market_chart
             .prices
             .into_iter()
