@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - breaking
 
 env:
   DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
@@ -51,20 +52,24 @@ jobs:
       run: |
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zk docker push rust
-        zk docker push nginx
 
   deploy:
+    # TODO: fix stage and enable deployments back.
+    # NOTE: breaking deployment is not supported.
+    # if: github.ref == 'refs/heads/dev'
+    if: 'false'
+
     name: Deploy to the Stage enviroment
     runs-on: [k8s, deployer, stage]
     needs: [pre, build-images]
 
     container:
-      image: dysnix/kubectl:v1.16-gcloud
+      image: dysnix/kubectl:v1.19-gcloud
 
     env:
       KUBECONF: ${{ secrets.KUBECONF_STAGE }}
       IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
-      HFENV: zksync-stage
+      HFENV: stage
 
     steps:
       -
@@ -85,16 +90,15 @@ jobs:
         with:
           token: "${{ github.token }}"
           environment: stage
-# TODO fix stage and resume deploy to stage
-#      -
-#        name: Deploy apps
-#        working-directory: helm-infra
-#        run: |
+      -
+        name: Deploy apps
+        working-directory: helm-infra
+        run: |
           # copy helm plugins over (from dysnix/kubectl, don't forget)!!!
-#          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
-#
-#          UPDATE_REPOS=y helmfile -e $HFENV repos
-#          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
+
+          UPDATE_REPOS=y helmfile -e $HFENV repos
+          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
       -
         name: Update deployment status (success)
         if: success()
