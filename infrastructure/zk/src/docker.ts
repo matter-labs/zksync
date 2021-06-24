@@ -14,7 +14,8 @@ const IMAGES = [
     'dev-liquidity-token-watcher',
     'ci-integration-test',
     'zk-environment',
-    'event-listener'
+    'event-listener',
+    'data-restore'
 ];
 
 async function dockerCommand(command: 'push' | 'build', image: string) {
