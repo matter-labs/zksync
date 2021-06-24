@@ -142,9 +142,10 @@ impl ApiAccountData {
         let account = transaction
             .chain()
             .account_schema()
-            .last_committed_state_for_account(account_id, None)
+            .last_committed_state_for_account(account_id)
             .await
-            .map_err(Error::storage)?;
+            .map_err(Error::storage)?
+            .1;
         let result = if let Some(account) = account {
             let last_block = transaction
                 .chain()
@@ -195,16 +196,10 @@ impl ApiAccountData {
     async fn account_full_info(&self, account_id: AccountId) -> Result<AccountState, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
-        let finalized_state = transaction
+        let (finalized_state, committed_state) = transaction
             .chain()
             .account_schema()
-            .account_and_last_block(account_id)
-            .await
-            .map_err(Error::storage)?;
-        let committed_state = transaction
-            .chain()
-            .account_schema()
-            .last_committed_state_for_account(account_id, Some(finalized_state.clone()))
+            .last_committed_state_for_account(account_id)
             .await
             .map_err(Error::storage)?;
         let finalized = if let Some(account) = finalized_state.1 {
