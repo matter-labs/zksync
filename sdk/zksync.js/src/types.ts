@@ -510,7 +510,7 @@ export interface ApiL2TxReceipt {
 
 export type ApiTxReceipt = ApiL1TxReceipt | ApiL2TxReceipt;
 
-export interface WithdrawAndEthHash {
+export interface WithdrawData {
     type: 'Withdraw';
     accountId: number;
     from: Address;
@@ -525,11 +525,26 @@ export interface WithdrawAndEthHash {
     ethTxHash?: string;
 }
 
-export interface ForcedExitAndEthHash {
+export interface ForcedExitData {
     type: 'ForcedExit';
     initiatorAccountId: number;
     target: Address;
     token: number;
+    fee: BigNumberish;
+    nonce: number;
+    signature?: Signature;
+    validFrom: number;
+    validUntil: number;
+    ethTxHash?: string;
+}
+
+export interface WithdrawNFTData {
+    type: 'WithdrawNFT';
+    accountId: number;
+    from: Address;
+    to: Address;
+    token: number;
+    feeToken: number;
     fee: BigNumberish;
     nonce: number;
     signature?: Signature;
@@ -563,12 +578,12 @@ export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccoun
 
 export type L2TxData =
     | Transfer
-    | WithdrawAndEthHash
+    | WithdrawData
     | ChangePubKey
-    | ForcedExitAndEthHash
+    | ForcedExitData
     | CloseAccount
     | MintNFT
-    | WithdrawNFT
+    | WithdrawNFTData
     | Swap;
 
 export type TransactionData = L2TxData | ApiDeposit | ApiFullExit;

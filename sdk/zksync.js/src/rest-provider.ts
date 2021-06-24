@@ -604,7 +604,11 @@ export class RestProvider extends SyncProvider {
 
     async getEthTxForWithdrawal(withdrawalHash: string): Promise<string> {
         const txData = await this.txData(withdrawalHash);
-        if (txData.tx.op.type === 'Withdraw' || txData.tx.op.type === 'ForcedExit') {
+        if (
+            txData.tx.op.type === 'Withdraw' ||
+            txData.tx.op.type === 'ForcedExit' ||
+            txData.tx.op.type === 'WithdrawNFT'
+        ) {
             return txData.tx.op.ethTxHash;
         } else {
             return null;

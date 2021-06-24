@@ -82,6 +82,7 @@ interface Parameters {
     pubKey: string;
     l2Signature: string;
     ethereumSignature: string;
+    nftId: number;
 }
 
 async function getHashesAndSignatures() {
@@ -118,6 +119,15 @@ async function getHashesAndSignatures() {
     const l2Signature = signedTransfer.tx.signature!.signature;
     const ethereumSignature = (signedTransfer.ethereumSignature! as zksync.types.TxEthSignature).signature;
 
+    const mintHandle = await syncWallet.mintNFT({
+        recipient: address,
+        contentHash: ethers.utils.randomBytes(32),
+        feeToken: 'ETH'
+    });
+    await mintHandle.awaitVerifyReceipt();
+    const state = await syncWallet.getAccountState();
+    const nftId = Object.values(state.verified.nfts)[0].id;
+
     let result: Parameters = {
         txHash,
         txBatchHash,
@@ -125,7 +135,8 @@ async function getHashesAndSignatures() {
         accountId,
         pubKey,
         l2Signature,
-        ethereumSignature
+        ethereumSignature,
+        nftId
     };
     return result;
 }
