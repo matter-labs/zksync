@@ -9,7 +9,7 @@ export $(cat $ZKSYNC_HOME/etc/env/docker.env | sed 's/#.*//g' | xargs)
 
 # Wait for the database to be ready.
 until pg_isready -d $DATABASE_URL; do
-    sleep 1
+  sleep 1
 done
 
 if [[ -z $COMMAND || -z $NETWORK || -z $WEB3_URL ]]
@@ -49,8 +49,9 @@ then
   [ -f /pg_restore/$PG_DUMP ] || { echo "$PG_DUMP not found" ; exit 1 ; }
 
   zk db drop || true
+  zk db basic-setup
   echo "Applying $PG_DUMP"
-  pg_restore -j 8 -d $DATABASE_URL /pg_restore/$PG_DUMP
+  pg_restore -j 8 -d $DATABASE_URL --clean --if-exists /pg_restore/$PG_DUMP
 fi
 
 CONFIG_FILE="/usr/src/configs/${NETWORK}.json"
