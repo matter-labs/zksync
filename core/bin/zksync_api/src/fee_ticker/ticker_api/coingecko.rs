@@ -56,7 +56,6 @@ impl CoinGeckoAPI {
 impl TokenPriceAPI for CoinGeckoAPI {
     async fn get_price(&self, token: &Token) -> Result<TokenPrice, PriceError> {
         let start = Instant::now();
-        let token_symbol = token.symbol.as_str();
         let token_id = self.token_ids.get(&token.address).ok_or_else(|| {
             PriceError::token_not_found(format!(
                 "Token '{}, {:?}' is not listed on CoinGecko",
@@ -69,8 +68,6 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .join(format!("api/v3/coins/{}/market_chart", token_id).as_str())
             .expect("failed to join URL path");
 
-        // If we use 2 day interval we will get hourly prices and not minute by minute which makes
-        // response faster and smaller
         let market_chart = self
             .client
             .get(market_chart_url)
@@ -100,12 +97,23 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .take(6)
             .map(|token_price| token_price.1);
 
-        let len = usd_prices.len();
-        let usd_price = if len == 0 {
-            return Err(PriceError::api_error("CoinGecko returned empty price data"));
+        // We use max price for ETH token because we spend ETH with each commit and collect token
+        // so it is in our interest to assume highest price for ETH.
+        // Theoretically we should use min and max price for ETH in our ticker formula when we
+        // calculate fee for tx with ETH token. Practically if we use only max price foe ETH it is fine because
+        // we don't need to sell this token lnd price only affects ZKP cost of such tx which is negligible.
+        let usd_price = if token.id.0 == 0 {
+            usd_prices.max()
         } else {
-            usd_prices.sum::<Ratio<BigUint>>() / BigUint::from(len)
+            let len = usd_prices.len();
+            if len == 0 {
+                None
+            } else {
+                Some(usd_prices.sum::<Ratio<BigUint>>() / BigUint::from(len))
+            }
         };
+        let usd_price = usd_price
+            .ok_or_else(|| PriceError::api_error("CoinGecko returned empty price data"))?;
 
         let naive_last_updated = NaiveDateTime::from_timestamp(
             last_updated_timestamp_ms / 1_000,                      // ms to s
