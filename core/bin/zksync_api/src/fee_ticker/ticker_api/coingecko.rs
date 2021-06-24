@@ -7,21 +7,22 @@ use num::BigUint;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::time::Instant;
-use zksync_types::TokenPrice;
-use zksync_utils::UnsignedRatioSerializeAsDecimal;
+use zksync_types::{Address, Token, TokenPrice};
+use zksync_utils::{remove_prefix, UnsignedRatioSerializeAsDecimal};
 
 #[derive(Debug, Clone)]
 pub struct CoinGeckoAPI {
     base_url: Url,
     client: reqwest::Client,
-    token_ids: HashMap<String, String>,
+    token_ids: HashMap<Address, String>,
 }
 
 impl CoinGeckoAPI {
     pub fn new(client: reqwest::Client, base_url: Url) -> anyhow::Result<Self> {
         let token_list_url = base_url
-            .join("api/v3/coins/list")
+            .join("api/v3/coins/list?include_platform=true")
             .expect("failed to join URL path");
 
         let token_list = reqwest::blocking::get(token_list_url)
@@ -30,8 +31,19 @@ impl CoinGeckoAPI {
 
         let mut token_ids = HashMap::new();
         for token in token_list.0 {
-            token_ids.insert(token.symbol, token.id);
+            if let Some(address_value) = token.platforms.get("ethereum") {
+                if let Some(address_str) = address_value.as_str() {
+                    let address_str = remove_prefix(address_str);
+                    if let Ok(address) = Address::from_str(address_str) {
+                        token_ids.insert(address, token.id);
+                    }
+                }
+            }
         }
+
+        // Add ETH manually because coingecko API doesn't return address for it.
+        token_ids.insert(Address::default(), String::from("ethereum"));
+
         Ok(Self {
             base_url,
             client,
@@ -42,21 +54,15 @@ impl CoinGeckoAPI {
 
 #[async_trait]
 impl TokenPriceAPI for CoinGeckoAPI {
-    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, PriceError> {
+    async fn get_price(&self, token: &Token) -> Result<TokenPrice, PriceError> {
         let start = Instant::now();
-        let token_lowercase_symbol = token_symbol.to_lowercase();
-        let token_id = self
-            .token_ids
-            .get(&token_lowercase_symbol)
-            .or_else(|| self.token_ids.get(token_symbol))
-            .unwrap_or(&token_lowercase_symbol);
-        // TODO ZKS-595. Uncomment this code
-        // .ok_or_else(|| {
-        //     PriceError::token_not_found(format!(
-        //         "Token '{}' is not listed on CoinGecko",
-        //         token_symbol
-        //     ))
-        // })?;
+        let token_symbol = token.symbol.as_str();
+        let token_id = self.token_ids.get(&token.address).ok_or_else(|| {
+            PriceError::token_not_found(format!(
+                "Token '{}, {:?}' is not listed on CoinGecko",
+                token.symbol, token.address
+            ))
+        })?;
 
         let market_chart_url = self
             .base_url
@@ -117,7 +123,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoinGeckoTokenInfo {
     pub(crate) id: String,
-    pub(crate) symbol: String,
+    pub(crate) platforms: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,6 +143,7 @@ pub struct CoinGeckoMarketChart {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zksync_types::TokenId;
     use zksync_utils::parse_env;
 
     #[tokio::test]
@@ -144,7 +151,8 @@ mod tests {
         let ticker_url = parse_env("FEE_TICKER_COINGECKO_BASE_URL");
         let client = reqwest::Client::new();
         let api = CoinGeckoAPI::new(client, ticker_url).unwrap();
-        api.get_price("ETH")
+        let token = Token::new(TokenId(0), Default::default(), "ETH", 18);
+        api.get_price(&token)
             .await
             .expect("Failed to get data from ticker");
     }
