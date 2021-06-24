@@ -27,17 +27,17 @@ jobs:
           key: "${{ github.event.deployment.environment }}"
           map: |
             {
-              "mainnet": {
+              "^mainnet$": {
                 "KUBECONF": "KUBECONF_MAINNET",
                 "HFENV": "prod",
                 "RUNNER": "mainnet"
               },
-              "rinkeby": {
+              "^rinkeby$": {
                 "KUBECONF": "KUBECONF_TESTNET",
                 "HFENV": "${{ github.event.deployment.environment }}",
                 "RUNNER": "testnet"
               },
-              "ropsten": {
+              "^ropsten$": {
                 "KUBECONF": "KUBECONF_TESTNET",
                 "HFENV": "${{ github.event.deployment.environment }}",
                 "RUNNER": "testnet"
