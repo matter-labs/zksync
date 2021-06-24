@@ -29,22 +29,22 @@ jobs:
             {
               "mainnet": {
                 "KUBECONF": "KUBECONF_MAINNET",
-                "HFENV": "zksync-prod",
+                "HFENV": "prod",
                 "RUNNER": "mainnet"
               },
               "rinkeby": {
                 "KUBECONF": "KUBECONF_TESTNET",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "HFENV": "${{ github.event.deployment.environment }}",
                 "RUNNER": "testnet"
               },
               "ropsten": {
                 "KUBECONF": "KUBECONF_TESTNET",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "HFENV": "${{ github.event.deployment.environment }}",
                 "RUNNER": "testnet"
               },
               ".*": {
                 "KUBECONF": "KUBECONF_STAGE",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "HFENV": "${{ github.event.deployment.environment }}",
                 "RUNNER": "stage"
               }
             }
@@ -71,7 +71,7 @@ jobs:
     if: ${{ needs.pre.outputs.isTag == 'true' }}
 
     container:
-      image: dysnix/kubectl:v1.16-gcloud
+      image: dysnix/kubectl:v1.19-gcloud
 
     env:
       IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
