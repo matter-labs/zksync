@@ -5,11 +5,15 @@
 + pubKeyHash: `sync:82b9eb68c6f7f80cecf49ee1a20acb8ae9ecd602` (string, required)
 + lastUpdateInBlock: 15001 (number, required)
 + balances (object, required)
-+ nfts (AccountBalances, required)
-+ mintedNfts (AccountNfts, required)
++ nfts (Account.Balances, required)
++ mintedNfts (Account.Nfts, required)
 
-## AccountBalances (object)
+## Account.FullInfo
++ committed (Account, required, nullable)
++ finalized (Account, required, nullable)
+
+## Account.Balances (object)
 + *ETH*: `1000000000000000000` (string, required)
 
-## AccountNfts (object)
+## Account.Nfts (object)
 + *100000* (Token.NFT, required)
