@@ -127,7 +127,8 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         assert_eq!(
             AccountSchema(&mut storage)
                 .last_committed_state_for_account(*account_id)
-                .await?,
+                .await?
+                .1,
             Some(got_account)
         );
 

@@ -449,6 +449,11 @@ export interface ApiAccountInfo {
     };
 }
 
+export interface ApiAccountFullInfo {
+    committed: ApiAccountInfo;
+    finalized: ApiAccountInfo;
+}
+
 export interface ApiConfig {
     network: Network;
     contract: Address;

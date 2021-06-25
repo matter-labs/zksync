@@ -108,6 +108,14 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
+    async accountFullInfoDetailed(idOrAddress: number | types.Address): Promise<Response<types.ApiAccountFullInfo>> {
+        return await this.get(`${this.address}/accounts/${idOrAddress}`);
+    }
+
+    async accountFullInfo(idOrAddress: number | types.Address): Promise<types.ApiAccountFullInfo> {
+        return this.parseResponse(await this.accountFullInfoDetailed(idOrAddress));
+    }
+
     async accountTxsDetailed(
         idOrAddress: number | types.Address,
         paginationQuery: types.PaginationQuery<string>
@@ -475,9 +483,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async getState(address: types.Address): Promise<types.AccountStateRest> {
-        const committedHandle = this.accountInfo(address, 'committed');
-        const finalizedHandle = this.accountInfo(address, 'finalized');
-        const [committedFullInfo, finalizedFullInfo] = await Promise.all([committedHandle, finalizedHandle]);
+        const fullInfo = await this.accountFullInfo(address);
         const defaultInfo = {
             balances: {},
             nonce: 0,
@@ -486,35 +492,35 @@ export class RestProvider extends SyncProvider {
             mintedNfts: {}
         };
 
-        if (finalizedFullInfo) {
+        if (fullInfo.finalized) {
             return {
                 address,
-                id: committedFullInfo.accountId,
+                id: fullInfo.committed.accountId,
                 committed: {
-                    balances: committedFullInfo.balances,
-                    nonce: committedFullInfo.nonce,
-                    pubKeyHash: committedFullInfo.pubKeyHash,
-                    nfts: committedFullInfo.nfts,
-                    mintedNfts: committedFullInfo.mintedNfts
+                    balances: fullInfo.committed.balances,
+                    nonce: fullInfo.committed.nonce,
+                    pubKeyHash: fullInfo.committed.pubKeyHash,
+                    nfts: fullInfo.committed.nfts,
+                    mintedNfts: fullInfo.committed.mintedNfts
                 },
                 verified: {
-                    balances: finalizedFullInfo.balances,
-                    nonce: finalizedFullInfo.nonce,
-                    pubKeyHash: finalizedFullInfo.pubKeyHash,
-                    nfts: finalizedFullInfo.nfts,
-                    mintedNfts: finalizedFullInfo.mintedNfts
+                    balances: fullInfo.finalized.balances,
+                    nonce: fullInfo.finalized.nonce,
+                    pubKeyHash: fullInfo.finalized.pubKeyHash,
+                    nfts: fullInfo.finalized.nfts,
+                    mintedNfts: fullInfo.finalized.mintedNfts
                 }
             };
-        } else if (committedFullInfo) {
+        } else if (fullInfo.committed) {
             return {
                 address,
-                id: committedFullInfo.accountId,
+                id: fullInfo.committed.accountId,
                 committed: {
-                    balances: committedFullInfo.balances,
-                    nonce: committedFullInfo.nonce,
-                    pubKeyHash: committedFullInfo.pubKeyHash,
-                    nfts: committedFullInfo.nfts,
-                    mintedNfts: committedFullInfo.mintedNfts
+                    balances: fullInfo.committed.balances,
+                    nonce: fullInfo.committed.nonce,
+                    pubKeyHash: fullInfo.committed.pubKeyHash,
+                    nfts: fullInfo.committed.nfts,
+                    mintedNfts: fullInfo.committed.mintedNfts
                 },
                 verified: defaultInfo
             };

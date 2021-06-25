@@ -9,14 +9,14 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_types::v02::{
-    account::{Account, AccountAddressOrId, AccountStateType},
+    account::{Account, AccountAddressOrId, AccountState},
     pagination::{
         parse_query, AccountTxsRequest, ApiEither, Paginated, PaginationQuery, PendingOpsRequest,
     },
     transaction::{Transaction, TxHashSerializeWrapper},
 };
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
-use zksync_storage::ConnectionPool;
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
 
 // Local uses
@@ -106,46 +106,13 @@ impl ApiAccountData {
         }
     }
 
-    async fn account_info(
+    async fn api_account(
         &self,
+        account: zksync_types::Account,
         account_id: AccountId,
-        state_type: AccountStateType,
-    ) -> Result<Option<Account>, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        let (last_update_in_block, account) = match state_type {
-            AccountStateType::Committed => {
-                let account = storage
-                    .chain()
-                    .account_schema()
-                    .last_committed_state_for_account(account_id)
-                    .await
-                    .map_err(Error::storage)?;
-                if let Some(account) = account {
-                    let last_block = storage
-                        .chain()
-                        .account_schema()
-                        .last_committed_block_with_update_for_acc(account_id)
-                        .await
-                        .map_err(Error::storage)?;
-                    (last_block, account)
-                } else {
-                    return Ok(None);
-                }
-            }
-            AccountStateType::Finalized => {
-                let (last_block, account) = storage
-                    .chain()
-                    .account_schema()
-                    .account_and_last_block(account_id)
-                    .await
-                    .map_err(Error::storage)?;
-                if let Some(account) = account {
-                    (BlockNumber(last_block as u32), account)
-                } else {
-                    return Ok(None);
-                }
-            }
-        };
+        last_update_in_block: BlockNumber,
+        storage: &mut StorageProcessor<'_>,
+    ) -> Result<Account, Error> {
         let mut balances = BTreeMap::new();
         let mut nfts = BTreeMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
@@ -159,7 +126,7 @@ impl ApiAccountData {
                     nfts.insert(
                         token_id,
                         self.tokens
-                            .get_nft_by_id(&mut storage, token_id)
+                            .get_nft_by_id(storage, token_id)
                             .await
                             .map_err(Error::storage)?
                             .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?
@@ -169,7 +136,7 @@ impl ApiAccountData {
                 _ => {
                     let token_symbol = self
                         .tokens
-                        .token_symbol(&mut storage, token_id)
+                        .token_symbol(storage, token_id)
                         .await
                         .map_err(Error::storage)?
                         .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?;
@@ -183,7 +150,7 @@ impl ApiAccountData {
             .map(|(id, nft)| (*id, nft.clone().into()))
             .collect();
 
-        Ok(Some(Account {
+        Ok(Account {
             account_id,
             address: account.address,
             nonce: account.nonce,
@@ -192,7 +159,110 @@ impl ApiAccountData {
             balances,
             nfts,
             minted_nfts,
-        }))
+        })
+    }
+
+    async fn account_committed_info(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<Account>, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
+        let account = transaction
+            .chain()
+            .account_schema()
+            .last_committed_state_for_account(account_id)
+            .await
+            .map_err(Error::storage)?
+            .1;
+        let result = if let Some(account) = account {
+            let last_block = transaction
+                .chain()
+                .account_schema()
+                .last_committed_block_with_update_for_acc(account_id)
+                .await
+                .map_err(Error::storage)?;
+            Ok(Some(
+                self.api_account(account, account_id, last_block, &mut transaction)
+                    .await?,
+            ))
+        } else {
+            Ok(None)
+        };
+        transaction.commit().await.map_err(Error::storage)?;
+        result
+    }
+
+    async fn account_finalized_info(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<Account>, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
+        let (last_block, account) = transaction
+            .chain()
+            .account_schema()
+            .account_and_last_block(account_id)
+            .await
+            .map_err(Error::storage)?;
+        let result = if let Some(account) = account {
+            Ok(Some(
+                self.api_account(
+                    account,
+                    account_id,
+                    BlockNumber(last_block as u32),
+                    &mut transaction,
+                )
+                .await?,
+            ))
+        } else {
+            Ok(None)
+        };
+        transaction.commit().await.map_err(Error::storage)?;
+        result
+    }
+
+    async fn account_full_info(&self, account_id: AccountId) -> Result<AccountState, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
+        let (finalized_state, committed_state) = transaction
+            .chain()
+            .account_schema()
+            .last_committed_state_for_account(account_id)
+            .await
+            .map_err(Error::storage)?;
+        let finalized = if let Some(account) = finalized_state.1 {
+            Some(
+                self.api_account(
+                    account,
+                    account_id,
+                    BlockNumber(finalized_state.0 as u32),
+                    &mut transaction,
+                )
+                .await?,
+            )
+        } else {
+            None
+        };
+        let committed = if let Some(account) = committed_state {
+            let last_block = transaction
+                .chain()
+                .account_schema()
+                .last_committed_block_with_update_for_acc(account_id)
+                .await
+                .map_err(Error::storage)?;
+            Some(
+                self.api_account(account, account_id, last_block, &mut transaction)
+                    .await?,
+            )
+        } else {
+            None
+        };
+        transaction.commit().await.map_err(Error::storage)?;
+        Ok(AccountState {
+            committed,
+            finalized,
+        })
     }
 
     async fn account_txs(
@@ -243,9 +313,7 @@ async fn account_committed_info(
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
     if let Some(account_id) = account_id {
-        data.account_info(account_id, AccountStateType::Committed)
-            .await
-            .into()
+        data.account_committed_info(account_id).await.into()
     } else {
         ApiResult::Ok(None)
     }
@@ -258,11 +326,25 @@ async fn account_finalized_info(
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
     if let Some(account_id) = account_id {
-        data.account_info(account_id, AccountStateType::Finalized)
-            .await
-            .into()
+        data.account_finalized_info(account_id).await.into()
     } else {
         ApiResult::Ok(None)
+    }
+}
+
+async fn account_full_info(
+    data: web::Data<ApiAccountData>,
+    web::Path(account_id_or_address): web::Path<String>,
+) -> ApiResult<AccountState> {
+    let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
+    let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
+    if let Some(account_id) = account_id {
+        data.account_full_info(account_id).await.into()
+    } else {
+        ApiResult::Ok(AccountState {
+            committed: None,
+            finalized: None,
+        })
     }
 }
 
@@ -311,6 +393,7 @@ pub fn api_scope(
             "{account_id_or_address}/finalized",
             web::get().to(account_finalized_info),
         )
+        .route("{account_id_or_address}", web::get().to(account_full_info))
         .route(
             "{account_id_or_address}/transactions",
             web::get().to(account_txs),
@@ -495,14 +578,30 @@ mod tests {
         let response = client
             .account_info(&account_id.to_string(), "committed")
             .await?;
-        let account_info_by_id: Account = deserialize_response_result(response)?;
+        let account_committed_info_by_id: Account = deserialize_response_result(response)?;
 
-        let address = account_info_by_id.address;
+        let address = account_committed_info_by_id.address;
         let response = client
             .account_info(&format!("{:?}", address), "committed")
             .await?;
-        let account_info_by_address: Account = deserialize_response_result(response)?;
-        assert_eq!(account_info_by_id, account_info_by_address);
+        let account_committed_info_by_address: Account = deserialize_response_result(response)?;
+        assert_eq!(
+            account_committed_info_by_id,
+            account_committed_info_by_address
+        );
+
+        let response = client
+            .account_info(&format!("{:?}", address), "finalized")
+            .await?;
+        let account_finalized_info: Option<Account> = deserialize_response_result(response)?;
+
+        let response = client.account_full_info(&format!("{:?}", address)).await?;
+        let account_full_info: AccountState = deserialize_response_result(response)?;
+        assert_eq!(
+            account_full_info.committed,
+            Some(account_committed_info_by_id)
+        );
+        assert_eq!(account_full_info.finalized, account_finalized_info);
 
         let query = PaginationQuery {
             from: ApiEither::from(tx_hash),

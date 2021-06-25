@@ -95,8 +95,11 @@ describe('ZkSync REST API V0.2 tests', () => {
     });
 
     it('should check api v0.2 account scope', async () => {
-        const accountState = await alice.getAccountState();
-        expect(accountState.id, 'Account does not have account id after being committed').to.exist;
+        const committedState = await provider.accountInfo(alice.address(), 'committed');
+        const finalizedState = await provider.accountInfo(alice.address(), 'finalized');
+        const fullState = await provider.accountFullInfo(alice.address());
+        expect(fullState.committed, 'committed state differs').to.eql(committedState);
+        expect(fullState.finalized, 'finalized state differs').to.eql(finalizedState);
 
         const txs = await provider.accountTxs(alice.accountId!, {
             from: lastTxHash,

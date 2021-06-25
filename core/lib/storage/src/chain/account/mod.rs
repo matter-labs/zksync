@@ -76,21 +76,18 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         account_id: AccountId,
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
-
         // Load committed & verified states, and return them.
-        let committed = self
+        let (verified_state, committed_state) = self
+            .0
+            .chain()
+            .account_schema()
             .last_committed_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
-        let verified = self
-            .last_verified_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
+            .await?;
 
         metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
         Ok(StoredAccountState {
-            committed,
-            verified,
+            committed: committed_state.map(|a| (account_id, a)),
+            verified: verified_state.1.map(|a| (account_id, a)),
         })
     }
 
@@ -119,10 +116,11 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
     /// Loads the last committed (e.g. just added but no necessarily verified) state for
     /// account given its ID.
+    /// Returns both verified and committed states.
     pub async fn last_committed_state_for_account(
         &mut self,
         account_id: AccountId,
-    ) -> QueryResult<Option<Account>> {
+    ) -> QueryResult<((i64, Option<Account>), Option<Account>)> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -211,7 +209,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let account_state = account_diff
             .into_iter()
             .map(|(_, upd)| upd)
-            .fold(account, Account::apply_update);
+            .fold(account.clone(), Account::apply_update);
 
         transaction.commit().await?;
 
@@ -219,7 +217,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             "sql.chain.account.last_committed_state_for_account",
             start.elapsed()
         );
-        Ok(account_state)
+        Ok(((last_block, account), account_state))
     }
 
     /// Loads the last verified state for the account (i.e. the one obtained in the last block
