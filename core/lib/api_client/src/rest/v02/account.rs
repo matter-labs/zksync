@@ -20,6 +20,15 @@ impl Client {
         .await
     }
 
+    pub async fn account_full_info(&self, account_id_or_address: &str) -> Result<Response> {
+        self.get_with_scope(
+            super::API_V02_SCOPE,
+            &format!("accounts/{}", account_id_or_address),
+        )
+        .send()
+        .await
+    }
+
     pub async fn account_txs(
         &self,
         pagination_query: &PaginationQuery<ApiEither<TxHash>>,
