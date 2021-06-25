@@ -19,11 +19,11 @@ use crate::api_server::rpc_server::error::RpcErrorCodes;
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
-        let mut storage = self.access_storage().await?;
 
         let account_state = self.get_account_state(address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
+        let mut storage = self.access_storage().await?;
         let depositing = DepositingAccountBalances::from_pending_ops(
             &mut storage,
             &self.tx_sender.tokens,
