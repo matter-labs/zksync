@@ -24,11 +24,14 @@ export interface Create2Data {
     codeHash: string;
 }
 
+export type EthAccountType = 'Owned' | 'CREATE2';
+
 export type AccountState = AccountStateRest | AccountStateRpc;
 
 export interface AccountStateRest {
     address: Address;
     id?: number;
+    accountType?: EthAccountType;
     committed: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
@@ -50,6 +53,7 @@ export interface AccountStateRest {
 export interface AccountStateRpc {
     address: Address;
     id?: number;
+    accountType?: EthAccountType;
     depositing: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
@@ -294,7 +298,7 @@ export interface ApiBlockInfo {
     status: 'committed' | 'finalized';
 }
 
-export type blockPosition = number | 'lastCommitted' | 'lastFinalized';
+export type BlockPosition = number | 'lastCommitted' | 'lastFinalized';
 
 export interface ApiAccountInfo {
     accountId: number;
@@ -305,6 +309,7 @@ export interface ApiAccountInfo {
     balances: {
         [token: string]: BigNumber;
     };
+    accountType?: EthAccountType;
 }
 
 export interface ApiAccountFullInfo {

@@ -165,16 +165,16 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.blockPaginationDetailed(paginationQuery));
     }
 
-    async blockByPositionDetailed(blockPosition: types.blockPosition): Promise<Response<types.ApiBlockInfo>> {
+    async blockByPositionDetailed(blockPosition: types.BlockPosition): Promise<Response<types.ApiBlockInfo>> {
         return await this.get(`${this.address}/blocks/${blockPosition}`);
     }
 
-    async blockByPosition(blockPosition: types.blockPosition): Promise<types.ApiBlockInfo> {
+    async blockByPosition(blockPosition: types.BlockPosition): Promise<types.ApiBlockInfo> {
         return this.parseResponse(await this.blockByPositionDetailed(blockPosition));
     }
 
     async blockTransactionsDetailed(
-        blockPosition: types.blockPosition,
+        blockPosition: types.BlockPosition,
         paginationQuery: types.PaginationQuery<string>
     ): Promise<Response<types.Paginated<types.ApiTransaction, string>>> {
         return await this.get(
@@ -184,7 +184,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async blockTransactions(
-        blockPosition: types.blockPosition,
+        blockPosition: types.BlockPosition,
         paginationQuery: types.PaginationQuery<string>
     ): Promise<types.Paginated<types.ApiTransaction, string>> {
         return this.parseResponse(await this.blockTransactionsDetailed(blockPosition, paginationQuery));
@@ -482,6 +482,7 @@ export class RestProvider extends SyncProvider {
             return {
                 address,
                 id: fullInfo.committed.accountId,
+                accountType: fullInfo.committed.accountType,
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
@@ -497,6 +498,7 @@ export class RestProvider extends SyncProvider {
             return {
                 address,
                 id: fullInfo.committed.accountId,
+                accountType: fullInfo.committed.accountType,
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
