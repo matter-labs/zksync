@@ -23,12 +23,24 @@ impl RpcApp {
         let account_state = self.get_account_state(address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
+        let mut storage = self.access_storage().await?;
         let depositing = DepositingAccountBalances::from_pending_ops(
-            &mut self.access_storage().await?,
+            &mut storage,
             &self.tx_sender.tokens,
             depositing_ops,
         )
         .await?;
+        let account_type = if let Some(account_id) = account_state.account_id {
+            storage
+                .chain()
+                .account_schema()
+                .account_type_by_id(account_id)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .map(|t| t.into())
+        } else {
+            None
+        };
 
         metrics::histogram!("api.rpc.account_info", start.elapsed());
         Ok(AccountInfoResp {
@@ -37,6 +49,7 @@ impl RpcApp {
             committed: account_state.committed,
             verified: account_state.verified,
             depositing,
+            account_type,
         })
     }
 

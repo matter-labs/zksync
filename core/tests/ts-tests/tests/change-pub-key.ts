@@ -34,5 +34,9 @@ Tester.prototype.testChangePubKey = async function (wallet: Wallet, feeToken: To
     const receipt = await changePubkeyHandle.awaitReceipt();
     expect(receipt.success, `ChangePubKey transaction failed with a reason: ${receipt.failReason}`).to.be.true;
     expect(await wallet.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
+
+    const accountState = await wallet.getAccountState();
+    expect(accountState.accountType, 'Incorrect account type').to.be.eql('Owned');
+
     this.runningFee = this.runningFee.add(fee);
 };

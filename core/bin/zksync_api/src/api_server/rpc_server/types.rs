@@ -6,6 +6,7 @@ use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_api_types::v02::account::EthAccountType;
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
@@ -125,6 +126,7 @@ pub struct AccountInfoResp {
     pub depositing: DepositingAccountBalances,
     pub committed: ResponseAccountState,
     pub verified: ResponseAccountState,
+    pub account_type: Option<EthAccountType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

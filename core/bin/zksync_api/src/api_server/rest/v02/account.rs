@@ -123,6 +123,13 @@ impl ApiAccountData {
 
             balances.insert(token_symbol, balance);
         }
+        let account_type = storage
+            .chain()
+            .account_schema()
+            .account_type_by_id(account_id)
+            .await
+            .map_err(Error::storage)?
+            .map(|t| t.into());
         Ok(Account {
             account_id,
             address: account.address,
@@ -130,6 +137,7 @@ impl ApiAccountData {
             pub_key_hash: account.pub_key_hash,
             last_update_in_block,
             balances,
+            account_type,
         })
     }
 

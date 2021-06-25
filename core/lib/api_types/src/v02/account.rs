@@ -19,6 +19,7 @@ pub struct Account {
     pub pub_key_hash: PubKeyHash,
     pub last_update_in_block: BlockNumber,
     pub balances: BTreeMap<String, BigUintSerdeWrapper>,
+    pub account_type: Option<EthAccountType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -26,4 +27,10 @@ pub struct Account {
 pub enum AccountAddressOrId {
     Address(Address),
     Id(AccountId),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub enum EthAccountType {
+    Owned,
+    CREATE2,
 }
