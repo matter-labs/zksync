@@ -104,6 +104,8 @@ async fn executed_priority_operations(mut storage: StorageProcessor<'_>) -> Quer
         eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
         eth_block: 10,
         created_at: chrono::Utc::now(),
+        tx_hash: Default::default(),
+        eth_block_index: Some(1),
     };
     OperationsSchema(&mut storage)
         .store_executed_priority_op(executed_tx.clone())
@@ -162,6 +164,8 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
         eth_block: 10,
         created_at: chrono::Utc::now(),
+        tx_hash: Default::default(),
+        eth_block_index: Some(1),
     };
 
     // Save the same operations twice.
@@ -371,6 +375,50 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
     Ok(())
 }
 
+/// Checks that getting executed priority operation by `eth_hash` is working correctly.
+#[db_test]
+async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let executed_priority_op = NewExecutedPriorityOperation {
+        block_number: 1,
+        block_index: 1,
+        operation: Default::default(),
+        from_account: Default::default(),
+        to_account: Default::default(),
+        priority_op_serialid: 1,
+        deadline_block: 100,
+        eth_hash: vec![0xAA, 0xAA, 0xAA, 0xAA],
+        eth_block: 10,
+        created_at: chrono::Utc::now(),
+        tx_hash: vec![0xBB, 0xBB, 0xBB, 0xBB],
+        eth_block_index: Some(1),
+    };
+    // Store executed priority op and try to get it by `eth_hash`.
+    storage
+        .chain()
+        .operations_schema()
+        .store_executed_priority_op(executed_priority_op.clone())
+        .await?;
+    let op_by_eth_hash = storage
+        .chain()
+        .operations_schema()
+        .get_executed_priority_operation_by_eth_hash(&executed_priority_op.eth_hash)
+        .await?;
+    assert_eq!(
+        op_by_eth_hash.unwrap().priority_op_serialid,
+        executed_priority_op.priority_op_serialid
+    );
+
+    // Checks that it doesn't find unexisting operation
+    let op = storage
+        .chain()
+        .operations_schema()
+        .get_executed_priority_operation_by_eth_hash(&[0xDE, 0xAD, 0xBE, 0xEF])
+        .await?;
+    assert!(op.is_none());
+
+    Ok(())
+}
+
 /// Checks if executed_priority_operations are removed correctly.
 #[db_test]
 async fn test_remove_executed_priority_operations(
@@ -389,6 +437,8 @@ async fn test_remove_executed_priority_operations(
             eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
             eth_block: 10,
             created_at: chrono::Utc::now(),
+            eth_block_index: Some(1),
+            tx_hash: Default::default(),
         };
         OperationsSchema(&mut storage)
             .store_executed_priority_op(executed_priority_op)

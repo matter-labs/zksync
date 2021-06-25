@@ -17,7 +17,6 @@ mod forced_exit_requests;
 mod helpers;
 mod v01;
 pub mod v02;
-pub mod v1;
 
 async fn start_server(
     api_v01: ApiV01,
@@ -27,16 +26,6 @@ async fn start_server(
 ) {
     HttpServer::new(move || {
         let api_v01 = api_v01.clone();
-
-        let api_v1_scope = {
-            let tx_sender = TxSender::new(
-                api_v01.connection_pool.clone(),
-                sign_verifier.clone(),
-                fee_ticker.clone(),
-                &api_v01.config,
-            );
-            v1::api_scope(tx_sender, &api_v01.config)
-        };
 
         let forced_exit_requests_api_scope =
             forced_exit_requests::api_scope(api_v01.connection_pool.clone(), &api_v01.config);
@@ -54,7 +43,6 @@ async fn start_server(
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())
             .wrap(vlog::actix_middleware())
             .service(api_v01.into_scope())
-            .service(api_v1_scope)
             .service(forced_exit_requests_api_scope)
             .service(api_v02_scope)
             // Endpoint needed for js isReachable

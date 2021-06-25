@@ -122,7 +122,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let block_details = transaction
             .chain()
             .block_schema()
-            .load_block_range(block_number, 1)
+            .load_block_range_desc(block_number, 1)
             .await?;
         // If there're no block details for the given block number,
         // ignore the event. Since the `eth_sender` is currently

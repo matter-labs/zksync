@@ -15,7 +15,9 @@ components, the logs will have the following format:
 
 ### Added
 
-- `loadnext` crate, a new implementation of the loadtest for zkSync.
+- (`loadnext`): crate, a new implementation of the loadtest for zkSync.
+- (`api-docs`): tool for generating and testing API documentation. Docs are generated from a bunch of .apib files where
+  API endpoints and their inputs/outputs are defined.
 
 ### Fixed
 

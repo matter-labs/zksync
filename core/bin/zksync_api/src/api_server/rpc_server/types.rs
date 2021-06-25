@@ -14,9 +14,7 @@ use zksync_types::{
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
 // Local uses
-use crate::{
-    api_server::v1::accounts::account_state_from_storage, utils::token_db_cache::TokenDBCache,
-};
+use crate::utils::token_db_cache::TokenDBCache;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,18 +37,21 @@ impl ResponseAccountState {
         tokens: &TokenDBCache,
         account: Account,
     ) -> Result<Self> {
-        let inner = account_state_from_storage(storage, tokens, &account)
-            .await
-            .map_err(|_| Error::internal_error())?;
+        let mut balances = HashMap::new();
+        for (token_id, balance) in account.get_nonzero_balances() {
+            let token_symbol = tokens
+                .token_symbol(storage, token_id)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .ok_or_else(Error::internal_error)?;
 
-        // Old code used `HashMap` as well and didn't rely on the particular order,
-        // so here we use `HashMap` as well for the consistency.
-        let balances: HashMap<_, _> = inner.balances.into_iter().collect();
+            balances.insert(token_symbol, balance);
+        }
 
         Ok(Self {
             balances,
-            nonce: inner.nonce,
-            pub_key_hash: inner.pub_key_hash,
+            nonce: account.nonce,
+            pub_key_hash: account.pub_key_hash,
         })
     }
 }

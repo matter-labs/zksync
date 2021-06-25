@@ -25,6 +25,7 @@ zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
 zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
 zksync_api_client  = { path = "../../lib/api_client", version = "0.1" }
+zksync_api_types  = { path = "../../lib/api_types", version = "1.0" }
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 zksync_balancer = { path = "../../lib/balancer", version = "1.0" }
 zksync_gateway_watcher = { path = "../../lib/gateway_watcher", version = "1.0" }
