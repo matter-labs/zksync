@@ -264,7 +264,7 @@ fn mint_token_to_new_account() {
         new_address,
         fee.clone(),
         fee_token_id,
-        creator_account.nonce,
+        creator_account.nonce + 1,
         &sk,
     )
     .unwrap();
@@ -424,4 +424,36 @@ fn mint_already_created_nft() {
     .unwrap();
 
     tb.test_tx_fail(mint_nft.into(), "NFT token is already in account")
+}
+
+/// Check MINT NFT failure if nonce mismathced
+#[test]
+fn nonce_mismatched() {
+    let fee_token_id = TokenId(0);
+    let fee = BigUint::from(10u32);
+
+    let mut tb = PlasmaTestBuilder::new();
+
+    let (creator_account_id, creator_account, creator_sk) = tb.add_account(Unlocked);
+    tb.set_balance(creator_account_id, fee_token_id, 20u32);
+
+    let (to_account_id, mut to_account, _to_sk) = tb.add_account(Locked);
+
+    let nft_token_id = TokenId(MIN_NFT_TOKEN_ID);
+    to_account.set_balance(nft_token_id, BigUint::from(1u32));
+    tb.state.insert_account(to_account_id, to_account.clone());
+    let content_hash = H256::default();
+    let mint_nft = MintNFT::new_signed(
+        creator_account_id,
+        creator_account.address,
+        content_hash,
+        to_account.address,
+        fee,
+        fee_token_id,
+        creator_account.nonce + 1,
+        &creator_sk,
+    )
+    .unwrap();
+
+    tb.test_tx_fail(mint_nft.into(), "Nonce mismatch")
 }
