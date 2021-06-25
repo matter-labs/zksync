@@ -264,7 +264,7 @@ fn mint_token_to_new_account() {
         new_address,
         fee.clone(),
         fee_token_id,
-        creator_account.nonce,
+        creator_account.nonce + 1,
         &sk,
     )
     .unwrap();
