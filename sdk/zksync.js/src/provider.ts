@@ -16,7 +16,7 @@ import {
     TxEthSignatureVariant,
     NFTInfo
 } from './types';
-import { isTokenETH, sleep, TokenSet, isNFT, SYNC_GOV_CONTRACT_INTERFACE } from './utils';
+import { isTokenETH, sleep, TokenSet } from './utils';
 import {
     Governance,
     GovernanceFactory,

@@ -43,13 +43,10 @@ use zksync_types::{
 };
 
 // Local uses
-use super::Client;
 use crate::{
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
     signature_checker::{VerifiedTx, VerifySignatureRequest},
 };
-use std::str::FromStr;
-use zksync_storage::test_data::generate_nft;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
