@@ -590,7 +590,7 @@ export type L2TxData =
     | Transfer
     | WithdrawAndEthHash
     | ChangePubKey
-    | ForcedExitAndEthHasha
+    | ForcedExitAndEthHash
     | CloseAccount
     | MintNFT
     | WithdrawNFTData
