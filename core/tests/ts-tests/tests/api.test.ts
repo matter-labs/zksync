@@ -196,7 +196,10 @@ describe('ZkSync REST API V0.2 tests', () => {
             .addTransfer({ to: bob.address(), token: 'ETH', amount: alice.provider.tokenSet.parseToken('ETH', '1') })
             .addTransfer({ to: bob.address(), token: 'ETH', amount: alice.provider.tokenSet.parseToken('ETH', '1') })
             .build('ETH');
-        const submitBatchResponse = await provider.submitTxsBatchNew(batch.txs, [batch.signature]);
+        const submitBatchResponse = await provider.submitTxsBatchNew(
+            batch.txs.map((signedTx) => signedTx.tx),
+            [batch.signature]
+        );
         await provider.notifyAnyTransaction(submitBatchResponse.transactionHashes[0], 'COMMIT');
         const batchInfo = await provider.getBatch(submitBatchResponse.batchHash);
         expect(batchInfo.batchHash).to.eql(submitBatchResponse.batchHash);

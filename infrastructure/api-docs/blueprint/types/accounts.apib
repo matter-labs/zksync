@@ -5,8 +5,13 @@
 + pubKeyHash: `sync:82b9eb68c6f7f80cecf49ee1a20acb8ae9ecd602` (string, required)
 + lastUpdateInBlock: 15001 (number, required)
 + balances (object, required)
++ accountType (Account.Type, required, nullable)
 + nfts (Account.Balances, required)
 + mintedNfts (Account.Nfts, required)
+
+## Account.Type (enum)
+- Owned
+- CREATE2
 
 ## Account.FullInfo
 + committed (Account, required, nullable)

@@ -77,12 +77,13 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
         // Load committed & verified states, and return them.
-        let (verified_state, committed_state) = self
-            .0
+        let mut transaction = self.0.start_transaction().await?;
+        let (verified_state, committed_state) = transaction
             .chain()
             .account_schema()
             .last_committed_state_for_account(account_id)
             .await?;
+        transaction.commit().await?;
 
         metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
         Ok(StoredAccountState {
@@ -273,7 +274,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             let nfts: Vec<StorageNFT> = sqlx::query_as!(
                 StorageNFT,
                 "
-                    SELECT * FROM nft 
+                    SELECT * FROM nft
                     WHERE creator_account_id = $1
                 ",
                 *account_id as i32
@@ -339,30 +340,6 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         Ok(address)
     }
 
-    // This method does not have metrics, since it is used only for the
-    // migration for the nft regenesis.
-    // Remove this function once the regenesis is complete and the tool is not
-    // needed anymore: ZKS-663
-    pub async fn get_all_accounts(&mut self) -> QueryResult<Vec<StorageAccount>> {
-        let result = sqlx::query_as!(StorageAccount, "SELECT * FROM accounts")
-            .fetch_all(self.0.conn())
-            .await?;
-
-        Ok(result)
-    }
-
-    // This method does not have metrics, since it is used only for the
-    // migration for the nft regenesis.
-    // Remove this function once the regenesis is complete and the tool is not
-    // needed anymore: ZKS-663
-    pub async fn get_all_balances(&mut self) -> QueryResult<Vec<StorageBalance>> {
-        let result = sqlx::query_as!(StorageBalance, "SELECT * FROM balances",)
-            .fetch_all(self.0.conn())
-            .await?;
-
-        Ok(result)
-    }
-
     /// Obtains the last committed block that affects the account.
     pub async fn last_committed_block_with_update_for_acc(
         &mut self,
@@ -396,5 +373,29 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             start.elapsed()
         );
         Ok(BlockNumber(block_number as u32))
+    }
+
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // needed anymore: ZKS-663
+    pub async fn get_all_accounts(&mut self) -> QueryResult<Vec<StorageAccount>> {
+        let result = sqlx::query_as!(StorageAccount, "SELECT * FROM accounts")
+            .fetch_all(self.0.conn())
+            .await?;
+
+        Ok(result)
+    }
+
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // needed anymore: ZKS-663
+    pub async fn get_all_balances(&mut self) -> QueryResult<Vec<StorageBalance>> {
+        let result = sqlx::query_as!(StorageBalance, "SELECT * FROM balances",)
+            .fetch_all(self.0.conn())
+            .await?;
+
+        Ok(result)
     }
 }

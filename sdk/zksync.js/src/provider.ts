@@ -16,7 +16,7 @@ import {
     TxEthSignatureVariant,
     NFTInfo
 } from './types';
-import { isTokenETH, sleep, TokenSet } from './utils';
+import { isTokenETH, sleep, TokenSet, isNFT, SYNC_GOV_CONTRACT_INTERFACE } from './utils';
 import {
     Governance,
     GovernanceFactory,
@@ -25,6 +25,7 @@ import {
     ZkSyncNFTFactory,
     ZkSyncNFTFactoryFactory
 } from './typechain';
+
 import { SyncProvider } from './provider-interface';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {

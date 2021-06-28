@@ -1,3 +1,5 @@
+// Workspace imports
+use zksync_api_types::v02::account::EthAccountType as ApiEthAccountType;
 // External imports
 use sqlx::{types::BigDecimal, FromRow};
 use zksync_types::{AccountId, Address, TokenId, H256, NFT};
@@ -85,6 +87,15 @@ pub struct StorageBalance {
 pub enum EthAccountType {
     Owned,
     CREATE2,
+}
+
+impl From<EthAccountType> for ApiEthAccountType {
+    fn from(account_type: EthAccountType) -> ApiEthAccountType {
+        match account_type {
+            EthAccountType::Owned => ApiEthAccountType::Owned,
+            EthAccountType::CREATE2 => ApiEthAccountType::CREATE2,
+        }
+    }
 }
 
 #[derive(Debug, Clone, FromRow)]

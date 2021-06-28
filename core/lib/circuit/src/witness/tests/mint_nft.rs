@@ -1,6 +1,7 @@
 use num::BigUint;
 
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
 use zksync_state::handler::TxHandler;
 use zksync_state::state::{CollectedFee, ZkSyncState};
 use zksync_types::{AccountId, MintNFT, MintNFTOp, TokenId, H256};
@@ -10,7 +11,6 @@ use crate::witness::tests::test_utils::{
     WitnessTestAccount,
 };
 use crate::witness::{utils::WitnessBuilder, MintNFTWitness, SigDataInput};
-use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
 
 /// Basic check for execution of `MintNFT` operation in circuit.
 /// Here we create two accounts and perform a mintNFT operation.

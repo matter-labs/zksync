@@ -22,6 +22,7 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
             ]' > ./etc/tokens/localhost.json`);
         if (!process.env.CI) {
             await docker.restart('dev-liquidity-token-watcher');
+            await docker.restart('dev-ticker');
         }
     } else if (command == 'new') {
         await utils.spawn(

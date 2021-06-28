@@ -165,16 +165,16 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.blockPaginationDetailed(paginationQuery));
     }
 
-    async blockByPositionDetailed(blockPosition: types.blockPosition): Promise<Response<types.ApiBlockInfo>> {
+    async blockByPositionDetailed(blockPosition: types.BlockPosition): Promise<Response<types.ApiBlockInfo>> {
         return await this.get(`${this.address}/blocks/${blockPosition}`);
     }
 
-    async blockByPosition(blockPosition: types.blockPosition): Promise<types.ApiBlockInfo> {
+    async blockByPosition(blockPosition: types.BlockPosition): Promise<types.ApiBlockInfo> {
         return this.parseResponse(await this.blockByPositionDetailed(blockPosition));
     }
 
     async blockTransactionsDetailed(
-        blockPosition: types.blockPosition,
+        blockPosition: types.BlockPosition,
         paginationQuery: types.PaginationQuery<string>
     ): Promise<Response<types.Paginated<types.ApiTransaction, string>>> {
         return await this.get(
@@ -184,7 +184,7 @@ export class RestProvider extends SyncProvider {
     }
 
     async blockTransactions(
-        blockPosition: types.blockPosition,
+        blockPosition: types.BlockPosition,
         paginationQuery: types.PaginationQuery<string>
     ): Promise<types.Paginated<types.ApiTransaction, string>> {
         return this.parseResponse(await this.blockTransactionsDetailed(blockPosition, paginationQuery));
@@ -365,15 +365,15 @@ export class RestProvider extends SyncProvider {
     }
 
     async submitTxsBatchNewDetailed(
-        txs: { tx: any; signature?: types.TxEthSignatureVariant }[],
-        signature?: types.TxEthSignature | types.TxEthSignature[]
+        txs: types.L2Tx[],
+        signature: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<Response<types.SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
     async submitTxsBatchNew(
-        txs: { tx: any; signature?: types.TxEthSignatureVariant }[],
-        signature?: types.TxEthSignature | types.TxEthSignature[]
+        txs: types.L2Tx[],
+        signature: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<types.SubmitBatchResponse> {
         return this.parseResponse(await this.submitTxsBatchNewDetailed(txs, signature));
     }
@@ -385,7 +385,14 @@ export class RestProvider extends SyncProvider {
         transactions: { tx: any; signature?: types.TxEthSignatureVariant }[],
         ethSignatures?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<string[]> {
-        return (await this.submitTxsBatchNew(transactions, ethSignatures)).transactionHashes;
+        let txs = [];
+        for (const signedTx of transactions) {
+            txs.push(signedTx.tx);
+        }
+        if (!ethSignatures) {
+            throw new Error('Batch signature should be provided in API v0.2');
+        }
+        return (await this.submitTxsBatchNew(txs, ethSignatures)).transactionHashes;
     }
 
     async getBatchDetailed(batchHash: string): Promise<Response<types.ApiBatchData>> {
@@ -503,6 +510,7 @@ export class RestProvider extends SyncProvider {
                     nfts: fullInfo.committed.nfts,
                     mintedNfts: fullInfo.committed.mintedNfts
                 },
+                accountType: fullInfo.committed.accountType,
                 verified: {
                     balances: fullInfo.finalized.balances,
                     nonce: fullInfo.finalized.nonce,
@@ -515,6 +523,7 @@ export class RestProvider extends SyncProvider {
             return {
                 address,
                 id: fullInfo.committed.accountId,
+                accountType: fullInfo.committed.accountType,
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
@@ -615,9 +624,11 @@ export class RestProvider extends SyncProvider {
             txData.tx.op.type === 'ForcedExit' ||
             txData.tx.op.type === 'WithdrawNFT'
         ) {
-            return txData.tx.op.ethTxHash;
-        } else {
-            return null;
+            if (txData.tx.op.type === 'Withdraw' || txData.tx.op.type === 'ForcedExit') {
+                return txData.tx.op.ethTxHash;
+            } else {
+                return null;
+            }
         }
     }
 }

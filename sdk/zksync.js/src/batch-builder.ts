@@ -20,7 +20,16 @@ import { Wallet } from './wallet';
 interface InternalTx {
     type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT' | 'WithdrawNFT' | 'Swap';
     tx: any;
-    feeType: 'Withdraw' | 'Transfer' | ChangePubKeyFee | 'MintNFT' | 'WithdrawNFT' | 'Swap' | 'ForcedExit';
+    feeType:
+        | 'Withdraw'
+        | 'Transfer'
+        | 'FastWithdraw'
+        | 'ForcedExit'
+        | ChangePubKeyFee
+        | 'Swap'
+        | 'MintNFT'
+        | 'WithdrawNFT'
+        | 'ForcedExit';
     address: Address;
     token: TokenLike;
     // Whether or not the tx has been signed.

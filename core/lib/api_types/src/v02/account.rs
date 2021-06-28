@@ -1,8 +1,11 @@
-use super::token::NFT;
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
 use zksync_types::{AccountId, Address, BlockNumber, Nonce, PubKeyHash, TokenId};
 use zksync_utils::BigUintSerdeWrapper;
+
+use super::token::NFT;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +25,7 @@ pub struct Account {
     pub balances: BTreeMap<String, BigUintSerdeWrapper>,
     pub nfts: BTreeMap<TokenId, NFT>,
     pub minted_nfts: BTreeMap<TokenId, NFT>,
+    pub account_type: Option<EthAccountType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -29,4 +33,10 @@ pub struct Account {
 pub enum AccountAddressOrId {
     Address(Address),
     Id(AccountId),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub enum EthAccountType {
+    Owned,
+    CREATE2,
 }

@@ -7,8 +7,8 @@ Submit batch of transactions.
 
 + Request (application/json)
     + Attributes
-        + txs (array[TxWithSignature], required)
-        + signature (BatchSignature, optional)
+        + txs (array[Transaction.Incoming], required)
+        + signature (BatchSignature, required)
 
 + Response 200 (application/json)
     + Attributes

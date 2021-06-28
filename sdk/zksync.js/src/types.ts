@@ -46,11 +46,14 @@ export interface NFTInfo {
     withdrawnFactory?: Address;
 }
 
+export type EthAccountType = 'Owned' | 'CREATE2';
+
 export type AccountState = AccountStateRest | AccountStateRpc;
 
 export interface AccountStateRest {
     address: Address;
     id?: number;
+    accountType?: EthAccountType;
     committed: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
@@ -88,6 +91,7 @@ export interface AccountStateRest {
 export interface AccountStateRpc {
     address: Address;
     id?: number;
+    accountType?: EthAccountType;
     depositing: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
@@ -430,7 +434,7 @@ export interface ApiBlockInfo {
     status: 'committed' | 'finalized';
 }
 
-export type blockPosition = number | 'lastCommitted' | 'lastFinalized';
+export type BlockPosition = number | 'lastCommitted' | 'lastFinalized';
 
 export interface ApiAccountInfo {
     accountId: number;
@@ -441,6 +445,7 @@ export interface ApiAccountInfo {
     balances: {
         [token: string]: BigNumber;
     };
+    accountType?: EthAccountType;
     nfts: {
         [tokenId: number]: NFT;
     };
@@ -515,7 +520,7 @@ export interface ApiL2TxReceipt {
 
 export type ApiTxReceipt = ApiL1TxReceipt | ApiL2TxReceipt;
 
-export interface WithdrawData {
+export interface WithdrawAndEthHash {
     type: 'Withdraw';
     accountId: number;
     from: Address;
@@ -530,7 +535,7 @@ export interface WithdrawData {
     ethTxHash?: string;
 }
 
-export interface ForcedExitData {
+export interface ForcedExitAndEthHash {
     type: 'ForcedExit';
     initiatorAccountId: number;
     target: Address;
@@ -583,9 +588,9 @@ export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccoun
 
 export type L2TxData =
     | Transfer
-    | WithdrawData
+    | WithdrawAndEthHash
     | ChangePubKey
-    | ForcedExitData
+    | ForcedExitAndEthHasha
     | CloseAccount
     | MintNFT
     | WithdrawNFTData

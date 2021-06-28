@@ -166,7 +166,6 @@ async fn submit_batch(
         .submit_txs_batch(body.txs, body.signature)
         .await
         .map_err(Error::from);
-
     response.into()
 }
 

@@ -283,6 +283,8 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
                 ethAuthType: 'CREATE2'
             });
             await cpk.awaitReceipt();
+            const accountState = await hilda.getAccountState();
+            expect(accountState.accountType, 'Incorrect account type').to.be.eql('CREATE2');
         });
 
         step('should make transfers from create2 account', async () => {

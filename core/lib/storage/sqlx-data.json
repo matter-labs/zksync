@@ -102,6 +102,20 @@
       "nullable": []
     }
   },
+  "0713d87afe5e398f68014f617cbef4653110ddda1d2cd793a2095bb113478231": {
+    "query": "\n            INSERT INTO nft_factory ( creator_id, factory_address, creator_address )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT ( creator_id )\n            DO UPDATE\n            SET factory_address = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "088013a67d0b8118980a606386ff38b394a26abfed0f209d17a6a583a297679b": {
     "query": "\n                SELECT * FROM account_creates\n                WHERE account_id = $1 AND block_number > $2\n            ",
     "describe": {
@@ -1265,6 +1279,56 @@
       ]
     }
   },
+  "29d2ac9094d660ffa445ed8787f303e35deefc41b403b23557f6a0850cdbf4c6": {
+    "query": "\n                    SELECT * FROM nft\n                    WHERE creator_account_id = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "2e92926816053cda2de6d571867a625fab5bb9668840db94bd18c411f96dc39b": {
     "query": "SELECT * FROM blocks WHERE number = $1",
     "describe": {
@@ -1629,20 +1693,6 @@
           "Numeric",
           "Int8",
           "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "44c99a84f28659435e9cae90670179cf2e49b789abeee4754a8f830a2eead483": {
-    "query": "\n            INSERT INTO nft_factory ( creator_id, factory_address, creator_address )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT ( creator_id ) \n            DO UPDATE \n            SET factory_address = $2 \n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text"
         ]
       },
       "nullable": []
@@ -2496,6 +2546,51 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "5e6bcb09720f9722091c80e4d90828b515d0398f9020abd4a328cfeca6c88b3a": {
+    "query": "\n            SELECT * FROM tokens\n            WHERE id <= $1\n            ORDER BY id DESC\n            LIMIT $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 4,
+          "name": "is_nft",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {
@@ -3667,56 +3762,6 @@
       "nullable": []
     }
   },
-  "9600a226f271e0939eb5fd0327a48e3f1dbbdfb673e91287c474c827cdea83ee": {
-    "query": "\n                    SELECT * FROM nft \n                    WHERE creator_account_id = $1\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 3,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "961bbd13b54a7d53a58dfef2e60ce77752ff30807226edc69a47487b994b1468": {
     "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
     "describe": {
@@ -4340,6 +4385,24 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "b1b0fd6eab9edcac470d79302d6da97ad73181c41fe313b08c7a6bfa3b0ccd11": {
+    "query": "SELECT MAX(id) FROM tokens",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {
@@ -5595,51 +5658,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "dd6a01d31268f3f9b922fdf75f8e9e265fc295562865e23dea4dd3293aa05d78": {
-    "query": "\n            SELECT * FROM tokens\n            WHERE id <= $1 AND is_nft = false\n            ORDER BY id DESC\n            LIMIT $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {

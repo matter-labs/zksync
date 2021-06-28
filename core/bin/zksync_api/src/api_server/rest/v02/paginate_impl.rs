@@ -58,15 +58,14 @@ impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
             .map_err(Error::storage)?;
         let count = transaction
             .tokens_schema()
-            .get_last_token_id()
+            .get_count()
             .await
-            .map_err(Error::storage)?
-            .0;
+            .map_err(Error::storage)?;
 
         transaction.commit().await.map_err(Error::storage)?;
 
         Ok(Paginated::new(
-            tokens,
+            tokens.values().cloned().collect(),
             query.from,
             query.limit,
             query.direction,

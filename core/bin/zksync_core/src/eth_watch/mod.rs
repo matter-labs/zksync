@@ -28,7 +28,8 @@ use zksync_api_types::{
 };
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_types::{
-    tx::TxHash, NewTokenEvent, PriorityOp, RegisterNFTFactoryEvent, ZkSyncPriorityOp, H256,
+    tx::TxHash, NewTokenEvent, Nonce, PriorityOp, PubKeyHash, RegisterNFTFactoryEvent,
+    ZkSyncPriorityOp, H256,
 };
 
 // Local deps
@@ -37,6 +38,8 @@ use self::{client::EthClient, eth_state::ETHState, received_ops::sift_outdated_o
 pub use client::{get_web3_block_number, EthHttpClient};
 use zksync_config::ZkSyncConfig;
 
+use crate::eth_watch::received_ops::ReceivedPriorityOp;
+use std::collections::HashMap;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
 
 mod client;
@@ -101,6 +104,12 @@ pub enum EthWatchRequest {
         last_eth_block: Option<u64>,
         resp: oneshot::Sender<Vec<RegisterNFTFactoryEvent>>,
     },
+    IsPubkeyChangeAuthorized {
+        address: Address,
+        nonce: Nonce,
+        pubkey_hash: PubKeyHash,
+        resp: oneshot::Sender<bool>,
+    },
 }
 
 pub struct EthWatch<W: EthClient> {
@@ -147,6 +156,7 @@ impl<W: EthClient> EthWatch<W> {
 
     async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
         debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
+        debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
 
         // We have to process every block between the current and previous known values.
         // This is crucial since `eth_watch` may enter the backoff mode in which it will skip many blocks.
@@ -162,9 +172,24 @@ impl<W: EthClient> EthWatch<W> {
 
         // Extend the existing priority operations with the new ones.
         let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
+
         for (serial_id, op) in updated_state.priority_queue() {
             priority_queue.insert(*serial_id, op.clone());
         }
+
+        // Check for gaps in priority queue. If some event is missing we skip this `ETHState` update.
+        let mut priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
+        priority_op_ids.sort_unstable();
+        for i in 0..priority_op_ids.len().saturating_sub(1) {
+            let gap = priority_op_ids[i + 1] - priority_op_ids[i];
+            anyhow::ensure!(
+                gap == 1,
+                "Gap in priority op queue: gap={}, priority_op_before_gap={}",
+                gap,
+                priority_op_ids[i]
+            );
+        }
+
         // Extend the existing token events with the new ones.
         let mut new_tokens = self.eth_state.new_tokens().to_vec();
         for token in updated_state.new_tokens() {
@@ -216,7 +241,7 @@ impl<W: EthClient> EthWatch<W> {
             new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
         let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
-        let priority_queue = self
+        let priority_queue: HashMap<u64, ReceivedPriorityOp> = self
             .client
             .get_priority_op_events(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
@@ -240,6 +265,15 @@ impl<W: EthClient> EthWatch<W> {
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
+
+        let mut new_priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
+        new_priority_op_ids.sort_unstable();
+        vlog::debug!(
+            "Updating eth state: block_range=[{},{}], new_priority_ops={:?}",
+            previous_block_with_accepted_events,
+            new_block_with_accepted_events,
+            new_priority_op_ids
+        );
 
         let new_state = ETHState::new(
             current_ethereum_block,
@@ -299,6 +333,20 @@ impl<W: EthClient> EthWatch<W> {
         }
 
         result
+    }
+
+    async fn is_new_pubkey_hash_authorized(
+        &self,
+        address: Address,
+        nonce: Nonce,
+        pub_key_hash: &PubKeyHash,
+    ) -> anyhow::Result<bool> {
+        let auth_fact_reset_time = self.client.get_auth_fact_reset_time(address, nonce).await?;
+        if auth_fact_reset_time != 0 {
+            return Ok(false);
+        }
+        let auth_fact = self.client.get_auth_fact(address, nonce).await?;
+        Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
     fn find_ongoing_op_by_eth_hash(&self, eth_hash: H256) -> Option<PriorityOp> {
@@ -555,6 +603,18 @@ impl<W: EthClient> EthWatch<W> {
                 } => {
                     resp.send(self.get_register_factory_event(last_eth_block))
                         .ok();
+                }
+                EthWatchRequest::IsPubkeyChangeAuthorized {
+                    address,
+                    nonce,
+                    pubkey_hash,
+                    resp,
+                } => {
+                    let authorized = self
+                        .is_new_pubkey_hash_authorized(address, nonce, &pubkey_hash)
+                        .await
+                        .unwrap_or(false);
+                    resp.send(authorized).unwrap_or_default();
                 }
             }
         }

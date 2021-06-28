@@ -150,6 +150,13 @@ impl ApiAccountData {
             .map(|(id, nft)| (*id, nft.clone().into()))
             .collect();
 
+        let account_type = storage
+            .chain()
+            .account_schema()
+            .account_type_by_id(account_id)
+            .await
+            .map_err(Error::storage)?
+            .map(|t| t.into());
         Ok(Account {
             account_id,
             address: account.address,
@@ -157,6 +164,7 @@ impl ApiAccountData {
             pub_key_hash: account.pub_key_hash,
             last_update_in_block,
             balances,
+            account_type,
             nfts,
             minted_nfts,
         })
@@ -520,7 +528,7 @@ mod tests {
                 .get_block_transactions(block)
                 .await?;
 
-            let tx = &transactions[1];
+            let tx = &transactions[0];
             let op = tx.op.as_object().unwrap();
 
             let id = if op.contains_key("accountId") {

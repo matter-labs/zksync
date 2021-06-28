@@ -4,11 +4,11 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 use zksync_types::{
     tx::{
-        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer, TxHash,
-        Withdraw, WithdrawNFT,
+        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
+        TxEthSignatureVariant, TxHash, Withdraw, WithdrawNFT,
     },
     AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
-    H256,
+    ZkSyncTx, H256,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, ZeroPrefixHexSerde};
 

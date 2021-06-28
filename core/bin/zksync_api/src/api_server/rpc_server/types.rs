@@ -6,16 +6,25 @@ use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_api_types::v02::token::NFT;
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
-    Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId, ZkSyncPriorityOp,
+    tx::TxEthSignatureVariant, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
+    ZkSyncPriorityOp, ZkSyncTx, NFT,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
+use zksync_api_types::v02::account::EthAccountType;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TxWithSignature {
+    pub tx: ZkSyncTx,
+    #[serde(default)]
+    pub signature: TxEthSignatureVariant,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -148,6 +157,7 @@ pub struct AccountInfoResp {
     pub depositing: DepositingAccountBalances,
     pub committed: ResponseAccountState,
     pub verified: ResponseAccountState,
+    pub account_type: Option<EthAccountType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
