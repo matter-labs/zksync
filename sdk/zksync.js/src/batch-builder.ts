@@ -20,7 +20,15 @@ import { Wallet } from './wallet';
 interface InternalTx {
     type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT' | 'WithdrawNFT' | 'Swap';
     tx: any;
-    feeType: 'Withdraw' | 'Transfer' | ChangePubKeyFee | 'MintNFT' | 'WithdrawNFT' | 'Swap';
+    feeType:
+        | 'Withdraw'
+        | 'Transfer'
+        | 'FastWithdraw'
+        | 'ForcedExit'
+        | ChangePubKeyFee
+        | 'Swap'
+        | 'MintNFT'
+        | 'WithdrawNFT';
     address: Address;
     token: TokenLike;
     // Whether or not the tx has been signed.
@@ -292,7 +300,7 @@ export class BatchBuilder {
         this.txs.push({
             type: 'ForcedExit',
             tx: _forcedExit,
-            feeType: 'Withdraw',
+            feeType: 'ForcedExit',
             address: _forcedExit.target,
             token: _forcedExit.token
         });

@@ -12,8 +12,20 @@ declare module './tester' {
         testTransferNFT(from: Wallet, to: Wallet, feeToken: TokenLike): Promise<void>;
         testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testRejectedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testInvalidFeeBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testRejectedBatch(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
+        testInvalidFeeBatch(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
     }
 }
 
@@ -152,7 +164,8 @@ Tester.prototype.testRejectedBatch = async function (
     sender: Wallet,
     receiver: Wallet,
     token: types.TokenLike,
-    amount: BigNumber
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
 ) {
     const tx = {
         to: receiver.address(),
@@ -169,7 +182,13 @@ Tester.prototype.testRejectedBatch = async function (
         }
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal(
+                'Transaction adding error: Transactions batch summary fee is too low.'
+            );
+        } else {
+            expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+        }
     }
     expect(thrown, 'Batch should have failed').to.be.true;
 };
@@ -180,7 +199,8 @@ Tester.prototype.testInvalidFeeBatch = async function (
     sender: Wallet,
     receiver: Wallet,
     token: types.TokenLike,
-    amount: BigNumber
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
 ) {
     // Ignore the second transfer.
     const fee = await this.syncProvider.getTransactionsBatchFee(['Transfer'], [receiver.address()], token);
@@ -212,7 +232,13 @@ Tester.prototype.testInvalidFeeBatch = async function (
         }
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal(
+                'Transaction adding error: Transactions batch summary fee is too low.'
+            );
+        } else {
+            expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+        }
     }
     expect(thrown, 'Batch should have failed').to.be.true;
 };

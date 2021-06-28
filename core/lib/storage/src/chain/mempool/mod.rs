@@ -1,15 +1,18 @@
 // Built-in deps
-use std::{collections::VecDeque, convert::TryFrom, time::Instant};
+use std::{collections::VecDeque, convert::TryFrom, str::FromStr, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
+use zksync_api_types::v02::transaction::{
+    ApiTxBatch, BatchStatus, TxHashSerializeWrapper, TxInBlockStatus,
+};
 use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxEthSignature, TxHash},
     BlockNumber, SignedZkSyncTx,
 };
 // Local imports
-use self::records::MempoolTx;
+use self::records::{MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
@@ -137,13 +140,16 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             anyhow::bail!("Cannot insert an empty batch");
         }
 
+        let mut transaction = self.0.start_transaction().await?;
+        let tx_hashes: Vec<TxHash> = txs.iter().map(|tx| tx.tx.hash()).collect();
+
         // The first transaction of the batch would be inserted manually
         // batch_id of the inserted transaction would be the id of this batch
         // Will be unique cause batch_id is bigserial
         // Special case: batch_id == 0 <==> transaction is not a part of some batch (uses in `insert_tx` function)
         let batch_id = {
             let first_tx_data = txs[0].clone();
-            let tx_hash = hex::encode(first_tx_data.hash().as_ref());
+            let tx_hash = hex::encode(tx_hashes[0].as_ref());
             let tx = serde_json::to_value(&first_tx_data.tx)
                 .expect("Unserializable TX provided to the database");
             let eth_sign_data = first_tx_data
@@ -159,7 +165,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 chrono::Utc::now(),
                 eth_sign_data,
             )
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
             sqlx::query_as!(
@@ -168,19 +174,19 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 ORDER BY batch_id DESC
                 LIMIT 1",
             )
-            .fetch_optional(self.0.conn())
+            .fetch_optional(transaction.conn())
             .await?
             .ok_or_else(|| anyhow::format_err!("Can't get maximal batch_id from mempool_txs"))?
             .batch_id
         };
 
         // Processing of all batch transactions, except the first
-        let mut tx_hashes = Vec::with_capacity(txs.len());
+        let mut tx_hashes_strs = Vec::with_capacity(txs.len());
         let mut tx_values = Vec::with_capacity(txs.len());
         let mut txs_sign_data = Vec::with_capacity(txs.len());
 
-        for tx_data in txs[1..].iter() {
-            tx_hashes.push(hex::encode(tx_data.hash().as_ref()));
+        for (tx_data, tx_hash) in txs[1..].iter().zip(tx_hashes[1..].iter()) {
+            tx_hashes_strs.push(hex::encode(tx_hash.as_ref()));
             tx_values.push(
                 serde_json::to_value(&tx_data.tx)
                     .expect("Unserializable TX provided to the database"),
@@ -198,13 +204,13 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             SELECT u.tx_hash, u.tx, u.eth_sign_data, $4, $5
                 FROM UNNEST ($1::text[], $2::jsonb[], $3::jsonb[])
                 AS u(tx_hash, tx, eth_sign_data)",
-            &tx_hashes,
+            &tx_hashes_strs,
             &tx_values,
             &txs_sign_data,
             chrono::Utc::now(),
             batch_id
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         // If there're signatures for the whole batch, store them too.
@@ -215,9 +221,20 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 batch_id,
                 signature
             )
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
         }
+
+        let batch_hash = TxHash::batch_hash(&tx_hashes);
+        sqlx::query!(
+            "INSERT INTO txs_batches_hashes VALUES($1, $2)",
+            batch_id,
+            batch_hash.as_ref()
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        transaction.commit().await?;
 
         metrics::histogram!("sql.chain.mempool.insert_batch", start.elapsed());
         Ok(batch_id)
@@ -290,7 +307,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         let tx_hash = hex::encode(tx_hash.as_ref());
 
         let row = sqlx::query!(
-            "SELECT count(*) from mempool_txs
+            "SELECT COUNT(*) from mempool_txs
             WHERE tx_hash = $1",
             &tx_hash
         )
@@ -304,8 +321,21 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         Ok(contains)
     }
 
-    /// Returns zkSync transaction with thr given hash.
+    /// Returns zkSync transaction with the given hash.
     pub async fn get_tx(&mut self, tx_hash: TxHash) -> QueryResult<Option<SignedZkSyncTx>> {
+        let start = Instant::now();
+
+        let mempool_tx = self.get_mempool_tx(tx_hash).await?;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_tx");
+        mempool_tx
+            .map(SignedZkSyncTx::try_from)
+            .transpose()
+            .map_err(anyhow::Error::from)
+    }
+
+    /// Returns mempool transaction as it is stored in the database.
+    pub async fn get_mempool_tx(&mut self, tx_hash: TxHash) -> QueryResult<Option<MempoolTx>> {
         let start = Instant::now();
 
         let tx_hash = hex::encode(tx_hash.as_ref());
@@ -320,10 +350,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_tx");
-        mempool_tx
-            .map(SignedZkSyncTx::try_from)
-            .transpose()
-            .map_err(anyhow::Error::from)
+        Ok(mempool_tx)
     }
 
     /// Removes transactions that are already committed.
@@ -374,6 +401,65 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.mempool.collect_garbage", start.elapsed());
         Ok(())
+    }
+
+    /// Returns mempool size.
+    pub async fn get_mempool_size(&mut self) -> QueryResult<u32> {
+        let start = Instant::now();
+
+        let size = sqlx::query!("SELECT COUNT(*) from mempool_txs")
+            .fetch_one(self.0.conn())
+            .await?
+            .count;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_mempool_size");
+        Ok(size.unwrap_or(0) as u32)
+    }
+
+    /// Get info about batch in mempool.
+    pub async fn get_queued_batch_info(
+        &mut self,
+        batch_hash: TxHash,
+    ) -> QueryResult<Option<ApiTxBatch>> {
+        let start = Instant::now();
+
+        let batch_data = sqlx::query_as!(
+            QueuedBatchTx,
+            r#"
+                SELECT tx_hash, created_at
+                FROM mempool_txs
+                INNER JOIN txs_batches_hashes
+                ON txs_batches_hashes.batch_id = mempool_txs.batch_id
+                WHERE batch_hash = $1
+                ORDER BY id ASC
+            "#,
+            batch_hash.as_ref()
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+        let result = if !batch_data.is_empty() {
+            let created_at = batch_data[0].created_at;
+            let transaction_hashes: Vec<TxHashSerializeWrapper> = batch_data
+                .iter()
+                .map(|tx| {
+                    TxHashSerializeWrapper(TxHash::from_str(&format!("0x{}", tx.tx_hash)).unwrap())
+                })
+                .collect();
+            Some(ApiTxBatch {
+                batch_hash,
+                transaction_hashes,
+                created_at,
+                batch_status: BatchStatus {
+                    updated_at: created_at,
+                    last_state: TxInBlockStatus::Queued,
+                },
+            })
+        } else {
+            None
+        };
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_queued_batch_info");
+        Ok(result)
     }
 
     // Returns executed txs back to mempool for blocks with number greater than `last_block`

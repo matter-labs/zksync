@@ -25,7 +25,7 @@ pub const CONNECTION_TIMEOUT: Duration = Duration::from_millis(700);
 
 #[async_trait]
 pub trait TokenPriceAPI {
-    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, PriceError>;
+    async fn get_price(&self, token: &Token) -> Result<TokenPrice, PriceError>;
 }
 
 /// Api responsible for querying for TokenPrices
@@ -232,7 +232,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             return Ok(cached_value);
         }
 
-        let api_price = self.token_price_api.get_price(&token.symbol).await;
+        let api_price = self.token_price_api.get_price(&token).await;
 
         match api_price {
             Ok(api_price) => {

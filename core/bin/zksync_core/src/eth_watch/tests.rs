@@ -3,6 +3,9 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
+use zksync_api_types::v02::pagination::{
+    ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest,
+};
 use zksync_types::{
     AccountId, Deposit, FullExit, NewTokenEvent, Nonce, PriorityOp, RegisterNFTFactoryEvent,
     TokenId, ZkSyncPriorityOp,
@@ -129,46 +132,48 @@ async fn test_operation_queues() {
     let from_addr = [1u8; 20].into();
     let to_addr = [2u8; 20].into();
 
-    client
-        .add_operations(&[
-            PriorityOp {
-                serial_id: 0,
-                data: ZkSyncPriorityOp::Deposit(Deposit {
-                    from: from_addr,
-                    token: TokenId(0),
-                    amount: Default::default(),
-                    to: to_addr,
-                }),
-                deadline_block: 0,
-                eth_hash: [2; 32].into(),
-                eth_block: 4,
-            },
-            PriorityOp {
-                serial_id: 1,
-                data: ZkSyncPriorityOp::Deposit(Deposit {
-                    from: Default::default(),
-                    token: TokenId(0),
-                    amount: Default::default(),
-                    to: Default::default(),
-                }),
-                deadline_block: 0,
-                eth_hash: [3; 32].into(),
-                eth_block: 3,
-            },
-            PriorityOp {
-                serial_id: 2,
-                data: ZkSyncPriorityOp::FullExit(FullExit {
-                    account_id: AccountId(1),
-                    eth_address: from_addr,
-                    token: TokenId(0),
-                    is_legacy: false,
-                }),
-                deadline_block: 0,
-                eth_block: 4,
-                eth_hash: [4; 32].into(),
-            },
-        ])
-        .await;
+    let priority_ops = vec![
+        PriorityOp {
+            serial_id: 0,
+            data: ZkSyncPriorityOp::Deposit(Deposit {
+                from: from_addr,
+                token: TokenId(0),
+                amount: Default::default(),
+                to: to_addr,
+            }),
+            deadline_block: 0,
+            eth_hash: [2; 32].into(),
+            eth_block: 4,
+            eth_block_index: Some(1),
+        },
+        PriorityOp {
+            serial_id: 1,
+            data: ZkSyncPriorityOp::Deposit(Deposit {
+                from: Default::default(),
+                token: TokenId(0),
+                amount: Default::default(),
+                to: Default::default(),
+            }),
+            deadline_block: 0,
+            eth_hash: [3; 32].into(),
+            eth_block: 3,
+            eth_block_index: Some(1),
+        },
+        PriorityOp {
+            serial_id: 2,
+            data: ZkSyncPriorityOp::FullExit(FullExit {
+                account_id: AccountId(1),
+                eth_address: from_addr,
+                token: TokenId(0),
+            }),
+            deadline_block: 0,
+            eth_block: 4,
+            eth_hash: [4; 32].into(),
+            eth_block_index: Some(2),
+        },
+    ];
+
+    client.add_operations(&priority_ops).await;
 
     let mut watcher = create_watcher(client);
     watcher.poll_eth_node().await.unwrap();
@@ -186,17 +191,37 @@ async fn test_operation_queues() {
     assert_eq!(unconfirmed_queue[1].serial_id, 2);
 
     priority_queues.get(&1).unwrap();
-    watcher.find_ongoing_op_by_hash(&[2u8; 32]).unwrap();
+    watcher
+        .find_ongoing_op_by_eth_hash(H256::from_slice(&[2u8; 32]))
+        .unwrap();
 
     // Make sure that the old behavior of the pending deposits getter has not changed.
     let deposits = watcher.get_ongoing_deposits_for(to_addr);
     assert_eq!(deposits.len(), 1);
-    // Check that the new pending operations getter shows only deposits with the same `from` address.
-    let ops = watcher.get_ongoing_ops_for(from_addr);
-
-    assert_eq!(ops[0].serial_id, 0);
-    assert_eq!(ops[1].serial_id, 2);
-    assert!(watcher.get_ongoing_ops_for(to_addr).is_empty());
+    // Check that the new pending operations getter shows only deposits with the same `to` address.
+    let ops = watcher.get_ongoing_ops_for(PaginationQuery {
+        from: PendingOpsRequest {
+            address: to_addr,
+            account_id: Some(AccountId(1)),
+            serial_id: ApiEither::from(0),
+        },
+        limit: 2,
+        direction: PaginationDirection::Newer,
+    });
+    assert_eq!(ops.list[0].tx_hash, priority_ops[0].tx_hash());
+    assert_eq!(ops.list[1].tx_hash, priority_ops[2].tx_hash());
+    assert!(watcher
+        .get_ongoing_ops_for(PaginationQuery {
+            from: PendingOpsRequest {
+                address: from_addr,
+                account_id: Some(AccountId(0)),
+                serial_id: ApiEither::from(0)
+            },
+            limit: 3,
+            direction: PaginationDirection::Newer
+        })
+        .list
+        .is_empty());
 }
 
 /// This test simulates the situation when eth watch module did not poll Ethereum node for some time
@@ -221,6 +246,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 1, // <- First operation goes to the first block.
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 1,
@@ -233,6 +259,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 100, // <-- Note 100th block, it will set the network block to 100.
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 2,
@@ -245,6 +272,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 110, // <-- This operation will get to the unconfirmed queue.
+                eth_block_index: Some(1),
             },
         ])
         .await;
@@ -288,6 +316,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 4,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 1,
@@ -300,6 +329,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 3,
+                eth_block_index: Some(1),
             },
         ])
         .await;
@@ -319,6 +349,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 5,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 4,
@@ -331,6 +362,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 5,
+                eth_block_index: Some(2),
             },
         ])
         .await;
@@ -342,7 +374,9 @@ async fn test_restore_and_poll() {
     assert_eq!(unconfirmed_queue.len(), 2);
     assert_eq!(unconfirmed_queue[0].serial_id, 3);
     priority_queues.get(&1).unwrap();
-    watcher.find_ongoing_op_by_hash(&[2u8; 32]).unwrap();
+    watcher
+        .find_ongoing_op_by_eth_hash(H256::from_slice(&[2u8; 32]))
+        .unwrap();
     let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
     assert_eq!(deposits.len(), 1);
 }
@@ -364,6 +398,7 @@ async fn test_restore_and_poll_time_lag() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 1,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 1,
@@ -376,6 +411,7 @@ async fn test_restore_and_poll_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 100,
+                eth_block_index: Some(1),
             },
         ])
         .await;

@@ -4,10 +4,10 @@ use std::time::Instant;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
-use zksync_api_client::rest::v1::accounts::ApiNFT;
+use zksync_api_types::v02::fee::ApiTxFeeTypes;
 use zksync_types::{
-    tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
-    Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    tx::{EthBatchSignatures, TxEthSignature, TxEthSignatureVariant, TxHash},
+    Address, BatchFee, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -15,6 +15,7 @@ use crate::{api_server::tx_sender::SubmitError, fee_ticker::TokenPriceRequestTyp
 
 use super::{types::*, RpcApp};
 use crate::api_server::rpc_server::error::RpcErrorCodes;
+use zksync_types::tokens::ApiNFT;
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
@@ -23,12 +24,24 @@ impl RpcApp {
         let account_state = self.get_account_state(address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
+        let mut storage = self.access_storage().await?;
         let depositing = DepositingAccountBalances::from_pending_ops(
-            &mut self.access_storage().await?,
+            &mut storage,
             &self.tx_sender.tokens,
             depositing_ops,
         )
         .await?;
+        let account_type = if let Some(account_id) = account_state.account_id {
+            storage
+                .chain()
+                .account_schema()
+                .account_type_by_id(account_id)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .map(|t| t.into())
+        } else {
+            None
+        };
 
         metrics::histogram!("api.rpc.account_info", start.elapsed());
         Ok(AccountInfoResp {
@@ -37,6 +50,7 @@ impl RpcApp {
             committed: account_state.committed,
             verified: account_state.verified,
             depositing,
+            account_type,
         })
     }
 
@@ -93,6 +107,7 @@ impl RpcApp {
         })
     }
 
+    #[allow(deprecated)]
     pub async fn _impl_tx_submit(
         self,
         tx: Box<ZkSyncTx>,
@@ -102,7 +117,7 @@ impl RpcApp {
         let start = Instant::now();
         let result = self
             .tx_sender
-            .submit_tx(*tx, *signature, fast_processing)
+            .submit_tx_with_separate_fp(*tx, *signature, fast_processing)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.tx_submit", start.elapsed());
@@ -115,11 +130,18 @@ impl RpcApp {
         eth_signatures: Option<EthBatchSignatures>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
-        let result = self
+        let result: Result<Vec<TxHash>> = self
             .tx_sender
             .submit_txs_batch(txs, eth_signatures)
             .await
-            .map_err(Error::from);
+            .map_err(Error::from)
+            .map(|response| {
+                response
+                    .transaction_hashes
+                    .into_iter()
+                    .map(|tx_hash| tx_hash.0)
+                    .collect()
+            });
         metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());
         result
     }
@@ -195,7 +217,7 @@ impl RpcApp {
 
     pub async fn _impl_get_tx_fee(
         self,
-        tx_type: TxFeeTypes,
+        tx_type: ApiTxFeeTypes,
         address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
@@ -205,7 +227,8 @@ impl RpcApp {
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
-        let result = Self::ticker_request(ticker.clone(), tx_type, address, token.clone()).await?;
+        let result =
+            Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
         let token = self.tx_sender.token_info_from_id(token).await?;
         let allowed_subsidy = self
@@ -224,10 +247,10 @@ impl RpcApp {
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
         self,
-        tx_types: Vec<TxFeeTypes>,
+        tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
-    ) -> Result<BatchFee> {
+    ) -> Result<TotalFee> {
         let start = Instant::now();
         if tx_types.len() != addresses.len() {
             return Err(Error {
@@ -243,8 +266,12 @@ impl RpcApp {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let transactions: Vec<(TxFeeTypes, Address)> =
-            (tx_types.iter().cloned().zip(addresses.iter().cloned())).collect();
+        let transactions: Vec<(TxFeeTypes, Address)> = (tx_types
+            .iter()
+            .cloned()
+            .map(|fee_type| fee_type.into())
+            .zip(addresses.iter().cloned()))
+        .collect();
         let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
         let token = self.tx_sender.token_info_from_id(token).await?;
@@ -259,7 +286,9 @@ impl RpcApp {
         };
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
-        Ok(fee)
+        Ok(TotalFee {
+            total_fee: fee.total_fee,
+        })
     }
 
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {

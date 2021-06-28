@@ -1,0 +1,13 @@
+# Group Config
+
+## api/v0.2/config [/config]
+
+### Get config of network [GET]
+Returns the config of network
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Config, required{{isResultNullable}})
+        + error (Error, required, nullable)

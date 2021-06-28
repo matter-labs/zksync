@@ -33,3 +33,9 @@ impl TryFrom<MempoolTx> for SignedZkSyncTx {
         })
     }
 }
+
+#[derive(Debug, FromRow, PartialEq)]
+pub struct QueuedBatchTx {
+    pub tx_hash: String,
+    pub created_at: DateTime<Utc>,
+}

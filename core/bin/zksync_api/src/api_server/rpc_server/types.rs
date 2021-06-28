@@ -6,20 +6,19 @@ use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_api_types::v02::account::EthAccountType;
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     tx::TxEthSignatureVariant, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
-    ZkSyncPriorityOp, ZkSyncTx,
+    ZkSyncPriorityOp, ZkSyncTx, NFT,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
-// This wrong dependency, but the whole data about account info stored in this place
-use zksync_api_client::rest::v1::accounts::NFT;
+// // This wrong dependency, but the whole data about account info stored in this place
+// use zksync_api_client::rest::v1::accounts::NFT;
 
 // Local uses
-use crate::{
-    api_server::v1::accounts::account_state_from_storage, utils::token_db_cache::TokenDBCache,
-};
+use crate::utils::token_db_cache::TokenDBCache;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,21 +44,22 @@ impl ResponseAccountState {
         tokens: &TokenDBCache,
         account: Account,
     ) -> Result<Self> {
-        let inner = account_state_from_storage(storage, tokens, &account)
-            .await
-            .map_err(|_| Error::internal_error())?;
-
-        // Old code used `HashMap` as well and didn't rely on the particular order,
-        // so here we use `HashMap` as well for the consistency.
-        let balances: HashMap<_, _> = inner.balances.into_iter().collect();
-
-        Ok(Self {
-            balances,
-            nfts: inner.nfts,
-            minted_nfts: inner.minted_nfts,
-            nonce: inner.nonce,
-            pub_key_hash: inner.pub_key_hash,
-        })
+        unimplemented!()
+        // let inner = account_state_from_storage(storage, tokens, &account)
+        //     .await
+        //     .map_err(|_| Error::internal_error())?;
+        //
+        // // Old code used `HashMap` as well and didn't rely on the particular order,
+        // // so here we use `HashMap` as well for the consistency.
+        // let balances: HashMap<_, _> = inner.balances.into_iter().collect();
+        //
+        // Ok(Self {
+        //     balances,
+        //     nfts: inner.nfts,
+        //     minted_nfts: inner.minted_nfts,
+        //     nonce: inner.nonce,
+        //     pub_key_hash: inner.pub_key_hash,
+        // })
     }
 }
 
@@ -132,6 +132,7 @@ pub struct AccountInfoResp {
     pub depositing: DepositingAccountBalances,
     pub committed: ResponseAccountState,
     pub verified: ResponseAccountState,
+    pub account_type: Option<EthAccountType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

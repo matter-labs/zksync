@@ -1,11 +1,12 @@
 // Built-in deps
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 // External imports
 use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
+use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery};
 use zksync_types::{
     tokens::ApiNFT, AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT,
 };
@@ -121,17 +122,24 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Loads all the stored tokens from the database.
-    /// Alongside with the tokens added via `store_token` method, the default `ETH` token
-    /// is returned.
-    pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
+    /// Loads tokens from the database starting from the given id with the given limit in the ascending order.
+    pub async fn load_tokens_asc(
+        &mut self,
+        from: TokenId,
+        limit: Option<u32>,
+    ) -> QueryResult<HashMap<TokenId, Token>> {
         let start = Instant::now();
+        let limit = limit.map(i64::from);
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT * FROM tokens WHERE is_nft = false
+            SELECT * FROM tokens
+            WHERE id >= $1 and is_nft = false
             ORDER BY id ASC
+            LIMIT $2
             "#,
+            from.0 as u32,
+            limit
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -143,9 +151,64 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                 (token.id, token)
             })
             .collect();
-
-        metrics::histogram!("sql.token.load_tokens", start.elapsed());
+        metrics::histogram!("sql.token.load_tokens_asc", start.elapsed());
         Ok(result)
+    }
+
+    /// Loads tokens from the database starting from the given id with the given limit in the descending order.
+    pub async fn load_tokens_desc(
+        &mut self,
+        from: TokenId,
+        limit: Option<u32>,
+    ) -> QueryResult<HashMap<TokenId, Token>> {
+        let start = Instant::now();
+        let limit = limit.map(i64::from);
+        let tokens = sqlx::query_as!(
+            DbToken,
+            r#"
+            SELECT * FROM tokens
+            WHERE id <= $1
+            ORDER BY id DESC
+            LIMIT $2
+            "#,
+            from.0 as u32,
+            limit
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = tokens
+            .into_iter()
+            .map(|t| {
+                let token: Token = t.into();
+                (token.id, token)
+            })
+            .collect();
+        metrics::histogram!("sql.token.load_tokens_desc", start.elapsed());
+        Ok(result)
+    }
+
+    /// Loads all the stored tokens from the database.
+    /// Alongside with the tokens added via `store_token` method, the default `ETH` token
+    /// is returned.
+    pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
+        self.load_tokens_asc(TokenId(0), None).await
+    }
+
+    /// Loads tokens for the given pagination query
+    pub async fn load_token_page(
+        &mut self,
+        query: &PaginationQuery<TokenId>,
+    ) -> QueryResult<HashMap<TokenId, Token>> {
+        let tokens = match query.direction {
+            PaginationDirection::Newer => {
+                self.load_tokens_asc(query.from, Some(query.limit)).await?
+            }
+            PaginationDirection::Older => {
+                self.load_tokens_desc(query.from, Some(query.limit)).await?
+            }
+        };
+        Ok(tokens)
     }
 
     /// Loads all the stored tokens, which have market_volume (ticker_market_volume table)
@@ -183,8 +246,40 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
-    /// Gets the last used token ID from Database.
-    pub async fn get_last_token_id(&mut self) -> QueryResult<TokenId> {
+    /// Filters out tokens whose market volume is less than the specified limit (min_market_volume).
+    pub async fn filter_tokens_by_market_volume(
+        &mut self,
+        tokens_to_check: Vec<TokenId>,
+        min_market_volume: &Ratio<BigUint>,
+    ) -> QueryResult<HashSet<TokenId>> {
+        let start = Instant::now();
+        let tokens_to_check: Vec<i32> = tokens_to_check.into_iter().map(|id| *id as i32).collect();
+        let tokens = sqlx::query!(
+            r#"
+            SELECT token_id
+            FROM ticker_market_volume
+            WHERE token_id = ANY($1) AND market_volume >= $2
+            "#,
+            &tokens_to_check,
+            ratio_to_big_decimal(min_market_volume, STORED_USD_PRICE_PRECISION)
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = Ok(tokens
+            .into_iter()
+            .map(|t| TokenId(t.token_id as u32))
+            .collect());
+
+        metrics::histogram!(
+            "sql.token.load_token_ids_that_enabled_for_fees",
+            start.elapsed()
+        );
+        result
+    }
+
+    /// Get the number of tokens from Database
+    pub async fn get_count(&mut self) -> QueryResult<u32> {
         let start = Instant::now();
         let last_token_id = sqlx::query!(
             r#"
@@ -193,11 +288,11 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         )
         .fetch_optional(self.0.conn())
         .await?
-        .map(|token| token.id as u32)
+        .map(|token| token.id)
         .unwrap_or(0);
 
         metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
-        Ok(TokenId(last_token_id))
+        Ok(last_token_id as u32)
     }
 
     pub async fn get_nft(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
@@ -396,6 +491,19 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(())
     }
 
+    pub async fn get_last_token_id(&mut self) -> QueryResult<TokenId> {
+        let start = Instant::now();
+
+        let token_id = sqlx::query!("SELECT MAX(id) FROM tokens")
+            .fetch_one(self.0.conn())
+            .await?
+            .max
+            .unwrap_or(0);
+
+        metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
+        Ok(TokenId(token_id as u32))
+    }
+
     pub async fn store_nft_factory(
         &mut self,
         creator_id: AccountId,
@@ -407,9 +515,9 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             r#"
             INSERT INTO nft_factory ( creator_id, factory_address, creator_address )
             VALUES ( $1, $2, $3 )
-            ON CONFLICT ( creator_id ) 
-            DO UPDATE 
-            SET factory_address = $2 
+            ON CONFLICT ( creator_id )
+            DO UPDATE
+            SET factory_address = $2
             "#,
             creator_id.0 as i32,
             address_to_stored_string(&factory_address),
