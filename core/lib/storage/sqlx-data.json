@@ -4387,24 +4387,6 @@
       "nullable": []
     }
   },
-  "b1b0fd6eab9edcac470d79302d6da97ad73181c41fe313b08c7a6bfa3b0ccd11": {
-    "query": "SELECT MAX(id) FROM tokens",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {
     "query": "INSERT INTO block_witness (block, witness)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING",
     "describe": {
@@ -5380,6 +5362,24 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "d6716a2303bbd6089d5399b8a67de2ff7fce8015958fa900921a8364f3c860fc": {
+    "query": "SELECT MAX(id) FROM tokens WHERE is_nft = false",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
       ]
     }
   },
