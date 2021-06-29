@@ -435,6 +435,9 @@ impl TxSender {
         .unwrap_tx();
 
         if let ZkSyncTx::Swap(tx) = &tx {
+            if signature.is_single() {
+                return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+            }
             let signatures = signature.orders_signatures();
             self.verify_order_eth_signature(&tx.orders.0, signatures.0.clone())
                 .await?;
@@ -623,6 +626,9 @@ impl TxSender {
 
         for tx in txs.iter() {
             if let ZkSyncTx::Swap(swap) = &tx.tx {
+                if tx.signature.is_single() {
+                    return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                }
                 let signatures = tx.signature.orders_signatures();
                 self.verify_order_eth_signature(&swap.orders.0, signatures.0.clone())
                     .await?;
