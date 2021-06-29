@@ -495,7 +495,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     pub async fn get_last_token_id(&mut self) -> QueryResult<TokenId> {
         let start = Instant::now();
 
-        let token_id = sqlx::query!("SELECT MAX(id) FROM tokens")
+        let token_id = sqlx::query!("SELECT MAX(id) FROM tokens WHERE is_nft = false")
             .fetch_one(self.0.conn())
             .await?
             .max

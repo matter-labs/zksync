@@ -528,7 +528,7 @@ mod tests {
                 .get_block_transactions(block)
                 .await?;
 
-            let tx = &transactions[0];
+            let tx = &transactions[1];
             let op = tx.op.as_object().unwrap();
 
             let id = if op.contains_key("accountId") {

@@ -24,6 +24,7 @@ use super::{
     paginate_trait::Paginate,
 };
 use crate::core_api_client::CoreApiClient;
+use zksync_api_types::v02::pagination::PaginationDirection;
 
 #[async_trait::async_trait]
 impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
@@ -64,8 +65,17 @@ impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
 
         transaction.commit().await.map_err(Error::storage)?;
 
+        let mut vec_tokens: Vec<_> = tokens.values().cloned().collect();
+        match query.direction {
+            PaginationDirection::Newer => {
+                vec_tokens.sort_by(|a, b| a.id.cmp(&b.id));
+            }
+            PaginationDirection::Older => {
+                vec_tokens.sort_by(|a, b| b.id.cmp(&a.id));
+            }
+        };
         Ok(Paginated::new(
-            tokens.values().cloned().collect(),
+            vec_tokens,
             query.from,
             query.limit,
             query.direction,
