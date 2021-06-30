@@ -154,6 +154,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
         await tester.testSwap(alice, frank, token, secondToken, TX_AMOUNT);
         await tester.testSwapBatch(alice, frank, david, token, secondToken, TX_AMOUNT);
+        await tester.testSwapMissingSignatures(alice, frank, token, secondToken, TX_AMOUNT);
     });
 
     step('should swap NFT for fungible tokens', async () => {
