@@ -77,18 +77,15 @@ Tester.prototype.testSwapMissingSignatures = async function (
 
     // first, try submitting without eth signatures
     signedSwap.ethereumSignature = null;
-    let swap = await wallet.submitSignedTransaction(signedSwap, this.syncProvider);
-    await expectThrow(swap.awaitReceipt(), 'MissingEthSignature');
+    await expectThrow(wallet.submitSignedTransaction(signedSwap, this.syncProvider), 'MissingEthSignature');
 
     // then, try submitting without eth signatures for orders
     signedSwap.ethereumSignature = ethSignatures[0];
-    swap = await wallet.submitSignedTransaction(signedSwap, this.syncProvider);
-    await expectThrow(swap.awaitReceipt(), 'MissingEthSignature');
+    await expectThrow(wallet.submitSignedTransaction(signedSwap, this.syncProvider), 'MissingEthSignature');
 
     // then, try submitting empty eth signatures for orders
     signedSwap.ethereumSignature = [ethSignatures[0], null, null];
-    swap = await wallet.submitSignedTransaction(signedSwap, this.syncProvider);
-    await expectThrow(swap.awaitReceipt(), 'MissingEthSignature');
+    await expectThrow(wallet.submitSignedTransaction(signedSwap, this.syncProvider), 'MissingEthSignature');
 };
 
 Tester.prototype.testSwapNFT = async function (
