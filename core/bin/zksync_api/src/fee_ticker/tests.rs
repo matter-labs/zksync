@@ -290,7 +290,7 @@ fn test_ticker_formula() {
     // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits
     // (mantissa len == 11)
     let threshold = BigDecimal::from_str("0.01").unwrap();
-    for token in TestToken::all_tokens() {
+    for token in &[TestToken::eth(), TestToken::expensive()] {
         let transfer_fee =
             get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into(), Address::default());
         let expected_fee = expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();

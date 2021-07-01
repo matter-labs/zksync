@@ -213,8 +213,6 @@ impl RpcApp {
         let result =
             Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
-        let token = self.tx_sender.token_info_from_id(token).await?;
-
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
         Ok(result.normal_fee)
     }
@@ -247,8 +245,6 @@ impl RpcApp {
             .zip(addresses.iter().cloned()))
         .collect();
         let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
-
-        let token = self.tx_sender.token_info_from_id(token).await?;
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
         Ok(TotalFee {

@@ -9,7 +9,7 @@ use actix_web::{web, App, Scope};
 use bigdecimal::BigDecimal;
 use chrono::Utc;
 use futures::{channel::mpsc, StreamExt};
-use num::{rational::Ratio, BigUint};
+use num::BigUint;
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;

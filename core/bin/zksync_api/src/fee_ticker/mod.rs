@@ -18,7 +18,7 @@ use futures::{
 use num::{
     rational::Ratio,
     traits::{Inv, Pow},
-    BigUint, CheckedDiv, CheckedSub, Zero,
+    BigUint, CheckedDiv, Zero,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -49,7 +49,6 @@ use crate::fee_ticker::{
     },
 };
 use crate::utils::token_db_cache::TokenDBCache;
-use num::bigint::ToBigInt;
 
 mod constants;
 mod ticker_api;
@@ -433,7 +432,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
 
         let normal_fee = Fee::new(
             fee_type,
-            zkp_fee.clone(),
+            zkp_fee,
             normal_gas_fee,
             gas_tx_amount,
             gas_price_wei.clone(),
@@ -468,7 +467,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let total_normal_gas_fee = (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price)
             * &token_usd_risk
             * self.config.scale_fee_coefficient.clone();
-        let normal_fee = BatchFee::new(total_zkp_fee.clone(), total_normal_gas_fee);
+        let normal_fee = BatchFee::new(total_zkp_fee, total_normal_gas_fee);
 
         Ok(ResponseBatchFee { normal_fee })
     }

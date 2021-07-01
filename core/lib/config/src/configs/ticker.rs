@@ -1,8 +1,4 @@
-// Built-in uses
-use std::collections::HashMap;
 // External uses
-use num::rational::Ratio;
-use num::BigUint;
 use serde::Deserialize;
 // Workspace uses
 use zksync_types::Address;

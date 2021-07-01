@@ -2,7 +2,6 @@
 
 // Built-in uses
 use std::iter::FromIterator;
-use std::sync::{Arc, RwLock};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -11,13 +10,12 @@ use std::{
 
 // External uses
 use bigdecimal::BigDecimal;
-use chrono::Utc;
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
 use itertools::izip;
-use num::{bigint::ToBigInt, rational::Ratio, BigUint, CheckedSub, Zero};
+use num::{bigint::ToBigInt, BigUint, Zero};
 use thiserror::Error;
 
 // Workspace uses
@@ -30,7 +28,6 @@ use zksync_types::{
     },
     AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
-use zksync_utils::ratio_to_big_decimal;
 
 // Local uses
 use crate::{
@@ -277,7 +274,7 @@ impl TxSender {
                 .into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
-            let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
+            let scaled_provided_fee = scale_user_fee_up(provided_fee);
             if required_fee >= scaled_provided_fee && should_enforce_fee {
                 return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
             }
