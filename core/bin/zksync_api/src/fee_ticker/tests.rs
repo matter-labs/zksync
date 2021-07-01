@@ -89,20 +89,14 @@ impl TestToken {
         Self::new(TokenId(4), 0.0, Some(0.9), 18, Address::default())
     }
 
-    fn subsidized_tokens() -> Vec<Self> {
-        vec![Self::eth(), Self::cheap(), Self::expensive()]
-    }
-
-    fn unsubsidized_tokens() -> Vec<Self> {
-        vec![Self::hex(), Self::zero_price()]
-    }
-
     fn all_tokens() -> Vec<Self> {
-        let mut all_tokens = Vec::new();
-        all_tokens.extend_from_slice(&Self::subsidized_tokens());
-        all_tokens.extend_from_slice(&Self::unsubsidized_tokens());
-
-        all_tokens
+        vec![
+            Self::eth(),
+            Self::cheap(),
+            Self::expensive(),
+            Self::hex(),
+            Self::zero_price(),
+        ]
     }
 }
 
@@ -118,11 +112,6 @@ fn get_test_ticker_config() -> TickerConfig {
                 t.risk_factor.map(|risk| (id, risk))
             })
             .collect(),
-        not_subsidized_tokens: vec![
-            Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
-        ]
-        .into_iter()
-        .collect(),
         scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
     }
 }
@@ -301,7 +290,7 @@ fn test_ticker_formula() {
     // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits
     // (mantissa len == 11)
     let threshold = BigDecimal::from_str("0.01").unwrap();
-    for token in TestToken::subsidized_tokens() {
+    for token in TestToken::all_tokens() {
         let transfer_fee =
             get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into(), Address::default());
         let expected_fee = expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();
