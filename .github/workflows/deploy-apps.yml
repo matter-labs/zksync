@@ -89,7 +89,7 @@ jobs:
         with:
           repository: matter-labs/helm-infra
           path: helm-infra
-          ref: master
+          ref: breaking-secrets
           token: ${{ secrets.GH_TOKEN }}
       -
         if: ${{ needs.pre.outputs.isTag == 'true' }}
