@@ -2180,6 +2180,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashes_migration"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "tokio 0.2.22",
+ "vlog",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "hashlink"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

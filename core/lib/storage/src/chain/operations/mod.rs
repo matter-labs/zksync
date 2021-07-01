@@ -1,9 +1,15 @@
 // Built-in deps
+use std::collections::HashMap;
 use std::time::Instant;
 // External imports
 use chrono::{Duration, Utc};
+use parity_crypto::digest::sha256;
 // Workspace imports
-use zksync_types::{tx::TxHash, BlockNumber};
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    tx::TxHash,
+    BlockNumber, H256,
+};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, StoredAggregatedOperation,
@@ -13,8 +19,6 @@ use crate::chain::operations::records::StoredExecutedTransaction;
 use crate::chain::operations_ext::OperationsExtSchema;
 use crate::ethereum::EthereumSchema;
 use crate::{chain::mempool::MempoolSchema, QueryResult, StorageProcessor};
-use zksync_basic_types::H256;
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 
 pub mod records;
 
@@ -596,6 +600,89 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             "sql.chain.operations.remove_aggregate_operations_and_bindings",
             start.elapsed()
         );
+        Ok(())
+    }
+    pub async fn calculate_priority_ops_hashes(&mut self) -> QueryResult<()> {
+        let ops = sqlx::query!(
+            "SELECT priority_op_serialid, eth_hash, eth_block, eth_block_index FROM executed_priority_operations"
+        )
+            .fetch_all(self.0.conn())
+            .await?;
+
+        let tx_hashes: Vec<Vec<u8>> = ops
+            .iter()
+            .map(|op| {
+                let mut bytes = Vec::new();
+                bytes.extend_from_slice(&op.eth_hash);
+                bytes.extend_from_slice(&(op.eth_block as u64).to_be_bytes());
+                bytes.extend_from_slice(&(op.eth_block_index.unwrap_or(0) as u64).to_be_bytes());
+
+                let tx_hash = sha256(&bytes);
+                tx_hash.to_vec()
+            })
+            .collect();
+        let ids: Vec<_> = ops.into_iter().map(|op| op.priority_op_serialid).collect();
+
+        // We don't want to block table for a long time so we are updating it by chunks
+        for (chunk_ids, chunk_hashes) in ids.chunks(10).zip(tx_hashes.chunks(10)) {
+            sqlx::query!(
+                r#"
+                UPDATE executed_priority_operations
+                SET tx_hash = u.tx_hash
+                FROM (
+                    SELECT * FROM
+                    UNNEST($1::bytea[], $2::bigint[])
+                    AS u(tx_hash, id)
+                ) u
+                WHERE priority_op_serialid = u.id
+            "#,
+                &chunk_hashes,
+                &chunk_ids
+            )
+            .execute(self.0.conn())
+            .await?;
+        }
+        Ok(())
+    }
+
+    pub async fn calculate_batch_hashes(&mut self) -> QueryResult<()> {
+        let txs =
+            sqlx::query!("SELECT tx_hash, batch_id FROM executed_transactions WHERE batch_id IS NOT NULL ORDER BY created_at")
+                .fetch_all(self.0.conn())
+                .await?;
+
+        let mut hash_bytes: HashMap<i64, Vec<u8>> = HashMap::new();
+        for tx in txs {
+            let batch_id = tx.batch_id.unwrap();
+            if !hash_bytes.contains_key(&batch_id) {
+                hash_bytes.insert(batch_id, Vec::new());
+            }
+            hash_bytes
+                .get_mut(&batch_id)
+                .unwrap()
+                .extend_from_slice(&tx.tx_hash);
+        }
+
+        let mut batch_hashes = Vec::new();
+        let mut ids = Vec::new();
+        for (id, bytes) in hash_bytes {
+            ids.push(id);
+            batch_hashes.push(sha256(&bytes).to_vec());
+        }
+
+        sqlx::query!(
+            r#"
+                INSERT INTO txs_batches_hashes (batch_id, batch_hash)
+                SELECT u.batch_id, u.batch_hash
+                FROM UNNEST ($1::bigint[], $2::bytea[])
+                AS u(batch_id, batch_hash)
+            "#,
+            &ids,
+            &batch_hashes,
+        )
+        .execute(self.0.conn())
+        .await?;
+
         Ok(())
     }
 }
