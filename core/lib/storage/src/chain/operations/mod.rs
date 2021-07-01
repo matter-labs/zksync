@@ -1,5 +1,4 @@
 // Built-in deps
-use std::collections::HashMap;
 use std::time::Instant;
 // External imports
 use chrono::{Duration, Utc};
@@ -609,6 +608,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             .fetch_all(self.0.conn())
             .await?;
 
+        println!("Select necessary priority ops");
         let tx_hashes: Vec<Vec<u8>> = ops
             .iter()
             .map(|op| {
@@ -623,6 +623,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             .collect();
         let ids: Vec<_> = ops.into_iter().map(|op| op.priority_op_serialid).collect();
 
+        println!("Start updating");
         // We don't want to block table for a long time so we are updating it by chunks
         for (chunk_ids, chunk_hashes) in ids.chunks(10).zip(tx_hashes.chunks(10)) {
             sqlx::query!(
@@ -646,27 +647,24 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     }
 
     pub async fn calculate_batch_hashes(&mut self) -> QueryResult<()> {
-        let txs =
-            sqlx::query!("SELECT tx_hash, batch_id FROM executed_transactions WHERE batch_id IS NOT NULL ORDER BY created_at")
-                .fetch_all(self.0.conn())
-                .await?;
-
-        let mut hash_bytes: HashMap<i64, Vec<u8>> = HashMap::new();
-        for tx in txs {
-            let batch_id = tx.batch_id.unwrap();
-            if !hash_bytes.contains_key(&batch_id) {
-                hash_bytes.insert(batch_id, Vec::new());
-            }
-            hash_bytes
-                .get_mut(&batch_id)
-                .unwrap()
-                .extend_from_slice(&tx.tx_hash);
-        }
+        let batches = sqlx::query!(
+            "SELECT batch_id, array_agg(tx_hash) as txs
+                FROM executed_transactions
+                GROUP BY batch_id
+                HAVING batch_id IS NOT NULL AND batch_id != 0;
+                "
+        )
+        .fetch_all(self.0.conn())
+        .await?;
 
         let mut batch_hashes = Vec::new();
         let mut ids = Vec::new();
-        for (id, bytes) in hash_bytes {
-            ids.push(id);
+        for batch in batches {
+            let mut bytes = vec![];
+            for tx in batch.txs.unwrap() {
+                bytes.extend_from_slice(&tx)
+            }
+            ids.push(batch.batch_id.unwrap());
             batch_hashes.push(sha256(&bytes).to_vec());
         }
 

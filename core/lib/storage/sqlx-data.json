@@ -2548,6 +2548,30 @@
       ]
     }
   },
+  "6a8f81ac8f56574e5a048e6acfa04d1c9f0adf348f1eee2ac0dde84f3cf63c40": {
+    "query": "SELECT batch_id, array_agg(tx_hash) as txs\n                FROM executed_transactions\n                GROUP BY batch_id\n                HAVING batch_id IS NOT NULL AND batch_id != 0;\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "batch_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "txs",
+          "type_info": "ByteaArray"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        null
+      ]
+    }
+  },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
     "query": "SELECT max(number) FROM blocks",
     "describe": {
@@ -4871,6 +4895,19 @@
       ]
     }
   },
+  "d5c6be595f62ef758fd39d8263139cf2ce777612bae32805daba299881d9b1e0": {
+    "query": "\n                UPDATE executed_priority_operations\n                SET tx_hash = u.tx_hash\n                FROM (\n                    SELECT * FROM\n                    UNNEST($1::bytea[], $2::bigint[])\n                    AS u(tx_hash, id)\n                ) u\n                WHERE priority_op_serialid = u.id\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
+          "Int8Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "d71db9de5e4ec2dc9a511d4a1247d912b15250bbd8f834f11b252de653c73176": {
     "query": "DELETE FROM account_creates WHERE block_number > $1",
     "describe": {
@@ -5226,6 +5263,42 @@
       "nullable": []
     }
   },
+  "e80dba3fa7252902a9c53f7500f7e498bbe062eb833baeb271ecb1c9af468dc1": {
+    "query": "SELECT priority_op_serialid, eth_hash, eth_block, eth_block_index FROM executed_priority_operations",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "priority_op_serialid",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 2,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_block_index",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {
     "query": "\n                SELECT * FROM prover_job_queue\n                WHERE job_status = $1\n                ORDER BY (job_priority, id, first_block)\n                LIMIT 1\n            ",
     "describe": {
@@ -5307,6 +5380,19 @@
       "parameters": {
         "Left": [
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "ec07bf1dcfe77b28e753f3f145ff02ce47924ed311b2b7848b6e13c377d1a235": {
+    "query": "\n                INSERT INTO txs_batches_hashes (batch_id, batch_hash)\n                SELECT u.batch_id, u.batch_hash\n                FROM UNNEST ($1::bigint[], $2::bytea[])\n                AS u(batch_id, batch_hash)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "ByteaArray"
         ]
       },
       "nullable": []

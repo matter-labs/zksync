@@ -6,6 +6,7 @@ async fn main() -> anyhow::Result<()> {
         .operations_schema()
         .calculate_priority_ops_hashes()
         .await?;
+    println!("Priority op hashes were calculated");
 
     storage
         .chain()
