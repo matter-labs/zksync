@@ -97,7 +97,7 @@ jobs:
 
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-      DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
+      DEPLOY_APPS: -l name=server -l name=prover
       IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
       HFENV: zksync-loadtest
 
