@@ -129,24 +129,23 @@ jobs:
         run: |
           echo "!!Run my test!!"
 
-  cleanup:
-    name: Cleanup loadtest environment
-    runs-on: [k8s, stage, deployer]
-    needs: loadtest
-    if: always()
-    container:
-      image: dysnix/kubectl:v1.16-gcloud
-    env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-
-    steps:
-      -
-        name: Create ~/.kube/config
-        run: .github/scripts/write-kubeconf.sh
-      -
-        name: Scale loadtest to 0 replicas
-        run: |
-          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/explorer
-          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/server
-          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/prover
-          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/sqlproxy-gcloud-sqlproxy
+#  cleanup:
+#    name: Cleanup loadtest environment
+#    runs-on: [k8s, stage, deployer]
+#    needs: loadtest
+#    if: always()
+#    container:
+#      image: dysnix/kubectl:v1.16-gcloud
+#    env:
+#      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+#
+#    steps:
+#      -
+#        name: Create ~/.kube/config
+#        run: .github/scripts/write-kubeconf.sh
+#      -
+#        name: Scale loadtest to 0 replicas
+#        run: |
+#          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/explorer
+#          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/server
+#          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/prover
