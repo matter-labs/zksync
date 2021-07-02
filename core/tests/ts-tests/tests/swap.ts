@@ -1,4 +1,4 @@
-import { Tester } from './tester';
+import { Tester, expectThrow } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, utils, wallet } from 'zksync';
 import { BigNumber } from 'ethers';
@@ -23,8 +23,70 @@ declare module './tester' {
             amount: BigNumber
         ): Promise<void>;
         testSwapNFT(walletA: Wallet, walletB: Wallet, token: TokenLike, nft: number, amount: BigNumber): Promise<void>;
+        testSwapMissingSignatures(
+            walletA: Wallet,
+            walletB: Wallet,
+            tokenA: TokenLike,
+            tokenB: TokenLike,
+            amount: BigNumber
+        ): Promise<void>;
     }
 }
+
+Tester.prototype.testSwapMissingSignatures = async function (
+    walletA: Wallet,
+    walletB: Wallet,
+    tokenA: TokenLike,
+    tokenB: TokenLike,
+    amount: BigNumber
+) {
+    const { totalFee: fee } = await this.syncProvider.getTransactionFee('Swap', walletA.address(), tokenA);
+
+    const orderA = await walletA.getOrder({
+        tokenSell: tokenA,
+        tokenBuy: tokenB,
+        amount,
+        ratio: utils.weiRatio({
+            [tokenA]: 1,
+            [tokenB]: 2
+        })
+    });
+
+    const orderB = await walletB.getOrder({
+        tokenSell: tokenB,
+        tokenBuy: tokenA,
+        amount: amount.mul(2),
+        ratio: utils.weiRatio({
+            [tokenA]: 1,
+            [tokenB]: 2
+        })
+    });
+
+    const tokenAId = this.syncProvider.tokenSet.resolveTokenId(tokenA);
+
+    const signedSwap = await walletA.signSyncSwap({
+        orders: [orderA, orderB],
+        feeToken: tokenAId,
+        fee,
+        amounts: [amount, amount.mul(2)],
+        nonce: await walletA.getNonce()
+    });
+
+    // @ts-ignore
+    const ethSignatures: types.TxEthSignature[] = signedSwap.ethereumSignature;
+
+    // first, try submitting without eth signatures
+    signedSwap.ethereumSignature = null;
+    await expectThrow(wallet.submitSignedTransaction(signedSwap, this.syncProvider), 'MissingEthSignature');
+
+    // then, try submitting without eth signatures for orders
+    signedSwap.ethereumSignature = ethSignatures[0];
+    await expectThrow(wallet.submitSignedTransaction(signedSwap, this.syncProvider), 'MissingEthSignature');
+
+    // then, try submitting empty eth signatures for orders
+    signedSwap.ethereumSignature = [ethSignatures[0], null, null];
+    await expectThrow(wallet.submitSignedTransaction(signedSwap, this.syncProvider), 'MissingEthSignature');
+};
 
 Tester.prototype.testSwapNFT = async function (
     walletA: Wallet,
