@@ -213,19 +213,8 @@ impl RpcApp {
         let result =
             Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
-        let token = self.tx_sender.token_info_from_id(token).await?;
-        let allowed_subsidy = self
-            .tx_sender
-            .subsidy_accumulator
-            .get_allowed_subsidy(&token.address);
-        let fee = if allowed_subsidy >= result.subsidy_size_usd {
-            result.subsidy_fee
-        } else {
-            result.normal_fee
-        };
-
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
-        Ok(fee)
+        Ok(result.normal_fee)
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -257,20 +246,9 @@ impl RpcApp {
         .collect();
         let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
-        let token = self.tx_sender.token_info_from_id(token).await?;
-        let allowed_subsidy = self
-            .tx_sender
-            .subsidy_accumulator
-            .get_allowed_subsidy(&token.address);
-        let fee = if allowed_subsidy >= result.subsidy_size_usd {
-            result.subsidy_fee
-        } else {
-            result.normal_fee
-        };
-
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
         Ok(TotalFee {
-            total_fee: fee.total_fee,
+            total_fee: result.normal_fee.total_fee,
         })
     }
 
