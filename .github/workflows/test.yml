@@ -123,12 +123,19 @@ jobs:
     # runs-on: [CI-worker, FAST]
     runs-on: [k8s, stage, deployer]
     needs: deploy
+    env:
+      WEB3_URL: ${{secrets.CI_LOADTEST_WEB3_URL}}
+      MASTER_WALLET_PK: ${{secrets.CI_LOADTEST_MAIN_PRIVKEY}}
+      ACCOUNTS_AMOUNT: 20
+      OPERATIONS_PER_ACCOUNT: 10
+      MAIN_TOKEN: "DAI"
+      ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/"
+      ETH_NETWORK: "rinkeby"
     steps:
       -
-        name: Do something
+        name: Run loadtest
         run: |
-          echo "!!Run my test!!"
-
+          cargo run --bin loadnext
 #  cleanup:
 #    name: Cleanup loadtest environment
 #    runs-on: [k8s, stage, deployer]
