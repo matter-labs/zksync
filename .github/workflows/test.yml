@@ -116,7 +116,7 @@ jobs:
           cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
 
           UPDATE_REPOS=y helmfile -e $HFENV repos
-          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+          IMAGE_TAG=b2f056a helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
 
   loadtest:
     name: Perform loadtest
