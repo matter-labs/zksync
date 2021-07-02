@@ -232,18 +232,47 @@ where
         self.tree_state = tree_state;
     }
 
+    async fn store_tree_cache(&mut self, interactor: &mut I) {
+        vlog::info!(
+            "Storing the tree cache, block number: {}",
+            self.tree_state.state.block_number
+        );
+        self.tree_state.state.root_hash();
+        let tree_cache = self.tree_state.state.get_balance_tree().get_internals();
+        interactor
+            .store_tree_cache(
+                self.tree_state.state.block_number,
+                serde_json::to_value(tree_cache).expect("failed to serialize tree cache"),
+            )
+            .await;
+    }
+
     /// Stops states from storage
     pub async fn load_state_from_storage(&mut self, interactor: &mut I) -> bool {
         vlog::info!("Loading state from storage");
         let state = interactor.get_storage_state().await;
         self.events_state = interactor.get_block_events_state_from_storage().await;
-        let tree_state = interactor.get_tree_state().await;
-        self.tree_state = TreeState::load(
-            tree_state.last_block_number,     // current block
-            tree_state.account_map,           // account map
-            tree_state.unprocessed_prior_ops, // unprocessed priority op
-            tree_state.fee_acc_id,            // fee account
-        );
+
+        let mut is_cached = false;
+        // Try to load tree cache from the database.
+        self.tree_state = if let Some(cache) = interactor.get_cached_tree_state().await {
+            vlog::info!("Using tree cache from the database");
+            is_cached = true;
+            TreeState::restore_from_cache(
+                cache.tree_cache,
+                cache.account_map,
+                cache.current_block,
+                cache.nfts,
+            )
+        } else {
+            let tree_state = interactor.get_tree_state().await;
+            TreeState::load(
+                tree_state.last_block_number,
+                tree_state.account_map,
+                tree_state.unprocessed_prior_ops,
+                tree_state.fee_acc_id,
+            )
+        };
         match state {
             StorageUpdateState::Events => {
                 // Update operations
@@ -268,7 +297,12 @@ where
             self.tree_state.root_hash()
         );
 
-        self.finite_mode && (total_verified_blocks == *last_verified_block)
+        let is_finished = self.finite_mode && (total_verified_blocks == *last_verified_block);
+        // Save tree cache if necessary.
+        if is_finished && !is_cached {
+            self.store_tree_cache(interactor).await;
+        }
+        is_finished
     }
 
     /// Activates states updates
@@ -324,7 +358,10 @@ where
                             panic!("Final hash was not met during the state restoring process");
                         }
 
-                        // We've restored all the blocks, our job is done.
+                        // We've restored all the blocks, our job is done. Store the tree cache for
+                        // consequent usage.
+                        self.store_tree_cache(interactor).await;
+
                         break;
                     }
                 }

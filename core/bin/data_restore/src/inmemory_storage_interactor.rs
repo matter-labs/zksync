@@ -14,8 +14,7 @@ use crate::{
     events::{BlockEvent, EventType},
     events_state::EventsState,
     rollup_ops::RollupOpsBlock,
-    storage_interactor::StorageInteractor,
-    storage_interactor::StoredTreeState,
+    storage_interactor::{CachedTreeState, StorageInteractor, StoredTreeState},
 };
 
 pub struct InMemoryStorageInteractor {
@@ -147,6 +146,18 @@ impl StorageInteractor for InMemoryStorageInteractor {
 
     async fn get_storage_state(&mut self) -> StorageUpdateState {
         self.storage_state
+    }
+
+    async fn get_cached_tree_state(&mut self) -> Option<CachedTreeState> {
+        None
+    }
+
+    async fn store_tree_cache(
+        &mut self,
+        _block_number: BlockNumber,
+        _tree_cache: serde_json::Value,
+    ) {
+        // Inmemory storage doesn't support caching.
     }
 }
 

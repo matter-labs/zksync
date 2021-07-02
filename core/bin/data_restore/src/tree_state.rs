@@ -1,19 +1,20 @@
 use crate::rollup_ops::RollupOpsBlock;
 use anyhow::format_err;
-use zksync_crypto::Fr;
+use std::collections::HashMap;
+use zksync_crypto::{params::account_tree_depth, Fr};
 use zksync_state::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, TransferOutcome, ZkSyncState},
 };
-use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use zksync_types::operations::ZkSyncOp;
-use zksync_types::priority_ops::PriorityOp;
-use zksync_types::priority_ops::ZkSyncPriorityOp;
-use zksync_types::tx::{
-    ChangePubKey, Close, ForcedExit, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx,
+use zksync_types::{
+    account::Account,
+    block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx},
+    operations::ZkSyncOp,
+    priority_ops::{PriorityOp, ZkSyncPriorityOp},
+    tx::{ChangePubKey, Close, ForcedExit, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx},
+    AccountId, AccountMap, AccountTree, AccountUpdates, Address, BlockNumber, MintNFT, TokenId,
+    H256, NFT,
 };
-use zksync_types::{account::Account, MintNFT};
-use zksync_types::{AccountId, AccountMap, AccountUpdates, Address, BlockNumber, H256};
 
 /// Rollup accounts states
 pub struct TreeState {
@@ -61,6 +62,51 @@ impl TreeState {
             .get_account(fee_account)
             .expect("Cant get fee account from tree state")
             .address;
+        Self {
+            state,
+            current_unprocessed_priority_op,
+            last_fee_account_address,
+        }
+    }
+
+    /// Restores the tree state from the storage cache
+    ///
+    /// # Arguments
+    ///
+    /// * `tree_cache` - Merkle tree cache
+    /// * `account_map` - Account map obtained from the latest finalized state
+    /// * `current_block` - Latest confirmed verified block
+    /// * `nfts` - Finalized NFTs
+    ///
+    pub fn restore_from_cache(
+        tree_cache: serde_json::Value,
+        account_map: AccountMap,
+        current_block: Block,
+        nfts: HashMap<TokenId, NFT>,
+    ) -> Self {
+        let mut account_id_by_address = HashMap::with_capacity(account_map.len());
+        let mut balance_tree = AccountTree::new(account_tree_depth());
+
+        balance_tree.set_internals(
+            serde_json::from_value(tree_cache).expect("failed to deserialize tree cache"),
+        );
+
+        account_map.into_iter().for_each(|(account_id, account)| {
+            account_id_by_address.insert(account.address, account_id);
+            balance_tree.items.insert(*account_id as u64, account);
+        });
+
+        let state = ZkSyncState::new(
+            balance_tree,
+            account_id_by_address,
+            current_block.block_number,
+            nfts,
+        );
+        let last_fee_account_address = state
+            .get_account(current_block.fee_account)
+            .expect("Failed to obtain fee account address from the cached tree")
+            .address;
+        let current_unprocessed_priority_op = current_block.processed_priority_ops.1;
         Self {
             state,
             current_unprocessed_priority_op,
