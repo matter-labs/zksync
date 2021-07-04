@@ -139,7 +139,7 @@ async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Load the txs and check that they match the expected list.
-    let txs_from_db = MempoolSchema(&mut storage)
+    let (txs_from_db, _) = MempoolSchema(&mut storage)
         .load_txs()
         .await
         .expect("Can't load txs");
@@ -196,7 +196,7 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         .await?;
 
     // Load the txs and check that they match the expected list.
-    let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
+    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
     assert_eq!(txs_from_db.len(), elements_count);
 
     assert!(matches!(txs_from_db[0], SignedTxVariant::Tx(_)));
@@ -240,7 +240,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Load the txs and check that they match the expected list.
-    let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
+    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
@@ -289,7 +289,7 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let retained_hashes: Vec<_> = txs[1..].iter().map(|tx| tx.hash()).collect();
 
     // Load the txs and check that they match the expected list.
-    let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
+    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
@@ -412,7 +412,7 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
         .await?;
 
     // Check that the first 3 txs are executed and 2 last are in mempool.
-    assert_eq!(MempoolSchema(&mut storage).load_txs().await?.len(), 2);
+    assert_eq!(MempoolSchema(&mut storage).load_txs().await?.0.len(), 2);
     for block_number in 1..=5 {
         let tx_hash = txs.get(block_number - 1).unwrap().hash();
         let tx_in_executed = OperationsSchema(&mut storage)

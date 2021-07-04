@@ -1,5 +1,10 @@
 // Built-in deps
-use std::{collections::VecDeque, convert::TryFrom, str::FromStr, time::Instant};
+use std::{
+    collections::VecDeque,
+    convert::{TryFrom, TryInto},
+    str::FromStr,
+    time::Instant,
+};
 // External imports
 use itertools::Itertools;
 // Workspace imports
@@ -7,7 +12,7 @@ use zksync_api_types::v02::transaction::{
     ApiTxBatch, BatchStatus, TxHashSerializeWrapper, TxInBlockStatus,
 };
 use zksync_types::{
-    mempool::SignedTxVariant,
+    mempool::{RevertedTxVariant, SignedTxVariant},
     tx::{TxEthSignature, TxHash},
     BlockNumber, SignedZkSyncTx,
 };
@@ -28,7 +33,9 @@ pub struct MempoolSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Loads all the transactions stored in the mempool schema.
-    pub async fn load_txs(&mut self) -> QueryResult<VecDeque<SignedTxVariant>> {
+    pub async fn load_txs(
+        &mut self,
+    ) -> QueryResult<(VecDeque<SignedTxVariant>, VecDeque<RevertedTxVariant>)> {
         let start = Instant::now();
         // Load the transactions from mempool along with corresponding batch IDs.
         let txs: Vec<MempoolTx> = sqlx::query_as!(
@@ -56,43 +63,45 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         });
 
         let mut txs = Vec::new();
+        let mut reverted_txs = Vec::new();
 
         for (batch_id, group) in grouped_txs.into_iter() {
-            let deserialized_txs: Vec<SignedZkSyncTx> = group
-                .map(|tx_object| -> QueryResult<SignedZkSyncTx> {
-                    let tx = serde_json::from_value(tx_object.tx)?;
-                    let sign_data = match tx_object.eth_sign_data {
-                        None => None,
-                        Some(sign_data_value) => serde_json::from_value(sign_data_value)?,
-                    };
+            if let Some(batch_id) = batch_id {
+                let mut group = group.peekable();
+                let next_priority_op_serial_id = group.peek().unwrap().next_priority_op_serial_id;
+                let deserialized_txs = group
+                    .map(SignedZkSyncTx::try_from)
+                    .collect::<Result<Vec<SignedZkSyncTx>, serde_json::Error>>()?;
+                let variant = SignedTxVariant::batch(deserialized_txs, batch_id, vec![]);
 
-                    Ok(SignedZkSyncTx {
-                        tx,
-                        eth_sign_data: sign_data,
-                    })
-                })
-                .collect::<Result<Vec<SignedZkSyncTx>, anyhow::Error>>()?;
-
-            match batch_id {
-                Some(batch_id) => {
-                    // Group of batched transactions.
-                    // Signatures will be loaded afterwards.
-                    let variant = SignedTxVariant::batch(deserialized_txs, batch_id, vec![]);
-                    txs.push(variant);
+                match next_priority_op_serial_id {
+                    Some(serial_id) => {
+                        reverted_txs.push(RevertedTxVariant::new(variant, serial_id.try_into()?));
+                    }
+                    None => txs.push(variant),
                 }
-                None => {
-                    // Group of non-batched transactions.
-                    let mut variants = deserialized_txs
-                        .into_iter()
-                        .map(SignedTxVariant::from)
-                        .collect();
-                    txs.append(&mut variants);
+            } else {
+                for mempool_tx in group {
+                    let next_priority_op_serial_id = mempool_tx.next_priority_op_serial_id;
+                    let signed_tx = SignedZkSyncTx::try_from(mempool_tx)?;
+                    let variant = SignedTxVariant::Tx(signed_tx);
+
+                    match next_priority_op_serial_id {
+                        Some(serial_id) => {
+                            reverted_txs
+                                .push(RevertedTxVariant::new(variant, serial_id.try_into()?));
+                        }
+                        None => txs.push(variant),
+                    }
                 }
             }
         }
 
         // Load signatures for batches.
-        for tx in &mut txs {
+        for tx in txs
+            .iter_mut()
+            .chain(reverted_txs.iter_mut().map(AsMut::as_mut))
+        {
             if let SignedTxVariant::Batch(batch) = tx {
                 let eth_signatures: Vec<TxEthSignature> = sqlx::query!(
                     "SELECT eth_signature FROM txs_batches_signatures
@@ -114,18 +123,11 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         // Now transactions should be sorted by the nonce (transaction natural order)
         // According to our convention in batch `fee transaction` would be the last one, so we would use nonce from it as a key for sort
-        txs.sort_by_key(|tx| match tx {
-            SignedTxVariant::Tx(tx) => tx.tx.nonce(),
-            SignedTxVariant::Batch(batch) => batch
-                .txs
-                .last()
-                .expect("batch must contain at least one transaction")
-                .tx
-                .nonce(),
-        });
+        txs.sort_by_key(SignedTxVariant::nonce);
+        reverted_txs.sort_by_key(|reverted_tx| reverted_tx.as_ref().nonce());
 
         metrics::histogram!("sql.chain.mempool.load_txs", start.elapsed());
-        Ok(txs.into())
+        Ok((txs.into(), reverted_txs.into()))
     }
 
     /// Adds a new transactions batch to the mempool schema.
@@ -364,7 +366,15 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// invoked periodically with a big interval (to prevent possible database bloating).
     pub async fn collect_garbage(&mut self) -> QueryResult<()> {
         let start = Instant::now();
-        let all_txs: Vec<_> = self.load_txs().await?.into_iter().collect();
+        let (queue, reverted_queue) = self.load_txs().await?;
+        let all_txs: Vec<_> = queue
+            .into_iter()
+            .chain(
+                reverted_queue
+                    .into_iter()
+                    .map(RevertedTxVariant::into_inner),
+            )
+            .collect();
         let mut tx_hashes_to_remove = Vec::new();
 
         for tx in all_txs {

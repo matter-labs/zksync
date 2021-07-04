@@ -1,6 +1,6 @@
 use super::{
     tx::{TxEthSignature, TxHash},
-    SerialId, SignedZkSyncTx,
+    Nonce, SerialId, SignedZkSyncTx,
 };
 
 /// A collection of transactions that must be executed together.
@@ -53,6 +53,17 @@ impl SignedTxVariant {
             Self::Batch(batch) => batch.txs.clone(),
         }
     }
+
+    pub fn nonce(&self) -> Nonce {
+        match self {
+            SignedTxVariant::Tx(tx) => tx.nonce(),
+            SignedTxVariant::Batch(batch) => batch
+                .txs
+                .last()
+                .expect("Transaction batch cannot be empty")
+                .nonce(),
+        }
+    }
 }
 
 pub struct RevertedTxVariant {
@@ -63,6 +74,12 @@ pub struct RevertedTxVariant {
 impl AsRef<SignedTxVariant> for RevertedTxVariant {
     fn as_ref(&self) -> &SignedTxVariant {
         &self.inner
+    }
+}
+
+impl AsMut<SignedTxVariant> for RevertedTxVariant {
+    fn as_mut(&mut self) -> &mut SignedTxVariant {
+        &mut self.inner
     }
 }
 

@@ -198,7 +198,7 @@ impl MempoolState {
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
-        let all_mempool_txs = transaction
+        let (all_mempool_txs, _) = transaction
             .chain()
             .mempool_schema()
             .load_txs()
