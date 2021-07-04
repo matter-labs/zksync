@@ -1796,6 +1796,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -1807,7 +1812,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
@@ -4153,6 +4159,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -4164,7 +4175,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
@@ -5149,6 +5161,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -5162,7 +5179,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
