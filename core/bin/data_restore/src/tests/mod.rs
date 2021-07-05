@@ -138,12 +138,7 @@ fn create_transaction_v4(number: u32, stored_block: Block, blocks: Vec<Block>) -
         gas_price: u32_to_32bytes(1).into(),
         gas: u32_to_32bytes(1).into(),
         input: Bytes(input_data),
-        v: None,
-        r: None,
-        s: None,
         raw: None,
-        transaction_type: None,
-        access_list: None,
     }
 }
 fn create_transaction(number: u32, block: Block) -> Transaction {
@@ -176,12 +171,7 @@ fn create_transaction(number: u32, block: Block) -> Transaction {
         gas_price: u32_to_32bytes(1).into(),
         gas: u32_to_32bytes(1).into(),
         input: Bytes(input_data),
-        v: None,
-        r: None,
-        s: None,
         raw: None,
-        transaction_type: None,
-        access_list: None,
     }
 }
 

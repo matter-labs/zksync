@@ -28,8 +28,8 @@ zksync_gateway_watcher = { path = "../../lib/gateway_watcher", version = "1.0" }
 
 num = { version = "0.3.1", features = ["serde"] }
 
-ethabi = "14.0.0"
-web3 = "0.16.0"
+ethabi = "13.0.0"
+web3 = "0.15.0"
 serde = "1.0.90"
 serde_json = "1.0.0"
 metrics = "=0.13.0-alpha.8"

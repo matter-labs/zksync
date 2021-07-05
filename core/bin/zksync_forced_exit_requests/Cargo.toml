@@ -26,8 +26,8 @@ vlog = { path = "../../lib/vlog", version = "1.0" }
 zksync_core = { path = "../zksync_core", version = "1.0" }
 zksync_api = { path = "../zksync_api", version = "1.0" }
 actix-web = "3.0.0"
-ethabi = "14.0.0"
-web3 = "0.16.0"
+ethabi = "13.0.0"
+web3 = "0.15.0"
 log = "0.4"
 hex = "0.4"
 metrics = "0.13.0-alpha.8"
