@@ -266,12 +266,10 @@ impl MempoolBlocksHandler {
         let mut proposed_block = ProposedBlock::new();
 
         let mut mempool_state = self.mempool_state.write().await;
-        'queue: loop {
-            // Peek into the reverted queue.
-            let reverted_tx = match mempool_state.transactions_queue.reverted_queue_front() {
-                Some(reverted_tx) => reverted_tx,
-                None => break,
-            };
+        // Peek into the reverted queue.
+        'queue: while let Some(reverted_tx) =
+            mempool_state.transactions_queue.reverted_queue_front()
+        {
             // Try to fill the block with missing priority operations.
             while *current_unprocessed_priority_op < reverted_tx.next_priority_op_id {
                 let eth_watch_resp = oneshot::channel();
