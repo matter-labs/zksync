@@ -7,8 +7,8 @@ use zksync_api_types::{
     v02::{
         block::BlockInfo,
         pagination::{
-            AccountTxsRequest, ApiEither, BlockAndTxHash, Paginated, PaginationDirection,
-            PaginationQuery, PendingOpsRequest,
+            AccountTxsRequest, ApiEither, BlockAndTxHash, Paginated, PaginationQuery,
+            PendingOpsRequest,
         },
         transaction::{Transaction, TxHashSerializeWrapper},
     },
@@ -61,20 +61,10 @@ impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
             .get_count()
             .await
             .map_err(Error::storage)?;
-
         transaction.commit().await.map_err(Error::storage)?;
 
-        let mut vec_tokens: Vec<_> = tokens.values().cloned().collect();
-        match query.direction {
-            PaginationDirection::Newer => {
-                vec_tokens.sort_by(|a, b| a.id.cmp(&b.id));
-            }
-            PaginationDirection::Older => {
-                vec_tokens.sort_by(|a, b| b.id.cmp(&a.id));
-            }
-        };
         Ok(Paginated::new(
-            vec_tokens,
+            tokens,
             query.from,
             query.limit,
             query.direction,

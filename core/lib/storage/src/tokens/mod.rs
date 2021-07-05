@@ -128,7 +128,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         from: TokenId,
         limit: Option<u32>,
-    ) -> QueryResult<HashMap<TokenId, Token>> {
+    ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
         let limit = limit.map(i64::from);
         let tokens = sqlx::query_as!(
@@ -145,13 +145,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        let result = tokens
-            .into_iter()
-            .map(|t| {
-                let token: Token = t.into();
-                (token.id, token)
-            })
-            .collect();
+        let result = tokens.into_iter().map(Token::from).collect();
         metrics::histogram!("sql.token.load_tokens_asc", start.elapsed());
         Ok(result)
     }
@@ -161,14 +155,14 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         from: TokenId,
         limit: Option<u32>,
-    ) -> QueryResult<HashMap<TokenId, Token>> {
+    ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
         let limit = limit.map(i64::from);
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
             SELECT * FROM tokens
-            WHERE id <= $1
+            WHERE id <= $1 AND is_nft = false
             ORDER BY id DESC
             LIMIT $2
             "#,
@@ -178,13 +172,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        let result = tokens
-            .into_iter()
-            .map(|t| {
-                let token: Token = t.into();
-                (token.id, token)
-            })
-            .collect();
+        let result = tokens.into_iter().map(Token::from).collect();
         metrics::histogram!("sql.token.load_tokens_desc", start.elapsed());
         Ok(result)
     }
@@ -193,14 +181,15 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Alongside with the tokens added via `store_token` method, the default `ETH` token
     /// is returned.
     pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
-        self.load_tokens_asc(TokenId(0), None).await
+        let tokens = self.load_tokens_asc(TokenId(0), None).await?;
+        Ok(tokens.into_iter().map(|token| (token.id, token)).collect())
     }
 
     /// Loads tokens for the given pagination query
     pub async fn load_token_page(
         &mut self,
         query: &PaginationQuery<TokenId>,
-    ) -> QueryResult<HashMap<TokenId, Token>> {
+    ) -> QueryResult<Vec<Token>> {
         let tokens = match query.direction {
             PaginationDirection::Newer => {
                 self.load_tokens_asc(query.from, Some(query.limit)).await?
