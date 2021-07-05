@@ -729,6 +729,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         match op {
             AggregatedOperation::CommitBlocks(operation) => {
                 let args = operation.get_eth_tx_args();
+                println!("args {:?}", &args);
                 self.ethereum
                     .encode_tx_data("commitBlocks", args.as_slice())
             }
