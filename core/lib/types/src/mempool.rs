@@ -66,6 +66,7 @@ impl SignedTxVariant {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct RevertedTxVariant {
     inner: SignedTxVariant,
     pub next_priority_op_id: SerialId,

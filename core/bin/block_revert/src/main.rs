@@ -21,6 +21,12 @@ async fn revert_blocks_in_storage(
 
     transaction
         .chain()
+        .mempool_schema()
+        .return_executed_txs_to_mempool(last_block)
+        .await?;
+    println!("`mempool_txs`, `executed_transactions` tables are updated");
+    transaction
+        .chain()
         .block_schema()
         .remove_blocks(last_block)
         .await?;
@@ -102,13 +108,6 @@ async fn revert_blocks_in_storage(
         .update_eth_parameters(last_block)
         .await?;
     println!("`eth_parameters` table is updated");
-
-    transaction
-        .chain()
-        .mempool_schema()
-        .return_executed_txs_to_mempool(last_block)
-        .await?;
-    println!("`mempool_txs`, `executed_transactions` tables are updated");
 
     transaction.commit().await?;
 
