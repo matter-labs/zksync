@@ -121,11 +121,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             }
         }
 
-        // Now transactions should be sorted by the nonce (transaction natural order)
-        // According to our convention in batch `fee transaction` would be the last one, so we would use nonce from it as a key for sort
-        txs.sort_by_key(SignedTxVariant::nonce);
-        reverted_txs.sort_by_key(|reverted_tx| reverted_tx.as_ref().nonce());
-
         metrics::histogram!("sql.chain.mempool.load_txs", start.elapsed());
         Ok((txs.into(), reverted_txs.into()))
     }
@@ -536,7 +531,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             let tx_hash = hex::encode(tx.hash().as_ref());
             let tx_value =
                 serde_json::to_value(tx).expect("Failed to serialize reverted transaction");
-            let eth_sign_data = eth_sign_data.map(|sign_data| {
+            let eth_sign_data = eth_sign_data.as_ref().map(|sign_data| {
                 serde_json::to_value(sign_data).expect("Failed to serialize Ethereum sign data")
             });
 

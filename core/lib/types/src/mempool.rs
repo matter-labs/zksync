@@ -1,6 +1,6 @@
 use super::{
     tx::{TxEthSignature, TxHash},
-    Nonce, SerialId, SignedZkSyncTx,
+    SerialId, SignedZkSyncTx,
 };
 
 /// A collection of transactions that must be executed together.
@@ -51,17 +51,6 @@ impl SignedTxVariant {
         match self {
             Self::Tx(tx) => vec![tx.clone()],
             Self::Batch(batch) => batch.txs.clone(),
-        }
-    }
-
-    pub fn nonce(&self) -> Nonce {
-        match self {
-            SignedTxVariant::Tx(tx) => tx.nonce(),
-            SignedTxVariant::Batch(batch) => batch
-                .txs
-                .last()
-                .expect("Transaction batch cannot be empty")
-                .nonce(),
         }
     }
 }
