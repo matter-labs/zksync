@@ -96,6 +96,10 @@ pub struct ProposedBlock {
 }
 
 impl ProposedBlock {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.priority_ops.is_empty() && self.txs.is_empty()
     }
@@ -198,17 +202,18 @@ impl MempoolState {
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
-        let (all_mempool_txs, _) = transaction
+        let (mempool_txs, reverted_txs) = transaction
             .chain()
             .mempool_schema()
             .load_txs()
             .await
             .expect("Attempt to restore mempool txs from DB failed");
+        let (mempool_size, reverted_queue_size) = (mempool_txs.len(), reverted_txs.len());
 
-        // Transactions can become ready when knowing the block timestamp
-        let mut transactions_queue = MempoolTransactionsQueue::new();
+        // Initialize the queue with reverted transactions loaded from the database.
+        let mut transactions_queue = MempoolTransactionsQueue::new(reverted_txs);
 
-        for tx in all_mempool_txs.clone() {
+        for tx in mempool_txs {
             transactions_queue.add_tx_variant(tx);
         }
 
@@ -218,8 +223,8 @@ impl MempoolState {
             .expect("mempool db transaction commit");
 
         vlog::info!(
-            "{} transactions were restored from the persistent mempool storage",
-            all_mempool_txs.len()
+            "{} transactions were restored from the persistent mempool storage, reverted queue size: {}",
+            mempool_size, reverted_queue_size
         );
 
         Self {
@@ -253,14 +258,85 @@ struct MempoolBlocksHandler {
 }
 
 impl MempoolBlocksHandler {
+    async fn prepare_proposed_block(
+        &mut self,
+        current_unprocessed_priority_op: &mut u64,
+    ) -> (usize, ProposedBlock) {
+        let mut chunks_left = self.max_block_size_chunks;
+        let mut proposed_block = ProposedBlock::new();
+
+        let mut mempool_state = self.mempool_state.write().await;
+        'queue: loop {
+            // Peek into the reverted queue.
+            let reverted_tx = match mempool_state.transactions_queue.reverted_queue_front() {
+                Some(reverted_tx) => reverted_tx,
+                None => break,
+            };
+            // Try to fill the block with missing priority operations.
+            while *current_unprocessed_priority_op < reverted_tx.next_priority_op_id {
+                let eth_watch_resp = oneshot::channel();
+                self.eth_watch_req
+                    .send(EthWatchRequest::GetPriorityOpBySerialId {
+                        serial_id: *current_unprocessed_priority_op,
+                        resp: eth_watch_resp.0,
+                    })
+                    .await
+                    .expect("Eth watch requests receiver is dropped");
+                let priority_op = eth_watch_resp
+                    .1
+                    .await
+                    .expect("Failed to receive priority operation from Eth watch")
+                    .expect("Operation not found in the priority queue");
+                // If the operation doesn't fit, don't increment the serial id and return
+                // the proposed block.
+                if priority_op.data.chunks() <= chunks_left {
+                    chunks_left -= priority_op.data.chunks();
+                    proposed_block.priority_ops.push(priority_op);
+                    *current_unprocessed_priority_op += 1;
+                } else {
+                    break 'queue;
+                }
+            }
+
+            // If the transaction fits into the block, pop it from the queue.
+            let required_chunks = mempool_state.required_chunks(reverted_tx.as_ref());
+            if required_chunks <= chunks_left {
+                chunks_left -= required_chunks;
+                let reverted_tx = mempool_state
+                    .transactions_queue
+                    .reverted_queue_pop_front()
+                    .unwrap();
+                proposed_block.txs.push(reverted_tx.into_inner());
+            } else {
+                break;
+            }
+        }
+
+        if !proposed_block.is_empty() {
+            vlog::debug!(
+                "Proposing new block with reverted operations, chunks used: {}",
+                self.max_block_size_chunks - chunks_left
+            );
+        }
+
+        (chunks_left, proposed_block)
+    }
+
     async fn propose_new_block(
         &mut self,
         current_unprocessed_priority_op: u64,
         block_timestamp: u64,
     ) -> ProposedBlock {
         let start = std::time::Instant::now();
+        let mut current_unprocessed_priority_op = current_unprocessed_priority_op;
+        // Initialize the proposed block. In most cases it will be empty
+        // unless the server is restarted after reverting blocks. In this case,
+        // the reverted queue will be used first.
+        let (chunks_left, mut proposed_block) = self
+            .prepare_proposed_block(&mut current_unprocessed_priority_op)
+            .await;
         let (chunks_left, priority_ops) = self
-            .select_priority_ops(current_unprocessed_priority_op)
+            .select_priority_ops(chunks_left, current_unprocessed_priority_op)
             .await;
         let (_chunks_left, txs) = self
             .prepare_tx_for_block(chunks_left, block_timestamp)
@@ -272,13 +348,18 @@ impl MempoolBlocksHandler {
         if !txs.is_empty() {
             vlog::debug!("Proposed txs for block: {:?}", txs);
         }
+
+        proposed_block.txs.extend(txs.into_iter());
+        proposed_block.priority_ops.extend(priority_ops.into_iter());
         metrics::histogram!("mempool.propose_new_block", start.elapsed());
-        ProposedBlock { priority_ops, txs }
+
+        proposed_block
     }
 
     /// Returns: chunks left from max amount of chunks, ops selected
     async fn select_priority_ops(
         &self,
+        chunks_left: usize,
         current_unprocessed_priority_op: u64,
     ) -> (usize, Vec<PriorityOp>) {
         let eth_watch_resp = oneshot::channel();
@@ -286,7 +367,7 @@ impl MempoolBlocksHandler {
             .clone()
             .send(EthWatchRequest::GetPriorityQueueOps {
                 op_start_id: current_unprocessed_priority_op,
-                max_chunks: self.max_block_size_chunks,
+                max_chunks: chunks_left,
                 resp: eth_watch_resp.0,
             })
             .await
@@ -295,7 +376,7 @@ impl MempoolBlocksHandler {
         let priority_ops = eth_watch_resp.1.await.expect("Err response from eth watch");
 
         (
-            self.max_block_size_chunks
+            chunks_left
                 - priority_ops
                     .iter()
                     .map(|op| op.data.chunks())
