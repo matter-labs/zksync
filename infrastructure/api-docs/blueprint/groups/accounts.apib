@@ -1,14 +1,13 @@
 # Group Accounts
 
 ## api/v0.2/accounts/{accountIdOrAddress}/{stateType} [/accounts/{accountIdOrAddress}/{stateType}]
-## api/v0.2/accounts [/accounts/{accountIdOrAddress}/{stateType}]
 
 + Parameters
     + accountIdOrAddress (required, string, `1`) ... Account Id or address in the zkSync network
     + stateType (required, "committed" | "finalized", `committed`) ... The type of account state which we want to get
 
 ### Get account state [GET]
-Returns the account state for a particular block
+Returns committed or finalized account state
 
 + Response 200 (application/json)
     + Attributes
