@@ -77,13 +77,12 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
         // Load committed & verified states, and return them.
-        let mut transaction = self.0.start_transaction().await?;
-        let (verified_state, committed_state) = transaction
+        let (verified_state, committed_state) = self
+            .0
             .chain()
             .account_schema()
             .last_committed_state_for_account(account_id)
             .await?;
-        transaction.commit().await?;
 
         metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
         Ok(StoredAccountState {

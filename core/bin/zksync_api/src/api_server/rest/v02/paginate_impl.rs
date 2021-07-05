@@ -7,8 +7,8 @@ use zksync_api_types::{
     v02::{
         block::BlockInfo,
         pagination::{
-            AccountTxsRequest, ApiEither, BlockAndTxHash, Paginated, PaginationQuery,
-            PendingOpsRequest,
+            AccountTxsRequest, ApiEither, BlockAndTxHash, Paginated, PaginationDirection,
+            PaginationQuery, PendingOpsRequest,
         },
         transaction::{Transaction, TxHashSerializeWrapper},
     },
@@ -24,7 +24,6 @@ use super::{
     paginate_trait::Paginate,
 };
 use crate::core_api_client::CoreApiClient;
-use zksync_api_types::v02::pagination::PaginationDirection;
 
 #[async_trait::async_trait]
 impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {

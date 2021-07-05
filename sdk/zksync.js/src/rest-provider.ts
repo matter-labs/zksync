@@ -365,15 +365,15 @@ export class RestProvider extends SyncProvider {
     }
 
     async submitTxsBatchNewDetailed(
-        txs: types.L2Tx[],
-        signature: types.TxEthSignature | types.TxEthSignature[]
+        txs: { tx: any; signature?: types.TxEthSignatureVariant }[],
+        signature?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<Response<types.SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
     async submitTxsBatchNew(
-        txs: types.L2Tx[],
-        signature: types.TxEthSignature | types.TxEthSignature[]
+        txs: { tx: any; signature?: types.TxEthSignatureVariant }[],
+        signature?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<types.SubmitBatchResponse> {
         return this.parseResponse(await this.submitTxsBatchNewDetailed(txs, signature));
     }
@@ -385,14 +385,7 @@ export class RestProvider extends SyncProvider {
         transactions: { tx: any; signature?: types.TxEthSignatureVariant }[],
         ethSignatures?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<string[]> {
-        let txs = [];
-        for (const signedTx of transactions) {
-            txs.push(signedTx.tx);
-        }
-        if (!ethSignatures) {
-            throw new Error('Batch signature should be provided in API v0.2');
-        }
-        return (await this.submitTxsBatchNew(txs, ethSignatures)).transactionHashes;
+        return (await this.submitTxsBatchNew(transactions, ethSignatures)).transactionHashes;
     }
 
     async getBatchDetailed(batchHash: string): Promise<Response<types.ApiBatchData>> {
@@ -624,11 +617,9 @@ export class RestProvider extends SyncProvider {
             txData.tx.op.type === 'ForcedExit' ||
             txData.tx.op.type === 'WithdrawNFT'
         ) {
-            if (txData.tx.op.type === 'Withdraw' || txData.tx.op.type === 'ForcedExit') {
-                return txData.tx.op.ethTxHash;
-            } else {
-                return null;
-            }
+            return txData.tx.op.ethTxHash;
+        } else {
+            return null;
         }
     }
 }

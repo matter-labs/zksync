@@ -6,17 +6,17 @@ use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_api_types::v02::{account::EthAccountType, token::NFT};
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     tx::TxEthSignatureVariant, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
-    ZkSyncPriorityOp, ZkSyncTx, NFT,
+    ZkSyncPriorityOp, ZkSyncTx,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
-use zksync_api_types::v02::account::EthAccountType;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
