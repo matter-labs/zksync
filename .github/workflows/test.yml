@@ -132,6 +132,7 @@ jobs:
       ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/"
       ETH_NETWORK: "rinkeby"
     steps:
+      - uses: actions/checkout@v2
       -
         name: Run loadtest
         run: |
