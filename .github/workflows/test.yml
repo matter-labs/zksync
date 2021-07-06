@@ -10,113 +10,113 @@ env:
   hfArgs: -e zksync-loadtest
 
 jobs:
-  sqlproxy:
-    name: Provision SQLProxy
-    runs-on: [k8s, stage, deployer]
-    container:
-      image: dysnix/kubectl:v1.16-gcloud
-
-    env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-
-    steps:
-      - uses: actions/checkout@v2
-      -
-        name: Clone helm-infra
-        uses: actions/checkout@v2
-        with:
-          repository: matter-labs/helm-infra
-          path: helm-infra
-          ref: master
-          token: ${{ secrets.GH_TOKEN }}
-      -
-        name: Create ~/.kube/config
-        run: ./.github/scripts/write-kubeconf.sh
-      -
-        name: Setup helm and loadtest.env
-        run: |
-          set -o pipefail
-          cp -rf /dysnix/kubectl/.local $HOME/.local
-
-          .github/scripts/zksync-env.sh --kube loadtest > etc/env/loadtest.env
-          echo -n "ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY=" >> etc/env/loadtest.env
-          kubectl get secret -n loadtest server-env -o jsonpath='{.data.ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY}' | base64 -d >> etc/env/loadtest.env
-      -
-        name: Deploy SQLProxy
-        working-directory: helm-infra
-        run: |
-          UPDATE_REPOS=y helmfile $hfArgs repos
-          helmfile $hfArgs -l name=sqlproxy sync
-
-  init:
-    name: Cleanup the database, compile and update contracts
-    runs-on: [k8s, stage, deployer]
-    needs: sqlproxy
-    env:
-      ZKSYNC_ENV: loadtest
-      RUSTUP_HOME: /usr/share/rust/.rustup
-      CARGO_HOME: /usr/share/rust/.cargo
-
-    steps:
-      -
-        name: Preperare env
-        run: |
-          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-          echo $(pwd)/bin >> $GITHUB_PATH
-          echo $CARGO_HOME/bin >> $GITHUB_PATH
-      -
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      -
-        name: Update cargo dependencies
-        run: |
-          cargo install --version=0.5.2 sqlx-cli
-          cargo install diesel_cli --no-default-features --features postgres
-      -
-        name: Setup loadtest database
-        run: |
-          zk
-          zk run yarn
-          zk run verify-keys unpack
-          zk db setup
-          zk contract build
-          zk contract deploy
-          zk server --genesis
-
-  deploy:
-    name: Deploy the apps
-    runs-on: [k8s, stage, deployer]
-    needs: init
-    container:
-      image: dysnix/kubectl:v1.16-gcloud
-
-    env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-      DEPLOY_APPS: -l name=server -l name=prover
-      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
-      HFENV: zksync-loadtest
-
-    steps:
-      -
-        name: Create ~/.kube/config
-        run: .github/scripts/write-kubeconf.sh
-      -
-        name: Update contracts in the ConfigMap
-        run: |
-          .github/scripts/zksync-env.sh --update-from deployed_contracts.log          
-      -
-        name: Deploy apps
-        working-directory: helm-infra
-        run: |
-          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
-
-          UPDATE_REPOS=y helmfile -e $HFENV repos
-          IMAGE_TAG=b2f056a helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+#  sqlproxy:
+#    name: Provision SQLProxy
+#    runs-on: [k8s, stage, deployer]
+#    container:
+#      image: dysnix/kubectl:v1.16-gcloud
+#
+#    env:
+#      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+#
+#    steps:
+#      - uses: actions/checkout@v2
+#      -
+#        name: Clone helm-infra
+#        uses: actions/checkout@v2
+#        with:
+#          repository: matter-labs/helm-infra
+#          path: helm-infra
+#          ref: master
+#          token: ${{ secrets.GH_TOKEN }}
+#      -
+#        name: Create ~/.kube/config
+#        run: ./.github/scripts/write-kubeconf.sh
+#      -
+#        name: Setup helm and loadtest.env
+#        run: |
+#          set -o pipefail
+#          cp -rf /dysnix/kubectl/.local $HOME/.local
+#
+#          .github/scripts/zksync-env.sh --kube loadtest > etc/env/loadtest.env
+#          echo -n "ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY=" >> etc/env/loadtest.env
+#          kubectl get secret -n loadtest server-env -o jsonpath='{.data.ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY}' | base64 -d >> etc/env/loadtest.env
+#      -
+#        name: Deploy SQLProxy
+#        working-directory: helm-infra
+#        run: |
+#          UPDATE_REPOS=y helmfile $hfArgs repos
+#          helmfile $hfArgs -l name=sqlproxy sync
+#
+#  init:
+#    name: Cleanup the database, compile and update contracts
+#    runs-on: [k8s, stage, deployer]
+#    needs: sqlproxy
+#    env:
+#      ZKSYNC_ENV: loadtest
+#      RUSTUP_HOME: /usr/share/rust/.rustup
+#      CARGO_HOME: /usr/share/rust/.cargo
+#
+#    steps:
+#      -
+#        name: Preperare env
+#        run: |
+#          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+#          echo $(pwd)/bin >> $GITHUB_PATH
+#          echo $CARGO_HOME/bin >> $GITHUB_PATH
+#      -
+#        uses: actions/cache@v2
+#        with:
+#          path: |
+#            ~/.cargo/registry
+#            ~/.cargo/git
+#            target
+#          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+#      -
+#        name: Update cargo dependencies
+#        run: |
+#          cargo install --version=0.5.2 sqlx-cli
+#          cargo install diesel_cli --no-default-features --features postgres
+#      -
+#        name: Setup loadtest database
+#        run: |
+#          zk
+#          zk run yarn
+#          zk run verify-keys unpack
+#          zk db setup
+#          zk contract build
+#          zk contract deploy
+#          zk server --genesis
+#
+#  deploy:
+#    name: Deploy the apps
+#    runs-on: [k8s, stage, deployer]
+#    needs: init
+#    container:
+#      image: dysnix/kubectl:v1.16-gcloud
+#
+#    env:
+#      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+#      DEPLOY_APPS: -l name=server -l name=prover
+#      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
+#      HFENV: zksync-loadtest
+#
+#    steps:
+#      -
+#        name: Create ~/.kube/config
+#        run: .github/scripts/write-kubeconf.sh
+#      -
+#        name: Update contracts in the ConfigMap
+#        run: |
+#          .github/scripts/zksync-env.sh --update-from deployed_contracts.log
+#      -
+#        name: Deploy apps
+#        working-directory: helm-infra
+#        run: |
+#          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
+#
+#          UPDATE_REPOS=y helmfile -e $HFENV repos
+#          IMAGE_TAG=b2f056a helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
 
   loadtest:
     name: Perform loadtest
@@ -136,7 +136,7 @@ jobs:
       -
         name: Run loadtest
         run: |
-          docker run -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNT_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
+          docker run -e RUST_LOG=debug -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNT_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
 #  cleanup:
 #    name: Cleanup loadtest environment
 #    runs-on: [k8s, stage, deployer]
