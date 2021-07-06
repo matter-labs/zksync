@@ -39,10 +39,6 @@ impl BlocksCommitOperation {
                     .0
                     .into_iter()
                     .map(|op| {
-                        println!(
-                            " witness {:?} offset {:?}",
-                            &op.eth_witness, op.public_data_offset
-                        );
                         Token::Tuple(vec![
                             Token::Bytes(op.eth_witness),
                             Token::Uint(U256::from(op.public_data_offset)),
