@@ -47,3 +47,6 @@ crypto_lib = { package = "zksync_crypto", path = "../../core/lib/crypto" }
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
+
+[patch.crates-io]
+web3 = { git = "https://github.com/Deniallugo/rust-web3", branch = "update_ethabi"}
