@@ -122,7 +122,7 @@ jobs:
     name: Perform loadtest
     # runs-on: [CI-worker, FAST]
     runs-on: [self-hosted, CI-worker]
-    needs: deploy
+#    needs: deploy
     env:
       WEB3_URL: ${{secrets.CI_LOADTEST_WEB3_URL}}
       MASTER_WALLET_PK: ${{secrets.CI_LOADTEST_MAIN_PRIVKEY}}
