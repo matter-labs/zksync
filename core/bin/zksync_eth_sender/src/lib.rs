@@ -244,11 +244,20 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
     async fn proceed_next_operations(&mut self) {
         let start = Instant::now();
+
+        let current_block = match self.ethereum.block_number().await {
+            Ok(current_block) => current_block.as_u64(),
+            Err(e) => {
+                Self::process_error(e).await;
+                return;
+            }
+        };
+
         // Queue for storing all the operations that were not finished at this iteration.
         let mut new_ongoing_ops = VecDeque::new();
 
         while let Some(tx) = self.tx_queue.pop_front() {
-            if let Err(e) = self.initialize_operation(tx.clone()).await {
+            if let Err(e) = self.initialize_operation(tx.clone(), current_block).await {
                 Self::process_error(e).await;
                 // Return the unperformed operation to the queue, since failing the
                 // operation initialization means that it was not stored in the database.
@@ -267,7 +276,10 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             // network issue which won't appear the next time, so we report the situation to the
             // log and consider the operation pending (meaning that we won't process it on this
             // step, but will try to do so on the next one).
-            let commitment = match self.perform_commitment_step(&mut current_op).await {
+            let commitment = match self
+                .perform_commitment_step(&mut current_op, current_block)
+                .await
+            {
                 Ok(commitment) => commitment,
                 Err(e) => {
                     Self::process_error(e).await;
@@ -312,9 +324,8 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
-    async fn initialize_operation(&mut self, tx: TxData) -> anyhow::Result<()> {
-        let current_block = self.ethereum.block_number().await?;
-        let deadline_block = self.get_deadline_block(current_block.as_u64());
+    async fn initialize_operation(&mut self, tx: TxData, current_block: u64) -> anyhow::Result<()> {
+        let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self
             .gas_adjuster
             .get_gas_price(&self.ethereum, None)
@@ -423,14 +434,13 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     async fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
+        current_block: u64,
     ) -> anyhow::Result<OperationCommitment> {
         let start = Instant::now();
         assert!(
             !op.used_tx_hashes.is_empty(),
             "OperationETHState should have at least one transaction"
         );
-
-        let current_block = self.ethereum.block_number().await?;
 
         // Check statuses of existing transactions.
         // Go through every transaction in a loop. We will exit this method early
@@ -443,7 +453,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             };
 
             match self
-                .check_transaction_state(mode, op, *tx_hash, current_block.as_u64())
+                .check_transaction_state(mode, op, *tx_hash, current_block)
                 .await?
             {
                 TxCheckOutcome::Pending => {
@@ -509,7 +519,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 
         // Reaching this point will mean that the latest transaction got stuck.
         // We should create another tx based on it, and send it.
-        let deadline_block = self.get_deadline_block(current_block.as_u64());
+        let deadline_block = self.get_deadline_block(current_block);
         // Raw tx contents are the same for every transaction, so we just
         // create a new one from the old one with updated parameters.
         let new_tx = self.create_supplement_tx(deadline_block, op).await?;
