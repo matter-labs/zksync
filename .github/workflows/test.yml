@@ -136,7 +136,7 @@ jobs:
       -
         name: Run loadtest
         run: |
-          docker run -e RUST_LOG=debug -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNT_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
+          docker run -e RUST_LOG=debug -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNTS_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
 #  cleanup:
 #    name: Cleanup loadtest environment
 #    runs-on: [k8s, stage, deployer]
