@@ -2,7 +2,7 @@ use std::{collections::VecDeque, str::FromStr, sync::Arc, time::Duration};
 
 use rand::Rng;
 
-use tokio::time::timeout;
+use tokio::time::{timeout, Elapsed};
 use zksync::{
     provider::Provider, utils::private_key_from_seed, RpcProvider, Wallet, WalletCredentials,
 };
@@ -13,6 +13,8 @@ use crate::{
     config::LoadtestConfig,
     rng::{LoadtestRng, Random},
 };
+use zksync::error::ClientError;
+use zksync::types::ContractAddress;
 
 /// Thread-safe pool of the addresses of accounts used in the loadtest.
 #[derive(Debug, Clone)]
@@ -90,9 +92,17 @@ impl AccountPool {
         // Perform a health check: check whether zkSync server is alive.
         let mut server_alive = false;
         for _ in 0usize..3 {
-            if let Ok(Ok(_)) = timeout(Duration::from_secs(3), provider.contract_address()).await {
-                server_alive = true;
-                break;
+            match timeout(Duration::from_secs(3), provider.contract_address()).await {
+                Ok(res) => match res {
+                    Ok(_) => {
+                        server_alive = true;
+                        break;
+                    }
+                    Err(err) => {
+                        println!("Client err {:?}", err);
+                    }
+                },
+                Err(_) => println!("timeout error"),
             }
         }
         if !server_alive {
