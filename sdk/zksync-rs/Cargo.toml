@@ -14,7 +14,7 @@ zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
 
 sha2 = "0.8"
 web3 = "0.15.0"
-ethabi = "13.0.0"
+ethabi = "14.0.0"
 tokio = { version = "0.2", features = ["time"] }
 
 serde = { version = "1.0", features = ["derive"] }
