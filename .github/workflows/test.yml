@@ -117,7 +117,8 @@ jobs:
           cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
 
           UPDATE_REPOS=y helmfile -e $HFENV repos
-          IMAGE_TAG=b2f056a helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+          IMAGE_TAG=b2f056a helmfile -e $HFENV $DEPLOY_APPS diff --args "timeout 180s"
+          IMAGE_TAG=b2f056a helmfile -e $HFENV $DEPLOY_APPS sync --args "timeout 180s"
 
   loadtest:
     name: Perform loadtest
@@ -136,24 +137,24 @@ jobs:
       -
         name: Run loadtest
         run: |
-          docker run -e RUST_LOG=debug -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNTS_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
-#  cleanup:
-#    name: Cleanup loadtest environment
-#    runs-on: [k8s, stage, deployer]
-#    needs: loadtest
-#    if: always()
-#    container:
-#      image: dysnix/kubectl:v1.16-gcloud
-#    env:
-#      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-#
-#    steps:
-#      -
-#        name: Create ~/.kube/config
-#        run: .github/scripts/write-kubeconf.sh
-#      -
-#        name: Scale loadtest to 0 replicas
-#        run: |
-#          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/explorer
-#          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/server
-#          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/prover
+          docker run -e RUST_LOG=info -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNTS_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
+  cleanup:
+    name: Cleanup loadtest environment
+    runs-on: [k8s, stage, deployer]
+    needs: loadtest
+    if: always()
+    container:
+      image: dysnix/kubectl:v1.16-gcloud
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+
+    steps:
+      -
+        name: Create ~/.kube/config
+        run: .github/scripts/write-kubeconf.sh
+      -
+        name: Scale loadtest to 0 replicas
+        run: |
+          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/explorer
+          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/server
+          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/prover
