@@ -126,7 +126,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     pub async fn block_number(&self) -> Result<U64, anyhow::Error> {
         let start = Instant::now();
         let block_number = self.inner.web3.eth().block_number().await?;
-        metrics::histogram!("eth_client.direct.current_nonce", start.elapsed());
+        metrics::histogram!("eth_client.direct.block_number", start.elapsed());
         Ok(block_number)
     }
 
@@ -375,7 +375,11 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         Ok(res)
     }
 
-    pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
+    pub async fn get_tx_status(
+        &self,
+        hash: H256,
+        current_block: Option<u64>,
+    ) -> anyhow::Result<Option<ExecutedTxStatus>> {
         let start = Instant::now();
 
         let receipt = self.tx_receipt(hash).await?;
@@ -385,11 +389,11 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                 status: Some(status),
                 ..
             }) => {
-                let confirmations = self
-                    .block_number()
-                    .await?
-                    .saturating_sub(tx_block_number)
-                    .as_u64();
+                let current_block = match current_block {
+                    Some(current_block) => current_block,
+                    None => self.block_number().await?.as_u64(),
+                };
+                let confirmations = current_block.saturating_sub(tx_block_number.as_u64());
                 let success = status.as_u64() == 1;
 
                 // Set the receipt only for failures.

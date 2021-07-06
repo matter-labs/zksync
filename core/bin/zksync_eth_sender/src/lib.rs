@@ -570,7 +570,10 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         tx_hash: H256,
         current_block: u64,
     ) -> anyhow::Result<TxCheckOutcome> {
-        let status = self.ethereum.get_tx_status(tx_hash).await?;
+        let status = self
+            .ethereum
+            .get_tx_status(tx_hash, Some(current_block))
+            .await?;
 
         let outcome = match status {
             // Successful execution.
