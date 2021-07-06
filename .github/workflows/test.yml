@@ -128,7 +128,7 @@ jobs:
       MASTER_WALLET_PK: ${{secrets.CI_LOADTEST_MAIN_PRIVKEY}}
       ACCOUNTS_AMOUNT: 20
       OPERATIONS_PER_ACCOUNT: 10
-      MAIN_TOKEN: "DAI"
+      MAIN_TOKEN: "USDT"
       ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
       ETH_NETWORK: "rinkeby"
     steps:
@@ -136,7 +136,7 @@ jobs:
       -
         name: Run loadtest
         run: |
-          docker run -e RUST_LOG=info -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNTS_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
+          docker run -e RUST_LOG=debug -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNTS_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
 #  cleanup:
 #    name: Cleanup loadtest environment
 #    runs-on: [k8s, stage, deployer]
