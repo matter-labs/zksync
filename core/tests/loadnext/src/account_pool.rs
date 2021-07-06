@@ -87,6 +87,7 @@ impl AccountPool {
             zksync::Network::from_str(&config.eth_network).expect("Invalid network name"),
         );
 
+        println!("Config {:?}", &config);
         // Perform a health check: check whether zkSync server is alive.
         let mut server_alive = false;
         for _ in 0usize..3 {
