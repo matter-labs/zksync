@@ -1796,6 +1796,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -1807,7 +1812,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
@@ -4028,6 +4034,23 @@
       "nullable": []
     }
   },
+  "b2058dc0ab15ec7fdbd2c2ca59faaadc9c826f6318851d8c3a22e8feaa4989b8": {
+    "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id, next_priority_op_serial_id)\n                VALUES ($1, $2, $3, $4, $5, $6)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Jsonb",
+          "Timestamptz",
+          "Jsonb",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "b5e0f843d267576d57f41e2c4a63335749cb40e79bdb2b2cccbbaed5200abe96": {
     "query": "\n                    SELECT * FROM tokens\n                    WHERE address = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -4153,6 +4176,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -4164,7 +4192,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
@@ -5149,6 +5178,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -5162,7 +5196,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
@@ -5393,18 +5428,6 @@
         "Left": [
           "Int8Array",
           "ByteaArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "f02021c46f5edc171f22c16e29bb028353eb0519aec1555c066fdd8dfe1d61e5": {
-    "query": "\n            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n            SELECT tx_hash, tx, created_at, eth_sign_data, COALESCE(batch_id, 0) FROM executed_transactions\n            WHERE block_number > $1\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
         ]
       },
       "nullable": []
