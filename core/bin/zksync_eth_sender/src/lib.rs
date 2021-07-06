@@ -184,6 +184,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
+        let mut last_used_block = 0;
         loop {
             // We perform a loading routine every X seconds.
             tokio::time::delay_for(self.options.sender.tx_poll_period()).await;
@@ -195,7 +196,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 
             if self.options.sender.is_enabled {
                 // ...and proceed them.
-                self.proceed_next_operations().await;
+                last_used_block = self.proceed_next_operations(last_used_block).await;
                 // Update the gas adjuster to maintain the up-to-date max gas price limit.
                 self.gas_adjuster
                     .keep_updated(&self.ethereum, &self.db)
@@ -242,14 +243,14 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     /// 1. Pops all the available transactions from the `TxQueue` and sends them.
     /// 2. Sifts all the ongoing operations, filtering the completed ones and
     ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
-    async fn proceed_next_operations(&mut self) {
+    async fn proceed_next_operations(&mut self, last_used_block: u64) -> u64 {
         let start = Instant::now();
 
         let current_block = match self.ethereum.block_number().await {
             Ok(current_block) => current_block.as_u64(),
             Err(e) => {
                 Self::process_error(e).await;
-                return;
+                return last_used_block;
             }
         };
 
@@ -271,30 +272,32 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         }
 
         // Commit the next operations (if any).
-        while let Some(mut current_op) = self.ongoing_ops.pop_front() {
-            // We perform a commitment step here. In case of error, we suppose that this is some
-            // network issue which won't appear the next time, so we report the situation to the
-            // log and consider the operation pending (meaning that we won't process it on this
-            // step, but will try to do so on the next one).
-            let commitment = match self
-                .perform_commitment_step(&mut current_op, current_block)
-                .await
-            {
-                Ok(commitment) => commitment,
-                Err(e) => {
-                    Self::process_error(e).await;
-                    OperationCommitment::Pending
-                }
-            };
+        if last_used_block != current_block {
+            while let Some(mut current_op) = self.ongoing_ops.pop_front() {
+                // We perform a commitment step here. In case of error, we suppose that this is some
+                // network issue which won't appear the next time, so we report the situation to the
+                // log and consider the operation pending (meaning that we won't process it on this
+                // step, but will try to do so on the next one).
+                let commitment = match self
+                    .perform_commitment_step(&mut current_op, current_block)
+                    .await
+                {
+                    Ok(commitment) => commitment,
+                    Err(e) => {
+                        Self::process_error(e).await;
+                        OperationCommitment::Pending
+                    }
+                };
 
-            match commitment {
-                OperationCommitment::Committed => {
-                    // Free a slot for the next tx in the queue.
-                    self.tx_queue.report_commitment();
-                }
-                OperationCommitment::Pending => {
-                    // Poll this operation on the next iteration.
-                    new_ongoing_ops.push_back(current_op);
+                match commitment {
+                    OperationCommitment::Committed => {
+                        // Free a slot for the next tx in the queue.
+                        self.tx_queue.report_commitment();
+                    }
+                    OperationCommitment::Pending => {
+                        // Poll this operation on the next iteration.
+                        new_ongoing_ops.push_back(current_op);
+                    }
                 }
             }
         }
@@ -307,6 +310,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         // Store the ongoing operations for the next round.
         self.ongoing_ops = new_ongoing_ops;
         metrics::histogram!("eth_sender.proceed_next_operations", start.elapsed());
+        return current_block;
     }
 
     async fn process_error(err: anyhow::Error) {
