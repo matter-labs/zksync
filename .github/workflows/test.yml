@@ -129,7 +129,7 @@ jobs:
       ACCOUNTS_AMOUNT: 20
       OPERATIONS_PER_ACCOUNT: 10
       MAIN_TOKEN: "DAI"
-      ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/"
+      ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
       ETH_NETWORK: "rinkeby"
     steps:
       - uses: actions/checkout@v2
