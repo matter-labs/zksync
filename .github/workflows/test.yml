@@ -86,7 +86,7 @@ jobs:
           zk db setup
           zk contract build
           zk contract deploy
-          zk run governance-add-erc20 rinkeby
+          cd contracts && zk f yarn governance-add-erc20 add-multi-current-network rinkeby
           zk server --genesis
 
   deploy:
