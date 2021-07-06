@@ -131,6 +131,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let block_details = match block_details.into_iter().next() {
             Some(block_details) => block_details,
             None => {
+                // Logging is currently disabled.
+                //
                 // vlog::warn!(
                 //     "Couldn't create block event, no block details found in the database. \
                 //     Block number: {}, status: {:?}",
@@ -252,6 +254,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             {
                 Ok(account_id) => account_id,
                 _ => {
+                    // Logging is currently disabled.
+                    //
                     // vlog::warn!(
                     //     "Couldn't create transaction event, no account id exists \
                     //     in the database. Operation: {:?}",
@@ -311,6 +315,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             {
                 Ok(account_id) => account_id,
                 _ => {
+                    // Logging is currently disabled.
+                    //
                     // vlog::warn!(
                     //     "Couldn't create transaction event, no account id exists \
                     //     in the database. Operation: {:?}",
