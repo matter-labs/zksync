@@ -30,7 +30,7 @@ impl BlockDetailsCache {
         let blocks = storage
             .chain()
             .block_schema()
-            .load_block_range(block_number, 1)
+            .load_block_range_desc(block_number, 1)
             .await?;
 
         if let Some(block) = blocks.into_iter().next() {

@@ -1,0 +1,15 @@
+## SubmitBatchResponse (object)
++ batchHash: 0x6d6f7e07c85a770c6cb9f667c6b7d2d6335781f956a3a66503c87a56fd392e80 (string, required)
++ transactionHashes: [0xca1d902dc4aa0d401aded0f3c4c6e73c1aa68fbb661856af1a8874472f5043bb] (array[string], required)
+
+## BatchStatus (object)
++ batchHash: 0x6d6f7e07c85a770c6cb9f667c6b7d2d6335781f956a3a66503c87a56fd392e80 (string, required),
++ transactionHashes: [0xca1d902dc4aa0d401aded0f3c4c6e73c1aa68fbb661856af1a8874472f5043bb] (array[string], required)
++ createdAt: `2020-10-12T09:05:03.123416742` (string, required),
++ batchStatus (object, required)
+    + updatedAt: `2020-10-12T09:05:03.123416742` (string, required)
+    + lastState: queued (TxState, required)
+
+## BatchSignature (enum)
+- (TxEthSignature)
+- (array[TxEthSignature])

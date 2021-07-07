@@ -73,7 +73,8 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
 
         let sender_state = account_schema
             .last_committed_state_for_account(account_id)
-            .await?;
+            .await?
+            .1;
 
         Ok(sender_state.map(|state| state.nonce))
     }

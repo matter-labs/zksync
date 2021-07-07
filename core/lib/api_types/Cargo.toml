@@ -1,0 +1,25 @@
+[package]
+name = "zksync_api_types"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+
+[dependencies]
+zksync_types = { path = "../types", version = "1.0" }
+zksync_utils = { path = "../utils", version = "1.0" }
+zksync_crypto = { path = "../crypto", version = "1.0" }
+zksync_config = { path = "../config", version = "1.0" }
+
+serde = "1.0"
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+hex = "0.4"
+num = "0.3"
+bigdecimal = { version = "0.2.0", features = ["serde"]}
+either = "1.6.1"
+thiserror = "1.0"

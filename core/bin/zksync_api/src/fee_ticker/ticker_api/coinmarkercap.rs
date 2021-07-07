@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use crate::fee_ticker::PriceError;
-use zksync_types::{TokenLike, TokenPrice};
+use zksync_types::{Token, TokenLike, TokenPrice};
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 #[derive(Debug)]
@@ -26,7 +26,8 @@ impl CoinMarketCapAPI {
 
 #[async_trait]
 impl TokenPriceAPI for CoinMarketCapAPI {
-    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, PriceError> {
+    async fn get_price(&self, token: &Token) -> Result<TokenPrice, PriceError> {
+        let token_symbol = token.symbol.as_str();
         let request_url = self
             .base_url
             .join(&format!(
@@ -84,6 +85,7 @@ pub(super) struct CoinmarketCapResponse {
 mod test {
     use super::*;
     use std::str::FromStr;
+    use zksync_types::TokenId;
     use zksync_utils::parse_env;
 
     #[test]
@@ -97,8 +99,9 @@ mod test {
         let ticker_url = parse_env("FEE_TICKER_COINMARKETCAP_BASE_URL");
         let client = reqwest::Client::new();
         let api = CoinMarketCapAPI::new(client, ticker_url);
+        let token = Token::new(TokenId(0), Default::default(), "ETH", 18);
         runtime
-            .block_on(api.get_price("ETH"))
+            .block_on(api.get_price(&token))
             .expect("Failed to get data from ticker");
     }
 

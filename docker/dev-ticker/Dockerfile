@@ -15,4 +15,5 @@ RUN apt install openssl -y
 EXPOSE 9876
 ENV RUST_LOG info
 COPY --from=builder /usr/src/zksync/target/release/dev-ticker-server /bin/
+COPY --from=builder /usr/src/zksync/etc/tokens /etc/tokens
 ENTRYPOINT ["dev-ticker-server"]

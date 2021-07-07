@@ -65,8 +65,8 @@ jobs:
           ci_run zk db basic-setup
           ci_run zk run yarn
 
-      - name: liquidity-token
-        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
+      - name: restart dev-liquidity-token-watcher and dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
       - name: contracts-unit-tests
         run: ci_run zk test contracts
@@ -102,8 +102,8 @@ jobs:
           ci_run zk dummy-prover enable --no-redeploy
           ci_run zk init
 
-      - name: liquidity-token
-        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
+      - name: restart dev-liquidity-token-watcher and dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
       - name: run-services
         run: |
@@ -116,7 +116,9 @@ jobs:
         run: ci_run zk test i server
 
       - name: integration-api
-        run: ci_run zk test i api
+        run: |
+          ci_run zk test i api
+          ci_run zk test i api-docs
 
       - name: integration-zcli
         run: ci_run zk test i zcli

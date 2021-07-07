@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
-
 // Local imports
 use crate::prover::records::ProverRun;
 
@@ -140,4 +139,34 @@ pub struct AccountOpReceiptResponse {
     /// The raw hash bytes of the corresponding "VERIFY" Ethereum operation for block with
     /// given priority operation.
     pub verify_tx_hash: Option<Vec<u8>>,
+}
+
+#[derive(Debug, FromRow, PartialEq)]
+pub struct InBlockBatchTx {
+    pub tx_hash: Vec<u8>,
+    pub created_at: DateTime<Utc>,
+    pub success: bool,
+    pub block_number: i64,
+}
+
+#[derive(Debug, FromRow, PartialEq)]
+pub struct StorageTxReceipt {
+    pub tx_hash: Vec<u8>,
+    pub block_number: Option<i64>,
+    pub success: Option<bool>,
+    pub fail_reason: Option<String>,
+    pub eth_block: Option<i64>,
+    pub priority_op_serialid: Option<i64>,
+}
+
+pub struct StorageTxData {
+    pub tx_hash: Vec<u8>,
+    pub block_number: Option<i64>,
+    pub op: Value,
+    pub success: Option<bool>,
+    pub fail_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub eth_hash: Option<Vec<u8>>,
+    pub priority_op_serialid: Option<i64>,
+    pub eth_sign_data: Option<serde_json::Value>,
 }

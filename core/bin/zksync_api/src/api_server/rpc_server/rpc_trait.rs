@@ -6,11 +6,14 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 
 // Workspace uses
-use zksync_api_client::rest::v1::accounts::ApiNFT;
+use zksync_api_types::{
+    v02::{fee::ApiTxFeeTypes, token::ApiNFT},
+    TxWithSignature,
+};
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
-    Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, Fee, Token, TokenId, TokenLike, TotalFee, ZkSyncTx,
 };
 
 // Local uses
@@ -55,19 +58,19 @@ pub trait Rpc {
     #[rpc(name = "get_tx_fee", returns = "Fee")]
     fn get_tx_fee(
         &self,
-        tx_type: TxFeeTypes,
+        tx_type: ApiTxFeeTypes,
         _address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee>;
 
     // _addresses argument is left for the backward compatibility.
-    #[rpc(name = "get_txs_batch_fee_in_wei", returns = "BatchFee")]
+    #[rpc(name = "get_txs_batch_fee_in_wei", returns = "TotalFee")]
     fn get_txs_batch_fee_in_wei(
         &self,
-        tx_types: Vec<TxFeeTypes>,
+        tx_types: Vec<ApiTxFeeTypes>,
         _addresses: Vec<Address>,
         token_like: TokenLike,
-    ) -> FutureResp<BatchFee>;
+    ) -> FutureResp<TotalFee>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(&self, token_like: TokenLike) -> FutureResp<BigDecimal>;
@@ -161,7 +164,7 @@ impl Rpc for RpcApp {
 
     fn get_tx_fee(
         &self,
-        tx_type: TxFeeTypes,
+        tx_type: ApiTxFeeTypes,
         address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee> {
@@ -178,10 +181,10 @@ impl Rpc for RpcApp {
 
     fn get_txs_batch_fee_in_wei(
         &self,
-        tx_types: Vec<TxFeeTypes>,
+        tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token_like: TokenLike,
-    ) -> FutureResp<BatchFee> {
+    ) -> FutureResp<TotalFee> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {

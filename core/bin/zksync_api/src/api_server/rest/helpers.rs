@@ -1,6 +1,5 @@
 //! Utilities for the REST API.
 
-use crate::core_api_client::EthBlockId;
 use actix_web::{HttpResponse, Result as ActixResult};
 use std::collections::HashMap;
 use zksync_storage::chain::{
@@ -29,7 +28,6 @@ pub fn block_verified(block: &StorageBlockDetails) -> bool {
 pub fn deposit_op_to_tx_by_hash(
     tokens: &HashMap<TokenId, Token>,
     op: &PriorityOp,
-    eth_block: EthBlockId,
 ) -> Option<TxByHashResponse> {
     match &op.data {
         ZkSyncPriorityOp::Deposit(deposit) => {
@@ -54,7 +52,7 @@ pub fn deposit_op_to_tx_by_hash(
                     "token": token_symbol
                 },
                 "type": "Deposit",
-                "eth_block_number": eth_block,
+                "eth_block_number": op.eth_block,
             });
 
             Some(TxByHashResponse {

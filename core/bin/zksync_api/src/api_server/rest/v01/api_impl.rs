@@ -379,7 +379,7 @@ impl ApiV01 {
 
         // If eth watcher has a priority op with given hash, transform it
         // to TxByHashResponse and assign it to res.
-        if let Some((eth_block, priority_op)) = unconfirmed_op {
+        if let Some(priority_op) = unconfirmed_op {
             let tokens = self_
                 .access_storage()
                 .await?
@@ -391,7 +391,7 @@ impl ApiV01 {
                     HttpResponse::InternalServerError().finish()
                 })?;
 
-            res = deposit_op_to_tx_by_hash(&tokens, &priority_op, eth_block);
+            res = deposit_op_to_tx_by_hash(&tokens, &priority_op);
         }
 
         metrics::histogram!("api.v01.tx_by_hash", start.elapsed());
@@ -441,7 +441,7 @@ impl ApiV01 {
         let resp = storage
             .chain()
             .block_schema()
-            .load_block_range(BlockNumber(max_block), limit)
+            .load_block_range_desc(BlockNumber(max_block), limit)
             .await
             .map_err(|err| {
                 vlog::warn!(

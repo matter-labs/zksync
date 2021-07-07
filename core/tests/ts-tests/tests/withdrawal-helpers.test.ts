@@ -16,14 +16,16 @@ const TEST_CONFIG = loadTestConfig(true);
 // The token here should have the ERC20 implementation from RevertTransferERC20.sol
 const erc20Token = 'wBTC';
 
-describe('Withdrawal helpers tests', () => {
+// prettier-ignore
+const TestSuite = (providerType: 'REST' | 'RPC') =>
+describe(`Withdrawal helpers tests (provider: ${providerType})`, () => {
     let tester: Tester;
     let alice: Wallet;
     let bob: Wallet;
     let chuck: Wallet;
 
     before('create tester and test wallets', async () => {
-        tester = await Tester.init('localhost', 'HTTP');
+        tester = await Tester.init('localhost', 'HTTP', providerType);
         alice = await tester.fundedWallet('10.0');
         bob = await tester.fundedWallet('10.0');
         chuck = await tester.emptyWallet();
@@ -76,3 +78,8 @@ describe('Withdrawal helpers tests', () => {
         );
     });
 });
+
+for (const providerType of ['RPC', 'REST']) {
+    // @ts-ignore
+    TestSuite(providerType);
+}

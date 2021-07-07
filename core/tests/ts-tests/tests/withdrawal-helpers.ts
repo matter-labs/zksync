@@ -1,6 +1,6 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types, Provider, utils } from 'zksync';
+import { Wallet, types, utils, SyncProvider } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { Address } from 'zksync/build/types';
 import { sleep } from 'zksync/build/utils';
@@ -26,7 +26,7 @@ declare module './tester' {
 }
 
 async function waitForOnchainWithdrawal(
-    syncProvider: Provider,
+    syncProvider: SyncProvider,
     hash: string,
     polling_interval: number = 200,
     polling_timeout: number = 35000
@@ -60,7 +60,7 @@ async function setRevertTransfer(ethWallet: ethers.Signer, tokenAddress: Address
 
 async function setRevert(
     ethWallet: ethers.Signer,
-    provider: Provider,
+    provider: SyncProvider,
     recipient: Address,
     token: TokenLike,
     value: boolean

@@ -2188,6 +2188,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashes_migration"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "tokio 0.2.22",
+ "vlog",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "hashlink"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6178,6 +6190,7 @@ dependencies = [
  "vlog",
  "web3",
  "zksync_api_client",
+ "zksync_api_types",
  "zksync_balancer",
  "zksync_config",
  "zksync_contracts",
@@ -6204,6 +6217,26 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "zksync_api_types",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_api_types"
+version = "1.0.0"
+dependencies = [
+ "bigdecimal",
+ "chrono",
+ "either",
+ "hex",
+ "num",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "zksync_config",
  "zksync_crypto",
  "zksync_types",
  "zksync_utils",
@@ -6294,6 +6327,7 @@ dependencies = [
  "tokio 0.2.22",
  "vlog",
  "web3",
+ "zksync_api_types",
  "zksync_balancer",
  "zksync_config",
  "zksync_contracts",
@@ -6642,6 +6676,7 @@ dependencies = [
  "thiserror",
  "tokio 0.2.22",
  "vlog",
+ "zksync_api_types",
  "zksync_basic_types",
  "zksync_config",
  "zksync_crypto",

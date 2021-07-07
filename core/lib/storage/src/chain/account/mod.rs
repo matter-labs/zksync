@@ -3,7 +3,7 @@ use std::time::Instant;
 // External imports
 use sqlx::Acquire;
 // Workspace imports
-use zksync_types::{Account, AccountId, AccountUpdates, Address, TokenId};
+use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;
@@ -76,21 +76,18 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         account_id: AccountId,
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
-
         // Load committed & verified states, and return them.
-        let committed = self
+        let (verified_state, committed_state) = self
+            .0
+            .chain()
+            .account_schema()
             .last_committed_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
-        let verified = self
-            .last_verified_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
+            .await?;
 
         metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
         Ok(StoredAccountState {
-            committed,
-            verified,
+            committed: committed_state.map(|a| (account_id, a)),
+            verified: verified_state.1.map(|a| (account_id, a)),
         })
     }
 
@@ -119,10 +116,11 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
     /// Loads the last committed (e.g. just added but no necessarily verified) state for
     /// account given its ID.
+    /// Returns both verified and committed states.
     pub async fn last_committed_state_for_account(
         &mut self,
         account_id: AccountId,
-    ) -> QueryResult<Option<Account>> {
+    ) -> QueryResult<((i64, Option<Account>), Option<Account>)> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -211,7 +209,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let account_state = account_diff
             .into_iter()
             .map(|(_, upd)| upd)
-            .fold(account, Account::apply_update);
+            .fold(account.clone(), Account::apply_update);
 
         transaction.commit().await?;
 
@@ -219,7 +217,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             "sql.chain.account.last_committed_state_for_account",
             start.elapsed()
         );
-        Ok(account_state)
+        Ok(((last_block, account), account_state))
     }
 
     /// Loads the last verified state for the account (i.e. the one obtained in the last block
@@ -238,7 +236,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     }
 
     /// Obtains the last verified state of the account.
-    async fn account_and_last_block(
+    pub async fn account_and_last_block(
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
@@ -275,7 +273,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             let nfts: Vec<StorageNFT> = sqlx::query_as!(
                 StorageNFT,
                 "
-                    SELECT * FROM nft 
+                    SELECT * FROM nft
                     WHERE creator_account_id = $1
                 ",
                 *account_id as i32
@@ -339,6 +337,41 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let address = result.map(|record| Address::from_slice(&record.address));
         metrics::histogram!("sql.chain.account.account_address_by_id", start.elapsed());
         Ok(address)
+    }
+
+    /// Obtains the last committed block that affects the account.
+    pub async fn last_committed_block_with_update_for_acc(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+
+        let block_number = sqlx::query!(
+            "
+                SELECT MAX(block_number)
+                FROM(
+                    SELECT block_number FROM account_balance_updates
+                    WHERE account_id = $1
+                    UNION ALL
+                    SELECT block_number FROM account_creates
+                    WHERE account_id = $1
+                    UNION ALL
+                    SELECT block_number FROM account_pubkey_updates
+                    WHERE account_id = $1
+                ) as subquery
+            ",
+            i64::from(*account_id),
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max
+        .unwrap_or(0);
+
+        metrics::histogram!(
+            "sql.chain.account.last_committed_block_with_update_for_acc",
+            start.elapsed()
+        );
+        Ok(BlockNumber(block_number as u32))
     }
 
     // This method does not have metrics, since it is used only for the

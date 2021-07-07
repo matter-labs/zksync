@@ -8,6 +8,7 @@ members = [
     "core/bin/parse_pub_data",
     "core/bin/regen-root-hash",
     "core/bin/block_revert",
+    "core/bin/hashes_migration",
 
     # Server micro-services
     "core/bin/zksync_api",
@@ -35,6 +36,7 @@ members = [
     "core/lib/contracts",
     "core/lib/api_client",
     "core/lib/notifier",
+    "core/lib/api_types",
     "core/lib/balancer",
 
     # Test infrastructure

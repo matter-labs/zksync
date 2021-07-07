@@ -1,0 +1,66 @@
+# Group Tokens
+
+## api/v0.2/tokens [/tokens{?from,limit,direction}]
+
++ Parameters
+    + from (required, "latest" | number, `latest`) ... From which token id to show
+    + limit (required, number, `2`) ... The limit of tokens to be returned
+    + direction (required, "newer" | "older", `older`) ... newer or older than the id of the `from`
+
+### Get list of supported tokens [GET]
+Returns the tokens that are currently supported by zkSync
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (object, required{{isResultNullable}})
+            + pagination (PaginationFromNumber, required)
+            + list (array[Token.Token], required)
+        + error (Error, required, nullable)
+
+## api/v0.2/tokens/tokenIdOrAddress [/tokens/{tokenIdOrAddress}]
+
++ Parameters
+    + tokenIdOrAddress (required, string, `2`) ... the id or address of the token in the zkSync network
+
+### Get token info [GET]
+Get token into
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Token.Token, required{{isResultNullable}})
+        + error (Error, required, nullable)
+
+## api/v0.2/tokens/:tokenIdOrAddress/priceIn/:currency [/tokens/{tokenIdOrAddress}/priceIn/{currency}]
+
++ Parameters
+    + tokenIdOrAddress (required, string, `2`) ... the id or address of the token in the zkSync network
+    + currency (required, `usd` | number, `usd`) ... either usd or any of the supported tokens in the zkSync network
+
+### Get token price [GET]
+Get token price relative to another token
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Token.Price, required{{isResultNullable}})
+        + error (Error, required, nullable)
+
+## api/v0.2/tokens/nft/id [/tokens/nft/{id}]
+
++ Parameters
+    + id (required, number, `{{nftId}}`) ... the id of the nft in the zkSync network
+
+### Get nft info [GET]
+Get nft into
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Token.NFTInfo, required{{isResultNullable}})
+        + error (Error, required, nullable)
