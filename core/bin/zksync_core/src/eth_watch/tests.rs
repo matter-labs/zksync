@@ -8,7 +8,7 @@ use zksync_api_types::v02::pagination::{
 };
 use zksync_types::{
     AccountId, Deposit, FullExit, NewTokenEvent, Nonce, PriorityOp, RegisterNFTFactoryEvent,
-    TokenId, ZkSyncPriorityOp,
+    TokenId, ZkSyncPriorityOp, H256,
 };
 
 use crate::eth_watch::{client::EthClient, EthWatch};
@@ -165,6 +165,7 @@ async fn test_operation_queues() {
                 account_id: AccountId(1),
                 eth_address: from_addr,
                 token: TokenId(0),
+                is_legacy: false,
             }),
             deadline_block: 0,
             eth_block: 4,

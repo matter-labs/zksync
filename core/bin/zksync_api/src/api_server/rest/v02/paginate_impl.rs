@@ -61,11 +61,10 @@ impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
             .get_count()
             .await
             .map_err(Error::storage)?;
-
         transaction.commit().await.map_err(Error::storage)?;
 
         Ok(Paginated::new(
-            tokens.values().cloned().collect(),
+            tokens,
             query.from,
             query.limit,
             query.direction,

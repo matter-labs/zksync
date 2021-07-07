@@ -6,16 +6,18 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 
 // Workspace uses
-use zksync_api_types::v02::fee::ApiTxFeeTypes;
+use zksync_api_types::{
+    v02::{fee::ApiTxFeeTypes, token::ApiNFT},
+    TxWithSignature,
+};
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
-    Address, BatchFee, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
+    Address, Fee, Token, TokenId, TokenLike, TotalFee, ZkSyncTx,
 };
 
 // Local uses
 use super::{types::*, RpcApp};
-use zksync_types::tokens::ApiNFT;
 
 pub type FutureResp<T> = Box<dyn futures01::Future<Item = T, Error = Error> + Send>;
 

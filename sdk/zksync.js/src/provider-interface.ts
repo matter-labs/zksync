@@ -8,10 +8,12 @@ import {
     TokenLike,
     Tokens,
     TransactionReceipt,
-    TxEthSignature
+    TxEthSignature,
+    TxEthSignatureVariant,
+    NFTInfo
 } from './types';
 import { BigNumber } from 'ethers';
-import { TokenSet } from './utils';
+import { TokenSet, isNFT } from './utils';
 
 export abstract class SyncProvider {
     contractAddress: ContractAddress;
@@ -20,9 +22,9 @@ export abstract class SyncProvider {
     // For HTTP provider
     public pollIntervalMilliSecs = 500;
 
-    abstract submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string>;
+    abstract submitTx(tx: any, signature?: TxEthSignatureVariant, fastProcessing?: boolean): Promise<string>;
     abstract submitTxsBatch(
-        transactions: { tx: any; signature?: TxEthSignature }[],
+        transactions: { tx: any; signature?: TxEthSignatureVariant }[],
         ethSignatures?: TxEthSignature | TxEthSignature[]
     ): Promise<string[]>;
     abstract getContractAddress(): Promise<ContractAddress>;
@@ -43,11 +45,19 @@ export abstract class SyncProvider {
         tokenLike: TokenLike
     ): Promise<BigNumber>;
     abstract getTokenPrice(tokenLike: TokenLike): Promise<number>;
-    abstract getEthTxForWithdrawal(withdrawal_hash: string): Promise<string>;
+    abstract getEthTxForWithdrawal(withdrawalHash: string): Promise<string>;
+    abstract getNFT(id: number): Promise<NFTInfo>;
 
     async updateTokenSet(): Promise<void> {
         const updatedTokenSet = new TokenSet(await this.getTokens());
         this.tokenSet = updatedTokenSet;
+    }
+    async getTokenSymbol(token: TokenLike): Promise<string> {
+        if (isNFT(token)) {
+            const nft = await this.getNFT(token as number);
+            return nft.symbol || `NFT-${token}`;
+        }
+        return this.tokenSet.resolveTokenSymbol(token);
     }
     async disconnect() {}
 }

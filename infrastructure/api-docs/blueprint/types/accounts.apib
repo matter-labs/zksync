@@ -6,7 +6,19 @@
 + lastUpdateInBlock: 15001 (number, required)
 + balances (object, required)
 + accountType (Account.Type, required, nullable)
++ nfts (Account.Balances, required)
++ mintedNfts (Account.Nfts, required)
 
 ## Account.Type (enum)
 - Owned
 - CREATE2
+
+## Account.FullInfo
++ committed (Account, required, nullable)
++ finalized (Account, required, nullable)
+
+## Account.Balances (object)
++ *ETH*: `1000000000000000000` (string, required)
+
+## Account.Nfts (object)
++ *100000* (Token.NFT, required)

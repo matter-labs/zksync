@@ -15,6 +15,7 @@ use zksync_api_types::v02::{
     },
     transaction::{Transaction, TxHashSerializeWrapper},
 };
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
 
@@ -113,16 +114,42 @@ impl ApiAccountData {
         storage: &mut StorageProcessor<'_>,
     ) -> Result<Account, Error> {
         let mut balances = BTreeMap::new();
+        let mut nfts = BTreeMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
-            let token_symbol = self
-                .tokens
-                .token_symbol(storage, token_id)
-                .await
-                .map_err(Error::storage)?
-                .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?;
-
-            balances.insert(token_symbol, balance);
+            match token_id.0 {
+                NFT_TOKEN_ID_VAL => {
+                    // Don't include special token to balances or nfts
+                }
+                MIN_NFT_TOKEN_ID..=NFT_TOKEN_ID_VAL => {
+                    // https://github.com/rust-lang/rust/issues/37854
+                    // Exclusive range is an experimental feature, but we have already checked the last value in the previous step
+                    nfts.insert(
+                        token_id,
+                        self.tokens
+                            .get_nft_by_id(storage, token_id)
+                            .await
+                            .map_err(Error::storage)?
+                            .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?
+                            .into(),
+                    );
+                }
+                _ => {
+                    let token_symbol = self
+                        .tokens
+                        .token_symbol(storage, token_id)
+                        .await
+                        .map_err(Error::storage)?
+                        .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?;
+                    balances.insert(token_symbol, balance);
+                }
+            }
         }
+        let minted_nfts = account
+            .minted_nfts
+            .iter()
+            .map(|(id, nft)| (*id, nft.clone().into()))
+            .collect();
+
         let account_type = storage
             .chain()
             .account_schema()
@@ -138,6 +165,8 @@ impl ApiAccountData {
             last_update_in_block,
             balances,
             account_type,
+            nfts,
+            minted_nfts,
         })
     }
 
@@ -499,10 +528,14 @@ mod tests {
                 .get_block_transactions(block)
                 .await?;
 
-            let tx = &transactions[0];
+            let tx = &transactions[1];
             let op = tx.op.as_object().unwrap();
 
-            let id = serde_json::from_value(op["accountId"].clone()).unwrap();
+            let id = if op.contains_key("accountId") {
+                serde_json::from_value(op["accountId"].clone()).unwrap()
+            } else {
+                serde_json::from_value(op["creatorId"].clone()).unwrap()
+            };
             Ok((id, TxHash::from_str(&tx.tx_hash).unwrap()))
         }
 

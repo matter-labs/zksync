@@ -4,18 +4,19 @@ use std::time::Instant;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
-use zksync_api_types::v02::fee::ApiTxFeeTypes;
-use zksync_types::{
-    tx::{EthBatchSignatures, TxEthSignature, TxEthSignatureVariant, TxHash},
-    Address, BatchFee, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
+use zksync_api_types::{
+    v02::{fee::ApiTxFeeTypes, token::ApiNFT},
+    TxWithSignature,
 };
-
+use zksync_types::{
+    tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
+    Address, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
+};
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::TokenPriceRequestType};
 
 use super::{types::*, RpcApp};
 use crate::api_server::rpc_server::error::RpcErrorCodes;
-use zksync_types::tokens::ApiNFT;
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
@@ -179,7 +180,7 @@ impl RpcApp {
     pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<ApiNFT>> {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
-        let result = storage
+        let nft = storage
             .tokens_schema()
             .get_nft_with_factories(id)
             .await
@@ -189,7 +190,7 @@ impl RpcApp {
             })?;
 
         metrics::histogram!("api.rpc.get_nft", start.elapsed());
-        Ok(result.map(|nft| nft.into()))
+        Ok(nft)
     }
 
     pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {

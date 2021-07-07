@@ -25,7 +25,7 @@ use zksync_storage::{
     prover::ProverSchema,
     test_data::{
         dummy_ethereum_tx_hash, gen_acc_random_updates, gen_sample_block,
-        gen_unique_aggregated_operation_with_txs, get_sample_aggregated_proof,
+        gen_unique_aggregated_operation_with_txs, generate_nft, get_sample_aggregated_proof,
         get_sample_single_proof, BLOCK_SIZE_CHUNKS,
     },
     ConnectionPool,
@@ -43,13 +43,10 @@ use zksync_types::{
 };
 
 // Local uses
-use super::Client;
 use crate::{
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
     signature_checker::{VerifiedTx, VerifySignatureRequest},
 };
-use std::str::FromStr;
-use zksync_storage::test_data::generate_nft;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -354,6 +351,11 @@ impl TestServerConfig {
         // Required since we use `EthereumSchema` in this test.
         storage.ethereum_schema().initialize_eth_data().await?;
 
+        storage
+            .config_schema()
+            .store_config(Address::default(), Address::default(), Address::default())
+            .await?;
+
         // Insert PHNX token
         storage
             .tokens_schema()
@@ -589,6 +591,11 @@ impl TestServerConfig {
                 storage
                     .ethereum_schema()
                     .confirm_eth_tx(&eth_tx_hash)
+                    .await?;
+                storage
+                    .chain()
+                    .state_schema()
+                    .apply_state_update(block_number)
                     .await?;
             }
         }

@@ -11,18 +11,16 @@ use actix_web::{
 // Workspace uses
 use zksync_api_types::{
     v02::transaction::{
-        ApiTxBatch, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, Receipt,
-        SubmitBatchResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
-        TxInBlockStatus,
+        ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
+        Transaction, TransactionData, TxData, TxHashSerializeWrapper, TxInBlockStatus,
     },
-    PriorityOpLookupQuery,
+    PriorityOpLookupQuery, TxWithSignature,
 };
 use zksync_types::{tx::TxHash, EthBlockId};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
-use crate::api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender};
-use zksync_types::tx::TxEthSignatureVariant;
+use crate::api_server::tx_sender::TxSender;
 
 /// Shared data between `api/v0.2/transactions` endpoints.
 #[derive(Clone)]
@@ -148,7 +146,7 @@ async fn tx_data(
 
 async fn submit_tx(
     data: web::Data<ApiTransactionData>,
-    Json(body): Json<IncomingTx>,
+    Json(body): Json<TxWithSignature>,
 ) -> ApiResult<TxHashSerializeWrapper> {
     let tx_hash = data
         .tx_sender
@@ -163,23 +161,11 @@ async fn submit_batch(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<IncomingTxBatch>,
 ) -> ApiResult<SubmitBatchResponse> {
-    let txs = body
-        .txs
-        .into_iter()
-        .map(|tx| TxWithSignature {
-            tx,
-            signature: TxEthSignatureVariant::Single(None),
-            // #TODO verify
-        })
-        .collect();
-
-    let signatures = body.signature;
     let response = data
         .tx_sender
-        .submit_txs_batch(txs, Some(signatures))
+        .submit_txs_batch(body.txs, body.signature)
         .await
         .map_err(Error::from);
-
     response.into()
 }
 
@@ -223,7 +209,10 @@ mod tests {
     };
     use zksync_types::{
         tokens::Token,
-        tx::{EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature},
+        tx::{
+            EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature,
+            TxEthSignatureVariant,
+        },
         BlockNumber, SignedZkSyncTx, TokenId,
     };
 
@@ -283,7 +272,9 @@ mod tests {
         );
 
         let tx = TestServerConfig::gen_zk_txs(100_u64).txs[0].0.clone();
-        let response = client.submit_tx(tx.clone(), None).await?;
+        let response = client
+            .submit_tx(tx.clone(), TxEthSignatureVariant::Single(None))
+            .await?;
         let tx_hash: TxHash = deserialize_response_result(response)?;
         assert_eq!(tx.hash(), tx_hash);
 
@@ -293,7 +284,13 @@ mod tests {
             .into_iter()
             .map(|(tx, _op)| {
                 let tx_hash = tx.hash();
-                (tx, tx_hash)
+                (
+                    TxWithSignature {
+                        tx,
+                        signature: TxEthSignatureVariant::Single(None),
+                    },
+                    tx_hash,
+                )
             })
             .unzip();
         let expected_batch_hash = TxHash::batch_hash(&expected_tx_hashes);
@@ -308,7 +305,7 @@ mod tests {
         let txs = good_batch
             .iter()
             .zip(std::iter::repeat(eth))
-            .map(|(tx, token)| (tx.clone(), token, tx.account()))
+            .map(|(tx, token)| (tx.tx.clone(), token, tx.tx.account()))
             .collect::<Vec<_>>();
         let batch_signature = {
             let eth_private_key = acc
@@ -322,7 +319,7 @@ mod tests {
         };
 
         let response = client
-            .submit_batch(good_batch.clone(), batch_signature)
+            .submit_batch(good_batch.clone(), Some(batch_signature))
             .await?;
         let submit_batch_response: SubmitBatchResponse = deserialize_response_result(response)?;
         assert_eq!(submit_batch_response, expected_response);
@@ -332,7 +329,7 @@ mod tests {
             let txs: Vec<_> = good_batch
                 .into_iter()
                 .map(|tx| SignedZkSyncTx {
-                    tx,
+                    tx: tx.tx,
                     eth_sign_data: None,
                 })
                 .collect();

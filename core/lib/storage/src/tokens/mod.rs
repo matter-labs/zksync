@@ -6,10 +6,11 @@ use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
-use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery};
-use zksync_types::{
-    tokens::ApiNFT, AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT,
+use zksync_api_types::v02::{
+    pagination::{PaginationDirection, PaginationQuery},
+    token::ApiNFT,
 };
+use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageApiNFT, StorageNFT};
@@ -127,30 +128,24 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         from: TokenId,
         limit: Option<u32>,
-    ) -> QueryResult<HashMap<TokenId, Token>> {
+    ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
         let limit = limit.map(i64::from);
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
             SELECT * FROM tokens
-            WHERE id >= $1 and is_nft = false
+            WHERE id >= $1 AND is_nft = false
             ORDER BY id ASC
             LIMIT $2
             "#,
-            from.0 as u32,
+            *from as i32,
             limit
         )
         .fetch_all(self.0.conn())
         .await?;
 
-        let result = tokens
-            .into_iter()
-            .map(|t| {
-                let token: Token = t.into();
-                (token.id, token)
-            })
-            .collect();
+        let result = tokens.into_iter().map(Token::from).collect();
         metrics::histogram!("sql.token.load_tokens_asc", start.elapsed());
         Ok(result)
     }
@@ -160,14 +155,14 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         from: TokenId,
         limit: Option<u32>,
-    ) -> QueryResult<HashMap<TokenId, Token>> {
+    ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
         let limit = limit.map(i64::from);
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
             SELECT * FROM tokens
-            WHERE id <= $1
+            WHERE id <= $1 AND is_nft = false
             ORDER BY id DESC
             LIMIT $2
             "#,
@@ -177,13 +172,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        let result = tokens
-            .into_iter()
-            .map(|t| {
-                let token: Token = t.into();
-                (token.id, token)
-            })
-            .collect();
+        let result = tokens.into_iter().map(Token::from).collect();
         metrics::histogram!("sql.token.load_tokens_desc", start.elapsed());
         Ok(result)
     }
@@ -192,14 +181,15 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Alongside with the tokens added via `store_token` method, the default `ETH` token
     /// is returned.
     pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
-        self.load_tokens_asc(TokenId(0), None).await
+        let tokens = self.load_tokens_asc(TokenId(0), None).await?;
+        Ok(tokens.into_iter().map(|token| (token.id, token)).collect())
     }
 
     /// Loads tokens for the given pagination query
     pub async fn load_token_page(
         &mut self,
         query: &PaginationQuery<TokenId>,
-    ) -> QueryResult<HashMap<TokenId, Token>> {
+    ) -> QueryResult<Vec<Token>> {
         let tokens = match query.direction {
             PaginationDirection::Newer => {
                 self.load_tokens_asc(query.from, Some(query.limit)).await?
@@ -494,7 +484,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     pub async fn get_last_token_id(&mut self) -> QueryResult<TokenId> {
         let start = Instant::now();
 
-        let token_id = sqlx::query!("SELECT MAX(id) FROM tokens")
+        let token_id = sqlx::query!("SELECT MAX(id) FROM tokens WHERE is_nft = false")
             .fetch_one(self.0.conn())
             .await?
             .max

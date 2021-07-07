@@ -397,6 +397,7 @@ async fn test_error_coingecko_api() {
         address: Address::random(),
         symbol: String::from("DAI"),
         decimals: 18,
+        is_nft: false,
     };
     let (address, handler) = run_server(token.address);
     let client = reqwest::ClientBuilder::new()

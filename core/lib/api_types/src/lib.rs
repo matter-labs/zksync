@@ -1,8 +1,19 @@
 pub use either::Either;
 use serde::{Deserialize, Serialize};
-use zksync_types::{tx::TxHash, H256};
+use zksync_types::{
+    tx::{TxEthSignatureVariant, TxHash},
+    ZkSyncTx, H256,
+};
 
 pub mod v02;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TxWithSignature {
+    pub tx: ZkSyncTx,
+    #[serde(default)]
+    pub signature: TxEthSignatureVariant,
+}
 
 /// Combined identifier of the priority operations for the lookup.
 #[derive(Debug, Serialize, Deserialize)]

@@ -58,7 +58,16 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create several accounts.
     let accounts = AccountMap::default();
+    let (last_finalized, _) = AccountSchema(&mut storage)
+        .account_and_last_block(AccountId(1))
+        .await?;
+    let last_committed = AccountSchema(&mut storage)
+        .last_committed_block_with_update_for_acc(AccountId(1))
+        .await?;
+    assert_eq!(last_finalized, 0);
+    assert_eq!(*last_committed, 0);
 
+    // Create several accounts.
     let (mut accounts_block, mut updates_block) = apply_random_updates(accounts, &mut rng);
 
     let mut nft_updates = vec![];

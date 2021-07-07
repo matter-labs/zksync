@@ -59,6 +59,14 @@ export interface AccountStateRest {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
         };
+        nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
+        mintedNfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
         nonce: number;
         pubKeyHash: PubKeyHash;
     };
@@ -66,6 +74,14 @@ export interface AccountStateRest {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
+        };
+        nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
+        mintedNfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
         };
         nonce: number;
         pubKeyHash: PubKeyHash;
@@ -386,6 +402,7 @@ export type IncomingTxFeeType =
     | 'ForcedExit'
     | 'MintNFT'
     | 'WithdrawNFT'
+    | 'FastWithdrawNFT'
     | 'Swap'
     | ChangePubKeyFee
     | LegacyChangePubKeyFee;
@@ -429,6 +446,12 @@ export interface ApiAccountInfo {
         [token: string]: BigNumber;
     };
     accountType?: EthAccountType;
+    nfts: {
+        [tokenId: number]: NFT;
+    };
+    mintedNfts: {
+        [tokenId: number]: NFT;
+    };
 }
 
 export interface ApiAccountFullInfo {
@@ -497,7 +520,7 @@ export interface ApiL2TxReceipt {
 
 export type ApiTxReceipt = ApiL1TxReceipt | ApiL2TxReceipt;
 
-export interface WithdrawAndEthHash {
+export interface WithdrawData {
     type: 'Withdraw';
     accountId: number;
     from: Address;
@@ -512,11 +535,26 @@ export interface WithdrawAndEthHash {
     ethTxHash?: string;
 }
 
-export interface ForcedExitAndEthHash {
+export interface ForcedExitData {
     type: 'ForcedExit';
     initiatorAccountId: number;
     target: Address;
     token: number;
+    fee: BigNumberish;
+    nonce: number;
+    signature?: Signature;
+    validFrom: number;
+    validUntil: number;
+    ethTxHash?: string;
+}
+
+export interface WithdrawNFTData {
+    type: 'WithdrawNFT';
+    accountId: number;
+    from: Address;
+    to: Address;
+    token: number;
+    feeToken: number;
     fee: BigNumberish;
     nonce: number;
     signature?: Signature;
@@ -546,9 +584,17 @@ export interface ApiFullExit {
     txHash: string;
 }
 
-export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount;
+export type L2Tx = Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount | MintNFT | WithdrawNFT | Swap;
 
-export type L2TxData = Transfer | WithdrawAndEthHash | ChangePubKey | ForcedExitAndEthHash | CloseAccount;
+export type L2TxData =
+    | Transfer
+    | WithdrawData
+    | ChangePubKey
+    | ForcedExitData
+    | CloseAccount
+    | MintNFT
+    | WithdrawNFTData
+    | Swap;
 
 export type TransactionData = L2TxData | ApiDeposit | ApiFullExit;
 

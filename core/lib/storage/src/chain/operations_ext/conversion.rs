@@ -3,7 +3,7 @@
 // Workspace imports
 use zksync_api_types::v02::transaction::{
     ForcedExitData, L1Receipt, L1Transaction, L2Receipt, L2Transaction, Receipt, Transaction,
-    TransactionData, TxData, TxInBlockStatus, WithdrawData,
+    TransactionData, TxData, TxInBlockStatus, WithdrawData, WithdrawNFTData,
 };
 use zksync_types::{
     tx::{EthSignData, TxHash},
@@ -74,9 +74,12 @@ impl StorageTxData {
                 tx: *tx,
                 eth_tx_hash: complete_withdrawals_tx_hash,
             })),
-            ZkSyncTx::MintNFT(_) => unimplemented!(),
-            ZkSyncTx::Swap(_) => unimplemented!(),
-            ZkSyncTx::WithdrawNFT(_) => unimplemented!(),
+            ZkSyncTx::MintNFT(tx) => L2Transaction::MintNFT(tx),
+            ZkSyncTx::WithdrawNFT(tx) => L2Transaction::WithdrawNFT(Box::new(WithdrawNFTData {
+                tx: *tx,
+                eth_tx_hash: complete_withdrawals_tx_hash,
+            })),
+            ZkSyncTx::Swap(tx) => L2Transaction::Swap(tx),
         };
         TransactionData::L2(tx)
     }

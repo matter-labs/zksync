@@ -28,7 +28,8 @@ interface InternalTx {
         | ChangePubKeyFee
         | 'Swap'
         | 'MintNFT'
-        | 'WithdrawNFT';
+        | 'WithdrawNFT'
+        | 'ForcedExit';
     address: Address;
     token: TokenLike;
     // Whether or not the tx has been signed.

@@ -596,6 +596,16 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     /// Returns the number of last block for which an aggregated operation exists.
+    pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
+            .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, None)
+            .await;
+        metrics::histogram!("sql.chain.block.get_last_committed_block", start.elapsed());
+        result
+    }
+
+    /// Returns the number of last block which commit is confirmed on Ethereum.
     pub async fn get_last_committed_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let result = OperationsSchema(self.0)
@@ -605,16 +615,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             "sql.chain.block.get_last_committed_confirmed_block",
             start.elapsed()
         );
-        result
-    }
-
-    /// Returns the number of last block for which an aggregated operation exists.
-    pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
-        let start = Instant::now();
-        let result = OperationsSchema(self.0)
-            .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, None)
-            .await;
-        metrics::histogram!("sql.chain.block.get_last_committed_block", start.elapsed());
         result
     }
 
