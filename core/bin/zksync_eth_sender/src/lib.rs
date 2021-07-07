@@ -184,6 +184,8 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
+        // `eth_sender` must perform some of the activities only once per block change.
+        // Having `0` as an initial value is to ensure that on the first iteration we will run all the activities.
         let mut last_used_block = 0;
         loop {
             // We perform a loading routine every X seconds.
@@ -243,6 +245,8 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     /// 1. Pops all the available transactions from the `TxQueue` and sends them.
     /// 2. Sifts all the ongoing operations, filtering the completed ones and
     ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
+    ///
+    /// It returns ethereum block number for which these things were done.
     async fn proceed_next_operations(&mut self, last_used_block: u64) -> u64 {
         let start = Instant::now();
 
@@ -271,8 +275,12 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             }
         }
 
-        // Commit the next operations (if any).
+        // In `perform_commitment_step` we request the states of transactions. We have requested
+        // states for the block with number `last_used_block` on the previous call of
+        // `proceed_next_operations`, so if the block number hasn't changed we shouldn't request
+        // states because it would be spare requests.
         if last_used_block != current_block {
+            // Commit the next operations (if any).
             while let Some(mut current_op) = self.ongoing_ops.pop_front() {
                 // We perform a commitment step here. In case of error, we suppose that this is some
                 // network issue which won't appear the next time, so we report the situation to the
@@ -310,7 +318,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         // Store the ongoing operations for the next round.
         self.ongoing_ops = new_ongoing_ops;
         metrics::histogram!("eth_sender.proceed_next_operations", start.elapsed());
-        return current_block;
+        current_block
     }
 
     async fn process_error(err: anyhow::Error) {
