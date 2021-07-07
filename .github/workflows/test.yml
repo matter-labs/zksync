@@ -27,7 +27,7 @@ jobs:
         with:
           repository: matter-labs/helm-infra
           path: helm-infra
-          ref: master
+          ref: XXXXXXXXXXXXXXXXXXXXXXXXX
           token: ${{ secrets.GH_TOKEN }}
       -
         name: Create ~/.kube/config
