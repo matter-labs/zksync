@@ -215,6 +215,20 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(tokens)
     }
 
+    /// Loads all finalized NFTs.
+    pub async fn load_nfts(&mut self) -> QueryResult<HashMap<TokenId, NFT>> {
+        let start = Instant::now();
+        let nfts = sqlx::query_as!(StorageNFT, "SELECT * FROM nft",)
+            .fetch_all(self.0.conn())
+            .await?
+            .into_iter()
+            .map(|nft| (TokenId(nft.token_id as u32), nft.into()))
+            .collect();
+
+        metrics::histogram!("sql.token.load_nfts", start.elapsed());
+        Ok(nfts)
+    }
+
     /// Loads all the stored tokens, which have market_volume (ticker_market_volume table)
     /// not less than parameter (min_market_volume)
     pub async fn load_tokens_by_market_volume(
