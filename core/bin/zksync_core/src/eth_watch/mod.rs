@@ -6,6 +6,7 @@
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
 
 // Built-in deps
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 // External uses
@@ -14,6 +15,7 @@ use futures::{
     SinkExt, StreamExt,
 };
 
+pub use client::{get_web3_block_number, EthHttpClient};
 use itertools::Itertools;
 use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
@@ -26,7 +28,9 @@ use zksync_api_types::{
     },
     Either,
 };
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::params::PRIORITY_EXPIRATION;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{
     tx::TxHash, NewTokenEvent, Nonce, PriorityOp, PubKeyHash, RegisterNFTFactoryEvent,
     ZkSyncPriorityOp, H256,
@@ -34,13 +38,6 @@ use zksync_types::{
 
 // Local deps
 use self::{client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops};
-
-pub use client::{get_web3_block_number, EthHttpClient};
-use zksync_config::ZkSyncConfig;
-
-use crate::eth_watch::received_ops::ReceivedPriorityOp;
-use std::collections::HashMap;
-use zksync_eth_client::ethereum_gateway::EthereumGateway;
 
 mod client;
 mod eth_state;
@@ -215,31 +212,15 @@ impl<W: EthClient> EthWatch<W> {
             new_tokens,
             register_nft_factory_events,
         );
-        // Check for gaps in priority queue. If some event is missing we skip this `ETHState` update.
-        let mut priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
-        priority_op_ids.sort_unstable();
 
-        for i in 0..priority_op_ids.len().saturating_sub(1) {
-            let gap = priority_op_ids[i + 1] - priority_op_ids[i];
-            anyhow::ensure!(
-                gap == 1,
-                "Gap in priority op queue: gap={}, priority_op_before_gap={}",
-                gap,
-                priority_op_ids[i]
-            );
-        }
-
-        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
         self.set_new_state(new_state);
         Ok(())
     }
 
     async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
-        let (unconfirmed_queue, priority_queue) = self
+        let new_state = self
             .update_eth_state(last_ethereum_block, PRIORITY_EXPIRATION)
             .await?;
-
-        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
 
         self.set_new_state(new_state);
 
@@ -251,7 +232,7 @@ impl<W: EthClient> EthWatch<W> {
         &mut self,
         current_ethereum_block: u64,
         unprocessed_blocks_amount: u64,
-    ) -> anyhow::Result<(Vec<PriorityOp>, HashMap<u64, ReceivedPriorityOp>)> {
+    ) -> anyhow::Result<ETHState> {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
@@ -301,7 +282,14 @@ impl<W: EthClient> EthWatch<W> {
             new_priority_op_ids
         );
 
-        Ok((unconfirmed_queue, priority_queue))
+        let state = ETHState::new(
+            current_ethereum_block,
+            unconfirmed_queue,
+            priority_queue,
+            new_tokens,
+            new_register_nft_factory_events,
+        );
+        Ok(state)
     }
 
     fn get_register_factory_event(
