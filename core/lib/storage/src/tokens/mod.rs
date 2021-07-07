@@ -295,7 +295,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .map(|token| token.id)
         .unwrap_or(0);
 
-        metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
+        metrics::histogram!("sql.token.get_count", start.elapsed());
         Ok(last_token_id as u32)
     }
 
