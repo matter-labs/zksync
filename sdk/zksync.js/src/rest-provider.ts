@@ -496,6 +496,7 @@ export class RestProvider extends SyncProvider {
             return {
                 address,
                 id: fullInfo.committed.accountId,
+                accountType: fullInfo.committed.accountType,
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,

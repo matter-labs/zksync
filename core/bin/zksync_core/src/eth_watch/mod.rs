@@ -215,18 +215,35 @@ impl<W: EthClient> EthWatch<W> {
             new_tokens,
             register_nft_factory_events,
         );
+        // Check for gaps in priority queue. If some event is missing we skip this `ETHState` update.
+        let mut priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
+        priority_op_ids.sort_unstable();
+
+        for i in 0..priority_op_ids.len().saturating_sub(1) {
+            let gap = priority_op_ids[i + 1] - priority_op_ids[i];
+            anyhow::ensure!(
+                gap == 1,
+                "Gap in priority op queue: gap={}, priority_op_before_gap={}",
+                gap,
+                priority_op_ids[i]
+            );
+        }
+
+        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
         self.set_new_state(new_state);
         Ok(())
     }
 
     async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
-        let new_state = self
+        let (unconfirmed_queue, priority_queue) = self
             .update_eth_state(last_ethereum_block, PRIORITY_EXPIRATION)
             .await?;
+
+        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
+
         self.set_new_state(new_state);
 
         vlog::debug!("ETH state: {:#?}", self.eth_state);
-
         Ok(())
     }
 
@@ -234,14 +251,14 @@ impl<W: EthClient> EthWatch<W> {
         &mut self,
         current_ethereum_block: u64,
         unprocessed_blocks_amount: u64,
-    ) -> anyhow::Result<ETHState> {
+    ) -> anyhow::Result<(Vec<PriorityOp>, HashMap<u64, ReceivedPriorityOp>)> {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
             new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
         let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
-        let priority_queue: HashMap<u64, ReceivedPriorityOp> = self
+        let priority_queue: HashMap<u64, _> = self
             .client
             .get_priority_op_events(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
@@ -275,15 +292,16 @@ impl<W: EthClient> EthWatch<W> {
             new_priority_op_ids
         );
 
-        let new_state = ETHState::new(
-            current_ethereum_block,
-            unconfirmed_queue,
-            priority_queue,
-            new_tokens,
-            new_register_nft_factory_events,
+        let mut new_priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
+        new_priority_op_ids.sort_unstable();
+        vlog::debug!(
+            "Updating eth state: block_range=[{},{}], new_priority_ops={:?}",
+            previous_block_with_accepted_events,
+            new_block_with_accepted_events,
+            new_priority_op_ids
         );
 
-        Ok(new_state)
+        Ok((unconfirmed_queue, priority_queue))
     }
 
     fn get_register_factory_event(
