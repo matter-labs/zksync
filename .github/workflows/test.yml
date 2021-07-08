@@ -88,6 +88,7 @@ jobs:
           zk contract build
           zk contract deploy
           cd contracts && zk f yarn governance-add-erc20 add-multi-current-network rinkeby
+          zk db insert contract
 
   deploy:
     name: Deploy the apps
