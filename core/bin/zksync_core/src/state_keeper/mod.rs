@@ -1,6 +1,4 @@
 use std::collections::{HashMap, VecDeque};
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 // External uses
@@ -596,16 +594,6 @@ impl ZkSyncStateKeeper {
         vlog::info!("Genesis block created, state: {}", state.root_hash());
         let genesis_root = format!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
         println!("{}", &genesis_root);
-        // Write updated genesis root to the separate file
-        // Currently it's used by loadtest github action to update deployment configmap.
-        let mut file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open("deployed_contracts.log")
-            .unwrap();
-        if let Err(e) = writeln!(file, "{}", genesis_root) {
-            println!("Couldn't write to file: {}", e);
-        }
         metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
     }
 

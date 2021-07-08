@@ -84,10 +84,10 @@ jobs:
           zk run yarn
           zk run verify-keys unpack
           zk db setup
+          zk server --genesis
           zk contract build
           zk contract deploy
           cd contracts && zk f yarn governance-add-erc20 add-multi-current-network rinkeby
-          zk server --genesis
 
   deploy:
     name: Deploy the apps

@@ -40,6 +40,9 @@ export async function genesis() {
     fs.copyFileSync('genesis.log', `logs/${label}/genesis.log`);
     env.modify('CONTRACTS_GENESIS_ROOT', genesisRoot);
     env.modify_contracts_toml('CONTRACTS_GENESIS_ROOT', genesisRoot);
+    // Write updated genesis root to the separate file
+    // Currently it's used by loadtest github action to update deployment configmap.
+    fs.writeFileSync('deployed_contracts.log', `\nCONTRACTS_GENESIS_ROOT=${genesisRoot}`);
 }
 
 // This functions deposits funds onto the forced exit sender account
