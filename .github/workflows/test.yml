@@ -134,8 +134,8 @@ jobs:
     env:
       WEB3_URL: ${{secrets.CI_LOADTEST_WEB3_URL}}
       MASTER_WALLET_PK: ${{secrets.CI_LOADTEST_MAIN_PRIVKEY}}
-      ACCOUNTS_AMOUNT: 40
-      OPERATIONS_PER_ACCOUNT: 50
+      ACCOUNTS_AMOUNT: 20
+      OPERATIONS_PER_ACCOUNT: 20
       MAIN_TOKEN: "USDT"
       ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
       ETH_NETWORK: "rinkeby"
