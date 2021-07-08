@@ -109,6 +109,7 @@ jobs:
       -
         name: Update contracts in the ConfigMap
         run: |
+          cat deployed_contracts.log
           .github/scripts/zksync-env.sh --update-from deployed_contracts.log
       -
         name: Deploy apps
