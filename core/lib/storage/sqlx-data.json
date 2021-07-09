@@ -5777,6 +5777,27 @@
       ]
     }
   },
+  "dffa1f171b2f4cfb87d3b2d705d6ea6974cb792d4656b52e032ad65685f97690": {
+    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "new_balance",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "e10f37a3c41cf1446b91605ffdeef37da79d7d3a77d47fb3dfab764831509536": {
     "query": "\n                    DELETE FROM accounts\n                    WHERE id = $1\n                    ",
     "describe": {

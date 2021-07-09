@@ -4,7 +4,7 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 // Local uses
 use super::{
-    types::{Address, BlockNumber, H256, U256},
+    types::{Address, BlockNumber, H256, U256, U64},
     Web3RpcApp,
 };
 
@@ -26,9 +26,6 @@ macro_rules! spawn {
 
 #[rpc]
 pub trait Web3Rpc {
-    #[rpc(name = "ping", returns = "bool")]
-    fn ping(&self) -> FutureResp<bool>;
-
     #[rpc(name = "web3_clientVersion", returns = "String")]
     fn web3_client_version(&self) -> FutureResp<String>;
 
@@ -55,13 +52,19 @@ pub trait Web3Rpc {
 
     #[rpc(name = "eth_getUncleCountByBlockNumber", returns = "U256")]
     fn get_uncle_count_by_block_number(&self, block_number: BlockNumber) -> FutureResp<U256>;
+
+    #[rpc(name = "eth_blockNumber", returns = "U64")]
+    fn block_number(&self) -> FutureResp<U64>;
+
+    #[rpc(name = "eth_getBalance", returns = "U256")]
+    fn get_balance(
+        &self,
+        address: zksync_types::Address,
+        block: Option<BlockNumber>,
+    ) -> FutureResp<U256>;
 }
 
 impl Web3Rpc for Web3RpcApp {
-    fn ping(&self) -> FutureResp<bool> {
-        spawn! { self._impl_ping() }
-    }
-
     fn web3_client_version(&self) -> FutureResp<String> {
         spawn! { self._impl_web3_client_version() }
     }
@@ -96,5 +99,17 @@ impl Web3Rpc for Web3RpcApp {
 
     fn get_uncle_count_by_block_number(&self, block_number: BlockNumber) -> FutureResp<U256> {
         spawn! { self._impl_get_uncle_count_by_block_number(block_number) }
+    }
+
+    fn block_number(&self) -> FutureResp<U64> {
+        spawn! { self._impl_block_number() }
+    }
+
+    fn get_balance(
+        &self,
+        address: zksync_types::Address,
+        block: Option<BlockNumber>,
+    ) -> FutureResp<U256> {
+        spawn! { self._impl_get_balance(address, block) }
     }
 }
