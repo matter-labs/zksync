@@ -3889,6 +3889,27 @@
       "nullable": []
     }
   },
+  "9cfc4a7d1b0453be30a5024f57989d57aeebd3f5304c90d6e09bc251c0e99ea9": {
+    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "new_balance",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "9fb67f0d0bc8387201e5358ca011da4b6d4d48c38c5de3f628c9818804c01376": {
     "query": "\n                                WITH transactions AS (\n                                    SELECT\n                                        tx_hash,\n                                        tx as op,\n                                        block_number,\n                                        created_at,\n                                        success,\n                                        fail_reason,\n                                        Null::bytea as eth_hash,\n                                        Null::bigint as priority_op_serialid,\n                                        block_index\n                                    FROM executed_transactions\n                                    WHERE block_number = $1 AND created_at <= $2\n                                ), priority_ops AS (\n                                    SELECT\n                                        tx_hash,\n                                        operation as op,\n                                        block_number,\n                                        created_at,\n                                        true as success,\n                                        Null as fail_reason,\n                                        eth_hash,\n                                        priority_op_serialid,\n                                        block_index\n                                    FROM executed_priority_operations\n                                    WHERE block_number = $1 AND created_at <= $2\n                                ), everything AS (\n                                    SELECT * FROM transactions\n                                    UNION ALL\n                                    SELECT * FROM priority_ops\n                                )\n                                SELECT\n                                    tx_hash as \"tx_hash!\",\n                                    block_number as \"block_number!\",\n                                    op as \"op!\",\n                                    created_at as \"created_at!\",\n                                    success as \"success!\",\n                                    fail_reason as \"fail_reason?\",\n                                    eth_hash as \"eth_hash?\",\n                                    priority_op_serialid as \"priority_op_serialid?\"\n                                FROM everything\n                                ORDER BY created_at DESC, block_index DESC\n                                LIMIT $3\n                            ",
     "describe": {
@@ -5773,27 +5794,6 @@
         false,
         false,
         true,
-        false
-      ]
-    }
-  },
-  "dffa1f171b2f4cfb87d3b2d705d6ea6974cb792d4656b52e032ad65685f97690": {
-    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "new_balance",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
         false
       ]
     }
