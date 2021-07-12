@@ -9,7 +9,7 @@ use zksync_config::ZkSyncConfig;
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
-use self::rpc_trait::Web3Rpc;
+use self::{rpc_trait::Web3Rpc, types::U256};
 
 mod rpc_impl;
 mod rpc_trait;
@@ -48,11 +48,9 @@ impl Web3RpcApp {
     }
 
     async fn resolve_block_number(
-        &self,
+        storage: &mut StorageProcessor<'_>,
         number: Option<self::types::BlockNumber>,
     ) -> Result<Option<zksync_types::BlockNumber>> {
-        let mut storage = self.access_storage().await?;
-
         let last_saved_block = storage
             .chain()
             .block_schema()
@@ -94,6 +92,19 @@ impl Web3RpcApp {
             }
         };
         Ok(Some(number))
+    }
+
+    async fn get_block_transaction_count(
+        storage: &mut StorageProcessor<'_>,
+        block_number: zksync_types::BlockNumber,
+    ) -> Result<U256> {
+        let count = storage
+            .chain()
+            .block_schema()
+            .get_block_transactions_count(block_number)
+            .await
+            .map_err(|_| Error::internal_error())?;
+        Ok(U256::from(count))
     }
 }
 

@@ -67,12 +67,15 @@ impl Web3RpcApp {
         block: Option<BlockNumber>,
     ) -> Result<U256> {
         let start = Instant::now();
-        let block_number = self
-            .resolve_block_number(block)
+        let mut storage = self.access_storage().await?;
+        let mut transaction = storage
+            .start_transaction()
+            .await
+            .map_err(|_| Error::internal_error())?;
+        let block_number = Self::resolve_block_number(&mut transaction, block)
             .await?
             .ok_or_else(|| Error::invalid_params("Block with such number doesn't exist yet"))?;
-        let mut storage = self.access_storage().await?;
-        let balance = storage
+        let balance = transaction
             .chain()
             .account_schema()
             .get_account_eth_balance_for_block(address, block_number)
@@ -84,23 +87,64 @@ impl Web3RpcApp {
         Ok(result)
     }
 
+    pub async fn _impl_get_block_transaction_count_by_hash(
+        self,
+        hash: H256,
+    ) -> Result<Option<U256>> {
+        let start = Instant::now();
+        let mut storage = self.access_storage().await?;
+        let mut transaction = storage
+            .start_transaction()
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        let block_number = transaction
+            .chain()
+            .block_schema()
+            .get_block_number_by_hash(hash.as_bytes())
+            .await
+            .map_err(|_| Error::internal_error())?;
+        let result = match block_number {
+            Some(block_number) => {
+                Some(Self::get_block_transaction_count(&mut transaction, block_number).await?)
+            }
+            None => None,
+        };
+        transaction
+            .commit()
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        metrics::histogram!(
+            "api.web3.get_block_transaction_count_by_hash",
+            start.elapsed()
+        );
+        Ok(result)
+    }
+
     pub async fn _impl_get_block_transaction_count_by_number(
         self,
         block: Option<BlockNumber>,
-    ) -> Result<U256> {
+    ) -> Result<Option<U256>> {
         let start = Instant::now();
-        let block_number = self
-            .resolve_block_number(block)
-            .await?
-            .ok_or_else(|| Error::invalid_params("Block with such number doesn't exist yet"))?;
         let mut storage = self.access_storage().await?;
-        let count = storage
-            .chain()
-            .block_schema()
-            .get_block_transactions_count(block_number)
+        let mut transaction = storage
+            .start_transaction()
             .await
             .map_err(|_| Error::internal_error())?;
-        let result = U256::from(count);
+
+        let block_number = Self::resolve_block_number(&mut transaction, block).await?;
+        let result = match block_number {
+            Some(block_number) => {
+                Some(Self::get_block_transaction_count(&mut transaction, block_number).await?)
+            }
+            None => None,
+        };
+        transaction
+            .commit()
+            .await
+            .map_err(|_| Error::internal_error())?;
+
         metrics::histogram!(
             "api.web3.get_block_transaction_count_by_number",
             start.elapsed()

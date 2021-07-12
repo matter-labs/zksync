@@ -6134,6 +6134,26 @@
       "nullable": []
     }
   },
+  "eac9603e24c96b9675d13f7b2d8b2f9509a0f72a4b058919343d9e49ece8657c": {
+    "query": "SELECT number FROM blocks where root_hash = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "number",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "eb9480426aebcc7679526858296f555bb4d3e1ccf488a942de6d0b2dd1ed4720": {
     "query": "\n                    INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n                    VALUES ( $1, $2, $3, $4, true )\n                    ",
     "describe": {

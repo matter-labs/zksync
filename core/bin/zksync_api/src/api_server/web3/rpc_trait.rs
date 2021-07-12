@@ -63,9 +63,17 @@ pub trait Web3Rpc {
         block: Option<BlockNumber>,
     ) -> FutureResp<U256>;
 
-    #[rpc(name = "eth_getBlockTransactionCountByNumber", returns = "U256")]
-    fn get_block_transaction_count_by_number(&self, block: Option<BlockNumber>)
-        -> FutureResp<U256>;
+    #[rpc(name = "eth_getBlockTransactionCountByHash", returns = "Option<U256>")]
+    fn get_block_transaction_count_by_hash(&self, hash: H256) -> FutureResp<Option<U256>>;
+
+    #[rpc(
+        name = "eth_getBlockTransactionCountByNumber",
+        returns = "Option<U256>"
+    )]
+    fn get_block_transaction_count_by_number(
+        &self,
+        block: Option<BlockNumber>,
+    ) -> FutureResp<Option<U256>>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -117,10 +125,14 @@ impl Web3Rpc for Web3RpcApp {
         spawn! { self._impl_get_balance(address, block) }
     }
 
+    fn get_block_transaction_count_by_hash(&self, hash: H256) -> FutureResp<Option<U256>> {
+        spawn! { self._impl_get_block_transaction_count_by_hash(hash) }
+    }
+
     fn get_block_transaction_count_by_number(
         &self,
         block: Option<BlockNumber>,
-    ) -> FutureResp<U256> {
+    ) -> FutureResp<Option<U256>> {
         spawn! { self._impl_get_block_transaction_count_by_number(block) }
     }
 }
