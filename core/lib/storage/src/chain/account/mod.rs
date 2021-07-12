@@ -435,7 +435,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
         let result = last_balance_update
             .map(|b| b.to_bigint().unwrap().to_biguint().unwrap())
-            .unwrap_or_else(|| BigUint::zero());
+            .unwrap_or_else(BigUint::zero);
 
         transaction.commit().await?;
         metrics::histogram!(

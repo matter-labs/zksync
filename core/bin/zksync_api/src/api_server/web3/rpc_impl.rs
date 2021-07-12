@@ -83,4 +83,28 @@ impl Web3RpcApp {
         metrics::histogram!("api.web3.get_balance", start.elapsed());
         Ok(result)
     }
+
+    pub async fn _impl_get_block_transaction_count_by_number(
+        self,
+        block: Option<BlockNumber>,
+    ) -> Result<U256> {
+        let start = Instant::now();
+        let block_number = self
+            .resolve_block_number(block)
+            .await?
+            .ok_or_else(|| Error::invalid_params("Block with such number doesn't exist yet"))?;
+        let mut storage = self.access_storage().await?;
+        let count = storage
+            .chain()
+            .block_schema()
+            .get_block_transactions_count(block_number)
+            .await
+            .map_err(|_| Error::internal_error())?;
+        let result = U256::from(count);
+        metrics::histogram!(
+            "api.web3.get_block_transaction_count_by_number",
+            start.elapsed()
+        );
+        Ok(result)
+    }
 }

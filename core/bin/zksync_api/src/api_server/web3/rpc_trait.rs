@@ -62,6 +62,10 @@ pub trait Web3Rpc {
         address: zksync_types::Address,
         block: Option<BlockNumber>,
     ) -> FutureResp<U256>;
+
+    #[rpc(name = "eth_getBlockTransactionCountByNumber", returns = "U256")]
+    fn get_block_transaction_count_by_number(&self, block: Option<BlockNumber>)
+        -> FutureResp<U256>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -111,5 +115,12 @@ impl Web3Rpc for Web3RpcApp {
         block: Option<BlockNumber>,
     ) -> FutureResp<U256> {
         spawn! { self._impl_get_balance(address, block) }
+    }
+
+    fn get_block_transaction_count_by_number(
+        &self,
+        block: Option<BlockNumber>,
+    ) -> FutureResp<U256> {
+        spawn! { self._impl_get_block_transaction_count_by_number(block) }
     }
 }
