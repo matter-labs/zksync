@@ -1,7 +1,9 @@
 // External imports
+use num::{BigUint, Zero};
 // Workspace imports
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, AccountId, AccountMap, BlockNumber,
+    aggregated_operations::AggregatedActionType, helpers::apply_updates, AccountId, AccountMap,
+    AccountUpdate, Address, BlockNumber, Nonce, TokenId,
 };
 // Local imports
 use super::block::apply_random_updates;
@@ -16,7 +18,6 @@ use crate::{
     },
     QueryResult, StorageProcessor,
 };
-use zksync_types::helpers::apply_updates;
 
 /// The save/load routine for EthAccountType
 #[db_test]
@@ -58,14 +59,6 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create several accounts.
     let accounts = AccountMap::default();
-    let (last_finalized, _) = AccountSchema(&mut storage)
-        .account_and_last_block(AccountId(1))
-        .await?;
-    let last_committed = AccountSchema(&mut storage)
-        .last_committed_block_with_update_for_acc(AccountId(1))
-        .await?;
-    assert_eq!(last_finalized, 0);
-    assert_eq!(*last_committed, 0);
 
     // Create several accounts.
     let (mut accounts_block, mut updates_block) = apply_random_updates(accounts, &mut rng);
@@ -212,6 +205,57 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             Some(got_account)
         );
     }
+
+    Ok(())
+}
+
+#[db_test]
+async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let _lock = ACCOUNT_MUTEX.lock().await;
+    let address = Address::random();
+    let block_number = BlockNumber(2);
+    let new_balance = BigUint::from(100u32);
+    let updates = vec![
+        (
+            AccountId(1),
+            AccountUpdate::Create {
+                address,
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            AccountId(1),
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(0),
+                new_nonce: Nonce(1),
+                balance_update: (TokenId(0), BigUint::zero(), new_balance.clone()),
+            },
+        ),
+    ];
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(block_number, &updates, 0)
+        .await?;
+
+    let balance_before = storage
+        .chain()
+        .account_schema()
+        .get_account_eth_balance_for_block(address, block_number - 1)
+        .await?;
+    let balance_after1 = storage
+        .chain()
+        .account_schema()
+        .get_account_eth_balance_for_block(address, block_number)
+        .await?;
+    let balance_after2 = storage
+        .chain()
+        .account_schema()
+        .get_account_eth_balance_for_block(address, block_number + 1)
+        .await?;
+    assert_eq!(balance_before, BigUint::zero());
+    assert_eq!(balance_after1, new_balance);
+    assert_eq!(balance_after2, new_balance);
 
     Ok(())
 }

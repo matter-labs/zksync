@@ -1262,3 +1262,24 @@ async fn test_remove_account_tree_cache(mut storage: StorageProcessor<'_>) -> Qu
 
     Ok(())
 }
+
+/// Check that `get_block_number_by_hash` works correctly
+#[db_test]
+async fn test_get_block_number_by_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let expected_number = BlockNumber(1);
+    let block = gen_sample_block(expected_number, BLOCK_SIZE_CHUNKS, Default::default());
+    storage
+        .chain()
+        .block_schema()
+        .save_block(block.clone())
+        .await?;
+
+    let actual_number = storage
+        .chain()
+        .block_schema()
+        .get_block_number_by_hash(&block.new_root_hash.to_bytes())
+        .await?;
+    assert_eq!(actual_number, Some(expected_number));
+
+    Ok(())
+}
