@@ -937,7 +937,7 @@ Signed bytes: 0xf60100001016041f3b8db956854839d7434f3e53c7141a236b16bd7289936758
 
 | Field | Value/type | Description                               |
 | ----- | ---------- | ----------------------------------------- |
-| tx    | MintNFTTx | Signed mint nft transaction defined above |
+| tx    | MintNFTTx  | Signed mint nft transaction defined above |
 
 #### Circuit constraints
 
