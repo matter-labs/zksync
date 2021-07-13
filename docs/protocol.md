@@ -362,17 +362,19 @@ representation 0x0012.
 
 ##### Structure
 
-| Field      | Value/type     | Description                                                                      |
-| ---------- | -------------- | -------------------------------------------------------------------------------- |
-| type       | `0xfa`         | Operation code                                                                   |
-| account_id | AccountId      | Unique id of the sender rollup account in the state tree                         |
-| from       | ETHAddress     | Unique address of the rollup account from which funds will be withdrawn (sender) |
-| to         | ETHAddress     | Unique address of the rollup account that will receive the funds (recipient)     |
-| token      | TokenId        | Unique token identifier in the rollup                                            |
-| amount     | PackedTxAmount | Amount of funds sent                                                             |
-| fee        | PackedFee      | Amount of fee paid                                                               |
-| nonce      | Nonce          | A one-time code that specifies the order of transactions                         |
-| signature  | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below       |
+| Field       | Value/type     | Description                                                                      |
+| ----------- | -------------- | -------------------------------------------------------------------------------- |
+| type        | `0xfa`         | Operation code                                                                   |
+| account_id  | AccountId      | Unique id of the sender rollup account in the state tree                         |
+| from        | ETHAddress     | Unique address of the rollup account from which funds will be withdrawn (sender) |
+| to          | ETHAddress     | Unique address of the rollup account that will receive the funds (recipient)     |
+| token       | TokenId        | Unique token identifier in the rollup                                            |
+| amount      | PackedTxAmount | Amount of funds sent                                                             |
+| fee         | PackedFee      | Amount of fee paid                                                               |
+| nonce       | Nonce          | A one-time code that specifies the order of transactions                         |
+| valid_from  | Timestamp      |
+| valid_until | Timestamp      |
+| signature   | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below       |
 
 ##### Example
 
@@ -388,6 +390,8 @@ the spec below).
   "amount": "12340000000000",
   "fee": "56700000000",
   "nonce": 784793056,
+  "validFrom": 0,
+  "validUntil": 4294967295,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
     "signature": "355b60e9fa06bb4755fde52001f32558f221aa8bbe974882abb5db2996ecb487086bcf51dbc3b8693dbad74f393278cce63d58e79e0a629e7cbb61c4aff7fb04"
@@ -403,6 +407,7 @@ Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
 type: 0xfa
+version: 0x01
 accountId: 0x0000080d
 from: 0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb
 to: 0x05e3066450dfcd4ee9ca4f2039d58883631f0460
@@ -410,8 +415,9 @@ token: 0x0000ede0
 amount: 0x5bf0aea003
 fee: 0x46e8
 nonce: 0x2ec6fde0
-
-Signed bytes: 0xfa010000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f04600000ede05bf0aea00346e82ec6fde0
+valid_from: 0x0000000000000000
+valid_until: 0x00000000ffffffff
+Signed bytes: 0xfa010000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f04600000ede05bf0aea00346e82ec6fde0000000000000000000000000ffffffff
 ```
 
 #### Rollup operation
@@ -459,7 +465,7 @@ def tree_updates():
     fee_account.balance[TransferOp.tx.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == oxfa
+    OnhcainOp.opcode == 0xfa
     OnchainOp.from_account == TransferOp.from_account_id
     OnchainOp.token == TransferOp.tx.token
     OnchainOp.to_account == TransferOp.to_account_id
@@ -611,6 +617,8 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 | amount       | StateAmount | Full amount of funds sent                                                                     |
 | fee          | PackedFee   | Packed amount of fee paid                                                                     |
 | nonce        | Nonce       | A one-time code that specifies the order of transactions                                      |
+| valid_from   | Timestamp   |
+| valid_until  | Timestamp   |
 | signature    | Signanture  | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 
 ##### Example
@@ -627,6 +635,8 @@ the spec below)..
   "amount": "12340000000000",
   "fee": "56700000000",
   "nonce": 352676723,
+  "validFrom": 0,
+  "validUntil": 4294967295,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
     "signature": "ae94d3b349e9ed18753c307262f62bea5ec1cc748ce5e5123caa5f7eb1aa599bc6734c43a92dad5c00eab5e6443e3ae8217e9bde60b93c7e9739dc85b148ad02"
@@ -650,8 +660,10 @@ token: 0x000026a0
 amount: 0x000000000000000000000b3921510800
 fee: 0x46e8
 nonce: 0x15056b73
+valid_from: 0x0000000000000000
+valid_until: 0x00000000ffffffff
 
-Signed bytes: 0xfc0100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000026a0000000000000000000000b392151080046e815056b73
+Signed bytes: 0xfc0100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000026a0000000000000000000000b392151080046e815056b73000000000000000000000000ffffffff
 ```
 
 #### Rollup operation
@@ -718,8 +730,8 @@ Withdraws NFT from Rollup account to appropriate ethereum account.
 | --------------- | -------- | ---------- | ------------------------------------------------------------------------------------------ |
 | opcode          | 1        | `0x0a`     | Operation code                                                                             |
 | from_account    | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
-| creator_account | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
-| creator_address | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
+| creator_account | 4        | AccountId  | Unique identifier of the rollup account which create the NFT (creator)                     |
+| creator_address | 20       | EthAddress | The address of Ethereum account, to the balance of which create the NFT (creator)          |
 | serial_id       | 4        | Int        | Special id for NFT for enforcing uniqueness                                                |
 | content_hash    | 32       | H256       | Content hash of NFT                                                                        |
 | to_address      | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
@@ -750,6 +762,8 @@ ethereum account with address 0x0809101112131415161718192021222334252628.
 | fee_token    | TokenId    | Fee token identifier in the rollup                                                            |
 | fee          | PackedFee  | Packed amount of fee paid                                                                     |
 | nonce        | Nonce      | A one-time code that specifies the order of transactions                                      |
+| valid_from   | Timestamp  |
+| valid_until  | Timestamp  |
 | signature    | Signanture | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 
 ##### Example
@@ -766,6 +780,8 @@ the spec below)..
   "feeToken": 9888,
   "fee": "56700000000",
   "nonce": 352676723,
+  "validFrom": 0,
+  "validUntil": 4294967295,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
     "signature": "ae94d3b349e9ed18753c307262f62bea5ec1cc748ce5e5123caa5f7eb1aa599bc6734c43a92dad5c00eab5e6443e3ae8217e9bde60b93c7e9739dc85b148ad02"
@@ -787,11 +803,12 @@ from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
 to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
 token: 0x0000ffdc
 feeToken: 0x000026a0
-amount: 0x000000000000000000000b3921510800
 fee: 0x46e8
 nonce: 0x15056b73
+valid_from: 0x0000000000000000
+valid_until: 0x00000000ffffffff
 
-Signed bytes: 0xf50100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb05130000ffdc000026a0000000000000000000000b392151080046e815056b73
+Signed bytes: 0xf50100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb05130000ffdc000026a046e815056b73000000000000000000000000ffffffff
 ```
 
 #### Rollup operation
@@ -845,7 +862,7 @@ def pubdata_invariants():
 
 #### Description
 
-MINT NFT inside Rollup
+Mints an NFT token inside Rollup
 
 #### Onchain operation
 
@@ -922,8 +939,8 @@ type: 0xf6
 version: 0x01
 creator_id: 0x00001016
 creator_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
-recipient: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
 contentHash: 0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996
+recipient: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
 feeToken: 0x000026a0
 fee: 0x46e8
 nonce: 0x15056b73
@@ -1082,23 +1099,25 @@ in a block.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 6      | 45                |
+| 11     | 45                |
 
 ##### Structure
 
-| Field       | Byte len | Value/type  | Description                                                                                 |
-| ----------- | -------- | ----------- | ------------------------------------------------------------------------------------------- |
-| opcode      | 1        | `0xf9`      | Operation code                                                                              |
-| version     | 1        | `0x01`      | Version of transaction                                                                      |
-| account_id  | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)         |
-| owner       | 20       | EthAddress  | The address of the fund owner account. Funds will be accrued to the balance of this address |
-| token       | 4        | TokenId     | Unique token identifier in the rollup                                                       |
-| full_amount | 16       | StateAmount | Full amount of funds that had been withdrawn                                                |
+| Field                         | Byte len | Value/type  | Description                                                                                 |
+| ----------------------------- | -------- | ----------- | ------------------------------------------------------------------------------------------- |
+| opcode                        | 1        | `0xf9`      | Operation code                                                                              |
+| account_id                    | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)         |
+| owner                         | 20       | EthAddress  | The address of the fund owner account. Funds will be accrued to the balance of this address |
+| token                         | 4        | TokenId     | Unique token identifier in the rollup                                                       |
+| full_amount                   | 16       | StateAmount | Full amount of funds that had been withdrawn                                                |
+| creator_account_id (Optional) | 4        | AccountId   | Unique identifier of the rollup account from which created nft                              |
+| serial_id (Optional)          | 4        | Int         |                                                                                             |
+| content_hash (Optional)       | 32       | ContentHash | Content of NFT                                                                              |
 
 ##### Example
 
 ```
-f9010000040809101112131415161718192021222334252628000200000000000002c68af0bb1400000000
+060000002a2a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 ```
 
 Reads as: full exit from account #4 with with address 0x0809101112131415161718192021222334252628, token #2, amount is
@@ -1238,6 +1257,8 @@ function create2_address_zksync(creator_address, salt_arg /* abitrary 32 bytes *
 | fee_token                | TokenId          | Unique token identifier in the rollup used to pay fee                                         |
 | fee                      | PackedFee        | Packed amount of fee paid                                                                     |
 | nonce                    | Nonce            | A one-time code that specifies the order of transactions                                      |
+| valid_from               | Timestamp        |
+| valid_until              | Timestamp        |
 | signature                | Signanture       | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 | eth_signature (optional) | ETHSignanture    | Ethereum signature of the message defined above. Null if operation was authorized on contract |
 
@@ -1252,6 +1273,8 @@ function create2_address_zksync(creator_address, salt_arg /* abitrary 32 bytes *
   "feeToken": 100,
   "fee": "56700000000",
   "nonce": 0,
+  "validFrom": 0,
+  "validUntil": 4294967295,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
     "signature": "4da3c53a246a0237f295baa4349e0c659edbf29e458709d9f48f9e04af168da09c5fc08ecaf5ee5b808d35806ea6043285ef10dc1d0bdd24ee6abad1918ada02"
@@ -1275,8 +1298,10 @@ new_pk_hash: 0x63aa2a0efb97064e0e52a6adb63a42018bd6e72b,
 fee_token: 0x00000064,
 fee: 0x46e8,
 nonce: 0x00000000,
+valid_from: 0x0000000000000000
+valid_until: 0x00000000ffffffff
 
-Signed bytes: 0xf8010000000511742517336ae1b09ca275bb6cafc6b341b6e32463aa2a0efb97064e0e52a6adb63a42018bd6e72b0000006446e800000000
+Signed bytes: 0xf8010000000511742517336ae1b09ca275bb6cafc6b341b6e32463aa2a0efb97064e0e52a6adb63a42018bd6e72b0000006446e800000000000000000000000000000000ffffffff
 ```
 
 #### Rollup operation
