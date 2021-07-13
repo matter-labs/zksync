@@ -3827,6 +3827,26 @@
       "nullable": []
     }
   },
+  "95a9be8b9c48e2a18c1bdb63ad4afa9d73fdaa0758f2cced759c32c069eb2bd3": {
+    "query": "\n                WITH transactions AS (\n                    SELECT tx_hash, created_at, block_index\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT tx_hash, created_at, block_index\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT tx_hash as \"tx_hash!\"\n                FROM everything\n                ORDER BY created_at, block_index\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "961bbd13b54a7d53a58dfef2e60ce77752ff30807226edc69a47487b994b1468": {
     "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
     "describe": {

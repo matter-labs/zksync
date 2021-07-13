@@ -6,7 +6,7 @@
 //! These "extensions" are required to provide more zkSync-specific information while remaining Web3-compilant.
 
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-pub use web3::types::{Address, H256, U256, U64};
+pub use web3::types::{Address, Block, Transaction, H160, H256, H64, U256, U64};
 
 /// Block Number
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -71,4 +71,21 @@ impl<'de> Deserialize<'de> for BlockNumber {
         }
         deserializer.deserialize_str(V)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct TxData {
+    pub block_number: u32,
+    pub block_index: Option<u32>,
+    pub from: H160,
+    pub to: Option<H160>,
+    pub nonce: u32,
+    pub tx_hash: H256,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum BlockInfo {
+    Block(Block<H256>),
+    BlockWithTxs(Block<Transaction>),
 }

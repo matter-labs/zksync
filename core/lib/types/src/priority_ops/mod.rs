@@ -82,6 +82,20 @@ impl ZkSyncPriorityOp {
         }
     }
 
+    pub fn from(&self) -> Address {
+        match self {
+            ZkSyncPriorityOp::Deposit(deposit) => deposit.from,
+            ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address,
+        }
+    }
+
+    pub fn to(&self) -> Option<Address> {
+        match self {
+            ZkSyncPriorityOp::Deposit(deposit) => Some(deposit.to),
+            ZkSyncPriorityOp::FullExit(full_exit) => Some(full_exit.eth_address),
+        }
+    }
+
     /// Parses legacy priority operation from the Ethereum logs.
     pub fn legacy_parse_from_priority_queue_logs(
         pub_data: &[u8],

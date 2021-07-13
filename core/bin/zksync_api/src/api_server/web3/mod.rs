@@ -6,10 +6,15 @@ use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
 use zksync_config::ZkSyncConfig;
+use zksync_crypto::convert::FeConvert;
 use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::ExecutedOperations;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
-use self::{rpc_trait::Web3Rpc, types::U256};
+use self::{
+    rpc_trait::Web3Rpc,
+    types::{Block, BlockInfo, Transaction, TxData, H160, H256, H64, U256},
+};
 
 mod rpc_impl;
 mod rpc_trait;
@@ -94,7 +99,7 @@ impl Web3RpcApp {
         Ok(Some(number))
     }
 
-    async fn get_block_transaction_count(
+    async fn block_transaction_count(
         storage: &mut StorageProcessor<'_>,
         block_number: zksync_types::BlockNumber,
     ) -> Result<U256> {
@@ -105,6 +110,147 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
         Ok(U256::from(count))
+    }
+
+    fn transaction_from_executed_tx_and_hash(tx: TxData, block_hash: H256) -> Transaction {
+        Transaction {
+            hash: tx.tx_hash,
+            nonce: tx.nonce.into(),
+            block_hash: Some(block_hash),
+            block_number: Some(tx.block_number.into()),
+            transaction_index: tx.block_index.map(Into::into),
+            from: tx.from,
+            to: tx.to,
+            value: 0.into(),
+            gas_price: 0.into(),
+            gas: 0.into(),
+            input: Vec::new().into(),
+            raw: None,
+        }
+    }
+
+    async fn block_by_number(
+        storage: &mut StorageProcessor<'_>,
+        block_number: zksync_types::BlockNumber,
+        include_txs: bool,
+    ) -> Result<BlockInfo> {
+        let parent_hash = if block_number.0 == 0 {
+            H256::zero()
+        } else {
+            // It was already checked that the block is in storage, so the parent block has to be there too.
+            let parent_block = storage
+                .chain()
+                .block_schema()
+                .get_storage_block(block_number - 1)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .expect("Can't find parent block in storage");
+            H256::from_slice(&parent_block.root_hash)
+        };
+
+        if include_txs {
+            // It was already checked that the block is in storage.
+            let block = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .expect("Can't find block in storage");
+            let hash = H256::from_slice(&block.new_root_hash.to_bytes());
+            let transactions = block
+                .block_transactions
+                .into_iter()
+                .map(|tx| {
+                    let tx = match tx {
+                        ExecutedOperations::Tx(tx) => TxData {
+                            block_number: block_number.0,
+                            block_index: tx.block_index,
+                            from: tx.signed_tx.tx.from(),
+                            to: tx.signed_tx.tx.to(),
+                            nonce: tx.signed_tx.tx.nonce().0,
+                            tx_hash: H256::from_slice(tx.signed_tx.tx.hash().as_ref()),
+                        },
+                        ExecutedOperations::PriorityOp(op) => TxData {
+                            block_number: block_number.0,
+                            block_index: Some(op.block_index),
+                            from: op.priority_op.data.from(),
+                            to: op.priority_op.data.to(),
+                            nonce: op.priority_op.serial_id as u32,
+                            tx_hash: H256::from_slice(op.priority_op.tx_hash().as_ref()),
+                        },
+                    };
+                    Self::transaction_from_executed_tx_and_hash(tx, hash)
+                })
+                .collect();
+
+            Ok(BlockInfo::BlockWithTxs(Block {
+                hash: Some(hash),
+                parent_hash,
+                uncles_hash: H256::zero(),
+                author: H160::zero(),
+                state_root: hash,
+                transactions_root: hash,
+                receipts_root: hash,
+                number: Some(block_number.0.into()),
+                gas_used: 0.into(),
+                gas_limit: 50000.into(),
+                extra_data: Vec::new().into(),
+                logs_bloom: None,
+                timestamp: block.timestamp.into(),
+                difficulty: 0.into(),
+                total_difficulty: Some(0.into()),
+                seal_fields: Vec::new(),
+                uncles: Vec::new(),
+                transactions,
+                size: None,
+                mix_hash: Some(H256::zero()),
+                nonce: Some(H64::zero()),
+            }))
+        } else {
+            // It was already checked that the block is in storage.
+            let block = storage
+                .chain()
+                .block_schema()
+                .get_storage_block(block_number)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .expect("Can't find block in storage");
+            let hash = H256::from_slice(&block.root_hash);
+            let transactions = storage
+                .chain()
+                .block_schema()
+                .get_block_transactions_hashes(block_number)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .into_iter()
+                .map(|hash| H256::from_slice(&hash))
+                .collect();
+
+            Ok(BlockInfo::Block(Block {
+                hash: Some(hash),
+                parent_hash,
+                uncles_hash: H256::zero(),
+                author: H160::zero(),
+                state_root: hash,
+                transactions_root: hash,
+                receipts_root: hash,
+                number: Some(block_number.0.into()),
+                gas_used: 0.into(),
+                gas_limit: 50000.into(),
+                extra_data: Vec::new().into(),
+                logs_bloom: None,
+                timestamp: block.timestamp.unwrap_or_default().into(),
+                difficulty: 0.into(),
+                total_difficulty: Some(0.into()),
+                seal_fields: Vec::new(),
+                uncles: Vec::new(),
+                transactions,
+                size: None,
+                mix_hash: Some(H256::zero()),
+                nonce: Some(H64::zero()),
+            }))
+        }
     }
 }
 
