@@ -268,4 +268,37 @@ impl Web3RpcApp {
         metrics::histogram!("api.web3.get_block_by_number", start.elapsed());
         Ok(result)
     }
+
+    pub async fn _impl_get_block_by_hash(
+        self,
+        hash: H256,
+        include_txs: bool,
+    ) -> Result<Option<BlockInfo>> {
+        let start = Instant::now();
+        let mut storage = self.access_storage().await?;
+        let mut transaction = storage
+            .start_transaction()
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        let block_number = transaction
+            .chain()
+            .block_schema()
+            .get_block_number_by_hash(hash.as_bytes())
+            .await
+            .map_err(|_| Error::internal_error())?;
+        let result = match block_number {
+            Some(block_number) => {
+                Some(Self::block_by_number(&mut transaction, block_number, include_txs).await?)
+            }
+            None => None,
+        };
+        transaction
+            .commit()
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        metrics::histogram!("api.web3.get_block_by_hash", start.elapsed());
+        Ok(result)
+    }
 }

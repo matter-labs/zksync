@@ -84,6 +84,9 @@ pub trait Web3Rpc {
         block_number: Option<BlockNumber>,
         include_txs: bool,
     ) -> FutureResp<Option<BlockInfo>>;
+
+    #[rpc(name = "eth_getBlockByHash", returns = "Option<BlockInfo>")]
+    fn get_block_by_hash(&self, hash: H256, include_txs: bool) -> FutureResp<Option<BlockInfo>>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -156,5 +159,9 @@ impl Web3Rpc for Web3RpcApp {
         include_txs: bool,
     ) -> FutureResp<Option<BlockInfo>> {
         spawn! { self._impl_get_block_by_number(block_number, include_txs) }
+    }
+
+    fn get_block_by_hash(&self, hash: H256, include_txs: bool) -> FutureResp<Option<BlockInfo>> {
+        spawn! { self._impl_get_block_by_hash(hash, include_txs) }
     }
 }
