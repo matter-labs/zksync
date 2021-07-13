@@ -286,7 +286,7 @@ Account.pubkey_hash -> RollupPubkeyHash # Hash of the public key set for the acc
 
 # Constants
 MAX_TOKENS = 2**32 # maximum number of tokens in the Rollup(including "ETH" token)
-MAX_FUNGIBLE_TOKENS = 2**16 # maximum number of tokens in the Rollup(including "ETH" token)
+MAX_FUNGIBLE_TOKENS = 2**16 # maximum number of fungible tokens in the Rollup(including "ETH" token)
 MAX_NONCE = 2**32 # max possible nonce
 ```
 
@@ -342,8 +342,7 @@ Transfers funds between Rollup accounts.
 
 | Field         | Byte len | Value/type     | Description                                                                         |
 | ------------- | -------- | -------------- | ----------------------------------------------------------------------------------- |
-| opcode        | 1        | `0xfa`         | Operation code                                                                      |
-| version       | 1        | `0x01`         | Version of transaction                                                              |
+| opcode        | 1        | `0x05`         | Operation code                                                                      |
 | from_account  | 4        | AccountId      | Unique identifier of the rollup account from which funds will be withdrawn (sender) |
 | token         | 4        | TokenId        | Unique token identifier in the rollup                                               |
 | to_account    | 4        | AccountId      | Unique identifier of the rollup account that will receive the funds (recipient)     |
@@ -353,7 +352,7 @@ Transfers funds between Rollup accounts.
 ##### Example
 
 ```
-fa010000000400000002000000030000001ad30012
+050000000400000002000000030000001ad30012
 ```
 
 Reads as: transfer from account #4 token #2 to account #3 amount in packed representation 0x0000001ad3 for fee in packed
@@ -488,8 +487,7 @@ assigned. And then the usual funds' Transfer between Rollup accounts will occur.
 
 | Field         | Byte len | Value/type     | Description                                                                         |
 | ------------- | -------- | -------------- | ----------------------------------------------------------------------------------- |
-| opcode        | 1        | `0xfd`         | Operation code                                                                      |
-| version       | 1        | `0x01`         | Version of transaction                                                              |
+| opcode        | 1        | `0x02`         | Operation code                                                                      |
 | from_account  | 4        | AccountId      | Unique identifier of the rollup account from which funds will be withdrawn (sender) |
 | token         | 4        | TokenId        | Unique token identifier in the rollup                                               |
 | packed_amount | 5        | PackedTxAmount | Packed amount of funds sent                                                         |
@@ -500,7 +498,7 @@ assigned. And then the usual funds' Transfer between Rollup accounts will occur.
 ##### Example
 
 ```
-fd0100000004000000020000001ad3080910111213141516171819202122233425262800000003001200000000
+0200000004000000020000001ad3080910111213141516171819202122233425262800000003001200000000
 ```
 
 Reads as: transfer from account #4 token #2 amount in packed representation 0x0000001ad3 to account with address
@@ -577,14 +575,13 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 6      | 6                 |
+| 6      | 47                |
 
 ##### Structure
 
 | Field        | Byte len | Value/type  | Description                                                                                |
 | ------------ | -------- | ----------- | ------------------------------------------------------------------------------------------ |
-| opcode       | 1        | `0xfc`      | Operation code                                                                             |
-| version      | 1        | `0x01`      | Version of transaction                                                                     |
+| opcode       | 1        | `0x03`      | Operation code                                                                             |
 | from_account | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
 | token        | 4        | TokenId     | Unique token identifier in the rollup                                                      |
 | full_amount  | 16       | StateAmount | Full amount of funds sent                                                                  |
@@ -594,7 +591,7 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 ##### Example
 
 ```
-fc010000000400000002000000000000000002c68af0bb1400000012080910111213141516171819202122233425262800000000
+030000000400000002000000000000000002c68af0bb1400000012080910111213141516171819202122233425262800000000
 ```
 
 Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb140000 for fee packed in representation
@@ -644,7 +641,8 @@ Signed using:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-type: 0x03
+type: 0xfc
+version: 0x01
 account_id: 0x00001016
 from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
 to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
@@ -692,7 +690,7 @@ def tree_updates():
     fee_account.balance[WithdrawOp.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0xfc
+    OnhcainOp.opcode == 0x03
     OnchainOp.from_account == WithdrawOp.tx.account_id
     OnchainOp.token == WithdrawOp.tx.token
     OnhcainOp.full_amount == WithdrawOp.tx.amount
@@ -782,7 +780,8 @@ Signed using:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-type: 0x0a
+type: 0xf5
+version: 0x01
 account_id: 0x00001016
 from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
 to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
@@ -881,7 +880,7 @@ Reads as: Mint NFT from account to recipient with content hash and pay packed fe
 
 | Field        | Value/type | Description                                                                                   |
 | ------------ | ---------- | --------------------------------------------------------------------------------------------- |
-| type         | `0x0a`     | Operation code                                                                                |
+| type         | `0xf6`     | Operation code                                                                                |
 | account_id   | AccountId  | Unique id of the sender rollup account in the state tree                                      |
 | from_address | ETHAddress | Unique address of the rollup account from which funds will be withdrawn (sender)              |
 | to_address   | EthAddress | The address of Ethereum account, to the balance of which the funds will be accrued(recipient) |
@@ -919,7 +918,8 @@ Signed using:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-type: 0x09
+type: 0xf6
+version: 0x01
 creator_id: 0x00001016
 creator_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
 recipient: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
@@ -937,7 +937,7 @@ Signed bytes: 0xf60100001016041f3b8db956854839d7434f3e53c7141a236b16bd7289936758
 
 | Field | Value/type | Description                               |
 | ----- | ---------- | ----------------------------------------- |
-| tx    | WithdrawTx | Signed withdraw transaction defined above |
+| tx    | MintNFTTx | Signed mint nft transaction defined above |
 
 #### Circuit constraints
 
@@ -1231,7 +1231,7 @@ function create2_address_zksync(creator_address, salt_arg /* abitrary 32 bytes *
 
 | Field                    | Value/type       | Description                                                                                   |
 | ------------------------ | ---------------- | --------------------------------------------------------------------------------------------- |
-| type                     | `0x07`           | Operation code                                                                                |
+| type                     | `0xf8`           | Operation code                                                                                |
 | account_id               | AccountId        | Unique id of the rollup account                                                               |
 | account                  | ETHAddress       | Address of the rollup account                                                                 |
 | new_pubkey_hash          | RollupPubkeyHash | Hash of the new rollup public key                                                             |
@@ -1267,7 +1267,8 @@ Signed using:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-type: 0x07,
+type: 0xf8,
+version: 0x01,
 account_id: 0x00000005,
 account: 0x11742517336ae1b09ca275bb6cafc6b341b6e324,
 new_pk_hash: 0x63aa2a0efb97064e0e52a6adb63a42018bd6e72b,
@@ -1275,7 +1276,7 @@ fee_token: 0x00000064,
 fee: 0x46e8,
 nonce: 0x00000000,
 
-Signed bytes: 0x070000000511742517336ae1b09ca275bb6cafc6b341b6e32463aa2a0efb97064e0e52a6adb63a42018bd6e72b0000006446e800000000
+Signed bytes: 0xf8010000000511742517336ae1b09ca275bb6cafc6b341b6e32463aa2a0efb97064e0e52a6adb63a42018bd6e72b0000006446e800000000
 ```
 
 #### Rollup operation
@@ -1406,13 +1407,14 @@ Signed using:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-type: 0x03
+type: 0xf7
+version: 0x01
 account_id: 0x00001016
 target: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
 token: 0x00000064
 fee: 0x46e8
 nonce: 0x15056b73
-Signed bytes: 0x0800001016dc8f1d4d7b5b4cde2dbc793c1d458f8916cb05130000006446e815056b73
+Signed bytes: 0xf70100001016dc8f1d4d7b5b4cde2dbc793c1d458f8916cb05130000006446e815056b73
 ```
 
 #### Rollup operation
