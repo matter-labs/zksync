@@ -2542,6 +2542,19 @@
       "nullable": []
     }
   },
+  "5bfcd9e4747395bdd0cd3f48700c70ae930af359b357f707da1cbe7ea8267273": {
+    "query": "\n                    INSERT INTO txs_batches_hashes (batch_id, batch_hash)\n                    SELECT u.batch_id, u.batch_hash\n                    FROM UNNEST ($1::bigint[], $2::bytea[])\n                    AS u(batch_id, batch_hash)\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "ByteaArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
     "query": "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
     "describe": {
@@ -2686,30 +2699,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "6a8f81ac8f56574e5a048e6acfa04d1c9f0adf348f1eee2ac0dde84f3cf63c40": {
-    "query": "SELECT batch_id, array_agg(tx_hash) as txs\n                FROM executed_transactions\n                GROUP BY batch_id\n                HAVING batch_id IS NOT NULL AND batch_id != 0;\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "batch_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "txs",
-          "type_info": "ByteaArray"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        true,
-        null
       ]
     }
   },
@@ -3893,6 +3882,30 @@
         "Left": []
       },
       "nullable": []
+    }
+  },
+  "9e72348619aa9c7f0f330c31f5ea4b3a73a4727a817e65e026756feea4d13d69": {
+    "query": "SELECT batch_id, array_agg(tx_hash) as txs\n                FROM executed_transactions\n                WHERE batch_id IS NOT NULL AND batch_id != 0\n                GROUP BY batch_id\n                ORDER BY batch_id;\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "batch_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "txs",
+          "type_info": "ByteaArray"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        null
+      ]
     }
   },
   "9fb67f0d0bc8387201e5358ca011da4b6d4d48c38c5de3f628c9818804c01376": {
@@ -6158,19 +6171,6 @@
           "Text",
           "Text",
           "Int2"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "ec07bf1dcfe77b28e753f3f145ff02ce47924ed311b2b7848b6e13c377d1a235": {
-    "query": "\n                INSERT INTO txs_batches_hashes (batch_id, batch_hash)\n                SELECT u.batch_id, u.batch_hash\n                FROM UNNEST ($1::bigint[], $2::bytea[])\n                AS u(batch_id, batch_hash)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8Array",
-          "ByteaArray"
         ]
       },
       "nullable": []

@@ -16,7 +16,6 @@ use futures::{
     StreamExt,
 };
 use num::{
-    bigint::ToBigInt,
     rational::Ratio,
     traits::{Inv, Pow},
     BigUint, CheckedDiv, Zero,
@@ -73,12 +72,8 @@ impl GasOperationsCost {
         // size, resulting in us paying more gas than for bigger block.
         let standard_fast_withdrawal_cost =
             (constants::BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
-        let subsidy_fast_withdrawal_cost =
-            (constants::SUBSIDY_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
         let standard_fast_withdrawal_nft_cost =
             (constants::BASE_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
-        let subsidy_fast_withdrawal_nft_cost =
-            (constants::SUBSIDY_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
 
         let standard_cost = vec![
             (

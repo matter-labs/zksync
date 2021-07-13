@@ -363,7 +363,6 @@ impl TxSender {
                 .await?;
         }
 
-        let tx_hash = verified_tx.tx.hash();
         // Send verified transactions to the mempool.
         self.core_api_client
             .send_tx(verified_tx)

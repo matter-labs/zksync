@@ -650,8 +650,9 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let batches = sqlx::query!(
             "SELECT batch_id, array_agg(tx_hash) as txs
                 FROM executed_transactions
+                WHERE batch_id IS NOT NULL AND batch_id != 0
                 GROUP BY batch_id
-                HAVING batch_id IS NOT NULL AND batch_id != 0;
+                ORDER BY batch_id;
                 "
         )
         .fetch_all(self.0.conn())
@@ -668,18 +669,23 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             batch_hashes.push(sha256(&bytes).to_vec());
         }
 
-        sqlx::query!(
-            r#"
-                INSERT INTO txs_batches_hashes (batch_id, batch_hash)
-                SELECT u.batch_id, u.batch_hash
-                FROM UNNEST ($1::bigint[], $2::bytea[])
-                AS u(batch_id, batch_hash)
-            "#,
-            &ids,
-            &batch_hashes,
-        )
-        .execute(self.0.conn())
-        .await?;
+        assert!(ids.len() == batch_hashes.len());
+
+        for (chunk_ids, chunk_hashes) in ids.chunks(10).zip(batch_hashes.chunks(10)) {
+            sqlx::query!(
+                r#"
+                    INSERT INTO txs_batches_hashes (batch_id, batch_hash)
+                    SELECT u.batch_id, u.batch_hash
+                    FROM UNNEST ($1::bigint[], $2::bytea[])
+                    AS u(batch_id, batch_hash)
+                "#,
+                &chunk_ids,
+                &chunk_hashes,
+            )
+            .execute(self.0.conn())
+            .await?;
+            println!("First id {:?}", &chunk_ids[0]);
+        }
 
         Ok(())
     }
