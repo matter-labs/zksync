@@ -440,7 +440,7 @@ amount = unpack_amount(TransferOp.tx.packed_amount)
 fee = unpack_fee(TransferOp.tx.packed_fee)
 
 def tree_invariants():
-    TransferOp.token < TOTAL_TOKENS
+    TransferOp.token < MAX_TOKENS 
 
     from_account.id == TransferOp.tx.from_account_id;
     from_account.nonce == TransferOp.tx.nonce
@@ -535,7 +535,7 @@ amount = unpack_amount(TransferToNewOp.tx.packed_amount)
 fee = unpack_fee(TransferToNewOp.tx.packed_fee)
 
 def tree_invariants():
-    TransferToNewOp.token < TOTAL_TOKENS
+    TransferToNewOp.token < MAX_TOKENS 
 
     from_account.id == TransferToNewOp.tx.from_account_id;
     from_account.nonce == TransferToNewOp.tx.nonce
@@ -677,7 +677,7 @@ fee_account = get_tree_account(Block.fee_account)
 fee = unpack_fee(WithdrawOp.tx.packed_fee)
 
 def tree_invariants():
-    WithdrawOp.token < TOTAL_TOKENS
+    WithdrawOp.token < MAX_FUNGIBLE_TOKENS 
 
     account.nonce == WithdrawOp.nonce
     account.nonce < MAX_NONCE
@@ -712,24 +712,27 @@ Withdraws NFT from Rollup account to appropriate ethereum account.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 10     | 6                 |
+| 10     | 95                |
 
 ##### Structure
 
-| Field        | Byte len | Value/type | Description                                                                                |
-| ------------ | -------- | ---------- | ------------------------------------------------------------------------------------------ |
-| opcode       | 1        | `0xf5`     | Operation code                                                                             |
-| version      | 1        | `0x01`     | Version of transaction                                                                     |
-| from_account | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
-| to_address   | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
-| token        | 4        | TokenId    | Unique token identifier in the rollup                                                      |
-| fee_token    | 4        | TokenId    | Fee for paying fee                                                                         |
-| packed_fee   | 2        | PackedFee  | Packed amount of fee paid                                                                  |
+| Field             | Byte len | Value/type | Description                                                                                |
+| ----------------- | -------- | ---------- | ------------------------------------------------------------------------------------------ |
+| opcode            | 1        | `0x0a`     | Operation code                                                                             |
+| from_account      | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
+| creator_account   | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
+| creator_address   | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
+| serial_id         | 4        | Int        | Special id for NFT for enforcing uniqueness
+| content_hash      | 32       | H256       | Content hash of NFT
+| to_address        | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
+| token             | 4        | TokenId    | Unique token identifier in the rollup                                                      |
+| fee_token         | 4        | TokenId    | Fee for paying fee                                                                         |
+| packed_fee        | 2        | PackedFee  | Packed amount of fee paid                                                                  |
 
 ##### Example
 
 ```
-f5010000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000186a0000000007d030000000c000000000000000000000000ffffffff
+0a0000002a0000002b21abaed8712072e918632259780e587698ef58da00000000000000000000000000000000000000000000000000000000000000000000000021abaed8712072e918632259780e587698ef58da000100000000002a05400000000000
 ```
 
 Reads as: Withdraw NFT from account #4 token #2 for fee packed in representation and paying in fee token 0x0012 to
@@ -813,7 +816,9 @@ fee_account = get_tree_account(Block.fee_account)
 fee = unpack_fee(WithdrawNFTOp.tx.packed_fee)
 
 def tree_invariants():
-    WithdrawNFTOp.token < TOTAL_TOKENS
+    WithdrawNFTOp.token < MAX_TOKENS
+    WithdrawNFTOp.token > MAX_FUNGIBLE_TOKENS
+    WithdrawNFTOp.fee_token < MAX_FUNGIBLE_TOKENS
 
     account.nonce == WithdrawNFTOp.nonce
     account.nonce < MAX_NONCE
@@ -849,28 +854,26 @@ MINT NFT inside Rollup
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 5      | 6                 |
+| 5      | 47                |
 
 ##### Structure
 
-| Field        | Byte len | Value/type  | Description                                                                                |
-| ------------ | -------- | ----------- | ------------------------------------------------------------------------------------------ |
-| opcode       | 1        | `0xf6`      | Operation code                                                                             |
-| version      | 1        | `0x01`      | Version of transaction                                                                     |
-| from_account | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
-| recipient    | 20       | EthAddress  | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
-| fee_token    | 4        | TokenId     | Fee for paying fee                                                                         |
-| content_hash | 32       | ContentHash | Content for NFT                                                                            |
-| packed_fee   | 2        | PackedFee   | Packed amount of fee paid                                                                  |
+| Field           | Byte len | Value/type  | Description                                                                                |
+| --------------- | -------- | ----------- | ------------------------------------------------------------------------------------------ |
+| opcode          | 1        | `0x09`      | Operation code                                                                             |
+| creator_account | 4        | AccountId   | Unique identifier of the rollup account will mint nft (creator)                            |
+| recipient       | 4        | AccountId   | Recipient of NFT 
+| content_hash    | 32       | ContentHash | Content for NFT                                                                            |
+| fee_token       | 4        | TokenId     | Fee for paying fee                                                                         |
+| packed_fee      | 2        | PackedFee   | Packed amount of fee paid                                                                  |
 
 ##### Example
 
 ```
-030000000400000002000000000000000002c68af0bb1400000012080910111213141516171819202122233425262800000000
+090000000a0000000b0000000000000000000000000000000000000000000000000000000000000000000000000140000000
 ```
 
-Reads as: Withdraw NFT from account #4 token #2 for fee packed in representation and paying in fee token 0x0012 to
-ethereum account with address 0x0809101112131415161718192021222334252628.
+Reads as: Mint NFT from account to recipient with content hash and pay packed fee in fee_token
 
 #### User transaction
 
@@ -895,10 +898,10 @@ the spec below)..
 
 ```json
 {
-  "accountId": 4118,
-  "from": "0x041f3b8db956854839d7434f3e53c7141a236b16",
-  "to": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
-  "token": 69888,
+  "creatorId": 4118,
+  "creatorAddress": "0x041f3b8db956854839d7434f3e53c7141a236b16",
+  "recipient": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
+  "contentHash": "0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996",
   "feeToken": 9888,
   "fee": "56700000000",
   "nonce": 352676723,
@@ -916,17 +919,16 @@ Signed using:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-type: 0x0a
-account_id: 0x00001016
-from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
-to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
-token: 0x11100
+type: 0x09
+creator_id: 0x00001016
+creator_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
+recipient: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
+contentHash: 0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996
 feeToken: 0x000026a0
-amount: 0x000000000000000000000b3921510800
 fee: 0x46e8
 nonce: 0x15056b73
 
-Signed bytes: 0x0300001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000026a0000000000000000000000b392151080046e815056b73
+Signed bytes: 0xf60100001016041f3b8db956854839d7434f3e53c7141a236b16bd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000026a046e815056b73
 ```
 
 #### Rollup operation
@@ -940,38 +942,39 @@ Signed bytes: 0x0300001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4c
 #### Circuit constraints
 
 ```python
-# WithdrawOp - Rollup operation described above
+# MintNFTOp - Rollup operation described above
 # Block - block where this Rollup operation is executed
 # OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
 
-account = get_tree_account(WithdrawOp.tx.account_id)
+creator_account = get_tree_account(MintNFTOp.tx.creator_id)
+recipient_account = get_tree_account(MintNFTOp.tx.recipient)
 fee_account = get_tree_account(Block.fee_account)
 
-fee = unpack_fee(WithdrawOp.tx.packed_fee)
+fee = unpack_fee(MintNFTOp.tx.packed_fee)
 
 def tree_invariants():
-    WithdrawOp.token < TOTAL_TOKENS
+    MintNFTOp.fee_token < MAX_FUNGIBLE_TOKENS
 
-    account.nonce == WithdrawOp.nonce
-    account.nonce < MAX_NONCE
-    account.balance[WithdrawOp.tx.token] == 1
-    account.balance[WithdrawOp.tx.fee_token] >= fee
-    account.pubkey_hash == recover_signer_pubkey_hash(WithdrawOp.tx)
+    creator_account.nonce == MintNFTOp.nonce
+    creator_account.nonce < MAX_NONCE
+    creator_account.balance[MintNFTOp.tx.fee_token] >= fee
+    creator_account.pubkey_hash == recover_signer_pubkey_hash(MintNFTOp.tx)
 
 
 def tree_updates():
-    account.balance[WithdrawOp.tx.token] -= (amount + fee)
-    account.nonce += 1
-
-    fee_account.balance[WithdrawOp.token] += fee
+    creator_account.balance[MintNFTOp.tx.token] -= fee
+    creator_account.balance[SPECIAL_NFT_TOKEN] += 1
+    special_nft_account.balance[SPECIAL_NFT_TOKEN] += 1
+    creator_account.nonce += 1
+    recipient_account[minted_token] = 1 
+    fee_account.balance[MintNFTOp.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x0a
-    OnchainOp.from_account == WithdrawOp.tx.account_id
-    OnchainOp.token == WithdrawOp.tx.token
-    OnchainOp.fee_token == WithdrawOp.tx.fee_token
-    OnhcainOp.packed_fee == WithdrawOp.tx.packed_fee
-    OnchainOp.to_address == WithdrawOp.tx.to_address
+    OnhcainOp.opcode == 0x09
+    OnchainOp.creator_account == MintNFTOp.tx.account_id
+    OnchainOp.recipient == MintNFTOp.tx.recipient
+    OnchainOp.fee_token == MintNFTOp.tx.fee_token
+    OnhcainOp.packed_fee == MintNFTOp.tx.packed_fee
 ```
 
 ### 5. Deposit
@@ -1039,7 +1042,7 @@ Reads as: deposit to account #4 token #2 amount 0x000000000000000002c68af0bb1400
 account = get_account_tree(DepositOp.to_account_id)
 
 def tree_invariants():
-    DepositOp.token < TOTAL_TOKENS
+    DepositOp.token < MAX_FUNGIBLE_TOKENS 
 
     is_account_empty(account) == True or account.address == DepositOp.op.to_address
 
@@ -1129,7 +1132,7 @@ account = get_account_tree(FullExitOp.op.account_id)
 withdrawn_amount = 0
 
 def tree_invariants():
-    FullExitOp.op.token < TOTAL_TOKENS
+    FullExitOp.op.token < MAX_TOKENS
     account.id == FullExitOp.op.id
 
 def tree_updates():
@@ -1436,7 +1439,7 @@ target_account_initial_balance = target_account.balances[ForcedExitOp.tx.token]
 fee = unpack_fee(ForcedExitOp.tx.packed_fee)
 
 def tree_invariants():
-    ForcedExitOp.token < TOTAL_TOKENS
+    ForcedExitOp.token < MAX_FUNGIBLE_TOKENS 
 
     initiator_account.nonce == ForcedExitOp.nonce
     initiator_account.nonce < MAX_NONCE
