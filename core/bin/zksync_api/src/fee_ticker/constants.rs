@@ -39,17 +39,3 @@ pub(crate) const BASE_MINT_NFT_COST: u64 = VerifyCost::MINT_NFT_COST
 pub(crate) const BASE_SWAP_COST: u64 = CommitCost::SWAP_COST
     + VerifyCost::SWAP_COST
     + AMORTIZED_COST_PER_CHUNK * (SwapOp::CHUNKS as u64);
-
-// The Subsidized cost of operations.
-// Represent the cost of performing operations after recursion is introduced to mainnet.
-pub(crate) const SUBSIDY_TRANSFER_COST: u64 = BASE_TRANSFER_COST * 5 / 100;
-pub(crate) const SUBSIDY_TRANSFER_TO_NEW_COST: u64 = BASE_TRANSFER_TO_NEW_COST * 5 / 100;
-pub(crate) const SUBSIDY_WITHDRAW_COST: u64 = BASE_WITHDRAW_COST;
-pub(crate) const SUBSIDY_WITHDRAW_NFT_COST: u64 = BASE_WITHDRAW_NFT_COST;
-pub(crate) const SUBSIDY_SWAP_COST: u64 = BASE_SWAP_COST;
-pub(crate) const SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST: u64 = BASE_CHANGE_PUBKEY_OFFCHAIN_COST;
-pub(crate) const SUBSIDY_CHANGE_PUBKEY_ONCHAIN_COST: u64 = BASE_CHANGE_PUBKEY_ONCHAIN_COST;
-pub(crate) const SUBSIDY_OLD_CHANGE_PUBKEY_OFFCHAIN_COST: u64 =
-    BASE_OLD_CHANGE_PUBKEY_OFFCHAIN_COST;
-pub(crate) const SUBSIDY_CHANGE_PUBKEY_CREATE2_COST: u64 = BASE_CHANGE_PUBKEY_CREATE2_COST;
-pub(crate) const SUBSIDY_MINT_NFT_COST: u64 = BASE_MINT_NFT_COST;
