@@ -312,7 +312,10 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
             MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
             false
         );
-        assert!(MempoolSchema(&mut storage).get_tx(tx_hash).await?.is_none());
+        assert!(MempoolSchema(&mut storage)
+            .get_tx(tx_hash.as_ref())
+            .await?
+            .is_none());
     }
 
     // Submit transactions.
@@ -338,7 +341,7 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
         );
         assert_eq!(
             MempoolSchema(&mut storage)
-                .get_tx(tx_hash)
+                .get_tx(tx_hash.as_ref())
                 .await?
                 .as_ref()
                 .unwrap()

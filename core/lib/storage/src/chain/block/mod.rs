@@ -103,7 +103,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     // Helper method for retrieving blocks from the database.
-    async fn get_storage_block(&mut self, block: BlockNumber) -> QueryResult<Option<StorageBlock>> {
+    pub async fn get_storage_block(
+        &mut self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<StorageBlock>> {
         let start = Instant::now();
         let block = sqlx::query_as!(
             StorageBlock,

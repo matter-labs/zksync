@@ -322,7 +322,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     }
 
     /// Returns zkSync transaction with the given hash.
-    pub async fn get_tx(&mut self, tx_hash: TxHash) -> QueryResult<Option<SignedZkSyncTx>> {
+    pub async fn get_tx(&mut self, tx_hash: &[u8]) -> QueryResult<Option<SignedZkSyncTx>> {
         let start = Instant::now();
 
         let mempool_tx = self.get_mempool_tx(tx_hash).await?;
@@ -335,10 +335,10 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     }
 
     /// Returns mempool transaction as it is stored in the database.
-    pub async fn get_mempool_tx(&mut self, tx_hash: TxHash) -> QueryResult<Option<MempoolTx>> {
+    pub async fn get_mempool_tx(&mut self, tx_hash: &[u8]) -> QueryResult<Option<MempoolTx>> {
         let start = Instant::now();
 
-        let tx_hash = hex::encode(tx_hash.as_ref());
+        let tx_hash = hex::encode(tx_hash);
 
         let mempool_tx = sqlx::query_as!(
             MempoolTx,
