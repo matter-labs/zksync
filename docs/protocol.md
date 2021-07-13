@@ -440,7 +440,7 @@ amount = unpack_amount(TransferOp.tx.packed_amount)
 fee = unpack_fee(TransferOp.tx.packed_fee)
 
 def tree_invariants():
-    TransferOp.token < MAX_TOKENS 
+    TransferOp.token < MAX_TOKENS
 
     from_account.id == TransferOp.tx.from_account_id;
     from_account.nonce == TransferOp.tx.nonce
@@ -535,7 +535,7 @@ amount = unpack_amount(TransferToNewOp.tx.packed_amount)
 fee = unpack_fee(TransferToNewOp.tx.packed_fee)
 
 def tree_invariants():
-    TransferToNewOp.token < MAX_TOKENS 
+    TransferToNewOp.token < MAX_TOKENS
 
     from_account.id == TransferToNewOp.tx.from_account_id;
     from_account.nonce == TransferToNewOp.tx.nonce
@@ -677,7 +677,7 @@ fee_account = get_tree_account(Block.fee_account)
 fee = unpack_fee(WithdrawOp.tx.packed_fee)
 
 def tree_invariants():
-    WithdrawOp.token < MAX_FUNGIBLE_TOKENS 
+    WithdrawOp.token < MAX_FUNGIBLE_TOKENS
 
     account.nonce == WithdrawOp.nonce
     account.nonce < MAX_NONCE
@@ -716,18 +716,18 @@ Withdraws NFT from Rollup account to appropriate ethereum account.
 
 ##### Structure
 
-| Field             | Byte len | Value/type | Description                                                                                |
-| ----------------- | -------- | ---------- | ------------------------------------------------------------------------------------------ |
-| opcode            | 1        | `0x0a`     | Operation code                                                                             |
-| from_account      | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
-| creator_account   | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
-| creator_address   | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
-| serial_id         | 4        | Int        | Special id for NFT for enforcing uniqueness
-| content_hash      | 32       | H256       | Content hash of NFT
-| to_address        | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
-| token             | 4        | TokenId    | Unique token identifier in the rollup                                                      |
-| fee_token         | 4        | TokenId    | Fee for paying fee                                                                         |
-| packed_fee        | 2        | PackedFee  | Packed amount of fee paid                                                                  |
+| Field           | Byte len | Value/type | Description                                                                                |
+| --------------- | -------- | ---------- | ------------------------------------------------------------------------------------------ |
+| opcode          | 1        | `0x0a`     | Operation code                                                                             |
+| from_account    | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
+| creator_account | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
+| creator_address | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
+| serial_id       | 4        | Int        | Special id for NFT for enforcing uniqueness                                                |
+| content_hash    | 32       | H256       | Content hash of NFT                                                                        |
+| to_address      | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
+| token           | 4        | TokenId    | Unique token identifier in the rollup                                                      |
+| fee_token       | 4        | TokenId    | Fee for paying fee                                                                         |
+| packed_fee      | 2        | PackedFee  | Packed amount of fee paid                                                                  |
 
 ##### Example
 
@@ -858,14 +858,14 @@ MINT NFT inside Rollup
 
 ##### Structure
 
-| Field           | Byte len | Value/type  | Description                                                                                |
-| --------------- | -------- | ----------- | ------------------------------------------------------------------------------------------ |
-| opcode          | 1        | `0x09`      | Operation code                                                                             |
-| creator_account | 4        | AccountId   | Unique identifier of the rollup account will mint nft (creator)                            |
-| recipient       | 4        | AccountId   | Recipient of NFT 
-| content_hash    | 32       | ContentHash | Content for NFT                                                                            |
-| fee_token       | 4        | TokenId     | Fee for paying fee                                                                         |
-| packed_fee      | 2        | PackedFee   | Packed amount of fee paid                                                                  |
+| Field           | Byte len | Value/type  | Description                                                     |
+| --------------- | -------- | ----------- | --------------------------------------------------------------- |
+| opcode          | 1        | `0x09`      | Operation code                                                  |
+| creator_account | 4        | AccountId   | Unique identifier of the rollup account will mint nft (creator) |
+| recipient       | 4        | AccountId   | Recipient of NFT                                                |
+| content_hash    | 32       | ContentHash | Content for NFT                                                 |
+| fee_token       | 4        | TokenId     | Fee for paying fee                                              |
+| packed_fee      | 2        | PackedFee   | Packed amount of fee paid                                       |
 
 ##### Example
 
@@ -966,7 +966,7 @@ def tree_updates():
     creator_account.balance[SPECIAL_NFT_TOKEN] += 1
     special_nft_account.balance[SPECIAL_NFT_TOKEN] += 1
     creator_account.nonce += 1
-    recipient_account[minted_token] = 1 
+    recipient_account[minted_token] = 1
     fee_account.balance[MintNFTOp.token] += fee
 
 def pubdata_invariants():
@@ -1042,7 +1042,7 @@ Reads as: deposit to account #4 token #2 amount 0x000000000000000002c68af0bb1400
 account = get_account_tree(DepositOp.to_account_id)
 
 def tree_invariants():
-    DepositOp.token < MAX_FUNGIBLE_TOKENS 
+    DepositOp.token < MAX_FUNGIBLE_TOKENS
 
     is_account_empty(account) == True or account.address == DepositOp.op.to_address
 
@@ -1439,7 +1439,7 @@ target_account_initial_balance = target_account.balances[ForcedExitOp.tx.token]
 fee = unpack_fee(ForcedExitOp.tx.packed_fee)
 
 def tree_invariants():
-    ForcedExitOp.token < MAX_FUNGIBLE_TOKENS 
+    ForcedExitOp.token < MAX_FUNGIBLE_TOKENS
 
     initiator_account.nonce == ForcedExitOp.nonce
     initiator_account.nonce < MAX_NONCE
