@@ -138,11 +138,11 @@ impl ZkSyncTx {
         }
     }
 
-    pub fn from(&self) -> Address {
+    pub fn from_account(&self) -> Address {
         self.account()
     }
 
-    pub fn to(&self) -> Option<Address> {
+    pub fn to_account(&self) -> Option<Address> {
         match self {
             ZkSyncTx::Transfer(tx) => Some(tx.to),
             ZkSyncTx::Withdraw(tx) => Some(tx.to),
