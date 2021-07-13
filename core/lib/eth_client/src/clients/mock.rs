@@ -98,7 +98,11 @@ impl MockEthereum {
         };
         self.inner.tx_statuses.write().await.insert(*hash, status);
     }
-    pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
+    pub async fn get_tx_status(
+        &self,
+        hash: H256,
+        _current_block: Option<u64>,
+    ) -> anyhow::Result<Option<ExecutedTxStatus>> {
         Ok(self.inner.tx_statuses.read().await.get(&hash).cloned())
     }
 

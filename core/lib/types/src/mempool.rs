@@ -1,6 +1,6 @@
 use super::{
     tx::{TxEthSignature, TxHash},
-    SignedZkSyncTx,
+    SerialId, SignedZkSyncTx,
 };
 
 /// A collection of transactions that must be executed together.
@@ -52,5 +52,36 @@ impl SignedTxVariant {
             Self::Tx(tx) => vec![tx.clone()],
             Self::Batch(batch) => batch.txs.clone(),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RevertedTxVariant {
+    inner: SignedTxVariant,
+    pub next_priority_op_id: SerialId,
+}
+
+impl AsRef<SignedTxVariant> for RevertedTxVariant {
+    fn as_ref(&self) -> &SignedTxVariant {
+        &self.inner
+    }
+}
+
+impl AsMut<SignedTxVariant> for RevertedTxVariant {
+    fn as_mut(&mut self) -> &mut SignedTxVariant {
+        &mut self.inner
+    }
+}
+
+impl RevertedTxVariant {
+    pub fn new(txs: SignedTxVariant, next_priority_op_id: SerialId) -> Self {
+        Self {
+            inner: txs,
+            next_priority_op_id,
+        }
+    }
+
+    pub fn into_inner(self) -> SignedTxVariant {
+        self.inner
     }
 }
