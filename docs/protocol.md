@@ -220,6 +220,8 @@ Rollup transactions:
 - Withdraw (Partial exit)
 - Change pubkey
 - Forced Exit
+- MintNFT
+- WithdrawNFT
 
 Priority operations:
 
@@ -283,7 +285,8 @@ Account.address -> EthAddress # Address of the account
 Account.pubkey_hash -> RollupPubkeyHash # Hash of the public key set for the account
 
 # Constants
-MAX_TOKENS = 2**16 # maximum number of tokens in the Rollup(including "ETH" token)
+MAX_TOKENS = 2**32 # maximum number of tokens in the Rollup(including "ETH" token)
+MAX_FUNGIBLE_TOKENS = 2**16 # maximum number of tokens in the Rollup(including "ETH" token)
 MAX_NONCE = 2**32 # max possible nonce
 ```
 
@@ -333,15 +336,16 @@ Transfers funds between Rollup accounts.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 2      | 18                |
+| 2      | 20                |
 
 ##### Structure
 
 | Field         | Byte len | Value/type     | Description                                                                         |
 | ------------- | -------- | -------------- | ----------------------------------------------------------------------------------- |
-| opcode        | 1        | `0x05`         | Operation code                                                                      |
+| opcode        | 1        | `0xfa`         | Operation code                                                                      |
+| version       | 1        | `0x01`         | Version of transaction                                                              |
 | from_account  | 4        | AccountId      | Unique identifier of the rollup account from which funds will be withdrawn (sender) |
-| token         | 2        | TokenId        | Unique token identifier in the rollup                                               |
+| token         | 4        | TokenId        | Unique token identifier in the rollup                                               |
 | to_account    | 4        | AccountId      | Unique identifier of the rollup account that will receive the funds (recipient)     |
 | packed_amount | 5        | PackedTxAmount | Packed amount of funds sent                                                         |
 | packed_fee    | 2        | PackedFee      | Packed amount of fee paid                                                           |
@@ -349,7 +353,7 @@ Transfers funds between Rollup accounts.
 ##### Example
 
 ```
-05000000040002000000030000001ad30012
+fa010000000400000002000000030000001ad30012
 ```
 
 Reads as: transfer from account #4 token #2 to account #3 amount in packed representation 0x0000001ad3 for fee in packed
@@ -361,7 +365,7 @@ representation 0x0012.
 
 | Field      | Value/type     | Description                                                                      |
 | ---------- | -------------- | -------------------------------------------------------------------------------- |
-| type       | `0x05`         | Operation code                                                                   |
+| type       | `0xfa`         | Operation code                                                                   |
 | account_id | AccountId      | Unique id of the sender rollup account in the state tree                         |
 | from       | ETHAddress     | Unique address of the rollup account from which funds will be withdrawn (sender) |
 | to         | ETHAddress     | Unique address of the rollup account that will receive the funds (recipient)     |
@@ -399,16 +403,16 @@ Signed using:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-type: 0x05
+type: 0xfa
 accountId: 0x0000080d
 from: 0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb
 to: 0x05e3066450dfcd4ee9ca4f2039d58883631f0460
-token: 0xede0
+token: 0x0000ede0
 amount: 0x5bf0aea003
 fee: 0x46e8
 nonce: 0x2ec6fde0
 
-Signed bytes: 0x050000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f0460ede05bf0aea00346e82ec6fde0
+Signed bytes: 0xfa010000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f04600000ede05bf0aea00346e82ec6fde0
 ```
 
 #### Rollup operation
@@ -456,7 +460,7 @@ def tree_updates():
     fee_account.balance[TransferOp.tx.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x05
+    OnhcainOp.opcode == oxfa
     OnchainOp.from_account == TransferOp.from_account_id
     OnchainOp.token == TransferOp.tx.token
     OnchainOp.to_account == TransferOp.to_account_id
@@ -478,15 +482,16 @@ assigned. And then the usual funds' Transfer between Rollup accounts will occur.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 6      | 38                |
+| 6      | 40                |
 
 ##### Structure
 
 | Field         | Byte len | Value/type     | Description                                                                         |
 | ------------- | -------- | -------------- | ----------------------------------------------------------------------------------- |
-| opcode        | 1        | `0x02`         | Operation code                                                                      |
+| opcode        | 1        | `0xfd`         | Operation code                                                                      |
+| version       | 1        | `0x01`         | Version of transaction                                                              |
 | from_account  | 4        | AccountId      | Unique identifier of the rollup account from which funds will be withdrawn (sender) |
-| token         | 2        | TokenId        | Unique token identifier in the rollup                                               |
+| token         | 4        | TokenId        | Unique token identifier in the rollup                                               |
 | packed_amount | 5        | PackedTxAmount | Packed amount of funds sent                                                         |
 | to_address    | 20       | ETHAddress     | The address of the rollup account that will receive the funds (recipient)           |
 | to_account    | 4        | AccountId      | Unique identifier of the rollup account that will receive the funds (recipient)     |
@@ -495,7 +500,7 @@ assigned. And then the usual funds' Transfer between Rollup accounts will occur.
 ##### Example
 
 ```
-020000000400020000001ad3080910111213141516171819202122233425262800000003001200000000
+fd0100000004000000020000001ad3080910111213141516171819202122233425262800000003001200000000
 ```
 
 Reads as: transfer from account #4 token #2 amount in packed representation 0x0000001ad3 to account with address
@@ -551,7 +556,7 @@ def tree_updates():
     fee_account.balance[TransferOp.tx.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x02
+    OnhcainOp.opcode == 0xfd
     OnchainOp.from_account == TransferToNewOp.from_account_id
     OnchainOp.token == TransferToNewOp.tx.token
     OnhcainOp.packed_amount == TransferToNewOp.tx.packed_amount
@@ -572,15 +577,16 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 6      | 44                |
+| 6      | 6                 |
 
 ##### Structure
 
 | Field        | Byte len | Value/type  | Description                                                                                |
 | ------------ | -------- | ----------- | ------------------------------------------------------------------------------------------ |
-| opcode       | 1        | `0x03`      | Operation code                                                                             |
+| opcode       | 1        | `0xfc`      | Operation code                                                                             |
+| version      | 1        | `0x01`      | Version of transaction                                                                     |
 | from_account | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
-| token        | 2        | TokenId     | Unique token identifier in the rollup                                                      |
+| token        | 4        | TokenId     | Unique token identifier in the rollup                                                      |
 | full_amount  | 16       | StateAmount | Full amount of funds sent                                                                  |
 | packed_fee   | 2        | PackedFee   | Packed amount of fee paid                                                                  |
 | to_address   | 20       | EthAddress  | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
@@ -588,7 +594,7 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 ##### Example
 
 ```
-03000000040002000000000000000002c68af0bb1400000012080910111213141516171819202122233425262800000000
+fc010000000400000002000000000000000002c68af0bb1400000012080910111213141516171819202122233425262800000000
 ```
 
 Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb140000 for fee packed in representation
@@ -600,7 +606,7 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 
 | Field        | Value/type  | Description                                                                                   |
 | ------------ | ----------- | --------------------------------------------------------------------------------------------- |
-| type         | `0x03`      | Operation code                                                                                |
+| type         | `0xfc`      | Operation code                                                                                |
 | account_id   | AccountId   | Unique id of the sender rollup account in the state tree                                      |
 | from_address | ETHAddress  | Unique address of the rollup account from which funds will be withdrawn (sender)              |
 | to_address   | EthAddress  | The address of Ethereum account, to the balance of which the funds will be accrued(recipient) |
@@ -642,12 +648,12 @@ type: 0x03
 account_id: 0x00001016
 from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
 to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
-token: 0x26a0
+token: 0x000026a0
 amount: 0x000000000000000000000b3921510800
 fee: 0x46e8
 nonce: 0x15056b73
 
-Signed bytes: 0x0300001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb051326a0000000000000000000000b392151080046e815056b73
+Signed bytes: 0xfc0100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000026a0000000000000000000000b392151080046e815056b73
 ```
 
 #### Rollup operation
@@ -686,10 +692,284 @@ def tree_updates():
     fee_account.balance[WithdrawOp.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x03
+    OnhcainOp.opcode == 0xfc
     OnchainOp.from_account == WithdrawOp.tx.account_id
     OnchainOp.token == WithdrawOp.tx.token
     OnhcainOp.full_amount == WithdrawOp.tx.amount
+    OnhcainOp.packed_fee == WithdrawOp.tx.packed_fee
+    OnchainOp.to_address == WithdrawOp.tx.to_address
+```
+
+### 7. Withdraw NFT
+
+#### Description
+
+Withdraws NFT from Rollup account to appropriate ethereum account.
+
+#### Onchain operation
+
+##### Size
+
+| Chunks | Significant bytes |
+| ------ | ----------------- |
+| 10     | 6                 |
+
+##### Structure
+
+| Field        | Byte len | Value/type | Description                                                                                |
+| ------------ | -------- | ---------- | ------------------------------------------------------------------------------------------ |
+| opcode       | 1        | `0xf5`     | Operation code                                                                             |
+| version      | 1        | `0x01`     | Version of transaction                                                                     |
+| from_account | 4        | AccountId  | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
+| to_address   | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
+| token        | 4        | TokenId    | Unique token identifier in the rollup                                                      |
+| fee_token    | 4        | TokenId    | Fee for paying fee                                                                         |
+| packed_fee   | 2        | PackedFee  | Packed amount of fee paid                                                                  |
+
+##### Example
+
+```
+f5010000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000186a0000000007d030000000c000000000000000000000000ffffffff
+```
+
+Reads as: Withdraw NFT from account #4 token #2 for fee packed in representation and paying in fee token 0x0012 to
+ethereum account with address 0x0809101112131415161718192021222334252628.
+
+#### User transaction
+
+##### Structure
+
+| Field        | Value/type | Description                                                                                   |
+| ------------ | ---------- | --------------------------------------------------------------------------------------------- |
+| type         | `0xf5`     | Operation code                                                                                |
+| account_id   | AccountId  | Unique id of the sender rollup account in the state tree                                      |
+| from_address | ETHAddress | Unique address of the rollup account from which funds will be withdrawn (sender)              |
+| to_address   | EthAddress | The address of Ethereum account, to the balance of which the funds will be accrued(recipient) |
+| token        | TokenId    | Unique token identifier in the rollup                                                         |
+| fee_token    | TokenId    | Fee token identifier in the rollup                                                            |
+| fee          | PackedFee  | Packed amount of fee paid                                                                     |
+| nonce        | Nonce      | A one-time code that specifies the order of transactions                                      |
+| signature    | Signanture | [Signature](#transaction-singature) of previous fields, see the spec below                    |
+
+##### Example
+
+User transaction representation. (NOTE: tx bytecode differs slightly from this representation due to data packing, see
+the spec below)..
+
+```json
+{
+  "accountId": 4118,
+  "from": "0x041f3b8db956854839d7434f3e53c7141a236b16",
+  "to": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
+  "token": 69888,
+  "feeToken": 9888,
+  "fee": "56700000000",
+  "nonce": 352676723,
+  "signature": {
+    "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
+    "signature": "ae94d3b349e9ed18753c307262f62bea5ec1cc748ce5e5123caa5f7eb1aa599bc6734c43a92dad5c00eab5e6443e3ae8217e9bde60b93c7e9739dc85b148ad02"
+  }
+}
+```
+
+Signed transaction representation.
+
+```
+Signed using:
+Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
+Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
+
+type: 0x0a
+account_id: 0x00001016
+from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
+to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
+token: 0x0000ffdc
+feeToken: 0x000026a0
+amount: 0x000000000000000000000b3921510800
+fee: 0x46e8
+nonce: 0x15056b73
+
+Signed bytes: 0xf50100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb05130000ffdc000026a0000000000000000000000b392151080046e815056b73
+```
+
+#### Rollup operation
+
+##### Structure
+
+| Field | Value/type    | Description                               |
+| ----- | ------------- | ----------------------------------------- |
+| tx    | WithdrawNFTTx | Signed withdraw transaction defined above |
+
+#### Circuit constraints
+
+```python
+# WithdrawOp - Rollup operation described above
+# Block - block where this Rollup operation is executed
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
+
+account = get_tree_account(WithdrawNFTOp.tx.account_id)
+fee_account = get_tree_account(Block.fee_account)
+
+fee = unpack_fee(WithdrawNFTOp.tx.packed_fee)
+
+def tree_invariants():
+    WithdrawNFTOp.token < TOTAL_TOKENS
+
+    account.nonce == WithdrawNFTOp.nonce
+    account.nonce < MAX_NONCE
+    account.balance[WithdrawNFTOp.tx.token] == 1
+    account.balance[WithdrawNFTOp.tx.fee_token] >= fee
+    account.pubkey_hash == recover_signer_pubkey_hash(WithdrawNFTOp.tx)
+
+
+def tree_updates():
+    account.balance[WithdrawNFTOp.tx.token] -= (amount + fee)
+    account.nonce += 1
+
+    fee_account.balance[WithdrawNFTOp.token] += fee
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x0a
+    OnchainOp.from_account == WithdrawNFTOp.tx.account_id
+    OnchainOp.token == WithdrawNFTOp.tx.token
+    OnchainOp.fee_token == WithdrawNFTOp.tx.fee_token
+    OnhcainOp.packed_fee == WithdrawNFTOp.tx.packed_fee
+    OnchainOp.to_address == WithdrawNFTOp.tx.to_address
+```
+
+### 7. Mint NFT
+
+#### Description
+
+MINT NFT inside Rollup
+
+#### Onchain operation
+
+##### Size
+
+| Chunks | Significant bytes |
+| ------ | ----------------- |
+| 5      | 6                 |
+
+##### Structure
+
+| Field        | Byte len | Value/type  | Description                                                                                |
+| ------------ | -------- | ----------- | ------------------------------------------------------------------------------------------ |
+| opcode       | 1        | `0xf6`      | Operation code                                                                             |
+| version      | 1        | `0x01`      | Version of transaction                                                                     |
+| from_account | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
+| recipient    | 20       | EthAddress  | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
+| fee_token    | 4        | TokenId     | Fee for paying fee                                                                         |
+| content_hash | 32       | ContentHash | Content for NFT                                                                            |
+| packed_fee   | 2        | PackedFee   | Packed amount of fee paid                                                                  |
+
+##### Example
+
+```
+030000000400000002000000000000000002c68af0bb1400000012080910111213141516171819202122233425262800000000
+```
+
+Reads as: Withdraw NFT from account #4 token #2 for fee packed in representation and paying in fee token 0x0012 to
+ethereum account with address 0x0809101112131415161718192021222334252628.
+
+#### User transaction
+
+##### Structure
+
+| Field        | Value/type | Description                                                                                   |
+| ------------ | ---------- | --------------------------------------------------------------------------------------------- |
+| type         | `0x0a`     | Operation code                                                                                |
+| account_id   | AccountId  | Unique id of the sender rollup account in the state tree                                      |
+| from_address | ETHAddress | Unique address of the rollup account from which funds will be withdrawn (sender)              |
+| to_address   | EthAddress | The address of Ethereum account, to the balance of which the funds will be accrued(recipient) |
+| token        | TokenId    | Unique token identifier in the rollup                                                         |
+| fee_token    | TokenId    | Fee token identifier in the rollup                                                            |
+| fee          | PackedFee  | Packed amount of fee paid                                                                     |
+| nonce        | Nonce      | A one-time code that specifies the order of transactions                                      |
+| signature    | Signanture | [Signature](#transaction-singature) of previous fields, see the spec below                    |
+
+##### Example
+
+User transaction representation. (NOTE: tx bytecode differs slightly from this representation due to data packing, see
+the spec below)..
+
+```json
+{
+  "accountId": 4118,
+  "from": "0x041f3b8db956854839d7434f3e53c7141a236b16",
+  "to": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
+  "token": 69888,
+  "feeToken": 9888,
+  "fee": "56700000000",
+  "nonce": 352676723,
+  "signature": {
+    "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
+    "signature": "ae94d3b349e9ed18753c307262f62bea5ec1cc748ce5e5123caa5f7eb1aa599bc6734c43a92dad5c00eab5e6443e3ae8217e9bde60b93c7e9739dc85b148ad02"
+  }
+}
+```
+
+Signed transaction representation.
+
+```
+Signed using:
+Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
+Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
+
+type: 0x0a
+account_id: 0x00001016
+from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
+to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
+token: 0x11100
+feeToken: 0x000026a0
+amount: 0x000000000000000000000b3921510800
+fee: 0x46e8
+nonce: 0x15056b73
+
+Signed bytes: 0x0300001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000026a0000000000000000000000b392151080046e815056b73
+```
+
+#### Rollup operation
+
+##### Structure
+
+| Field | Value/type | Description                               |
+| ----- | ---------- | ----------------------------------------- |
+| tx    | WithdrawTx | Signed withdraw transaction defined above |
+
+#### Circuit constraints
+
+```python
+# WithdrawOp - Rollup operation described above
+# Block - block where this Rollup operation is executed
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
+
+account = get_tree_account(WithdrawOp.tx.account_id)
+fee_account = get_tree_account(Block.fee_account)
+
+fee = unpack_fee(WithdrawOp.tx.packed_fee)
+
+def tree_invariants():
+    WithdrawOp.token < TOTAL_TOKENS
+
+    account.nonce == WithdrawOp.nonce
+    account.nonce < MAX_NONCE
+    account.balance[WithdrawOp.tx.token] == 1
+    account.balance[WithdrawOp.tx.fee_token] >= fee
+    account.pubkey_hash == recover_signer_pubkey_hash(WithdrawOp.tx)
+
+
+def tree_updates():
+    account.balance[WithdrawOp.tx.token] -= (amount + fee)
+    account.nonce += 1
+
+    fee_account.balance[WithdrawOp.token] += fee
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x0a
+    OnchainOp.from_account == WithdrawOp.tx.account_id
+    OnchainOp.token == WithdrawOp.tx.token
+    OnchainOp.fee_token == WithdrawOp.tx.fee_token
     OnhcainOp.packed_fee == WithdrawOp.tx.packed_fee
     OnchainOp.to_address == WithdrawOp.tx.to_address
 ```
@@ -709,22 +989,23 @@ be created if needed.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 6      | 43                |
+| 6      | 45                |
 
 ##### Structure
 
 | Field       | Byte len | Value/type  | Description                                                                     |
 | ----------- | -------- | ----------- | ------------------------------------------------------------------------------- |
-| opcode      | 1        | `0x01`      | Operation code                                                                  |
+| opcode      | 1        | `0xfe`      | Operation code                                                                  |
+| version     | 1        | `0x01`      | Version of transaction                                                          |
 | to_account  | 4        | AccountId   | Unique identifier of the rollup account that will receive the funds (recipient) |
-| token       | 2        | TokenId     | Unique token identifier in the rollup                                           |
+| token       | 4        | TokenId     | Unique token identifier in the rollup                                           |
 | full_amount | 16       | StateAmount | Full amount of funds sent                                                       |
 | to_address  | 20       | ETHAddress  | The address of the rollup account that will receive the funds (recipient)       |
 
 ##### Example
 
 ```
-01000000040002000000000000000002c68af0bb1400000809101112131415161718192021222334252628000000000000
+fe010000000400000002000000000000000002c68af0bb1400000809101112131415161718192021222334252628000000000000
 ```
 
 Reads as: deposit to account #4 token #2 amount 0x000000000000000002c68af0bb140000, account will have address
@@ -736,7 +1017,7 @@ Reads as: deposit to account #4 token #2 amount 0x000000000000000002c68af0bb1400
 
 | Field       | Byte len | Value/type  | Description                                                               |
 | ----------- | -------- | ----------- | ------------------------------------------------------------------------- |
-| token       | 2        | TokenId     | Unique token identifier in the rollup                                     |
+| token       | 4        | TokenId     | Unique token identifier in the rollup                                     |
 | full_amount | 16       | StateAmount | Full amount of funds sent                                                 |
 | to_address  | 20       | ETHAddress  | The address of the rollup account that will receive the funds (recipient) |
 
@@ -798,22 +1079,23 @@ in a block.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 6      | 43                |
+| 6      | 45                |
 
 ##### Structure
 
 | Field       | Byte len | Value/type  | Description                                                                                 |
 | ----------- | -------- | ----------- | ------------------------------------------------------------------------------------------- |
-| opcode      | 1        | `0x06`      | Operation code                                                                              |
+| opcode      | 1        | `0xf9`      | Operation code                                                                              |
+| version     | 1        | `0x01`      | Version of transaction                                                                      |
 | account_id  | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)         |
 | owner       | 20       | EthAddress  | The address of the fund owner account. Funds will be accrued to the balance of this address |
-| token       | 2        | TokenId     | Unique token identifier in the rollup                                                       |
+| token       | 4        | TokenId     | Unique token identifier in the rollup                                                       |
 | full_amount | 16       | StateAmount | Full amount of funds that had been withdrawn                                                |
 
 ##### Example
 
 ```
-060000040809101112131415161718192021222334252628000200000000000002c68af0bb1400000000
+f9010000040809101112131415161718192021222334252628000200000000000002c68af0bb1400000000
 ```
 
 Reads as: full exit from account #4 with with address 0x0809101112131415161718192021222334252628, token #2, amount is
@@ -827,7 +1109,7 @@ Reads as: full exit from account #4 with with address 0x080910111213141516171819
 | ----------- | -------- | ---------- | --------------------------------------- |
 | account_id  | 4        | AccountId  | Unique identifier of the rollup account |
 | eth_address | 20       | ETHAddress | The address of the account              |
-| token       | 2        | TokenId    | Unique token identifier in the rollup   |
+| token       | 4        | TokenId    | Unique token identifier in the rollup   |
 
 #### Rollup operation
 
@@ -898,7 +1180,7 @@ with ethereum keys for which address is the same as account address.
 | new_pubkey_hash | 20       | RollupPubkeyHash | Hash of the new rollup public key                     |
 | account_address | 20       | ETHAddress       | Address of the account                                |
 | nonce           | 4        | Nonce            | Account nonce                                         |
-| fee_token       | 2        | TokenId          | Unique token identifier in the rollup used to pay fee |
+| fee_token       | 4        | TokenId          | Unique token identifier in the rollup used to pay fee |
 | packed_fee      | 2        | PackedFee        | Packed amount of fee paid                             |
 
 ##### Example
@@ -986,11 +1268,11 @@ type: 0x07,
 account_id: 0x00000005,
 account: 0x11742517336ae1b09ca275bb6cafc6b341b6e324,
 new_pk_hash: 0x63aa2a0efb97064e0e52a6adb63a42018bd6e72b,
-fee_token: 0x0064,
+fee_token: 0x00000064,
 fee: 0x46e8,
 nonce: 0x00000000,
 
-Signed bytes: 0x070000000511742517336ae1b09ca275bb6cafc6b341b6e32463aa2a0efb97064e0e52a6adb63a42018bd6e72b006446e800000000
+Signed bytes: 0x070000000511742517336ae1b09ca275bb6cafc6b341b6e32463aa2a0efb97064e0e52a6adb63a42018bd6e72b0000006446e800000000
 ```
 
 #### Rollup operation
@@ -1057,7 +1339,7 @@ account. Unowned account is an account with no signing key set.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 6      | 49                |
+| 6      | 51                |
 
 ##### Structure
 
@@ -1066,7 +1348,7 @@ account. Unowned account is an account with no signing key set.
 | opcode               | 1        | `0x08`      | Operation code                                                                             |
 | initiator_account_id | 4        | AccountId   | Unique identifier of the rollup account which initiates a forced exit operation (sender)   |
 | target_account_id    | 4        | AccountId   | Unique identifier of the rollup account to perform a forced exit on (target)               |
-| token                | 2        | TokenId     | Unique token identifier in the rollup                                                      |
+| token                | 4        | TokenId     | Unique token identifier in the rollup                                                      |
 | full_amount          | 16       | StateAmount | Full amount of funds sent                                                                  |
 | packed_fee           | 2        | PackedFee   | Packed amount of fee paid                                                                  |
 | target_address       | 20       | EthAddress  | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
@@ -1124,10 +1406,10 @@ Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86b
 type: 0x03
 account_id: 0x00001016
 target: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
-token: 0x0064
+token: 0x00000064
 fee: 0x46e8
 nonce: 0x15056b73
-Signed bytes: 0x0800001016dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513006446e815056b73
+Signed bytes: 0x0800001016dc8f1d4d7b5b4cde2dbc793c1d458f8916cb05130000006446e815056b73
 ```
 
 #### Rollup operation
@@ -1210,31 +1492,36 @@ depositERC20(IERC20 _token, uint104 _amount, address _rollupAddr) payable
 
 #### Withdraw Ether
 
-Withdraw ETH to L1 - register withdrawal and transfer ether from contract to msg.sender
+Withdraw NFT to L1
 
 ```solidity
-withdrawETH(uint128 _amount)
+withdrawPendingNFTBalance(uint32 _tokenId)
 ```
 
-- `_amount`: Amount to withdraw
+- `_tokenId`: Token to withdraw
 
 #### Withdraw ERC-20 token
 
-Withdraw ERC20 token to L1 - register withdrawal and transfer token from contract to msg.sender
+Withdraw ERC20 token to L1 - Transfer token from contract to owner
 
 ```solidity
-withdrawERC20(IERC20 _token, uint128 _amount)
+withdrawPendingBalance(
+address payable _owner,
+address _token,
+uint128 _amount
+)
 ```
 
 - `_token`: Token address in L1 chain
 - `_amount`: Amount to withdraw
+- `_owner`: Recipient
 
 #### Authenticate rollup public key change
 
 Authenticates pubkey hash change for new rollup public key.
 
 ```solidity
-function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
+setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
 ```
 
 - `_pubkey_hash`: `RollupPubkeyHash`
@@ -1246,14 +1533,28 @@ Register full exit request to withdraw all token balance from the account. The u
 that her transactions are censored by the validator.
 
 ```solidity
-fullExit (
+requestFullExit (
     uint24 _accountId,
     address _token,
+
 )
 ```
 
 - `_accountId`: `AccountId` of the Rollup account
 - `_token`: Token address in L1 chain
+
+Register full exit request to withdraw NFT tokens balance from the account. The user needs to call it if she believes
+that her transactions are censored by the validator.
+
+```solidity
+requestFullExitNFT (
+    uint24 _accountId,
+    uint32 _tokenId,
+)
+```
+
+- `_accountId`: `AccountId` of the Rollup account
+- `_tokenId`: NFT Token ID
 
 #### Exodus mode
 
@@ -1262,11 +1563,15 @@ fullExit (
 Withdraws token from Rollup to L1 in case of exodus mode. User must provide proof that she owns funds.
 
 ```solidity
-exit(
+performExodus(
     StoredBlockInfo memory _storedBlockInfo,
     uint24 _accountId,
-    uint16 _tokenId,
+    uint32 _tokenId,
     uint128 _amount,
+    uint32 _nftCreatorAccountId,
+    address _nftCreatorAddress,
+    uint32 _nftSerialId,
+    bytes32 _nftContentHash,
     uint256[] calldata _proof
 )
 ```
@@ -1274,7 +1579,10 @@ exit(
 - `_storedBlockInfo`: Stored block data of the last verified block
 - `_accountId`: `AccountId` of the owner account.
 - `_tokenId`: Verified token id
-- `_amount`: `StateAmount` full amount of the given token that belong to `AccountId` in the last verified block.
+- `_amount`: `StateAmount` Full amount of the given token that belong to `AccountId` in the last verified block.
+- `_nftCreatorAccountId`: Creator id of NFT (optional, only for NFT)
+- `_nftCreatorAddress`: Creator Address of NFT (optional, only for NFT)
+- `_nftSerialId`: Serial ID of NFT (optional, only for NFT)
 - `_proof`: Proof that user funds are present in the account tree
 
 ##### Cancel outstanding deposits
@@ -1434,7 +1742,7 @@ changeGovernor(address _newGovernor)
 
 #### Add token
 
-Add token to the list of networks tokens. The caller must be current governor.
+Add token to the list of networks tokens. The caller must be current token governance.
 
 ```solidity
 addToken(address _token)
@@ -1466,9 +1774,17 @@ setValidator(address _validator, bool _active)
 - `_validator`: Validator address
 - `_active`: Active flag
 
+##### Change token governance
+
+```solidity
+changeTokenGovernance(TokenGovernance _newTokenGovernance)
+```
+
+- `_newTokenGovernance`: New token Governance
+
 #### Check for governor
 
-Validate that specified address is the governor address
+Validate that specified address is the token governance address
 
 ```solidity
 requireGovernor(address _address)
@@ -1491,7 +1807,7 @@ requireActiveValidator(address _address)
 Validate token id (must be less than total tokens amount).
 
 ```solidity
-isValidTokenId(uint16 _tokenId) returns (bool)
+isValidTokenId(uint32 _tokenId) returns (bool)
 ```
 
 - `_tokenId`: Token id
@@ -1503,12 +1819,45 @@ Returns: bool flag that indicates if token id is less than total tokens amount.
 Validate token address (it must be presented in tokens list).
 
 ```solidity
-validateTokenAddress(address _tokenAddr) returns (uint16)
+validateTokenAddress(address _tokenAddr) returns (uint32)
 ```
 
 - `_tokenAddr`: Token address
 
 Returns: token id.
+
+#### Register creator corresponding to the factory
+
+Register custom factory for withdrawing NFT
+
+```solidity
+registerNFTFactoryCreator(uint32 _creatorAccountId, address _creatorAddress, bytes memory _signature)
+```
+
+- `_creatorAccountId`: Creator's zkSync account ID
+- `_creatorAddress`: NFT creator address
+- `_signature`: Creator's signature
+
+#### Set default NFT factory
+
+Register factory, which will be use for withdrawing NFT by default
+
+```solidity
+setDefaultNFTFactory(address _factory)
+```
+
+- `_factory`: NFT factory address
+
+#### Get NFT factory for creator
+
+Get NFT factory which will be used for withdrawing NFT for corresponding creator
+
+```solidity
+    getNFTFactory(uint32 _creatorAccountId, address _creatorAddress)
+```
+
+- `_creatorAccountId`: Creator account id
+- `_creatorAddress`: Creator address
 
 ## Block state transition circuit
 
