@@ -19,6 +19,8 @@ use zksync_types::{
 // Local imports
 use self::records::{MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
+use serde_json::Value;
+use zksync_types::tx::TxEthSignatureVariant;
 
 pub mod records;
 
@@ -153,6 +155,16 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 .eth_sign_data
                 .as_ref()
                 .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"));
+
+            let eth_sign_data = if let Some(val) = eth_sign_data {
+                if val.is_null() {
+                    None
+                } else {
+                    Some(val)
+                }
+            } else {
+                None
+            };
 
             sqlx::query!(
                 "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)
