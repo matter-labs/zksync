@@ -214,8 +214,13 @@ impl TransactionsHistoryTestSetup {
                 account_id: self.from_zksync_account.get_account_id().unwrap(),
                 eth_address: self.from_zksync_account.address,
                 token: self.tokens[2].id,
+                is_legacy: false,
             },
             withdraw_amount: Some(self.amount.clone().into()),
+            creator_account_id: None,
+            creator_address: None,
+            serial_id: None,
+            content_hash: None,
         }));
 
         let executed_op = ExecutedPriorityOp {

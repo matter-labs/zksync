@@ -6,11 +6,14 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 
 // Workspace uses
-use zksync_api_types::v02::fee::ApiTxFeeTypes;
+use zksync_api_types::{
+    v02::{fee::ApiTxFeeTypes, token::ApiNFT},
+    TxWithSignature,
+};
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
-    tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, Fee, Token, TokenLike, TotalFee, ZkSyncTx,
+    tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
+    Address, Fee, Token, TokenId, TokenLike, TotalFee, ZkSyncTx,
 };
 
 // Local uses
@@ -33,7 +36,7 @@ pub trait Rpc {
     fn tx_submit(
         &self,
         tx: Box<ZkSyncTx>,
-        signature: Box<Option<TxEthSignature>>,
+        signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash>;
 
@@ -80,6 +83,9 @@ pub trait Rpc {
 
     #[rpc(name = "get_zksync_version", returns = "String")]
     fn get_zksync_version(&self) -> Result<String, Error>;
+
+    #[rpc(name = "get_nft", returns = "Option<ApiNFT>")]
+    fn get_nft(&self, id: TokenId) -> FutureResp<Option<ApiNFT>>;
 }
 
 impl Rpc for RpcApp {
@@ -112,7 +118,7 @@ impl Rpc for RpcApp {
     fn tx_submit(
         &self,
         tx: Box<ZkSyncTx>,
-        signature: Box<Option<TxEthSignature>>,
+        signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash> {
         let handle = self.runtime_handle.clone();
@@ -228,5 +234,12 @@ impl Rpc for RpcApp {
 
     fn get_zksync_version(&self) -> Result<String, Error> {
         Ok(String::from(ZKSYNC_VERSION))
+    }
+
+    fn get_nft(&self, id: TokenId) -> FutureResp<Option<ApiNFT>> {
+        let handle = self.runtime_handle.clone();
+        let self_ = self.clone();
+        let resp = async move { handle.spawn(self_._impl_get_nft(id)).await.unwrap() };
+        Box::new(resp.boxed().compat())
     }
 }

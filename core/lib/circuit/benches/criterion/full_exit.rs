@@ -19,8 +19,13 @@ fn full_exit_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
             account_id: account.id,
             eth_address: account.account.address,
             token: TokenId(0),
+            is_legacy: false,
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
+        creator_account_id: None,
+        creator_address: None,
+        serial_id: None,
+        content_hash: None,
     };
     let (_, circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
@@ -39,8 +44,13 @@ fn full_exit_get_pubdata(b: &mut Bencher<'_>) {
             account_id: account.id,
             eth_address: account.account.address,
             token: TokenId(0),
+            is_legacy: false,
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
+        creator_account_id: None,
+        creator_address: None,
+        serial_id: None,
+        content_hash: None,
     };
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
@@ -59,8 +69,13 @@ fn full_exit_calculate_operations(b: &mut Bencher<'_>) {
             account_id: account.id,
             eth_address: account.account.address,
             token: TokenId(0),
+            is_legacy: false,
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
+        creator_account_id: None,
+        creator_address: None,
+        serial_id: None,
+        content_hash: None,
     };
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 

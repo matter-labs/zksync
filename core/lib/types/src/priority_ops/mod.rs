@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use zksync_basic_types::{Address, Log, H256, U256};
 use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN,
-    TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CONTENT_HASH_WIDTH, ETH_ADDRESS_BIT_WIDTH,
+    FR_ADDRESS_LEN, LEGACY_TOKEN_BIT_WIDTH, SERIAL_ID_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
 };
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
@@ -48,6 +48,12 @@ pub struct FullExit {
     pub account_id: AccountId,
     pub eth_address: Address,
     pub token: TokenId,
+    /// A flag that indicates whether the operation was performed
+    /// before the NFT upgrade with an old number of required block chunks.
+    /// Only serialized manually by the `data_restore`, `false` by default.
+    #[serde(default)]
+    #[serde(skip_serializing)]
+    pub is_legacy: bool,
 }
 
 /// A set of L1 priority operations supported by the zkSync network.
@@ -73,6 +79,116 @@ impl ZkSyncPriorityOp {
         match self {
             ZkSyncPriorityOp::Deposit(deposit) => deposit.token,
             ZkSyncPriorityOp::FullExit(full_exit) => full_exit.token,
+        }
+    }
+
+    /// Parses legacy priority operation from the Ethereum logs.
+    pub fn legacy_parse_from_priority_queue_logs(
+        pub_data: &[u8],
+        op_type_id: u8,
+        sender: Address,
+    ) -> Result<Self, LogParseError> {
+        // see contracts/contracts/Operations.sol
+        match op_type_id {
+            DepositOp::OP_CODE => {
+                let pub_data_left = pub_data;
+
+                if pub_data_left.len() < TX_TYPE_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
+                let (_, pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
+
+                // account_id
+                if pub_data_left.len() < ACCOUNT_ID_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
+                let (_, pub_data_left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
+
+                // token
+                let (token, pub_data_left) = {
+                    if pub_data_left.len() < LEGACY_TOKEN_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (token, left) = pub_data_left.split_at(LEGACY_TOKEN_BIT_WIDTH / 8);
+                    (u16::from_be_bytes(token.try_into().unwrap()), left)
+                };
+
+                // amount
+                let (amount, pub_data_left) = {
+                    if pub_data_left.len() < BALANCE_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (amount, left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
+                    let amount = u128::from_be_bytes(amount.try_into().unwrap());
+                    (BigUint::from(amount), left)
+                };
+
+                // account
+                let (account, pub_data_left) = {
+                    if pub_data_left.len() < FR_ADDRESS_LEN {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (account, left) = pub_data_left.split_at(FR_ADDRESS_LEN);
+                    (Address::from_slice(account), left)
+                };
+
+                if !pub_data_left.is_empty() {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
+
+                Ok(Self::Deposit(Deposit {
+                    from: sender,
+                    token: TokenId(token as u32),
+                    amount,
+                    to: account,
+                }))
+            }
+            FullExitOp::OP_CODE => {
+                if pub_data.len() < TX_TYPE_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
+                let (_, pub_data_left) = pub_data.split_at(TX_TYPE_BIT_WIDTH / 8);
+
+                // account_id
+                let (account_id, pub_data_left) = {
+                    if pub_data_left.len() < ACCOUNT_ID_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (account_id, left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
+                    (u32::from_bytes(account_id).unwrap(), left)
+                };
+
+                // owner
+                let (eth_address, pub_data_left) = {
+                    if pub_data_left.len() < ETH_ADDRESS_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (eth_address, left) = pub_data_left.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
+                    (Address::from_slice(eth_address), left)
+                };
+
+                // token
+                let (token, pub_data_left) = {
+                    if pub_data_left.len() < LEGACY_TOKEN_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (token, left) = pub_data_left.split_at(LEGACY_TOKEN_BIT_WIDTH / 8);
+                    (u16::from_be_bytes(token.try_into().unwrap()), left)
+                };
+
+                // amount
+                if pub_data_left.len() != BALANCE_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
+
+                Ok(Self::FullExit(FullExit {
+                    account_id: AccountId(account_id),
+                    eth_address,
+                    token: TokenId(token as u32),
+                    is_legacy: false,
+                }))
+            }
+            _ => Err(LogParseError::UnsupportedPriorityOpType),
         }
     }
 
@@ -104,7 +220,7 @@ impl ZkSyncPriorityOp {
                         return Err(LogParseError::PubdataLengthMismatch);
                     }
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
-                    (u16::from_be_bytes(token.try_into().unwrap()), left)
+                    (u32::from_be_bytes(token.try_into().unwrap()), left)
                 };
 
                 // amount
@@ -167,11 +283,23 @@ impl ZkSyncPriorityOp {
                         return Err(LogParseError::PubdataLengthMismatch);
                     }
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
-                    (u16::from_be_bytes(token.try_into().unwrap()), left)
+                    (u32::from_be_bytes(token.try_into().unwrap()), left)
                 };
 
                 // amount
-                if pub_data_left.len() != BALANCE_BIT_WIDTH / 8 {
+                if pub_data_left.len() < BALANCE_BIT_WIDTH / 8 {
+                    return Err(LogParseError::PubdataLengthMismatch);
+                }
+
+                let (_, pub_data_left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
+
+                // Creator account ID, creator address, serial id, content hash
+                if pub_data_left.len()
+                    != ACCOUNT_ID_BIT_WIDTH / 8
+                        + ETH_ADDRESS_BIT_WIDTH / 8
+                        + SERIAL_ID_WIDTH / 8
+                        + CONTENT_HASH_WIDTH / 8
+                {
                     return Err(LogParseError::PubdataLengthMismatch);
                 }
 
@@ -179,6 +307,7 @@ impl ZkSyncPriorityOp {
                     account_id: AccountId(account_id),
                     eth_address,
                     token: TokenId(token),
+                    is_legacy: false,
                 }))
             }
             _ => Err(LogParseError::UnsupportedPriorityOpType),
@@ -266,7 +395,18 @@ impl TryFrom<Log> for PriorityOp {
                     .map(|ui| U256::as_u32(ui) as u8)
                     .unwrap();
                 let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
-                ZkSyncPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type, sender)?
+                let result =
+                    ZkSyncPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type, sender);
+
+                // If parsing was unsuccessful it was probably because of the legacy pub data
+                match result {
+                    Ok(op) => op,
+                    _ => ZkSyncPriorityOp::legacy_parse_from_priority_queue_logs(
+                        &op_pubdata,
+                        op_type,
+                        sender,
+                    )?,
+                }
             },
             deadline_block: dec_ev
                 .remove(0)

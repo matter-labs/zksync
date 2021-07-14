@@ -18,7 +18,7 @@ use num::{rational::Ratio, BigUint, FromPrimitive};
 // Workspace uses
 use zksync_api_types::v02::{
     pagination::{parse_query, ApiEither, Paginated, PaginationQuery},
-    token::{ApiToken, TokenPrice},
+    token::{ApiNFT, ApiToken, TokenPrice},
 };
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{ConnectionPool, StorageProcessor};
@@ -163,7 +163,7 @@ impl ApiTokenData {
         first_token: TokenLike,
         currency: &str,
     ) -> Result<BigDecimal, Error> {
-        if let Ok(second_token_id) = u16::from_str(currency) {
+        if let Ok(second_token_id) = u32::from_str(currency) {
             let second_token = TokenLike::from(TokenId(second_token_id));
             let first_usd_price = self.token_price_usd(first_token).await;
             let second_usd_price = self.token_price_usd(second_token).await;
@@ -235,14 +235,26 @@ async fn token_price(
     let price = api_try!(data.token_price_in(first_token.clone(), &currency).await);
     let token = api_try!(data.token(first_token).await);
 
-    Ok(TokenPrice {
+    ApiResult::Ok(TokenPrice {
         token_id: token.id,
         token_symbol: token.symbol,
         price_in: currency,
         decimals: token.decimals,
         price,
     })
-    .into()
+}
+
+async fn get_nft(
+    data: web::Data<ApiTokenData>,
+    web::Path(id): web::Path<TokenId>,
+) -> ApiResult<Option<ApiNFT>> {
+    let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
+    let nft = api_try!(storage
+        .tokens_schema()
+        .get_nft_with_factories(id)
+        .await
+        .map_err(Error::storage));
+    ApiResult::Ok(nft)
 }
 
 pub fn api_scope(
@@ -264,6 +276,7 @@ pub fn api_scope(
             "{token_id_or_address}/priceIn/{currency}",
             web::get().to(token_price),
         )
+        .route("nft/{id}", web::get().to(get_nft))
 }
 
 #[cfg(test)]
@@ -406,6 +419,11 @@ mod tests {
 
         let response = client.token_price(&token_like, "333").await?;
         assert!(response.error.is_some());
+
+        let id = TokenId(65542);
+        let response = client.nft_by_id(id).await?;
+        let nft: ApiNFT = deserialize_response_result(response)?;
+        assert_eq!(nft.id, id);
 
         server.stop().await;
         Ok(())

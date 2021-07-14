@@ -8,4 +8,5 @@ pub struct ServerConfig {
     pub id: bool,
     pub contract_addr: Option<String>,
     pub gov_contract_addr: Option<String>,
+    pub nft_factory_addr: Option<String>,
 }

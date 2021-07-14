@@ -40,6 +40,7 @@ pub mod account;
 pub mod aggregated_operations;
 pub mod block;
 pub mod config;
+pub mod error;
 pub mod ethereum;
 pub mod event;
 pub mod fee;
@@ -51,6 +52,7 @@ pub mod network;
 pub mod operations;
 pub mod priority_ops;
 pub mod prover;
+pub mod register_factory;
 pub mod tokens;
 pub mod tx;
 mod utils;
@@ -62,12 +64,15 @@ pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::fee::{BatchFee, Fee, OutputFeeType, TotalFee};
 pub use self::operations::{
-    ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
-    ZkSyncOp,
+    ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, MintNFTOp, SwapOp, TransferOp,
+    TransferToNewOp, WithdrawNFTOp, WithdrawOp, ZkSyncOp,
 };
 pub use self::priority_ops::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
-pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
-pub use self::tx::{ForcedExit, SignedZkSyncTx, Transfer, Withdraw, ZkSyncTx};
+pub use self::register_factory::RegisterNFTFactoryEvent;
+pub use self::tokens::{NewTokenEvent, Token, TokenInfo, TokenLike, TokenPrice, TxFeeTypes, NFT};
+pub use self::tx::{
+    ForcedExit, MintNFT, Order, SignedZkSyncTx, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx,
+};
 
 #[doc(hidden)]
 pub use self::{operations::CloseOp, tx::Close};

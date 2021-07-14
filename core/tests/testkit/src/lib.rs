@@ -5,7 +5,11 @@ pub use self::{
     types::*,
 };
 
+use num::BigUint;
 use zksync_core::state_keeper::ZkSyncStateInitParams;
+use zksync_crypto::params::{
+    MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
+};
 pub use zksync_test_account as zksync_account;
 
 pub mod account_set;
@@ -22,5 +26,8 @@ pub fn genesis_state(fee_account_address: &Address) -> ZkSyncStateInitParams {
     let operator_account = Account::default_with_address(fee_account_address);
     let mut params = ZkSyncStateInitParams::new();
     params.insert_account(AccountId(0), operator_account);
+    let mut nft_storage = Account::default_with_address(&NFT_STORAGE_ACCOUNT_ADDRESS);
+    nft_storage.set_balance(NFT_TOKEN_ID, BigUint::from(MIN_NFT_TOKEN_ID));
+    params.insert_account(NFT_STORAGE_ACCOUNT_ID, nft_storage);
     params
 }

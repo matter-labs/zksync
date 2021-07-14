@@ -7,7 +7,8 @@ use zksync_api_types::v02::pagination::{
     ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest,
 };
 use zksync_types::{
-    AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp, H256,
+    AccountId, Deposit, FullExit, NewTokenEvent, Nonce, PriorityOp, RegisterNFTFactoryEvent,
+    TokenId, ZkSyncPriorityOp, H256,
 };
 
 use crate::eth_watch::{client::EthClient, EthWatch};
@@ -82,6 +83,23 @@ impl EthClient for FakeEthClient {
         Ok(operations)
     }
 
+    async fn get_new_register_nft_factory_events(
+        &self,
+        _from: BlockNumber,
+        _to: BlockNumber,
+    ) -> anyhow::Result<Vec<RegisterNFTFactoryEvent>> {
+        Ok(Vec::new())
+    }
+
+    async fn get_new_tokens_events(
+        &self,
+        _from: BlockNumber,
+        _to: BlockNumber,
+    ) -> anyhow::Result<Vec<NewTokenEvent>> {
+        // Ignore NewTokens event.
+        Ok(Vec::new())
+    }
+
     async fn block_number(&self) -> Result<u64, anyhow::Error> {
         Ok(self.inner.read().await.last_block_number)
     }
@@ -147,6 +165,7 @@ async fn test_operation_queues() {
                 account_id: AccountId(1),
                 eth_address: from_addr,
                 token: TokenId(0),
+                is_legacy: false,
             }),
             deadline_block: 0,
             eth_block: 4,
@@ -236,6 +255,7 @@ async fn test_operation_queues_time_lag() {
                     account_id: AccountId(0),
                     eth_address: Default::default(),
                     token: TokenId(0),
+                    is_legacy: false,
                 }),
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
@@ -338,6 +358,7 @@ async fn test_restore_and_poll() {
                     account_id: AccountId(0),
                     eth_address: Default::default(),
                     token: TokenId(0),
+                    is_legacy: false,
                 }),
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
@@ -386,6 +407,7 @@ async fn test_restore_and_poll_time_lag() {
                     account_id: AccountId(0),
                     eth_address: Default::default(),
                     token: TokenId(0),
+                    is_legacy: false,
                 }),
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),

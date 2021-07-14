@@ -65,6 +65,13 @@ async fn revert_blocks_in_storage(
 
     transaction
         .chain()
+        .state_schema()
+        .remove_mint_nft_updates(last_block)
+        .await?;
+    println!("`mint_nft_updates` table is cleaned");
+
+    transaction
+        .chain()
         .operations_schema()
         .remove_eth_unprocessed_aggregated_ops()
         .await?;
@@ -235,7 +242,7 @@ async fn main() -> anyhow::Result<()> {
     let last_commited_block = storage
         .chain()
         .block_schema()
-        .get_last_committed_block()
+        .get_last_committed_confirmed_block()
         .await?;
     let last_verified_block = storage
         .chain()

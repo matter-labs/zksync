@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use zksync_crypto::{
     params::{
         ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, LEGACY_CHUNK_BYTES,
+        LEGACY_TOKEN_BIT_WIDTH, TOKEN_BIT_WIDTH,
     },
     primitives::FromBytes,
 };
@@ -37,13 +38,25 @@ impl TransferToNewOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, TransferOpError> {
-        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+        Self::parse_pub_data(bytes, TOKEN_BIT_WIDTH, CHUNK_BYTES)
+    }
+
+    pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, TransferOpError> {
+        Self::parse_pub_data(bytes, LEGACY_TOKEN_BIT_WIDTH, LEGACY_CHUNK_BYTES)
+    }
+
+    fn parse_pub_data(
+        bytes: &[u8],
+        token_bit_width: usize,
+        chunk_bytes: usize,
+    ) -> Result<Self, TransferOpError> {
+        if bytes.len() != Self::CHUNKS * chunk_bytes {
             return Err(TransferOpError::PubdataSizeMismatch);
         }
 
         let from_offset = 1;
         let token_id_offset = from_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let amount_offset = token_id_offset + TOKEN_BIT_WIDTH / 8;
+        let amount_offset = token_id_offset + token_bit_width / 8;
         let to_address_offset =
             amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8;
         let to_id_offset = to_address_offset + FR_ADDRESS_LEN;
@@ -55,7 +68,7 @@ impl TransferToNewOp {
             .ok_or(TransferOpError::CannotGetToAccountId)?;
         let from = Address::zero(); // It is unknown from pubdata;
         let to = Address::from_slice(&bytes[to_address_offset..to_address_offset + FR_ADDRESS_LEN]);
-        let token = u16::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+        let token = u32::from_bytes(&bytes[token_id_offset..token_id_offset + token_bit_width / 8])
             .ok_or(TransferOpError::CannotGetTokenId)?;
         let amount = unpack_token_amount(
             &bytes[amount_offset

@@ -38,11 +38,13 @@ impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
 
         let token_id = match query.from.inner {
             Either::Left(token_id) => token_id,
-            Either::Right(_) => transaction
-                .tokens_schema()
-                .get_last_token_id()
-                .await
-                .map_err(Error::storage)?,
+            Either::Right(_) => TokenId(
+                transaction
+                    .tokens_schema()
+                    .get_count()
+                    .await
+                    .map_err(Error::storage)?,
+            ),
         };
 
         let query = PaginationQuery {
@@ -60,8 +62,7 @@ impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
             .tokens_schema()
             .get_count()
             .await
-            .map_err(Error::storage)? as u32;
-
+            .map_err(Error::storage)?;
         transaction.commit().await.map_err(Error::storage)?;
 
         Ok(Paginated::new(

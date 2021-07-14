@@ -16,8 +16,8 @@ use futures::{
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
 use zksync_types::{
-    tx::{EthBatchSignData, TxEthSignature},
-    Address, SignedZkSyncTx, Token, ZkSyncTx,
+    tx::{EthBatchSignData, EthSignData, TxEthSignature},
+    Address, Order, SignedZkSyncTx, Token, ZkSyncTx,
 };
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
@@ -30,6 +30,7 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 pub enum TxVariant {
     Tx(SignedZkSyncTx),
     Batch(Vec<SignedZkSyncTx>, Option<EthBatchSignData>),
+    Order(Box<Order>),
 }
 
 /// Wrapper on a `TxVariant` which guarantees that (a batch of)
@@ -66,6 +67,7 @@ impl VerifiedTx {
         match self.0 {
             TxVariant::Tx(tx) => tx,
             TxVariant::Batch(_, _) => panic!("called `unwrap_tx` on a `Batch` value"),
+            TxVariant::Order(_) => panic!("called `unwrap_tx` on an `Order` value"),
         }
     }
 
@@ -74,6 +76,7 @@ impl VerifiedTx {
         match self.0 {
             TxVariant::Batch(txs, batch_sign_data) => (txs, batch_sign_data),
             TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
+            TxVariant::Order(_) => panic!("called `unwrap_batch` on an `Order` value"),
         }
     }
 }
@@ -110,6 +113,18 @@ async fn verify_eth_signature(
                 txs.iter().zip(accounts.iter()).zip(tokens.iter().cloned())
             {
                 verify_eth_signature_single_tx(tx, account, token, eth_checker).await?;
+            }
+        }
+        RequestData::Order(request) => {
+            let signature_correct = verify_ethereum_signature(
+                &request.sign_data.signature,
+                &request.sign_data.message,
+                request.sender,
+                eth_checker,
+            )
+            .await;
+            if !signature_correct {
+                return Err(TxAddError::IncorrectEthSignature);
             }
         }
     }
@@ -207,8 +222,14 @@ async fn verify_eth_signature_txs_batch(
     let start = Instant::now();
     // Cache for verified senders.
     let mut signers = HashSet::with_capacity(senders.len());
-    let old_message = EthBatchSignData::get_old_ethereum_batch_message(txs.iter().map(|tx| &tx.tx));
     // For every sender check whether there exists at least one signature that matches it.
+    let old_message = match txs.iter().all(|tx| tx.is_backwards_compatible()) {
+        true => Some(EthBatchSignData::get_old_ethereum_batch_message(
+            txs.iter().map(|tx| &tx.tx),
+        )),
+        false => None,
+    };
+
     for sender in senders {
         if signers.contains(sender) {
             continue;
@@ -228,13 +249,15 @@ async fn verify_eth_signature_txs_batch(
             )
             .await;
             if !signature_correct {
-                signature_correct = verify_ethereum_signature(
-                    signature,
-                    old_message.as_slice(),
-                    *sender,
-                    eth_checker,
-                )
-                .await;
+                if let Some(old_message) = &old_message {
+                    signature_correct = verify_ethereum_signature(
+                        signature,
+                        old_message.as_slice(),
+                        *sender,
+                        eth_checker,
+                    )
+                    .await;
+                }
             }
             if signature_correct {
                 signers.insert(sender);
@@ -268,6 +291,11 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
                 return Err(TxAddError::IncorrectTx);
             }
         }
+        TxVariant::Order(order) => {
+            if !order.check_correctness() {
+                return Err(TxAddError::IncorrectTx);
+            }
+        }
     }
     Ok(())
 }
@@ -292,6 +320,13 @@ pub struct BatchRequest {
     pub tokens: Vec<Token>,
 }
 
+#[derive(Debug)]
+pub struct OrderRequest {
+    pub order: Box<Order>,
+    pub sign_data: EthSignData,
+    pub sender: Address,
+}
+
 /// Request for the signature check.
 #[derive(Debug)]
 pub struct VerifySignatureRequest {
@@ -304,6 +339,7 @@ pub struct VerifySignatureRequest {
 pub enum RequestData {
     Tx(TxRequest),
     Batch(BatchRequest),
+    Order(OrderRequest),
 }
 
 impl RequestData {
@@ -313,6 +349,7 @@ impl RequestData {
             RequestData::Batch(request) => {
                 TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
             }
+            RequestData::Order(request) => TxVariant::Order(request.order.clone()),
         }
     }
 }

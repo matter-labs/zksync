@@ -102,6 +102,46 @@ pub enum WithdrawOpError {
 }
 
 #[derive(Debug, Error, PartialEq)]
+pub enum WithdrawNFTOpError {
+    #[error("Wrong bytes length for withdraw nft pubdata")]
+    PubdataSizeMismatch,
+    #[error("Failed to get creator account id")]
+    CannotGetCreatorAccountId,
+    #[error("Failed to get serial id")]
+    CannotGetSerialId,
+    #[error("Failed to get account id")]
+    CannotGetAccountId,
+    #[error("Failed to get token id")]
+    CannotGetTokenId,
+    #[error("Failed to get fee token id")]
+    CannotGetFeeTokenId,
+    #[error("Failed to get amount")]
+    CannotGetAmount,
+    #[error("Failed to get fee")]
+    CannotGetFee,
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub enum MintNFTOpError {
+    #[error("Wrong number of types")]
+    WrongNumberOfBytes,
+    #[error("Cannot parse creator account id")]
+    CreatorAccountId,
+    #[error("Cannot parse token id")]
+    TokenId,
+    #[error("Cannot parse fee token id")]
+    FeeTokenId,
+    #[error("Cannot parse token account id")]
+    AccountId,
+    #[error("Cannot parse serial id")]
+    SerialId,
+    #[error("Cannot parse recipient account id")]
+    RecipientAccountId,
+    #[error("Cannot parse fee")]
+    Fee,
+}
+
+#[derive(Debug, Error, PartialEq)]
 pub enum PublicDataDecodeError {
     #[error("Cannot decode empty public data")]
     EmptyData,
@@ -123,8 +163,28 @@ pub enum PublicDataDecodeError {
     TransferOpError(#[from] TransferOpError),
     #[error(transparent)]
     WithdrawOpError(#[from] WithdrawOpError),
+    #[error(transparent)]
+    SwapOpError(#[from] SwapOpError),
+    #[error(transparent)]
+    MintNFTOpError(#[from] MintNFTOpError),
+    #[error(transparent)]
+    WithdrawNFTOpError(#[from] WithdrawNFTOpError),
 }
 
 #[derive(Debug, Error, PartialEq)]
 #[error("Wrong operation type")]
 pub struct UnexpectedOperationType();
+
+#[derive(Debug, Error, PartialEq)]
+pub enum SwapOpError {
+    #[error("Wrong bytes length for swap pubdata")]
+    PubdataSizeMismatch,
+    #[error("Failed to get account id")]
+    CannotGetAccountId,
+    #[error("Failed to get token id")]
+    CannotGetTokenId,
+    #[error("Failed to get amount")]
+    CannotGetAmount,
+    #[error("Failed to get Fee")]
+    CannotGetFee,
+}

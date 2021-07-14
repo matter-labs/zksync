@@ -363,18 +363,18 @@ impl MempoolBlocksHandler {
         &self,
         current_unprocessed_priority_op: u64,
     ) -> (usize, Vec<PriorityOp>) {
-        let eth_watch_resp = oneshot::channel();
+        let (sender, receiver) = oneshot::channel();
         self.eth_watch_req
             .clone()
             .send(EthWatchRequest::GetPriorityQueueOps {
                 op_start_id: current_unprocessed_priority_op,
                 max_chunks: self.max_block_size_chunks,
-                resp: eth_watch_resp.0,
+                resp: sender,
             })
             .await
             .expect("ETH watch req receiver dropped");
 
-        let priority_ops = eth_watch_resp.1.await.expect("Err response from eth watch");
+        let priority_ops = receiver.await.expect("Err response from eth watch");
 
         (
             self.max_block_size_chunks
@@ -483,6 +483,9 @@ impl MempoolBlocksHandler {
                                         *nonce = new_nonce;
                                     }
                                 }
+                            }
+                            AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveNFT { .. } => {
+                                // Minting nft affects only tokens, mempool doesn't contain them
                             }
                         }
                     }

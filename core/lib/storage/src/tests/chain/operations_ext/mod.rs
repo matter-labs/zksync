@@ -22,6 +22,7 @@ use crate::{
         BLOCK_SIZE_CHUNKS,
     },
     tests::db_test,
+    tokens::StoreTokenError,
     QueryResult, StorageProcessor,
 };
 
@@ -33,7 +34,13 @@ pub async fn commit_schema_data(
     setup: &TransactionsHistoryTestSetup,
 ) -> QueryResult<()> {
     for token in &setup.tokens {
-        storage.tokens_schema().store_token(token.clone()).await?;
+        let try_insert_token = storage.tokens_schema().store_token(token.clone()).await;
+        // If the token is added or it already exists in the database,
+        // then we consider that the token was successfully added.
+        match try_insert_token {
+            Ok(..) | Err(StoreTokenError::TokenAlreadyExistsError(..)) => (),
+            Err(StoreTokenError::Other(anyhow_err)) => return Err(anyhow_err),
+        }
     }
 
     for block in &setup.blocks {

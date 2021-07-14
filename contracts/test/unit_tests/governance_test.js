@@ -7,11 +7,12 @@ describe('Governance unit tests', function () {
 
     let testContract;
     before(async () => {
-        const contractFactory = await hardhat.ethers.getContractFactory('Governance');
+        const contractFactory = await hardhat.ethers.getContractFactory('TestGovernance');
         testContract = await contractFactory.deploy();
         await testContract.initialize(
             hardhat.ethers.utils.defaultAbiCoder.encode(['address'], [await testContract.signer.getAddress()])
         );
+        await testContract.changeTokenGovernance(await testContract.signer.getAddress());
     });
 
     it('checking correctness of using MAX_AMOUNT_OF_REGISTERED_TOKENS constant', async () => {

@@ -1,11 +1,12 @@
 // External deps
+use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use zksync_state::state::CollectedFee;
 use zksync_state::{handler::TxHandler, state::ZkSyncState};
 use zksync_types::{
     tx::{ChangePubKey, ChangePubKeyType, TxSignature},
-    AccountId, ChangePubKeyOp, TokenId,
+    AccountId, ChangePubKeyOp, Nonce, PubKeyHash, TokenId,
 };
 // Local deps
 use crate::witness::{
@@ -38,6 +39,61 @@ fn test_change_pubkey_offchain_success() {
 
     let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
         .expect("SigDataInput creation failed");
+
+    generic_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
+        &accounts,
+        change_pkhash_op,
+        input,
+        |plasma_state, op| {
+            let fee = <ZkSyncState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
+                .expect("Operation failed")
+                .0
+                .unwrap();
+
+            vec![fee]
+        },
+    );
+}
+
+/// Basic check for execution of `ChangePubKeyOp` in circuit with old signature scheme.
+/// Here we generate an empty account and change its public key.
+#[test]
+#[ignore]
+fn test_change_pubkey_offchain_old_signature_success() {
+    // Input data.
+    let accounts = vec![WitnessTestAccount::new_empty(AccountId(0xc1))];
+    let account = &accounts[0];
+
+    let mut tx = ChangePubKey::new(
+        AccountId(0xc1),
+        account.zksync_account.address,
+        PubKeyHash::from_privkey(&account.zksync_account.private_key),
+        FEE_TOKEN,
+        BigUint::from(0u32),
+        Nonce(0),
+        Default::default(),
+        None,
+        None,
+    );
+    tx.signature =
+        TxSignature::sign_musig(&account.zksync_account.private_key, &tx.get_old_bytes());
+    let change_pkhash_op = ChangePubKeyOp {
+        tx,
+        account_id: account.id,
+    };
+
+    let sign_packed = change_pkhash_op
+        .tx
+        .signature
+        .signature
+        .serialize_packed()
+        .expect("signature serialize");
+    let input = SigDataInput::new(
+        &sign_packed,
+        &change_pkhash_op.tx.get_old_bytes(),
+        &change_pkhash_op.tx.signature.pub_key,
+    )
+    .expect("input constructing fails");
 
     generic_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
         &accounts,
@@ -122,7 +178,7 @@ fn test_incorrect_change_pubkey_account() {
     let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
         .expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _, _>(
         &accounts,
         change_pkhash_op,
         input,
@@ -133,6 +189,7 @@ fn test_incorrect_change_pubkey_account() {
                 amount: 0u32.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -184,7 +241,7 @@ fn test_incorrect_change_pubkey_signature() {
     let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
         .expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _, _>(
         &accounts,
         change_pkhash_op,
         input,
@@ -195,5 +252,6 @@ fn test_incorrect_change_pubkey_signature() {
                 amount: HIJACK_FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }

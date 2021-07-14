@@ -18,12 +18,15 @@ use zksync_crypto::franklin_crypto::{
 };
 // Workspace deps
 use zksync_crypto::params::{
-    self, FR_BIT_WIDTH_PADDED, OLD_SIGNED_TRANSFER_BIT_WIDTH, SIGNED_FORCED_EXIT_BIT_WIDTH,
-    SIGNED_TRANSFER_BIT_WIDTH,
+    self, CONTENT_HASH_WIDTH, FR_BIT_WIDTH_PADDED, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
+    SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_MINT_NFT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
+    SIGNED_WITHDRAW_NFT_BIT_WIDTH,
 };
 use zksync_types::{
     operations::{ChangePubKeyOp, NoopOp},
-    CloseOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    tx::Order,
+    CloseOp, DepositOp, ForcedExitOp, FullExitOp, MintNFTOp, SwapOp, TransferOp, TransferToNewOp,
+    WithdrawNFTOp, WithdrawOp,
 };
 // Local deps
 use crate::{
@@ -38,11 +41,11 @@ use crate::{
     utils::{
         allocate_numbers_vec, allocate_sum, boolean_or, calculate_empty_account_tree_hashes,
         calculate_empty_balance_tree_hashes, multi_and, pack_bits_to_element_strict,
-        resize_grow_only, vectorized_compare,
+        resize_grow_only, sequences_equal, u8_into_bits_be, vectorized_compare,
     },
 };
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 12;
 pub struct ZkSyncCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
@@ -60,12 +63,16 @@ pub struct ZkSyncCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub validator_balances: Vec<Option<E::Fr>>,
     pub validator_audit_path: Vec<Option<E::Fr>>,
     pub validator_account: AccountWitness<E>,
+
+    pub validator_non_processable_tokens_audit_before_fees: Vec<Option<E::Fr>>,
+    pub validator_non_processable_tokens_audit_after_fees: Vec<Option<E::Fr>>,
 }
 
 pub struct CircuitGlobalVariables<E: RescueEngine + JubjubEngine> {
     pub explicit_zero: CircuitElement<E>,
     pub block_timestamp: CircuitElement<E>,
     pub chunk_data: AllocatedChunkData<E>,
+    pub min_nft_token_id: CircuitElement<E>,
 }
 
 impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for ZkSyncCircuit<'a, E> {
@@ -84,6 +91,13 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for ZkSyncCircuit<'a,
             validator_balances: self.validator_balances.clone(),
             validator_audit_path: self.validator_audit_path.clone(),
             validator_account: self.validator_account.clone(),
+
+            validator_non_processable_tokens_audit_before_fees: self
+                .validator_non_processable_tokens_audit_before_fees
+                .clone(),
+            validator_non_processable_tokens_audit_after_fees: self
+                .validator_non_processable_tokens_audit_after_fees
+                .clone(),
         }
     }
 }
@@ -159,6 +173,20 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             params::TIMESTAMP_BIT_WIDTH,
         )?;
 
+        let min_nft_token_id_number =
+            AllocatedNum::alloc(cs.namespace(|| "min_nft_token_id number"), || {
+                Ok(E::Fr::from_str(&params::MIN_NFT_TOKEN_ID.to_string()).unwrap())
+            })?;
+        min_nft_token_id_number.assert_number(
+            cs.namespace(|| "assert min_nft_token_id is a constant"),
+            &E::Fr::from_str(&params::MIN_NFT_TOKEN_ID.to_string()).unwrap(),
+        )?;
+        let min_nft_token_id = CircuitElement::from_number_with_known_length(
+            cs.namespace(|| "min_nft_token_id circuit element"),
+            min_nft_token_id_number,
+            params::TOKEN_BIT_WIDTH,
+        )?;
+
         let chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
             is_chunk_last: Boolean::constant(false),
             is_chunk_first: Boolean::constant(false),
@@ -170,11 +198,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             block_timestamp,
             chunk_data,
             explicit_zero: zero_circuit_element,
+            min_nft_token_id,
         };
 
         // we create a memory value for a token ID that is used to collect fees.
         // It is overwritten when we enter the first chunk of the op (that exposes sender
-        // and defined a token in which transaction is valued). Later one (at the last chunk)
+        // and defines a token in which transaction is valued). Later one (at the last chunk)
         // we use this value to give fee to the operator
         let mut last_token_id = zero.clone();
 
@@ -190,9 +219,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             data[TransferOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[TransferToNewOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 4];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[ForcedExitOp::OP_CODE as usize] = vec![zero; 2];
+            data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[MintNFTOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[WithdrawNFTOp::OP_CODE as usize] = vec![zero.clone(); 4];
+            data[SwapOp::OP_CODE as usize] = vec![zero; 2];
 
             // this operation is disabled for now
             // data[CloseOp::OP_CODE as usize] = vec![];
@@ -228,6 +260,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                         ForcedExitOp::OP_CODE,
                         FullExitOp::OP_CODE,
                         ChangePubKeyOp::OP_CODE,
+                        WithdrawNFTOp::OP_CODE,
                     ];
 
                     let mut onchain_op_flags = Vec::new();
@@ -279,6 +312,17 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 |lc| lc + rolling_root.get_variable(),
             );
 
+            let is_special_nft_storage_account = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_special_nft_storage_account"),
+                &current_branch.account_id.get_number(),
+                Expression::u64::<CS>(NFT_STORAGE_ACCOUNT_ID.0.into()),
+            )?);
+            let is_special_nft_token = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_special_nft_token"),
+                &current_branch.token.get_number(),
+                Expression::u64::<CS>(NFT_TOKEN_ID.0.into()),
+            )?);
+
             self.execute_op(
                 cs.namespace(|| "execute_op"),
                 &mut current_branch,
@@ -293,6 +337,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 &mut fees,
                 &mut prev,
                 &mut pubdata_holder,
+                &is_special_nft_storage_account,
+                &is_special_nft_token,
             )?;
             let (new_state_root, _, _) = check_account_data(
                 cs.namespace(|| "calculate new account root"),
@@ -325,24 +371,10 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
         let validator_address_bits = validator_address_padded.get_bits_le();
         assert_eq!(validator_address_bits.len(), params::ACCOUNT_ID_BIT_WIDTH);
 
-        let mut validator_balances_processable_tokens = {
-            assert_eq!(self.validator_balances.len(), params::total_tokens());
-            for balance in self.validator_balances[params::number_of_processable_tokens()..]
-                .iter()
-                .flatten()
-            {
-                assert!(balance.is_zero());
-            }
-            let allocated_validator_balances = allocate_numbers_vec(
-                cs.namespace(|| "validator_balances"),
-                &self.validator_balances[..params::number_of_processable_tokens()],
-            )?;
-            assert_eq!(
-                allocated_validator_balances.len(),
-                params::number_of_processable_tokens()
-            );
-            allocated_validator_balances
-        };
+        let mut validator_balances_processable_tokens = allocate_numbers_vec(
+            cs.namespace(|| "validator_balances"),
+            &self.validator_balances,
+        )?;
 
         let validator_audit_path = allocate_numbers_vec(
             cs.namespace(|| "validator_audit_path"),
@@ -358,11 +390,15 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             &self.validator_account,
         )?;
 
-        // calculate operator's balance_tree root hash from sub tree representation
-        let old_operator_balance_root = calculate_balances_root_from_left_tree_values(
-            cs.namespace(|| "calculate_root_from_full_representation_fees before"),
+        // calculate operator's balance_tree root hash from processable tokens balances full representation
+        let validator_non_processable_tokens_audit_before_fees = allocate_numbers_vec(
+            cs.namespace(|| "validator_non_processable_tokens_audit_before_fees"),
+            &self.validator_non_processable_tokens_audit_before_fees,
+        )?;
+        let old_operator_balance_root = calculate_validator_root_from_processable_values(
+            cs.namespace(|| "calculate_validator_root_from_processable_values before fees"),
             &validator_balances_processable_tokens,
-            params::balance_tree_depth(),
+            &validator_non_processable_tokens_audit_before_fees,
             self.rescue_params,
         )?;
 
@@ -410,11 +446,15 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             )?;
         }
 
-        // calculate operator's balance_tree root hash from whole tree representation
-        let new_operator_balance_root = calculate_balances_root_from_left_tree_values(
-            cs.namespace(|| "calculate_root_from_full_representation_fees after"),
+        // calculate operator's balance_tree root hash from processable tokens balances full representation
+        let validator_non_processable_tokens_audit_after_fees = allocate_numbers_vec(
+            cs.namespace(|| "validator_non_processable_tokens_audit_after_fees"),
+            &self.validator_non_processable_tokens_audit_after_fees,
+        )?;
+        let new_operator_balance_root = calculate_validator_root_from_processable_values(
+            cs.namespace(|| "calculate_validator_root_from_processable_values after fees"),
             &validator_balances_processable_tokens,
-            params::balance_tree_depth(),
+            &validator_non_processable_tokens_audit_after_fees,
             self.rescue_params,
         )?;
 
@@ -465,11 +505,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 params::BLOCK_NUMBER_BIT_WIDTH,
             )?;
 
-            initial_hash_data.extend(block_number.into_padded_be_bits(256));
+            initial_hash_data.extend(block_number.into_padded_be_bits(FR_BIT_WIDTH_PADDED));
 
-            initial_hash_data.extend(validator_address_padded.into_padded_be_bits(256));
+            initial_hash_data
+                .extend(validator_address_padded.into_padded_be_bits(FR_BIT_WIDTH_PADDED));
 
-            assert_eq!(initial_hash_data.len(), 512);
+            assert_eq!(initial_hash_data.len(), FR_BIT_WIDTH_PADDED * 2);
 
             let mut hash_block = sha256::sha256(
                 cs.namespace(|| "initial rolling sha256"),
@@ -485,10 +526,14 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 let mut old_root_le_bits = old_root
                     .into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
                 assert_eq!(old_root_le_bits.len(), E::Fr::NUM_BITS as usize);
-                resize_grow_only(&mut old_root_le_bits, 256, Boolean::constant(false));
+                resize_grow_only(
+                    &mut old_root_le_bits,
+                    FR_BIT_WIDTH_PADDED,
+                    Boolean::constant(false),
+                );
                 let mut old_root_be_bits = old_root_le_bits;
                 old_root_be_bits.reverse();
-                assert_eq!(old_root_be_bits.len(), 256);
+                assert_eq!(old_root_be_bits.len(), FR_BIT_WIDTH_PADDED);
                 old_root_be_bits
             };
             pack_bits.extend(old_root_be_bits);
@@ -504,10 +549,14 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 let mut final_root_le_bits = final_root
                     .into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
                 assert_eq!(final_root_le_bits.len(), E::Fr::NUM_BITS as usize);
-                resize_grow_only(&mut final_root_le_bits, 256, Boolean::constant(false));
+                resize_grow_only(
+                    &mut final_root_le_bits,
+                    FR_BIT_WIDTH_PADDED,
+                    Boolean::constant(false),
+                );
                 let mut final_root_be_bits = final_root_le_bits;
                 final_root_be_bits.reverse();
-                assert_eq!(final_root_be_bits.len(), 256);
+                assert_eq!(final_root_be_bits.len(), FR_BIT_WIDTH_PADDED);
                 final_root_be_bits
             };
             pack_bits.extend(final_root_be_bits);
@@ -516,8 +565,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(global_variables.block_timestamp.into_padded_be_bits(256));
-            assert_eq!(pack_bits.len(), 512);
+            pack_bits.extend(
+                global_variables
+                    .block_timestamp
+                    .into_padded_be_bits(FR_BIT_WIDTH_PADDED),
+            );
+            assert_eq!(pack_bits.len(), FR_BIT_WIDTH_PADDED * 2);
 
             hash_block = sha256::sha256(cs.namespace(|| "hash with timestamp"), &pack_bits)?;
 
@@ -619,6 +672,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
     // select a branch.
     // If TX type == deposit then select first branch
+    // If TX type == swap then select first if chunk number is even, else second
     // else if chunk number == 0 select first, else - select second
     fn select_branch<CS: ConstraintSystem<E>>(
         &self,
@@ -628,15 +682,29 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         _op: &Operation<E>,
         chunk_data: &AllocatedChunkData<E>,
     ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
-        let deposit_tx_type = Expression::u64::<CS>(1);
+        let deposit_tx_type = Expression::u64::<CS>(DepositOp::OP_CODE.into());
+        let swap_tx_type = Expression::u64::<CS>(SwapOp::OP_CODE.into());
         let left_side = Expression::constant::<CS>(E::Fr::zero());
 
         let cur_side = Expression::select_ifeq(
-            cs.namespace(|| "select corresponding branch"),
+            cs.namespace(|| "select corresponding branch - if deposit"),
             &chunk_data.tx_type.get_number(),
             deposit_tx_type,
             left_side.clone(),
             &chunk_data.chunk_number,
+        )?;
+
+        let chunk_number_bits = chunk_data
+            .chunk_number
+            .into_bits_le_fixed(cs.namespace(|| "chunk number into bits"), 8)?;
+        let chunk_number_last_bit = Expression::boolean::<CS>(chunk_number_bits[0].clone());
+
+        let cur_side = Expression::select_ifeq(
+            cs.namespace(|| "select corresponding branch - if swap"),
+            &chunk_data.tx_type.get_number(),
+            swap_tx_type,
+            chunk_number_last_bit,
+            &cur_side,
         )?;
 
         let is_left = Boolean::from(Expression::equals(
@@ -716,22 +784,15 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
         previous_pubdatas: &mut [Vec<AllocatedNum<E>>],
+        is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
     ) -> Result<(), SynthesisError> {
-        let max_token_id =
-            Expression::<E>::u64::<CS>(params::number_of_processable_tokens() as u64);
         cs.enforce(
             || "left and right tokens are equal",
             |lc| lc + lhs.token.get_number().get_variable(),
             |lc| lc + CS::one(),
             |lc| lc + rhs.token.get_number().get_variable(),
         );
-
-        let diff_token_numbers = max_token_id - Expression::from(&lhs.token.get_number());
-
-        let _ = diff_token_numbers.into_bits_le_fixed(
-            cs.namespace(|| "token number is smaller than processable number"),
-            params::balance_tree_depth(),
-        )?;
 
         let public_generator = self
             .jubjub_params
@@ -755,9 +816,16 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let op_data =
             AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
+
+        let is_swap = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_swap"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(SwapOp::OP_CODE)),
+        )?);
+
         // ensure op_data is equal to previous
         {
-            let is_op_data_correct_flags = vec![
+            let a_and_b_same_as_previous_flags = vec![
                 CircuitElement::equals(
                     cs.namespace(|| "is a equal to previous"),
                     &op_data.a,
@@ -768,15 +836,63 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &op_data.b,
                     &prev.op_data.b,
                 )?,
+            ];
+
+            let a_and_b_same_as_previous = multi_and(
+                cs.namespace(|| "a and b are equal to previous"),
+                &a_and_b_same_as_previous_flags,
+            )?;
+
+            let is_op_data_correct_flags = vec![
+                boolean_or(
+                    cs.namespace(|| "a and b are equal to previous or op == swap"),
+                    &a_and_b_same_as_previous,
+                    &is_swap,
+                )?,
                 CircuitElement::equals(
                     cs.namespace(|| "is amount_packed equal to previous"),
                     &op_data.amount_packed,
                     &prev.op_data.amount_packed,
                 )?,
                 CircuitElement::equals(
+                    cs.namespace(|| "is second_amount_packed equal to previous"),
+                    &op_data.second_amount_packed,
+                    &prev.op_data.second_amount_packed,
+                )?,
+                CircuitElement::equals(
                     cs.namespace(|| "is fee_packed equal to previous"),
                     &op_data.fee_packed,
                     &prev.op_data.fee_packed,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_amounts_packed equal to previous"),
+                    &op_data.special_amounts_packed,
+                    &prev.op_data.special_amounts_packed,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_eth_addresses equal to previous"),
+                    &op_data.special_eth_addresses,
+                    &prev.op_data.special_eth_addresses,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_nonces equal to previous"),
+                    &op_data.special_nonces,
+                    &prev.op_data.special_nonces,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_tokens equal to previous"),
+                    &op_data.special_tokens,
+                    &prev.op_data.special_tokens,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_accounts equal to previous"),
+                    &op_data.special_accounts,
+                    &prev.op_data.special_accounts,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_prices equal to previous"),
+                    &op_data.special_prices,
+                    &prev.op_data.special_prices,
                 )?,
                 CircuitElement::equals(
                     cs.namespace(|| "is eth_address equal to previous"),
@@ -802,6 +918,36 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     cs.namespace(|| "is valid_until equal to previous"),
                     &op_data.valid_until,
                     &prev.op_data.valid_until,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is second_valid_from equal to previous"),
+                    &op_data.second_valid_from,
+                    &prev.op_data.second_valid_from,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is second_valid_until equal to previous"),
+                    &op_data.second_valid_until,
+                    &prev.op_data.second_valid_until,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "special_eth_addresses"),
+                    &op_data.special_eth_addresses,
+                    &prev.op_data.special_eth_addresses,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "special_tokens"),
+                    &op_data.special_tokens,
+                    &prev.op_data.special_tokens,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "special_content_hash"),
+                    &op_data.special_content_hash,
+                    &prev.op_data.special_content_hash,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is special_serial_id equal to previous"),
+                    &op_data.special_serial_id,
+                    &prev.op_data.special_serial_id,
                 )?,
             ];
 
@@ -863,6 +1009,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &global_variables,
         )?;
 
+        let nft_content_as_balance = hash_nft_content_to_balance_type(
+            cs.namespace(|| "nft_content_as_balance"),
+            &op_data.special_accounts[0],  // creator_account_id
+            &op_data.special_serial_id,    // serial_id
+            &op_data.special_content_hash, // content_hash
+            self.rescue_params,
+        )?;
+
+        let is_fungible_token = CircuitElement::less_than_fixed(
+            cs.namespace(|| "is_fungible_token"),
+            &cur.token,
+            &global_variables.min_nft_token_id,
+        )?;
+
         let op_flags = vec![
             self.deposit(
                 cs.namespace(|| "deposit"),
@@ -887,6 +1047,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[TransferOp::OP_CODE as usize],
+                is_special_nft_storage_account,
+                is_special_nft_token,
+                &is_fungible_token,
             )?,
             self.transfer_to_new(
                 cs.namespace(|| "transfer_to_new"),
@@ -902,6 +1065,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[TransferToNewOp::OP_CODE as usize],
+                is_special_nft_storage_account,
+                is_special_nft_token,
+                &is_fungible_token,
             )?,
             self.withdraw(
                 cs.namespace(|| "withdraw"),
@@ -914,9 +1080,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[WithdrawOp::OP_CODE as usize],
+                is_special_nft_storage_account,
+                is_special_nft_token,
+                &is_fungible_token,
             )?,
             // Close disable.
-            //  op_flags.push(self.close_account(
+            // self.close_account(
             //      cs.namespace(|| "close_account"),
             //      &mut cur,
             //      &chunk_data,
@@ -926,7 +1095,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             //      &subtree_root,
             //      &is_valid_timestamp,
             //      &signature_data.is_verified,
-            //  )?);
+            // )?,
             self.full_exit(
                 cs.namespace(|| "full_exit"),
                 &mut cur,
@@ -934,6 +1103,10 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &op_data,
                 &ext_pubdata_chunk,
                 &mut previous_pubdatas[FullExitOp::OP_CODE as usize],
+                &nft_content_as_balance,
+                is_special_nft_storage_account,
+                is_special_nft_token,
+                &is_fungible_token,
             )?,
             self.change_pubkey_offchain(
                 cs.namespace(|| "change_pubkey_offchain"),
@@ -947,6 +1120,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_a_geq_b,
                 &signature_data.is_verified,
                 &signer_key,
+                is_special_nft_storage_account,
+                is_special_nft_token,
+                &is_fungible_token,
             )?,
             self.noop(
                 cs.namespace(|| "noop"),
@@ -969,6 +1145,54 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
+                is_special_nft_storage_account,
+                is_special_nft_token,
+                &is_fungible_token,
+            )?,
+            self.mint_nft(
+                cs.namespace(|| "mint_nft"),
+                &mut cur,
+                global_variables,
+                &is_a_geq_b,
+                &is_account_empty,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[MintNFTOp::OP_CODE as usize],
+                &nft_content_as_balance,
+                is_special_nft_storage_account,
+                is_special_nft_token,
+            )?,
+            self.withdraw_nft(
+                cs.namespace(|| "withdraw_nft"),
+                &mut cur,
+                global_variables,
+                &is_a_geq_b,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &is_valid_timestamp,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[WithdrawNFTOp::OP_CODE as usize],
+                &nft_content_as_balance,
+                is_special_nft_storage_account,
+                is_special_nft_token,
+            )?,
+            self.swap(
+                cs.namespace(|| "swap"),
+                &mut cur,
+                global_variables,
+                &is_a_geq_b,
+                &is_account_empty,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &is_valid_timestamp,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[SwapOp::OP_CODE as usize],
+                is_special_nft_storage_account,
+                is_special_nft_token,
             )?,
         ];
 
@@ -1004,6 +1228,19 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &global_variables.chunk_data.is_chunk_first,
         )?;
 
+        // if TX type == swap then update the token on the last chunk
+        let swap_and_last_chunk = Boolean::and(
+            cs.namespace(|| "last chunk of swap tx"),
+            &is_swap,
+            &global_variables.chunk_data.is_chunk_last,
+        )?;
+        let new_last_token_id = AllocatedNum::conditionally_select(
+            cs.namespace(|| "change token_id on last chunk of swap tx"),
+            &cur.token.get_number(),
+            &new_last_token_id,
+            &swap_and_last_chunk,
+        )?;
+
         *last_token_id = new_last_token_id.clone();
 
         for (i, fee) in fees.iter_mut().enumerate() {
@@ -1032,6 +1269,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn withdraw<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1044,9 +1282,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        _is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         let mut base_valid_flags = vec![];
-        //construct pubdata
+        // construct pubdata
         let mut pubdata_bits = vec![];
 
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
@@ -1073,33 +1314,53 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         // construct signature message
 
-        let mut serialized_tx_bits = vec![];
-
-        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(cur.account_id.get_bits_be());
-        serialized_tx_bits.extend(cur.account.address.get_bits_be());
-        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-        assert_eq!(serialized_tx_bits.len(), params::SIGNED_WITHDRAW_BIT_WIDTH);
-
-        let mut serialized_tx_bits_old = vec![];
-
-        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account_id.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account.address.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits_old.extend(cur.token.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.full_amount.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(WithdrawOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.full_amount.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
         assert_eq!(
-            serialized_tx_bits_old.len(),
-            params::OLD_SIGNED_WITHDRAW_BIT_WIDTH
+            serialized_tx_bits_version1.len(),
+            params::SIGNED_WITHDRAW_BIT_WIDTH
+        );
+
+        let mut serialized_tx_bits_old1 = vec![];
+        serialized_tx_bits_old1.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account.address.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.eth_address.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old1.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old1.extend(op_data.full_amount.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old1.len(),
+            params::OLD1_SIGNED_WITHDRAW_BIT_WIDTH
+        );
+
+        let mut serialized_tx_bits_old2 = vec![];
+        serialized_tx_bits_old2.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account.address.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.eth_address.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old2.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old2.extend(op_data.full_amount.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old2.len(),
+            params::OLD2_SIGNED_WITHDRAW_BIT_WIDTH
         );
 
         let pubdata_chunk = select_pubdata_chunk(
@@ -1139,20 +1400,39 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         base_valid_flags.push(is_withdraw);
         base_valid_flags.push(is_valid_timestamp.clone());
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
-        let is_old_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_old_serialized_tx_correct"),
-            serialized_tx_bits_old,
+
+        let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old1_serialized_tx_correct"),
+            serialized_tx_bits_old1,
             &op_data,
+        )?;
+        is_old1_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
+            &[is_old1_serialized_tx_correct, is_fungible_token.clone()],
+        )?;
+
+        let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old2_serialized_tx_correct"),
+            serialized_tx_bits_old2,
+            &op_data,
+        )?;
+        is_old2_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
+            &[is_old2_serialized_tx_correct, is_fungible_token.clone()],
         )?;
 
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
+            &[
+                is_version1_serialized_tx_correct,
+                is_old1_serialized_tx_correct,
+                is_old2_serialized_tx_correct,
+            ],
         )?;
         let is_signed_correctly = multi_and(
             cs.namespace(|| "is_signed_correctly"),
@@ -1172,10 +1452,15 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
         base_valid_flags.push(is_signer_valid);
 
-        // base_valid_flags.push(_is_signer_valid);
+        base_valid_flags.push(is_fungible_token.clone());
+
         let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
 
-        let mut lhs_valid_flags = vec![is_first_chunk.clone(), is_base_valid.clone()];
+        let mut lhs_valid_flags = vec![
+            is_first_chunk.clone(),
+            is_base_valid.clone(),
+            is_special_nft_token.not(),
+        ];
 
         // check operation arguments
         let is_a_correct =
@@ -1244,157 +1529,217 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        nft_content_as_balance: &CircuitElement<E>,
+        is_special_nft_storage_account: &Boolean,
+        _is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
-        // Execute first chunk
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+        /*
+        fields specification:
 
-        let is_first_chunk = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_first_chunk"),
+        special:
+        special_eth_addresses = [creator_address]
+        special_accounts = [creator_account_id, account_id]
+        */
+
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
+        pubdata_bits.extend(op_data.special_accounts[1].get_bits_be()); // account_id = 4 bytes
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); // initiator_address = 20 bytes
+        pubdata_bits.extend(cur.token.get_bits_be()); // token_id = 4 bytes
+        pubdata_bits.extend(op_data.full_amount.get_bits_be()); // full_amount = 16 bytes
+        pubdata_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // creator_address = 20 bytes
+        pubdata_bits.extend(op_data.special_serial_id.get_bits_be()); // serial_id = 4 bytes
+        pubdata_bits.extend(
+            op_data
+                .special_content_hash
+                .iter()
+                .map(|bit| bit.get_bits_be())
+                .flatten(),
+        ); // content_hash = 32 bytes
+        resize_grow_only(
+            &mut pubdata_bits,
+            FullExitOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        *pubdata_holder = packed_pubdata;
+
+        let is_chunk_with_index: Vec<Boolean> = (0..3)
+            .map(|chunk_index| {
+                Expression::equals(
+                    cs.namespace(|| format!("is_chunk_with_index {}", chunk_index)),
+                    &global_variables.chunk_data.chunk_number,
+                    Expression::u64::<CS>(chunk_index as u64),
+                )
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?
+            .iter()
+            .map(|bit| Boolean::from(bit.clone()))
+            .collect();
+
+        // common valid flags
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_chunk_with_index[0].clone(),
+            &is_equal_pubdata,
+        )?;
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
             &global_variables.chunk_data.chunk_number,
-            Expression::constant::<CS>(E::Fr::zero()),
+            FullExitOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        let fee_is_zero = CircuitElement::equals(
+            cs.namespace(|| "fee_is_zero"),
+            &op_data.fee,
+            &global_variables.explicit_zero,
+        )?;
+        let is_full_exit_operation = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_full_exit_operation"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(FullExitOp::OP_CODE)),
         )?);
 
-        // MUST be true for all chunks
-        let (is_pubdata_chunk_correct, pubdata_is_properly_copied) = {
-            //construct pubdata
-            let pubdata_bits = {
-                let mut pub_data = Vec::new();
-                pub_data.extend(global_variables.chunk_data.tx_type.get_bits_be()); //1
-                pub_data.extend(cur.account_id.get_bits_be()); //3
-                pub_data.extend(op_data.eth_address.get_bits_be()); //20
-                pub_data.extend(cur.token.get_bits_be()); // 2
-                pub_data.extend(op_data.full_amount.get_bits_be());
-
-                resize_grow_only(
-                    &mut pub_data,
-                    FullExitOp::CHUNKS * params::CHUNK_BIT_WIDTH,
-                    Boolean::constant(false),
-                );
-
-                pub_data
-            };
-
-            let pubdata_chunk = select_pubdata_chunk(
-                cs.namespace(|| "select_pubdata_chunk"),
-                &pubdata_bits,
-                &global_variables.chunk_data.chunk_number,
-                FullExitOp::CHUNKS,
-            )?;
-
-            let pubdata_chunk_correct = Boolean::from(Expression::equals(
-                cs.namespace(|| "is_pubdata_equal"),
-                &pubdata_chunk,
-                ext_pubdata_chunk,
-            )?);
-
-            let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
-                cs.namespace(|| "compare pubdata"),
-                &*pubdata_holder,
-                &pubdata_bits,
-            )?;
-
-            *pubdata_holder = packed_pubdata;
-
-            let pubdata_properly_copied = boolean_or(
-                cs.namespace(|| "first chunk or pubdata is copied properly"),
-                &is_first_chunk,
-                &is_equal_pubdata,
-            )?;
-
-            (pubdata_chunk_correct, pubdata_properly_copied)
-        };
-
-        let fee_is_zero = AllocatedNum::equals(
-            cs.namespace(|| "fee is zero for full exit"),
-            &op_data.fee.get_number(),
-            &global_variables.explicit_zero.get_number(),
+        let common_valid = multi_and(
+            cs.namespace(|| "is_common_valid"),
+            &[
+                pubdata_properly_copied,
+                is_pubdata_chunk_correct,
+                fee_is_zero,
+                is_full_exit_operation,
+            ],
         )?;
 
-        let fee_is_zero = Boolean::from(fee_is_zero);
-
-        let is_base_valid = {
-            let mut base_valid_flags = Vec::new();
-
-            vlog::debug!(
-                "is_pubdata_chunk_correct {:?}",
-                is_pubdata_chunk_correct.get_value()
-            );
-            base_valid_flags.push(is_pubdata_chunk_correct);
-            // MUST be true
-            let is_full_exit = Boolean::from(Expression::equals(
-                cs.namespace(|| "is_full_exit"),
-                &global_variables.chunk_data.tx_type.get_number(),
-                Expression::u64::<CS>(u64::from(FullExitOp::OP_CODE)), //full_exit tx code
-            )?);
-
-            base_valid_flags.push(is_full_exit);
-            base_valid_flags.push(pubdata_is_properly_copied);
-            base_valid_flags.push(fee_is_zero);
-            multi_and(cs.namespace(|| "valid base full_exit"), &base_valid_flags)?
-        };
-
-        // SHOULD be true for successful exit
-        let is_address_correct = CircuitElement::equals(
-            cs.namespace(|| "is_address_correct"),
-            &cur.account.address,
-            &op_data.eth_address,
+        let full_amount_equals_to_zero = CircuitElement::equals(
+            cs.namespace(|| "full_amount_equals_to_zero"),
+            &op_data.full_amount,
+            &global_variables.explicit_zero,
         )?;
 
-        // MUST be true for the validity of the first chunk
-        let is_pubdata_amount_valid = {
-            let circuit_pubdata_amount = CircuitElement::conditionally_select_with_number_strict(
-                cs.namespace(|| "pubdata_amount"),
+        let first_chunk_valid = {
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
+
+            let is_initiator_account = CircuitElement::equals(
+                cs.namespace(|| "is_initiator_account"),
+                &op_data.special_accounts[1],
+                &cur.account_id,
+            )?;
+            flags.push(is_initiator_account);
+
+            let is_full_exit_success = CircuitElement::equals(
+                cs.namespace(|| "is_full_exit_success"),
+                &op_data.eth_address,
+                &cur.account.address,
+            )?;
+            let real_full_amount = CircuitElement::conditionally_select_with_number_strict(
+                cs.namespace(|| "real_full_amount"),
                 Expression::constant::<CS>(E::Fr::zero()),
                 &cur.balance,
-                &is_address_correct.not(),
+                &is_full_exit_success.not(),
             )?;
-
-            CircuitElement::equals(
-                cs.namespace(|| "is_pubdata_amount_correct"),
-                &circuit_pubdata_amount,
+            flags.push(CircuitElement::equals(
+                cs.namespace(|| "real_full_amount equals to declared in op_data"),
+                &real_full_amount,
                 &op_data.full_amount,
-            )?
-        };
+            )?);
 
-        // MUST be true for correct op. First chunk is correct and tree update can be executed.
-        let first_chunk_valid = {
-            let flags = vec![
-                is_first_chunk.clone(),
-                is_base_valid.clone(),
-                no_nonce_overflow(
-                    cs.namespace(|| "no nonce overflow"),
-                    &cur.account.nonce.get_number(),
-                )?,
-                is_pubdata_amount_valid,
-            ];
             multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
         };
-
-        // Full exit was a success, update account is the first chunk.
-        let success_account_update = multi_and(
-            cs.namespace(|| "success_account_update"),
-            &[first_chunk_valid.clone(), is_address_correct],
-        )?;
-
-        //mutate current branch if it is first chunk of a successful withdraw transaction
+        let updated_balance = Expression::from(&cur.balance.get_number())
+            - Expression::from(&op_data.full_amount.get_number());
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "mutated balance"),
-            Expression::constant::<CS>(E::Fr::zero()),
+            cs.namespace(|| "updated cur balance"),
+            updated_balance,
             &cur.balance,
-            &success_account_update,
+            &first_chunk_valid,
         )?;
 
-        // Check other chunks
-        let other_chunks_valid = {
-            let flags = vec![is_base_valid, is_first_chunk.not()];
-            multi_and(cs.namespace(|| "other_chunks_valid"), &flags)?
+        let second_chunk_valid = {
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[1].clone()];
+
+            flags.push(is_special_nft_storage_account.clone());
+
+            let is_nft_stored_content_valid = CircuitElement::equals(
+                cs.namespace(|| "is_nft_stored_content_valid"),
+                &nft_content_as_balance,
+                &cur.balance,
+            )?;
+            flags.push(multi_or(
+                cs.namespace(|| "is_nft_content_correct"),
+                &[
+                    full_amount_equals_to_zero.clone(),
+                    is_nft_stored_content_valid,
+                    is_fungible_token.clone(),
+                ],
+            )?);
+
+            multi_and(cs.namespace(|| "second_chunk_valid"), &flags)?
         };
 
-        // MUST be true for correct (successful or not) full exit
-        let tx_valid = multi_or(
-            cs.namespace(|| "tx_valid"),
-            &[first_chunk_valid, other_chunks_valid],
+        let third_chunk_valid = {
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[2].clone()];
+
+            let is_creator_account = CircuitElement::equals(
+                cs.namespace(|| "is_creator_account"),
+                &op_data.special_accounts[0],
+                &cur.account_id,
+            )?;
+            flags.push(is_creator_account);
+
+            let creator_address_valid = CircuitElement::equals(
+                cs.namespace(|| "creator_address_valid"),
+                &op_data.special_eth_addresses[0],
+                &cur.account.address,
+            )?;
+            flags.push(multi_or(
+                cs.namespace(|| "is_creator_address_correct"),
+                &[
+                    full_amount_equals_to_zero,
+                    creator_address_valid,
+                    is_fungible_token.clone(),
+                ],
+            )?);
+
+            multi_and(cs.namespace(|| "third_chunk_valid"), &flags)?
+        };
+
+        let ohs_valid = multi_and(
+            cs.namespace(|| "ohs_valid"),
+            &[
+                common_valid,
+                is_chunk_with_index[0].not(),
+                is_chunk_with_index[1].not(),
+                is_chunk_with_index[2].not(),
+            ],
         )?;
-        Ok(tx_valid)
+
+        multi_or(
+            cs.namespace(|| "is_full_exit_valid"),
+            &[
+                first_chunk_valid,
+                second_chunk_valid,
+                third_chunk_valid,
+                ohs_valid,
+            ],
+        )
     }
 
     fn deposit<CS: ConstraintSystem<E>>(
@@ -1412,7 +1757,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             "pubdata holder has to be preallocated"
         );
 
-        //construct pubdata
+        // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
@@ -1490,7 +1835,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         //keys are same or account is empty
 
         let is_pubkey_correct = Boolean::xor(
-            cs.namespace(|| "keys are same or account is empty"),
+            cs.namespace(|| "keys are same xor account is empty"),
             &is_pub_equal_to_previous,
             &is_account_empty,
         )?;
@@ -1534,6 +1879,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         Ok(tx_valid)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn change_pubkey_offchain<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1547,13 +1893,16 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_a_geq_b: &Boolean,
         is_sig_verified: &Boolean,
         signer_key: &AllocatedSignerPubkey<E>,
+        _is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
             "pubdata holder has to be preallocated"
         );
 
-        //construct pubdata
+        // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
@@ -1571,53 +1920,87 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         );
 
         // Construct serialized tx
-        let mut serialized_tx_bits = vec![];
-
-        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(cur.account_id.get_bits_be());
-        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(ChangePubKeyOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
         assert_eq!(
-            serialized_tx_bits.len(),
+            serialized_tx_bits_version1.len(),
             params::SIGNED_CHANGE_PUBKEY_BIT_WIDTH
         );
 
         // Construct serialized tx
-        let mut serialized_tx_bits_old = vec![];
-
-        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account_id.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.new_pubkey_hash.get_bits_be());
-        serialized_tx_bits_old.extend(cur.token.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
-
+        let mut serialized_tx_bits_old1 = vec![];
+        serialized_tx_bits_old1.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.new_pubkey_hash.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old1.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account.nonce.get_bits_be());
         assert_eq!(
-            serialized_tx_bits_old.len(),
-            params::OLD_SIGNED_CHANGE_PUBKEY_BIT_WIDTH
+            serialized_tx_bits_old1.len(),
+            params::OLD1_SIGNED_CHANGE_PUBKEY_BIT_WIDTH
         );
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
+        // Construct serialized tx
+        let mut serialized_tx_bits_old2 = vec![];
+        serialized_tx_bits_old2.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.new_pubkey_hash.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old2.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old2.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old2.len(),
+            params::OLD2_SIGNED_CHANGE_PUBKEY_BIT_WIDTH
+        );
+
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
-        let is_old_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_old_serialized_tx_correct"),
-            serialized_tx_bits_old,
+
+        let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old1_serialized_tx_correct"),
+            serialized_tx_bits_old1,
             &op_data,
+        )?;
+        is_old1_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
+            &[is_old1_serialized_tx_correct, is_fungible_token.clone()],
+        )?;
+
+        let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old2_serialized_tx_correct"),
+            serialized_tx_bits_old2,
+            &op_data,
+        )?;
+        is_old2_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
+            &[is_old2_serialized_tx_correct, is_fungible_token.clone()],
         )?;
 
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
+            &[
+                is_version1_serialized_tx_correct,
+                is_old1_serialized_tx_correct,
+                is_old2_serialized_tx_correct,
+            ],
         )?;
 
         let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
@@ -1734,6 +2117,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 is_first_chunk,
                 is_pub_nonce_valid,
                 no_nonce_overflow,
+                is_special_nft_token.not(),
             ],
         )?;
 
@@ -1781,7 +2165,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         );
 
         let mut is_valid_flags = vec![];
-        //construct pubdata (it's all 0 for noop)
+        // construct pubdata (it's all 0 for noop)
         let mut pubdata_bits = vec![];
         pubdata_bits.resize(params::CHUNK_BIT_WIDTH, Boolean::constant(false));
 
@@ -1830,6 +2214,597 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn mint_nft<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        is_sig_verified: &Boolean,
+        pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        nft_content_as_balance: &CircuitElement<E>,
+        is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
+    ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+        /*
+        fields specification:
+
+        special:
+        special_eth_addresses = [recipient_address]
+        special_tokens = [fee_token, new_token]
+        special_accounts = [creator_account_id, recipient_account_id]
+        special_content_hash = vector of bits of the content hash
+        special_serial_id = serial_id of the NFT from this creator
+        */
+
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
+        pubdata_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_accounts[1].get_bits_be()); // recipient_account_id = 4 bytes
+        pubdata_bits.extend(
+            op_data
+                .special_content_hash
+                .iter()
+                .map(|bit| bit.get_bits_be())
+                .flatten(),
+        ); // content_hash = 32 bytes
+        pubdata_bits.extend(op_data.special_tokens[0].get_bits_be()); // fee_token = 4 bytes
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be()); // fee = 2 bytes
+        resize_grow_only(
+            &mut pubdata_bits,
+            MintNFTOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        *pubdata_holder = packed_pubdata;
+
+        let is_chunk_with_index: Vec<Boolean> = (0u64..MintNFTOp::CHUNKS as u64)
+            .map(|chunk_index| {
+                Expression::equals(
+                    cs.namespace(|| format!("is_chunk_with_index {}", chunk_index)),
+                    &global_variables.chunk_data.chunk_number,
+                    Expression::u64::<CS>(chunk_index),
+                )
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?
+            .iter()
+            .map(|bit| Boolean::from(bit.clone()))
+            .collect();
+
+        // common valid flags
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_chunk_with_index[0].clone(),
+            &is_equal_pubdata,
+        )?;
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &global_variables.chunk_data.chunk_number,
+            MintNFTOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        let is_mint_nft_operation = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_mint_nft_operation"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(MintNFTOp::OP_CODE)),
+        )?);
+
+        let common_valid = multi_and(
+            cs.namespace(|| "is_common_valid"),
+            &[
+                pubdata_properly_copied,
+                is_pubdata_chunk_correct,
+                is_mint_nft_operation,
+            ],
+        )?;
+
+        // used in first and second chunk
+        let is_creator_account = CircuitElement::equals(
+            cs.namespace(|| "is_creator_account"),
+            &op_data.special_accounts[0],
+            &cur.account_id,
+        )?;
+        // used in fourth and fifth chunk
+        let is_new_token = CircuitElement::equals(
+            cs.namespace(|| "is_new_token"),
+            &op_data.special_tokens[1],
+            &cur.token,
+        )?;
+
+        let first_chunk_valid = {
+            // First chunk should take a fee from creator account and increment nonce.
+            // Here will be checked signature of the creator.
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
+
+            let mut serialized_tx_bits_version1 = vec![];
+            serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(MintNFTOp::OP_CODE)); // reversed_tx_type
+            serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION)); // signature scheme identificator
+            serialized_tx_bits_version1.extend(op_data.special_accounts[0].get_bits_be()); // creator_id
+            serialized_tx_bits_version1.extend(cur.account.address.get_bits_be()); // creator_address
+            serialized_tx_bits_version1.extend(
+                op_data
+                    .special_content_hash
+                    .iter()
+                    .map(|bit| bit.get_bits_be())
+                    .flatten(),
+            ); // content_hash
+            serialized_tx_bits_version1.extend(op_data.special_eth_addresses[0].get_bits_be()); // recipient_address
+            serialized_tx_bits_version1.extend(cur.token.get_bits_be()); // fee token
+            serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be()); // fee
+            serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be()); // nonce
+            assert_eq!(serialized_tx_bits_version1.len(), SIGNED_MINT_NFT_BIT_WIDTH);
+
+            let is_serialized_tx_correct = verify_signature_message_construction(
+                cs.namespace(|| "is_serialized_tx_correct"),
+                serialized_tx_bits_version1,
+                &op_data,
+            )?;
+            flags.push(is_serialized_tx_correct);
+            let is_signer_valid = CircuitElement::equals(
+                cs.namespace(|| "signer_key_correct"),
+                &signer_key.pubkey.get_hash(),
+                &cur.account.pub_key_hash,
+            )?;
+            flags.push(is_signer_valid);
+            flags.push(is_sig_verified.clone());
+
+            flags.push(is_creator_account.clone());
+            // We should enforce that fee_token value that is used in pubdata (op_data.special_tokens[0])
+            // is equal to the token used in the first chunk and signed by the creator
+            let is_fee_token = CircuitElement::equals(
+                cs.namespace(|| "is_fee_token"),
+                &op_data.special_tokens[0],
+                &cur.token,
+            )?;
+            flags.push(is_fee_token);
+            flags.push(is_special_nft_token.not());
+
+            let is_a_correct =
+                CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+            let is_b_correct =
+                CircuitElement::equals(cs.namespace(|| "is_b_correct"), &op_data.b, &op_data.fee)?;
+            flags.push(is_a_correct);
+            flags.push(is_b_correct);
+            flags.push(is_a_geq_b.clone());
+            flags.push(no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?);
+
+            multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
+        };
+        let updated_nonce_first_chunk =
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
+        let updated_balance_first_chunk = Expression::from(&cur.balance.get_number())
+            - Expression::from(&op_data.fee.get_number());
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce (first chunk)"),
+            updated_nonce_first_chunk,
+            &cur.account.nonce,
+            &first_chunk_valid,
+        )?;
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (first chunk)"),
+            updated_balance_first_chunk,
+            &cur.balance,
+            &first_chunk_valid,
+        )?;
+
+        let second_chunk_valid = {
+            // Second chunk should enforce the validity of serial_id of creator account.
+            // Also here serial_id counter of the creator account will be incremented.
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[1].clone()];
+
+            flags.push(is_creator_account);
+            flags.push(is_special_nft_token.clone());
+            let valid_serial_id = CircuitElement::equals(
+                cs.namespace(|| "valid_serial_id"),
+                &op_data.special_serial_id,
+                &cur.balance,
+            )?;
+            flags.push(valid_serial_id);
+
+            multi_and(cs.namespace(|| "second_chunk_valid"), &flags)?
+        };
+        let updated_balance_second_chunk =
+            Expression::from(&cur.balance.get_number()) + Expression::u64::<CS>(1);
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (second chunk)"),
+            updated_balance_second_chunk,
+            &cur.balance,
+            &second_chunk_valid,
+        )?;
+
+        let third_chunk_valid = {
+            // Third chunk should enforce the validity of new_token_id value.
+            // Also here nft counter of the special account will be incremented.
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[2].clone()];
+
+            flags.push(is_special_nft_storage_account.clone());
+            flags.push(is_special_nft_token.clone());
+            let is_new_token_id_valid = CircuitElement::equals(
+                cs.namespace(|| "is_new_token_id_valid"),
+                &op_data.special_tokens[1],
+                &cur.balance,
+            )?;
+            flags.push(is_new_token_id_valid);
+
+            multi_and(cs.namespace(|| "third_chunk_valid"), &flags)?
+        };
+        let updated_balance_third_chunk =
+            Expression::from(&cur.balance.get_number()) + Expression::u64::<CS>(1);
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (third chunk)"),
+            updated_balance_third_chunk,
+            &cur.balance,
+            &third_chunk_valid,
+        )?;
+
+        let fourth_chunk_valid = {
+            // Fourth chunk should store nft content to the corresponding leaf of the special account.
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[3].clone()];
+
+            flags.push(is_special_nft_storage_account.clone());
+            flags.push(is_new_token.clone());
+            flags.push(is_special_nft_token.not()); // all possible NFT slots are filled
+
+            multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
+        };
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (fourth chunk)"),
+            Expression::from(&nft_content_as_balance.get_number()),
+            &cur.balance,
+            &fourth_chunk_valid,
+        )?;
+
+        let fifth_chunk_valid = {
+            // Fifth chunk should increment the balance of the recipient.
+            let mut flags = vec![common_valid, is_chunk_with_index[4].clone()];
+
+            let is_recipient_account = CircuitElement::equals(
+                cs.namespace(|| "is_recipient_account"),
+                &op_data.special_accounts[1],
+                &cur.account_id,
+            )?;
+            flags.push(is_recipient_account);
+            flags.push(is_special_nft_storage_account.not());
+            let is_recipient_address = CircuitElement::equals(
+                cs.namespace(|| "is_recipient_address"),
+                &op_data.special_eth_addresses[0],
+                &cur.account.address,
+            )?;
+            flags.push(is_recipient_address);
+            flags.push(is_new_token);
+            flags.push(is_account_empty.not());
+
+            multi_and(cs.namespace(|| "fifth_chunk_valid"), &flags)?
+        };
+        let updated_balance_fifth_chunk =
+            Expression::from(&cur.balance.get_number()) + Expression::u64::<CS>(1);
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (fifth chunk)"),
+            updated_balance_fifth_chunk,
+            &cur.balance,
+            &fifth_chunk_valid,
+        )?;
+
+        multi_or(
+            cs.namespace(|| "is_mintNFT_valid"),
+            &[
+                first_chunk_valid,
+                second_chunk_valid,
+                third_chunk_valid,
+                fourth_chunk_valid,
+                fifth_chunk_valid,
+            ],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn withdraw_nft<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+        is_a_geq_b: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
+        is_sig_verified: &Boolean,
+        pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        nft_content_as_balance: &CircuitElement<E>,
+        is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
+    ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+        /*
+        fields specification:
+        eth_address = to_address
+
+        special:
+        special_eth_addresses = [creator_address]
+        special_tokens = [fee_token, token]
+        special_accounts = [creator_account_id, initiator_account_id]
+        special_content_hash = vector of bits of the content hash
+        special_serial_id = serial_id of the NFT from this creator
+        */
+
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
+        pubdata_bits.extend(op_data.special_accounts[1].get_bits_be()); // initiator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // creator_address = 20 bytes
+        pubdata_bits.extend(op_data.special_serial_id.get_bits_be()); // serial_id = 4 bytes
+        pubdata_bits.extend(
+            op_data
+                .special_content_hash
+                .iter()
+                .map(|bit| bit.get_bits_be())
+                .flatten(),
+        ); // content_hash = 32 bytes
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); // to_address = 20 bytes
+        pubdata_bits.extend(op_data.special_tokens[1].get_bits_be()); // token = 4 bytes
+        pubdata_bits.extend(op_data.special_tokens[0].get_bits_be()); // fee_token = 4 bytes
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be()); // fee = 2 bytes
+        resize_grow_only(
+            &mut pubdata_bits,
+            WithdrawNFTOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        *pubdata_holder = packed_pubdata;
+
+        let is_chunk_with_index: Vec<Boolean> = (0..4)
+            .map(|chunk_index| {
+                Expression::equals(
+                    cs.namespace(|| format!("is_chunk_with_index {}", chunk_index)),
+                    &global_variables.chunk_data.chunk_number,
+                    Expression::u64::<CS>(chunk_index as u64),
+                )
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?
+            .iter()
+            .map(|bit| Boolean::from(bit.clone()))
+            .collect();
+
+        // common valid flags
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_chunk_with_index[0].clone(),
+            &is_equal_pubdata,
+        )?;
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &global_variables.chunk_data.chunk_number,
+            WithdrawNFTOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        let is_withdraw_nft_operation = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_withdraw_nft_operation"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(WithdrawNFTOp::OP_CODE)),
+        )?);
+
+        let common_valid = multi_and(
+            cs.namespace(|| "is_common_valid"),
+            &[
+                pubdata_properly_copied,
+                is_pubdata_chunk_correct,
+                is_withdraw_nft_operation,
+                is_valid_timestamp.clone(),
+            ],
+        )?;
+
+        // used in first and second chunk
+        let is_initiator_account = CircuitElement::equals(
+            cs.namespace(|| "is_initiator_account"),
+            &op_data.special_accounts[1],
+            &cur.account_id,
+        )?;
+        // used in second and third chunk
+        let is_token_to_withdraw = CircuitElement::equals(
+            cs.namespace(|| "is_token_to_withdraw"),
+            &op_data.special_tokens[1],
+            &cur.token,
+        )?;
+
+        let first_chunk_valid = {
+            // First chunk should take a fee from initiator account and increment nonce.
+            // Here will be checked signature of the initiator.
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
+
+            let mut serialized_tx_bits_version1 = vec![];
+            serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(WithdrawNFTOp::OP_CODE)); // reversed_tx_type
+            serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION)); // signature scheme identificator
+            serialized_tx_bits_version1.extend(op_data.special_accounts[1].get_bits_be()); // initiator_id
+            serialized_tx_bits_version1.extend(cur.account.address.get_bits_be()); // initiator_address
+            serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be()); // to_address
+            serialized_tx_bits_version1.extend(op_data.special_tokens[1].get_bits_be()); // token
+            serialized_tx_bits_version1.extend(cur.token.get_bits_be()); // fee_token
+            serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be()); // fee
+            serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be()); // nonce
+            serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be()); // valid_from
+            serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be()); // valid_until
+            assert_eq!(
+                serialized_tx_bits_version1.len(),
+                SIGNED_WITHDRAW_NFT_BIT_WIDTH
+            );
+
+            let is_serialized_tx_correct = verify_signature_message_construction(
+                cs.namespace(|| "is_serialized_tx_correct"),
+                serialized_tx_bits_version1,
+                &op_data,
+            )?;
+            flags.push(is_serialized_tx_correct);
+            let is_signer_valid = CircuitElement::equals(
+                cs.namespace(|| "signer_key_correct"),
+                &signer_key.pubkey.get_hash(),
+                &cur.account.pub_key_hash,
+            )?;
+            flags.push(is_signer_valid);
+            flags.push(is_sig_verified.clone());
+
+            flags.push(is_initiator_account.clone());
+            // We should enforce that fee_token value that is used in pubdata (op_data.special_tokens[0])
+            // is equal to the token used in the first chunk and signed by the creator
+            let is_fee_token = CircuitElement::equals(
+                cs.namespace(|| "is_fee_token"),
+                &op_data.special_tokens[0],
+                &cur.token,
+            )?;
+            flags.push(is_fee_token);
+            flags.push(is_special_nft_token.not());
+
+            let is_a_correct =
+                CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+            let is_b_correct =
+                CircuitElement::equals(cs.namespace(|| "is_b_correct"), &op_data.b, &op_data.fee)?;
+            flags.push(is_a_correct);
+            flags.push(is_b_correct);
+            flags.push(is_a_geq_b.clone());
+            flags.push(no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?);
+
+            multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
+        };
+        let updated_nonce_first_chunk =
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
+        let updated_balance_first_chunk = Expression::from(&cur.balance.get_number())
+            - Expression::from(&op_data.fee.get_number());
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce (first chunk)"),
+            updated_nonce_first_chunk,
+            &cur.account.nonce,
+            &first_chunk_valid,
+        )?;
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (first chunk)"),
+            updated_balance_first_chunk,
+            &cur.balance,
+            &first_chunk_valid,
+        )?;
+
+        let second_chunk_valid = {
+            // Second chunk should nullify the balance of the initiator.
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[1].clone()];
+
+            flags.push(is_initiator_account);
+            flags.push(is_token_to_withdraw.clone());
+            let is_balance_valid = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_balance_valid"),
+                &cur.balance.get_number(),
+                Expression::u64::<CS>(1),
+            )?);
+            flags.push(is_balance_valid);
+
+            multi_and(cs.namespace(|| "second_chunk_valid"), &flags)?
+        };
+        let updated_balance_second_chunk = Expression::u64::<CS>(0);
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (second chunk)"),
+            updated_balance_second_chunk,
+            &cur.balance,
+            &second_chunk_valid,
+        )?;
+
+        let third_chunk_valid = {
+            // Third chunk should enforce the validity of creator account id and content hash values.
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[2].clone()];
+
+            flags.push(is_special_nft_storage_account.clone());
+            flags.push(is_token_to_withdraw);
+            let stored_content_valid = CircuitElement::equals(
+                cs.namespace(|| "stored_content_valid"),
+                &nft_content_as_balance,
+                &cur.balance,
+            )?;
+            flags.push(stored_content_valid);
+
+            multi_and(cs.namespace(|| "third_chunk_valid"), &flags)?
+        };
+
+        let fourth_chunk_valid = {
+            // Fourth chunk should enforce the validity of creator account address.
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[3].clone()];
+
+            let is_creator_account = CircuitElement::equals(
+                cs.namespace(|| "is_creator_account"),
+                &op_data.special_accounts[0],
+                &cur.account_id,
+            )?;
+            flags.push(is_creator_account);
+            let creator_address_valid = CircuitElement::equals(
+                cs.namespace(|| "creator_address_valid"),
+                &op_data.special_eth_addresses[0],
+                &cur.account.address,
+            )?;
+            flags.push(creator_address_valid);
+
+            multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
+        };
+
+        let ohs_valid = multi_and(
+            cs.namespace(|| "ohs_valid"),
+            &[
+                common_valid,
+                is_chunk_with_index[0].not(),
+                is_chunk_with_index[1].not(),
+                is_chunk_with_index[2].not(),
+                is_chunk_with_index[3].not(),
+            ],
+        )?;
+
+        multi_or(
+            cs.namespace(|| "is_withdrawNFT_valid"),
+            &[
+                first_chunk_valid,
+                second_chunk_valid,
+                third_chunk_valid,
+                fourth_chunk_valid,
+                ohs_valid,
+            ],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn transfer_to_new<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1845,6 +2820,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -1874,39 +2852,56 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         *pubdata_holder = packed_pubdata;
 
         // construct signature message preimage (serialized_tx)
-        let mut serialized_tx_bits = vec![];
-        let tx_code = CircuitElement::from_fe_with_known_length(
-            cs.namespace(|| "transfer_to_new_code_ce"),
-            || Ok(E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap()),
-            8,
-        )?; //we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
-        tx_code.get_number().assert_number(
-            cs.namespace(|| "tx code is constant TransferOp"),
-            &E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap(),
-        )?;
+        // we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
 
-        serialized_tx_bits.extend(tx_code.get_bits_be());
-        serialized_tx_bits.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(TransferOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_version1.len(),
+            params::SIGNED_TRANSFER_BIT_WIDTH
+        );
 
-        let mut serialized_tx_bits_old = vec![];
-        serialized_tx_bits_old.extend(tx_code.get_bits_be());
-        serialized_tx_bits_old.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits_old.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.eth_address.get_bits_be());
-        serialized_tx_bits_old.extend(cur.token.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.amount_packed.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
-        assert_eq!(serialized_tx_bits_old.len(), OLD_SIGNED_TRANSFER_BIT_WIDTH);
+        let mut serialized_tx_bits_old1 = vec![];
+        serialized_tx_bits_old1.extend(u8_into_bits_be(TransferOp::OP_CODE));
+        serialized_tx_bits_old1.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_old1.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.eth_address.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old1.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old1.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old1.len(),
+            params::OLD1_SIGNED_TRANSFER_BIT_WIDTH
+        );
+
+        let mut serialized_tx_bits_old2 = vec![];
+        serialized_tx_bits_old2.extend(u8_into_bits_be(TransferOp::OP_CODE));
+        serialized_tx_bits_old2.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_old2.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.eth_address.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old2.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old2.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old2.len(),
+            params::OLD2_SIGNED_TRANSFER_BIT_WIDTH
+        );
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -1965,20 +2960,39 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
-            &op_data,
-        )?;
-        let is_old_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_old_serialized_tx_correct"),
-            serialized_tx_bits_old,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
 
+        let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old1_serialized_tx_correct"),
+            serialized_tx_bits_old1,
+            &op_data,
+        )?;
+        is_old1_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
+            &[is_old1_serialized_tx_correct, is_fungible_token.clone()],
+        )?;
+
+        let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old2_serialized_tx_correct"),
+            serialized_tx_bits_old2,
+            &op_data,
+        )?;
+        is_old2_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
+            &[is_old2_serialized_tx_correct, is_fungible_token.clone()],
+        )?;
+
         let is_serialized_tx_correct = multi_or(
-            cs.namespace(|| "old_or_new_signature_correct"),
-            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
+            cs.namespace(|| "is_serialized_tx_correct"),
+            &[
+                is_version1_serialized_tx_correct,
+                is_old1_serialized_tx_correct,
+                is_old2_serialized_tx_correct,
+            ],
         )?;
 
         vlog::debug!(
@@ -2059,6 +3073,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             is_valid_timestamp.clone(),
             is_account_empty.clone(),
             pubdata_properly_copied.clone(),
+            is_special_nft_storage_account.not(),
+            is_special_nft_token.not(),
         ];
         let rhs_valid = multi_and(cs.namespace(|| "rhs_valid"), &rhs_valid_flags)?;
 
@@ -2097,6 +3113,657 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn swap<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
+        is_sig_verified: &Boolean,
+        pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
+    ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+        /*
+        fields specification:
+
+        special_eth_addresses = [recipient_0_address, recipient_1_address]
+        special_tokens = [order_0_sell_token, order_1_sell_token, fee_token]
+        special_accounts = [order_0_sell_amount, order_1_sell_amount]
+        special_prices = [order_0_sell_price, order_0_buy_price, order_1_sell_price, order_1_buy_price]
+        special_nonces = [account_0_nonce, account_1_nonce, submitter_nonce]
+        */
+
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        pubdata_bits.extend(
+            op_data
+                .special_accounts
+                .iter()
+                .map(|acc| acc.get_bits_be())
+                .flatten(),
+        );
+        pubdata_bits.extend(
+            op_data
+                .special_tokens
+                .iter()
+                .map(|tok| tok.get_bits_be())
+                .flatten(),
+        );
+        pubdata_bits.extend(op_data.amount_packed.get_bits_be());
+        pubdata_bits.extend(op_data.second_amount_packed.get_bits_be());
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+
+        let zero = Expression::constant::<CS>(E::Fr::zero());
+        let one = Expression::constant::<CS>(E::Fr::one());
+
+        let nonce_inc_0 = Expression::select_ifeq(
+            cs.namespace(|| "nonce increment 0"),
+            &op_data.special_amounts_unpacked[0].get_number(),
+            Expression::u64::<CS>(0u64),
+            zero.clone(),
+            one.clone(),
+        )?;
+
+        let nonce_inc_1 = Expression::select_ifeq(
+            cs.namespace(|| "nonce increment 1"),
+            &op_data.special_amounts_unpacked[1].get_number(),
+            Expression::u64::<CS>(0u64),
+            zero.clone(),
+            one.clone(),
+        )?;
+
+        let nonce_mask = {
+            let double_nonce_inc_1 =
+                nonce_inc_1.add(cs.namespace(|| "double nonce_inc_1"), &nonce_inc_1)?;
+            let nonce_mask = nonce_inc_0.add(cs.namespace(|| "nonce mask"), &double_nonce_inc_1)?;
+            CircuitElement::from_fe_with_known_length(
+                cs.namespace(|| "nonce mask construction"),
+                || nonce_mask.get_value().grab(),
+                8,
+            )?
+        };
+
+        pubdata_bits.extend(nonce_mask.get_bits_be());
+
+        resize_grow_only(
+            &mut pubdata_bits,
+            SwapOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        *pubdata_holder = packed_pubdata;
+
+        // construct signature message preimage (serialized_tx)
+
+        let mut serialized_order_bits_0 = vec![];
+        let mut serialized_order_bits_1 = vec![];
+        let mut serialized_tx_bits_version1 = vec![];
+
+        let order_type = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "order message type"),
+            || Ok(E::Fr::from_str(&Order::MSG_TYPE.to_string()).unwrap()),
+            8,
+        )?;
+
+        serialized_order_bits_0.extend(order_type.get_bits_be());
+        serialized_order_bits_0.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_order_bits_0.extend(op_data.special_accounts[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_eth_addresses[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_nonces[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_tokens[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_tokens[1].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_prices[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_prices[1].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_amounts_packed[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.valid_from.get_bits_be());
+        serialized_order_bits_0.extend(op_data.valid_until.get_bits_be());
+
+        serialized_order_bits_1.extend(order_type.get_bits_be());
+        serialized_order_bits_1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_order_bits_1.extend(op_data.special_accounts[2].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_eth_addresses[1].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_nonces[1].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_tokens[1].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_tokens[0].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_prices[2].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_prices[3].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_amounts_packed[1].get_bits_be());
+        serialized_order_bits_1.extend(op_data.second_valid_from.get_bits_be());
+        serialized_order_bits_1.extend(op_data.second_valid_until.get_bits_be());
+
+        let mut orders_bits = Vec::with_capacity(serialized_order_bits_0.len() * 2);
+        orders_bits.extend_from_slice(&serialized_order_bits_0);
+        orders_bits.extend_from_slice(&serialized_order_bits_1);
+
+        let result_orders_hash = rescue_hash_allocated_bits(
+            cs.namespace(|| "hash orders"),
+            self.rescue_params,
+            &orders_bits,
+        )?;
+
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(SwapOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(op_data.special_accounts[4].get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.special_nonces[2].get_bits_be());
+        serialized_tx_bits_version1.extend(result_orders_hash);
+        serialized_tx_bits_version1.extend(op_data.special_tokens[2].get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.second_amount_packed.get_bits_be());
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &global_variables.chunk_data.chunk_number,
+            SwapOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_correct"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+
+        let is_swap = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_swap"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(SwapOp::OP_CODE)), // swap tx_type
+        )?);
+
+        let is_chunk_number = (0..SwapOp::CHUNKS as u64)
+            .map(|num| {
+                Ok(Boolean::from(Expression::equals(
+                    cs.namespace(|| format!("is chunk number {}", num)),
+                    &global_variables.chunk_data.chunk_number,
+                    Expression::u64::<CS>(num),
+                )?))
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+        let is_first_part = boolean_or(
+            cs.namespace(|| "is first part"),
+            &is_chunk_number[0],
+            &is_chunk_number[1],
+        )?;
+
+        let is_second_part = boolean_or(
+            cs.namespace(|| "is second part"),
+            &is_chunk_number[2],
+            &is_chunk_number[3],
+        )?;
+
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_chunk_number[0],
+            &is_equal_pubdata,
+        )?;
+
+        // nonce enforcement
+        // order in special_nonces: account0, account1, submitter
+        // order in chunks:         account0, recipient1, account1, recipient0, submitter
+        let is_nonce_correct_in_slot = (0..3)
+            .map(|num| {
+                let nonce_correct = CircuitElement::equals(
+                    cs.namespace(|| format!("is_nonce_correct_in_slot {}", num)),
+                    &cur.account.nonce,
+                    &op_data.special_nonces[num],
+                )?;
+                Boolean::and(
+                    cs.namespace(|| format!("is nonce is correct in chunk {}", num * 2)),
+                    &nonce_correct,
+                    &is_chunk_number[num * 2],
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let is_nonce_correct = multi_or(
+            cs.namespace(|| "is_nonce_correct"),
+            &is_nonce_correct_in_slot,
+        )?;
+
+        // account id enforcement
+        // order in special accounts: account0, recipient0, account1, recipient1, submitter
+        // order in chunks:           account0, recipient1, account1, recipient0, submitter
+        let is_account_id_correct_in_slot = (0..5)
+            .map(|num| {
+                let permutation = [0, 3, 2, 1, 4];
+                let account_id_correct = CircuitElement::equals(
+                    cs.namespace(|| format!("is_account_id_correct_in_slot {}", num)),
+                    &cur.account_id,
+                    &op_data.special_accounts[num],
+                )?;
+                Boolean::and(
+                    cs.namespace(|| format!("is account id correct in chunk {}", permutation[num])),
+                    &account_id_correct,
+                    &is_chunk_number[permutation[num]],
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let is_account_id_correct = multi_or(
+            cs.namespace(|| "is_account_id_correct"),
+            &is_account_id_correct_in_slot,
+        )?;
+
+        // token enforcement
+        // order in special_tokens: token_sell, token_buy, fee_token
+        // order in chunks:         token_sell, token_sell, token_buy, token_buy, fee_token
+        let is_token_correct_in_chunk = (0..5)
+            .map(|num| {
+                let token_correct = CircuitElement::equals(
+                    cs.namespace(|| format!("is_token_correct_in_slot {}", num)),
+                    &cur.token,
+                    &op_data.special_tokens[num / 2],
+                )?;
+                Boolean::and(
+                    cs.namespace(|| format!("is token correct in chunk {}", num)),
+                    &token_correct,
+                    &is_chunk_number[num],
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let is_token_correct = multi_or(
+            cs.namespace(|| "is_token_correct"),
+            &is_token_correct_in_chunk,
+        )?;
+
+        let is_submitter_address_correct = {
+            let is_correct = CircuitElement::equals(
+                cs.namespace(|| "is_submitter_address_correct"),
+                &cur.account.address,
+                &op_data.eth_address,
+            )?;
+
+            boolean_or(
+                cs.namespace(|| "is_submitter_address_correct_in_last_chunk"),
+                &is_correct,
+                &is_chunk_number[4].not(),
+            )?
+        };
+
+        let is_recipient_0_address_correct = {
+            let is_correct = CircuitElement::equals(
+                cs.namespace(|| "is_recipient_0_address_correct"),
+                &cur.account.address,
+                &op_data.special_eth_addresses[0],
+            )?;
+
+            boolean_or(
+                cs.namespace(|| "is_recipient_0_address_correct_in_fourth_chunk"),
+                &is_correct,
+                &is_chunk_number[3].not(),
+            )?
+        };
+
+        let is_recipient_1_address_correct = {
+            let is_correct = CircuitElement::equals(
+                cs.namespace(|| "is_recipient_1_address_correct"),
+                &cur.account.address,
+                &op_data.special_eth_addresses[1],
+            )?;
+
+            boolean_or(
+                cs.namespace(|| "is_recipient_1_address_correct_in_second_chunk"),
+                &is_correct,
+                &is_chunk_number[1].not(),
+            )?
+        };
+
+        let is_a_correct =
+            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+
+        let amount_unpacked = CircuitElement::conditionally_select(
+            cs.namespace(|| "swapped amount"),
+            &op_data.amount_unpacked,
+            &op_data.second_amount_unpacked,
+            &is_first_part,
+        )?;
+
+        let actual_b = CircuitElement::conditionally_select(
+            cs.namespace(|| "b"),
+            &op_data.fee,
+            &amount_unpacked,
+            &is_chunk_number[4],
+        )?;
+
+        let is_b_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b.get_number(),
+            &actual_b.get_number(),
+        )?);
+
+        let are_swapped_tokens_different = CircuitElement::equals(
+            cs.namespace(|| "swapped tokens equal"),
+            &op_data.special_tokens[0],
+            &op_data.special_tokens[1],
+        )?
+        .not();
+
+        let are_swapping_accounts_different = CircuitElement::equals(
+            cs.namespace(|| "swapping accounts equal"),
+            &op_data.special_accounts[0],
+            &op_data.special_accounts[2],
+        )?
+        .not();
+
+        let is_amount_valid = {
+            let is_amount_explicit = CircuitElement::equals(
+                cs.namespace(|| "is first amount explicit"),
+                &op_data.special_amounts_unpacked[0],
+                &op_data.amount_unpacked,
+            )?;
+            let is_amount_implicit = CircuitElement::equals(
+                cs.namespace(|| "is first amount implicit"),
+                &op_data.special_amounts_unpacked[0],
+                &global_variables.explicit_zero,
+            )?;
+            boolean_or(
+                cs.namespace(|| "is first amount valid"),
+                &is_amount_explicit,
+                &is_amount_implicit,
+            )?
+        };
+
+        let is_second_amount_valid = {
+            let is_amount_explicit = CircuitElement::equals(
+                cs.namespace(|| "is second amount explicit"),
+                &op_data.special_amounts_unpacked[1],
+                &op_data.second_amount_unpacked,
+            )?;
+            let is_amount_implicit = CircuitElement::equals(
+                cs.namespace(|| "is second amount implicit"),
+                &op_data.special_amounts_unpacked[1],
+                &global_variables.explicit_zero,
+            )?;
+            boolean_or(
+                cs.namespace(|| "is second amount valid"),
+                &is_amount_explicit,
+                &is_amount_implicit,
+            )?
+        };
+
+        // check that both prices are valid
+        // Swap.amountA * Swap.orderA.price.buy <= Swap.amountB * Swap.orderA.price.sell
+        // Swap.amountB * Swap.orderB.price.buy <= Swap.amountA * Swap.orderB.price.sell
+        let is_first_price_ok = {
+            let amount_bought = {
+                let amount = op_data.amount_unpacked.get_number().mul(
+                    cs.namespace(|| "amountA * orderA.price_buy"),
+                    &op_data.special_prices[1].get_number(),
+                )?;
+                CircuitElement::from_number_with_known_length(
+                    cs.namespace(|| "amount bought - first order"),
+                    amount,
+                    params::BALANCE_BIT_WIDTH + params::PRICE_BIT_WIDTH,
+                )?
+            };
+
+            let amount_sold = {
+                let amount = op_data.second_amount_unpacked.get_number().mul(
+                    cs.namespace(|| "amountB * orderA.price_sell"),
+                    &op_data.special_prices[0].get_number(),
+                )?;
+                CircuitElement::from_number_with_known_length(
+                    cs.namespace(|| "amount sold - first order"),
+                    amount,
+                    params::BALANCE_BIT_WIDTH + params::PRICE_BIT_WIDTH,
+                )?
+            };
+
+            CircuitElement::less_than_fixed(
+                cs.namespace(|| "sold < bought (first order)"),
+                &amount_sold,
+                &amount_bought,
+            )?
+            .not()
+        };
+
+        let is_second_price_ok = {
+            let amount_bought = {
+                let amount = op_data.second_amount_unpacked.get_number().mul(
+                    cs.namespace(|| "amountB * orderB.price_buy"),
+                    &op_data.special_prices[3].get_number(),
+                )?;
+                CircuitElement::from_number_with_known_length(
+                    cs.namespace(|| "amount bought - second order"),
+                    amount,
+                    params::BALANCE_BIT_WIDTH + params::PRICE_BIT_WIDTH,
+                )?
+            };
+
+            let amount_sold = {
+                let amount = op_data.amount_unpacked.get_number().mul(
+                    cs.namespace(|| "amountA * orderB.price_sell"),
+                    &op_data.special_prices[2].get_number(),
+                )?;
+                CircuitElement::from_number_with_known_length(
+                    cs.namespace(|| "amount sold - second order"),
+                    amount,
+                    params::BALANCE_BIT_WIDTH + params::PRICE_BIT_WIDTH,
+                )?
+            };
+
+            CircuitElement::less_than_fixed(
+                cs.namespace(|| "sold < bought (second order)"),
+                &amount_sold,
+                &amount_bought,
+            )?
+            .not()
+        };
+
+        let common_valid_flag = multi_and(
+            cs.namespace(|| "common_valid_flags"),
+            &[
+                is_pubdata_chunk_correct,
+                is_swap,
+                is_valid_timestamp.clone(),
+                pubdata_properly_copied,
+                is_account_id_correct,
+                is_token_correct,
+                is_submitter_address_correct,
+                is_recipient_0_address_correct,
+                is_recipient_1_address_correct,
+                are_swapped_tokens_different,
+                are_swapping_accounts_different,
+                is_amount_valid,
+                is_second_amount_valid,
+                is_first_price_ok,
+                is_second_price_ok,
+                is_special_nft_token.not(),
+            ],
+        )?;
+
+        let is_lhs_chunk = multi_or(
+            cs.namespace(|| "is lhs chunk"),
+            &[
+                is_chunk_number[0].clone(),
+                is_chunk_number[2].clone(),
+                is_chunk_number[4].clone(),
+            ],
+        )?;
+
+        let is_rhs_chunk = boolean_or(
+            cs.namespace(|| "is rhs chunk"),
+            &is_chunk_number[1],
+            &is_chunk_number[3],
+        )?;
+
+        let is_serialized_swap_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_swap_correct"),
+            serialized_tx_bits_version1,
+            &op_data,
+        )?;
+
+        let is_serialized_order_0_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_order_0_correct"),
+            serialized_order_bits_0,
+            &op_data,
+        )?;
+
+        let is_serialized_order_1_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_order_1_correct"),
+            serialized_order_bits_1,
+            &op_data,
+        )?;
+
+        let correct_messages_in_corresponding_chunks = &[
+            Boolean::and(
+                cs.namespace(|| "serialized order 0 in first part of the swap"),
+                &is_first_part,
+                &is_serialized_order_0_correct,
+            )?,
+            Boolean::and(
+                cs.namespace(|| "serialized order 1 in second part of the swap"),
+                &is_second_part,
+                &is_serialized_order_1_correct,
+            )?,
+            Boolean::and(
+                cs.namespace(|| "whole swap serialized in last part of the swap"),
+                &is_chunk_number[4],
+                &is_serialized_swap_correct,
+            )?,
+        ];
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            correct_messages_in_corresponding_chunks,
+        )?;
+
+        let is_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "signer_key_correct"),
+            &signer_key.pubkey.get_hash(),
+            &cur.account.pub_key_hash,
+        )?;
+
+        let lhs_valid_flags = vec![
+            common_valid_flag.clone(),
+            is_a_correct,
+            is_b_correct,
+            is_a_geq_b.clone(),
+            is_sig_verified.clone(),
+            is_nonce_correct,
+            is_lhs_chunk,
+            is_serialized_tx_correct,
+            is_signer_valid,
+            no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?,
+        ];
+
+        let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
+
+        let updated_balance =
+            Expression::from(&cur.balance.get_number()) - Expression::from(&actual_b.get_number());
+
+        let nonce_inc = Expression::conditionally_select(
+            cs.namespace(|| "nonce increment"),
+            &nonce_inc_0,
+            &nonce_inc_1,
+            &is_first_part,
+        )?;
+
+        let nonce_inc = Expression::conditionally_select(
+            cs.namespace(|| "nonce increment for submitter always 1"),
+            one,
+            Expression::from(&nonce_inc),
+            &is_chunk_number[4],
+        )?;
+
+        let sender_is_submitter = CircuitElement::equals(
+            cs.namespace(|| "is account sender == submitter"),
+            &cur.account_id,
+            &op_data.special_accounts[4],
+        )?;
+
+        // if submitter == account_0 or account_1 then
+        // don't increment nonce for this account
+        let nonce_inc = {
+            let sender_is_submitter_and_not_last_chunk = Boolean::and(
+                cs.namespace(|| "sender == submitter and we are not in the last chunk"),
+                &sender_is_submitter,
+                &is_chunk_number[4].not(),
+            )?;
+            Expression::conditionally_select(
+                cs.namespace(|| "nonce increment is 0 if account == submitter (for account)"),
+                zero,
+                Expression::from(&nonce_inc),
+                &sender_is_submitter_and_not_last_chunk,
+            )?
+        };
+
+        let updated_nonce =
+            Expression::from(&cur.account.nonce.get_number()) + Expression::from(&nonce_inc);
+
+        //update cur values if lhs is valid
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            updated_nonce,
+            &cur.account.nonce,
+            &lhs_valid,
+        )?;
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance"),
+            updated_balance,
+            &cur.balance,
+            &lhs_valid,
+        )?;
+
+        // rhs
+        let rhs_valid = multi_and(
+            cs.namespace(|| "is_rhs_valid"),
+            &[
+                common_valid_flag,
+                is_account_empty.not(),
+                is_rhs_chunk,
+                is_special_nft_storage_account.not(),
+            ],
+        )?;
+
+        // calculate new rhs balance value
+        let updated_balance = Expression::from(&cur.balance.get_number())
+            + Expression::from(&amount_unpacked.get_number());
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated_balance rhs"),
+            updated_balance,
+            &cur.balance,
+            &rhs_valid,
+        )?;
+
+        // Either LHS xor RHS are correct (due to chunking at least)
+        let correct = Boolean::xor(
+            cs.namespace(|| "lhs_valid XOR rhs_valid"),
+            &lhs_valid,
+            &rhs_valid,
+        )?;
+
+        Ok(correct)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn transfer<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -2112,6 +3779,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -2142,32 +3812,51 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         *pubdata_holder = packed_pubdata;
 
         // construct signature message preimage (serialized_tx)
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(TransferOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(serialized_tx_bits_version1.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
-        let mut serialized_tx_bits = vec![];
+        let mut serialized_tx_bits_old1 = vec![];
+        serialized_tx_bits_old1.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old1.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_old1.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_old1.extend(rhs.account.address.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old1.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old1.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old1.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old1.len(),
+            params::OLD1_SIGNED_TRANSFER_BIT_WIDTH
+        );
 
-        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(rhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
-
-        let mut serialized_tx_bits_old = vec![];
-
-        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits_old.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits_old.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits_old.extend(rhs.account.address.get_bits_be());
-        serialized_tx_bits_old.extend(cur.token.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.amount_packed.get_bits_be());
-        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
-        assert_eq!(serialized_tx_bits_old.len(), OLD_SIGNED_TRANSFER_BIT_WIDTH);
+        let mut serialized_tx_bits_old2 = vec![];
+        serialized_tx_bits_old2.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old2.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_old2.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_old2.extend(rhs.account.address.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old2.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old2.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old2.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old2.len(),
+            params::OLD2_SIGNED_TRANSFER_BIT_WIDTH
+        );
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -2233,20 +3922,39 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_new_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_new_serialized_tx_correct"),
-            serialized_tx_bits,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
-        let is_old_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_old_serialized_tx_correct"),
-            serialized_tx_bits_old,
+
+        let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old1_serialized_tx_correct"),
+            serialized_tx_bits_old1,
             &op_data,
+        )?;
+        is_old1_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
+            &[is_old1_serialized_tx_correct, is_fungible_token.clone()],
+        )?;
+
+        let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old2_serialized_tx_correct"),
+            serialized_tx_bits_old2,
+            &op_data,
+        )?;
+        is_old2_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
+            &[is_old2_serialized_tx_correct, is_fungible_token.clone()],
         )?;
 
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
+            &[
+                is_version1_serialized_tx_correct,
+                is_old1_serialized_tx_correct,
+                is_old2_serialized_tx_correct,
+            ],
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
@@ -2256,8 +3964,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &lhs.account.pub_key_hash,
         )?;
         lhs_valid_flags.push(is_signer_valid);
-
-        // lhs_valid_flags.push(_is_signer_valid);
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
@@ -2296,6 +4002,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?);
         rhs_valid_flags.push(is_chunk_second);
         rhs_valid_flags.push(is_account_empty.not());
+        rhs_valid_flags.push(is_special_nft_storage_account.not());
+        rhs_valid_flags.push(is_special_nft_token.not());
 
         rhs_valid_flags.push(is_pubdata_chunk_correct);
         let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
@@ -2312,7 +4020,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &is_rhs_valid,
         )?;
 
-        // Either LHS or RHS are correct (due to chunking at least)
+        // Either LHS xor RHS are correct (due to chunking at least)
         let correct = Boolean::xor(
             cs.namespace(|| "lhs_valid XOR rhs_valid"),
             &lhs_valid,
@@ -2338,6 +4046,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -2370,17 +4081,36 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         // construct signature message preimage (serialized_tx)
 
-        let mut serialized_tx_bits = vec![];
+        let mut serialized_tx_bits_version1 = vec![];
+        serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(ForcedExitOp::OP_CODE));
+        serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
+        serialized_tx_bits_version1.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_version1.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(cur.token.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_version1.extend(lhs.account.nonce.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_version1.len(),
+            SIGNED_FORCED_EXIT_BIT_WIDTH
+        );
 
-        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits.extend(rhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.nonce.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
-        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
-        assert_eq!(serialized_tx_bits.len(), SIGNED_FORCED_EXIT_BIT_WIDTH);
+        // Construct serialized tx
+        let mut serialized_tx_bits_old = vec![];
+        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_old.extend(rhs.account.address.get_bits_be());
+        // the old version contains token 2-byte representation
+        serialized_tx_bits_old.extend_from_slice(&cur.token.get_bits_be()[16..32]);
+        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old.extend(lhs.account.nonce.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old.len(),
+            params::OLD_SIGNED_FORCED_EXIT_BIT_WIDTH
+        );
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -2406,6 +4136,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             is_pubdata_chunk_correct.clone(),
             is_forced_exit.clone(),
             is_valid_timestamp.clone(),
+            is_special_nft_token.not(),
         ];
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -2445,11 +4176,30 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
-            serialized_tx_bits,
+        let is_version1_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_version1_serialized_tx_correct"),
+            serialized_tx_bits_version1,
             &op_data,
         )?;
+
+        let mut is_old_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old_serialized_tx_correct"),
+            serialized_tx_bits_old,
+            &op_data,
+        )?;
+        is_old_serialized_tx_correct = multi_and(
+            cs.namespace(|| "is_old_serialized_tx_correct and fungible"),
+            &[is_old_serialized_tx_correct, is_fungible_token.clone()],
+        )?;
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            &[
+                is_version1_serialized_tx_correct,
+                is_old_serialized_tx_correct,
+            ],
+        )?;
+
         lhs_valid_flags.push(is_serialized_tx_correct);
 
         let is_signer_valid = CircuitElement::equals(
@@ -2458,6 +4208,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &lhs.account.pub_key_hash,
         )?;
         lhs_valid_flags.push(is_signer_valid);
+
+        lhs_valid_flags.push(is_fungible_token.clone());
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
@@ -2488,6 +4240,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             pubdata_properly_copied.clone(),
             is_forced_exit.clone(),
             is_valid_timestamp.clone(),
+            is_special_nft_storage_account.not(),
+            is_special_nft_token.not(),
         ];
         let is_second_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
@@ -2515,6 +4269,16 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
         rhs_valid_flags.push(is_address_correct);
 
+        // Check that `eth_address` corresponds to the rhs account Ethereum address.
+        let is_pubkey_empty = CircuitElement::equals(
+            cs.namespace(|| "is_pubkey_empty"),
+            &rhs.account.pub_key_hash,
+            &global_variables.explicit_zero,
+        )?;
+        rhs_valid_flags.push(is_pubkey_empty);
+
+        rhs_valid_flags.push(is_fungible_token.clone());
+
         let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
@@ -2537,6 +4301,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             is_forced_exit,
             is_valid_timestamp.clone(),
             pubdata_properly_copied,
+            is_fungible_token.clone(),
         ];
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
@@ -2568,10 +4333,28 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?
         .not();
 
-        let is_valid_timestamp = Boolean::and(
+        let is_second_valid_from_ok = CircuitElement::less_than_fixed(
+            cs.namespace(|| "second_valid_from leq block_timestamp"),
+            &global_variables.block_timestamp,
+            &op_data.second_valid_from,
+        )?
+        .not();
+
+        let is_second_valid_until_ok = CircuitElement::less_than_fixed(
+            cs.namespace(|| "block_timestamp leq second_valid_until"),
+            &op_data.second_valid_until,
+            &global_variables.block_timestamp,
+        )?
+        .not();
+
+        let is_valid_timestamp = multi_and(
             cs.namespace(|| "is_valid_from_ok AND is_valid_until_ok"),
-            &is_valid_from_ok,
-            &is_valid_until_ok,
+            &[
+                is_valid_from_ok,
+                is_valid_until_ok,
+                is_second_valid_from_ok,
+                is_second_valid_until_ok,
+            ],
         )?;
 
         Ok(is_valid_timestamp)
@@ -2702,6 +4485,12 @@ pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     // only first bits of index are considered valuable
     assert!(length_to_root <= index.len());
     assert!(index.len() >= audit_path.len());
+
+    let remaining_index_bits = AllocatedNum::pack_bits_to_element(
+        cs.namespace(|| "index_bits_after_length_root_packed"),
+        &index[length_to_root..],
+    )?;
+    remaining_index_bits.assert_zero(cs.namespace(|| "index_bits_after_length_are_zero"))?;
 
     let index = &index[0..length_to_root];
     let audit_path = &audit_path[0..length_to_root];
@@ -2837,6 +4626,7 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(result)
 }
 
+#[allow(dead_code)]
 fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     processable_fees: &[AllocatedNum<E>],
@@ -2932,6 +4722,93 @@ fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: Constraint
     Ok(node_hash)
 }
 
+fn calculate_validator_root_from_processable_values<E: RescueEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    processable_fees: &[AllocatedNum<E>],
+    non_processable_audit: &[AllocatedNum<E>],
+    params: &E::Params,
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert_eq!(
+        processable_fees.len(),
+        params::number_of_processable_tokens()
+    );
+
+    let processable_fee_hashes = processable_fees
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(index, fee)| {
+            let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
+
+            fee.limit_number_of_bits(
+                cs.namespace(|| "ensure that fees are short enough"),
+                params::BALANCE_BIT_WIDTH,
+            )?;
+
+            let fee_hash = {
+                let mut sponge_output = rescue::rescue_hash(
+                    cs.namespace(|| "hash the fee leaf content"),
+                    &[fee],
+                    params,
+                )?;
+                assert_eq!(sponge_output.len(), 1);
+                sponge_output.pop().expect("must get a single element")
+            };
+
+            Ok(fee_hash)
+        })
+        .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+    let processable_fees_tree_depth = processable_fees.len().trailing_zeros() as usize;
+    assert_eq!(
+        1 << processable_fees_tree_depth,
+        params::number_of_processable_tokens()
+    );
+    assert_eq!(
+        non_processable_audit.len(),
+        params::balance_tree_depth() - processable_fees_tree_depth,
+    );
+
+    // will hash processable part of the tree
+    let mut hash_vec = processable_fee_hashes;
+    for i in 0..processable_fees_tree_depth {
+        let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
+        assert!(hash_vec.len().is_power_of_two());
+        let chunks = hash_vec.chunks(2);
+        let mut new_hashes = vec![];
+        for (chunk_number, x) in chunks.enumerate() {
+            let cs = &mut cs.namespace(|| format!("chunk number {}", chunk_number));
+
+            let mut sponge_output = rescue::rescue_hash(cs, &x, params)?;
+
+            assert_eq!(sponge_output.len(), 1);
+
+            let tmp = sponge_output.pop().expect("must get a single element");
+
+            new_hashes.push(tmp);
+        }
+        hash_vec = new_hashes;
+    }
+    assert_eq!(hash_vec.len(), 1);
+
+    let mut node_hash = hash_vec[0].clone();
+    for (i, audit_value) in (processable_fees_tree_depth..params::balance_tree_depth())
+        .zip(non_processable_audit.iter())
+    {
+        let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
+
+        let mut sponge_output = rescue::rescue_hash(
+            cs.namespace(|| "perform smt hashing"),
+            &[node_hash, audit_value.clone()],
+            params,
+        )?;
+        assert_eq!(sponge_output.len(), 1, "must get a single element");
+        node_hash = sponge_output.pop().unwrap();
+    }
+
+    Ok(node_hash)
+}
+
 fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     subroot: &AllocatedNum<E>,
@@ -2971,6 +4848,48 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     Ok(node_hash)
 }
 
+pub fn hash_nft_content_to_balance_type<E: RescueEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    creator_account_id: &CircuitElement<E>,
+    serial_id: &CircuitElement<E>,
+    content_hash: &[CircuitElement<E>],
+    params: &E::Params,
+) -> Result<CircuitElement<E>, SynthesisError> {
+    let mut content_hash_as_booleans_le = content_hash
+        .iter()
+        .map(|bit| bit.get_bits_le())
+        .flatten()
+        .collect::<Vec<_>>();
+    content_hash_as_booleans_le.reverse();
+    assert_eq!(content_hash_as_booleans_le.len(), CONTENT_HASH_WIDTH);
+
+    let mut lhs_le_bits = vec![];
+    lhs_le_bits.extend_from_slice(&content_hash_as_booleans_le[128..]);
+    lhs_le_bits.extend(serial_id.get_bits_le());
+    lhs_le_bits.extend(creator_account_id.get_bits_le());
+    let lhs = CircuitElement::from_le_bits(cs.namespace(|| "lhs"), lhs_le_bits)?;
+
+    let mut rhs_le_bits = vec![];
+    rhs_le_bits.extend_from_slice(&content_hash_as_booleans_le[..128]);
+    let rhs = CircuitElement::from_le_bits(cs.namespace(|| "rhs"), rhs_le_bits)?;
+
+    let mut sponge_output = rescue::rescue_hash(
+        cs.namespace(|| "hash lhs and rhs"),
+        &[lhs.get_number(), rhs.get_number()],
+        params,
+    )?;
+    assert_eq!(sponge_output.len(), 1);
+    let content_as_bits_le = sponge_output
+        .pop()
+        .expect("must get a single element")
+        .into_bits_le_strict(cs.namespace(|| "content into_bits_le_strict"))?;
+
+    CircuitElement::from_le_bits(
+        cs.namespace(|| "NFT_content_as_balance from lower BALANCE_BIT_WIDTH bits"),
+        content_as_bits_le[..params::BALANCE_BIT_WIDTH].to_vec(),
+    )
+}
+
 fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     use zksync_crypto::franklin_crypto::interpolation::interpolate;
 
@@ -2990,6 +4909,9 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS),
         get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS),
         get_xy(ForcedExitOp::OP_CODE, ForcedExitOp::CHUNKS),
+        get_xy(MintNFTOp::OP_CODE, MintNFTOp::CHUNKS),
+        get_xy(WithdrawNFTOp::OP_CODE, WithdrawNFTOp::CHUNKS),
+        get_xy(SwapOp::OP_CODE, SwapOp::CHUNKS),
     ];
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);
@@ -3007,4 +4929,32 @@ fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
         Expression::constant::<CS>(E::Fr::from_str(&std::u32::MAX.to_string()).unwrap()),
     )?)
     .not())
+}
+
+fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    rescue_params: &<E as RescueEngine>::Params,
+    bits: &[Boolean],
+) -> Result<Vec<Boolean>, SynthesisError> {
+    let input = multipack::pack_into_witness(
+        cs.namespace(|| "pack transaction bits into field elements for rescue"),
+        &bits,
+    )?;
+
+    let sponge_output = rescue::rescue_hash(cs.namespace(|| "rescue hash"), &input, rescue_params)?;
+    assert_eq!(sponge_output.len(), 1);
+
+    let output_bits_le = sponge_output[0].into_bits_le(cs.namespace(|| "rescue hash bits"))?;
+
+    // Max whole number of bytes that fit into Fr (248 bits)
+    let len_bits = (E::Fr::CAPACITY / 8 * 8) as usize;
+
+    Ok(output_bits_le[..len_bits].to_vec())
+}
+
+fn reversed_tx_type_bits_be(tx_type: u8) -> Vec<Boolean> {
+    let reversed_tx_type = 255 - tx_type;
+    assert!(reversed_tx_type > tx_type);
+
+    u8_into_bits_be(reversed_tx_type)
 }

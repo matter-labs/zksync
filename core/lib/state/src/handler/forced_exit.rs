@@ -7,6 +7,7 @@ use crate::{
     handler::{error::ForcedExitOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
+use num::{BigUint, Zero};
 
 impl TxHandler<ForcedExit> for ZkSyncState {
     type Op = ForcedExitOp;
@@ -18,21 +19,37 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         let initiator_account = self
             .get_account(tx.initiator_account_id)
             .ok_or(ForcedExitOpError::InitiatorAccountNotFound)?;
-        invariant!(
-            tx.verify_signature() == Some(initiator_account.pub_key_hash),
-            ForcedExitOpError::InvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != initiator_account.pub_key_hash {
+                return Err(ForcedExitOpError::InvalidSignature);
+            }
+        }
 
         // Check the token ID correctness.
         invariant!(
-            tx.token <= params::max_token_id(),
+            tx.token <= params::max_fungible_token_id(),
             ForcedExitOpError::InvalidTokenId
         );
+
+        if tx.fee != BigUint::zero() {
+            // Fee can only be paid in processable tokens
+            invariant!(
+                tx.token <= params::max_processable_token(),
+                ForcedExitOpError::InvalidFeeTokenId
+            );
+        }
 
         // Check that target account does not have an account ID set.
         let (target_account_id, account) = self
             .get_account_by_address(&tx.target)
             .ok_or(ForcedExitOpError::TargetAccountNotFound)?;
+
+        invariant!(
+            target_account_id != params::NFT_STORAGE_ACCOUNT_ID,
+            ForcedExitOpError::TargetAccountNotFound
+        );
+
         invariant!(
             account.pub_key_hash == PubKeyHash::default(),
             ForcedExitOpError::TargetAccountNotLocked

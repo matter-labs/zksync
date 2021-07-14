@@ -58,7 +58,7 @@ export class RestProvider extends SyncProvider {
     }
 
     static async newProvider(
-        address: string = 'http://127.0.0.1:3001',
+        address: string = 'http://127.0.0.1:3001/api/v0.2',
         pollIntervalMilliSecs?: number
     ): Promise<RestProvider> {
         const provider = new RestProvider(address);
@@ -328,18 +328,18 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
     }
 
-    async submitTxNewDetailed(tx: types.L2Tx, signature?: types.TxEthSignature): Promise<Response<string>> {
+    async submitTxNewDetailed(tx: types.L2Tx, signature?: types.TxEthSignatureVariant): Promise<Response<string>> {
         return await this.post(`${this.address}/transactions`, { tx, signature });
     }
 
-    async submitTxNew(tx: types.L2Tx, signature?: types.TxEthSignature): Promise<string> {
+    async submitTxNew(tx: types.L2Tx, signature?: types.TxEthSignatureVariant): Promise<string> {
         return this.parseResponse(await this.submitTxNewDetailed(tx, signature));
     }
 
     /**
      * @deprecated Use submitTxNew method instead
      */
-    async submitTx(tx: any, signature?: types.TxEthSignature, fastProcessing?: boolean): Promise<string> {
+    async submitTx(tx: any, signature?: types.TxEthSignatureVariant, fastProcessing?: boolean): Promise<string> {
         if (fastProcessing) {
             tx.fastProcessing = fastProcessing;
         }
@@ -365,15 +365,15 @@ export class RestProvider extends SyncProvider {
     }
 
     async submitTxsBatchNewDetailed(
-        txs: types.L2Tx[],
-        signature: types.TxEthSignature | types.TxEthSignature[]
+        txs: { tx: any; signature?: types.TxEthSignatureVariant }[],
+        signature?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<Response<types.SubmitBatchResponse>> {
         return await this.post(`${this.address}/transactions/batches`, { txs, signature });
     }
 
     async submitTxsBatchNew(
-        txs: types.L2Tx[],
-        signature: types.TxEthSignature | types.TxEthSignature[]
+        txs: { tx: any; signature?: types.TxEthSignatureVariant }[],
+        signature?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<types.SubmitBatchResponse> {
         return this.parseResponse(await this.submitTxsBatchNewDetailed(txs, signature));
     }
@@ -382,17 +382,10 @@ export class RestProvider extends SyncProvider {
      * @deprecated Use submitTxsBatchNew method instead.
      */
     async submitTxsBatch(
-        transactions: { tx: any; signature?: types.TxEthSignature }[],
+        transactions: { tx: any; signature?: types.TxEthSignatureVariant }[],
         ethSignatures?: types.TxEthSignature | types.TxEthSignature[]
     ): Promise<string[]> {
-        let txs = [];
-        for (const signedTx of transactions) {
-            txs.push(signedTx.tx);
-        }
-        if (!ethSignatures) {
-            throw new Error('Batch signature should be provided in API v0.2');
-        }
-        return (await this.submitTxsBatchNew(txs, ethSignatures)).transactionHashes;
+        return (await this.submitTxsBatchNew(transactions, ethSignatures)).transactionHashes;
     }
 
     async getBatchDetailed(batchHash: string): Promise<Response<types.ApiBatchData>> {
@@ -401,6 +394,20 @@ export class RestProvider extends SyncProvider {
 
     async getBatch(batchHash: string): Promise<types.ApiBatchData> {
         return this.parseResponse(await this.getBatchDetailed(batchHash));
+    }
+
+    async getNFTDetailed(id: number): Promise<Response<types.NFTInfo>> {
+        return await this.get(`${this.address}/tokens/nft/${id}`);
+    }
+
+    async getNFT(id: number): Promise<types.NFTInfo> {
+        const nft = this.parseResponse(await this.getNFTDetailed(id));
+
+        // If the NFT does not exist, throw an exception
+        if (nft == null) {
+            throw new Error(`Requested NFT doesn't exist or the corresponding mintNFT operation is not verified yet`);
+        }
+        return nft;
     }
 
     async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.ApiTxReceipt> {
@@ -477,6 +484,13 @@ export class RestProvider extends SyncProvider {
 
     async getState(address: types.Address): Promise<types.AccountStateRest> {
         const fullInfo = await this.accountFullInfo(address);
+        const defaultInfo = {
+            balances: {},
+            nonce: 0,
+            pubKeyHash: 'sync:0000000000000000000000000000000000000000',
+            nfts: {},
+            mintedNfts: {}
+        };
 
         if (fullInfo.finalized) {
             return {
@@ -486,12 +500,16 @@ export class RestProvider extends SyncProvider {
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
-                    pubKeyHash: fullInfo.committed.pubKeyHash
+                    pubKeyHash: fullInfo.committed.pubKeyHash,
+                    nfts: fullInfo.committed.nfts,
+                    mintedNfts: fullInfo.committed.mintedNfts
                 },
                 verified: {
                     balances: fullInfo.finalized.balances,
                     nonce: fullInfo.finalized.nonce,
-                    pubKeyHash: fullInfo.finalized.pubKeyHash
+                    pubKeyHash: fullInfo.finalized.pubKeyHash,
+                    nfts: fullInfo.finalized.nfts,
+                    mintedNfts: fullInfo.finalized.mintedNfts
                 }
             };
         } else if (fullInfo.committed) {
@@ -502,27 +520,17 @@ export class RestProvider extends SyncProvider {
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
-                    pubKeyHash: fullInfo.committed.pubKeyHash
+                    pubKeyHash: fullInfo.committed.pubKeyHash,
+                    nfts: fullInfo.committed.nfts,
+                    mintedNfts: fullInfo.committed.mintedNfts
                 },
-                verified: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                }
+                verified: defaultInfo
             };
         } else {
             return {
                 address,
-                committed: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                },
-                verified: {
-                    balances: {},
-                    nonce: 0,
-                    pubKeyHash: 'sync:0000000000000000000000000000000000000000'
-                }
+                committed: defaultInfo,
+                verified: defaultInfo
             };
         }
     }
@@ -604,7 +612,11 @@ export class RestProvider extends SyncProvider {
 
     async getEthTxForWithdrawal(withdrawalHash: string): Promise<string> {
         const txData = await this.txData(withdrawalHash);
-        if (txData.tx.op.type === 'Withdraw' || txData.tx.op.type === 'ForcedExit') {
+        if (
+            txData.tx.op.type === 'Withdraw' ||
+            txData.tx.op.type === 'ForcedExit' ||
+            txData.tx.op.type === 'WithdrawNFT'
+        ) {
             return txData.tx.op.ethTxHash;
         } else {
             return null;

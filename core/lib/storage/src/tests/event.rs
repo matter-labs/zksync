@@ -1,4 +1,5 @@
 // Built-in uses
+use std::convert::TryFrom;
 // External uses
 // Workspace uses
 use zksync_types::{
@@ -23,6 +24,20 @@ use crate::{
 // (inserts into `executed_priority_operations` and `eth_account_types`)
 // Also, a more generic setup is needed to check a deposit event which
 // doesn't store an account id.
+
+/// Helper method for fetching and deserializing events from the database.
+async fn fetch_new_events(
+    storage: &mut StorageProcessor<'_>,
+    last_event_id: EventId,
+) -> QueryResult<Vec<ZkSyncEvent>> {
+    Ok(storage
+        .event_schema()
+        .fetch_new_events(last_event_id)
+        .await?
+        .into_iter()
+        .map(ZkSyncEvent::try_from)
+        .collect::<Result<_, _>>()?)
+}
 
 /// Helper method for populating block events in the database.
 /// Since `store_block_event` relies on `load_block_range` method,
@@ -126,10 +141,7 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         )
         .await?;
         // Expect a single block event with the `Committed` status.
-        let events = storage
-            .event_schema()
-            .fetch_new_events(last_event_id)
-            .await?;
+        let events = fetch_new_events(&mut storage, last_event_id).await?;
 
         assert_eq!(events.len(), 1);
         check_block_event(&events[0], BlockStatus::Committed, block_number);
@@ -163,10 +175,7 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         .await?;
     }
     // Fetch new events.
-    let events = storage
-        .event_schema()
-        .fetch_new_events(last_event_id)
-        .await?;
+    let events = fetch_new_events(&mut storage, last_event_id).await?;
     // Update the offset.
     last_event_id = events.last().unwrap().id;
     let expected_len = TO_BLOCK as usize + 1;
@@ -187,9 +196,7 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         .block_schema()
         .remove_blocks(BlockNumber(0))
         .await?;
-    let mut events = storage
-        .event_schema()
-        .fetch_new_events(last_event_id)
+    let mut events = fetch_new_events(&mut storage, last_event_id)
         .await?
         .into_iter();
     // Check the status for each event.
@@ -257,10 +264,7 @@ async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<(
     .await?;
     // Load new events. The first event should be "block committed",
     // the rest is "state updated".
-    let events = storage
-        .event_schema()
-        .fetch_new_events(last_event_id)
-        .await?;
+    let events = fetch_new_events(&mut storage, last_event_id).await?;
     assert!(!events.is_empty());
     assert_eq!(events.len(), updates_block_1.len() + 1);
     // For all events the status is `Committed`.
@@ -309,10 +313,7 @@ async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<(
     )
     .await?;
     // Load new events.
-    let events = storage
-        .event_schema()
-        .fetch_new_events(last_event_id)
-        .await?;
+    let events = fetch_new_events(&mut storage, last_event_id).await?;
     assert_eq!(
         events.len(),
         updates_block_1.len() + updates_block_2.len() + 2

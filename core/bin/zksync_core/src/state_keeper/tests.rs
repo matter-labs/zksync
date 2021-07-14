@@ -264,12 +264,11 @@ mod apply_priority_op {
     /// Checks if deposit is processed correctly by the state_keeper
     #[test]
     fn success() {
-        let mut tester = StateKeeperTester::new(6, 1, 1);
+        let mut tester = StateKeeperTester::new(8, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
         let deposit = create_deposit(TokenId(0), 145u32);
         let result = tester.state_keeper.apply_priority_op(deposit);
         let pending_block = tester.state_keeper.pending_block;
-
         assert!(result.is_ok());
         assert!(pending_block.chunks_left < old_pending_block.chunks_left);
         assert_eq!(

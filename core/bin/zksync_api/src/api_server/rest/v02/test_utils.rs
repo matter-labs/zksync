@@ -25,7 +25,7 @@ use zksync_storage::{
     prover::ProverSchema,
     test_data::{
         dummy_ethereum_tx_hash, gen_acc_random_updates, gen_sample_block,
-        gen_unique_aggregated_operation_with_txs, get_sample_aggregated_proof,
+        gen_unique_aggregated_operation_with_txs, generate_nft, get_sample_aggregated_proof,
         get_sample_single_proof, BLOCK_SIZE_CHUNKS,
     },
     ConnectionPool,
@@ -38,8 +38,8 @@ use zksync_types::{
     prover::ProverJobType,
     tx::ChangePubKeyType,
     AccountId, AccountMap, Address, BatchFee, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, Nonce, OutputFeeType, PriorityOp,
-    Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
+    ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp, Nonce, OutputFeeType,
+    PriorityOp, Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local uses
@@ -281,6 +281,41 @@ impl TestServerConfig {
             ));
         }
 
+        // Mint NFT
+        {
+            let tx = from
+                .sign_mint_nft(
+                    TokenId(0),
+                    "ETH",
+                    H256::random(),
+                    closest_packable_fee_amount(&fee.into()),
+                    &to.address,
+                    None,
+                    true,
+                )
+                .0;
+
+            let zksync_op = ZkSyncOp::MintNFTOp(Box::new(MintNFTOp {
+                tx: tx.clone(),
+                creator_account_id: from.get_account_id().unwrap(),
+                recipient_account_id: to.get_account_id().unwrap(),
+            }));
+
+            let executed_tx = ExecutedTx {
+                signed_tx: zksync_op.try_get_tx().unwrap().into(),
+                success: true,
+                op: Some(zksync_op),
+                fail_reason: None,
+                block_index: Some(4),
+                created_at: chrono::Utc::now(),
+                batch_id: None,
+            };
+
+            txs.push((
+                ZkSyncTx::MintNFT(Box::new(tx)),
+                ExecutedOperations::Tx(Box::new(executed_tx)),
+            ));
+        }
         TestTransactions { acc: from, txs }
     }
 
@@ -316,10 +351,15 @@ impl TestServerConfig {
         // Required since we use `EthereumSchema` in this test.
         storage.ethereum_schema().initialize_eth_data().await?;
 
+        storage
+            .config_schema()
+            .store_config(Address::default(), Address::default(), Address::default())
+            .await?;
+
         // Insert PHNX token
         storage
             .tokens_schema()
-            .store_token(Token::new(
+            .store_or_update_token(Token::new(
                 TokenId(1),
                 Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
                 "PHNX",
@@ -329,7 +369,7 @@ impl TestServerConfig {
         // Insert Golem token with old symbol (from rinkeby).
         storage
             .tokens_schema()
-            .store_token(Token::new(
+            .store_or_update_token(Token::new(
                 TokenId(16),
                 Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
                 "GNT",
@@ -342,9 +382,20 @@ impl TestServerConfig {
         // Create and apply several blocks to work with.
         for block_number in 1..=COMMITTED_BLOCKS_COUNT {
             let block_number = BlockNumber(block_number);
-            let updates = (0..3)
+            let mut updates = (0..3)
                 .flat_map(|_| gen_acc_random_updates(&mut rng))
                 .collect::<Vec<_>>();
+
+            accounts
+                .iter()
+                .enumerate()
+                .for_each(|(id, (account_id, account))| {
+                    updates.append(&mut generate_nft(
+                        *account_id,
+                        account,
+                        block_number.0 * accounts.len() as u32 + id as u32,
+                    ));
+                });
             apply_updates(&mut accounts, updates.clone());
 
             // Add transactions to every odd block.
@@ -541,6 +592,11 @@ impl TestServerConfig {
                     .ethereum_schema()
                     .confirm_eth_tx(&eth_tx_hash)
                     .await?;
+                storage
+                    .chain()
+                    .state_schema()
+                    .apply_state_update(block_number)
+                    .await?;
             }
         }
 
@@ -664,8 +720,13 @@ pub fn dummy_full_exit_op(
             account_id,
             eth_address,
             token: TokenId(0),
+            is_legacy: false,
         },
         withdraw_amount: None,
+        creator_account_id: None,
+        creator_address: None,
+        serial_id: None,
+        content_hash: None,
     }));
 
     ExecutedPriorityOp {

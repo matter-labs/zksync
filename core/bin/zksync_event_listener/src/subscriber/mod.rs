@@ -4,7 +4,7 @@ use actix::prelude::*;
 use actix_web_actors::ws;
 // Workspace uses
 // Local uses
-use crate::messages::{NewEvents, RegisterSubscriber, RemoveSubscriber};
+use crate::messages::{NewEvents, RegisterSubscriber, RemoveSubscriber, Shutdown};
 use crate::monitor::ServerMonitor;
 use filters::SubscriberFilters;
 
@@ -143,5 +143,19 @@ impl Handler<NewEvents> for Subscriber {
             let json = serde_json::to_string(&event).unwrap();
             ctx.text(json);
         }
+    }
+}
+
+impl Handler<Shutdown> for Subscriber {
+    type Result = ();
+
+    fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) {
+        let reason = Some(ws::CloseReason {
+            code: ws::CloseCode::Error,
+            description: Some("internal server error".to_string()),
+        });
+        ctx.close(reason);
+        // No need to notify the monitor, stop the context right away.
+        ctx.stop();
     }
 }

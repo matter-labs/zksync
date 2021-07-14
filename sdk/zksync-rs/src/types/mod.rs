@@ -1,15 +1,27 @@
+use std::collections::HashMap;
+
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Token};
+
+use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Token, TokenId, H256};
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
 pub type Tokens = HashMap<String, Token>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NFT {
+    pub id: TokenId,
+    pub symbol: String,
+    pub creator_id: AccountId,
+    pub content_hash: H256,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountState {
     pub balances: HashMap<String, BigUintSerdeWrapper>,
+    pub nfts: HashMap<TokenId, NFT>,
     pub nonce: Nonce,
     pub pub_key_hash: PubKeyHash,
 }
@@ -147,6 +159,9 @@ pub enum OutputFeeType {
     FastWithdraw,
     Withdraw,
     ChangePubKey(ChangePubKeyFeeType),
+    MintNFT,
+    WithdrawNFT,
+    FastWithdrawNFT,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

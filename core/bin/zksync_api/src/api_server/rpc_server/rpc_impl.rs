@@ -4,12 +4,14 @@ use std::time::Instant;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
-use zksync_api_types::v02::fee::ApiTxFeeTypes;
-use zksync_types::{
-    tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, Fee, Token, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
+use zksync_api_types::{
+    v02::{fee::ApiTxFeeTypes, token::ApiNFT},
+    TxWithSignature,
 };
-
+use zksync_types::{
+    tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
+    Address, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
+};
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::TokenPriceRequestType};
 
@@ -110,7 +112,7 @@ impl RpcApp {
     pub async fn _impl_tx_submit(
         self,
         tx: Box<ZkSyncTx>,
-        signature: Box<Option<TxEthSignature>>,
+        signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
     ) -> Result<TxHash> {
         let start = Instant::now();
@@ -173,6 +175,22 @@ impl RpcApp {
             main_contract,
             gov_contract,
         })
+    }
+
+    pub async fn _impl_get_nft(self, id: TokenId) -> Result<Option<ApiNFT>> {
+        let start = Instant::now();
+        let mut storage = self.access_storage().await?;
+        let nft = storage
+            .tokens_schema()
+            .get_nft_with_factories(id)
+            .await
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
+                Error::internal_error()
+            })?;
+
+        metrics::histogram!("api.rpc.get_nft", start.elapsed());
+        Ok(nft)
     }
 
     pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {

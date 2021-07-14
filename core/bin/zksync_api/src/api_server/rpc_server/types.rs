@@ -6,28 +6,23 @@ use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_api_types::v02::account::EthAccountType;
+use zksync_api_types::v02::{account::EthAccountType, token::NFT};
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
-    tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
-    ZkSyncPriorityOp, ZkSyncTx,
+    Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId, ZkSyncPriorityOp,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TxWithSignature {
-    pub tx: ZkSyncTx,
-    pub signature: Option<TxEthSignature>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
     pub balances: HashMap<String, BigUintSerdeWrapper>,
+    pub nfts: HashMap<TokenId, NFT>,
+    pub minted_nfts: HashMap<TokenId, NFT>,
     pub nonce: Nonce,
     pub pub_key_hash: PubKeyHash,
 }
@@ -39,18 +34,45 @@ impl ResponseAccountState {
         account: Account,
     ) -> Result<Self> {
         let mut balances = HashMap::new();
+        let mut nfts = HashMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
-            let token_symbol = tokens
-                .token_symbol(storage, token_id)
-                .await
-                .map_err(|_| Error::internal_error())?
-                .ok_or_else(Error::internal_error)?;
-
-            balances.insert(token_symbol, balance);
+            match token_id.0 {
+                NFT_TOKEN_ID_VAL => {
+                    // Don't include special token to balances or nfts
+                }
+                MIN_NFT_TOKEN_ID..=NFT_TOKEN_ID_VAL => {
+                    // https://github.com/rust-lang/rust/issues/37854
+                    // Exclusive range is an experimental feature, but we have already checked the last value in the previous step
+                    nfts.insert(
+                        token_id,
+                        tokens
+                            .get_nft_by_id(storage, token_id)
+                            .await
+                            .map_err(|_| Error::internal_error())?
+                            .ok_or_else(Error::internal_error)?
+                            .into(),
+                    );
+                }
+                _ => {
+                    let token_symbol = tokens
+                        .token_symbol(storage, token_id)
+                        .await
+                        .map_err(|_| Error::internal_error())?
+                        .ok_or_else(Error::internal_error)?;
+                    balances.insert(token_symbol, balance);
+                }
+            }
         }
+        let minted_nfts = account
+            .minted_nfts
+            .iter()
+            .map(|(id, nft)| (*id, nft.clone().into()))
+            .collect();
 
         Ok(Self {
             balances,
+            nfts,
+            minted_nfts,
             nonce: account.nonce,
             pub_key_hash: account.pub_key_hash,
         })

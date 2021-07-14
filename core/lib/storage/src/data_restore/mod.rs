@@ -6,7 +6,7 @@ use zksync_types::{
     aggregated_operations::{
         AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
     },
-    AccountId, AccountUpdate, BlockNumber, Token,
+    AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp,
 };
 // Local imports
 use self::records::{
@@ -15,7 +15,10 @@ use self::records::{
 };
 
 use crate::chain::operations::OperationsSchema;
-use crate::{chain::state::StateSchema, tokens::TokensSchema};
+use crate::{
+    chain::state::StateSchema,
+    tokens::{StoreTokenError, TokensSchema},
+};
 use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
@@ -77,12 +80,12 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
     pub async fn save_genesis_state(
         &mut self,
-        genesis_acc_update: AccountUpdate,
+        genesis_updates: &[(AccountId, AccountUpdate)],
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         StateSchema(&mut transaction)
-            .commit_state_update(BlockNumber(0), &[(AccountId(0), genesis_acc_update)], 0)
+            .commit_state_update(BlockNumber(0), genesis_updates, 0)
             .await?;
         StateSchema(&mut transaction)
             .apply_state_update(BlockNumber(0))
@@ -191,7 +194,11 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
             let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
-            TokensSchema(&mut transaction).store_token(token).await?;
+            let try_insert_token = TokensSchema(&mut transaction).store_token(token).await;
+
+            if let Err(StoreTokenError::Other(anyhow_err)) = try_insert_token {
+                return Err(anyhow_err);
+            }
         }
 
         DataRestoreSchema(&mut transaction)
@@ -235,7 +242,16 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             let operations: Vec<_> = block
                 .ops
                 .iter()
-                .map(|op| serde_json::to_value(op.clone()).unwrap())
+                .map(|op| {
+                    let mut value = serde_json::to_value(op.clone()).unwrap();
+                    if let ZkSyncOp::FullExit(full_exit) = op {
+                        // In general, this field is not expected to be serialized,
+                        // however it is used in data_restore to determine the number of
+                        // required chunks
+                        value["priority_op"]["is_legacy"] = full_exit.priority_op.is_legacy.into();
+                    }
+                    value
+                })
                 .collect();
             sqlx::query!(
                 "INSERT INTO data_restore_rollup_block_ops (block_num, operation)

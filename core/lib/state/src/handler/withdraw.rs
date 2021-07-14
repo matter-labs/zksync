@@ -6,6 +6,7 @@ use crate::{
     handler::{error::WithdrawOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
+use num::{BigUint, Zero};
 
 impl TxHandler<Withdraw> for ZkSyncState {
     type Op = WithdrawOp;
@@ -14,9 +15,17 @@ impl TxHandler<Withdraw> for ZkSyncState {
 
     fn create_op(&self, tx: Withdraw) -> Result<Self::Op, WithdrawOpError> {
         invariant!(
-            tx.token <= params::max_token_id(),
+            tx.token <= params::max_fungible_token_id(),
             WithdrawOpError::InvalidTokenId
         );
+        if tx.fee != BigUint::zero() {
+            // Fee can only be paid in processable tokens
+            invariant!(
+                tx.token <= params::max_processable_token(),
+                WithdrawOpError::InvalidFeeTokenId
+            );
+        }
+
         let (account_id, account) = self
             .get_account_by_address(&tx.from)
             .ok_or(WithdrawOpError::FromAccountNotFound)?;
@@ -24,10 +33,12 @@ impl TxHandler<Withdraw> for ZkSyncState {
             account.pub_key_hash != PubKeyHash::default(),
             WithdrawOpError::FromAccountLocked
         );
-        invariant!(
-            tx.verify_signature() == Some(account.pub_key_hash),
-            WithdrawOpError::InvalidSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != account.pub_key_hash {
+                return Err(WithdrawOpError::InvalidSignature);
+            }
+        }
         invariant!(
             account_id == tx.account_id,
             WithdrawOpError::FromAccountIncorrect

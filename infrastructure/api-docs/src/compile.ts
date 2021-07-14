@@ -82,6 +82,7 @@ interface Parameters {
     pubKey: string;
     l2Signature: string;
     ethereumSignature: string;
+    nftId: number;
 }
 
 async function getHashesAndSignatures() {
@@ -95,13 +96,9 @@ async function getHashesAndSignatures() {
         .batchBuilder()
         .addTransfer({ to: syncWallet.address(), token: 'ETH', amount: 0 })
         .build('ETH');
-    let txs = [];
-    for (const signedTx of batch.txs) {
-        txs.push(signedTx.tx);
-    }
 
     const submitBatchResponse = await (syncWallet.provider as zksync.RestProvider).submitTxsBatchNew(
-        txs,
+        batch.txs,
         batch.signature
     );
     await syncWallet.provider.notifyTransaction(submitBatchResponse.transactionHashes[0], 'COMMIT');
@@ -120,7 +117,16 @@ async function getHashesAndSignatures() {
     const accountId = (await syncWallet.getAccountId())!;
     const pubKey = signedTransfer.tx.signature!.pubKey;
     const l2Signature = signedTransfer.tx.signature!.signature;
-    const ethereumSignature = signedTransfer.ethereumSignature!.signature;
+    const ethereumSignature = (signedTransfer.ethereumSignature as zksync.types.TxEthSignature).signature;
+
+    const mintHandle = await syncWallet.mintNFT({
+        recipient: address,
+        contentHash: ethers.utils.randomBytes(32),
+        feeToken: 'ETH'
+    });
+    await mintHandle.awaitVerifyReceipt();
+    const state = await syncWallet.getAccountState();
+    const nftId = Object.values(state.verified.nfts)[0].id;
 
     let result: Parameters = {
         txHash,
@@ -129,7 +135,8 @@ async function getHashesAndSignatures() {
         accountId,
         pubKey,
         l2Signature,
-        ethereumSignature
+        ethereumSignature,
+        nftId
     };
     return result;
 }

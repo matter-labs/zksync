@@ -31,21 +31,21 @@ use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address, BatchFee, ChangePubKeyOp, Fee,
-    OutputFeeType, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
+    MintNFTOp, OutputFeeType, SwapOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp,
+    TxFeeTypes, WithdrawNFTOp, WithdrawOp,
 };
 use zksync_utils::ratio_to_big_decimal;
 
 // Local deps
-use crate::fee_ticker::ticker_info::{FeeTickerInfo, TickerInfo};
-use crate::fee_ticker::validator::MarketUpdater;
 use crate::fee_ticker::{
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
         CONNECTION_TIMEOUT,
     },
+    ticker_info::{FeeTickerInfo, TickerInfo},
     validator::{
         watcher::{TokenWatcher, UniswapTokenWatcher},
-        FeeTokenValidator,
+        FeeTokenValidator, MarketUpdater,
     },
 };
 use crate::utils::token_db_cache::TokenDBCache;
@@ -72,12 +72,15 @@ impl GasOperationsCost {
         // size, resulting in us paying more gas than for bigger block.
         let standard_fast_withdrawal_cost =
             (constants::BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
+        let standard_fast_withdrawal_nft_cost =
+            (constants::BASE_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
 
         let standard_cost = vec![
             (
                 OutputFeeType::Transfer,
                 constants::BASE_TRANSFER_COST.into(),
             ),
+            (OutputFeeType::MintNFT, constants::BASE_MINT_NFT_COST.into()),
             (
                 OutputFeeType::TransferToNew,
                 constants::BASE_TRANSFER_TO_NEW_COST.into(),
@@ -90,6 +93,16 @@ impl GasOperationsCost {
                 OutputFeeType::FastWithdraw,
                 standard_fast_withdrawal_cost.into(),
             ),
+            (OutputFeeType::Swap, constants::BASE_SWAP_COST.into()),
+            (
+                OutputFeeType::WithdrawNFT,
+                constants::BASE_WITHDRAW_NFT_COST.into(),
+            ),
+            (
+                OutputFeeType::FastWithdrawNFT,
+                standard_fast_withdrawal_nft_cost.into(),
+            ),
+            (OutputFeeType::MintNFT, constants::BASE_MINT_NFT_COST.into()),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: false,
@@ -514,6 +527,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
+            TxFeeTypes::WithdrawNFT => (OutputFeeType::WithdrawNFT, WithdrawNFTOp::CHUNKS),
+            TxFeeTypes::FastWithdrawNFT => (OutputFeeType::FastWithdrawNFT, WithdrawNFTOp::CHUNKS),
             TxFeeTypes::Transfer => {
                 if self.is_account_new(recipient).await {
                     (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)
@@ -521,9 +536,11 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
+            TxFeeTypes::Swap => (OutputFeeType::Swap, SwapOp::CHUNKS),
             TxFeeTypes::ChangePubKey(arg) => {
                 (OutputFeeType::ChangePubKey(arg), ChangePubKeyOp::CHUNKS)
             }
+            TxFeeTypes::MintNFT => (OutputFeeType::MintNFT, MintNFTOp::CHUNKS),
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);

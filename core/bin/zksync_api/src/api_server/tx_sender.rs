@@ -19,12 +19,16 @@ use num::{bigint::ToBigInt, BigUint, Zero};
 use thiserror::Error;
 
 // Workspace uses
-use zksync_api_types::v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper};
+use zksync_api_types::{
+    v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper},
+    TxWithSignature,
+};
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
     tx::{
-        EthBatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash,
+        EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
+        TxEthSignatureVariant, TxHash,
     },
     AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
@@ -32,10 +36,11 @@ use zksync_types::{
 // Local uses
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
-    api_server::rpc_server::types::TxWithSignature,
     core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
-    signature_checker::{BatchRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest},
+    signature_checker::{
+        BatchRequest, OrderRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest,
+    },
     tx_error::TxAddError,
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
@@ -163,20 +168,28 @@ impl TxSender {
     /// the corresponding address.
     async fn get_tx_sender(&self, tx: &ZkSyncTx) -> Result<Address, anyhow::Error> {
         match tx {
-            ZkSyncTx::ForcedExit(tx) => self
-                .pool
-                .access_storage()
-                .await?
-                .chain()
-                .account_schema()
-                .account_address_by_id(tx.initiator_account_id)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Forced Exit account is not found in db")),
+            ZkSyncTx::ForcedExit(tx) => self.get_address_by_id(tx.initiator_account_id).await,
             _ => Ok(tx.account()),
         }
     }
 
+    async fn get_address_by_id(&self, id: AccountId) -> Result<Address, anyhow::Error> {
+        self.pool
+            .access_storage()
+            .await?
+            .chain()
+            .account_schema()
+            .account_address_by_id(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Order signer account id not found in db"))
+    }
+
     async fn get_tx_sender_type(&self, tx: &ZkSyncTx) -> Result<EthAccountType, SubmitError> {
+        self.get_sender_type(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
+            .await
+    }
+
+    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, SubmitError> {
         Ok(self
             .pool
             .access_storage()
@@ -184,10 +197,52 @@ impl TxSender {
             .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
             .chain()
             .account_schema()
-            .account_type_by_id(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
+            .account_type_by_id(id)
             .await
             .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
             .unwrap_or(EthAccountType::Owned))
+    }
+
+    async fn verify_order_eth_signature(
+        &self,
+        order: &Order,
+        signature: Option<TxEthSignature>,
+    ) -> Result<(), SubmitError> {
+        let signer_type = self.get_sender_type(order.account_id).await?;
+        if matches!(signer_type, EthAccountType::CREATE2) {
+            return if signature.is_some() {
+                Err(SubmitError::IncorrectTx(
+                    "Eth signature from CREATE2 account not expected".to_string(),
+                ))
+            } else {
+                Ok(())
+            };
+        }
+        let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+        let signer = self
+            .get_address_by_id(order.account_id)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+
+        let token_sell = self.token_info_from_id(order.token_sell).await?;
+        let token_buy = self.token_info_from_id(order.token_buy).await?;
+        let message = order
+            .get_ethereum_sign_message(&token_sell.symbol, &token_buy.symbol, token_sell.decimals)
+            .into_bytes();
+        let eth_sign_data = EthSignData { signature, message };
+        let (sender, receiever) = oneshot::channel();
+
+        let request = VerifySignatureRequest {
+            data: RequestData::Order(OrderRequest {
+                order: Box::new(order.clone()),
+                sign_data: eth_sign_data,
+                sender: signer,
+            }),
+            response: sender,
+        };
+
+        send_verify_request_and_recv(request, self.sign_verify_requests.clone(), receiever).await?;
+        Ok(())
     }
 
     // This method is left for RPC API
@@ -195,7 +250,7 @@ impl TxSender {
     pub async fn submit_tx_with_separate_fp(
         &self,
         mut tx: ZkSyncTx,
-        signature: Option<TxEthSignature>,
+        signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
     ) -> Result<TxHash, SubmitError> {
         let fast_processing = fast_processing.unwrap_or(false);
@@ -220,7 +275,7 @@ impl TxSender {
     pub async fn submit_tx(
         &self,
         tx: ZkSyncTx,
-        signature: Option<TxEthSignature>,
+        signature: TxEthSignatureVariant,
     ) -> Result<TxHash, SubmitError> {
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
@@ -290,12 +345,23 @@ impl TxSender {
             tx_sender,
             token.clone(),
             self.get_tx_sender_type(&tx).await?,
-            signature.clone(),
+            signature.tx_signature().clone(),
             msg_to_sign,
             sign_verify_channel,
         )
         .await?
         .unwrap_tx();
+
+        if let ZkSyncTx::Swap(tx) = &tx {
+            if signature.is_single() {
+                return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+            }
+            let signatures = signature.orders_signatures();
+            self.verify_order_eth_signature(&tx.orders.0, signatures.0.clone())
+                .await?;
+            self.verify_order_eth_signature(&tx.orders.1, signatures.1.clone())
+                .await?;
+        }
 
         // Send verified transactions to the mempool.
         self.core_api_client
@@ -447,6 +513,19 @@ impl TxSender {
             }
         }
 
+        for tx in txs.iter() {
+            if let ZkSyncTx::Swap(swap) = &tx.tx {
+                if tx.signature.is_single() {
+                    return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                }
+                let signatures = tx.signature.orders_signatures();
+                self.verify_order_eth_signature(&swap.orders.0, signatures.0.clone())
+                    .await?;
+                self.verify_order_eth_signature(&swap.orders.1, signatures.1.clone())
+                    .await?;
+            }
+        }
+
         let mut verified_txs = Vec::with_capacity(txs.len());
         let mut verified_signatures = Vec::new();
 
@@ -587,6 +666,15 @@ impl TxSender {
             }
             ZkSyncTx::Withdraw(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
+
+                let msg = tx
+                    .get_ethereum_sign_message(&token.symbol, token.decimals)
+                    .into_bytes();
+                Some(msg)
+            }
+
+            ZkSyncTx::MintNFT(tx) => {
+                let token = self.token_info_from_id(tx.fee_token).await?;
 
                 let msg = tx
                     .get_ethereum_sign_message(&token.symbol, token.decimals)
@@ -794,7 +882,7 @@ async fn verify_txs_batch_signature(
         let eth_sign_data = if let Some(message) = message {
             match sender_type {
                 EthAccountType::CREATE2 => {
-                    if tx.signature.is_some() {
+                    if tx.signature.exists() {
                         return Err(SubmitError::IncorrectTx(
                             "Eth signature from CREATE2 account not expected".to_string(),
                         ));
@@ -802,10 +890,12 @@ async fn verify_txs_batch_signature(
                     None
                 }
                 EthAccountType::Owned => {
-                    if batch_sign_data.is_none() && tx.signature.is_none() {
+                    if batch_sign_data.is_none() && !tx.signature.exists() {
                         return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
                     }
                     tx.signature
+                        .tx_signature()
+                        .clone()
                         .map(|signature| EthSignData { signature, message })
                 }
             }

@@ -6,11 +6,13 @@
   "workspaces": {
     "packages": [
       "sdk/zksync.js",
+      "sdk/zksync-crypto",
       "contracts",
       "infrastructure/zcli",
       "infrastructure/explorer",
       "infrastructure/zk",
       "infrastructure/reading-tool",
+      "infrastructure/token-lists-manager",
       "infrastructure/api-docs",
       "core/tests/ts-tests"
     ],
@@ -25,6 +27,7 @@
   },
   "scripts": {
     "zksync": "yarn workspace zksync",
+    "crypto": "yarn workspace zksync-crypto",
     "contracts": "yarn workspace franklin-contracts",
     "zcli": "yarn workspace zcli",
     "ts-tests": "yarn workspace ts-tests",

@@ -19,23 +19,25 @@ use zksync_crypto::{
         utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element},
     },
     merkle_tree::{hasher::Hasher, RescueHasher},
-    params::{
-        total_tokens, used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS,
-    },
+    params::{used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS},
     primitives::GetBits,
     Engine,
 };
 use zksync_state::state::CollectedFee;
 use zksync_types::{
     block::Block,
-    operations::{ChangePubKeyOp, CloseOp, ForcedExitOp, TransferOp, TransferToNewOp, WithdrawOp},
-    tx::PackedPublicKey,
+    operations::{
+        ChangePubKeyOp, CloseOp, ForcedExitOp, MintNFTOp, SwapOp, TransferOp, TransferToNewOp,
+        WithdrawNFTOp, WithdrawOp,
+    },
+    tx::{Order, PackedPublicKey, TxVersion},
     AccountId, BlockNumber, ZkSyncOp,
 };
 // Local deps
 use crate::witness::{
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
-    FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+    FullExitWitness, MintNFTWitness, SwapWitness, TransferToNewWitness, TransferWitness,
+    WithdrawNFTWitness, WithdrawWitness, Witness,
 };
 use crate::{
     account::AccountWitness,
@@ -44,6 +46,20 @@ use crate::{
     utils::sign_rescue,
 };
 
+use zksync_crypto::params::number_of_processable_tokens;
+
+macro_rules! get_bytes {
+    ($tx:ident) => {
+        if let Some((_, version)) = $tx.tx.verify_signature() {
+            match version {
+                TxVersion::Legacy => $tx.tx.get_old_bytes(),
+                TxVersion::V1 => $tx.tx.get_bytes(),
+            }
+        } else {
+            vec![]
+        }
+    };
+}
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
 /// used for testing
@@ -62,6 +78,8 @@ pub struct WitnessBuilder<'a> {
     pub fee_account_balances: Option<Vec<Option<Fr>>>,
     pub fee_account_witness: Option<AccountWitness<Engine>>,
     pub fee_account_audit_path: Option<Vec<Option<Fr>>>,
+    pub validator_non_processable_tokens_audit_before_fees: Option<Vec<Option<Fr>>>,
+    pub validator_non_processable_tokens_audit_after_fees: Option<Vec<Option<Fr>>>,
     pub pubdata_commitment: Option<Fr>,
 }
 
@@ -89,6 +107,8 @@ impl<'a> WitnessBuilder<'a> {
             fee_account_balances: None,
             fee_account_witness: None,
             fee_account_audit_path: None,
+            validator_non_processable_tokens_audit_before_fees: None,
+            validator_non_processable_tokens_audit_after_fees: None,
             pubdata_commitment: None,
         }
     }
@@ -129,8 +149,8 @@ impl<'a> WitnessBuilder<'a> {
             .account_tree
             .get(*self.fee_account_id)
             .expect("fee account is not in the tree");
-        let mut fee_circuit_account_balances = Vec::with_capacity(total_tokens());
-        for i in 0u32..(total_tokens() as u32) {
+        let mut fee_circuit_account_balances = Vec::with_capacity(number_of_processable_tokens());
+        for i in 0u32..(number_of_processable_tokens() as u32) {
             let balance_value = fee_circuit_account
                 .subtree
                 .get(i)
@@ -140,6 +160,18 @@ impl<'a> WitnessBuilder<'a> {
         }
         self.fee_account_balances = Some(fee_circuit_account_balances);
 
+        self.validator_non_processable_tokens_audit_before_fees = Some(
+            self.account_tree
+                .get(*self.fee_account_id)
+                .unwrap_or(&CircuitAccount::default())
+                .subtree
+                .merkle_path(0)
+                .into_iter()
+                .map(|e| Some(e.0))
+                .collect::<Vec<_>>()
+                .as_slice()[zksync_crypto::params::PROCESSABLE_TOKENS_DEPTH as usize..]
+                .to_vec(),
+        );
         let (mut root_after_fee, mut fee_account_witness) =
             crate::witness::utils::apply_fee(&mut self.account_tree, *self.fee_account_id, 0, 0);
         for CollectedFee { token, amount } in fees {
@@ -152,6 +184,18 @@ impl<'a> WitnessBuilder<'a> {
             root_after_fee = root;
             fee_account_witness = acc_witness;
         }
+        self.validator_non_processable_tokens_audit_after_fees = Some(
+            self.account_tree
+                .get(*self.fee_account_id)
+                .unwrap_or(&CircuitAccount::default())
+                .subtree
+                .merkle_path(0)
+                .into_iter()
+                .map(|e| Some(e.0))
+                .collect::<Vec<_>>()
+                .as_slice()[zksync_crypto::params::PROCESSABLE_TOKENS_DEPTH as usize..]
+                .to_vec(),
+        );
 
         self.root_after_fees = Some(root_after_fee);
         self.fee_account_witness = Some(fee_account_witness);
@@ -171,8 +215,8 @@ impl<'a> WitnessBuilder<'a> {
                     .expect("root after fee should be present at this step"),
             ),
             Some(Fr::from_str(&self.fee_account_id.to_string()).expect("failed to parse")),
-            Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
-            Some(Fr::from_str(&self.timestamp.to_string()).unwrap()),
+            Some(fr_from(self.block_number)),
+            Some(fr_from(self.timestamp)),
             &self.offset_commitment,
         );
         self.pubdata_commitment = Some(public_data_commitment);
@@ -190,18 +234,24 @@ impl<'a> WitnessBuilder<'a> {
                 self.pubdata_commitment
                     .expect("pubdata commitment not present"),
             ),
-            block_number: Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
-            block_timestamp: Some(Fr::from_str(&self.timestamp.to_string()).unwrap()),
+            block_number: Some(fr_from(self.block_number)),
+            block_timestamp: Some(fr_from(self.timestamp)),
             validator_account: self
                 .fee_account_witness
                 .expect("fee account witness not present"),
-            validator_address: Some(Fr::from_str(&self.fee_account_id.to_string()).unwrap()),
+            validator_address: Some(fr_from(self.fee_account_id)),
             validator_balances: self
                 .fee_account_balances
                 .expect("fee account balances not present"),
             validator_audit_path: self
                 .fee_account_audit_path
                 .expect("fee account audit path not present"),
+            validator_non_processable_tokens_audit_before_fees: self
+                .validator_non_processable_tokens_audit_before_fees
+                .expect("fee account non processable tokens audit before fees not present"),
+            validator_non_processable_tokens_audit_after_fees: self
+                .validator_non_processable_tokens_audit_after_fees
+                .expect("fee account non processable tokens audit after fees not present"),
         }
     }
 }
@@ -421,7 +471,7 @@ pub fn apply_fee(
     token: u32,
     fee: u128,
 ) -> (Fr, AccountWitness<Bn256>) {
-    let fee_fe = Fr::from_str(&fee.to_string()).unwrap();
+    let fee_fe = fr_from(fee);
     let mut validator_leaf = tree
         .remove(validator_address)
         .expect("validator_leaf is empty");
@@ -441,6 +491,19 @@ pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
     let mut fr_repr = <Fr as PrimeField>::Repr::default();
     fr_repr.read_be(&*bytes).unwrap();
     Fr::from_repr(fr_repr).unwrap()
+}
+
+pub fn fr_from<T: ToString>(input: T) -> Fr {
+    Fr::from_str(&input.to_string()).unwrap()
+}
+
+pub fn fr_into_u32_low(value: Fr) -> u32 {
+    let mut be_bytes = [0u8; 32];
+    value
+        .into_repr()
+        .write_be(be_bytes.as_mut())
+        .expect("Write value bytes");
+    u32::from_be_bytes([be_bytes[28], be_bytes[29], be_bytes[30], be_bytes[31]])
 }
 
 /// Gathered signature data for calculating the operations in several
@@ -515,11 +578,10 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        SigDataInput::new(
-            &sign_packed,
-            &transfer_op.tx.get_bytes(),
-            &transfer_op.tx.signature.pub_key,
-        )
+
+        let tx_bytes = get_bytes!(transfer_op);
+
+        SigDataInput::new(&sign_packed, &tx_bytes, &transfer_op.tx.signature.pub_key)
     }
 
     pub fn from_transfer_to_new_op(transfer_op: &TransferToNewOp) -> Result<Self, anyhow::Error> {
@@ -529,11 +591,8 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        SigDataInput::new(
-            &sign_packed,
-            &transfer_op.tx.get_bytes(),
-            &transfer_op.tx.signature.pub_key,
-        )
+        let tx_bytes = get_bytes!(transfer_op);
+        SigDataInput::new(&sign_packed, &tx_bytes, &transfer_op.tx.signature.pub_key)
     }
 
     pub fn from_change_pubkey_op(change_pubkey_op: &ChangePubKeyOp) -> Result<Self, anyhow::Error> {
@@ -543,9 +602,10 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
+        let tx_bytes = get_bytes!(change_pubkey_op);
         SigDataInput::new(
             &sign_packed,
-            &change_pubkey_op.tx.get_bytes(),
+            &tx_bytes,
             &change_pubkey_op.tx.signature.pub_key,
         )
     }
@@ -557,11 +617,8 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        SigDataInput::new(
-            &sign_packed,
-            &withdraw_op.tx.get_bytes(),
-            &withdraw_op.tx.signature.pub_key,
-        )
+        let tx_bytes = get_bytes!(withdraw_op);
+        SigDataInput::new(&sign_packed, &tx_bytes, &withdraw_op.tx.signature.pub_key)
     }
 
     pub fn from_forced_exit_op(forced_exit_op: &ForcedExitOp) -> Result<Self, anyhow::Error> {
@@ -571,10 +628,62 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
+        let tx_bytes = get_bytes!(forced_exit_op);
         SigDataInput::new(
             &sign_packed,
-            &forced_exit_op.tx.get_bytes(),
+            &tx_bytes,
             &forced_exit_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_mint_nft_op(mint_nft_op: &MintNFTOp) -> Result<Self, anyhow::Error> {
+        let sign_packed = mint_nft_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &mint_nft_op.tx.get_bytes(),
+            &mint_nft_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_withdraw_nft_op(withdraw_nft_op: &WithdrawNFTOp) -> Result<Self, anyhow::Error> {
+        let sign_packed = withdraw_nft_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &withdraw_nft_op.tx.get_bytes(),
+            &withdraw_nft_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_order(order: &Order) -> Result<Self, anyhow::Error> {
+        let sign_packed = order
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(&sign_packed, &order.get_bytes(), &order.signature.pub_key)
+    }
+
+    pub fn from_swap_op(swap_op: &SwapOp) -> Result<Self, anyhow::Error> {
+        let sign_packed = swap_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &swap_op.tx.get_sign_bytes(),
+            &swap_op.tx.signature.pub_key,
         )
     }
 
@@ -771,7 +880,56 @@ pub fn build_block_witness<'a>(
                 pub_data.extend(forced_exit_witness.get_pubdata());
                 offset_commitment.extend(forced_exit_witness.get_offset_commitment_data())
             }
+            ZkSyncOp::Swap(swap) => {
+                let swap_witness = SwapWitness::apply_tx(&mut witness_accum.account_tree, &swap);
+
+                let input = (
+                    SigDataInput::from_order(&swap.tx.orders.0)?,
+                    SigDataInput::from_order(&swap.tx.orders.1)?,
+                    SigDataInput::from_swap_op(&swap)?,
+                );
+
+                let swap_operations = swap_witness.calculate_operations(input);
+
+                operations.extend(swap_operations);
+                fees.push(CollectedFee {
+                    token: swap.tx.fee_token,
+                    amount: swap.tx.fee,
+                });
+                pub_data.extend(swap_witness.get_pubdata());
+                offset_commitment.extend(swap_witness.get_offset_commitment_data())
+            }
             ZkSyncOp::Noop(_) => {} // Noops are handled below
+            ZkSyncOp::MintNFTOp(mint_nft) => {
+                let mint_nft_witness =
+                    MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft);
+
+                let input = SigDataInput::from_mint_nft_op(&mint_nft)?;
+                let mint_nft_operations = mint_nft_witness.calculate_operations(input);
+
+                operations.extend(mint_nft_operations);
+                fees.push(CollectedFee {
+                    token: mint_nft.tx.fee_token,
+                    amount: mint_nft.tx.fee,
+                });
+                pub_data.extend(mint_nft_witness.get_pubdata());
+                offset_commitment.extend(mint_nft_witness.get_offset_commitment_data())
+            }
+            ZkSyncOp::WithdrawNFT(withdraw_nft) => {
+                let withdraw_nft_witness =
+                    WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft);
+
+                let input = SigDataInput::from_withdraw_nft_op(&withdraw_nft)?;
+                let withdraw_nft_operations = withdraw_nft_witness.calculate_operations(input);
+
+                operations.extend(withdraw_nft_operations);
+                fees.push(CollectedFee {
+                    token: withdraw_nft.tx.fee_token,
+                    amount: withdraw_nft.tx.fee,
+                });
+                pub_data.extend(withdraw_nft_witness.get_pubdata());
+                offset_commitment.extend(withdraw_nft_witness.get_offset_commitment_data())
+            }
         }
     }
 

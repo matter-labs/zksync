@@ -22,18 +22,21 @@ impl CommitCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 40_000;
-    pub const DEPOSIT_COST: u64 = 7_000;
+    pub const BASE_COST: u64 = 51_000;
+    pub const DEPOSIT_COST: u64 = 7_700;
     // TODO: estimate after changepubkey gas cost estimation is fixed [ZKS-554]
     pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 25_000;
-    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 11_050;
-    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 5_530;
-    pub const CHANGE_PUBKEY_COST_CREATE2: u64 = 7_330;
-    pub const TRANSFER_COST: u64 = 250;
-    pub const TRANSFER_TO_NEW_COST: u64 = 780;
-    pub const FULL_EXIT_COST: u64 = 7_000;
-    pub const WITHDRAW_COST: u64 = 3_500;
+    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 12_700;
+    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 6_400;
+    pub const CHANGE_PUBKEY_COST_CREATE2: u64 = 8_450;
+    pub const TRANSFER_COST: u64 = 300;
+    pub const TRANSFER_TO_NEW_COST: u64 = 940;
+    pub const FULL_EXIT_COST: u64 = 10_000;
+    pub const WITHDRAW_COST: u64 = 3_900;
+    pub const WITHDRAW_NFT_COST: u64 = 5_150;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
+    pub const MINT_TOKEN_COST: u64 = 920;
+    pub const SWAP_COST: u64 = 710;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -67,7 +70,10 @@ impl CommitCost {
             ZkSyncOp::FullExit(_) => Self::FULL_EXIT_COST,
             ZkSyncOp::Withdraw(_) => Self::WITHDRAW_COST,
             ZkSyncOp::ForcedExit(_) => Self::FORCED_EXIT_COST,
+            ZkSyncOp::Swap(_) => Self::SWAP_COST,
+            ZkSyncOp::MintNFTOp(_) => Self::MINT_TOKEN_COST,
             ZkSyncOp::Close(_) => unreachable!("Close operations are disabled"),
+            ZkSyncOp::WithdrawNFT(_) => Self::WITHDRAW_NFT_COST,
         };
 
         U256::from(cost)
@@ -85,13 +91,16 @@ impl VerifyCost {
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 10_000;
-    pub const DEPOSIT_COST: u64 = 50;
+    pub const DEPOSIT_COST: u64 = 100;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
+    pub const SWAP_COST: u64 = 0;
     pub const FULL_EXIT_COST: u64 = 30_000;
     pub const WITHDRAW_COST: u64 = 48_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
+    pub const MINT_NFT_COST: u64 = 0;
+    pub const WITHDRAW_NFT_COST: u64 = 200_000;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -107,7 +116,10 @@ impl VerifyCost {
             ZkSyncOp::FullExit(_) => Self::FULL_EXIT_COST,
             ZkSyncOp::Withdraw(_) => Self::WITHDRAW_COST,
             ZkSyncOp::ForcedExit(_) => Self::FORCED_EXIT_COST,
+            ZkSyncOp::MintNFTOp(_) => Self::MINT_NFT_COST,
+            ZkSyncOp::Swap(_) => Self::SWAP_COST,
             ZkSyncOp::Close(_) => unreachable!("Close operations are disabled"),
+            ZkSyncOp::WithdrawNFT(_) => Self::WITHDRAW_NFT_COST,
         };
 
         U256::from(cost)
@@ -268,6 +280,7 @@ mod tests {
         },
         priority_ops::{Deposit, FullExit},
         tx::{ChangePubKey, ForcedExit, Transfer, Withdraw},
+        MintNFT, MintNFTOp, WithdrawNFT, WithdrawNFTOp,
     };
 
     #[test]
@@ -331,8 +344,13 @@ mod tests {
                 account_id: AccountId(0),
                 eth_address: Default::default(),
                 token: TokenId(0),
+                is_legacy: false,
             },
             withdraw_amount: None,
+            creator_account_id: None,
+            creator_address: None,
+            serial_id: None,
+            content_hash: None,
         };
         let forced_exit_op = ForcedExitOp {
             tx: ForcedExit::new(
@@ -362,6 +380,38 @@ mod tests {
             account_id: AccountId(1),
         };
 
+        let withdraw_nft_op = WithdrawNFTOp {
+            tx: WithdrawNFT::new(
+                AccountId(1),
+                Default::default(),
+                Default::default(),
+                TokenId(0),
+                Default::default(),
+                Default::default(),
+                Nonce(0),
+                Default::default(),
+                None,
+            ),
+            creator_id: Default::default(),
+            creator_address: Default::default(),
+            content_hash: Default::default(),
+            serial_id: 0,
+        };
+
+        let mint_nft_op = MintNFTOp {
+            tx: MintNFT::new(
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                None,
+            ),
+            creator_account_id: Default::default(),
+            recipient_account_id: Default::default(),
+        };
         let test_vector_commit = vec![
             (
                 ZkSyncOp::from(change_pubkey_op.clone()),
@@ -389,6 +439,18 @@ mod tests {
                 ZkSyncOp::from(withdraw_op.clone()),
                 CommitCost::WITHDRAW_COST,
             ),
+            (
+                ZkSyncOp::from(withdraw_op.clone()),
+                CommitCost::WITHDRAW_COST,
+            ),
+            (
+                ZkSyncOp::from(withdraw_nft_op.clone()),
+                CommitCost::WITHDRAW_NFT_COST,
+            ),
+            (
+                ZkSyncOp::from(mint_nft_op.clone()),
+                CommitCost::MINT_TOKEN_COST,
+            ),
         ];
         let test_vector_verify = vec![
             (
@@ -405,10 +467,20 @@ mod tests {
             (ZkSyncOp::from(full_exit_op), VerifyCost::FULL_EXIT_COST),
             (ZkSyncOp::from(forced_exit_op), VerifyCost::FORCED_EXIT_COST),
             (ZkSyncOp::from(withdraw_op), VerifyCost::WITHDRAW_COST),
+            (
+                ZkSyncOp::from(withdraw_nft_op),
+                VerifyCost::WITHDRAW_NFT_COST,
+            ),
+            (ZkSyncOp::from(mint_nft_op), VerifyCost::MINT_NFT_COST),
         ];
 
         for (op, expected_cost) in test_vector_commit {
-            assert_eq!(CommitCost::op_cost(&op), U256::from(expected_cost));
+            assert_eq!(
+                CommitCost::op_cost(&op),
+                U256::from(expected_cost),
+                "{:?}",
+                &op
+            );
         }
         for (op, expected_cost) in test_vector_verify {
             assert_eq!(VerifyCost::op_cost(&op), U256::from(expected_cost));

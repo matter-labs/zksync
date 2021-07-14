@@ -1,7 +1,7 @@
 use crate::{operations::error::CloseOpError, tx::TxSignature, AccountId, Address, Close, Nonce};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::{
-    params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES},
+    params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES, LEGACY_CHUNK_BYTES},
     primitives::FromBytes,
 };
 
@@ -23,7 +23,15 @@ impl CloseOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, CloseOpError> {
-        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+        Self::parse_pub_data(bytes, CHUNK_BYTES)
+    }
+
+    pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, CloseOpError> {
+        Self::parse_pub_data(bytes, LEGACY_CHUNK_BYTES)
+    }
+
+    fn parse_pub_data(bytes: &[u8], chunk_bytes: usize) -> Result<Self, CloseOpError> {
+        if bytes.len() != Self::CHUNKS * chunk_bytes {
             return Err(CloseOpError::PubdataSizeMismatch);
         }
 

@@ -10,6 +10,7 @@ use crate::{
     handler::{error::ChangePubKeyOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
+use zksync_crypto::params::max_processable_token;
 
 impl TxHandler<ChangePubKey> for ZkSyncState {
     type Op = ChangePubKeyOp;
@@ -24,13 +25,19 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
             ChangePubKeyOpError::InvalidAccountAddress
         );
         invariant!(
+            tx.fee_token <= max_processable_token(),
+            ChangePubKeyOpError::InvalidFeeTokenId
+        );
+        invariant!(
             tx.is_eth_auth_data_valid(),
             ChangePubKeyOpError::InvalidAuthData
         );
-        invariant!(
-            tx.verify_signature() == Some(tx.new_pk_hash),
-            ChangePubKeyOpError::InvalidZksyncSignature
-        );
+
+        if let Some((pub_key_hash, _)) = tx.verify_signature() {
+            if pub_key_hash != tx.new_pk_hash {
+                return Err(ChangePubKeyOpError::InvalidZksyncSignature);
+            }
+        }
         invariant!(
             account_id == tx.account_id,
             ChangePubKeyOpError::InvalidAccountId

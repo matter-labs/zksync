@@ -13,6 +13,7 @@ publish = false # We don't want to publish our binaries.
 [dependencies]
 zksync_state = { path = "../../lib/state", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_notifier = { path = "../../lib/notifier", version = "1.0" }
 zksync_api_types = { path = "../../lib/api_types", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 
@@ -26,6 +27,8 @@ zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version =
 zksync_balancer = { path = "../../lib/balancer", version = "1.0" }
 zksync_gateway_watcher = { path = "../../lib/gateway_watcher", version = "1.0" }
 
+num = { version = "0.3.1", features = ["serde"] }
+
 ethabi = "12.0.0"
 web3 = "0.13.0"
 serde = "1.0.90"
@@ -33,12 +36,13 @@ serde_json = "1.0.0"
 metrics = "=0.13.0-alpha.8"
 itertools = "0.9.0"
 
-vlog = { path = "../../lib/vlog", version = "1.0" }
+vlog = { path = "../../lib/vlog", version = "1.0", features = ["actix"] }
 
 tokio = { version = "0.2", features = ["time"] }
 futures = "0.3"
 actix-rt = "1.1.1"
 actix-web = "3.0.0"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"

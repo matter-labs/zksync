@@ -6,6 +6,7 @@ members = [
     "core/bin/server",
     "core/bin/prover",
     "core/bin/parse_pub_data",
+    "core/bin/regen-root-hash",
     "core/bin/block_revert",
     "core/bin/hashes_migration",
 
@@ -34,6 +35,7 @@ members = [
     "core/lib/config",
     "core/lib/contracts",
     "core/lib/api_client",
+    "core/lib/notifier",
     "core/lib/api_types",
     "core/lib/balancer",
 
@@ -44,7 +46,7 @@ members = [
     "core/tests/loadnext",
 
     # SDK section
-    "sdk/zksync-rs",
+    "sdk/zksync-rs"
 ]
 
 [patch.crates-io]

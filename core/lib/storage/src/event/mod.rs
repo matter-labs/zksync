@@ -10,7 +10,7 @@ use zksync_types::event::{
     },
     block::{BlockEvent, BlockStatus},
     transaction::{TransactionEvent, TransactionStatus},
-    EventId, ZkSyncEvent,
+    EventId,
 };
 use zksync_types::{block::ExecutedOperations, priority_ops::ZkSyncPriorityOp};
 // Local uses
@@ -68,8 +68,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     }
 
     /// Load all events from the database with the `id` greater than `from`.
-    pub async fn fetch_new_events(&mut self, from: EventId) -> QueryResult<Vec<ZkSyncEvent>> {
+    pub async fn fetch_new_events(&mut self, from: EventId) -> QueryResult<Vec<StoredEvent>> {
         let start = Instant::now();
+        // Don't deserialize JSONs, the event server is responsible for handling
+        // possible errors.
         let events = sqlx::query_as!(
             StoredEvent,
             r#"
@@ -84,10 +86,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             *from as i64
         )
         .fetch_all(self.0.conn())
-        .await?
-        .into_iter()
-        .map(ZkSyncEvent::from)
-        .collect();
+        .await?;
 
         metrics::histogram!("sql.event.fetch_new_events", start.elapsed());
         Ok(events)
@@ -177,14 +176,20 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .into_iter()
             .map(|(account_id, update)| {
                 let update_type = AccountStateChangeType::from(&update);
-                let update_details = AccountUpdateDetails::from_account_update(account_id, update);
-                let account_event = AccountEvent {
-                    update_type,
-                    status,
-                    update_details,
-                };
-                serde_json::to_value(account_event).expect("couldn't serialize account event")
+                AccountUpdateDetails::from_account_update(account_id, update).map(
+                    |update_details| {
+                        let account_event = AccountEvent {
+                            update_type,
+                            status,
+                            update_details,
+                        };
+                        serde_json::to_value(account_event)
+                            .expect("couldn't serialize account event")
+                    },
+                )
             })
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
             .collect();
 
         transaction
@@ -224,7 +229,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     }
 
     /// Create new transaction events and store them in the database.
-    pub async fn store_transaction_event(
+    /// The block is expected to be either committed or finalized.
+    pub async fn store_confirmed_transaction_event(
         &mut self,
         block_number: BlockNumber,
         status: TransactionStatus,
@@ -288,29 +294,27 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Fetch rejected transactions for the given block and store corresponding
-    /// events in the database. Unlike `store_transaction_event`, this method is called
-    /// when the block is not yet committed on the chain.
-    pub async fn store_rejected_transaction_event(
+    /// Fetch executed transactions for the given block and store corresponding
+    /// `Queued` or `Rejected` events in the database. This method is called when
+    /// the `committer` saves the block in the database.
+    pub async fn store_executed_transaction_event(
         &mut self,
         block_number: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        // Load all failed block operations.
+        // Load all operations executed in the given block.
         let block_operations = transaction
             .chain()
             .block_schema()
             .get_block_executed_ops(block_number)
-            .await?
-            .into_iter()
-            .filter(|op| !op.is_successful());
+            .await?;
 
-        let mut events = Vec::new();
-        for rejected_tx in block_operations {
+        let mut events = Vec::with_capacity(block_operations.len());
+        for executed_tx in block_operations {
             let account_id = match transaction
                 .event_schema()
-                .account_id_from_op(&rejected_tx)
+                .account_id_from_op(&executed_tx)
                 .await
             {
                 Ok(account_id) => account_id,
@@ -327,10 +331,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             };
 
             let transaction_event = TransactionEvent::from_executed_operation(
-                rejected_tx,
+                executed_tx,
                 block_number,
                 account_id,
-                TransactionStatus::Rejected,
+                TransactionStatus::Queued,
             );
 
             let event_data = serde_json::to_value(transaction_event)
@@ -345,10 +349,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .await?;
         transaction.commit().await?;
 
-        metrics::histogram!(
-            "sql.event.store_rejected_transaction_event",
-            start.elapsed()
-        );
+        metrics::histogram!("sql.event.store_queued_transaction_event", start.elapsed());
         Ok(())
     }
 }

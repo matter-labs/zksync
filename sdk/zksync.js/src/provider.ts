@@ -1,5 +1,5 @@
 import { AbstractJSONRPCTransport, DummyTransport, HTTPTransport, WSTransport } from './transport';
-import { BigNumber, Contract, ethers } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import {
     AccountState,
     Address,
@@ -12,9 +12,20 @@ import {
     TokenLike,
     Tokens,
     TransactionReceipt,
-    TxEthSignature
+    TxEthSignature,
+    TxEthSignatureVariant,
+    NFTInfo
 } from './types';
-import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
+import { isTokenETH, sleep, TokenSet } from './utils';
+import {
+    Governance,
+    GovernanceFactory,
+    ZkSync,
+    ZkSyncFactory,
+    ZkSyncNFTFactory,
+    ZkSyncNFTFactoryFactory
+} from './typechain';
+
 import { SyncProvider } from './provider-interface';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
@@ -74,8 +85,9 @@ export class Provider extends SyncProvider {
     static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
@@ -88,8 +100,9 @@ export class Provider extends SyncProvider {
         if (pollIntervalMilliSecs) {
             provider.pollIntervalMilliSecs = pollIntervalMilliSecs;
         }
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
@@ -101,20 +114,21 @@ export class Provider extends SyncProvider {
         const transport = new DummyTransport(network, ethPrivateKey, getTokens);
         const provider = new Provider(transport);
 
-        provider.contractAddress = await provider.getContractAddress();
-        provider.tokenSet = new TokenSet(await provider.getTokens());
+        const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
+        provider.contractAddress = contractsAndTokens[0];
+        provider.tokenSet = new TokenSet(contractsAndTokens[1]);
         return provider;
     }
 
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
+    async submitTx(tx: any, signature?: TxEthSignatureVariant, fastProcessing?: boolean): Promise<string> {
         return await this.transport.request('tx_submit', [tx, signature, fastProcessing]);
     }
 
     // Requests `zkSync` server to execute several transactions together.
     // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTxsBatch(
-        transactions: { tx: any; signature?: TxEthSignature }[],
+        transactions: { tx: any; signature?: TxEthSignatureVariant }[],
         ethSignatures?: TxEthSignature | TxEthSignature[]
     ): Promise<string[]> {
         let signatures: TxEthSignature[] = [];
@@ -157,6 +171,17 @@ export class Provider extends SyncProvider {
 
     async getEthTxForWithdrawal(withdrawal_hash: string): Promise<string> {
         return await this.transport.request('get_eth_tx_for_withdrawal', [withdrawal_hash]);
+    }
+
+    async getNFT(id: number): Promise<NFTInfo> {
+        const nft = await this.transport.request('get_nft', [id]);
+
+        // If the NFT does not exist, throw an exception
+        if (nft == null) {
+            throw new Error(`Requested NFT doesn't exist or the corresponding mintNFT operation is not verified yet`);
+        }
+
+        return nft;
     }
 
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {
@@ -248,14 +273,47 @@ export class Provider extends SyncProvider {
 }
 
 export class ETHProxy {
-    private governanceContract: Contract;
+    private governanceContract: Governance;
+    private zkSyncContract: ZkSync;
+    private zksyncNFTFactory: ZkSyncNFTFactory;
+    // Needed for typechain to work
+    private dummySigner: ethers.VoidSigner;
 
     constructor(private ethersProvider: ethers.providers.Provider, public contractAddress: ContractAddress) {
-        this.governanceContract = new Contract(
-            this.contractAddress.govContract,
-            SYNC_GOV_CONTRACT_INTERFACE,
-            this.ethersProvider
-        );
+        this.dummySigner = new ethers.VoidSigner(ethers.constants.AddressZero, this.ethersProvider);
+
+        const governanceFactory = new GovernanceFactory(this.dummySigner);
+        this.governanceContract = governanceFactory.attach(contractAddress.govContract);
+
+        const zkSyncFactory = new ZkSyncFactory(this.dummySigner);
+        this.zkSyncContract = zkSyncFactory.attach(contractAddress.mainContract);
+    }
+
+    getGovernanceContract(): Governance {
+        return this.governanceContract;
+    }
+
+    getZkSyncContract(): ZkSync {
+        return this.zkSyncContract;
+    }
+
+    // This method is very helpful for those who have already fetched the
+    // default factory and want to avoid asynchorouns execution from now on
+    getCachedNFTDefaultFactory(): ZkSyncNFTFactory | undefined {
+        return this.zksyncNFTFactory;
+    }
+
+    async getDefaultNFTFactory(): Promise<ZkSyncNFTFactory> {
+        if (this.zksyncNFTFactory) {
+            return this.zksyncNFTFactory;
+        }
+
+        const nftFactoryAddress = await this.governanceContract.defaultFactory();
+
+        const nftFactory = new ZkSyncNFTFactoryFactory(this.dummySigner);
+        this.zksyncNFTFactory = nftFactory.attach(nftFactoryAddress);
+
+        return this.zksyncNFTFactory;
     }
 
     async resolveTokenId(token: TokenAddress): Promise<number> {

@@ -822,10 +822,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .save_block_transactions(block.block_number, block.block_transactions)
             .await?;
 
-        // Notify about rejected transactions right away without waiting for the block commit.
+        // Notify about queued and rejected transactions right away without
+        // waiting for the block commit.
         transaction
             .event_schema()
-            .store_rejected_transaction_event(block.block_number)
+            .store_executed_transaction_event(block.block_number)
             .await?;
 
         let new_block = StorageBlock {
@@ -865,6 +866,29 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.save_block", start.elapsed());
+        Ok(())
+    }
+
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // needed anymore: ZKS-663
+    pub async fn change_block_root_hash(
+        &mut self,
+        block_number: BlockNumber,
+        new_root_hash: Fr,
+    ) -> QueryResult<()> {
+        let root_hash_bytes = new_root_hash.to_bytes();
+        sqlx::query!(
+            "UPDATE blocks
+                SET root_hash = $1
+                WHERE number = $2",
+            root_hash_bytes,
+            *block_number as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
         Ok(())
     }
 
@@ -915,6 +939,24 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.chain.block.store_account_tree_cache", start.elapsed());
+        Ok(())
+    }
+
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // needed anymore: ZKS-663
+    pub async fn reset_account_tree_cache(&mut self, block_number: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "
+            DELETE FROM account_tree_cache 
+            WHERE block = $1
+            ",
+            *block_number as u32
+        )
+        .execute(self.0.conn())
+        .await?;
+
         Ok(())
     }
 
@@ -1233,6 +1275,55 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.chain.block.remove_account_tree_cache", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn store_factories_for_block_withdraw_nfts(
+        &mut self,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let executed_txs: Vec<StoredExecutedTransaction> = sqlx::query_as!(
+            StoredExecutedTransaction,
+            "SELECT * FROM executed_transactions WHERE block_number BETWEEN $1 AND $2 AND success = true",
+            i64::from(*from_block),
+            i64::from(*to_block)
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+
+        let mut token_ids = Vec::new();
+        for executed_tx in executed_txs {
+            if executed_tx.tx.get("type")
+                == Some(&serde_json::Value::String("WithdrawNFT".to_string()))
+            {
+                token_ids.push(executed_tx.tx.get("token").unwrap().as_i64().unwrap() as i32);
+            }
+        }
+
+        sqlx::query!(
+            r#"
+                INSERT INTO withdrawn_nfts_factories (token_id, factory_address)
+                SELECT token_id, 
+                    COALESCE(nft_factory.factory_address, server_config.nft_factory_addr) as factory_address
+                FROM nft
+                INNER JOIN server_config ON server_config.id = true
+                LEFT JOIN nft_factory ON nft_factory.creator_id = nft.creator_account_id
+                WHERE nft.token_id = ANY($1)
+            "#,
+            &token_ids
+        )
+        .execute(transaction.conn())
+        .await?;
+        transaction.commit().await?;
+
+        metrics::histogram!(
+            "sql.chain.block.store_factories_for_block_withdraw_nfts",
+            start.elapsed()
+        );
         Ok(())
     }
 }
