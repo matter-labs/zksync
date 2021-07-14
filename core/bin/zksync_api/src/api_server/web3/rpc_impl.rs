@@ -1,7 +1,8 @@
+// Built-in uses
 use std::time::Instant;
 // External uses
 use jsonrpc_core::Result;
-
+// Local uses
 use super::Web3RpcApp;
 
 impl Web3RpcApp {
