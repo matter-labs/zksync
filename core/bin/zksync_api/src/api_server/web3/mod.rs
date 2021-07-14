@@ -65,7 +65,7 @@ impl Web3RpcApp {
         let number = match number {
             Some(number) => number,
             None => {
-                return Ok(Some(last_saved_block));
+                return Ok(Some(Self::last_saved_block(storage).await?));
             }
         };
 
