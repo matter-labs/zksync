@@ -424,6 +424,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             r#"
                 SELECT new_balance FROM account_balance_updates
                 WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0
+                ORDER BY update_order_id DESC
                 LIMIT 1
             "#,
             i64::from(account_id.0),
