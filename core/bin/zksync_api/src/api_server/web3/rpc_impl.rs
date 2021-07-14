@@ -3,10 +3,7 @@ use std::time::Instant;
 // External uses
 use jsonrpc_core::Result;
 // Local uses
-use super::{
-    types::{Address, BlockNumber, H256, U256},
-    Web3RpcApp,
-};
+use super::Web3RpcApp;
 
 impl Web3RpcApp {
     pub async fn _impl_ping(self) -> Result<bool> {
