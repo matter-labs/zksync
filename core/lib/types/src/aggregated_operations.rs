@@ -16,7 +16,7 @@ pub fn stored_block_info(block: &Block) -> Token {
     Token::Tuple(vec![
         Token::Uint(U256::from(*block.block_number)),
         Token::Uint(U256::from(block.number_of_processed_prior_ops())),
-        Token::FixedBytes(if (block.block_number.0 == 19646) {
+        Token::FixedBytes(if block.block_number.0 == 19646 {
             hex::decode("4733836f2cfa3bd7d4323227172b534af5c97e1a995953dadb7a16e96ef9857c").unwrap()
         } else {
             block

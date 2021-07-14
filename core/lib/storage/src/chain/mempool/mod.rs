@@ -154,16 +154,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 .as_ref()
                 .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"));
 
-            let eth_sign_data = if let Some(val) = eth_sign_data {
-                if val.is_null() {
-                    None
-                } else {
-                    Some(val)
-                }
-            } else {
-                None
-            };
-
             sqlx::query!(
                 "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)
                 VALUES ($1, $2, $3, $4)",
@@ -188,37 +178,28 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         };
 
         // Processing of all batch transactions, except the first
-        let mut tx_hashes_strs = Vec::with_capacity(txs.len());
-        let mut tx_values = Vec::with_capacity(txs.len());
-        let mut txs_sign_data = Vec::with_capacity(txs.len());
 
         for (tx_data, tx_hash) in txs[1..].iter().zip(tx_hashes[1..].iter()) {
-            tx_hashes_strs.push(hex::encode(tx_hash.as_ref()));
-            tx_values.push(
-                serde_json::to_value(&tx_data.tx)
-                    .expect("Unserializable TX provided to the database"),
-            );
-            txs_sign_data.push(
-                tx_data
-                    .eth_sign_data
-                    .as_ref()
-                    .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"))
-                    .unwrap_or_default(),
-            );
+            let tx_hash = hex::encode(tx_hash.as_ref());
+            let tx = serde_json::to_value(&tx_data.tx)
+                .expect("Unserializable TX provided to the database");
+            let eth_sign_data = tx_data
+                .eth_sign_data
+                .as_ref()
+                .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"));
+
+            sqlx::query!(
+                "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
+                VALUES ($1, $2, $3, $4, $5)",
+                tx_hash,
+                tx,
+                chrono::Utc::now(),
+                eth_sign_data,
+                batch_id
+            )
+            .execute(transaction.conn())
+            .await?;
         }
-        sqlx::query!(
-            "INSERT INTO mempool_txs (tx_hash, tx, eth_sign_data, created_at, batch_id)
-            SELECT u.tx_hash, u.tx, u.eth_sign_data, $4, $5
-                FROM UNNEST ($1::text[], $2::jsonb[], $3::jsonb[])
-                AS u(tx_hash, tx, eth_sign_data)",
-            &tx_hashes_strs,
-            &tx_values,
-            &txs_sign_data,
-            chrono::Utc::now(),
-            batch_id
-        )
-        .execute(transaction.conn())
-        .await?;
 
         // If there're signatures for the whole batch, store them too.
         for signature in eth_signatures {
