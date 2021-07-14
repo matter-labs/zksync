@@ -13,7 +13,7 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
 use self::{
     rpc_trait::Web3Rpc,
-    types::{Block, BlockInfo, Transaction, TxData, H160, H256, H64, U256},
+    types::{BlockInfo, Transaction, TxData, H256, U256},
 };
 
 mod rpc_impl;
@@ -112,12 +112,12 @@ impl Web3RpcApp {
         Ok(U256::from(count))
     }
 
-    fn transaction_from_executed_tx_and_hash(tx: TxData, block_hash: H256) -> Transaction {
+    fn transaction_from_tx_data(tx: TxData) -> Transaction {
         Transaction {
             hash: tx.tx_hash,
             nonce: tx.nonce.into(),
-            block_hash: Some(block_hash),
-            block_number: Some(tx.block_number.into()),
+            block_hash: tx.block_hash,
+            block_number: tx.block_number.map(Into::into),
             transaction_index: tx.block_index.map(Into::into),
             from: tx.from,
             to: tx.to,
@@ -164,7 +164,8 @@ impl Web3RpcApp {
                 .map(|tx| {
                     let tx = match tx {
                         ExecutedOperations::Tx(tx) => TxData {
-                            block_number: block_number.0,
+                            block_hash: Some(hash),
+                            block_number: Some(block_number.0),
                             block_index: tx.block_index,
                             from: tx.signed_tx.tx.from_account(),
                             to: tx.signed_tx.tx.to_account(),
@@ -172,7 +173,8 @@ impl Web3RpcApp {
                             tx_hash: H256::from_slice(tx.signed_tx.tx.hash().as_ref()),
                         },
                         ExecutedOperations::PriorityOp(op) => TxData {
-                            block_number: block_number.0,
+                            block_hash: Some(hash),
+                            block_number: Some(block_number.0),
                             block_index: Some(op.block_index),
                             from: op.priority_op.data.from_account(),
                             to: op.priority_op.data.to_account(),
@@ -180,33 +182,17 @@ impl Web3RpcApp {
                             tx_hash: H256::from_slice(op.priority_op.tx_hash().as_ref()),
                         },
                     };
-                    Self::transaction_from_executed_tx_and_hash(tx, hash)
+                    Self::transaction_from_tx_data(tx)
                 })
                 .collect();
 
-            Ok(BlockInfo::BlockWithTxs(Block {
-                hash: Some(hash),
+            Ok(BlockInfo::new_with_txs(
+                hash,
                 parent_hash,
-                uncles_hash: H256::zero(),
-                author: H160::zero(),
-                state_root: hash,
-                transactions_root: hash,
-                receipts_root: hash,
-                number: Some(block_number.0.into()),
-                gas_used: 0.into(),
-                gas_limit: 50000.into(),
-                extra_data: Vec::new().into(),
-                logs_bloom: None,
-                timestamp: block.timestamp.into(),
-                difficulty: 0.into(),
-                total_difficulty: Some(0.into()),
-                seal_fields: Vec::new(),
-                uncles: Vec::new(),
+                block_number,
+                block.timestamp,
                 transactions,
-                size: None,
-                mix_hash: Some(H256::zero()),
-                nonce: Some(H64::zero()),
-            }))
+            ))
         } else {
             // It was already checked that the block is in storage.
             let block = storage
@@ -227,29 +213,13 @@ impl Web3RpcApp {
                 .map(|hash| H256::from_slice(&hash))
                 .collect();
 
-            Ok(BlockInfo::Block(Block {
-                hash: Some(hash),
+            Ok(BlockInfo::new_with_hashes(
+                hash,
                 parent_hash,
-                uncles_hash: H256::zero(),
-                author: H160::zero(),
-                state_root: hash,
-                transactions_root: hash,
-                receipts_root: hash,
-                number: Some(block_number.0.into()),
-                gas_used: 0.into(),
-                gas_limit: 50000.into(),
-                extra_data: Vec::new().into(),
-                logs_bloom: None,
-                timestamp: block.timestamp.unwrap_or_default().into(),
-                difficulty: 0.into(),
-                total_difficulty: Some(0.into()),
-                seal_fields: Vec::new(),
-                uncles: Vec::new(),
+                block_number,
+                block.timestamp.unwrap_or_default() as u64,
                 transactions,
-                size: None,
-                mix_hash: Some(H256::zero()),
-                nonce: Some(H64::zero()),
-            }))
+            ))
         }
     }
 }
