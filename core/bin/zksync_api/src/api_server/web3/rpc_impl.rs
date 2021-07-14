@@ -4,7 +4,7 @@ use std::time::Instant;
 use jsonrpc_core::{Error, Result};
 // Local uses
 use super::{
-    types::{Address, BlockNumber, H256, U256, U64},
+    types::{BlockNumber, H256, U256, U64},
     Web3RpcApp,
 };
 
