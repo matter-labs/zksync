@@ -943,3 +943,70 @@ async fn tx_data(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     Ok(())
 }
+
+/// Test `tx_data_for_web3` method
+#[db_test]
+async fn tx_data_for_web3(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+
+    // Checks that it returns None for unexisting tx
+    let data = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(&[0xDE, 0xAD, 0xBE, 0xEF])
+        .await?;
+    assert!(data.is_none());
+
+    setup.add_block(1);
+    commit_schema_data(&mut storage, &setup).await?;
+
+    // Test data for L1 op.
+    let eth_hash = match setup.blocks[0].block_transactions[0].clone() {
+        ExecutedOperations::PriorityOp(op) => op.priority_op.eth_hash,
+        ExecutedOperations::Tx(_) => {
+            panic!("Should be L1 op")
+        }
+    };
+    let tx_hash = setup.get_tx_hash(0, 0).as_ref().to_vec();
+
+    let l1_data_by_tx_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(&tx_hash)
+        .await?;
+    assert_eq!(l1_data_by_tx_hash.unwrap().tx_hash, tx_hash);
+
+    let l1_data_by_eth_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(eth_hash.as_ref())
+        .await?;
+    assert_eq!(l1_data_by_eth_hash.unwrap().tx_hash, tx_hash);
+
+    // Test data for executed L2 tx.
+    let tx_hash = setup.get_tx_hash(0, 2).as_ref().to_vec();
+    let l2_data = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(&tx_hash)
+        .await?;
+    assert_eq!(l2_data.unwrap().tx_hash, tx_hash);
+
+    // Test data for tx from mempool.
+    setup.add_block(2);
+    let tx = match setup.blocks[1].block_transactions[2].clone() {
+        ExecutedOperations::Tx(tx) => tx.signed_tx,
+        ExecutedOperations::PriorityOp(_) => {
+            panic!("Should be L2 tx")
+        }
+    };
+    storage.chain().mempool_schema().insert_tx(&tx).await?;
+    let l2_data = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(tx.hash().as_ref())
+        .await?;
+    assert_eq!(l2_data.unwrap().tx_hash, tx.hash().as_ref().to_vec());
+
+    Ok(())
+}
