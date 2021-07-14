@@ -5,6 +5,7 @@ pub use self::{
     eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig, event_listener::EventListenerConfig,
     forced_exit_requests::ForcedExitRequestsConfig, gateway_watcher::GatewayWatcherConfig,
     misc::MiscConfig, prover::ProverConfig, ticker::TickerConfig,
+    token_handler::TokenHandlerConfig,
 };
 
 pub mod api;
@@ -21,6 +22,7 @@ pub mod gateway_watcher;
 pub mod misc;
 pub mod prover;
 pub mod ticker;
+pub mod token_handler;
 
 #[cfg(test)]
 pub(crate) mod test_utils;

@@ -1,12 +1,10 @@
+use thiserror::Error;
+
 use parity_crypto::{
-    publickey::{
-        public_to_address, recover, sign, Error as ParityCryptoError, KeyPair,
-        Signature as ETHSignature,
-    },
+    publickey::{public_to_address, recover, sign, KeyPair, Signature as ETHSignature},
     Keccak256,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use thiserror::Error;
 use zksync_basic_types::{Address, H256};
 use zksync_utils::ZeroPrefixHexSerde;
 
@@ -30,16 +28,25 @@ use zksync_utils::ZeroPrefixHexSerde;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackedEthSignature(ETHSignature);
 
+#[derive(Debug, Error)]
+pub enum PackedETHSignatureError {
+    #[error("Signature length mismatch")]
+    LengthMismatched,
+    #[error("Crypto Error: {0:?}")]
+    CryptoError(#[from] parity_crypto::publickey::Error),
+}
+
 impl PackedEthSignature {
     pub fn serialize_packed(&self) -> [u8; 65] {
         // adds 27 to v
         self.0.clone().into_electrum()
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializeError> {
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, PackedETHSignatureError> {
         if bytes.len() != 65 {
-            return Err(DeserializeError::IncorrectSignatureLength);
+            return Err(PackedETHSignatureError::LengthMismatched);
         }
+
         let mut bytes_array = [0u8; 65];
         bytes_array.copy_from_slice(&bytes);
 
@@ -52,7 +59,10 @@ impl PackedEthSignature {
 
     /// Signs message using ethereum private key, results are identical to signature created
     /// using `geth`, `ethecore/lib/types/src/gas_counter.rsrs.js`, etc. No hashing and prefixes required.
-    pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, ParityCryptoError> {
+    pub fn sign(
+        private_key: &H256,
+        msg: &[u8],
+    ) -> Result<PackedEthSignature, PackedETHSignatureError> {
         let secret_key = (*private_key).into();
         let signed_bytes = Self::message_to_signed_bytes(msg);
         let signature = sign(&secret_key, &signed_bytes)?;
@@ -70,22 +80,18 @@ impl PackedEthSignature {
     /// Checks signature and returns ethereum address of the signer.
     /// message should be the same message that was passed to `eth.sign`(or similar) method
     /// as argument. No hashing and prefixes required.
-    pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, ParityCryptoError> {
+    pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, PackedETHSignatureError> {
         let signed_bytes = Self::message_to_signed_bytes(msg);
         let public_key = recover(&self.0, &signed_bytes)?;
         Ok(public_to_address(&public_key))
     }
 
     /// Get Ethereum address from private key.
-    pub fn address_from_private_key(private_key: &H256) -> Result<Address, ParityCryptoError> {
+    pub fn address_from_private_key(
+        private_key: &H256,
+    ) -> Result<Address, PackedETHSignatureError> {
         Ok(KeyPair::from_secret((*private_key).into())?.address())
     }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub enum DeserializeError {
-    #[error("Eth signature length should be 65 bytes")]
-    IncorrectSignatureLength,
 }
 
 impl Serialize for PackedEthSignature {

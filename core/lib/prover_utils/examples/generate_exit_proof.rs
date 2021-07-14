@@ -4,6 +4,7 @@
 use serde::Serialize;
 use std::time::Instant;
 use structopt::StructOpt;
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_crypto::proof::EncodedSingleProof;
 use zksync_storage::ConnectionPool;
 use zksync_types::{block::Block, AccountId, Address, BlockNumber, TokenId, TokenLike, H256};
@@ -123,9 +124,29 @@ async fn main() {
 
     vlog::info!("Restored state from db: {} s", timer.elapsed().as_secs());
 
-    let (proof, amount) =
-        zksync_prover_utils::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
-            .expect("Failed to generate exit proof");
+    let (proof, amount) = if token_id.0 < MIN_NFT_TOKEN_ID {
+        zksync_prover_utils::exit_proof::create_exit_proof_fungible(
+            accounts, account_id, address, token_id,
+        )
+        .expect("Failed to generate exit proof")
+    } else {
+        let nft = storage
+            .tokens_schema()
+            .get_nft(token_id)
+            .await
+            .expect("Db access fail")
+            .expect("NFT token should exist");
+        zksync_prover_utils::exit_proof::create_exit_proof_nft(
+            accounts,
+            account_id,
+            address,
+            token_id,
+            nft.creator_id,
+            nft.serial_id,
+            nft.content_hash,
+        )
+        .expect("Failed to generate exit proof")
+    };
 
     let proof_data = ExitProofData {
         stored_block_info,

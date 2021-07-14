@@ -16,6 +16,7 @@ mod backward_compatibility {
         deadline_block: u64,
         eth_hash: Vec<u8>,
         eth_block: u64,
+        eth_block_index: u64,
     }
 
     fn old_value() -> OldPriorityOp {
@@ -23,6 +24,7 @@ mod backward_compatibility {
             account_id: AccountId(155),
             eth_address: Address::default(),
             token: TokenId(1000),
+            is_legacy: false,
         };
         OldPriorityOp {
             serial_id: 12345,
@@ -30,6 +32,7 @@ mod backward_compatibility {
             deadline_block: 100,
             eth_hash: vec![2; 32],
             eth_block: 0,
+            eth_block_index: 0,
         }
     }
 

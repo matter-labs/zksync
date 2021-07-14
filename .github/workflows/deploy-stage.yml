@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - breaking
 
 env:
   DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
@@ -51,73 +52,73 @@ jobs:
       run: |
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zk docker push rust
-        zk docker push nginx
 
-  deploy:
-    name: Deploy to the Stage enviroment
-    runs-on: [k8s, deployer, stage]
-    needs: [pre, build-images]
+  ##  !!! TODO: fix stage and enable deployments back.
+  ##  !!! TODO: breaking deployment is not supported.
+  # deploy:
+  #   name: Deploy to the Stage enviroment
+  #   runs-on: [k8s, deployer, stage]
+  #   needs: [pre, build-images]
 
-    container:
-      image: dysnix/kubectl:v1.16-gcloud
+  #   container:
+  #     image: dysnix/kubectl:v1.19-gcloud
 
-    env:
-      KUBECONF: ${{ secrets.KUBECONF_STAGE }}
-      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
-      HFENV: zksync-stage
+  #   env:
+  #     KUBECONF: ${{ secrets.KUBECONF_STAGE }}
+  #     IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
+  #     HFENV: stage
 
-    steps:
-      -
-        name: Create ~/.kube/config
-        run: mkdir -p ~/.kube && echo "$KUBECONF" | base64 -d > ~/.kube/config
-      -
-        name: Clone helm-infra
-        uses: actions/checkout@v2
-        with:
-          repository: matter-labs/helm-infra
-          path: helm-infra
-          ref: master
-          token: ${{ secrets.GH_TOKEN }}
-      -
-        uses: chrnorm/deployment-action@releases/v1
-        name: Create GitHub deployment
-        id: deployment
-        with:
-          token: "${{ github.token }}"
-          environment: stage
-# TODO fix stage and resume deploy to stage
-#      -
-#        name: Deploy apps
-#        working-directory: helm-infra
-#        run: |
-          # copy helm plugins over (from dysnix/kubectl, don't forget)!!!
-#          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
-#
-#          UPDATE_REPOS=y helmfile -e $HFENV repos
-#          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
-      -
-        name: Update deployment status (success)
-        if: success()
-        uses: chrnorm/deployment-status@releases/v1
-        with:
-          token: ${{ github.token }}
-          state: success
-          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-      -
-        name: Update deployment status (failure)
-        if: failure()
-        uses: chrnorm/deployment-status@releases/v1
-        with:
-          token: ${{ github.token }}
-          state: failure
-          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-      -
-        name: Notify to Mattermost (on failure)
-        uses: tferreira/matterfy@releases/v1
-        if: failure()
-        with:
-          type: ${{ job.status }}
-          job_name: '*Deployment to stage failed*'
-          icon_emoji: octocat
-          channel: 'matterlabs-alerts'
-          url: ${{ secrets.MATTERMOST_WEBHOOK }}
+  #   steps:
+  #     -
+  #       name: Create ~/.kube/config
+  #       run: mkdir -p ~/.kube && echo "$KUBECONF" | base64 -d > ~/.kube/config
+  #     -
+  #       name: Clone helm-infra
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: matter-labs/helm-infra
+  #         path: helm-infra
+  #         ref: master
+  #         token: ${{ secrets.GH_TOKEN }}
+  #     -
+  #       uses: chrnorm/deployment-action@releases/v1
+  #       name: Create GitHub deployment
+  #       id: deployment
+  #       with:
+  #         token: "${{ github.token }}"
+  #         environment: stage
+  #     -
+  #       name: Deploy apps
+  #       working-directory: helm-infra
+  #       run: |
+  #         # copy helm plugins over (from dysnix/kubectl, don't forget)!!!
+  #         cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
+
+  #         UPDATE_REPOS=y helmfile -e $HFENV repos
+  #         helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+  #     -
+  #       name: Update deployment status (success)
+  #       if: success()
+  #       uses: chrnorm/deployment-status@releases/v1
+  #       with:
+  #         token: ${{ github.token }}
+  #         state: success
+  #         deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+  #     -
+  #       name: Update deployment status (failure)
+  #       if: failure()
+  #       uses: chrnorm/deployment-status@releases/v1
+  #       with:
+  #         token: ${{ github.token }}
+  #         state: failure
+  #         deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+  #     -
+  #       name: Notify to Mattermost (on failure)
+  #       uses: tferreira/matterfy@releases/v1
+  #       if: failure()
+  #       with:
+  #         type: ${{ job.status }}
+  #         job_name: '*Deployment to stage failed*'
+  #         icon_emoji: octocat
+  #         channel: 'matterlabs-alerts'
+  #         url: ${{ secrets.MATTERMOST_WEBHOOK }}

@@ -7,7 +7,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    Token, TokenGenesisListItem, TokenId,
+    AccountId, BlockNumber, NewTokenEvent, Token, TokenId, TokenInfo,
     {block::Block, AccountUpdate, AccountUpdates},
 };
 
@@ -16,22 +16,13 @@ use crate::storage_interactor::StoredTreeState;
 use crate::{
     data_restore_driver::StorageUpdateState,
     events::BlockEvent,
-    events_state::{EventsState, NewTokenEvent},
+    events_state::EventsState,
     rollup_ops::RollupOpsBlock,
     storage_interactor::{
         block_event_into_stored_block_event, stored_block_event_into_block_event,
-        stored_ops_block_into_ops_block, StorageInteractor,
+        stored_ops_block_into_ops_block, CachedTreeState, StorageInteractor,
     },
 };
-
-impl From<&NewTokenEvent> for zksync_storage::data_restore::records::NewTokenEvent {
-    fn from(event: &NewTokenEvent) -> Self {
-        Self {
-            address: event.address,
-            id: event.id,
-        }
-    }
-}
 
 pub struct DatabaseStorageInteractor<'a> {
     storage: StorageProcessor<'a>,
@@ -125,16 +116,15 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .expect("Unable to commit DB transaction");
     }
 
-    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId) {
+    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         self.storage
             .tokens_schema()
             .store_token(Token {
                 id: token_id,
                 symbol: token.symbol,
-                address: token.address[2..]
-                    .parse()
-                    .expect("failed to parse token address"),
+                address: token.address,
                 decimals: token.decimals,
+                is_nft: false,
             })
             .await
             .expect("failed to store token");
@@ -153,7 +143,15 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
 
         let block_number = last_watched_eth_block_number.to_string();
 
-        let tokens: Vec<_> = tokens.iter().map(From::from).collect();
+        let tokens: Vec<_> = tokens
+            .iter()
+            .map(
+                |event| zksync_storage::data_restore::records::NewTokenEvent {
+                    address: event.address,
+                    id: event.id,
+                },
+            )
+            .collect();
         self.storage
             .data_restore_schema()
             .save_events_state(new_events.as_slice(), &tokens, &block_number)
@@ -161,7 +159,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .expect("Cant update events state");
     }
 
-    async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate) {
+    async fn save_genesis_tree_state(&mut self, genesis_updates: &[(AccountId, AccountUpdate)]) {
         let (_last_committed, mut _accounts) = self
             .storage
             .chain()
@@ -175,9 +173,17 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
         );
         self.storage
             .data_restore_schema()
-            .save_genesis_state(genesis_acc_update)
+            .save_genesis_state(genesis_updates)
             .await
             .expect("Cant update genesis state");
+    }
+
+    async fn save_special_token(&mut self, token: Token) {
+        self.storage
+            .tokens_schema()
+            .store_token(token)
+            .await
+            .expect("failed to store special token");
     }
 
     async fn get_block_events_state_from_storage(&mut self) -> EventsState {
@@ -281,6 +287,58 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             )
             .await
             .expect("Can't update the eth_stats table")
+    }
+
+    async fn get_cached_tree_state(&mut self) -> Option<CachedTreeState> {
+        let (last_block, account_map) = self
+            .storage
+            .chain()
+            .state_schema()
+            .load_verified_state()
+            .await
+            .expect("Failed to load verified state from the database");
+
+        let tree_cache = self
+            .storage
+            .chain()
+            .block_schema()
+            .get_account_tree_cache_block(last_block)
+            .await
+            .expect("Failed to query the database for the tree cache");
+
+        if let Some(tree_cache) = tree_cache {
+            let current_block = self
+                .storage
+                .chain()
+                .block_schema()
+                .get_block(last_block)
+                .await
+                .expect("Failed to query the database for the latest block")
+                .unwrap();
+            let nfts = self
+                .storage
+                .tokens_schema()
+                .load_nfts()
+                .await
+                .expect("Failed to load NFTs from the database");
+            Some(CachedTreeState {
+                tree_cache,
+                account_map,
+                current_block,
+                nfts,
+            })
+        } else {
+            None
+        }
+    }
+
+    async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: serde_json::Value) {
+        self.storage
+            .chain()
+            .block_schema()
+            .store_account_tree_cache(block_number, tree_cache)
+            .await
+            .expect("Failed to store the tree cache");
     }
 
     async fn get_storage_state(&mut self) -> StorageUpdateState {

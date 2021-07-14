@@ -441,7 +441,7 @@ impl ApiV01 {
         let resp = storage
             .chain()
             .block_schema()
-            .load_block_range(BlockNumber(max_block), limit)
+            .load_block_range_desc(BlockNumber(max_block), limit)
             .await
             .map_err(|err| {
                 vlog::warn!(

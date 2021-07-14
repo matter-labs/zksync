@@ -27,24 +27,24 @@ jobs:
           key: "${{ github.event.deployment.environment }}"
           map: |
             {
-              "mainnet": {
+              "^mainnet$": {
                 "KUBECONF": "KUBECONF_MAINNET",
-                "HFENV": "zksync-prod",
+                "HFENV": "prod",
                 "RUNNER": "mainnet"
               },
-              "rinkeby": {
+              "^rinkeby$": {
                 "KUBECONF": "KUBECONF_TESTNET",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "HFENV": "${{ github.event.deployment.environment }}",
                 "RUNNER": "testnet"
               },
-              "ropsten": {
+              "^ropsten$": {
                 "KUBECONF": "KUBECONF_TESTNET",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "HFENV": "${{ github.event.deployment.environment }}",
                 "RUNNER": "testnet"
               },
               ".*": {
                 "KUBECONF": "KUBECONF_STAGE",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "HFENV": "${{ github.event.deployment.environment }}",
                 "RUNNER": "stage"
               }
             }
@@ -68,10 +68,9 @@ jobs:
     name: Deploy Apps
     runs-on: [k8s, deployer, "${{ needs.pre.outputs.runner }}"]
     needs: pre
-    if: ${{ needs.pre.outputs.isTag == 'true' }}
 
     container:
-      image: dysnix/kubectl:v1.16-gcloud
+      image: dysnix/kubectl:v1.19-gcloud
 
     env:
       IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
@@ -80,17 +79,20 @@ jobs:
 
     steps:
       -
+        if: ${{ needs.pre.outputs.isTag == 'true' }}
         name: Create ~/.kube/config
         run: mkdir -p ~/.kube && echo "$KUBECONF" | base64 -d > ~/.kube/config
       -
+        if: ${{ needs.pre.outputs.isTag == 'true' }}
         name: Clone helm-infra
         uses: actions/checkout@v2
         with:
           repository: matter-labs/helm-infra
           path: helm-infra
-          ref: master
+          ref: new-health-and-conf
           token: ${{ secrets.GH_TOKEN }}
       -
+        if: ${{ needs.pre.outputs.isTag == 'true' }}
         name: Deploy apps
         working-directory: helm-infra
         run: |
@@ -100,25 +102,25 @@ jobs:
           UPDATE_REPOS=y helmfile -e $HFENV repos
           helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
       -
+        if: success() && needs.pre.outputs.isTag == 'true'
         name: Update deployment status (success)
-        if: success()
         uses: chrnorm/deployment-status@releases/v1
         with:
           token: ${{ github.token }}
           state: success
           deployment_id: ${{ github.event.deployment.id }}
       -
+        if: failure() && needs.pre.outputs.isTag == 'true'
         name: Update deployment status (failure)
-        if: failure()
         uses: chrnorm/deployment-status@releases/v1
         with:
           token: ${{ github.token }}
           state: failure
           deployment_id: ${{ github.event.deployment.id }}
       -
+        if: failure() && needs.pre.outputs.isTag == 'true'
         name: Notify to Mattermost (on failure)
         uses: tferreira/matterfy@releases/v1
-        if: failure()
         with:
           type: ${{ job.status }}
           job_name: '*Deployment to "${{ github.event.deployment.environment }}" failed*'

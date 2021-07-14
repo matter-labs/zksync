@@ -15,6 +15,7 @@ use zksync_crypto::circuit::{
 };
 
 pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
+use crate::NFT;
 
 mod account_update;
 pub mod error;
@@ -34,6 +35,7 @@ pub struct Account {
     /// Current nonce of the account. All the transactions require nonce field to be set in
     /// order to not allow double spend, and the nonce must increment by one after each operation.
     pub nonce: Nonce,
+    pub minted_nfts: HashMap<TokenId, NFT>,
 }
 
 impl PartialEq for Account {
@@ -60,7 +62,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
             .collect();
 
         for (i, b) in balances.into_iter() {
-            circuit_account.subtree.insert(u32::from(*i), b);
+            circuit_account.subtree.insert(*i, b);
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
@@ -77,6 +79,7 @@ impl Default for Account {
             nonce: Nonce(0),
             pub_key_hash: PubKeyHash::default(),
             address: Address::zero(),
+            minted_nfts: HashMap::new(),
         }
     }
 }
@@ -167,6 +170,14 @@ impl Account {
                 } => {
                     account.pub_key_hash = new_pub_key_hash;
                     account.nonce = new_nonce;
+                    Some(account)
+                }
+                AccountUpdate::MintNFT { token } => {
+                    account.minted_nfts.insert(token.id, token);
+                    Some(account)
+                }
+                AccountUpdate::RemoveNFT { token } => {
+                    account.minted_nfts.remove(&token.id);
                     Some(account)
                 }
                 _ => {

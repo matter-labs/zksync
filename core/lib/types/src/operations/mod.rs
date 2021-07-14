@@ -3,7 +3,8 @@
 use super::ZkSyncTx;
 use crate::ZkSyncPriorityOp;
 use serde::{Deserialize, Serialize};
-use zksync_crypto::params::CHUNK_BYTES;
+use zksync_basic_types::AccountId;
+use zksync_crypto::params::{CHUNK_BYTES, LEGACY_CHUNK_BYTES};
 
 mod change_pubkey_op;
 mod close_op;
@@ -11,20 +12,23 @@ mod deposit_op;
 mod error;
 mod forced_exit;
 mod full_exit_op;
+mod mint_nft_op;
 mod noop_op;
+mod swap_op;
 mod transfer_op;
 mod transfer_to_new_op;
+mod withdraw_nft_op;
 mod withdraw_op;
 
 #[doc(hidden)]
 pub use self::close_op::CloseOp;
 pub use self::{
     change_pubkey_op::ChangePubKeyOp, deposit_op::DepositOp, forced_exit::ForcedExitOp,
-    full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
-    transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
+    full_exit_op::FullExitOp, mint_nft_op::MintNFTOp, noop_op::NoopOp, swap_op::SwapOp,
+    transfer_op::TransferOp, transfer_to_new_op::TransferToNewOp, withdraw_nft_op::WithdrawNFTOp,
+    withdraw_op::WithdrawOp,
 };
 use crate::operations::error::{PublicDataDecodeError, UnexpectedOperationType};
-use zksync_basic_types::AccountId;
 
 /// zkSync network operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,13 +41,16 @@ pub enum ZkSyncOp {
     /// recipient account doesn't exist and has to be created.
     TransferToNew(Box<TransferToNewOp>),
     Withdraw(Box<WithdrawOp>),
+    WithdrawNFT(Box<WithdrawNFTOp>),
     #[doc(hidden)]
     Close(Box<CloseOp>),
     FullExit(Box<FullExitOp>),
     ChangePubKeyOffchain(Box<ChangePubKeyOp>),
     ForcedExit(Box<ForcedExitOp>),
+    MintNFTOp(Box<MintNFTOp>),
     /// `NoOp` operation cannot be directly created, but it's used to fill the block capacity.
     Noop(NoopOp),
+    Swap(Box<SwapOp>),
 }
 
 impl ZkSyncOp {
@@ -56,9 +63,12 @@ impl ZkSyncOp {
             ZkSyncOp::Withdraw(_) => WithdrawOp::CHUNKS,
             ZkSyncOp::Close(_) => CloseOp::CHUNKS,
             ZkSyncOp::Transfer(_) => TransferOp::CHUNKS,
-            ZkSyncOp::FullExit(_) => FullExitOp::CHUNKS,
+            ZkSyncOp::FullExit(full_exit_op) => full_exit_op.chunks(),
             ZkSyncOp::ChangePubKeyOffchain(_) => ChangePubKeyOp::CHUNKS,
             ZkSyncOp::ForcedExit(_) => ForcedExitOp::CHUNKS,
+            ZkSyncOp::Swap(_) => SwapOp::CHUNKS,
+            ZkSyncOp::MintNFTOp(_) => MintNFTOp::CHUNKS,
+            ZkSyncOp::WithdrawNFT(_) => WithdrawNFTOp::CHUNKS,
         }
     }
 
@@ -74,6 +84,9 @@ impl ZkSyncOp {
             ZkSyncOp::FullExit(op) => op.get_public_data(),
             ZkSyncOp::ChangePubKeyOffchain(op) => op.get_public_data(),
             ZkSyncOp::ForcedExit(op) => op.get_public_data(),
+            ZkSyncOp::Swap(op) => op.get_public_data(),
+            ZkSyncOp::MintNFTOp(op) => op.get_public_data(),
+            ZkSyncOp::WithdrawNFT(op) => op.get_public_data(),
         }
     }
 
@@ -100,6 +113,7 @@ impl ZkSyncOp {
     pub fn withdrawal_data(&self) -> Option<Vec<u8>> {
         match self {
             ZkSyncOp::Withdraw(op) => Some(op.get_withdrawal_data()),
+            ZkSyncOp::WithdrawNFT(op) => Some(op.get_withdrawal_data()),
             ZkSyncOp::FullExit(op) => Some(op.get_withdrawal_data()),
             ZkSyncOp::ForcedExit(op) => Some(op.get_withdrawal_data()),
             _ => None,
@@ -135,6 +149,49 @@ impl ZkSyncOp {
             ForcedExitOp::OP_CODE => Ok(ZkSyncOp::ForcedExit(Box::new(
                 ForcedExitOp::from_public_data(&bytes)?,
             ))),
+            SwapOp::OP_CODE => Ok(ZkSyncOp::Swap(Box::new(SwapOp::from_public_data(&bytes)?))),
+            MintNFTOp::OP_CODE => Ok(ZkSyncOp::MintNFTOp(Box::new(MintNFTOp::from_public_data(
+                &bytes,
+            )?))),
+            WithdrawNFTOp::OP_CODE => Ok(ZkSyncOp::WithdrawNFT(Box::new(
+                WithdrawNFTOp::from_public_data(&bytes)?,
+            ))),
+            _ => Err(PublicDataDecodeError::UnknownOperationType),
+        }
+    }
+
+    /// Attempts to restore the operation from the public data committed on the Ethereum smart contract
+    /// prior to v6 upgrade. The token id bit width is 2 bytes instead of 4.
+    ///
+    /// Used by the data restore module for recovering old operations.
+    pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, PublicDataDecodeError> {
+        let op_type: u8 = *bytes.first().ok_or(PublicDataDecodeError::EmptyData)?;
+        match op_type {
+            NoopOp::OP_CODE => Ok(ZkSyncOp::Noop(NoopOp::from_legacy_public_data(&bytes)?)),
+            DepositOp::OP_CODE => Ok(ZkSyncOp::Deposit(Box::new(
+                DepositOp::from_legacy_public_data(&bytes)?,
+            ))),
+            TransferToNewOp::OP_CODE => Ok(ZkSyncOp::TransferToNew(Box::new(
+                TransferToNewOp::from_legacy_public_data(&bytes)?,
+            ))),
+            WithdrawOp::OP_CODE => Ok(ZkSyncOp::Withdraw(Box::new(
+                WithdrawOp::from_legacy_public_data(&bytes)?,
+            ))),
+            CloseOp::OP_CODE => Ok(ZkSyncOp::Close(Box::new(CloseOp::from_legacy_public_data(
+                &bytes,
+            )?))),
+            TransferOp::OP_CODE => Ok(ZkSyncOp::Transfer(Box::new(
+                TransferOp::from_legacy_public_data(&bytes)?,
+            ))),
+            FullExitOp::OP_CODE => Ok(ZkSyncOp::FullExit(Box::new(
+                FullExitOp::from_legacy_public_data(&bytes)?,
+            ))),
+            ChangePubKeyOp::OP_CODE => Ok(ZkSyncOp::ChangePubKeyOffchain(Box::new(
+                ChangePubKeyOp::from_legacy_public_data(&bytes)?,
+            ))),
+            ForcedExitOp::OP_CODE => Ok(ZkSyncOp::ForcedExit(Box::new(
+                ForcedExitOp::from_legacy_public_data(&bytes)?,
+            ))),
             _ => Err(PublicDataDecodeError::UnknownOperationType),
         }
     }
@@ -151,9 +208,30 @@ impl ZkSyncOp {
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS),
             ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
             ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
+            SwapOp::OP_CODE => Ok(SwapOp::CHUNKS),
+            MintNFTOp::OP_CODE => Ok(MintNFTOp::CHUNKS),
+            WithdrawNFTOp::OP_CODE => Ok(WithdrawNFTOp::CHUNKS),
             _ => Err(UnexpectedOperationType()),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
+    }
+
+    /// Returns the expected number of chunks for a certain type of operation
+    /// prior to v6 upgrade.
+    pub fn legacy_public_data_length(op_type: u8) -> Result<usize, UnexpectedOperationType> {
+        match op_type {
+            NoopOp::OP_CODE => Ok(NoopOp::CHUNKS),
+            DepositOp::OP_CODE => Ok(DepositOp::CHUNKS),
+            TransferToNewOp::OP_CODE => Ok(TransferToNewOp::CHUNKS),
+            WithdrawOp::OP_CODE => Ok(WithdrawOp::CHUNKS),
+            CloseOp::OP_CODE => Ok(CloseOp::CHUNKS),
+            TransferOp::OP_CODE => Ok(TransferOp::CHUNKS),
+            FullExitOp::OP_CODE => Ok(FullExitOp::LEGACY_CHUNKS),
+            ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
+            ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
+            _ => Err(UnexpectedOperationType()),
+        }
+        .map(|chunks| chunks * LEGACY_CHUNK_BYTES)
     }
 
     /// Attempts to interpret the operation as the L2 transaction.
@@ -167,6 +245,9 @@ impl ZkSyncOp {
                 Ok(ZkSyncTx::ChangePubKey(Box::new(op.tx.clone())))
             }
             ZkSyncOp::ForcedExit(op) => Ok(ZkSyncTx::ForcedExit(Box::new(op.tx.clone()))),
+            ZkSyncOp::Swap(op) => Ok(ZkSyncTx::Swap(Box::new(op.tx.clone()))),
+            ZkSyncOp::MintNFTOp(op) => Ok(ZkSyncTx::MintNFT(Box::new(op.tx.clone()))),
+            ZkSyncOp::WithdrawNFT(op) => Ok(ZkSyncTx::WithdrawNFT(Box::new(op.tx.clone()))),
             _ => Err(UnexpectedOperationType()),
         }
     }
@@ -192,6 +273,9 @@ impl ZkSyncOp {
             ZkSyncOp::FullExit(op) => op.get_updated_account_ids(),
             ZkSyncOp::ChangePubKeyOffchain(op) => op.get_updated_account_ids(),
             ZkSyncOp::ForcedExit(op) => op.get_updated_account_ids(),
+            ZkSyncOp::Swap(op) => op.get_updated_account_ids(),
+            ZkSyncOp::MintNFTOp(op) => op.get_updated_account_ids(),
+            ZkSyncOp::WithdrawNFT(op) => op.get_updated_account_ids(),
         }
     }
 
@@ -200,6 +284,7 @@ impl ZkSyncOp {
             self,
             &ZkSyncOp::Deposit(_)
                 | &ZkSyncOp::Withdraw(_)
+                | &ZkSyncOp::WithdrawNFT(_)
                 | &ZkSyncOp::FullExit(_)
                 | &ZkSyncOp::ChangePubKeyOffchain(_)
                 | &ZkSyncOp::ForcedExit(_)
@@ -209,7 +294,10 @@ impl ZkSyncOp {
     pub fn is_processable_onchain_operation(&self) -> bool {
         matches!(
             self,
-            &ZkSyncOp::Withdraw(_) | &ZkSyncOp::FullExit(_) | &ZkSyncOp::ForcedExit(_)
+            &ZkSyncOp::Withdraw(_)
+                | &ZkSyncOp::FullExit(_)
+                | &ZkSyncOp::ForcedExit(_)
+                | &ZkSyncOp::WithdrawNFT(_)
         )
     }
 
@@ -269,5 +357,23 @@ impl From<ChangePubKeyOp> for ZkSyncOp {
 impl From<ForcedExitOp> for ZkSyncOp {
     fn from(op: ForcedExitOp) -> Self {
         Self::ForcedExit(Box::new(op))
+    }
+}
+
+impl From<MintNFTOp> for ZkSyncOp {
+    fn from(op: MintNFTOp) -> Self {
+        Self::MintNFTOp(Box::new(op))
+    }
+}
+
+impl From<SwapOp> for ZkSyncOp {
+    fn from(op: SwapOp) -> Self {
+        Self::Swap(Box::new(op))
+    }
+}
+
+impl From<WithdrawNFTOp> for ZkSyncOp {
+    fn from(op: WithdrawNFTOp) -> Self {
+        Self::WithdrawNFT(Box::new(op))
     }
 }

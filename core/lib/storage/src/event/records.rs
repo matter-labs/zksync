@@ -1,4 +1,5 @@
 // Built-in uses
+use std::convert::TryFrom;
 // External uses
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
@@ -27,26 +28,26 @@ pub struct StoredEvent {
     pub event_data: Value,
 }
 
-impl From<StoredEvent> for ZkSyncEvent {
-    fn from(stored_event: StoredEvent) -> Self {
+impl TryFrom<StoredEvent> for ZkSyncEvent {
+    type Error = serde_json::Error;
+
+    fn try_from(stored_event: StoredEvent) -> Result<Self, Self::Error> {
         let id = EventId(stored_event.id as u64);
         let block_number = BlockNumber(stored_event.block_number as u32);
         let data = match &stored_event.event_type {
             EventType::Account => {
-                EventData::Account(serde_json::from_value(stored_event.event_data).unwrap())
+                EventData::Account(serde_json::from_value(stored_event.event_data)?)
             }
-            EventType::Block => {
-                EventData::Block(serde_json::from_value(stored_event.event_data).unwrap())
-            }
+            EventType::Block => EventData::Block(serde_json::from_value(stored_event.event_data)?),
             EventType::Transaction => {
-                EventData::Transaction(serde_json::from_value(stored_event.event_data).unwrap())
+                EventData::Transaction(serde_json::from_value(stored_event.event_data)?)
             }
         };
-        Self {
+        Ok(Self {
             id,
             block_number,
             data,
-        }
+        })
     }
 }
 

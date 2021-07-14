@@ -2,6 +2,7 @@
 !docker/prover/prover-entry.sh
 !docker/exit-tool/exit-tool-entry.sh
 !docker/exit-tool/configs
+!docker/data-restore/data-restore-entry.sh
 !docker/keybase-secrets/entrypoint.sh
 !docker/ci-integration-test/entrypoint.sh
 !docker/zk/entrypoint.sh

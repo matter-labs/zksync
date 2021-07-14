@@ -8,11 +8,17 @@ pub enum OpError {
     #[error(transparent)]
     WithdrawOpError(#[from] WithdrawOpError),
     #[error(transparent)]
+    WithdrawNFTOpError(#[from] WithdrawNFTOpError),
+    #[error(transparent)]
     CloseOpError(#[from] CloseOpError),
     #[error(transparent)]
     ChangePubKeyOpError(#[from] ChangePubKeyOpError),
     #[error(transparent)]
     ForcedExitOpError(#[from] ForcedExitOpError),
+    #[error(transparent)]
+    SwapOpError(#[from] SwapOpError),
+    #[error(transparent)]
+    MintNFTOpError(#[from] MintNFTOpError),
     #[error("The transaction can't be executed in the block because of an invalid timestamp")]
     TimestampError,
 }

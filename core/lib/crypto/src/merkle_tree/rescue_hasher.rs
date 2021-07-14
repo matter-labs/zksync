@@ -37,7 +37,6 @@ impl<E: RescueEngine> Hasher<E::Fr> for RescueHasher<E> {
         let bits: Vec<bool> = input.into_iter().collect();
         let packed = multipack::compute_multipacking::<E>(&bits);
         let sponge_output = rescue_hash::<E>(self.params, &packed);
-
         assert_eq!(sponge_output.len(), 1);
         sponge_output[0]
     }

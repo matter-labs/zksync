@@ -2,7 +2,6 @@
 
 // Built-in uses
 use std::iter::FromIterator;
-use std::sync::{Arc, RwLock};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -11,33 +10,37 @@ use std::{
 
 // External uses
 use bigdecimal::BigDecimal;
-use chrono::Utc;
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
 use itertools::izip;
-use num::{bigint::ToBigInt, rational::Ratio, BigUint, CheckedSub, Zero};
+use num::{bigint::ToBigInt, BigUint, Zero};
 use thiserror::Error;
 
 // Workspace uses
+use zksync_api_types::{
+    v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper},
+    TxWithSignature,
+};
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
     tx::{
-        EthBatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash,
+        EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
+        TxEthSignatureVariant, TxHash,
     },
     AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
-use zksync_utils::ratio_to_big_decimal;
 
 // Local uses
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
-    api_server::rpc_server::types::TxWithSignature,
     core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
-    signature_checker::{BatchRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest},
+    signature_checker::{
+        BatchRequest, OrderRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest,
+    },
     tx_error::TxAddError,
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
@@ -59,75 +62,6 @@ pub struct TxSender {
     // Limit the number of both transactions and Ethereum signatures per batch.
     pub max_number_of_transactions_per_batch: usize,
     pub max_number_of_authors_per_batch: usize,
-
-    pub subsidy_accumulator: SubsidyAccumulator,
-}
-
-/// Used to store paid subsidy and daily limit
-#[derive(Debug)]
-pub struct SubsidyAccumulator {
-    /// Subsidy limit for token address in USD (e.g. 1 -> 1 USD)
-    daily_limits: HashMap<Address, Ratio<BigUint>>,
-    /// Paid subsidy per token, dated by time when first subsidy is paid
-    #[allow(clippy::type_complexity)]
-    limit_used: Arc<RwLock<HashMap<Address, (Ratio<BigUint>, chrono::DateTime<Utc>)>>>,
-}
-
-impl Clone for SubsidyAccumulator {
-    fn clone(&self) -> Self {
-        Self {
-            daily_limits: self.daily_limits.clone(),
-            limit_used: Arc::clone(&self.limit_used),
-        }
-    }
-}
-
-impl SubsidyAccumulator {
-    pub fn new(daily_limits: HashMap<Address, Ratio<BigUint>>) -> Self {
-        Self {
-            daily_limits,
-            limit_used: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    pub fn get_allowed_subsidy(&self, token_address: &Address) -> Ratio<BigUint> {
-        let limit = self
-            .daily_limits
-            .get(token_address)
-            .cloned()
-            .unwrap_or_else(|| Ratio::from_integer(0u32.into()));
-        let used = self.limit_used.read().expect("subsidy counter rlock");
-        let subsidy_used = used
-            .get(token_address)
-            .map(|(subs, _)| subs.clone())
-            .unwrap_or_else(|| Ratio::from_integer(0u32.into()));
-        limit
-            .checked_sub(&subsidy_used)
-            .unwrap_or_else(|| Ratio::from_integer(0u32.into()))
-    }
-
-    pub fn get_total_paid_subsidy(&self, token_address: &Address) -> Ratio<BigUint> {
-        let used = self.limit_used.read().expect("subsidy counter rlock");
-        used.get(token_address)
-            .map(|(subs, _)| subs.clone())
-            .unwrap_or_else(|| Ratio::from_integer(0u32.into()))
-    }
-
-    pub fn add_used_subsidy(&self, token_address: &Address, subsidy_amount: Ratio<BigUint>) {
-        let mut used = self.limit_used.write().expect("subsidy counter wlock");
-        let new_value = if let Some((mut old_amount, creation_time)) = used.remove(token_address) {
-            if Utc::now().signed_duration_since(creation_time) >= chrono::Duration::days(1) {
-                (Ratio::from_integer(0u32.into()), Utc::now())
-            } else {
-                old_amount += subsidy_amount;
-                (old_amount, creation_time)
-            }
-        } else {
-            (Ratio::from_integer(0u32.into()), Utc::now())
-        };
-
-        used.insert(*token_address, new_value);
-    }
 }
 
 #[derive(Debug, Error)]
@@ -213,8 +147,6 @@ impl TxSender {
         let max_number_of_authors_per_batch =
             config.api.common.max_number_of_authors_per_batch as usize;
 
-        let subsidy_accumulator = SubsidyAccumulator::new(config.ticker.get_subsidy_limits());
-
         Self {
             core_api_client,
             pool: connection_pool,
@@ -228,7 +160,6 @@ impl TxSender {
             fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
-            subsidy_accumulator,
         }
     }
 
@@ -237,20 +168,28 @@ impl TxSender {
     /// the corresponding address.
     async fn get_tx_sender(&self, tx: &ZkSyncTx) -> Result<Address, anyhow::Error> {
         match tx {
-            ZkSyncTx::ForcedExit(tx) => self
-                .pool
-                .access_storage()
-                .await?
-                .chain()
-                .account_schema()
-                .account_address_by_id(tx.initiator_account_id)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Forced Exit account is not found in db")),
+            ZkSyncTx::ForcedExit(tx) => self.get_address_by_id(tx.initiator_account_id).await,
             _ => Ok(tx.account()),
         }
     }
 
+    async fn get_address_by_id(&self, id: AccountId) -> Result<Address, anyhow::Error> {
+        self.pool
+            .access_storage()
+            .await?
+            .chain()
+            .account_schema()
+            .account_address_by_id(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Order signer account id not found in db"))
+    }
+
     async fn get_tx_sender_type(&self, tx: &ZkSyncTx) -> Result<EthAccountType, SubmitError> {
+        self.get_sender_type(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
+            .await
+    }
+
+    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, SubmitError> {
         Ok(self
             .pool
             .access_storage()
@@ -258,27 +197,63 @@ impl TxSender {
             .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
             .chain()
             .account_schema()
-            .account_type_by_id(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
+            .account_type_by_id(id)
             .await
             .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
             .unwrap_or(EthAccountType::Owned))
     }
 
-    pub async fn submit_tx(
+    async fn verify_order_eth_signature(
+        &self,
+        order: &Order,
+        signature: Option<TxEthSignature>,
+    ) -> Result<(), SubmitError> {
+        let signer_type = self.get_sender_type(order.account_id).await?;
+        if matches!(signer_type, EthAccountType::CREATE2) {
+            return if signature.is_some() {
+                Err(SubmitError::IncorrectTx(
+                    "Eth signature from CREATE2 account not expected".to_string(),
+                ))
+            } else {
+                Ok(())
+            };
+        }
+        let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+        let signer = self
+            .get_address_by_id(order.account_id)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+
+        let token_sell = self.token_info_from_id(order.token_sell).await?;
+        let token_buy = self.token_info_from_id(order.token_buy).await?;
+        let message = order
+            .get_ethereum_sign_message(&token_sell.symbol, &token_buy.symbol, token_sell.decimals)
+            .into_bytes();
+        let eth_sign_data = EthSignData { signature, message };
+        let (sender, receiever) = oneshot::channel();
+
+        let request = VerifySignatureRequest {
+            data: RequestData::Order(OrderRequest {
+                order: Box::new(order.clone()),
+                sign_data: eth_sign_data,
+                sender: signer,
+            }),
+            response: sender,
+        };
+
+        send_verify_request_and_recv(request, self.sign_verify_requests.clone(), receiever).await?;
+        Ok(())
+    }
+
+    // This method is left for RPC API
+    #[deprecated(note = "Use the submit_tx function instead")]
+    pub async fn submit_tx_with_separate_fp(
         &self,
         mut tx: ZkSyncTx,
-        signature: Option<TxEthSignature>,
+        signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
     ) -> Result<TxHash, SubmitError> {
-        if tx.is_close() {
-            return Err(SubmitError::AccountCloseDisabled);
-        }
-
-        if let ZkSyncTx::ForcedExit(forced_exit) = &tx {
-            self.check_forced_exit(forced_exit).await?;
-        }
-
-        let fast_processing = fast_processing.unwrap_or_default(); // `None` => false
+        let fast_processing = fast_processing.unwrap_or(false);
         if fast_processing && !tx.is_withdraw() {
             return Err(SubmitError::UnsupportedFastProcessing);
         }
@@ -291,16 +266,27 @@ impl TxSender {
                 ));
             }
 
-            // `fast` field is not used in serializing (as it's an internal server option,
-            // not the actual transaction part), so we have to set it manually depending on
-            // the RPC method input.
             withdraw.fast = fast_processing;
+        }
+
+        self.submit_tx(tx, signature).await
+    }
+
+    pub async fn submit_tx(
+        &self,
+        tx: ZkSyncTx,
+        signature: TxEthSignatureVariant,
+    ) -> Result<TxHash, SubmitError> {
+        if tx.is_close() {
+            return Err(SubmitError::AccountCloseDisabled);
+        }
+
+        if let ZkSyncTx::ForcedExit(forced_exit) = &tx {
+            self.check_forced_exit(forced_exit).await?;
         }
 
         // Resolve the token.
         let token = self.token_info_from_id(tx.token_id()).await?;
-        let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&token.address);
-        let mut paid_subsidy = Ratio::from_integer(0u32.into());
         let msg_to_sign = tx
             .get_ethereum_sign_message(token.clone())
             .map(String::into_bytes);
@@ -343,24 +329,9 @@ impl TxSender {
                 .into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
-            let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
+            let scaled_provided_fee = scale_user_fee_up(provided_fee);
             if required_fee >= scaled_provided_fee && should_enforce_fee {
-                let max_subsidy = required_fee_data.get_max_subsidy(&allowed_subsidy);
-
-                if max_subsidy >= &required_fee - &scaled_provided_fee {
-                    paid_subsidy += required_fee_data.subsidy_size_usd
-                } else {
-                    vlog::error!(
-                        "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
-                        required_fee.to_string(),
-                        provided_fee.to_string(),
-                        scaled_provided_fee.to_string(),
-                        (&required_fee - &scaled_provided_fee).to_string(),
-                        token
-                    );
-
-                    return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
-                }
+                return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
             }
         }
 
@@ -374,14 +345,24 @@ impl TxSender {
             tx_sender,
             token.clone(),
             self.get_tx_sender_type(&tx).await?,
-            signature.clone(),
+            signature.tx_signature().clone(),
             msg_to_sign,
             sign_verify_channel,
         )
         .await?
         .unwrap_tx();
 
-        let tx_hash = verified_tx.tx.hash();
+        if let ZkSyncTx::Swap(tx) = &tx {
+            if signature.is_single() {
+                return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+            }
+            let signatures = signature.orders_signatures();
+            self.verify_order_eth_signature(&tx.orders.0, signatures.0.clone())
+                .await?;
+            self.verify_order_eth_signature(&tx.orders.1, signatures.1.clone())
+                .await?;
+        }
+
         // Send verified transactions to the mempool.
         self.core_api_client
             .send_tx(verified_tx)
@@ -389,24 +370,6 @@ impl TxSender {
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
         // if everything is OK, return the transactions hashes.
-        if paid_subsidy > Ratio::from_integer(0u32.into()) {
-            let paid_subsidy_dec = ratio_to_big_decimal(&paid_subsidy, 6).to_string();
-            let total_paid_subsidy = ratio_to_big_decimal(
-                &self
-                    .subsidy_accumulator
-                    .get_total_paid_subsidy(&token.address),
-                6,
-            );
-            vlog::info!(
-                "Paid subsidy for tx, tx: {}, token: {}, subsidy_tx: {} USD, subsidy_token_total: {} USD",
-                tx_hash.to_string(),
-                &token.address,
-                paid_subsidy_dec,
-                total_paid_subsidy
-            );
-            self.subsidy_accumulator
-                .add_used_subsidy(&token.address, paid_subsidy);
-        }
         Ok(tx.hash())
     }
 
@@ -414,7 +377,7 @@ impl TxSender {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-    ) -> Result<Vec<TxHash>, SubmitError> {
+    ) -> Result<SubmitBatchResponse, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
 
@@ -492,7 +455,6 @@ impl TxSender {
             }
         }
 
-        let mut subsidy_paid = None;
         // Only one token in batch
         if token_fees.len() == 1 {
             let (batch_token, fee_paid) = token_fees.into_iter().next().unwrap();
@@ -508,22 +470,13 @@ impl TxSender {
                 BigDecimal::from(batch_token_fee.normal_fee.total_fee.to_bigint().unwrap());
 
             // Not enough fee
-            if required_normal_fee >= user_provided_fee {
-                let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&batch_token);
-                let max_subsidy = batch_token_fee.get_max_subsidy(&allowed_subsidy);
-                let required_subsidy = &required_normal_fee - &user_provided_fee;
-                // check if subsidy can be used
-                if max_subsidy >= required_subsidy {
-                    subsidy_paid = Some((batch_token, batch_token_fee.subsidy_size_usd));
-                } else {
-                    vlog::error!(
-                        "User provided batch fee in token is too low, required: {}, provided (scaled): {} (subsidy: {})",
-                        required_normal_fee.to_string(),
-                        user_provided_fee.to_string(),
-                        max_subsidy.to_string(),
-                    );
-                    return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
-                }
+            if required_normal_fee > user_provided_fee {
+                vlog::error!(
+                    "User provided batch fee in token is too low, required: {}, provided (scaled): {}",
+                    required_normal_fee.to_string(),
+                    user_provided_fee.to_string(),
+                );
+                return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
             }
         } else {
             // Calculate required fee for ethereum token
@@ -548,7 +501,7 @@ impl TxSender {
 
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
-            if required_total_usd_fee >= scaled_provided_fee_in_usd {
+            if required_total_usd_fee > scaled_provided_fee_in_usd {
                 vlog::error!(
                     "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
                     &required_total_usd_fee,
@@ -557,6 +510,19 @@ impl TxSender {
                     (&required_total_usd_fee - &scaled_provided_fee_in_usd).to_string(),
                 );
                 return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
+            }
+        }
+
+        for tx in txs.iter() {
+            if let ZkSyncTx::Swap(swap) = &tx.tx {
+                if tx.signature.is_single() {
+                    return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                }
+                let signatures = tx.signature.orders_signatures();
+                self.verify_order_eth_signature(&swap.orders.0, signatures.0.clone())
+                    .await?;
+                self.verify_order_eth_signature(&swap.orders.1, signatures.1.clone())
+                    .await?;
             }
         }
 
@@ -619,25 +585,6 @@ impl TxSender {
         }
         verified_txs.extend(verified_batch.into_iter());
 
-        if let Some((subsidy_token, subsidy_paid)) = subsidy_paid {
-            let paid_subsidy_dec = ratio_to_big_decimal(&subsidy_paid, 6);
-            let total_paid_subsidy = ratio_to_big_decimal(
-                &self
-                    .subsidy_accumulator
-                    .get_total_paid_subsidy(&subsidy_token),
-                6,
-            );
-
-            vlog::info!(
-                "Paid subsidy for batch: token: {}, , subsidy_tx: {} USD, subsidy_token_total: {} USD",
-                subsidy_token,
-                paid_subsidy_dec,
-                total_paid_subsidy
-            );
-            self.subsidy_accumulator
-                .add_used_subsidy(&subsidy_token, subsidy_paid);
-        }
-
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
         // Send verified transactions to the mempool.
         self.core_api_client
@@ -646,7 +593,11 @@ impl TxSender {
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
 
-        Ok(tx_hashes)
+        let batch_hash = TxHash::batch_hash(&tx_hashes);
+        Ok(SubmitBatchResponse {
+            transaction_hashes: tx_hashes.into_iter().map(TxHashSerializeWrapper).collect(),
+            batch_hash,
+        })
     }
 
     pub async fn get_txs_fee_in_wei(
@@ -662,19 +613,7 @@ impl TxSender {
             token.clone(),
         )
         .await?;
-
-        if resp_fee.subsidy_fee.total_fee == resp_fee.normal_fee.total_fee {
-            return Ok(resp_fee.normal_fee);
-        }
-
-        let token = self.token_info_from_id(token).await?;
-
-        let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&token.address);
-        if allowed_subsidy >= resp_fee.subsidy_size_usd {
-            Ok(resp_fee.subsidy_fee)
-        } else {
-            Ok(resp_fee.normal_fee)
-        }
+        Ok(resp_fee.normal_fee)
     }
 
     pub async fn get_txs_batch_fee_in_wei(
@@ -688,19 +627,7 @@ impl TxSender {
             token.clone(),
         )
         .await?;
-
-        if resp_fee.normal_fee.total_fee == resp_fee.subsidy_fee.total_fee {
-            return Ok(resp_fee.normal_fee);
-        }
-
-        let token = self.token_info_from_id(token).await?;
-
-        let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&token.address);
-        if allowed_subsidy >= resp_fee.subsidy_size_usd {
-            Ok(resp_fee.subsidy_fee)
-        } else {
-            Ok(resp_fee.normal_fee)
-        }
+        Ok(resp_fee.normal_fee)
     }
 
     /// For forced exits, we must check that target account exists for more
@@ -739,6 +666,15 @@ impl TxSender {
             }
             ZkSyncTx::Withdraw(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
+
+                let msg = tx
+                    .get_ethereum_sign_message(&token.symbol, token.decimals)
+                    .into_bytes();
+                Some(msg)
+            }
+
+            ZkSyncTx::MintNFT(tx) => {
+                let token = self.token_info_from_id(tx.fee_token).await?;
 
                 let msg = tx
                     .get_ethereum_sign_message(&token.symbol, token.decimals)
@@ -946,7 +882,7 @@ async fn verify_txs_batch_signature(
         let eth_sign_data = if let Some(message) = message {
             match sender_type {
                 EthAccountType::CREATE2 => {
-                    if tx.signature.is_some() {
+                    if tx.signature.exists() {
                         return Err(SubmitError::IncorrectTx(
                             "Eth signature from CREATE2 account not expected".to_string(),
                         ));
@@ -954,10 +890,12 @@ async fn verify_txs_batch_signature(
                     None
                 }
                 EthAccountType::Owned => {
-                    if batch_sign_data.is_none() && tx.signature.is_none() {
+                    if batch_sign_data.is_none() && !tx.signature.exists() {
                         return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
                     }
                     tx.signature
+                        .tx_signature()
+                        .clone()
                         .map(|signature| EthSignData { signature, message })
                 }
             }

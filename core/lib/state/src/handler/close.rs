@@ -34,7 +34,7 @@ impl TxHandler<Close> for ZkSyncState {
 
         for token in 0..params::total_tokens() {
             invariant!(
-                account.get_balance(TokenId(token as u16)) == BigUint::from(0u32),
+                account.get_balance(TokenId(token as u32)) == BigUint::from(0u32),
                 CloseOpError::AccountNotEmpty(token)
             );
         }

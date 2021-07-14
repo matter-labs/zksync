@@ -3,18 +3,19 @@ use std::time::Instant;
 // External imports
 use sqlx::Acquire;
 // Workspace imports
-use zksync_types::{Account, AccountId, AccountUpdates, Address};
+use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;
 use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
-mod restore_account;
+pub mod restore_account;
 mod stored_state;
 
 pub(crate) use self::restore_account::restore_account;
 pub use self::stored_state::StoredAccountState;
+use crate::tokens::records::StorageNFT;
 
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
@@ -75,21 +76,18 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         account_id: AccountId,
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
-
         // Load committed & verified states, and return them.
-        let committed = self
+        let (verified_state, committed_state) = self
+            .0
+            .chain()
+            .account_schema()
             .last_committed_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
-        let verified = self
-            .last_verified_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
+            .await?;
 
         metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
         Ok(StoredAccountState {
-            committed,
-            verified,
+            committed: committed_state.map(|a| (account_id, a)),
+            verified: verified_state.1.map(|a| (account_id, a)),
         })
     }
 
@@ -118,10 +116,11 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
     /// Loads the last committed (e.g. just added but no necessarily verified) state for
     /// account given its ID.
+    /// Returns both verified and committed states.
     pub async fn last_committed_state_for_account(
         &mut self,
         account_id: AccountId,
-    ) -> QueryResult<Option<Account>> {
+    ) -> QueryResult<((i64, Option<Account>), Option<Account>)> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -167,6 +166,17 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         )
         .fetch_all(transaction.conn())
         .await?;
+        let mint_nft_updates = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            "
+                SELECT * FROM mint_nft_updates
+                WHERE creator_account_id = $1 AND block_number > $2
+            ",
+            *account_id as i32,
+            last_block
+        )
+        .fetch_all(transaction.conn())
+        .await?;
 
         // Chain the diffs, converting them into `StorageAccountDiff`.
         let account_diff = {
@@ -186,6 +196,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                     .into_iter()
                     .map(StorageAccountDiff::from),
             );
+            account_diff.extend(mint_nft_updates.into_iter().map(StorageAccountDiff::from));
             account_diff.sort_by(StorageAccountDiff::cmp_order);
 
             account_diff
@@ -198,7 +209,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let account_state = account_diff
             .into_iter()
             .map(|(_, upd)| upd)
-            .fold(account, Account::apply_update);
+            .fold(account.clone(), Account::apply_update);
 
         transaction.commit().await?;
 
@@ -206,7 +217,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             "sql.chain.account.last_committed_state_for_account",
             start.elapsed()
         );
-        Ok(account_state)
+        Ok(((last_block, account), account_state))
     }
 
     /// Loads the last verified state for the account (i.e. the one obtained in the last block
@@ -225,7 +236,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     }
 
     /// Obtains the last verified state of the account.
-    async fn account_and_last_block(
+    pub async fn account_and_last_block(
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
@@ -258,7 +269,21 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .await?;
 
             let last_block = account.last_block;
-            let (_, account) = restore_account(&account, balances);
+            let (_, mut account) = restore_account(&account, balances);
+            let nfts: Vec<StorageNFT> = sqlx::query_as!(
+                StorageNFT,
+                "
+                    SELECT * FROM nft
+                    WHERE creator_account_id = $1
+                ",
+                *account_id as i32
+            )
+            .fetch_all(&mut transaction)
+            .await?;
+            account.minted_nfts.extend(
+                nfts.into_iter()
+                    .map(|nft| (TokenId(nft.token_id as u32), nft.into())),
+            );
             Ok((last_block, Some(account)))
         } else {
             Ok((0, None))
@@ -312,5 +337,64 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let address = result.map(|record| Address::from_slice(&record.address));
         metrics::histogram!("sql.chain.account.account_address_by_id", start.elapsed());
         Ok(address)
+    }
+
+    /// Obtains the last committed block that affects the account.
+    pub async fn last_committed_block_with_update_for_acc(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+
+        let block_number = sqlx::query!(
+            "
+                SELECT MAX(block_number)
+                FROM(
+                    SELECT block_number FROM account_balance_updates
+                    WHERE account_id = $1
+                    UNION ALL
+                    SELECT block_number FROM account_creates
+                    WHERE account_id = $1
+                    UNION ALL
+                    SELECT block_number FROM account_pubkey_updates
+                    WHERE account_id = $1
+                ) as subquery
+            ",
+            i64::from(*account_id),
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max
+        .unwrap_or(0);
+
+        metrics::histogram!(
+            "sql.chain.account.last_committed_block_with_update_for_acc",
+            start.elapsed()
+        );
+        Ok(BlockNumber(block_number as u32))
+    }
+
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // needed anymore: ZKS-663
+    pub async fn get_all_accounts(&mut self) -> QueryResult<Vec<StorageAccount>> {
+        let result = sqlx::query_as!(StorageAccount, "SELECT * FROM accounts")
+            .fetch_all(self.0.conn())
+            .await?;
+
+        Ok(result)
+    }
+
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // needed anymore: ZKS-663
+    pub async fn get_all_balances(&mut self) -> QueryResult<Vec<StorageBalance>> {
+        let result = sqlx::query_as!(StorageBalance, "SELECT * FROM balances",)
+            .fetch_all(self.0.conn())
+            .await?;
+
+        Ok(result)
     }
 }

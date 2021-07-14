@@ -1420,10 +1420,10 @@
     consola "^2.15.0"
     node-fetch "^2.6.1"
 
-"@openzeppelin/contracts@3.2.1-solc-0.7":
-  version "3.2.1-solc-0.7"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.2.1-solc-0.7.tgz#067a60918b935d4733208edb3d7e35cd1d51026b"
-  integrity sha512-VfKZE9L2HNaZVBR7l5yHbRmap3EiVw9F5iVXRRDdgfnA9vQ1yFanrs0VYmdo2VIXC+EsI9wPPYZY9Ic7/qDBdw==
+"@openzeppelin/contracts@3.4.0-solc-0.7":
+  version "3.4.0-solc-0.7"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.4.0-solc-0.7.tgz#c4fbd1b761714745c4bce6fc97e8b44d4c29d5b9"
+  integrity sha512-bJz1YgmeKRYVnYZedYSiy5/YmaYTxOhb76ftCseN1z2r4DK7PwCGvRCF2fRavTxAmGkIC/Q5zSy/Dr3OerPw0w==
 
 "@resolver-engine/core@^0.3.3":
   version "0.3.3"
@@ -2037,6 +2037,11 @@
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@ungap/promise-all-settled/-/promise-all-settled-1.1.2.tgz#aa58042711d6e3275dd37dc597e5d31e8c290a44"
   integrity sha512-sL/cEvJWAnClXw0wHk85/2L0G6Sj8UB0Ctc1TEMbKSsmpRosqhwj9gWgFRZSrBr2f9tiXISwNhCPmlfqUqyb9Q==
+
+"@uniswap/token-lists@^1.0.0-beta.19":
+  version "1.0.0-beta.24"
+  resolved "https://registry.yarnpkg.com/@uniswap/token-lists/-/token-lists-1.0.0-beta.24.tgz#6809b80bee58e4a2f235cdedc07113652c85a741"
+  integrity sha512-9IMltV7ITwxnjuK0LYXlUZhYIB8wVAdwx5NAbGjHF9ss+zKL9FTyFfWTFif/EL6PCWvST+2B15ofUwSVZd17RA==
 
 "@vue/babel-helper-vue-jsx-merge-props@^1.2.1":
   version "1.2.1"
@@ -7397,6 +7402,18 @@ handle-thing@^2.0.0:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/handle-thing/-/handle-thing-2.0.1.tgz#857f79ce359580c340d43081cc648970d0bb234e"
   integrity sha512-9Qn4yBxelxoh2Ow62nP+Ka/kMnOXRi8BXnRaUwezLNhqelnN49xKz4F/dPP8OYLxLxq6JDtZb2i9XznUQbNPTg==
+
+handlebars@4.7.6:
+  version "4.7.6"
+  resolved "https://registry.yarnpkg.com/handlebars/-/handlebars-4.7.6.tgz#d4c05c1baf90e9945f77aa68a7a219aa4a7df74e"
+  integrity sha512-1f2BACcBfiwAfStCKZNrUCgqNZkGsAT7UM3kkYtXuLo0KnaVfjKOyf7PRzB6++aK9STyT1Pd2ZCPe3EGOXleXA==
+  dependencies:
+    minimist "^1.2.5"
+    neo-async "^2.6.0"
+    source-map "^0.6.1"
+    wordwrap "^1.0.0"
+  optionalDependencies:
+    uglify-js "^3.1.4"
 
 handlebars@^4.7.6:
   version "4.7.7"
@@ -14727,15 +14744,10 @@ yocto-queue@^0.1.0:
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-0.1.0.tgz#0294eb3dee05028d31ee1a5fa2c556a6aaf10a1b"
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
 
-zksync-crypto@^0.5.4:
-  version "0.5.4"
-  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.5.4.tgz#6b3ca224ce35bbf1843f20ffa526651c45000e03"
-  integrity sha512-E5TrDnOijfbyqt3J38iYtqsSdytB68FsEEgiTd/YPVeF6Q1Fp+4ecVlUs+FlelY/OTRpWNkSLD9HGug1GpXHcw==
-
 "zksync@link:sdk/zksync.js":
-  version "0.10.7"
+  version "0.11.0-beta.7"
   dependencies:
     axios "^0.21.1"
     websocket "^1.0.30"
     websocket-as-promised "^1.1.0"
-    zksync-crypto "^0.5.4"
+    zksync-crypto "^0.6.0-beta.1"

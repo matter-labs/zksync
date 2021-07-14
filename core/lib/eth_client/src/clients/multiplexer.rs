@@ -206,8 +206,9 @@ impl MultiplexerEthereumClient {
     pub async fn get_tx_status(
         &self,
         hash: H256,
+        current_block: Option<u64>,
     ) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
-        multiple_call!(self, get_tx_status(hash));
+        multiple_call!(self, get_tx_status(hash, current_block));
     }
 
     pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {

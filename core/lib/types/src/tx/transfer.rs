@@ -1,3 +1,18 @@
+use std::convert::TryFrom;
+
+use num::{BigUint, Zero};
+use serde::{Deserialize, Serialize};
+
+use zksync_basic_types::Address;
+use zksync_crypto::{
+    franklin_crypto::eddsa::PrivateKey,
+    params::{
+        max_account_id, max_processable_token, max_token_id, CURRENT_TX_VERSION, MIN_NFT_TOKEN_ID,
+    },
+};
+use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
+
+use super::{TxSignature, VerifiedSignatureCache};
 use crate::{
     helpers::{
         is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
@@ -5,19 +20,10 @@ use crate::{
     tx::TimeRange,
     AccountId, Nonce, TokenId,
 };
-use num::BigUint;
 
-use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
-use serde::{Deserialize, Serialize};
-use zksync_basic_types::Address;
-use zksync_crypto::{
-    franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_token_id},
-};
-use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
-
-use super::{TxSignature, VerifiedSignatureCache};
 use crate::tx::error::TransactionSignatureError;
+use crate::tx::version::TxVersion;
+use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
 
 /// `Transfer` transaction performs a move of funds from one zkSync account to another.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,12 +119,42 @@ impl Transfer {
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
+        self.get_bytes_with_version(CURRENT_TX_VERSION)
+    }
+
+    pub fn get_bytes_with_version(&self, version: u8) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[version]);
+        out.extend_from_slice(&self.account_id.to_be_bytes());
+        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(&self.to.as_bytes());
+        out.extend_from_slice(&self.token.to_be_bytes());
+        out.extend_from_slice(&pack_token_amount(&self.amount));
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        if let Some(time_range) = &self.time_range {
+            out.extend_from_slice(&time_range.to_be_bytes());
+        }
+        out
+    }
+
+    pub fn is_backwards_compatible(&self) -> bool {
+        self.token.0 < MIN_NFT_TOKEN_ID
+    }
+
+    /// Encodes the transaction data as the byte sequence according to the old zkSync protocol with 2 bytes token.
+    pub fn get_old_bytes(&self) -> Vec<u8> {
+        if !self.is_backwards_compatible() {
+            return vec![];
+        }
+
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(&self.to.as_bytes());
-        out.extend_from_slice(&self.token.to_be_bytes());
+        out.extend_from_slice(&(u16::try_from(self.token.0).unwrap()).to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -149,6 +185,10 @@ impl Transfer {
                 .map(|r| r.check_correctness())
                 .unwrap_or(true);
         if valid {
+            if self.fee != BigUint::zero() {
+                // Fee can only be paid in processable tokens
+                valid = self.token <= max_processable_token();
+            }
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
             self.cached_signer = VerifiedSignatureCache::Cached(signer);
@@ -157,13 +197,22 @@ impl Transfer {
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
-    pub fn verify_signature(&self) -> Option<PubKeyHash> {
+    pub fn verify_signature(&self) -> Option<(PubKeyHash, TxVersion)> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
+            if self.token.0 < MIN_NFT_TOKEN_ID {
+                if let Some(res) = self
+                    .signature
+                    .verify_musig(&self.get_old_bytes())
+                    .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                {
+                    return Some((res, TxVersion::Legacy));
+                }
+            }
             self.signature
                 .verify_musig(&self.get_bytes())
-                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                .map(|pub_key| (PubKeyHash::from_pubkey(&pub_key), TxVersion::V1))
         }
     }
 

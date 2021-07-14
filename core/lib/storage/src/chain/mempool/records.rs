@@ -18,6 +18,7 @@ pub struct MempoolTx {
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
     pub batch_id: i64,
+    pub next_priority_op_serial_id: Option<i64>,
 }
 
 impl TryFrom<MempoolTx> for SignedZkSyncTx {
@@ -32,4 +33,10 @@ impl TryFrom<MempoolTx> for SignedZkSyncTx {
                 .transpose()?,
         })
     }
+}
+
+#[derive(Debug, FromRow, PartialEq)]
+pub struct QueuedBatchTx {
+    pub tx_hash: String,
+    pub created_at: DateTime<Utc>,
 }

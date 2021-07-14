@@ -15,7 +15,7 @@ pub struct StoredOperation {
     pub confirmed: bool,
 }
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct StoredExecutedPriorityOperation {
     pub block_number: i64,
     pub block_index: i32,
@@ -27,6 +27,9 @@ pub struct StoredExecutedPriorityOperation {
     pub eth_hash: Vec<u8>,
     pub eth_block: i64,
     pub created_at: DateTime<Utc>,
+    /// This field must be optional because of backward compatibility.
+    pub eth_block_index: Option<i64>,
+    pub tx_hash: Vec<u8>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -65,6 +68,9 @@ pub struct NewExecutedPriorityOperation {
     pub eth_hash: Vec<u8>,
     pub eth_block: i64,
     pub created_at: DateTime<Utc>,
+    /// This field must be optional because of backward compatibility.
+    pub eth_block_index: Option<i64>,
+    pub tx_hash: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]

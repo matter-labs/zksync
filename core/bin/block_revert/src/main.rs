@@ -21,6 +21,12 @@ async fn revert_blocks_in_storage(
 
     transaction
         .chain()
+        .mempool_schema()
+        .return_executed_txs_to_mempool(last_block)
+        .await?;
+    println!("`mempool_txs`, `executed_transactions` tables are updated");
+    transaction
+        .chain()
         .block_schema()
         .remove_blocks(last_block)
         .await?;
@@ -56,6 +62,13 @@ async fn revert_blocks_in_storage(
         .remove_account_pubkey_updates(last_block)
         .await?;
     println!("`account_pubkey_updates` table is cleaned");
+
+    transaction
+        .chain()
+        .state_schema()
+        .remove_mint_nft_updates(last_block)
+        .await?;
+    println!("`mint_nft_updates` table is cleaned");
 
     transaction
         .chain()
@@ -102,13 +115,6 @@ async fn revert_blocks_in_storage(
         .update_eth_parameters(last_block)
         .await?;
     println!("`eth_parameters` table is updated");
-
-    transaction
-        .chain()
-        .mempool_schema()
-        .return_executed_txs_to_mempool(last_block)
-        .await?;
-    println!("`mempool_txs`, `executed_transactions` tables are updated");
 
     transaction.commit().await?;
 
@@ -236,7 +242,7 @@ async fn main() -> anyhow::Result<()> {
     let last_commited_block = storage
         .chain()
         .block_schema()
-        .get_last_committed_block()
+        .get_last_committed_confirmed_block()
         .await?;
     let last_verified_block = storage
         .chain()

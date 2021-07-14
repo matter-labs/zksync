@@ -14,7 +14,7 @@ impl TxHandler<Deposit> for ZkSyncState {
 
     fn create_op(&self, priority_op: Deposit) -> Result<Self::Op, DepositOpError> {
         invariant!(
-            priority_op.token <= params::max_token_id(),
+            priority_op.token <= params::max_fungible_token_id(),
             DepositOpError::InvalidToken
         );
         let account_id = if let Some((account_id, _)) = self.get_account_by_address(&priority_op.to)

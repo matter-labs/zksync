@@ -134,6 +134,7 @@ async fn check_exit_garbage_proof(
             AccountId(fund_owner.0 as u32),
             token,
             amount,
+            Default::default(),
             proof,
         )
         .await
@@ -154,8 +155,12 @@ async fn check_exit_correct_proof(
     let balance_to_withdraw_before = test_setup
         .get_balance_to_withdraw(send_account, token_address)
         .await;
+    let zero_account = accounts
+        .get(&AccountId(0))
+        .expect("Zero account does not exist")
+        .to_owned();
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -171,7 +176,14 @@ async fn check_exit_correct_proof(
         .expect("Account should exits")
         .0;
     test_setup
-        .exit(send_account, account_id, token, &exit_amount, proof)
+        .exit(
+            send_account,
+            account_id,
+            token,
+            &exit_amount,
+            zero_account.address,
+            proof,
+        )
         .await
         .expect_success();
 
@@ -200,8 +212,12 @@ async fn check_exit_correct_proof_second_time(
     let balance_to_withdraw_before = test_setup
         .get_balance_to_withdraw(send_account, token_address)
         .await;
+    let zero_account = accounts
+        .get(&AccountId(0))
+        .expect("Zero account does not exist")
+        .to_owned();
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -212,7 +228,14 @@ async fn check_exit_correct_proof_second_time(
         .expect("Account should exits")
         .0;
     test_setup
-        .exit(send_account, account_id, token, &exit_amount, proof)
+        .exit(
+            send_account,
+            account_id,
+            token,
+            &exit_amount,
+            zero_account.address,
+            proof,
+        )
         .await
         .expect_revert("t");
 
@@ -241,8 +264,12 @@ async fn check_exit_correct_proof_other_token(
     let balance_to_withdraw_before = test_setup
         .get_balance_to_withdraw(send_account, token_address)
         .await;
+    let zero_account = accounts
+        .get(&AccountId(0))
+        .expect("Zero account does not exist")
+        .to_owned();
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -253,7 +280,14 @@ async fn check_exit_correct_proof_other_token(
         .expect("Account should exits")
         .0;
     test_setup
-        .exit(send_account, account_id, false_token, &exit_amount, proof)
+        .exit(
+            send_account,
+            account_id,
+            false_token,
+            &exit_amount,
+            zero_account.address,
+            proof,
+        )
         .await
         .expect_revert("x");
 
@@ -282,8 +316,12 @@ async fn check_exit_correct_proof_other_amount(
     let balance_to_withdraw_before = test_setup
         .get_balance_to_withdraw(send_account, token_address)
         .await;
+    let zero_account = accounts
+        .get(&AccountId(0))
+        .expect("Zero account does not exist")
+        .to_owned();
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -294,7 +332,14 @@ async fn check_exit_correct_proof_other_amount(
         .expect("Account should exits")
         .0;
     test_setup
-        .exit(send_account, account_id, token, false_amount, proof)
+        .exit(
+            send_account,
+            account_id,
+            token,
+            false_amount,
+            zero_account.address,
+            proof,
+        )
         .await
         .expect_revert("x");
 
@@ -322,8 +367,12 @@ async fn check_exit_correct_proof_incorrect_sender(
     let balance_to_withdraw_before = test_setup
         .get_balance_to_withdraw(send_account, token_address)
         .await;
+    let zero_account = accounts
+        .get(&AccountId(0))
+        .expect("Zero account does not exist")
+        .to_owned();
 
-    let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
+    let (proof, exit_amount) = test_setup.gen_exit_proof_fungible(accounts, fund_owner, token);
     assert_eq!(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
@@ -334,7 +383,14 @@ async fn check_exit_correct_proof_incorrect_sender(
         .expect("Account should exits")
         .0;
     test_setup
-        .exit(send_account, account_id, token, &exit_amount, proof)
+        .exit(
+            send_account,
+            account_id,
+            token,
+            &exit_amount,
+            zero_account.address,
+            proof,
+        )
         .await
         .expect_revert("x");
 

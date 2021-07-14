@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
-use zksync_types::mempool::SignedTxVariant;
+use zksync_types::mempool::{RevertedTxVariant, SignedTxVariant};
 
 #[derive(Debug, Clone)]
 struct MempoolPendingTransaction {
@@ -34,18 +34,37 @@ impl PartialOrd for MempoolPendingTransaction {
 
 #[derive(Debug, Clone)]
 pub struct MempoolTransactionsQueue {
-    // transactions ready for execution
+    /// Reverted transactions queue that must be used before processing any other transactions.
+    /// Transactions in this queue are marked by the revert block tool with `next_priority_op_id`
+    /// in order to preserve the order of reverted priority operations.
+    ///
+    /// The queue is only accessible for popping elements.
+    reverted_txs: VecDeque<RevertedTxVariant>,
+    /// Transactions ready for execution.
     ready_txs: VecDeque<SignedTxVariant>,
-    // transactions that are not ready yet because of the `valid_from` field
+    /// Transactions that are not ready yet because of the `valid_from` field.
     pending_txs: BinaryHeap<MempoolPendingTransaction>,
 }
 
 impl MempoolTransactionsQueue {
-    pub fn new() -> Self {
+    pub fn new(reverted_txs: VecDeque<RevertedTxVariant>) -> Self {
         Self {
+            reverted_txs,
             ready_txs: VecDeque::new(),
             pending_txs: BinaryHeap::new(),
         }
+    }
+
+    /// Returns a reference to the front element of the reverted queue, or `None`
+    /// if the queue is empty.
+    pub fn reverted_queue_front(&self) -> Option<&RevertedTxVariant> {
+        self.reverted_txs.front()
+    }
+
+    /// Removes the first element from the reverted queue and returns it , or `None`
+    /// if the queue is empty.
+    pub fn reverted_queue_pop_front(&mut self) -> Option<RevertedTxVariant> {
+        self.reverted_txs.pop_front()
     }
 
     pub fn pop_front(&mut self) -> Option<SignedTxVariant> {
@@ -149,6 +168,7 @@ mod tests {
     #[test]
     fn test_mempool_transactions_queue() {
         let mut transactions_queue = MempoolTransactionsQueue {
+            reverted_txs: VecDeque::new(),
             ready_txs: VecDeque::new(),
             pending_txs: BinaryHeap::new(),
         };

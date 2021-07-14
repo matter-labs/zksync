@@ -147,6 +147,7 @@ fn apply_full_exit_tx(b: &mut Bencher<'_>) {
         account_id: AccountId(0),
         eth_address: from_account.address,
         token: ETH_TOKEN_ID,
+        is_legacy: false,
     };
 
     let full_exit_op = ZkSyncPriorityOp::FullExit(full_exit);

@@ -1,5 +1,5 @@
 import { utils, constants, ethers, BigNumber, BigNumberish, Contract } from 'ethers';
-import { Provider } from '.';
+import { SyncProvider } from './provider-interface';
 import {
     PubKeyHash,
     TokenAddress,
@@ -12,23 +12,30 @@ import {
     ForcedExit,
     ChangePubKey,
     Withdraw,
-    CloseAccount
+    CloseAccount,
+    MintNFT,
+    Order,
+    Swap,
+    TokenRatio,
+    WeiRatio,
+    WithdrawNFT
 } from './types';
+import { rescueHashOrders } from './crypto';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
-const MAX_NUMBER_OF_TOKENS = 128;
+const MAX_NUMBER_OF_TOKENS = Math.pow(2, 31);
 // Max number of accounts for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export const MAX_TIMESTAMP = 4294967295;
+export const MIN_NFT_TOKEN_ID = 65536;
+export const CURRENT_TX_VERSION = 1;
 
 export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
-
 export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncGov.json').abi);
-
+export const SYNC_NFT_FACTORY_INTERFACE = new utils.Interface(require('../abi/NFTFactory.json').abi);
 export const IEIP1271_INTERFACE = new utils.Interface(require('../abi/IEIP1271.json').abi);
-
 export const MULTICALL_INTERFACE = new utils.Interface(require('../abi/Multicall.json').abi);
 
 export const ERC20_DEPOSIT_GAS_LIMIT = require('../misc/DepositERC20GasLimit.json');
@@ -52,6 +59,20 @@ const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
+
+export function tokenRatio(ratio: { [token: string]: string | number; [token: number]: string | number }): TokenRatio {
+    return {
+        type: 'Token',
+        ...ratio
+    };
+}
+
+export function weiRatio(ratio: { [token: string]: BigNumberish; [token: number]: BigNumberish }): WeiRatio {
+    return {
+        type: 'Wei',
+        ...ratio
+    };
+}
 
 export function floatToInteger(
     floatBytes: Uint8Array,
@@ -295,6 +316,12 @@ export function isTransactionFeePackable(amount: BigNumberish): boolean {
     return closestPackableTransactionFee(amount).eq(amount);
 }
 
+// Check that this token could be an NFT.
+// NFT is not represented in TokenSets, so we cannot check the availability of NFT in TokenSets
+export function isNFT(token: TokenLike): boolean {
+    return typeof token === 'number' && token >= MIN_NFT_TOKEN_ID;
+}
+
 export function buffer2bitsBE(buff) {
     const res = new Array(buff.length * 8);
     for (let i = 0; i < buff.length; i++) {
@@ -358,7 +385,11 @@ export class TokenSet {
 
     public formatToken(tokenLike: TokenOrId, amount: BigNumberish): string {
         const decimals = this.resolveTokenDecimals(tokenLike);
-        return utils.formatUnits(amount, decimals);
+        const value = utils.formatUnits(amount, decimals);
+
+        // We need to add this check to support broader versions of ethers
+        // since the `formatUnits` function behaves differently within ^5.0.0 versions
+        return value.includes('.') ? value : value + '.0';
     }
 
     public parseToken(tokenLike: TokenOrId, amount: string): BigNumber {
@@ -367,10 +398,16 @@ export class TokenSet {
     }
 
     public resolveTokenDecimals(tokenLike: TokenOrId): number {
+        if (isNFT(tokenLike)) {
+            return 0;
+        }
         return this.resolveTokenObject(tokenLike).decimals;
     }
 
     public resolveTokenId(tokenLike: TokenOrId): number {
+        if (isNFT(tokenLike)) {
+            return tokenLike as number;
+        }
         return this.resolveTokenObject(tokenLike).id;
     }
 
@@ -502,6 +539,14 @@ function removeAddressPrefix(address: Address | PubKeyHash): string {
     throw new Error("ETH address must start with '0x' and PubKeyHash must start with 'sync:'");
 }
 
+export function serializeContentHash(contentHash: string): Uint8Array {
+    const contentHashBytes = utils.arrayify(contentHash);
+    if (contentHashBytes.length !== 32) {
+        throw new Error('Content hash must be 32 bytes long');
+    }
+
+    return contentHashBytes;
+}
 // PubKeyHash or eth address
 export function serializeAddress(address: Address | PubKeyHash): Uint8Array {
     const prefixlessAddress = removeAddressPrefix(address);
@@ -531,7 +576,7 @@ export function serializeTokenId(tokenId: number): Uint8Array {
     if (tokenId >= MAX_NUMBER_OF_TOKENS) {
         throw new Error('TokenId is too big');
     }
-    return numberToBytesBE(tokenId, 2);
+    return numberToBytesBE(tokenId, 4);
 }
 
 export function serializeAmountPacked(amount: BigNumberish): Uint8Array {
@@ -561,8 +606,65 @@ export function serializeTimestamp(time: number): Uint8Array {
     return ethers.utils.concat([new Uint8Array(4), numberToBytesBE(time, 4)]);
 }
 
+export function serializeOrder(order: Order): Uint8Array {
+    const type = new Uint8Array(['o'.charCodeAt(0)]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
+    const accountId = serializeAccountId(order.accountId);
+    const recipientBytes = serializeAddress(order.recipient);
+    const nonceBytes = serializeNonce(order.nonce);
+    const tokenSellId = serializeTokenId(order.tokenSell);
+    const tokenBuyId = serializeTokenId(order.tokenBuy);
+    const sellPriceBytes = BigNumber.from(order.ratio[0]).toHexString();
+    const buyPriceBytes = BigNumber.from(order.ratio[1]).toHexString();
+    const amountBytes = serializeAmountPacked(order.amount);
+    const validFrom = serializeTimestamp(order.validFrom);
+    const validUntil = serializeTimestamp(order.validUntil);
+    return ethers.utils.concat([
+        type,
+        version,
+        accountId,
+        recipientBytes,
+        nonceBytes,
+        tokenSellId,
+        tokenBuyId,
+        ethers.utils.zeroPad(sellPriceBytes, 15),
+        ethers.utils.zeroPad(buyPriceBytes, 15),
+        amountBytes,
+        validFrom,
+        validUntil
+    ]);
+}
+
+export async function serializeSwap(swap: Swap): Promise<Uint8Array> {
+    const type = new Uint8Array([255 - 11]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
+    const submitterId = serializeAccountId(swap.submitterId);
+    const submitterAddress = serializeAddress(swap.submitterAddress);
+    const nonceBytes = serializeNonce(swap.nonce);
+    const orderA = serializeOrder(swap.orders[0]);
+    const orderB = serializeOrder(swap.orders[1]);
+    const ordersHashed = await rescueHashOrders(ethers.utils.concat([orderA, orderB]));
+    const tokenIdBytes = serializeTokenId(swap.feeToken);
+    const feeBytes = serializeFeePacked(swap.fee);
+    const amountABytes = serializeAmountPacked(swap.amounts[0]);
+    const amountBBytes = serializeAmountPacked(swap.amounts[1]);
+    return ethers.utils.concat([
+        type,
+        version,
+        submitterId,
+        submitterAddress,
+        nonceBytes,
+        ordersHashed,
+        tokenIdBytes,
+        feeBytes,
+        amountABytes,
+        amountBBytes
+    ]);
+}
+
 export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
-    const type = new Uint8Array([3]);
+    const type = new Uint8Array([255 - 3]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountId = serializeAccountId(withdraw.accountId);
     const accountBytes = serializeAddress(withdraw.from);
     const ethAddressBytes = serializeAddress(withdraw.to);
@@ -574,6 +676,7 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
     const validUntil = serializeTimestamp(withdraw.validUntil);
     return ethers.utils.concat([
         type,
+        version,
         accountId,
         accountBytes,
         ethAddressBytes,
@@ -586,8 +689,59 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
     ]);
 }
 
+export function serializeMintNFT(mintNFT: MintNFT): Uint8Array {
+    const type = new Uint8Array([255 - 9]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
+    const accountId = serializeAccountId(mintNFT.creatorId);
+    const accountBytes = serializeAddress(mintNFT.creatorAddress);
+    const contentHashBytes = serializeContentHash(mintNFT.contentHash);
+    const recipientBytes = serializeAddress(mintNFT.recipient);
+    const tokenIdBytes = serializeTokenId(mintNFT.feeToken);
+    const feeBytes = serializeFeePacked(mintNFT.fee);
+    const nonceBytes = serializeNonce(mintNFT.nonce);
+    return ethers.utils.concat([
+        type,
+        version,
+        accountId,
+        accountBytes,
+        contentHashBytes,
+        recipientBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes
+    ]);
+}
+
+export function serializeWithdrawNFT(withdrawNFT: WithdrawNFT): Uint8Array {
+    const type = new Uint8Array([255 - 10]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
+    const accountId = serializeAccountId(withdrawNFT.accountId);
+    const accountBytes = serializeAddress(withdrawNFT.from);
+    const ethAddressBytes = serializeAddress(withdrawNFT.to);
+    const tokenBytes = serializeTokenId(withdrawNFT.token);
+    const tokenIdBytes = serializeTokenId(withdrawNFT.feeToken);
+    const feeBytes = serializeFeePacked(withdrawNFT.fee);
+    const nonceBytes = serializeNonce(withdrawNFT.nonce);
+    const validFrom = serializeTimestamp(withdrawNFT.validFrom);
+    const validUntil = serializeTimestamp(withdrawNFT.validUntil);
+    return ethers.utils.concat([
+        type,
+        version,
+        accountId,
+        accountBytes,
+        ethAddressBytes,
+        tokenBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes,
+        validFrom,
+        validUntil
+    ]);
+}
+
 export function serializeTransfer(transfer: Transfer): Uint8Array {
-    const type = new Uint8Array([5]); // tx type
+    const type = new Uint8Array([255 - 5]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountId = serializeAccountId(transfer.accountId);
     const from = serializeAddress(transfer.from);
     const to = serializeAddress(transfer.to);
@@ -597,11 +751,12 @@ export function serializeTransfer(transfer: Transfer): Uint8Array {
     const nonce = serializeNonce(transfer.nonce);
     const validFrom = serializeTimestamp(transfer.validFrom);
     const validUntil = serializeTimestamp(transfer.validUntil);
-    return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce, validFrom, validUntil]);
+    return ethers.utils.concat([type, version, accountId, from, to, token, amount, fee, nonce, validFrom, validUntil]);
 }
 
 export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
-    const type = new Uint8Array([7]);
+    const type = new Uint8Array([255 - 7]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const accountIdBytes = serializeAccountId(changePubKey.accountId);
     const accountBytes = serializeAddress(changePubKey.account);
     const pubKeyHashBytes = serializeAddress(changePubKey.newPkHash);
@@ -612,6 +767,7 @@ export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
     const validUntil = serializeTimestamp(changePubKey.validUntil);
     return ethers.utils.concat([
         type,
+        version,
         accountIdBytes,
         accountBytes,
         pubKeyHashBytes,
@@ -624,7 +780,8 @@ export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
 }
 
 export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
-    const type = new Uint8Array([8]);
+    const type = new Uint8Array([255 - 8]);
+    const version = new Uint8Array([CURRENT_TX_VERSION]);
     const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
     const targetBytes = serializeAddress(forcedExit.target);
     const tokenIdBytes = serializeTokenId(forcedExit.token);
@@ -634,6 +791,7 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
     const validUntil = serializeTimestamp(forcedExit.validUntil);
     return ethers.utils.concat([
         type,
+        version,
         initiatorAccountIdBytes,
         targetBytes,
         tokenIdBytes,
@@ -648,7 +806,9 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
  * Encodes the transaction data as the byte sequence according to the zkSync protocol.
  * @param tx A transaction to serialize.
  */
-export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
+export async function serializeTx(
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT | Swap
+): Promise<Uint8Array> {
     switch (tx.type) {
         case 'Transfer':
             return serializeTransfer(tx);
@@ -658,12 +818,19 @@ export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccoun
             return serializeChangePubKey(tx);
         case 'ForcedExit':
             return serializeForcedExit(tx);
+        case 'MintNFT':
+            return serializeMintNFT(tx);
+        case 'WithdrawNFT':
+            return serializeWithdrawNFT(tx);
+        case 'Swap':
+            // this returns a promise
+            return serializeSwap(tx);
         default:
             return new Uint8Array();
     }
 }
 
-function numberToBytesBE(number: number, bytes: number): Uint8Array {
+export function numberToBytesBE(number: number, bytes: number): Uint8Array {
     const result = new Uint8Array(bytes);
     for (let i = bytes - 1; i >= 0; i--) {
         result[i] = number & 0xff;
@@ -713,7 +880,7 @@ export function getCREATE2AddressAndSalt(
 
 export async function getEthereumBalance(
     ethProvider: ethers.providers.Provider,
-    syncProvider: Provider,
+    syncProvider: SyncProvider,
     address: Address,
     token: TokenLike
 ): Promise<BigNumber> {
@@ -734,7 +901,7 @@ export async function getEthereumBalance(
 
 export async function getPendingBalance(
     ethProvider: ethers.providers.Provider,
-    syncProvider: Provider,
+    syncProvider: SyncProvider,
     address: Address,
     token: TokenLike
 ): Promise<BigNumberish> {
@@ -749,10 +916,12 @@ export async function getPendingBalance(
     return zksyncContract.getPendingBalance(address, tokenAddress);
 }
 
-export function getTxHash(tx: Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount): string {
+export async function getTxHash(
+    tx: Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount | Swap | MintNFT | WithdrawNFT
+): Promise<string> {
     if (tx.type == 'Close') {
         throw new Error('Close operation is disabled');
     }
-    let txBytes = serializeTx(tx);
+    let txBytes = await serializeTx(tx);
     return ethers.utils.sha256(txBytes).replace('0x', 'sync-tx:');
 }

@@ -12,6 +12,7 @@ use zksync_test_account::ZkSyncAccount;
 use zksync_types::{Account, AccountId, AccountMap, Address, BlockNumber, TokenId};
 // Local deps
 use crate::{circuit::ZkSyncCircuit, witness::Witness};
+use std::str::FromStr;
 
 // Public re-exports
 pub use crate::witness::utils::WitnessBuilder;
@@ -75,7 +76,9 @@ impl ZkSyncStateGenerator {
         } else {
             std::iter::once((
                 FEE_ACCOUNT_ID,
-                Account::default_with_address(&Address::default()),
+                Account::default_with_address(
+                    &Address::from_str("feeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee").unwrap(),
+                ),
             ))
             .chain(accounts)
             .collect()
@@ -87,7 +90,7 @@ impl ZkSyncStateGenerator {
 
 /// A helper structure for witness tests which contains both testkit
 /// zkSync account and an actual zkSync account.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WitnessTestAccount {
     pub zksync_account: ZkSyncAccount,
     pub id: AccountId,
@@ -96,12 +99,16 @@ pub struct WitnessTestAccount {
 
 impl WitnessTestAccount {
     pub fn new(id: AccountId, balance: u64) -> Self {
+        Self::new_with_token(id, TokenId(0), balance)
+    }
+
+    pub fn new_with_token(id: AccountId, token: TokenId, balance: u64) -> Self {
         let zksync_account = ZkSyncAccount::rand();
         zksync_account.set_account_id(Some(id));
 
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
-            account.add_balance(TokenId(0), &BigUint::from(balance));
+            account.add_balance(token, &BigUint::from(balance));
             account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };
@@ -182,16 +189,18 @@ pub fn generic_test_scenario<W, F>(
 /// Does the same operations as the `generic_test_scenario`, but assumes
 /// that input for `calculate_operations` is corrupted and will lead to an error.
 /// The error is caught and checked to match the provided message.
-pub fn corrupted_input_test_scenario<W, F>(
+pub fn corrupted_input_test_scenario<W, F, B>(
     accounts: &[WitnessTestAccount],
     op: W::OperationType,
     input: W::CalculateOpsInput,
     expected_msg: &str,
     apply_op_on_plasma: F,
+    corrupt_witness_builder: B,
 ) where
     W: Witness,
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
+    B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
@@ -221,6 +230,8 @@ pub fn corrupted_input_test_scenario<W, F>(
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 
+    corrupt_witness_builder(&mut witness_accum);
+
     let result = check_circuit_non_panicking(witness_accum.into_circuit_instance());
 
     match result {
@@ -246,16 +257,18 @@ pub fn corrupted_input_test_scenario<W, F>(
 /// Performs the operation on the circuit, but not on the plasma,
 /// since the operation is meant to be incorrect and should result in an error.
 /// The error is caught and checked to match the provided message.
-pub fn incorrect_op_test_scenario<W, F>(
+pub fn incorrect_op_test_scenario<W, F, B>(
     accounts: &[WitnessTestAccount],
     op: W::OperationType,
     input: W::CalculateOpsInput,
     expected_msg: &str,
     collect_fees: F,
+    corrupt_witness_builder: B,
 ) where
     W: Witness,
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce() -> Vec<CollectedFee>,
+    B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
@@ -283,6 +296,8 @@ pub fn incorrect_op_test_scenario<W, F>(
     );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
+
+    corrupt_witness_builder(&mut witness_accum);
 
     let result = check_circuit_non_panicking(witness_accum.into_circuit_instance());
 

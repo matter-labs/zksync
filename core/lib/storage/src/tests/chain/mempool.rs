@@ -1,10 +1,14 @@
 // External imports
-use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+use chrono::Utc;
 // Workspace imports
+use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_types::{
+    block::Block,
     mempool::SignedTxVariant,
-    tx::{ChangePubKey, Transfer, Withdraw},
-    AccountId, Address, BlockNumber, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx,
+    priority_ops::FullExit,
+    tx::{ChangePubKey, Transfer, TxHash, Withdraw},
+    AccountId, Address, BlockNumber, ExecutedPriorityOp, FullExitOp, Nonce, PriorityOp,
+    SignedZkSyncTx, TokenId, ZkSyncOp, ZkSyncPriorityOp, ZkSyncTx, H256,
 };
 // Local imports
 use crate::test_data::gen_eth_sign_data;
@@ -12,7 +16,11 @@ use crate::tests::db_test;
 use crate::{
     chain::{
         mempool::MempoolSchema,
-        operations::{records::NewExecutedTransaction, OperationsSchema},
+        operations::{
+            records::{NewExecutedPriorityOperation, NewExecutedTransaction},
+            OperationsSchema,
+        },
+        operations_ext::OperationsExtSchema,
     },
     QueryResult, StorageProcessor,
 };
@@ -137,7 +145,7 @@ async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Load the txs and check that they match the expected list.
-    let txs_from_db = MempoolSchema(&mut storage)
+    let (txs_from_db, _) = MempoolSchema(&mut storage)
         .load_txs()
         .await
         .expect("Can't load txs");
@@ -194,7 +202,7 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         .await?;
 
     // Load the txs and check that they match the expected list.
-    let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
+    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
     assert_eq!(txs_from_db.len(), elements_count);
 
     assert!(matches!(txs_from_db[0], SignedTxVariant::Tx(_)));
@@ -238,7 +246,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Load the txs and check that they match the expected list.
-    let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
+    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
@@ -287,7 +295,7 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let retained_hashes: Vec<_> = txs[1..].iter().map(|tx| tx.hash()).collect();
 
     // Load the txs and check that they match the expected list.
-    let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
+    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
@@ -348,10 +356,90 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
     Ok(())
 }
 
+/// Checks that batch is got from mempool correctly
+#[db_test]
+async fn test_get_batch_info_from_mempool(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let txs = gen_transfers(5);
+    MempoolSchema(&mut storage)
+        .insert_batch(&txs, Vec::new())
+        .await?;
+
+    let tx_hashes: Vec<TxHash> = txs.into_iter().map(|tx| tx.hash()).collect();
+    let batch_hash = TxHash::batch_hash(&tx_hashes);
+
+    let batch = OperationsExtSchema(&mut storage)
+        .get_batch_info(batch_hash)
+        .await?
+        .unwrap();
+
+    let actual_tx_hashes: Vec<TxHash> = batch
+        .transaction_hashes
+        .into_iter()
+        .map(|tx_hash| tx_hash.0)
+        .collect();
+    assert_eq!(actual_tx_hashes, tx_hashes);
+
+    Ok(())
+}
+
 /// Checks that returning executed txs to mempool works correctly.
 #[db_test]
 async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let txs = gen_transfers(5);
+
+    // Save the last block.
+    storage
+        .chain()
+        .block_schema()
+        .save_block(Block {
+            block_number: BlockNumber(3),
+            new_root_hash: Default::default(),
+            fee_account: AccountId(0),
+            block_transactions: Vec::new(),
+            processed_priority_ops: (0u64, 1), // Next priority operation serial id is 1.
+            block_chunks_size: 0usize,
+            commit_gas_limit: Default::default(),
+            verify_gas_limit: Default::default(),
+            block_commitment: Default::default(),
+            timestamp: 0u64,
+        })
+        .await?;
+
+    // Save priority operation with serial id 1.
+    let priority_op = FullExit {
+        account_id: AccountId(0),
+        eth_address: Address::zero(),
+        token: TokenId(0),
+        is_legacy: false,
+    };
+    let exec_priority_op = ExecutedPriorityOp {
+        priority_op: PriorityOp {
+            serial_id: 1,
+            data: ZkSyncPriorityOp::FullExit(priority_op.clone()),
+            deadline_block: 0,
+            eth_hash: H256::zero(),
+            eth_block: 0,
+            eth_block_index: None,
+        },
+        op: ZkSyncOp::FullExit(Box::new(FullExitOp {
+            priority_op,
+            withdraw_amount: None,
+            creator_account_id: None,
+            creator_address: None,
+            serial_id: None,
+            content_hash: None,
+        })),
+        block_index: 0,
+        created_at: Utc::now(),
+    };
+    storage
+        .chain()
+        .operations_schema()
+        .store_executed_priority_op(NewExecutedPriorityOperation::prepare_stored_priority_op(
+            exec_priority_op,
+            BlockNumber(5),
+        ))
+        .await?;
 
     // Insert 5 executed transactions.
     for block_number in 1..=5 {
@@ -384,7 +472,10 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
         .await?;
 
     // Check that the first 3 txs are executed and 2 last are in mempool.
-    assert_eq!(MempoolSchema(&mut storage).load_txs().await?.len(), 2);
+    let (mempool_txs, reverted_txs) = storage.chain().mempool_schema().load_txs().await?;
+    // No transactions in the mempool apart from the reverted ones.
+    assert!(mempool_txs.is_empty());
+    assert_eq!(reverted_txs.len(), 2);
     for block_number in 1..=5 {
         let tx_hash = txs.get(block_number - 1).unwrap().hash();
         let tx_in_executed = OperationsSchema(&mut storage)
@@ -397,6 +488,12 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
             assert!(!tx_in_executed);
         }
     }
+    // The order of priority operations is preserved.
+    let mut reverted_iter = reverted_txs.iter();
+    // Block number 4.
+    assert_eq!(reverted_iter.next().unwrap().next_priority_op_id, 1u64);
+    // Block number 5.
+    assert_eq!(reverted_iter.next().unwrap().next_priority_op_id, 2u64);
 
     Ok(())
 }
