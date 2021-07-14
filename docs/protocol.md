@@ -238,7 +238,7 @@ Legend:
 - Onchain operation: what the operator can put into the rollup block pubdata (operation pubdata).
 - Node implementation: node model that describes an operation.
 - Circuit implementation: circuit model that describes the operation and its witness.
-- Chunk: the dimension of the operation. Each chunk has its own part of the public data (9 bytes) given through
+- Chunk: the dimension of the operation. Each chunk has its own part of the public data (10 bytes) given through
   witnesses.
 - Significant bytes: how many bytes, of all bytes occupied by the operation, are significant (including operation
   number).
@@ -386,15 +386,15 @@ the spec below).
   "accountId": 2061,
   "from": "0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb",
   "to": "0x05e3066450dfcd4ee9ca4f2039d58883631f0460",
-  "token": 60896,
+  "token": 1023,
   "amount": "12340000000000",
   "fee": "56700000000",
   "nonce": 784793056,
   "validFrom": 0,
-  "validUntil": 4294967295,
+  "validUntil": 18446744073709551615,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
-    "signature": "355b60e9fa06bb4755fde52001f32558f221aa8bbe974882abb5db2996ecb487086bcf51dbc3b8693dbad74f393278cce63d58e79e0a629e7cbb61c4aff7fb04"
+    "signature": "817c866e71a0b3e6d412ac56524557d368c11332db93554693787e89c9813310adeda68314fc833a4f73323eca00e2cc774e78db88921dc230db7dae691fe500"
   }
 }
 ```
@@ -402,22 +402,22 @@ the spec below).
 Signed transaction representation.
 
 ```
-Signed using:
+Signer:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
+Signed transaction fields:
 type: 0xfa
 version: 0x01
 accountId: 0x0000080d
 from: 0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb
 to: 0x05e3066450dfcd4ee9ca4f2039d58883631f0460
-token: 0x0000ede0
+token: 0x000003ff
 amount: 0x5bf0aea003
 fee: 0x46e8
 nonce: 0x2ec6fde0
-valid_from: 0x0000000000000000
-valid_until: 0x00000000ffffffff
-Signed bytes: 0xfa010000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f04600000ede05bf0aea00346e82ec6fde0000000000000000000000000ffffffff
+time_range: 0x0000000000000000ffffffffffffffff
+Signed bytes: 0xfa010000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f0460000003ff5bf0aea00346e82ec6fde00000000000000000ffffffffffffffff
 ```
 
 #### Rollup operation
@@ -631,39 +631,39 @@ the spec below)..
   "accountId": 4118,
   "from": "0x041f3b8db956854839d7434f3e53c7141a236b16",
   "to": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
-  "token": 9888,
+  "token": 1023,
   "amount": "12340000000000",
   "fee": "56700000000",
   "nonce": 352676723,
-  "validFrom": 0,
-  "validUntil": 4294967295,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
-    "signature": "ae94d3b349e9ed18753c307262f62bea5ec1cc748ce5e5123caa5f7eb1aa599bc6734c43a92dad5c00eab5e6443e3ae8217e9bde60b93c7e9739dc85b148ad02"
-  }
+    "signature": "e29781125bdd3c1d0a4e863e7d364979dd3e3a36c2cd31fcf18d3853ae417201632c5c6ce4ac24da6a3ca99ed7e2005a74e6d6e2a3378d4102d68efb02d28d03"
+  },
+  "fast": false,
+  "validFrom": 0,
+  "validUntil": 18446744073709551615
 }
 ```
 
 Signed transaction representation.
 
 ```
-Signed using:
+Signer:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
+Signed transaction fields:
 type: 0xfc
 version: 0x01
-account_id: 0x00001016
-from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
-to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
-token: 0x000026a0
-amount: 0x000000000000000000000b3921510800
+accountId: 0x00001016
+from: 0x041f3b8db956854839d7434f3e53c7141a236b16
+to: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
+token: 0x000003ff
+fullAmount: 0x000000000000000000000b3921510800
 fee: 0x46e8
 nonce: 0x15056b73
-valid_from: 0x0000000000000000
-valid_until: 0x00000000ffffffff
-
-Signed bytes: 0xfc0100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000026a0000000000000000000000b392151080046e815056b73000000000000000000000000ffffffff
+time_range: 0x0000000000000000ffffffffffffffff
+Signed bytes: 0xfc0100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000003ff000000000000000000000b392151080046e815056b730000000000000000ffffffffffffffff
 ```
 
 #### Rollup operation
@@ -776,39 +776,39 @@ the spec below)..
   "accountId": 4118,
   "from": "0x041f3b8db956854839d7434f3e53c7141a236b16",
   "to": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
-  "token": 69888,
-  "feeToken": 9888,
-  "fee": "56700000000",
-  "nonce": 352676723,
-  "validFrom": 0,
-  "validUntil": 4294967295,
+  "token": 274474656,
+  "feeToken": 1023,
+  "fee": "12340000000000",
+  "nonce": 3924379879,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
-    "signature": "ae94d3b349e9ed18753c307262f62bea5ec1cc748ce5e5123caa5f7eb1aa599bc6734c43a92dad5c00eab5e6443e3ae8217e9bde60b93c7e9739dc85b148ad02"
-  }
+    "signature": "55aea80f1359cbedf68f86509a51ab721c7656263b221f8afa38a6c794ba181d119396c3d82e93feb61d2a5bef44069a3c1a7086206d7fab923abcc16e30b501"
+  },
+  "fast": false,
+  "validFrom": 0,
+  "validUntil": 18446744073709551615
 }
 ```
 
 Signed transaction representation.
 
 ```
-Signed using:
+Signer:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
+Signed transaction fields:
 type: 0xf5
 version: 0x01
-account_id: 0x00001016
-from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
-to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
-token: 0x0000ffdc
-feeToken: 0x000026a0
-fee: 0x46e8
-nonce: 0x15056b73
-valid_from: 0x0000000000000000
-valid_until: 0x00000000ffffffff
-
-Signed bytes: 0xf50100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb05130000ffdc000026a046e815056b73000000000000000000000000ffffffff
+accountId: 0x00001016
+from: 0x041f3b8db956854839d7434f3e53c7141a236b16
+to: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
+token: 0x105c26a0
+fee_token: 0x000003ff
+fee: 0x9a4a
+nonce: 0xe9e948e7
+time_range: 0x0000000000000000ffffffffffffffff
+Signed bytes: 0xf50100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513105c26a0000003ff9a4ae9e948e70000000000000000ffffffffffffffff
 ```
 
 #### Rollup operation
@@ -822,7 +822,7 @@ Signed bytes: 0xf50100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b
 #### Circuit constraints
 
 ```python
-# WithdrawOp - Rollup operation described above
+# WithdrawNFTOp - Rollup operation described above
 # Block - block where this Rollup operation is executed
 # OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
 
@@ -916,14 +916,14 @@ the spec below)..
 {
   "creatorId": 4118,
   "creatorAddress": "0x041f3b8db956854839d7434f3e53c7141a236b16",
+  "contentHash": "0x0d185e587f0a80e93cd0f311cf9c7a0071ae63d088cfc810de55c9f6d9fb4bcc",
   "recipient": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
-  "contentHash": "0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996",
-  "feeToken": 9888,
-  "fee": "56700000000",
+  "fee": "12340000000000",
+  "feeToken": 1023,
   "nonce": 352676723,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
-    "signature": "ae94d3b349e9ed18753c307262f62bea5ec1cc748ce5e5123caa5f7eb1aa599bc6734c43a92dad5c00eab5e6443e3ae8217e9bde60b93c7e9739dc85b148ad02"
+    "signature": "59aff7f0f3dff5c6b0efc1f919599e62214bb99933438b74acb96076598b41ae4976b68328492978b349e907aebfc9dce2b1298debda589686517780afae7203"
   }
 }
 ```
@@ -931,21 +931,22 @@ the spec below)..
 Signed transaction representation.
 
 ```
-Signed using:
+Signer:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
+Signed transaction fields:
 type: 0xf6
 version: 0x01
-creator_id: 0x00001016
-creator_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
-contentHash: 0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996
+creatorId: 0x00001016
+creatorAddress: 0x041f3b8db956854839d7434f3e53c7141a236b16
+contentHash: 0x0d185e587f0a80e93cd0f311cf9c7a0071ae63d088cfc810de55c9f6d9fb4bcc
 recipient: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
-feeToken: 0x000026a0
-fee: 0x46e8
+fee_token: 0x000003ff
+fee: 0x9a4a
 nonce: 0x15056b73
 
-Signed bytes: 0xf60100001016041f3b8db956854839d7434f3e53c7141a236b16bd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996dc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000026a046e815056b73
+Signed bytes: 0xf60100001016041f3b8db956854839d7434f3e53c7141a236b160d185e587f0a80e93cd0f311cf9c7a0071ae63d088cfc810de55c9f6d9fb4bccdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513000003ff9a4a15056b73
 ```
 
 #### Rollup operation
