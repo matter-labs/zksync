@@ -19,8 +19,6 @@ use zksync_types::{
 // Local imports
 use self::records::{MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
-use serde_json::Value;
-use zksync_types::tx::TxEthSignatureVariant;
 
 pub mod records;
 
