@@ -383,6 +383,7 @@ the spec below).
 
 ```json
 {
+  "type": "Transfer",
   "accountId": 2061,
   "from": "0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb",
   "to": "0x05e3066450dfcd4ee9ca4f2039d58883631f0460",
@@ -628,6 +629,7 @@ the spec below)..
 
 ```json
 {
+  "type": "Withdraw",
   "accountId": 4118,
   "from": "0x041f3b8db956854839d7434f3e53c7141a236b16",
   "to": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
@@ -710,7 +712,7 @@ def pubdata_invariants():
     OnchainOp.to_address == WithdrawOp.tx.to_address
 ```
 
-### 7. Withdraw NFT
+### 5. Withdraw NFT
 
 #### Description
 
@@ -773,6 +775,7 @@ the spec below)..
 
 ```json
 {
+  "type": "WithdrawNFT",
   "accountId": 4118,
   "from": "0x041f3b8db956854839d7434f3e53c7141a236b16",
   "to": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
@@ -859,7 +862,7 @@ def pubdata_invariants():
     OnchainOp.to_address == WithdrawNFTOp.tx.to_address
 ```
 
-### 7. Mint NFT
+### 6. Mint NFT
 
 #### Description
 
@@ -915,6 +918,7 @@ the spec below)..
 
 ```json
 {
+  "type": "MintNFT",
   "creatorId": 4118,
   "creatorAddress": "0x041f3b8db956854839d7434f3e53c7141a236b16",
   "contentHash": "0x0d185e587f0a80e93cd0f311cf9c7a0071ae63d088cfc810de55c9f6d9fb4bcc",
@@ -996,7 +1000,7 @@ def pubdata_invariants():
     OnhcainOp.packed_fee == MintNFTOp.tx.packed_fee
 ```
 
-### 5. Deposit
+### 7. Deposit
 
 #### Description
 
@@ -1086,7 +1090,7 @@ It is possible that the operator for some reason does not include this operation
 of ethereum blocks set on the smart contract, the exodus mode will be launched. It will allow recipient account (i.e.
 with `msg.sender == Deposit.to`) to withdraw funds from zkSync contract.
 
-### 6. Full exit
+### 8. Full exit
 
 #### Description
 
@@ -1180,7 +1184,7 @@ It is possible that the operator for some reason does not include this operation
 of ethereum blocks set on the smart contract, the exodus mode will be launched. After that, a user can submit exit proof
 to get her funds. Read more about censorship resistance and exodus mode in special sections.
 
-### 7. Change pubkey
+### 9. Change pubkey
 
 #### Description
 
@@ -1269,41 +1273,43 @@ function create2_address_zksync(creator_address, salt_arg /* abitrary 32 bytes *
 ```json
 {
   "type": "ChangePubKey",
-  "accountId": 5,
-  "account": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
-  "newPkHash": "sync:4a38f08c06ac48328029485e07d6d9a3c29155e7",
-  "feeToken": 100,
+  "accountId": 2061,
+  "account": "0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb",
+  "newPkHash": "sync:63aa2a0efb97064e0e52a6adb63a42018bd6e72b",
+  "feeToken": 1023,
   "fee": "56700000000",
-  "nonce": 0,
-  "validFrom": 0,
-  "validUntil": 4294967295,
+  "nonce": 155724003,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
-    "signature": "4da3c53a246a0237f295baa4349e0c659edbf29e458709d9f48f9e04af168da09c5fc08ecaf5ee5b808d35806ea6043285ef10dc1d0bdd24ee6abad1918ada02"
+    "signature": "a44999d6d7962b8216ebb2c53afc159f4bd85282844b1e443f82a1e50bfe1c2b70377ac0dbe1b8c14672fac3548df77f0b7bae0eb40c553191b9b0606ef86b04"
   },
-  "ethSignature": "0x40875b0ad3c5520093c8222acf293f34016c4fea9596ca02b37cc6e5c7cf007170cfa1195d3461ad17296ff80721762e6f783f195db19dbf40cf6ae58057172b1b"
+  "ethSignature": null,
+  "ethAuthData": {
+    "type": "Onchain"
+  },
+  "validFrom": 0,
+  "validUntil": 18446744073709551615
 }
 ```
 
 Signed transaction representation.
 
 ```
-Signed using:
+Signer:
 Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-type: 0xf8,
-version: 0x01,
-account_id: 0x00000005,
-account: 0x11742517336ae1b09ca275bb6cafc6b341b6e324,
-new_pk_hash: 0x63aa2a0efb97064e0e52a6adb63a42018bd6e72b,
-fee_token: 0x00000064,
-fee: 0x46e8,
-nonce: 0x00000000,
-valid_from: 0x0000000000000000
-valid_until: 0x00000000ffffffff
-
-Signed bytes: 0xf8010000000511742517336ae1b09ca275bb6cafc6b341b6e32463aa2a0efb97064e0e52a6adb63a42018bd6e72b0000006446e800000000000000000000000000000000ffffffff
+Signed transaction fields:
+type: 0xf8
+version: 0x01
+accountId: 0x0000080d
+account: 0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb
+new_pub_key_hash: 0x63aa2a0efb97064e0e52a6adb63a42018bd6e72b
+token: 0x000003ff
+fee: 0x46e8
+nonce: 0x094828e3
+time_range: 0x0000000000000000ffffffffffffffff
+Signed bytes: 0xf8010000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb63aa2a0efb97064e0e52a6adb63a42018bd6e72b000003ff46e8094828e30000000000000000ffffffffffffffff
 ```
 
 #### Rollup operation
@@ -1357,7 +1363,7 @@ Signature validity is verified twice:
 1. Rollup signature is verified in circuit.
 2. Ethereum signature is verified when transaction is committed to the Ethereum.
 
-### 8. Forced exit
+### 10. Forced exit
 
 #### Description
 

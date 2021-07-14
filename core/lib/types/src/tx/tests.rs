@@ -14,7 +14,7 @@ use zksync_crypto::{
 use super::*;
 use crate::{
     helpers::{pack_fee_amount, pack_token_amount},
-    AccountId, Engine, Nonce, TokenId, H256,
+    AccountId, Engine, Nonce, PubKeyHash, TokenId, H256,
 };
 
 fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
@@ -74,6 +74,66 @@ fn test_print_transfer_for_protocol() {
         ("to", transfer.to.as_bytes().to_vec()),
         ("token", transfer.token.to_be_bytes().to_vec()),
         ("amount", pack_token_amount(&transfer.amount)),
+        ("fee", pack_fee_amount(&transfer.fee)),
+        ("nonce", transfer.nonce.to_be_bytes().to_vec()),
+        (
+            "time_range",
+            transfer
+                .time_range
+                .expect("no time range on transfer")
+                .to_be_bytes()
+                .to_vec(),
+        ),
+    ];
+    println!("Signed transaction fields:");
+    let mut field_concat = Vec::new();
+    for (field, value) in signed_fields.into_iter() {
+        println!("{}: 0x{}", field, hex::encode(&value));
+        field_concat.extend(value.into_iter());
+    }
+    println!("Signed bytes: 0x{}", hex::encode(&field_concat));
+    assert_eq!(
+        field_concat,
+        transfer.get_bytes(),
+        "Protocol serialization mismatch"
+    );
+}
+
+#[test]
+fn test_print_change_pub_key_for_protocol() {
+    let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+    let key = gen_pk_and_msg().0;
+    PubKeyHash::from_privkey(&key);
+    let transfer = ChangePubKey::new_signed(
+        gen_account_id(&mut rng),
+        Address::from(rng.gen::<[u8; 20]>()),
+        PubKeyHash::from_privkey(&key),
+        gen_token_id(&mut rng),
+        BigUint::from(56_700_000_000u64),
+        Nonce(rng.gen()),
+        Default::default(),
+        None,
+        &key,
+    )
+    .expect("failed to sign transfer");
+
+    println!(
+        "User representation:\n{}\n",
+        serde_json::to_string_pretty(&transfer).expect("json serialize")
+    );
+
+    println!("Signer:");
+    println!("Private key: {}", key.0.to_string());
+    let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
+    println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
+
+    let signed_fields = vec![
+        ("type", vec![255u8 - ChangePubKey::TX_TYPE]),
+        ("version", vec![CURRENT_TX_VERSION]),
+        ("accountId", transfer.account_id.to_be_bytes().to_vec()),
+        ("account", transfer.account.as_bytes().to_vec()),
+        ("new_pub_key_hash", transfer.new_pk_hash.data.to_vec()),
+        ("token", transfer.fee_token.to_be_bytes().to_vec()),
         ("fee", pack_fee_amount(&transfer.fee)),
         ("nonce", transfer.nonce.to_be_bytes().to_vec()),
         (
