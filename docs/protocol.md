@@ -560,7 +560,7 @@ def tree_updates():
     fee_account.balance[TransferOp.tx.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0xfd
+    OnhcainOp.opcode == 0x02
     OnchainOp.from_account == TransferToNewOp.from_account_id
     OnchainOp.token == TransferToNewOp.tx.token
     OnhcainOp.packed_amount == TransferToNewOp.tx.packed_amount
@@ -745,7 +745,7 @@ Withdraws NFT from Rollup account to appropriate ethereum account.
 0a0000002a0000002b21abaed8712072e918632259780e587698ef58da00000000000000000000000000000000000000000000000000000000000000000000000021abaed8712072e918632259780e587698ef58da000100000000002a05400000000000
 ```
 
-Reads as: Withdraw NFT from account #4 token #2 for fee packed in representation and paying in fee token 0x0012 to
+Reads as: Withdraw NFT from account #4 token #2 for fee packed in representation and paying fee in token 0x0012 to
 ethereum account with address 0x0809101112131415161718192021222334252628.
 
 #### User transaction
@@ -844,7 +844,8 @@ def tree_invariants():
 
 
 def tree_updates():
-    account.balance[WithdrawNFTOp.tx.token] -= (amount + fee)
+    account.balance[WithdrawNFTOp.tx.token] = 0
+    account.balance[WithdrawNFTOp.tx.fee_token] -= fee
     account.nonce += 1
 
     fee_account.balance[WithdrawNFTOp.token] += fee
