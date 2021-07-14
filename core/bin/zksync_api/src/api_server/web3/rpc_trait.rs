@@ -27,28 +27,28 @@ macro_rules! spawn {
 #[rpc]
 pub trait Web3Rpc {
     #[rpc(name = "web3_clientVersion", returns = "String")]
-    fn web3_client_version(&self) -> FutureResp<String>;
+    fn web3_client_version(&self) -> Result<String, Error>;
 
     #[rpc(name = "net_version", returns = "String")]
-    fn net_version(&self) -> FutureResp<String>;
+    fn net_version(&self) -> Result<String, Error>;
 
     #[rpc(name = "eth_protocolVersion", returns = "String")]
-    fn protocol_version(&self) -> FutureResp<String>;
+    fn protocol_version(&self) -> Result<String, Error>;
 
     #[rpc(name = "eth_mining", returns = "bool")]
-    fn mining(&self) -> FutureResp<bool>;
+    fn mining(&self) -> Result<bool, Error>;
 
     #[rpc(name = "eth_hashrate", returns = "U256")]
-    fn hashrate(&self) -> FutureResp<U256>;
+    fn hashrate(&self) -> Result<U256, Error>;
 
     #[rpc(name = "eth_gasPrice", returns = "U256")]
-    fn gas_price(&self) -> FutureResp<U256>;
+    fn gas_price(&self) -> Result<U256, Error>;
 
     #[rpc(name = "eth_accounts", returns = "Vec<Address>")]
-    fn accounts(&self) -> FutureResp<Vec<Address>>;
+    fn accounts(&self) -> Result<Vec<Address>, Error>;
 
     #[rpc(name = "eth_getUncleCountByBlockHash", returns = "U256")]
-    fn get_uncle_count_by_block_hash(&self, block_hash: H256) -> FutureResp<U256>;
+    fn get_uncle_count_by_block_hash(&self, block_hash: H256) -> Result<U256, Error>;
 
     #[rpc(name = "eth_getUncleCountByBlockNumber", returns = "U256")]
     fn get_uncle_count_by_block_number(&self, block_number: BlockNumber) -> FutureResp<U256>;
@@ -77,40 +77,40 @@ pub trait Web3Rpc {
 }
 
 impl Web3Rpc for Web3RpcApp {
-    fn web3_client_version(&self) -> FutureResp<String> {
-        spawn! { self._impl_web3_client_version() }
+    fn web3_client_version(&self) -> Result<String, Error> {
+        Ok(String::from("zkSync"))
     }
 
-    fn net_version(&self) -> FutureResp<String> {
-        spawn! { self._impl_net_version() }
+    fn net_version(&self) -> Result<String, Error> {
+        Ok(self.chain_id.to_string())
     }
 
-    fn protocol_version(&self) -> FutureResp<String> {
-        spawn! { self._impl_protocol_version() }
+    fn protocol_version(&self) -> Result<String, Error> {
+        Ok(String::from("0"))
     }
 
-    fn mining(&self) -> FutureResp<bool> {
-        spawn! { self._impl_mining() }
+    fn mining(&self) -> Result<bool, Error> {
+        Ok(false)
     }
 
-    fn hashrate(&self) -> FutureResp<U256> {
-        spawn! { self._impl_hashrate() }
+    fn hashrate(&self) -> Result<U256, Error> {
+        Ok(U256::zero())
     }
 
-    fn gas_price(&self) -> FutureResp<U256> {
-        spawn! { self._impl_gas_price() }
+    fn gas_price(&self) -> Result<U256, Error> {
+        Ok(U256::zero())
     }
 
-    fn accounts(&self) -> FutureResp<Vec<Address>> {
-        spawn! { self._impl_accounts() }
+    fn accounts(&self) -> Result<Vec<Address>, Error> {
+        Ok(Vec::new())
     }
 
-    fn get_uncle_count_by_block_hash(&self, block_hash: H256) -> FutureResp<U256> {
-        spawn! { self._impl_get_uncle_count_by_block_hash(block_hash) }
+    fn get_uncle_count_by_block_hash(&self, _block_hash: H256) -> Result<U256, Error> {
+        Ok(U256::zero())
     }
 
-    fn get_uncle_count_by_block_number(&self, block_number: BlockNumber) -> FutureResp<U256> {
-        spawn! { self._impl_get_uncle_count_by_block_number(block_number) }
+    fn get_uncle_count_by_block_number(&self, _block_number: BlockNumber) -> Result<U256, Error> {
+        Ok(U256::zero())
     }
 
     fn block_number(&self) -> FutureResp<U64> {
