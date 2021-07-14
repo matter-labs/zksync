@@ -52,12 +52,9 @@ async function startPreparation(upgradeGatekeeper: Contract) {
 async function finishUpgrade(upgradeGatekeeper: Contract, lastBlockInfo: string) {
     const blockInfo = JSON.parse(lastBlockInfo);
     const upgradeData = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [blockInfo]);
-
-    console.log(upgradeData2);
-
-    // console.log('Finishing upgrade');
-    await (await upgradeGatekeeper.finishUpgrade([[], [], upgradeData], { gasLimit: 3_000_000 })).wait();
-    // console.log('The upgrade has finished');
+    console.log('Finishing upgrade');
+    await (await upgradeGatekeeper.finishUpgrade([[], [], upgradeData], { gasLimit: 3000000 })).wait();
+    console.log('The upgrade has finished');
 }
 
 async function cancelUpgrade(upgradeGatekeeper: Contract) {
