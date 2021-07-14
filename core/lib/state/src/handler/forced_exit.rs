@@ -1,6 +1,8 @@
 use std::time::Instant;
 use zksync_crypto::params;
-use zksync_types::{AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, PubKeyHash, ZkSyncOp};
+use zksync_types::{
+    AccountUpdate, AccountUpdates, Address, ForcedExit, ForcedExitOp, PubKeyHash, ZkSyncOp,
+};
 use zksync_utils::BigUintSerdeWrapper;
 
 use crate::{
@@ -36,6 +38,10 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         invariant!(
             account.pub_key_hash == PubKeyHash::default(),
             ForcedExitOpError::TargetAccountNotLocked
+        );
+        invariant!(
+            account.address != Address::default(),
+            ForcedExitOpError::InvalidTargetAccount
         );
 
         // Obtain the token balance to be withdrawn.
