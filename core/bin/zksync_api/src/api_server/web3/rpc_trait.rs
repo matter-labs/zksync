@@ -51,7 +51,7 @@ pub trait Web3Rpc {
     fn get_uncle_count_by_block_hash(&self, block_hash: H256) -> Result<U256, Error>;
 
     #[rpc(name = "eth_getUncleCountByBlockNumber", returns = "U256")]
-    fn get_uncle_count_by_block_number(&self, block_number: BlockNumber) -> FutureResp<U256>;
+    fn get_uncle_count_by_block_number(&self, block_number: BlockNumber) -> Result<U256, Error>;
 
     #[rpc(name = "eth_blockNumber", returns = "U64")]
     fn block_number(&self) -> FutureResp<U64>;
