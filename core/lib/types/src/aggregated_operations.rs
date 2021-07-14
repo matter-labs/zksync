@@ -10,17 +10,21 @@ pub struct BlocksCommitOperation {
     pub blocks: Vec<Block>,
 }
 
+// {"blockNumber":19646,"priorityOperations":8,"pendingOnchainOperationsHash":"0x4733836f2cfa3bd7d4323227172b534af5c97e1a995953dadb7a16e96ef9857c","timestamp":1626236789,"stateHash":"0x15585f24273ea69d31073e4c051627439cb3de9148965c134730f3accbc5725e","commitment":"0x1c6c1de6af63dd9a53977e0d2659b28f7cd3d4c8062427883dfd8453012421a5"}
+//
 pub fn stored_block_info(block: &Block) -> Token {
     Token::Tuple(vec![
         Token::Uint(U256::from(*block.block_number)),
         Token::Uint(U256::from(block.number_of_processed_prior_ops())),
-        Token::FixedBytes(
+        Token::FixedBytes(if (block.block_number.0 == 19646) {
+            hex::decode("4733836f2cfa3bd7d4323227172b534af5c97e1a995953dadb7a16e96ef9857c").unwrap()
+        } else {
             block
                 .get_onchain_operations_block_info()
                 .1
                 .as_bytes()
-                .to_vec(),
-        ),
+                .to_vec()
+        }),
         Token::Uint(U256::from(block.timestamp)),
         Token::FixedBytes(block.get_eth_encoded_root().as_bytes().to_vec()),
         Token::FixedBytes(block.block_commitment.as_bytes().to_vec()),
