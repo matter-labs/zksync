@@ -5,7 +5,10 @@ use jsonrpc_core::{Error, Result};
 // Workspace uses
 // Local uses
 use super::{
-    types::{BlockInfo, BlockNumber, Transaction, H256, U256, U64},
+    types::{
+        tx_receipt_from_storage_receipt, BlockInfo, BlockNumber, Transaction, TransactionReceipt,
+        H256, U256, U64,
+    },
     Web3RpcApp,
 };
 
@@ -188,6 +191,25 @@ impl Web3RpcApp {
             .map_err(|_| Error::internal_error())?;
 
         metrics::histogram!("api.web3.get_block_by_hash", start.elapsed());
+        Ok(result)
+    }
+
+    pub async fn _impl_get_transaction_receipt(
+        self,
+        hash: H256,
+    ) -> Result<Option<TransactionReceipt>> {
+        let start = Instant::now();
+        let mut storage = self.access_storage().await?;
+
+        let tx = storage
+            .chain()
+            .operations_ext_schema()
+            .tx_receipt_for_web3(hash.as_ref())
+            .await
+            .map_err(|_| Error::internal_error())?;
+        let result = tx.map(tx_receipt_from_storage_receipt);
+
+        metrics::histogram!("api.web3.get_transaction_receipt", start.elapsed());
         Ok(result)
     }
 }

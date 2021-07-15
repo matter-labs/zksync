@@ -4,7 +4,7 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 // Local uses
 use super::{
-    types::{Address, BlockInfo, BlockNumber, Transaction, H256, U256, U64},
+    types::{Address, BlockInfo, BlockNumber, Transaction, TransactionReceipt, H256, U256, U64},
     Web3RpcApp,
 };
 
@@ -87,6 +87,12 @@ pub trait Web3Rpc {
 
     #[rpc(name = "eth_getBlockByHash", returns = "Option<BlockInfo>")]
     fn get_block_by_hash(&self, hash: H256, include_txs: bool) -> FutureResp<Option<BlockInfo>>;
+
+    #[rpc(
+        name = "eth_getTransactionReceipt",
+        returns = "Option<TransactionReceipt>"
+    )]
+    fn get_transaction_receipt(&self, hash: H256) -> FutureResp<Option<TransactionReceipt>>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -163,5 +169,9 @@ impl Web3Rpc for Web3RpcApp {
 
     fn get_block_by_hash(&self, hash: H256, include_txs: bool) -> FutureResp<Option<BlockInfo>> {
         spawn! { self._impl_get_block_by_hash(hash, include_txs) }
+    }
+
+    fn get_transaction_receipt(&self, hash: H256) -> FutureResp<Option<TransactionReceipt>> {
+        spawn! { self._impl_get_transaction_receipt(hash) }
     }
 }

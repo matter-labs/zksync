@@ -183,3 +183,15 @@ pub struct Web3TxData {
     pub from_account: Vec<u8>,
     pub to_account: Option<Vec<u8>>,
 }
+
+#[derive(Debug, FromRow, PartialEq)]
+pub struct Web3TxReceipt {
+    pub tx_hash: Vec<u8>,
+    pub block_number: i64,
+    pub tx: Value,
+    pub block_hash: Vec<u8>,
+    pub block_index: Option<i32>,
+    pub from_account: Vec<u8>,
+    pub to_account: Option<Vec<u8>>,
+    pub success: bool,
+}
