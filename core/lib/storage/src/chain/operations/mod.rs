@@ -2,7 +2,6 @@
 use std::time::Instant;
 // External imports
 use chrono::{Duration, Utc};
-use parity_crypto::digest::sha256;
 // Workspace imports
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
