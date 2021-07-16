@@ -37,7 +37,6 @@ impl StateKeeperTester {
             vec![available_chunk_size],
             max_iterations,
             fast_iterations,
-            None,
         );
 
         Self {

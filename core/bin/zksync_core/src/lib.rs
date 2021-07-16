@@ -135,7 +135,6 @@ pub async fn run_core(
         config.chain.state_keeper.block_chunk_sizes.clone(),
         config.chain.state_keeper.miniblock_iterations as usize,
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
-        config.chain.state_keeper.last_tx_signer_data(),
     );
     let state_keeper_task = start_state_keeper(state_keeper, pending_block);
 

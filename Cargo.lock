@@ -2188,18 +2188,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashes_migration"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "tokio 0.2.22",
- "vlog",
- "zksync_storage",
- "zksync_types",
-]
-
-[[package]]
 name = "hashlink"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4089,27 +4077,6 @@ name = "redox_syscall"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
-
-[[package]]
-name = "regen-root-hash"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "bigdecimal",
- "ethabi",
- "hex",
- "num",
- "once_cell",
- "serde",
- "serde_json",
- "structopt",
- "tokio 0.2.22",
- "zksync_circuit",
- "zksync_crypto",
- "zksync_storage",
- "zksync_types",
- "zksync_utils",
-]
 
 [[package]]
 name = "regex"
