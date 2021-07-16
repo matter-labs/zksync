@@ -1364,7 +1364,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     SELECT
                         tx_hash,
                         block_number,
-                        Null::jsonb as tx,
+                        tx,
                         nonce,
                         block_index,
                         from_account,
@@ -1375,7 +1375,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     SELECT
                         tx_hash,
                         block_number,
-                        Null::jsonb as tx,
+                        operation as tx,
                         priority_op_serialid as nonce,
                         block_index,
                         from_account,
@@ -1404,7 +1404,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 SELECT
                     tx_hash as "tx_hash!",
                     block_number as "block_number?",
-                    tx as "tx?",
+                    tx as "tx!",
                     nonce as "nonce!",
                     block_index as "block_index?",
                     from_account as "from_account!",
@@ -1423,7 +1423,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         // `nonce`, `from_account`, `to_account` of mempool tx can be retrieved only from `tx` json value.
         if let Some(tx) = tx.as_mut() {
             if tx.block_number.is_none() {
-                let zksync_tx: ZkSyncTx = serde_json::from_value(tx.tx.clone().unwrap()).unwrap();
+                let zksync_tx: ZkSyncTx = serde_json::from_value(tx.tx.clone()).unwrap();
                 tx.nonce = zksync_tx.nonce().0 as i64;
                 tx.from_account = zksync_tx.from_account().as_bytes().to_vec();
                 tx.to_account = zksync_tx

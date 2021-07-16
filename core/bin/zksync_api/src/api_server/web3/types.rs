@@ -5,11 +5,26 @@
 //!
 //! These "extensions" are required to provide more zkSync-specific information while remaining Web3-compilant.
 
+// Built-in uses
+use std::collections::HashMap;
+use std::str::FromStr;
+// External uses
+use jsonrpc_core::Error;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use tiny_keccak::keccak256;
 pub use web3::types::{
-    Address, Block, Transaction, TransactionReceipt, H160, H2048, H256, H64, U256, U64,
+    Address, Block, Bytes, Log, Transaction, TransactionReceipt, H160, H2048, H256, H64, U256, U64,
 };
-use zksync_storage::chain::operations_ext::records::{Web3TxData, Web3TxReceipt};
+// Workspace uses
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
+use zksync_storage::{chain::operations_ext::records::Web3TxData, StorageProcessor};
+use zksync_types::{Token, TokenId, ZkSyncOp, ZkSyncTx, NFT};
+// Local uses
+use super::converter::{log, u256_from_biguint};
+use crate::utils::token_db_cache::TokenDBCache;
+
+const ZKSYNC_PROXY_ADDRESS: H160 =
+    H160::from_str("1000000000000000000000000000000000000000").unwrap();
 
 /// Block Number
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -174,20 +189,428 @@ impl BlockInfo {
     }
 }
 
-pub fn tx_receipt_from_storage_receipt(tx: Web3TxReceipt) -> TransactionReceipt {
-    let root_hash = H256::from_slice(&tx.block_hash);
-    TransactionReceipt {
-        transaction_hash: H256::from_slice(&tx.tx_hash),
-        // U64::MAX for failed transactions
-        transaction_index: tx.block_index.map(Into::into).unwrap_or(U64::MAX),
-        block_hash: Some(root_hash),
-        block_number: Some(tx.block_number.into()),
-        cumulative_gas_used: 0.into(),
-        gas_used: Some(0.into()),
-        contract_address: None,
-        logs: Vec::new(),
-        status: Some((tx.success as u8).into()),
-        root: Some(root_hash),
-        logs_bloom: H2048::zero(),
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+pub enum Event {
+    ZkSyncTransfer,
+    ZkSyncWithdraw,
+    ZkSyncForcedExit,
+    ZkSyncChangePubKey,
+    ZkSyncDeposit,
+    ZkSyncFullExit,
+    ZkSyncMintNFT,
+    ZkSyncWithdrawNFT,
+    ZkSyncSwap,
+    ERCTransfer, // they have same topics
+}
+
+#[derive(Debug, Clone)]
+pub struct LogsHelper {
+    topic_by_event: HashMap<Event, H256>,
+    event_by_topic: HashMap<H256, Event>,
+    tokens: TokenDBCache,
+}
+
+#[derive(Debug, Clone)]
+pub struct CommonLogData {
+    pub block_hash: Option<H256>,
+    pub block_number: Option<U64>,
+    pub transaction_hash: H256,
+    pub transaction_index: Option<U64>,
+}
+
+impl LogsHelper {
+    pub fn new() -> Self {
+        let data = vec![
+            (Event::ZkSyncTransfer, "ZkSyncTransfer(address,address,address,uint256,uint256)"),
+            (Event::ZkSyncWithdraw, "ZkSyncWithdraw(address,address,address,uint256,uint256)"),
+            (Event::ZkSyncForcedExit, "ZkSyncForcedExit(address,address,address,uint256)"),
+            (Event::ZkSyncChangePubKey, "ZkSyncChangePubKey(address,address,address,uint256)"),
+            (Event::ZkSyncDeposit, "ZkSyncDeposit(address,address,address,uint256)"),
+            (Event::ZkSyncFullExit, "ZkSyncFullExit(address,address)"),
+            (Event::ZkSyncMintNFT, "ZkSyncMintNFT(uint32,address,address,bytes32,address,uint256)"),
+            (Event::ZkSyncWithdrawNFT, "ZkSyncWithdrawNFT(address,address,bytes32,uint32,address,uint256)"),
+            (Event::ZkSyncSwap, "ZkSyncSwap(address,address,address,address,address,address,uint256,uint256,uint256)"),
+            (Event::ERCTransfer, "Transfer(address,address,uint256)"),
+        ];
+        let mut topic_by_event = HashMap::new();
+        let mut event_by_topic = HashMap::new();
+
+        for (event_name, event_str) in data.into_iter() {
+            let topic = H256::from(keccak256(event_str.as_bytes()));
+            topic_by_event.insert(event_name, topic);
+            event_by_topic.insert(topic, event_name);
+        }
+
+        Self {
+            topic_by_event,
+            event_by_topic,
+            tokens: TokenDBCache::new(),
+        }
+    }
+
+    pub fn zksync_log(
+        &self,
+        tx: Web3TxData,
+        storage: &mut StorageProcessor<'_>,
+    ) -> jsonrpc_core::Result<Option<Log>> {
+        let block_hash = tx.block_hash.map(|h| H256::from_slice(&h));
+        let block_number = tx.block_number.map(Into::into);
+        let transaction_hash = H256::from_slice(&tx.tx_hash);
+        let transaction_index = tx.block_index.map(Into::into);
+        let common_data = CommonLogData {
+            block_hash,
+            block_number,
+            transaction_hash,
+            transaction_index,
+        };
+
+        let log = if let Ok(tx) = serde_json::from_value::<ZkSyncTx>(tx.tx.clone()) {
+            let transaction_log_index = Self::zksync_tx_log_index(&*tx);
+            let log_data = match tx {
+                ZkSyncTx::Transfer(tx) => {
+                    let token = self.get_token_by_id(storage, tx.token)?;
+                    let data = Self::zksync_transfer_data(
+                        tx.from,
+                        tx.to,
+                        token.address,
+                        u256_from_biguint(tx.amount)?,
+                        u256_from_biguint(tx.fee)?,
+                    );
+                    Some((Event::ZkSyncTransfer, data))
+                }
+                ZkSyncTx::Withdraw(tx) => {
+                    let token = self.get_token_by_id(storage, tx.token)?;
+                    let data = Self::zksync_withdraw_data(
+                        tx.from,
+                        tx.to,
+                        token.address,
+                        u256_from_biguint(tx.amount)?,
+                        u256_from_biguint(tx.fee)?,
+                    );
+                    Some((Event::ZkSyncWithdraw, data))
+                }
+                ZkSyncTx::ForcedExit(tx) => {
+                    let token = self.get_token_by_id(storage, tx.token)?;
+                    let initiator = storage
+                        .chain()
+                        .account_schema()
+                        .account_address_by_id(tx.initiator_account_id)
+                        .await
+                        .map_err(|_| Error::internal_error())?
+                        .expect("Can`t find account in storage");
+                    let data = Self::zksync_forced_exit_data(
+                        initiator,
+                        tx.target,
+                        token.address,
+                        u256_from_biguint(tx.fee)?,
+                    );
+                    Some((Event::ZkSyncForcedExit, data))
+                }
+                ZkSyncTx::ChangePubKey(tx) => {
+                    let fee_token = self.get_token_by_id(storage, tx.fee_token)?;
+                    let data = Self::zksync_change_pub_key_data(
+                        tx.account,
+                        tx.new_pk_hash.data,
+                        fee_token.address,
+                        u256_from_biguint(tx.fee)?,
+                    );
+                    Some((Event::ZkSyncChangePubKey, data))
+                }
+                ZkSyncTx::MintNFT(tx) => {
+                    let fee_token = self.get_token_by_id(storage, tx.fee_token)?;
+                    let data = Self::zksync_mint_nft_data(
+                        tx.creator_id.0.into(),
+                        tx.creator_address,
+                        tx.recipient,
+                        tx.content_hash,
+                        fee_token.address,
+                        u256_from_biguint(tx.fee)?,
+                    );
+                    Some((Event::ZkSyncMintNFT, data))
+                }
+                ZkSyncTx::WithdrawNFT(tx) => {
+                    let fee_token = self.get_token_by_id(storage, tx.fee_token)?;
+                    let nft = self.get_nft_by_id(storage, tx.token)?;
+                    let data = Self::zksync_withdraw_nft_data(
+                        nft.creator_address,
+                        tx.to,
+                        nft.content_hash,
+                        tx.token.0.into(),
+                        fee_token.address,
+                        u256_from_biguint(tx.fee)?,
+                    );
+                    Some((Event::ZkSyncWithdrawNFT, data))
+                }
+                ZkSyncTx::Swap(tx) => {
+                    let fee_token = self.get_token_by_id(storage, tx.fee_token)?;
+                    let token1 = self.get_token_by_id(storage, tx.orders.0.token_buy)?;
+                    let token2 = self.get_token_by_id(storage, tx.orders.0.token_sell)?;
+                    let address1 = storage
+                        .chain()
+                        .account_schema()
+                        .account_address_by_id(tx.orders.0.account_id)
+                        .await
+                        .map_err(|_| Error::internal_error())?
+                        .expect("Can`t find account in storage");
+                    let address2 = storage
+                        .chain()
+                        .account_schema()
+                        .account_address_by_id(tx.orders.1.account_id)
+                        .await
+                        .map_err(|_| Error::internal_error())?
+                        .expect("Can`t find account in storage");
+                    let data = Self::zksync_swap_data(
+                        tx.submitter_address,
+                        address1,
+                        address2,
+                        fee_token.address,
+                        token1.address,
+                        token2.address,
+                        u256_from_biguint(tx.fee)?,
+                        u256_from_biguint(tx.amounts.0)?,
+                        u256_from_biguint(tx.amounts.1)?,
+                    );
+                    Some((Event::ZkSyncSwap, data))
+                }
+                ZkSyncTx::Close(_) => None,
+            };
+            log_data.map(|(event, data)| {
+                log(
+                    ZKSYNC_PROXY_ADDRESS,
+                    *self.topic_by_event.get(&event).unwrap(),
+                    data,
+                    common_data,
+                    transaction_log_index,
+                )
+            })
+        } else {
+            let transaction_log_index = 1u8.into();
+            let op = serde_json::from_value::<ZkSyncOp>(tx.tx).unwrap();
+            let (event, data) = match op {
+                ZkSyncOp::Deposit(op) => {
+                    let token = self.get_token_by_id(storage, op.priority_op.token)?;
+                    let data = Self::zksync_deposit_data(
+                        op.priority_op.to,
+                        op.priority_op.to,
+                        token.address,
+                        u256_from_biguint(op.priority_op.amount)?,
+                    );
+                    (Event::ZkSyncDeposit, data)
+                }
+                ZkSyncOp::FullExit(op) => {
+                    let token = self.get_token_by_id(storage, op.priority_op.token)?;
+                    let account = storage
+                        .chain()
+                        .account_schema()
+                        .account_address_by_id(op.priority_op.account_id)
+                        .await
+                        .map_err(|_| Error::internal_error())?
+                        .expect("Can`t find account in storage");
+                    let data = Self::zksync_full_exit_data(account, token.address);
+                    (Event::ZkSyncFullExit, data)
+                }
+                _ => unreachable!(),
+            };
+            log(
+                ZKSYNC_PROXY_ADDRESS,
+                *self.topic_by_event.get(&event).unwrap(),
+                data,
+                common_data,
+                transaction_log_index,
+            )
+        };
+        Ok(log)
+    }
+
+    fn get_token_by_id(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        id: TokenId,
+    ) -> jsonrpc_core::Result<Token> {
+        Ok(self
+            .tokens
+            .get_token(storage, id)
+            .await
+            .map_err(|_| Error::internal_error())?
+            .expect("Can't find token in storage"))
+    }
+
+    fn get_nft_by_id(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        id: TokenId,
+    ) -> jsonrpc_core::Result<NFT> {
+        Ok(self
+            .tokens
+            .get_nft_by_id(storage, id)
+            .await
+            .map_err(|_| Error::internal_error())?
+            .expect("Can't find token in storage"))
+    }
+
+    fn zksync_tx_log_index(tx: &ZkSyncTx) -> U256 {
+        if matches!(tx, ZkSyncTx::ChangePubKey(_)) {
+            0u8.into()
+        } else if matches!(tx, ZkSyncTx::Swap(_)) {
+            2u8.into()
+        } else {
+            1u8.into()
+        }
+    }
+
+    fn erc_transfer(
+        &self,
+        from: H160,
+        to: H160,
+        token: &Token,
+        common_data: CommonData,
+    ) -> jsonrpc_core::Result<Log> {
+        let (contract_address, amount_or_id) = if !token.is_nft {
+            (token.address, u256_from_biguint(tx.amount.clone())?)
+        } else {
+            let nft = self
+                .tokens
+                .get_nft_by_id(storage, tx.token)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .expect("Can't find token in storage");
+            (nft.creator_address, nft.serial_id.into());
+        };
+        let data = Self::erc_transfer_data(from, to, amount_or_id);
+        Ok(log(
+            contract_address,
+            *self.topic_by_event.get(&Event::ERCTransfer).unwrap(),
+            data,
+            common_data,
+            0.into(),
+        ))
+    }
+
+    fn append_bytes(value: &[u8]) -> Vec<u8> {
+        let mut vec = value.to_vec();
+        vec.resize(32, 0);
+        vec
+    }
+
+    fn erc_transfer_data(from: H160, to: H160, amount_or_id: U256) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(from.as_bytes()));
+        bytes.append(&mut Self::append_bytes(to.as_bytes()));
+        bytes.append(&mut Self::append_bytes(amount_or_id.as_byte_slice()));
+        bytes.into()
+    }
+
+    fn zksync_transfer_data(from: H160, to: H160, token: H160, amount: U256, fee: U256) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(from.as_bytes()));
+        bytes.append(&mut Self::append_bytes(to.as_bytes()));
+        bytes.append(&mut Self::append_bytes(token.as_bytes()));
+        bytes.append(&mut Self::append_bytes(amount.as_byte_slice()));
+        bytes.append(&mut Self::append_bytes(fee.as_byte_slice()));
+        bytes.into()
+    }
+
+    fn zksync_withdraw_data(from: H160, to: H160, token: H160, amount: U256, fee: U256) -> Bytes {
+        Self::zksync_transfer_data(from, to, token, amount, fee)
+    }
+
+    fn zksync_forced_exit_data(initiator: H160, target: H160, token: H160, fee: U256) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(initiator.as_bytes()));
+        bytes.append(&mut Self::append_bytes(target.as_bytes()));
+        bytes.append(&mut Self::append_bytes(token.as_bytes()));
+        bytes.append(&mut Self::append_bytes(fee.as_byte_slice()));
+        bytes.into()
+    }
+
+    fn zksync_change_pub_key_data(
+        account: H160,
+        new_pub_key_hash: [u8; 20],
+        token: H160,
+        fee: U256,
+    ) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(account.as_bytes()));
+        bytes.append(&mut Self::append_bytes(&new_pub_key_hash));
+        bytes.append(&mut Self::append_bytes(token.as_bytes()));
+        bytes.append(&mut Self::append_bytes(fee.as_byte_slice()));
+        bytes.into()
+    }
+
+    fn zksync_mint_nft_data(
+        creator_id: U256,
+        creator_address: H160,
+        recipient: H160,
+        content_hash: H256,
+        fee_token: H160,
+        fee: U256,
+    ) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(creator_id.as_byte_slice()));
+        bytes.append(&mut Self::append_bytes(creator_address.as_bytes()));
+        bytes.append(&mut Self::append_bytes(recipient.as_bytes()));
+        bytes.append(&mut Self::append_bytes(content_hash.as_bytes()));
+        bytes.append(&mut Self::append_bytes(fee_token.as_bytes()));
+        bytes.append(&mut Self::append_bytes(fee.as_byte_slice()));
+        bytes.into()
+    }
+
+    fn zksync_withdraw_nft_data(
+        creator_address: H160,
+        recipient: H160,
+        content_hash: H256,
+        token_id: U256,
+        fee_token: H160,
+        fee: U256,
+    ) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(creator_address.as_bytes()));
+        bytes.append(&mut Self::append_bytes(recipient.as_bytes()));
+        bytes.append(&mut Self::append_bytes(content_hash.as_bytes()));
+        bytes.append(&mut Self::append_bytes(token_id.as_byte_slice()));
+        bytes.append(&mut Self::append_bytes(fee_token.as_bytes()));
+        bytes.append(&mut Self::append_bytes(fee.as_byte_slice()));
+        bytes.into()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn zksync_swap_data(
+        initiator: H160,
+        account1: H160,
+        account2: H160,
+        fee_token: H160,
+        token1: H160,
+        token2: H160,
+        fee: U256,
+        amount1: U256,
+        amount2: U256,
+    ) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(initiator.as_bytes()));
+        bytes.append(&mut Self::append_bytes(account1.as_bytes()));
+        bytes.append(&mut Self::append_bytes(account2.as_bytes()));
+        bytes.append(&mut Self::append_bytes(fee_token.as_bytes()));
+        bytes.append(&mut Self::append_bytes(token1.as_bytes()));
+        bytes.append(&mut Self::append_bytes(token2.as_bytes()));
+        bytes.append(&mut Self::append_bytes(fee.as_byte_slice()));
+        bytes.append(&mut Self::append_bytes(amount1.as_byte_slice()));
+        bytes.append(&mut Self::append_bytes(amount2.as_byte_slice()));
+        bytes.into()
+    }
+
+    fn zksync_deposit_data(to: H160, from: H160, token: H160, amount: U256) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(to.as_bytes()));
+        bytes.append(&mut Self::append_bytes(from.as_bytes()));
+        bytes.append(&mut Self::append_bytes(token.as_bytes()));
+        bytes.append(&mut Self::append_bytes(amount.as_byte_slice()));
+        bytes.into()
+    }
+
+    fn zksync_full_exit_data(account: H160, token: H160) -> Bytes {
+        let mut bytes = Vec::new();
+        bytes.append(&mut Self::append_bytes(account.as_bytes()));
+        bytes.append(&mut Self::append_bytes(token.as_bytes()));
+        bytes.into()
     }
 }

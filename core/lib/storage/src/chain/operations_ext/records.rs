@@ -176,7 +176,7 @@ pub struct StorageTxData {
 pub struct Web3TxData {
     pub tx_hash: Vec<u8>,
     pub block_number: Option<i64>,
-    pub tx: Option<Value>,
+    pub tx: Value,
     pub nonce: i64,
     pub block_hash: Option<Vec<u8>>,
     pub block_index: Option<i32>,
