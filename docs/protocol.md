@@ -1022,7 +1022,6 @@ be created if needed.
 | Field       | Byte len | Value/type  | Description                                                                     |
 | ----------- | -------- | ----------- | ------------------------------------------------------------------------------- |
 | opcode      | 1        | `0xfe`      | Operation code                                                                  |
-| version     | 1        | `0x01`      | Version of transaction                                                          |
 | to_account  | 4        | AccountId   | Unique identifier of the rollup account that will receive the funds (recipient) |
 | token       | 4        | TokenId     | Unique token identifier in the rollup                                           |
 | full_amount | 16       | StateAmount | Full amount of funds sent                                                       |
