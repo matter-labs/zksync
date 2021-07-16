@@ -279,6 +279,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         // states for the block with number `last_used_block` on the previous call of
         // `proceed_next_operations`, so if the block number hasn't changed we shouldn't request
         // states because it would be spare requests.
+        // The ongoing operations list would be the same for the next step
         if last_used_block != current_block {
             // Commit the next operations (if any).
             while let Some(mut current_op) = self.ongoing_ops.pop_front() {
@@ -308,15 +309,14 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
                     }
                 }
             }
+            assert!(
+                self.ongoing_ops.is_empty(),
+                "Ongoing ops queue should be empty after draining"
+            );
+            // Store the ongoing operations for the next round.
+            self.ongoing_ops = new_ongoing_ops;
         }
 
-        assert!(
-            self.ongoing_ops.is_empty(),
-            "Ongoing ops queue should be empty after draining"
-        );
-
-        // Store the ongoing operations for the next round.
-        self.ongoing_ops = new_ongoing_ops;
         metrics::histogram!("eth_sender.proceed_next_operations", start.elapsed());
         current_block
     }
