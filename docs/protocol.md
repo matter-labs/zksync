@@ -985,7 +985,7 @@ def tree_invariants():
 
 
 def tree_updates():
-    creator_account.balance[MintNFTOp.tx.token] -= fee
+    creator_account.balance[MintNFTOp.tx.fee_token] -= fee
     creator_account.balance[SPECIAL_NFT_TOKEN] += 1
     special_nft_account.balance[SPECIAL_NFT_TOKEN] += 1
     creator_account.nonce += 1
@@ -1104,7 +1104,7 @@ in a block.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 11     | 45                |
+| 11     | 85                |
 
 ##### Structure
 
@@ -1580,7 +1580,7 @@ requestFullExit (
 - `_accountId`: `AccountId` of the Rollup account
 - `_token`: Token address in L1 chain
 
-Register full exit request to withdraw NFT tokens balance from the account. The user needs to call it if she believes
+Register full exit request to withdraw NFT tokens balance from the account. Users need to call it if they believes
 that her transactions are censored by the validator.
 
 ```solidity
@@ -1874,6 +1874,20 @@ registerNFTFactoryCreator(uint32 _creatorAccountId, address _creatorAddress, byt
 - `_creatorAccountId`: Creator's zkSync account ID
 - `_creatorAddress`: NFT creator address
 - `_signature`: Creator's signature
+
+The creator should sing the message 
+
+```solidity
+    "\x19Ethereum Signed Message:\n141",
+    "\nCreator's account ID in zkSync: ",
+    Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAccountId))),
+    "\nCreator: ",
+    Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAddress))),
+    "\nFactory: ",
+    Bytes.bytesToHexASCIIBytes(abi.encodePacked((_factoryAddress)))
+```
+They then have to send this signature to the governance contract using the factory contract by calling the above function.
+
 
 #### Set default NFT factory
 
