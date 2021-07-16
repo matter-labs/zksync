@@ -1,7 +1,9 @@
 // External imports
+use num::{BigUint, Zero};
 // Workspace imports
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, AccountId, AccountMap, BlockNumber,
+    aggregated_operations::AggregatedActionType, helpers::apply_updates, AccountId, AccountMap,
+    AccountUpdate, Address, BlockNumber, Nonce, TokenId,
 };
 // Local imports
 use super::block::apply_random_updates;
@@ -16,7 +18,6 @@ use crate::{
     },
     QueryResult, StorageProcessor,
 };
-use zksync_types::helpers::apply_updates;
 
 /// The save/load routine for EthAccountType
 #[db_test]
@@ -58,14 +59,6 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create several accounts.
     let accounts = AccountMap::default();
-    let (last_finalized, _) = AccountSchema(&mut storage)
-        .account_and_last_block(AccountId(1))
-        .await?;
-    let last_committed = AccountSchema(&mut storage)
-        .last_committed_block_with_update_for_acc(AccountId(1))
-        .await?;
-    assert_eq!(last_finalized, 0);
-    assert_eq!(*last_committed, 0);
 
     // Create several accounts.
     let (mut accounts_block, mut updates_block) = apply_random_updates(accounts, &mut rng);
@@ -212,6 +205,93 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             Some(got_account)
         );
     }
+
+    Ok(())
+}
+
+#[db_test]
+async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let _lock = ACCOUNT_MUTEX.lock().await;
+    let address = Address::random();
+    let updates1 = vec![
+        (
+            AccountId(1),
+            AccountUpdate::Create {
+                address,
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            AccountId(1),
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(0),
+                new_nonce: Nonce(1),
+                balance_update: (TokenId(0), BigUint::zero(), BigUint::from(100u32)),
+            },
+        ),
+    ];
+    let updates2 = vec![
+        (
+            AccountId(1),
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(1),
+                new_nonce: Nonce(2),
+                balance_update: (TokenId(0), BigUint::from(100u32), BigUint::from(200u32)),
+            },
+        ),
+        (
+            AccountId(1),
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(2),
+                new_nonce: Nonce(3),
+                balance_update: (TokenId(0), BigUint::from(200u32), BigUint::from(300u32)),
+            },
+        ),
+        // Balance updates of non-eth tokens should be ignored.
+        (
+            AccountId(1),
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(3),
+                new_nonce: Nonce(4),
+                balance_update: (TokenId(1), BigUint::zero(), BigUint::from(10000u32)),
+            },
+        ),
+    ];
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(2), &updates1, 0)
+        .await?;
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(3), &updates2, updates1.len())
+        .await?;
+
+    let balance1 = storage
+        .chain()
+        .account_schema()
+        .get_account_eth_balance_for_block(address, BlockNumber(1))
+        .await?;
+    let balance2 = storage
+        .chain()
+        .account_schema()
+        .get_account_eth_balance_for_block(address, BlockNumber(2))
+        .await?;
+    let balance3 = storage
+        .chain()
+        .account_schema()
+        .get_account_eth_balance_for_block(address, BlockNumber(3))
+        .await?;
+    let balance4 = storage
+        .chain()
+        .account_schema()
+        .get_account_eth_balance_for_block(address, BlockNumber(4))
+        .await?;
+    assert_eq!(balance1, BigUint::zero());
+    assert_eq!(balance2, BigUint::from(100u32));
+    assert_eq!(balance3, BigUint::from(300u32));
+    assert_eq!(balance4, BigUint::from(300u32));
 
     Ok(())
 }

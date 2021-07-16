@@ -2548,6 +2548,27 @@
       "nullable": []
     }
   },
+  "608b872d00f343f4409accbc9f4eda94918de5596ae55c062fed6d8c894e7b29": {
+    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0\n                ORDER BY update_order_id DESC\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "new_balance",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {
     "query": "SELECT * FROM executed_priority_operations WHERE eth_hash = $1",
     "describe": {
@@ -6111,6 +6132,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "eac9603e24c96b9675d13f7b2d8b2f9509a0f72a4b058919343d9e49ece8657c": {
+    "query": "SELECT number FROM blocks where root_hash = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "number",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "eb9480426aebcc7679526858296f555bb4d3e1ccf488a942de6d0b2dd1ed4720": {

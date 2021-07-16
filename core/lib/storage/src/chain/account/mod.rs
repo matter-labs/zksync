@@ -1,7 +1,8 @@
 // Built-in deps
 use std::time::Instant;
 // External imports
-use sqlx::Acquire;
+use num::{BigUint, Zero};
+use sqlx::{types::BigDecimal, Acquire};
 // Workspace imports
 use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
 // Local imports
@@ -16,6 +17,7 @@ mod stored_state;
 pub(crate) use self::restore_account::restore_account;
 pub use self::stored_state::StoredAccountState;
 use crate::tokens::records::StorageNFT;
+use num::bigint::ToBigInt;
 
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
@@ -394,6 +396,53 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let result = sqlx::query_as!(StorageBalance, "SELECT * FROM balances",)
             .fetch_all(self.0.conn())
             .await?;
+
+        Ok(result)
+    }
+
+    pub async fn get_account_eth_balance_for_block(
+        &mut self,
+        address: Address,
+        block_number: BlockNumber,
+    ) -> QueryResult<BigUint> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let account_id = transaction
+            .chain()
+            .account_schema()
+            .account_id_by_address(address)
+            .await?;
+        let account_id = match account_id {
+            Some(id) => id,
+            None => {
+                return Ok(BigUint::zero());
+            }
+        };
+
+        let record = sqlx::query!(
+            r#"
+                SELECT new_balance FROM account_balance_updates
+                WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0
+                ORDER BY update_order_id DESC
+                LIMIT 1
+            "#,
+            i64::from(account_id.0),
+            i64::from(block_number.0)
+        )
+        .fetch_optional(transaction.conn())
+        .await?;
+        let last_balance_update: Option<BigDecimal> = record.map(|r| r.new_balance);
+
+        let result = last_balance_update
+            .map(|b| b.to_bigint().unwrap().to_biguint().unwrap())
+            .unwrap_or_else(BigUint::zero);
+
+        transaction.commit().await?;
+        metrics::histogram!(
+            "sql.chain.account.get_account_balance_for_block",
+            start.elapsed()
+        );
 
         Ok(result)
     }

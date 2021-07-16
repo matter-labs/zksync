@@ -1326,4 +1326,18 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         );
         Ok(())
     }
+
+    pub async fn get_block_number_by_hash(
+        &mut self,
+        hash: &[u8],
+    ) -> QueryResult<Option<BlockNumber>> {
+        let start = Instant::now();
+        let record = sqlx::query!("SELECT number FROM blocks where root_hash = $1", hash)
+            .fetch_optional(self.0.conn())
+            .await?;
+        let block_number = record.map(|r| BlockNumber(r.number as u32));
+
+        metrics::histogram!("sql.chain.block.get_block_number_by_hash", start.elapsed());
+        Ok(block_number)
+    }
 }
