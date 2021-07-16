@@ -95,7 +95,7 @@ All notable changes to the contracts will be documented in this file.
 
 - `ChangePubKey` operation requires fee for processing.
 
-## 2020-07-20
+## 2020-20-07
 
 **Version 2** is released.
 
