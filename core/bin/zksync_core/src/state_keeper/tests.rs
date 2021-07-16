@@ -253,7 +253,6 @@ fn test_create_incorrect_state_keeper() {
         vec![1, 2, 2], // `available_block_chunk_sizes` must be strictly increasing.
         MAX_ITERATIONS,
         FAST_ITERATIONS,
-        None,
     );
 }
 
