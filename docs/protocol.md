@@ -372,8 +372,8 @@ representation 0x0012.
 | amount      | PackedTxAmount | Amount of funds sent                                                             |
 | fee         | PackedFee      | Amount of fee paid                                                               |
 | nonce       | Nonce          | A one-time code that specifies the order of transactions                         |
-| valid_from  | Timestamp      |
-| valid_until | Timestamp      |
+| valid_from  | Timestamp      | Unix timestamp from which the block with this transaction can be processed       |
+| valid_until | Timestamp      | Unix timestamp until which the block with this transaction can be processed      |
 | signature   | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below       |
 
 ##### Example
@@ -618,8 +618,8 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 | amount       | StateAmount | Full amount of funds sent                                                                     |
 | fee          | PackedFee   | Packed amount of fee paid                                                                     |
 | nonce        | Nonce       | A one-time code that specifies the order of transactions                                      |
-| valid_from   | Timestamp   |
-| valid_until  | Timestamp   |
+| valid_from   | Timestamp   | Unix timestamp from which the block with this transaction can be processed                    |
+| valid_until  | Timestamp   | Unix timestamp until which the block with this transaction can be processed                   |
 | signature    | Signanture  | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 
 ##### Example
@@ -764,8 +764,8 @@ ethereum account with address 0x0809101112131415161718192021222334252628.
 | fee_token    | TokenId    | Fee token identifier in the rollup                                                            |
 | fee          | PackedFee  | Packed amount of fee paid                                                                     |
 | nonce        | Nonce      | A one-time code that specifies the order of transactions                                      |
-| valid_from   | Timestamp  |
-| valid_until  | Timestamp  |
+| valid_from   | Timestamp  | Unix timestamp from which the block with this transaction can be processed                    |
+| valid_until  | Timestamp  | Unix timestamp until which the block with this transaction can be processed                   |
 | signature    | Signanture | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 
 ##### Example
@@ -1262,8 +1262,8 @@ function create2_address_zksync(creator_address, salt_arg /* abitrary 32 bytes *
 | fee_token                | TokenId          | Unique token identifier in the rollup used to pay fee                                         |
 | fee                      | PackedFee        | Packed amount of fee paid                                                                     |
 | nonce                    | Nonce            | A one-time code that specifies the order of transactions                                      |
-| valid_from               | Timestamp        |
-| valid_until              | Timestamp        |
+| valid_from               | Timestamp        | Unix timestamp from which the block with this transaction can be processed                    |
+| valid_until              | Timestamp        | Unix timestamp until which the block with this transaction can be processed                   |
 | signature                | Signanture       | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 | eth_signature (optional) | ETHSignanture    | Ethereum signature of the message defined above. Null if operation was authorized on contract |
 
@@ -1573,7 +1573,6 @@ that her transactions are censored by the validator.
 requestFullExit (
     uint24 _accountId,
     address _token,
-
 )
 ```
 
