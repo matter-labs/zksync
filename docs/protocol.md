@@ -1580,8 +1580,8 @@ requestFullExit (
 - `_accountId`: `AccountId` of the Rollup account
 - `_token`: Token address in L1 chain
 
-Register full exit request to withdraw NFT tokens balance from the account. Users need to call it if they believes that
-her transactions are censored by the validator.
+Register full exit request to withdraw NFT tokens balance from the account. Users need to call it if they believe that
+their transactions are censored by the validator.
 
 ```solidity
 requestFullExitNFT (
@@ -1875,7 +1875,7 @@ registerNFTFactoryCreator(uint32 _creatorAccountId, address _creatorAddress, byt
 - `_creatorAddress`: NFT creator address
 - `_signature`: Creator's signature
 
-The creator should sing the message
+The creator should sign the message
 
 ```solidity
     "\x19Ethereum Signed Message:\n141",
@@ -1887,8 +1887,7 @@ The creator should sing the message
     Bytes.bytesToHexASCIIBytes(abi.encodePacked((_factoryAddress)))
 ```
 
-They then have to send this signature to the governance contract using the factory contract by calling the above
-function.
+This signature should be sent to the governance contract by calling `registerNFTFactoryCreator` from the factory contract.
 
 #### Set default NFT factory
 
