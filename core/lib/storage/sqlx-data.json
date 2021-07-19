@@ -3439,68 +3439,6 @@
       "nullable": []
     }
   },
-  "8840deb0ffc0d683e9095a91ec48fbf6d24af085568c586a737bbcc73617cfc4": {
-    "query": "\n                WITH transaction AS (\n                    SELECT\n                        tx_hash,\n                        block_number,\n                        tx,\n                        block_index,\n                        from_account,\n                        to_account,\n                        success\n                    FROM executed_transactions\n                    WHERE tx_hash = $1\n                ), priority_op AS (\n                    SELECT\n                        tx_hash,\n                        block_number,\n                        operation as tx,\n                        block_index,\n                        from_account,\n                        to_account,\n                        true as success\n                    FROM executed_priority_operations\n                    WHERE tx_hash = $1 OR eth_hash = $1\n                ),\n                everything AS (\n                    SELECT * FROM transaction\n                    UNION ALL\n                    SELECT * FROM priority_op\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    tx as \"tx!\",\n                    block_index as \"block_index?\",\n                    from_account as \"from_account!\",\n                    to_account as \"to_account?\",\n                    success as \"success!\",\n                    root_hash as \"block_hash!\"\n                FROM everything\n                LEFT JOIN blocks\n                    ON everything.block_number = blocks.number\n                lEFT JOIN aggregate_operations\n                    ON (blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block)\n                    AND aggregate_operations.action_type = 'CommitBlocks'\n                WHERE confirmed = true\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "tx!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "block_index?",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "from_account!",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "to_account?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 6,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 7,
-          "name": "block_hash!",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        false
-      ]
-    }
-  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
@@ -4779,6 +4717,68 @@
       "nullable": [
         false,
         false,
+        false
+      ]
+    }
+  },
+  "bbdcc9f2fb718582a7147f8a3fa3e3cc30fe96491fd816af41acd9fc3815e184": {
+    "query": "\n                WITH transaction AS (\n                    SELECT\n                        tx_hash,\n                        block_number,\n                        operation,\n                        block_index,\n                        from_account,\n                        to_account,\n                        success\n                    FROM executed_transactions\n                    WHERE tx_hash = $1\n                ), priority_op AS (\n                    SELECT\n                        tx_hash,\n                        block_number,\n                        operation,\n                        block_index,\n                        from_account,\n                        to_account,\n                        true as success\n                    FROM executed_priority_operations\n                    WHERE tx_hash = $1 OR eth_hash = $1\n                ),\n                everything AS (\n                    SELECT * FROM transaction\n                    UNION ALL\n                    SELECT * FROM priority_op\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    operation as \"operation!\",\n                    block_index as \"block_index?\",\n                    from_account as \"from_account!\",\n                    to_account as \"to_account?\",\n                    success as \"success!\",\n                    root_hash as \"block_hash!\"\n                FROM everything\n                LEFT JOIN blocks\n                    ON everything.block_number = blocks.number\n                lEFT JOIN aggregate_operations\n                    ON (blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block)\n                    AND aggregate_operations.action_type = 'CommitBlocks'\n                WHERE confirmed = true\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "operation!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "block_index?",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "from_account!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "to_account?",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "block_hash!",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         false
       ]
     }

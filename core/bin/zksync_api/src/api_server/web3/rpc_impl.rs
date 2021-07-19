@@ -8,10 +8,7 @@ use zksync_storage::StorageProcessor;
 use zksync_types::ExecutedOperations;
 // Local uses
 use super::{
-    converter::{
-        resolve_block_number, transaction_from_tx_data, tx_receipt_from_storage_receipt,
-        u256_from_biguint,
-    },
+    converter::{resolve_block_number, transaction_from_tx_data, u256_from_biguint},
     types::{BlockInfo, BlockNumber, Transaction, TransactionReceipt, TxData, H256, U256, U64},
     Web3RpcApp,
 };
@@ -210,7 +207,11 @@ impl Web3RpcApp {
             .tx_receipt_for_web3(hash.as_ref())
             .await
             .map_err(|_| Error::internal_error())?;
-        let result = tx.map(tx_receipt_from_storage_receipt);
+        let result = if let Some(tx) = tx {
+            Some(self.tx_receipt(&mut storage, tx).await?)
+        } else {
+            None
+        };
 
         metrics::histogram!("api.web3.get_transaction_receipt", start.elapsed());
         Ok(result)

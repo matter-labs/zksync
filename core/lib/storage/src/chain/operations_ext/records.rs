@@ -172,7 +172,7 @@ pub struct StorageTxData {
     pub eth_sign_data: Option<serde_json::Value>,
 }
 
-#[derive(Debug, FromRow, PartialEq)]
+#[derive(Debug, FromRow, Clone, PartialEq)]
 pub struct Web3TxData {
     pub tx_hash: Vec<u8>,
     pub block_number: Option<i64>,
@@ -184,11 +184,11 @@ pub struct Web3TxData {
     pub to_account: Option<Vec<u8>>,
 }
 
-#[derive(Debug, FromRow, PartialEq)]
+#[derive(Debug, FromRow, Clone, PartialEq)]
 pub struct Web3TxReceipt {
     pub tx_hash: Vec<u8>,
     pub block_number: i64,
-    pub tx: Value,
+    pub operation: Value,
     pub block_hash: Vec<u8>,
     pub block_index: Option<i32>,
     pub from_account: Vec<u8>,

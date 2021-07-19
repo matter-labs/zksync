@@ -77,24 +77,6 @@ pub fn transaction_from_tx_data(tx: TxData) -> Transaction {
     }
 }
 
-pub fn tx_receipt_from_storage_receipt(tx: Web3TxReceipt) -> TransactionReceipt {
-    let root_hash = H256::from_slice(&tx.block_hash);
-    TransactionReceipt {
-        transaction_hash: H256::from_slice(&tx.tx_hash),
-        // U64::MAX for failed transactions
-        transaction_index: tx.block_index.map(Into::into).unwrap_or(U64::MAX),
-        block_hash: Some(root_hash),
-        block_number: Some(tx.block_number.into()),
-        cumulative_gas_used: 0.into(),
-        gas_used: Some(0.into()),
-        contract_address: None,
-        logs: Vec::new(),
-        status: Some((tx.success as u8).into()),
-        root: Some(root_hash),
-        logs_bloom: H2048::zero(),
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn log(
     address: H160,

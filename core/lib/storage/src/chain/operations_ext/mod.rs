@@ -1446,7 +1446,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     SELECT
                         tx_hash,
                         block_number,
-                        tx,
+                        operation,
                         block_index,
                         from_account,
                         to_account,
@@ -1457,7 +1457,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     SELECT
                         tx_hash,
                         block_number,
-                        operation as tx,
+                        operation,
                         block_index,
                         from_account,
                         to_account,
@@ -1473,7 +1473,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 SELECT
                     tx_hash as "tx_hash!",
                     block_number as "block_number!",
-                    tx as "tx!",
+                    operation as "operation!",
                     block_index as "block_index?",
                     from_account as "from_account!",
                     to_account as "to_account?",
