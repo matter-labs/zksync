@@ -1887,7 +1887,8 @@ The creator should sign the message
     Bytes.bytesToHexASCIIBytes(abi.encodePacked((_factoryAddress)))
 ```
 
-This signature should be sent to the governance contract by calling `registerNFTFactoryCreator` from the factory contract.
+This signature should be sent to the governance contract by calling `registerNFTFactoryCreator` from the factory
+contract.
 
 #### Set default NFT factory
 
