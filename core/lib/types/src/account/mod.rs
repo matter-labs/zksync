@@ -66,7 +66,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
-        circuit_account.pub_key_hash = acc.pub_key_hash.as_fr();
+        circuit_account.pub_key_hash = acc.pub_key_hash.to_fr();
         circuit_account.address = eth_address_to_fr(&acc.address);
         circuit_account
     }

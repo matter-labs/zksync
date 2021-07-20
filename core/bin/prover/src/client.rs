@@ -96,7 +96,7 @@ impl ApiClient {
 #[async_trait::async_trait]
 impl crate::ApiClient for ApiClient {
     async fn get_job(&self, req: ProverInputRequest) -> anyhow::Result<ProverInputResponse> {
-        let operation = || async {
+        let operation = (|| async {
             vlog::trace!("get prover job");
 
             let response = self
@@ -116,13 +116,13 @@ impl crate::ApiClient for ApiClient {
                 .json()
                 .await
                 .map_err(|e| Transient(format_err!("failed parse json on get job request: {}", e)))
-        };
+        });
 
         self.with_retries(operation).await
     }
 
     async fn working_on(&self, job_id: i32, prover_name: &str) -> anyhow::Result<()> {
-        let operation = || async {
+        let operation = (|| async {
             log::trace!(
                 "sending working_on job_id: {}, prover_name: {}",
                 job_id,
@@ -146,13 +146,13 @@ impl crate::ApiClient for ApiClient {
             }
 
             Ok(())
-        };
+        });
 
         self.with_retries(operation).await
     }
 
     async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()> {
-        let operation = || async {
+        let operation = (|| async {
             log::trace!("Trying publish proof: {:?}", data);
 
             let response = self
@@ -169,13 +169,13 @@ impl crate::ApiClient for ApiClient {
             }
 
             Ok(())
-        };
+        });
 
         self.with_retries(operation).await
     }
 
     async fn prover_stopped(&self, prover_name: String) -> anyhow::Result<()> {
-        let operation = || async {
+        let operation = (|| async {
             let response = self
                 .http_client
                 .post(self.stopped_url.clone())
@@ -194,7 +194,7 @@ impl crate::ApiClient for ApiClient {
             }
 
             Ok(())
-        };
+        });
 
         self.with_retries(operation).await
     }

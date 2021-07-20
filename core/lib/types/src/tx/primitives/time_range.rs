@@ -18,7 +18,7 @@ impl TimeRange {
         }
     }
 
-    pub fn as_be_bytes(&self) -> [u8; 16] {
+    pub fn to_be_bytes(&self) -> [u8; 16] {
         [
             self.valid_from.to_be_bytes(),
             self.valid_until.to_be_bytes(),

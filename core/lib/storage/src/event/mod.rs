@@ -188,7 +188,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                     },
                 )
             })
-            .flatten()
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
             .collect();
 
         transaction

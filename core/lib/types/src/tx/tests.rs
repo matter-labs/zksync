@@ -81,7 +81,7 @@ fn test_print_transfer_for_protocol() {
             transfer
                 .time_range
                 .expect("no time range on transfer")
-                .as_be_bytes()
+                .to_be_bytes()
                 .to_vec(),
         ),
     ];
@@ -141,7 +141,7 @@ fn test_print_change_pub_key_for_protocol() {
             transfer
                 .time_range
                 .expect("no time range on transfer")
-                .as_be_bytes()
+                .to_be_bytes()
                 .to_vec(),
         ),
     ];
@@ -204,7 +204,7 @@ fn test_print_withdraw_for_protocol() {
             withdraw
                 .time_range
                 .expect("no time range on withdraw")
-                .as_be_bytes()
+                .to_be_bytes()
                 .to_vec(),
         ),
     ];
@@ -259,7 +259,7 @@ fn test_print_withdraw_nft_for_protocol() {
         ("fee_token", withdraw.fee_token.to_be_bytes().to_vec()),
         ("fee", pack_fee_amount(&withdraw.fee)),
         ("nonce", withdraw.nonce.to_be_bytes().to_vec()),
-        ("time_range", withdraw.time_range.as_be_bytes().to_vec()),
+        ("time_range", withdraw.time_range.to_be_bytes().to_vec()),
     ];
     println!("Signed transaction fields:");
     let mut field_concat = Vec::new();

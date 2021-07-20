@@ -218,7 +218,7 @@ async fn is_fast_processing_requested(
             break;
         }
     }
-    Ok(fast_processing)
+    return Ok(fast_processing);
 }
 
 async fn create_aggregated_commits_storage(
