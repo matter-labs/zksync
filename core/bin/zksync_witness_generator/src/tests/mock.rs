@@ -382,10 +382,9 @@ impl DatabaseInterface for MockDatabase {
     ) -> anyhow::Result<()> {
         let witness_str = serde_json::to_string(&witness).expect("Failed to serialize witness");
         let mut block_witness = self.block_witness.write().await;
-        let is_block_not_saved_yet = block_witness
+        let is_block_not_saved_yet = !block_witness
             .iter()
-            .find(|witness| witness.block == *block as i64)
-            .is_none();
+            .any(|witness| witness.block == *block as i64);
 
         if is_block_not_saved_yet {
             block_witness.push(StorageBlockWitness {

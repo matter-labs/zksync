@@ -132,7 +132,7 @@ impl WithdrawNFT {
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.time_range.to_be_bytes());
+        out.extend_from_slice(&self.time_range.as_be_bytes());
         out
     }
 
