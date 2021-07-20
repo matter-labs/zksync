@@ -42,7 +42,7 @@ jobs:
         echo $(pwd)/bin >> $GITHUB_PATH
     - name: init
       run: |
-        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
+        cargo sqlx --version || cargo install sqlx-cli
         zk
         zk run yarn
         cp etc/tokens/{test,localhost}.json
