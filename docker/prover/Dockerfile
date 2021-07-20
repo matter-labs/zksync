@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:experimental
-FROM rust:1.53 as builder
+FROM rust:1.51 as builder
 WORKDIR /usr/src/zksync
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
