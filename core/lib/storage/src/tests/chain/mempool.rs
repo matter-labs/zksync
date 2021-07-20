@@ -314,10 +314,7 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
     for tx in &txs {
         let tx_hash = tx.hash();
 
-        assert_eq!(
-            MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
-            false
-        );
+        assert!(!MempoolSchema(&mut storage).contains_tx(tx_hash).await?,);
         assert!(MempoolSchema(&mut storage).get_tx(tx_hash).await?.is_none());
     }
 
@@ -338,10 +335,7 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
     for tx in &txs {
         let tx_hash = tx.hash();
 
-        assert_eq!(
-            MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
-            true
-        );
+        assert!(MempoolSchema(&mut storage).contains_tx(tx_hash).await?,);
         assert_eq!(
             MempoolSchema(&mut storage)
                 .get_tx(tx_hash)

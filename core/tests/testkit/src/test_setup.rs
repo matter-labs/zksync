@@ -164,6 +164,8 @@ impl TestSetup {
         (receipts, deposit_op)
     }
 
+    #[allow(clippy::map_entry)]
+    // Due to await function map entry looks really ugly
     pub async fn setup_basic_l1_balances(&mut self, eth_account_id: ETHAccountId, token: Token) {
         if !self
             .expected_changes_for_current_block

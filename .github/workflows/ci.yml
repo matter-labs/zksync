@@ -6,7 +6,6 @@ on:
     branches:
     - staging
     - trying
-    - cargo-update
 
 jobs:
   lint:

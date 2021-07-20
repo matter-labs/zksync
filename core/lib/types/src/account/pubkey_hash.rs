@@ -23,7 +23,7 @@ pub struct PubKeyHash {
 
 impl std::fmt::Debug for PubKeyHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex())
+        write!(f, "{}", self.as_hex())
     }
 }
 
@@ -47,9 +47,9 @@ impl PubKeyHash {
     /// use zksync_types::account::PubKeyHash;
     ///
     /// let pubkey_hash = PubKeyHash::zero();
-    /// assert_eq!(pubkey_hash.to_hex(), "sync:0000000000000000000000000000000000000000");
+    /// assert_eq!(pubkey_hash.as_hex(), "sync:0000000000000000000000000000000000000000");
     /// ```
-    pub fn to_hex(&self) -> String {
+    pub fn as_hex(&self) -> String {
         format!("sync:{}", hex::encode(&self.data))
     }
 
@@ -92,7 +92,7 @@ impl PubKeyHash {
     }
 
     /// Converts the `PubKeyhash` into the field element.
-    pub fn to_fr(&self) -> Fr {
+    pub fn as_fr(&self) -> Fr {
         ff::from_hex(&format!("0x{}", hex::encode(&self.data))).unwrap()
     }
 
@@ -108,7 +108,7 @@ impl Serialize for PubKeyHash {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.to_hex())
+        serializer.serialize_str(&self.as_hex())
     }
 }
 

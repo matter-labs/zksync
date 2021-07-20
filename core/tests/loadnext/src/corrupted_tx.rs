@@ -395,10 +395,9 @@ mod tests {
         let (modified_transfer, _eth_signature) =
             transfer.not_packable_amount(account.eth_account_data.unwrap_eoa_pk(), "ETH", 18);
 
-        assert_eq!(
-            is_token_amount_packable(&unwrap_transfer(modified_transfer).amount),
-            false
-        );
+        assert!(!is_token_amount_packable(
+            &unwrap_transfer(modified_transfer).amount
+        ));
     }
 
     #[test]
@@ -410,10 +409,9 @@ mod tests {
         let (modified_transfer, _eth_signature) =
             transfer.not_packable_fee(account.eth_account_data.unwrap_eoa_pk(), "ETH", 18);
 
-        assert_eq!(
-            is_fee_amount_packable(&unwrap_transfer(modified_transfer).fee),
-            false
-        );
+        assert!(!is_fee_amount_packable(
+            &unwrap_transfer(modified_transfer).fee
+        ),);
     }
 
     #[test]

@@ -37,7 +37,7 @@ async fn aggregated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
     assert_eq!(stored_operation.from_block, 1);
     assert_eq!(stored_operation.to_block, 1);
     assert_eq!(stored_operation.action_type, action_type.to_string());
-    assert_eq!(stored_operation.confirmed, false);
+    assert!(!stored_operation.confirmed);
 
     Ok(())
 }
@@ -248,7 +248,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?
         .unwrap();
     assert_eq!(loaded_tx.tx_hash, executed_tx.tx_hash);
-    assert_eq!(loaded_tx.success, true);
+    assert!(loaded_tx.success);
 
     // Get the block transactions and check if there is exactly 1 tx (failed tx not copied but replaced).
     let block_txs = BlockSchema(&mut storage)
@@ -268,7 +268,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?
         .unwrap();
     assert_eq!(loaded_tx.tx_hash, executed_tx.tx_hash);
-    assert_eq!(loaded_tx.success, true);
+    assert!(loaded_tx.success);
 
     // ...and there still must be one operation.
     let block_txs = BlockSchema(&mut storage)
