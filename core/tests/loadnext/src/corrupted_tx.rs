@@ -411,7 +411,7 @@ mod tests {
 
         assert!(!is_fee_amount_packable(
             &unwrap_transfer(modified_transfer).fee
-        ),);
+        ));
     }
 
     #[test]
