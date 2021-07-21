@@ -593,7 +593,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             - (GasCounter::BASE_PROOF_BLOCKS_TX_COST
                 / self.config.max_blocks_to_aggregate as usize)
                 * future_blocks
-                    .blocks_to_commit
+                    .blocks_to_prove
                     .rem_euclid(self.config.max_blocks_to_aggregate) as usize;
         BigUint::from(commit_cost + execute_cost + proof_cost)
     }
