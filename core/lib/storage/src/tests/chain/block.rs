@@ -1285,7 +1285,7 @@ async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -
         .remove_old_account_tree_cache(BlockNumber(3))
         .await?;
 
-    // Check if account tree cache for the 2nd block is present, and for the 3rd is not.
+    // Check if account tree cache for the 3 block is present, and for the 1 is not.
     assert!(BlockSchema(&mut storage)
         .get_account_tree_cache_block(BlockNumber(3))
         .await?
