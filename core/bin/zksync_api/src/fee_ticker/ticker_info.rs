@@ -32,10 +32,11 @@ impl TickerInfo {
     }
 }
 
-struct BlocksInFutureAggregatedOperations {
-    pub blocks_for_commit: usize,
-    pub blocks_for_prove: usize,
-    pub blocks_for_execute: usize,
+#[derive(Debug, Clone)]
+pub struct BlocksInFutureAggregatedOperations {
+    pub blocks_to_commit: u32,
+    pub blocks_to_prove: u32,
+    pub blocks_to_execute: u32,
 }
 
 #[async_trait]
@@ -71,11 +72,13 @@ impl FeeTickerInfo for TickerInfo {
             .chain()
             .block_schema()
             .get_last_saved_block()
+            .await
             .expect("Unable to query account state from the database");
         let last_committed_block = storage
             .chain()
             .operations_schema()
             .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, None)
+            .await
             .expect("Unable to query block from the database");
         let last_proven_block = storage
             .chain()
@@ -84,16 +87,18 @@ impl FeeTickerInfo for TickerInfo {
                 AggregatedActionType::PublishProofBlocksOnchain,
                 None,
             )
+            .await
             .expect("Unable to query block state from the database");
         let last_executed_block = storage
             .chain()
             .operations_schema()
             .get_last_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks, None)
+            .await
             .expect("Unable to query block from the database");
         BlocksInFutureAggregatedOperations {
-            blocks_for_commit: *last_block - last_committed_block,
-            blocks_for_prove: *last_block - last_proven_block,
-            blocks_for_execute: *last_block - last_executed_block,
+            blocks_to_commit: *last_block - *last_committed_block,
+            blocks_to_prove: *last_block - *last_proven_block,
+            blocks_to_execute: *last_block - *last_executed_block,
         }
     }
 }

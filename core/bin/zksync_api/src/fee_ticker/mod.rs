@@ -49,6 +49,7 @@ use crate::fee_ticker::{
     },
 };
 use crate::utils::token_db_cache::TokenDBCache;
+use zksync_types::gas_counter::GasCounter;
 
 mod constants;
 mod ticker_api;
@@ -550,17 +551,40 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
 
-        let gas_tx_amount = self
-            .config
-            .gas_cost_tx
-            .standard_cost
-            .get(&fee_type)
-            .cloned()
-            .unwrap();
+        let gas_tx_amount = if fee_type == OutputFeeType::FastWithdraw
+            || fee_type == OutputFeeType::FastWithdrawNFT
+        {
+            self.calculate_fast_withdrawal_cost().await
+        } else {
+            self.config
+                .gas_cost_tx
+                .standard_cost
+                .get(&fee_type)
+                .cloned()
+                .unwrap()
+        };
 
         (fee_type, gas_tx_amount, op_chunks)
     }
     async fn calculate_fast_withdrawal_cost(&mut self) -> BigUint {
         let future_blocks = self.info.blocks_in_future_aggregated_operations().await;
+        // We have to calculate how much from base price for operations has already paid in blocks and add remain cost to fast withdrawal operation
+        let commit_cost = GasCounter::BASE_COMMIT_BLOCKS_TX_COST
+            - (GasCounter::BASE_COMMIT_BLOCKS_TX_COST / self.config.max_blocks_to_aggregate)
+                * future_blocks.blocks_to_commit as usize;
+        let execute_cost = GasCounter::BASE_EXECUTE_BLOCKS_TX_COST
+            - (GasCounter::BASE_EXECUTE_BLOCKS_TX_COST / self.config.max_blocks_to_aggregate)
+                * future_blocks.blocks_to_execute as usize;
+        let proof_cost = GasCounter::BASE_PROOF_BLOCKS_TX_COST
+            - (GasCounter::BASE_PROOF_BLOCKS_TX_COST / self.config.max_blocks_to_aggregate)
+                * future_blocks.blocks_to_commit as usize;
+        BigUint::from(commit_cost + execute_cost + proof_cost)
+            + self
+                .config
+                .gas_cost_tx
+                .standard_cost
+                .get(&OutputFeeType::Withdraw)
+                .cloned()
+                .unwrap()
     }
 }
