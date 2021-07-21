@@ -2526,19 +2526,6 @@
       "nullable": []
     }
   },
-  "5bfcd9e4747395bdd0cd3f48700c70ae930af359b357f707da1cbe7ea8267273": {
-    "query": "\n                    INSERT INTO txs_batches_hashes (batch_id, batch_hash)\n                    SELECT u.batch_id, u.batch_hash\n                    FROM UNNEST ($1::bigint[], $2::bytea[])\n                    AS u(batch_id, batch_hash)\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8Array",
-          "ByteaArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
     "query": "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
     "describe": {
@@ -2684,19 +2671,6 @@
         false,
         false
       ]
-    }
-  },
-  "6c25f6955c7381b5ed9bf4f2eb233adbd2923baafc688f36b66b86f44b456668": {
-    "query": "UPDATE blocks\n                SET root_hash = $1\n                WHERE number = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
@@ -3866,30 +3840,6 @@
         "Left": []
       },
       "nullable": []
-    }
-  },
-  "9e72348619aa9c7f0f330c31f5ea4b3a73a4727a817e65e026756feea4d13d69": {
-    "query": "SELECT batch_id, array_agg(tx_hash) as txs\n                FROM executed_transactions\n                WHERE batch_id IS NOT NULL AND batch_id != 0\n                GROUP BY batch_id\n                ORDER BY batch_id;\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "batch_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "txs",
-          "type_info": "ByteaArray"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        true,
-        null
-      ]
     }
   },
   "9fb67f0d0bc8387201e5358ca011da4b6d4d48c38c5de3f628c9818804c01376": {
@@ -5434,19 +5384,6 @@
       ]
     }
   },
-  "d5c6be595f62ef758fd39d8263139cf2ce777612bae32805daba299881d9b1e0": {
-    "query": "\n                UPDATE executed_priority_operations\n                SET tx_hash = u.tx_hash\n                FROM (\n                    SELECT * FROM\n                    UNNEST($1::bytea[], $2::bigint[])\n                    AS u(tx_hash, id)\n                ) u\n                WHERE priority_op_serialid = u.id\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "ByteaArray",
-          "Int8Array"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "d71db9de5e4ec2dc9a511d4a1247d912b15250bbd8f834f11b252de653c73176": {
     "query": "DELETE FROM account_creates WHERE block_number > $1",
     "describe": {
@@ -6039,42 +5976,6 @@
       ]
     }
   },
-  "e80dba3fa7252902a9c53f7500f7e498bbe062eb833baeb271ecb1c9af468dc1": {
-    "query": "SELECT priority_op_serialid, eth_hash, eth_block, eth_block_index FROM executed_priority_operations",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "priority_op_serialid",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 2,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_block_index",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        true
-      ]
-    }
-  },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {
     "query": "\n                SELECT * FROM prover_job_queue\n                WHERE job_status = $1\n                ORDER BY (job_priority, id, first_block)\n                LIMIT 1\n            ",
     "describe": {
@@ -6215,36 +6116,6 @@
       "nullable": [
         false,
         false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "ed39b22ac81b690c2102487ae3351915eec23b00a9cf9e409de08662c42fa20d": {
-    "query": "SELECT * FROM balances",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "account_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "coin_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "balance",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
         false,
         false,
         false
@@ -6689,18 +6560,6 @@
       "nullable": [
         null
       ]
-    }
-  },
-  "f5bb5886974577c7f43179f77638507511ffbe1462bb75844a1f1c72414a4d83": {
-    "query": "\n            DELETE FROM account_tree_cache \n            WHERE block = $1\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
