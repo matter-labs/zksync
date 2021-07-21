@@ -113,6 +113,7 @@ fn get_test_ticker_config() -> TickerConfig {
             })
             .collect(),
         scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
+        max_blocks_to_aggregate: 5,
     }
 }
 

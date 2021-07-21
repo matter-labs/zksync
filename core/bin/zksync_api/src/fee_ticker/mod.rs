@@ -147,6 +147,7 @@ pub struct TickerConfig {
     gas_cost_tx: GasOperationsCost,
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
     scale_fee_coefficient: Ratio<BigUint>,
+    max_blocks_to_aggregate: usize,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -259,6 +260,10 @@ pub fn run_ticker_task(
         scale_fee_coefficient: Ratio::new(
             BigUint::from(config.ticker.scale_fee_percent),
             BigUint::from(100u32),
+        ),
+        max_blocks_to_aggregate: std::cmp::max(
+            config.chain.state_keeper.max_aggregated_blocks_to_commit,
+            config.chain.state_keeper.max_aggregated_blocks_to_execute,
         ),
     };
 
@@ -554,5 +559,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .unwrap();
 
         (fee_type, gas_tx_amount, op_chunks)
+    }
+    async fn calculate_fast_withdrawal_cost(&mut self) -> BigUint {
+        let future_blocks = self.info.blocks_in_future_aggregated_operations().await;
     }
 }
