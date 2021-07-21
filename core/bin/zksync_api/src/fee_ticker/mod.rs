@@ -148,7 +148,7 @@ pub struct TickerConfig {
     gas_cost_tx: GasOperationsCost,
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
     scale_fee_coefficient: Ratio<BigUint>,
-    max_blocks_to_aggregate: usize,
+    max_blocks_to_aggregate: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -265,7 +265,7 @@ pub fn run_ticker_task(
         max_blocks_to_aggregate: std::cmp::max(
             config.chain.state_keeper.max_aggregated_blocks_to_commit,
             config.chain.state_keeper.max_aggregated_blocks_to_execute,
-        ),
+        ) as u32,
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
@@ -551,10 +551,18 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
 
-        let gas_tx_amount = if fee_type == OutputFeeType::FastWithdraw
-            || fee_type == OutputFeeType::FastWithdrawNFT
-        {
-            self.calculate_fast_withdrawal_cost().await
+        let gas_tx_amount = if matches!(
+            fee_type,
+            OutputFeeType::FastWithdraw | OutputFeeType::FastWithdrawNFT
+        ) {
+            self.calculate_fast_withdrawal_gas_cost().await
+                + self
+                    .config
+                    .gas_cost_tx
+                    .standard_cost
+                    .get(&fee_type)
+                    .cloned()
+                    .unwrap()
         } else {
             self.config
                 .gas_cost_tx
@@ -566,25 +574,27 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
 
         (fee_type, gas_tx_amount, op_chunks)
     }
-    async fn calculate_fast_withdrawal_cost(&mut self) -> BigUint {
+    async fn calculate_fast_withdrawal_gas_cost(&mut self) -> BigUint {
         let future_blocks = self.info.blocks_in_future_aggregated_operations().await;
         // We have to calculate how much from base price for operations has already paid in blocks and add remain cost to fast withdrawal operation
         let commit_cost = GasCounter::BASE_COMMIT_BLOCKS_TX_COST
-            - (GasCounter::BASE_COMMIT_BLOCKS_TX_COST / self.config.max_blocks_to_aggregate)
-                * future_blocks.blocks_to_commit as usize;
+            - (GasCounter::BASE_COMMIT_BLOCKS_TX_COST
+                / self.config.max_blocks_to_aggregate as usize)
+                * future_blocks
+                    .blocks_to_commit
+                    .rem_euclid(self.config.max_blocks_to_aggregate) as usize;
         let execute_cost = GasCounter::BASE_EXECUTE_BLOCKS_TX_COST
-            - (GasCounter::BASE_EXECUTE_BLOCKS_TX_COST / self.config.max_blocks_to_aggregate)
-                * future_blocks.blocks_to_execute as usize;
+            - (GasCounter::BASE_EXECUTE_BLOCKS_TX_COST
+                / self.config.max_blocks_to_aggregate as usize)
+                * future_blocks
+                    .blocks_to_execute
+                    .rem_euclid(self.config.max_blocks_to_aggregate) as usize;
         let proof_cost = GasCounter::BASE_PROOF_BLOCKS_TX_COST
-            - (GasCounter::BASE_PROOF_BLOCKS_TX_COST / self.config.max_blocks_to_aggregate)
-                * future_blocks.blocks_to_commit as usize;
+            - (GasCounter::BASE_PROOF_BLOCKS_TX_COST
+                / self.config.max_blocks_to_aggregate as usize)
+                * future_blocks
+                    .blocks_to_commit
+                    .rem_euclid(self.config.max_blocks_to_aggregate) as usize;
         BigUint::from(commit_cost + execute_cost + proof_cost)
-            + self
-                .config
-                .gas_cost_tx
-                .standard_cost
-                .get(&OutputFeeType::Withdraw)
-                .cloned()
-                .unwrap()
     }
 }
