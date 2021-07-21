@@ -67,46 +67,6 @@ impl Web3RpcApp {
             .map_err(|_| Error::internal_error())?;
         Ok(U256::from(count))
     }
-
-    async fn tx_receipt(
-        &self,
-        storage: &mut StorageProcessor<'_>,
-        tx: Web3TxReceipt,
-    ) -> Result<TransactionReceipt> {
-        let root_hash = H256::from_slice(&tx.block_hash);
-        let common_data: CommonLogData = tx.clone().into();
-        let op: Option<ZkSyncOp> = serde_json::from_value(tx.operation).unwrap();
-        let logs = if let Some(op) = op {
-            let mut logs = self
-                .logs_helper
-                .erc_logs(op.clone(), common_data.clone(), storage)
-                .await?;
-            let zksync_log = self
-                .logs_helper
-                .zksync_log(op, common_data, storage)
-                .await?;
-            if let Some(zksync_log) = zksync_log {
-                logs.push(zksync_log);
-            }
-            logs
-        } else {
-            Vec::new()
-        };
-        Ok(TransactionReceipt {
-            transaction_hash: H256::from_slice(&tx.tx_hash),
-            // U64::MAX for failed transactions
-            transaction_index: tx.block_index.map(Into::into).unwrap_or(U64::MAX),
-            block_hash: Some(root_hash),
-            block_number: Some(tx.block_number.into()),
-            cumulative_gas_used: 0.into(),
-            gas_used: Some(0.into()),
-            contract_address: None,
-            logs,
-            status: Some((tx.success as u8).into()),
-            root: Some(root_hash),
-            logs_bloom: H2048::zero(),
-        })
-    }
 }
 
 pub fn start_rpc_server(

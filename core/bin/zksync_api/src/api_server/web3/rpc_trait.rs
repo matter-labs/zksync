@@ -4,7 +4,10 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 // Local uses
 use super::{
-    types::{Address, BlockInfo, BlockNumber, Transaction, TransactionReceipt, H256, U256, U64},
+    types::{
+        Address, BlockInfo, BlockNumber, Log, Transaction, TransactionReceipt, ValueOrArray, H160,
+        H256, U256, U64,
+    },
     Web3RpcApp,
 };
 
@@ -57,11 +60,7 @@ pub trait Web3Rpc {
     fn block_number(&self) -> FutureResp<U64>;
 
     #[rpc(name = "eth_getBalance", returns = "U256")]
-    fn get_balance(
-        &self,
-        address: zksync_types::Address,
-        block: Option<BlockNumber>,
-    ) -> FutureResp<U256>;
+    fn get_balance(&self, address: H160, block: Option<BlockNumber>) -> FutureResp<U256>;
 
     #[rpc(name = "eth_getBlockTransactionCountByHash", returns = "Option<U256>")]
     fn get_block_transaction_count_by_hash(&self, hash: H256) -> FutureResp<Option<U256>>;
@@ -93,6 +92,15 @@ pub trait Web3Rpc {
         returns = "Option<TransactionReceipt>"
     )]
     fn get_transaction_receipt(&self, hash: H256) -> FutureResp<Option<TransactionReceipt>>;
+
+    #[rpc(name = "eth_getLogs", returns = "Vec<Log>")]
+    fn get_logs(
+        &self,
+        from_block: Option<BlockNumber>,
+        to_block: Option<BlockNumber>,
+        address: Option<ValueOrArray<H160>>,
+        topics: Option<Vec<Option<ValueOrArray<H256>>>>,
+    ) -> FutureResp<Vec<Log>>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -136,11 +144,7 @@ impl Web3Rpc for Web3RpcApp {
         spawn! { self._impl_block_number() }
     }
 
-    fn get_balance(
-        &self,
-        address: zksync_types::Address,
-        block: Option<BlockNumber>,
-    ) -> FutureResp<U256> {
+    fn get_balance(&self, address: H160, block: Option<BlockNumber>) -> FutureResp<U256> {
         spawn! { self._impl_get_balance(address, block) }
     }
 
@@ -173,5 +177,15 @@ impl Web3Rpc for Web3RpcApp {
 
     fn get_transaction_receipt(&self, hash: H256) -> FutureResp<Option<TransactionReceipt>> {
         spawn! { self._impl_get_transaction_receipt(hash) }
+    }
+
+    fn get_logs(
+        &self,
+        from_block: Option<BlockNumber>,
+        to_block: Option<BlockNumber>,
+        address: Option<ValueOrArray<H160>>,
+        topics: Option<Vec<Option<ValueOrArray<H256>>>>,
+    ) -> FutureResp<Vec<Log>> {
+        spawn! { self._impl_get_logs(from_block, to_block, address, topics) }
     }
 }

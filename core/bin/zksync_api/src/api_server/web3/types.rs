@@ -7,8 +7,11 @@
 
 // Built-in uses
 use std::collections::HashMap;
+use std::fmt;
+use std::marker::PhantomData;
 use std::str::FromStr;
 // External uses
+use itertools::unfold;
 use jsonrpc_core::Error;
 use num::BigUint;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -189,6 +192,64 @@ impl BlockInfo {
     }
 }
 
+/// Either value or array of values.
+#[derive(Default, Debug, PartialEq, Clone)]
+pub struct ValueOrArray<T>(pub Vec<T>);
+
+impl<'de, T: fmt::Debug + Deserialize<'de>> ::serde::Deserialize<'de> for ValueOrArray<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        struct Visitor<T>(PhantomData<T>);
+
+        impl<'de, T: fmt::Debug + Deserialize<'de>> de::Visitor<'de> for Visitor<T> {
+            type Value = ValueOrArray<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("Expected value or sequence")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                use serde::de::IntoDeserializer;
+
+                Deserialize::deserialize(value.into_deserializer())
+                    .map(|value| ValueOrArray(vec![value]))
+            }
+
+            fn visit_seq<S>(self, visitor: S) -> Result<Self::Value, S::Error>
+            where
+                S: de::SeqAccess<'de>,
+            {
+                unfold(visitor, |vis| vis.next_element().transpose())
+                    .collect::<Result<_, _>>()
+                    .map(ValueOrArray)
+            }
+        }
+
+        deserializer.deserialize_any(Visitor(PhantomData))
+    }
+}
+
+impl<T> Serialize for ValueOrArray<T>
+where
+    T: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self.0.len() {
+            0 => serializer.serialize_none(),
+            1 => Serialize::serialize(&self.0[0], serializer),
+            _ => Serialize::serialize(&self.0, serializer),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum Event {
     ZkSyncTransfer,
@@ -200,7 +261,7 @@ pub enum Event {
     ZkSyncMintNFT,
     ZkSyncWithdrawNFT,
     ZkSyncSwap,
-    ERCTransfer, // they have same topics
+    ERCTransfer, // erc20 and erc721 transfers have same topics
 }
 
 #[derive(Debug, Clone)]
@@ -208,7 +269,7 @@ pub struct LogsHelper {
     topic_by_event: HashMap<Event, H256>,
     event_by_topic: HashMap<H256, Event>,
     tokens: TokenDBCache,
-    zksync_proxy_address: H160,
+    pub zksync_proxy_address: H160,
 }
 
 #[derive(Debug, Clone)]
@@ -217,22 +278,6 @@ pub struct CommonLogData {
     pub block_number: Option<U64>,
     pub transaction_hash: H256,
     pub transaction_index: Option<U64>,
-}
-
-impl From<Web3TxReceipt> for CommonLogData {
-    fn from(tx: Web3TxReceipt) -> CommonLogData {
-        let block_hash = Some(H256::from_slice(&tx.block_hash));
-        let block_number = Some(tx.block_number.into());
-        let transaction_hash = H256::from_slice(&tx.tx_hash);
-        // U64::MAX for failed transactions
-        let transaction_index = Some(tx.block_index.map(Into::into).unwrap_or(U64::MAX));
-        CommonLogData {
-            block_hash,
-            block_number,
-            transaction_hash,
-            transaction_index,
-        }
-    }
 }
 
 impl LogsHelper {
@@ -265,6 +310,10 @@ impl LogsHelper {
             zksync_proxy_address: H160::from_str("1000000000000000000000000000000000000000")
                 .unwrap(),
         }
+    }
+
+    pub fn event_by_topic(&self, topic: &H256) -> Option<Event> {
+        self.event_by_topic.get(topic).cloned()
     }
 
     pub async fn zksync_log(
