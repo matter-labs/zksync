@@ -11,16 +11,21 @@
 - [Data format](#data-format)
   - [Data types](#data-types)
   - [Amount packing](#amount-packing)
-  - [State Merkle Tree (SMT)](#state-merkle-tree)
+  - [State Merkle Tree](#state-merkle-tree)
   - [zkSync block pub data format](#zksync-block-pub-data-format)
 - [zkSync operations](#zksync-operations)
+  - [0. Rollup operation lifecycle](#0-rollup-operation-lifecycle)
   - [1. Noop operation](#1-noop-operation)
   - [2. Transfer](#2-transfer)
   - [3. Transfer to new](#3-transfer-to-new)
   - [4. Withdraw (Partial Exit)](#4-withdraw-partial-exit)
-  - [5. Deposit](#5-deposit)
-  - [7. Change pubkey](#7-change-pubkey)
-  - [8. Forced exit](#8-forced-exit)
+  - [5. Withdraw NFT](#5-withdraw-nft)
+  - [6. Mint NFT](#6-mint-nft)
+  - [7. Deposit](#7-deposit)
+  - [8. Full exit](#8-full-exit)
+  - [9. Change pubkey](#9-change-pubkey)
+  - [10. Forced exit](#10-forced-exit)
+  - [11. Swap](#11-swap)
 - [Smart contracts API](#smart-contracts-api)
   - [Rollup contract](#rollup-contract)
     - [Deposit Ether](#deposit-ether)
@@ -40,13 +45,10 @@
     - [Check that token address is valid](#check-that-token-address-is-valid)
 - [Block state transition circuit](#block-state-transition-circuit)
 - [Appendix I: Cryptographic primitives](#appendix-i-cryptographic-primitives)
-  - [Transaction signature](#transaction-signature)
   - [Rescue hash](#rescue-hash)
+  - [Bitpacking](#bitpacking)
+  - [Transaction signature](#transaction-signature)
   - [SHA256](#sha256)
-  - [Sparse Merkle Tree](#sparse-merkle-tree)
-
-<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with
-markdown-toc</a></i></small>
 
 ## Glossary
 
