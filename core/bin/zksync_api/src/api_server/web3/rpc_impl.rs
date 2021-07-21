@@ -1,4 +1,6 @@
 // Built-in uses
+use std::collections::HashSet;
+use std::iter::FromIterator;
 use std::time::Instant;
 // External uses
 use jsonrpc_core::{Error, Result};
@@ -248,6 +250,8 @@ impl Web3RpcApp {
         };
 
         let topics = if let Some(mut topics) = topics {
+            // If there is non-null topic at the non-first position then return empty vec,
+            // since all our logs contain exactly one topic.
             let has_not_first = topics
                 .iter()
                 .enumerate()
@@ -262,7 +266,7 @@ impl Web3RpcApp {
         };
         let addresses = address.map(|a| a.0).unwrap_or_default();
         let mut logs = Vec::new();
-        match (topics.is_empty(), addresses.is_empty()) {
+        match (addresses.is_empty(), topics.is_empty()) {
             (false, false) => {
                 let (has_erc_topic, tx_types) = self.process_topics(topics);
                 let (has_zksync_proxy_address, token_addresses) = self.process_addresses(addresses);
@@ -271,12 +275,20 @@ impl Web3RpcApp {
                     let receipts = transaction
                         .chain()
                         .operations_ext_schema()
-                        .web3_receipts_with_token_addresses(from_block, to_block, token_addresses)
+                        .web3_receipts_with_token_addresses(from_block, to_block, &token_addresses)
                         .await
                         .map_err(|_| Error::internal_error())?;
+                    let token_addresses = HashSet::from_iter(token_addresses.into_iter());
                     for receipt in receipts {
-                        self.append_logs(&mut transaction, receipt, &mut logs, false, true)
-                            .await?;
+                        self.append_logs(
+                            &mut transaction,
+                            receipt,
+                            &mut logs,
+                            false,
+                            true,
+                            Some(&token_addresses),
+                        )
+                        .await?;
                     }
                 }
 
@@ -288,7 +300,7 @@ impl Web3RpcApp {
                         .await
                         .map_err(|_| Error::internal_error())?;
                     for receipt in receipts {
-                        self.append_logs(&mut transaction, receipt, &mut logs, true, false)
+                        self.append_logs(&mut transaction, receipt, &mut logs, true, false, None)
                             .await?;
                     }
                 }
@@ -303,19 +315,27 @@ impl Web3RpcApp {
                         .await
                         .map_err(|_| Error::internal_error())?;
                     for receipt in receipts {
-                        self.append_logs(&mut transaction, receipt, &mut logs, true, false)
+                        self.append_logs(&mut transaction, receipt, &mut logs, true, false, None)
                             .await?;
                     }
                 }
                 let receipts = transaction
                     .chain()
                     .operations_ext_schema()
-                    .web3_receipts_with_token_addresses(from_block, to_block, token_addresses)
+                    .web3_receipts_with_token_addresses(from_block, to_block, &token_addresses)
                     .await
                     .map_err(|_| Error::internal_error())?;
+                let token_addresses = HashSet::from_iter(token_addresses.into_iter());
                 for receipt in receipts {
-                    self.append_logs(&mut transaction, receipt, &mut logs, false, true)
-                        .await?;
+                    self.append_logs(
+                        &mut transaction,
+                        receipt,
+                        &mut logs,
+                        false,
+                        true,
+                        Some(&token_addresses),
+                    )
+                    .await?;
                 }
             }
             (true, false) => {
@@ -328,7 +348,7 @@ impl Web3RpcApp {
                         .await
                         .map_err(|_| Error::internal_error())?;
                     for receipt in receipts {
-                        self.append_logs(&mut transaction, receipt, &mut logs, false, true)
+                        self.append_logs(&mut transaction, receipt, &mut logs, false, true, None)
                             .await?;
                     }
                 }
@@ -339,7 +359,7 @@ impl Web3RpcApp {
                     .await
                     .map_err(|_| Error::internal_error())?;
                 for receipt in receipts {
-                    self.append_logs(&mut transaction, receipt, &mut logs, true, false)
+                    self.append_logs(&mut transaction, receipt, &mut logs, true, false, None)
                         .await?;
                 }
             }
@@ -351,7 +371,7 @@ impl Web3RpcApp {
                     .await
                     .map_err(|_| Error::internal_error())?;
                 for receipt in receipts {
-                    self.append_logs(&mut transaction, receipt, &mut logs, true, true)
+                    self.append_logs(&mut transaction, receipt, &mut logs, true, true, None)
                         .await?;
                 }
             }
@@ -373,6 +393,7 @@ impl Web3RpcApp {
         logs: &mut Vec<Log>,
         include_zksync: bool,
         include_erc: bool,
+        token_addresses: Option<&HashSet<H160>>,
     ) -> Result<()> {
         let common_data = CommonLogData {
             block_hash: Some(H256::from_slice(&receipt.block_hash)),
@@ -384,11 +405,22 @@ impl Web3RpcApp {
         let op: Option<ZkSyncOp> = serde_json::from_value(receipt.operation).unwrap();
         if let Some(op) = op {
             if include_erc {
-                let mut erc_logs = self
+                let erc_logs = self
                     .logs_helper
                     .erc_logs(op.clone(), common_data.clone(), storage)
                     .await?;
-                logs.append(&mut erc_logs);
+                for log in erc_logs {
+                    if let Some(token_addresses) = token_addresses {
+                        // We need to filter it here because of swaps.
+                        // They produce 2 erc transfers and it can be
+                        // that only one of them satisfies filter.
+                        if token_addresses.contains(&log.address) {
+                            logs.push(log);
+                        }
+                    } else {
+                        logs.push(log);
+                    }
+                }
             }
             if include_zksync {
                 let zksync_log = self
@@ -409,7 +441,7 @@ impl Web3RpcApp {
         receipt: Web3TxReceipt,
     ) -> Result<TransactionReceipt> {
         let mut logs = Vec::new();
-        self.append_logs(storage, receipt.clone(), &mut logs, true, true)
+        self.append_logs(storage, receipt.clone(), &mut logs, true, true, None)
             .await?;
         let root_hash = H256::from_slice(&receipt.block_hash);
         Ok(TransactionReceipt {
@@ -558,5 +590,18 @@ impl Web3RpcApp {
             }
         }
         (has_zksync_proxy_address, token_addresses)
+    }
+
+    async fn block_transaction_count(
+        storage: &mut StorageProcessor<'_>,
+        block_number: zksync_types::BlockNumber,
+    ) -> Result<U256> {
+        let count = storage
+            .chain()
+            .block_schema()
+            .get_block_transactions_count(block_number)
+            .await
+            .map_err(|_| Error::internal_error())?;
+        Ok(U256::from(count))
     }
 }

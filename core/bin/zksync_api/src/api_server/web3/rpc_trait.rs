@@ -5,8 +5,8 @@ use jsonrpc_derive::rpc;
 // Local uses
 use super::{
     types::{
-        Address, BlockInfo, BlockNumber, Log, Transaction, TransactionReceipt, ValueOrArray, H160,
-        H256, U256, U64,
+        BlockInfo, BlockNumber, Log, Transaction, TransactionReceipt, ValueOrArray, H160, H256,
+        U256, U64,
     },
     Web3RpcApp,
 };
@@ -47,8 +47,8 @@ pub trait Web3Rpc {
     #[rpc(name = "eth_gasPrice", returns = "U256")]
     fn gas_price(&self) -> Result<U256, Error>;
 
-    #[rpc(name = "eth_accounts", returns = "Vec<Address>")]
-    fn accounts(&self) -> Result<Vec<Address>, Error>;
+    #[rpc(name = "eth_accounts", returns = "Vec<H160>")]
+    fn accounts(&self) -> Result<Vec<H160>, Error>;
 
     #[rpc(name = "eth_getUncleCountByBlockHash", returns = "U256")]
     fn get_uncle_count_by_block_hash(&self, block_hash: H256) -> Result<U256, Error>;
@@ -128,7 +128,7 @@ impl Web3Rpc for Web3RpcApp {
         Ok(U256::zero())
     }
 
-    fn accounts(&self) -> Result<Vec<Address>, Error> {
+    fn accounts(&self) -> Result<Vec<H160>, Error> {
         Ok(Vec::new())
     }
 

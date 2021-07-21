@@ -5,18 +5,13 @@ use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
 use zksync_config::ZkSyncConfig;
-use zksync_storage::{
-    chain::operations_ext::records::Web3TxReceipt, ConnectionPool, StorageProcessor,
-};
-use zksync_types::ZkSyncOp;
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
-use self::{
-    rpc_trait::Web3Rpc,
-    types::{CommonLogData, LogsHelper, TransactionReceipt, H2048, H256, U256, U64},
-};
+use self::{logs::LogsHelper, rpc_trait::Web3Rpc};
 
 mod converter;
+mod logs;
 mod rpc_impl;
 mod rpc_trait;
 mod types;
@@ -45,27 +40,12 @@ impl Web3RpcApp {
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
     }
-}
 
-impl Web3RpcApp {
     async fn access_storage(&self) -> Result<StorageProcessor<'_>> {
         self.connection_pool
             .access_storage()
             .await
             .map_err(|_| Error::internal_error())
-    }
-
-    async fn block_transaction_count(
-        storage: &mut StorageProcessor<'_>,
-        block_number: zksync_types::BlockNumber,
-    ) -> Result<U256> {
-        let count = storage
-            .chain()
-            .block_schema()
-            .get_block_transactions_count(block_number)
-            .await
-            .map_err(|_| Error::internal_error())?;
-        Ok(U256::from(count))
     }
 }
 

@@ -4,12 +4,9 @@ use std::convert::TryInto;
 use jsonrpc_core::{Error, Result};
 use num::BigUint;
 // Workspace uses
-use zksync_storage::{chain::operations_ext::records::Web3TxReceipt, StorageProcessor};
+use zksync_storage::StorageProcessor;
 // Local uses
-use super::types::{
-    Bytes, CommonLogData, Log, Transaction, TransactionReceipt, TxData, H160, H2048, H256, U256,
-    U64,
-};
+use super::types::{Bytes, CommonLogData, Log, Transaction, TxData, H160, H256, U256};
 
 pub fn u256_from_biguint(number: BigUint) -> Result<U256> {
     U256::from_dec_str(&number.to_string()).map_err(|_| Error::internal_error())
