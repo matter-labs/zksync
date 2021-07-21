@@ -339,7 +339,7 @@ impl DatabaseInterface for MockDatabase {
             let eth_operations = self.eth_operations.read().await.clone();
 
             // Consider an operation that affects sequential blocks.
-            let maybe_operation = eth_operations.iter().find(|(eth_operation)| {
+            let maybe_operation = eth_operations.iter().find(|eth_operation| {
                 let op_block_range = eth_operation.op.as_ref().unwrap().1.get_block_range();
 
                 op_block_range.1 == first_block - 1
