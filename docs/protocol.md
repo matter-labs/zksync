@@ -469,7 +469,7 @@ def tree_updates():
     fee_account.balance[TransferOp.tx.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0xfa
+    OnhcainOp.opcode == 0x05
     OnchainOp.from_account == TransferOp.from_account_id
     OnchainOp.token == TransferOp.tx.token
     OnchainOp.to_account == TransferOp.to_account_id
@@ -1547,7 +1547,7 @@ Performs an atomic swap of tokens between 2 Rollup accounts at an arranged ratio
 Reads as: account #5 has swapped amount 0x0000001220 in packed representation of token #7 for account #7's amount
 0x0000001b20 in packed representation of token #1. account #6 received the swapped tokens #1, and account #8 received
 swapped tokens #7. account #42 has submitted the swap and payed the fee of 0x0580 in packed representation with a token
-#45. account #5's nonce has not been incremented, while account #7's has.
+\#45. account #5's nonce has not been incremented, while account #7's has.
 
 #### User transaction
 
@@ -1562,6 +1562,7 @@ swapped tokens #7. account #42 has submitted the swap and payed the fee of 0x058
 | token_sell  | TokenId        | Unique identifier of the token to be swapped                                |
 | token_buy   | TokenId        | Unique identifier of the token to be swapped for                            |
 | amount      | PackedTxAmount | Amount of funds to be swapped, 0 indicates a limit order                    |
+| ratio       | Ratio          | Array of 2 15-byte values, acceptable sell:buy ratio                        |
 | valid_from  | Timestamp      | Unix timestamp from which the block with this transaction can be processed  |
 | valid_until | Timestamp      | Unix timestamp until which the block with this transaction can be processed |
 | signature   | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below  |
@@ -1660,6 +1661,103 @@ fee: 0x4605
 amounts[0]: 0x59682f0000
 amounts[1]: 0x861c468000
 Signed bytes: 0xf40100fffffea143fc5851d93cdc72e90d63cfb7286395ce20d57c1077578d2f227c69cb8d3dc16e20cb1b6829d1ee5d97d276ada6c6e6f71e3bccdc17000003ff460559682f0000861c468000
+```
+
+#### Rollup operation
+
+##### Structure
+
+| Field | Value/type | Description                           |
+| ----- | ---------- | ------------------------------------- |
+| tx    | SwapTx     | Signed swap transaction defined above |
+
+#### Circuit constraints
+
+```python
+# SwapOp - Rollup operation described above
+# Block - block where this Rollup operation is executed
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
+
+account_a = get_tree_account(SwapOp.orders.0.account_id)
+account_b = get_tree_account(SwapOp.orders.1.account_id)
+submitter = get_tree_account(SwapOp.submitter_id)
+received_a = get_account_by_address(SwapOp.orders.0.receiver)
+received_b = get_account_by_address(SwapOp.orders.1.receiver)
+fee_account = get_tree_account(Block.fee_account)
+
+fee = unpack_fee(SwapOp.tx.packed_fee)
+
+def tree_invariants():
+    SwapOp.orders.0.token_sell < MAX_TOKENS
+    SwapOp.orders.0.token_buy < MAX_TOKENS
+    SwapOp.orders.1.token_sell < MAX_TOKENS
+    SwapOp.orders.1.token_buy < MAX_TOKENS
+
+    submitter.nonce == SwapOp.nonce
+    account_a.nonce == SwapOp.orders.0.nonce
+    account_b.nonce == SwapOp.orders.1.nonce
+    submitter.nonce < MAX_NONCE
+    account_a.nonce < MAX_NONCE
+    account_b.nonce < MAX_NONCE
+
+    submitter.pubkey_hash == recover_signer_pubkey_hash(SwapOp)
+    account_a.pubkey_hash == recover_signer_pubkey_hash(SwapOp.orders.0)
+    account_b.pubkey_hash == recover_signer_pubkey_hash(SwapOp.orders.1)
+
+    # tokens must match
+    SwapOp.orders.0.token_buy == SwapOp.orders.1.token_sell
+    SwapOp.orders.1.token_sell == SwapOp.orders.0.token_buy
+    SwapOp.orders.0.token_buy != SwapOp.orders.0.token_sell
+
+    # if partial order filling is not allowed, amounts must match
+    SwapOp.orders.0.amount == 0 or SwapOp.orders.0.amount == SwapOp.amounts.0
+    SwapOp.orders.1.amount == 0 or SwapOp.orders.1.amount == SwapOp.amounts.1
+
+    # either one of 2 proposed prices is accepted (or in between)
+    SwapOp.amounts.0 * SwapOp.orders.0.ratio.1 <= SwapOp.amounts.1 * SwapOp.orders.0.ratio.0
+    SwapOp.amounts.1 * SwapOp.orders.1.ratio.1 <= SwapOp.amounts.0 * SwapOp.orders.1.ratio.0
+
+    # balance checks
+    account_a.balance[SwapOp.orders.0.token_sell] >= SwapOp.amounts.0
+    account_b.balance[SwapOp.orders.1.token_sell] >= SwapOp.amounts.1
+    submitter.balance[SwapOp.fee_token] >= SwapOp.fee
+
+    if account_a.id == submitter.id and SwapOp.fee_token == SwapOp.orders.0.token_sell:
+        account_a.balance[SwapOp.orders.0.token_sell] >= SwapOp.amounts.0 + SwapOp.fee
+
+    if account_b.id == submitter.id and SwapOp.fee_token == SwapOp.orders.1.token_sell:
+        account_b.balance[SwapOp.orders.1.token_sell] >= SwapOp.amounts.1 + SwapOp.fee
+
+
+def tree_updates():
+    account_a.balance[SwapOp.orders.0.token_sell] -= SwapOp.amounts.0
+    receiver_b.balance[SwapOp.orders.1.token_buy] += SwapOp.amounts.0
+    account_b.balance[SwapOp.orders.1.token_sell] -= SwapOp.amounts.1
+    receiver_a.balance[SwapOp.orders.0.token_buy] += SwapOp.amounts.1
+
+    submitter.balance[SwapOp.fee_token] -= SwapOp.fee
+    fee_account.balance[SwapOp.fee_token] += SwapOp.fee
+
+    submitter.nonce += 1
+    if SwapOp.orders.0.amount != 0 and submitter.id != account_a.id:
+        account_a.nonce += 1
+    if SwapOp.orders.1.amount != 0 and submitter.id != account_b.id:
+        account_b.nonce += 1
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x0b
+    OnchainOp.account_a == SwapOp.orders.0.account_id
+    OnchainOp.recipient_a == SwapOp.orders.0.recipient
+    OnchainOp.account_b == SwapOp.orders.1.account_id
+    OnchainOp.recipient_b == SwapOp.orders.1.recipient
+    OnchainOp.submitter == SwapOp.submitter_id
+    OnchainOp.token_a == SwapOp.orders.0.token_sell
+    OnchainOp.token_b == SwapOp.orders.1.token_sell
+    OnchainOp.fee_token == SwapOp.fee_token
+    OnhcainOp.packed_amount_a == SwapOp.amounts.0
+    OnhcainOp.packed_amount_b == SwapOp.amounts.1
+    OnhcainOp.packed_fee == SwapOp.fee
+    OnchainOp.nonce_mask == (SwapOp.orders.0.amount != 0) | (SwapOp.orders.1.amount != 0) << 1
 ```
 
 ## Smart contracts API
