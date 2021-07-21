@@ -408,6 +408,30 @@ fn test_ticker_formula() {
             );
             last_fast_withdraw_fee = fast_withdraw_fee;
         }
+        let fast_withdraw_fee_for_6_block = get_token_fee_in_usd(
+            TxFeeTypes::FastWithdraw,
+            token.id.into(),
+            Address::default(),
+            Some(BlocksInFutureAggregatedOperations {
+                blocks_to_commit: 6,
+                blocks_to_prove: 6,
+                blocks_to_execute: 6,
+            }),
+        );
+        let fast_withdraw_fee_for_1_block = get_token_fee_in_usd(
+            TxFeeTypes::FastWithdraw,
+            token.id.into(),
+            Address::default(),
+            Some(BlocksInFutureAggregatedOperations {
+                blocks_to_commit: 1,
+                blocks_to_prove: 1,
+                blocks_to_execute: 1,
+            }),
+        );
+        assert_eq!(
+            fast_withdraw_fee_for_1_block, fast_withdraw_fee_for_6_block,
+            "Fee should be the same because 5 blocks should aggregate independent"
+        );
     }
 }
 
