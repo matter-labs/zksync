@@ -222,6 +222,7 @@ Rollup transactions:
 - Forced Exit
 - MintNFT
 - WithdrawNFT
+- Swap
 
 Priority operations:
 
@@ -738,7 +739,7 @@ Withdraws NFT from Rollup account to appropriate ethereum account.
 | content_hash    | 32       | H256       | Content hash of NFT                                                                        |
 | to_address      | 20       | EthAddress | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
 | token           | 4        | TokenId    | Unique token identifier in the rollup                                                      |
-| fee_token       | 4        | TokenId    | Fee for paying fee                                                                         |
+| fee_token       | 4        | TokenId    | Token for paying fees                                                                      |
 | packed_fee      | 2        | PackedFee  | Packed amount of fee paid                                                                  |
 
 ##### Example
@@ -1497,6 +1498,177 @@ def pubdata_invariants():
     OnhcainOp.full_amount == target_account_initial_balance
     OnhcainOp.packed_fee == WithdrawOp.tx.packed_fee
     OnchainOp.target == WithdrawOp.tx.target
+```
+
+### 11. Swap
+
+#### Description
+
+Performs an atomic swap of tokens between 2 Rollup accounts at an arranged ratio.
+
+#### Onchain operation
+
+##### Size
+
+| Chunks | Significant bytes |
+| ------ | ----------------- |
+| 5      | 46                |
+
+##### Structure
+
+| Field                | Byte len | Value/type     | Description                                                                                |
+| -------------------- | -------- | -------------- | ------------------------------------------------------------------------------------------ |
+| opcode               | 1        | `0x0b`         | Operation code                                                                             |
+| account_a            | 4        | AccountId      | Unique identifier of one the rollup accounts between which the swap is performed           |
+| recipient_a          | 4        | AccountId      | Unique identifier of the rollup account which receives the funds sent by account_b         |
+| account_b            | 4        | AccountId      | Unique identifier of one the rollup accounts between which the swap is performed           |
+| recipient_b          | 4        | AccountId      | Unique identifier of the rollup account which receives the funds sent by account_a         |
+| submitter            | 4        | AccountId      | Unique identifier of the rollup account which submits the swap transaction and pays fees   |
+| token_a              | 4        | TokenId        | Unique identifier of the token that account_a is swapping                                  |
+| token_b              | 4        | TokenId        | Unique identifier of the token that account_b is swapping                                  |
+| fee_token            | 4        | TokenId        | Unique identifier of the token in which submitter is paying fees                           |
+| amount_a             | 5        | PackedTxAmount | Full amount of funds sent by account_a (of token_a)                                        |
+| amount_b             | 5        | PackedTxAmount | Full amount of funds sent by account_b (of token_b)                                        |
+| packed_fee           | 2        | PackedFee      | Packed amount of fee paid                                                                  |
+| nonce_mask           | 1        | 1 Byte         | Nonce mask[^nonce_mask]                                                                    |
+
+[^nonce_mask]: Nonce mask is an 8-bit number. 1st bit set indicates that account_a's nonce was incremented. 
+               2nd bit set indicates that account_b's nonce was incremented. Other bits are always 0.
+
+
+##### Example
+
+```
+0b000000050000000600000007000000080000002a00000007000000010000002d00000012200000001b2005800200000000
+```
+
+Reads as: 
+account #5 has swapped amount 0x0000001220 in packed representation of token #7 for
+account #7's amount 0x0000001b20 in packed representation of token #1.
+account #6 received the swapped tokens #1, and account #8 received swapped tokens #7.
+account #42 has submitted the swap and payed the fee of 0x0580 in packed representation with a token #45.
+account #5's nonce has not been incremented, while account #7's has.
+
+#### User transaction
+
+##### Order structure
+
+| Field       | Value/type     | Description                                                                      |
+| ----------- | -------------- | -------------------------------------------------------------------------------- |
+| type        | `0x6f`         | Operation code                                                                   |
+| account_id  | AccountId      | Unique id of the sender rollup account in the state tree                         |
+| recipient   | ETHAddress     | Unique address of the rollup account that will receive the funds                 |
+| nonce       | Nonce          | A one-time code that specifies the order of transactions                         |
+| token_sell  | TokenId        | Unique identifier of the token to be swapped                                     |
+| token_buy   | TokenId        | Unique identifier of the token to be swapped for                                 |
+| amount      | PackedTxAmount | Amount of funds to be swapped, 0 indicates a limit order                         |
+| valid_from  | Timestamp      | Unix timestamp from which the block with this transaction can be processed       |
+| valid_until | Timestamp      | Unix timestamp until which the block with this transaction can be processed      |
+| signature   | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below       |
+
+##### Swap structure
+
+| Field         | Value/type     | Description                                                                      |
+| ------------- | -------------- | -------------------------------------------------------------------------------- |
+| type          | `0xf4`         | Operation code                                                                   |
+| submitter_id  | AccountId      | Unique id of the sender rollup account in the state tree                         |
+| submitter_address | ETHAddress | Unique address of the rollup account that submitted the transaction              |
+| nonce         | Nonce          | A one-time code that specifies the order of transactions                         |
+| orders_hash   | Hash           | Rescue hash of 2 serialized concatenated orders                                  |
+| fee_token     | TokenId        | Unique identifier of the token in which submitter is paying fees                 |
+| fee           | PackedFee      | Packed amount of fee paid                                                        |
+| amount_a      | PackedTxAmount | Amount of funds to be swapped by account_a                                       |
+| amount_b      | PackedTxAmount | Amount of funds to be swapped by account_b                                       |
+| signature     | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below       |
+
+##### Example
+
+User transaction representation. (NOTE: tx bytecode differs slightly from this representation due to data packing, see
+the spec below).
+
+```json
+{
+  "submitterId": 16777214,
+  "submitterAddress": "0xa143fc5851d93cdc72e90d63cfb7286395ce20d5",
+  "nonce": 2081453911,
+  "orders": [
+    {
+      "accountId": 4,
+      "recipient": "0x204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3",
+      "nonce": 412184582,
+      "tokenBuy": 1023,
+      "tokenSell": 1023,
+      "ratio": [
+        "12",
+        "18"
+      ],
+      "amount": "12000000000",
+      "validFrom": 0,
+      "validUntil": 18446744073709551615,
+      "signature": {
+        "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
+        "signature": "8bfc1b854d6cf4f6d30a98249562d34c4b2c72344498a5803817ca994f6f051b984052dd501b10d2567a24719043de92bd1d7a55a951e7be9cc0995873f88002"
+      }
+    },
+    {
+      "accountId": 16777214,
+      "recipient": "0x50dfcd4ee9ca4f2039d58883631f0460e0e0668f",
+      "nonce": 119487968,
+      "tokenBuy": 1023,
+      "tokenSell": 1023,
+      "ratio": [
+        "18",
+        "12"
+      ],
+      "amount": "18000000000",
+      "validFrom": 0,
+      "validUntil": 18446744073709551615,
+      "signature": {
+        "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
+        "signature": "ce385443624ae362991fd6150d950aea8143ae66388b36b4ec2ccac2c2b80a19fee8c56fcf693158f655f8612fbc3374b046b22673bd9907b31e13bdb61cc301"
+      }
+    }
+  ],
+  "amounts": [
+    "12000000000",
+    "18000000000"
+  ],
+  "fee": "56000000",
+  "feeToken": 1023,
+  "signature": {
+    "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
+    "signature": "5b64500bf4fae9766792129808f8116a8d63a9c35dda9378e986ba708f983a9d5bd0d8ffb59aaa1b3f47f42ae8bc629cd19514f6a72fc82a144591c16105b605"
+  }
+}
+```
+
+Signed transaction representation.
+
+```
+Signer (account_a):
+Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
+Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
+
+Signer (account_b):
+Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
+Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
+
+Signer (submitter):
+Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
+Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
+
+Signed transaction fields:
+type: 0xf4
+version: 0x01
+submitterId: 0x00fffffe
+submitterAddress: 0xa143fc5851d93cdc72e90d63cfb7286395ce20d5
+nonce: 0x7c107757
+orders_hash: 0x8d2f227c69cb8d3dc16e20cb1b6829d1ee5d97d276ada6c6e6f71e3bccdc17
+fee_token: 0x000003ff
+fee: 0x4605
+amounts[0]: 0x59682f0000
+amounts[1]: 0x861c468000
+Signed bytes: 0xf40100fffffea143fc5851d93cdc72e90d63cfb7286395ce20d57c1077578d2f227c69cb8d3dc16e20cb1b6829d1ee5d97d276ada6c6e6f71e3bccdc17000003ff460559682f0000861c468000
 ```
 
 ## Smart contracts API
