@@ -76,8 +76,8 @@ impl<'de> Deserialize<'de> for BlockNumber {
 
 #[derive(Debug, Clone)]
 pub struct TxData {
-    pub block_hash: Option<H256>,
-    pub block_number: Option<u32>,
+    pub block_hash: H256,
+    pub block_number: u32,
     pub block_index: Option<u32>,
     pub from: H160,
     pub to: Option<H160>,
@@ -88,8 +88,8 @@ pub struct TxData {
 impl From<Web3TxData> for TxData {
     fn from(tx: Web3TxData) -> TxData {
         TxData {
-            block_hash: tx.block_hash.map(|h| H256::from_slice(&h)),
-            block_number: tx.block_number.map(|n| n as u32),
+            block_hash: H256::from_slice(&tx.block_hash),
+            block_number: tx.block_number as u32,
             block_index: tx.block_index.map(|i| i as u32),
             from: H160::from_slice(&tx.from_account),
             to: tx.to_account.map(|to| H160::from_slice(&to)),
