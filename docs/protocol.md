@@ -377,7 +377,7 @@ representation 0x0012.
 | nonce       | Nonce          | A one-time code that specifies the order of transactions                         |
 | valid_from  | Timestamp      | Unix timestamp from which the block with this transaction can be processed       |
 | valid_until | Timestamp      | Unix timestamp until which the block with this transaction can be processed      |
-| signature   | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below       |
+| signature   | Signature      | [Signature](#transaction-singature) of previous fields, see the spec below       |
 
 ##### Example
 
@@ -623,7 +623,7 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 | nonce        | Nonce       | A one-time code that specifies the order of transactions                                      |
 | valid_from   | Timestamp   | Unix timestamp from which the block with this transaction can be processed                    |
 | valid_until  | Timestamp   | Unix timestamp until which the block with this transaction can be processed                   |
-| signature    | Signanture  | [Signature](#transaction-singature) of previous fields, see the spec below                    |
+| signature    | Signature   | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 
 ##### Example
 
@@ -769,7 +769,7 @@ ethereum account with address 0x0809101112131415161718192021222334252628.
 | nonce        | Nonce      | A one-time code that specifies the order of transactions                                      |
 | valid_from   | Timestamp  | Unix timestamp from which the block with this transaction can be processed                    |
 | valid_until  | Timestamp  | Unix timestamp until which the block with this transaction can be processed                   |
-| signature    | Signanture | [Signature](#transaction-singature) of previous fields, see the spec below                    |
+| signature    | Signature  | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 
 ##### Example
 
@@ -912,7 +912,7 @@ Reads as: Mint NFT from account to recipient with content hash and pay packed fe
 | fee_token    | TokenId    | Fee token identifier in the rollup                                                            |
 | fee          | PackedFee  | Packed amount of fee paid                                                                     |
 | nonce        | Nonce      | A one-time code that specifies the order of transactions                                      |
-| signature    | Signanture | [Signature](#transaction-singature) of previous fields, see the spec below                    |
+| signature    | Signature  | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 
 ##### Example
 
@@ -1267,8 +1267,8 @@ function create2_address_zksync(creator_address, salt_arg /* abitrary 32 bytes *
 | nonce                    | Nonce            | A one-time code that specifies the order of transactions                                      |
 | valid_from               | Timestamp        | Unix timestamp from which the block with this transaction can be processed                    |
 | valid_until              | Timestamp        | Unix timestamp until which the block with this transaction can be processed                   |
-| signature                | Signanture       | [Signature](#transaction-singature) of previous fields, see the spec below                    |
-| eth_signature (optional) | ETHSignanture    | Ethereum signature of the message defined above. Null if operation was authorized on contract |
+| signature                | Signature        | [Signature](#transaction-singature) of previous fields, see the spec below                    |
+| eth_signature (optional) | ETHSignature     | Ethereum signature of the message defined above. Null if operation was authorized on contract |
 
 ##### Example
 
@@ -1414,7 +1414,7 @@ packed in representation 0x0012 for the Rollup account which has Ethereum accoun
 | token                | TokenId    | Unique token identifier in the rollup                                                        |
 | fee                  | PackedFee  | Packed amount of fee paid                                                                    |
 | nonce                | Nonce      | A one-time code that specifies the order of transactions                                     |
-| signature            | Signanture | [Signature](#transaction-singature) of previous fields, see the spec below                   |
+| signature            | Signature  | [Signature](#transaction-singature) of previous fields, see the spec below                   |
 
 ##### Example
 
@@ -1564,7 +1564,7 @@ swapped tokens #7. account #42 has submitted the swap and payed the fee of 0x058
 | ratio       | Ratio          | Array of 2 15-byte values, acceptable sell:buy ratio                        |
 | valid_from  | Timestamp      | Unix timestamp from which the block with this transaction can be processed  |
 | valid_until | Timestamp      | Unix timestamp until which the block with this transaction can be processed |
-| signature   | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below  |
+| signature   | Signature      | [Signature](#transaction-singature) of previous fields, see the spec below  |
 
 ##### Swap structure
 
@@ -1579,7 +1579,7 @@ swapped tokens #7. account #42 has submitted the swap and payed the fee of 0x058
 | fee               | PackedFee      | Packed amount of fee paid                                                  |
 | amount_a          | PackedTxAmount | Amount of funds to be swapped by `account_a`                               |
 | amount_b          | PackedTxAmount | Amount of funds to be swapped by `account_b`                               |
-| signature         | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below |
+| signature         | Signature      | [Signature](#transaction-singature) of previous fields, see the spec below |
 
 <sup>\*</sup> In the submitted transaction both orders are present in their full form, but only their hash is signed by
 the user.
@@ -1694,6 +1694,7 @@ def tree_invariants():
     SwapOp.orders.0.token_buy < MAX_TOKENS
     SwapOp.orders.1.token_sell < MAX_TOKENS
     SwapOp.orders.1.token_buy < MAX_TOKENS
+    SwapOp.fee_token < MAX_FUNGIBLE_TOKENS
 
     submitter.nonce == SwapOp.nonce
     account_a.nonce == SwapOp.orders.0.nonce
