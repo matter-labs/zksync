@@ -1521,22 +1521,21 @@ Performs an atomic swap of tokens between 2 Rollup accounts at an arranged ratio
 | Field       | Byte len | Value/type     | Description                                                                              |
 | ----------- | -------- | -------------- | ---------------------------------------------------------------------------------------- |
 | opcode      | 1        | `0x0b`         | Operation code                                                                           |
-| account_a   | 4        | AccountId      | Unique identifier of one the rollup accounts between which the swap is performed         |
-| recipient_a | 4        | AccountId      | Unique identifier of the rollup account which receives the funds sent by account_b       |
-| account_b   | 4        | AccountId      | Unique identifier of one the rollup accounts between which the swap is performed         |
-| recipient_b | 4        | AccountId      | Unique identifier of the rollup account which receives the funds sent by account_a       |
+| account_a   | 4        | AccountId      | Unique identifier of the first rollup account that performs a swap                       |
+| recipient_a | 4        | AccountId      | Unique identifier of the rollup account which receives the funds sent by `account_b`     |
+| account_b   | 4        | AccountId      | Unique identifier of one second rollup account that performs a swap                      |
+| recipient_b | 4        | AccountId      | Unique identifier of the rollup account which receives the funds sent by `account_a`     |
 | submitter   | 4        | AccountId      | Unique identifier of the rollup account which submits the swap transaction and pays fees |
 | token_a     | 4        | TokenId        | Unique identifier of the token that account_a is swapping                                |
 | token_b     | 4        | TokenId        | Unique identifier of the token that account_b is swapping                                |
 | fee_token   | 4        | TokenId        | Unique identifier of the token in which submitter is paying fees                         |
-| amount_a    | 5        | PackedTxAmount | Full amount of funds sent by account_a (of token_a)                                      |
-| amount_b    | 5        | PackedTxAmount | Full amount of funds sent by account_b (of token_b)                                      |
+| amount_a    | 5        | PackedTxAmount | Full amount of funds sent by `account_a` (of `token_a`)                                  |
+| amount_b    | 5        | PackedTxAmount | Full amount of funds sent by `account_b` (of `token_b`)                                  |
 | packed_fee  | 2        | PackedFee      | Packed amount of fee paid                                                                |
-| nonce_mask  | 1        | 1 Byte         | Nonce mask[^nonce_mask]                                                                  |
+| nonce_mask  | 1        | 1 Byte         | Nonce mask <sup>\*</sup>                                                                 |
 
-[^nonce_mask]:
-    Nonce mask is an 8-bit number. 1st bit set indicates that account_a's nonce was incremented. 2nd bit set indicates
-    that account_b's nonce was incremented. Other bits are always 0.
+<sup>\*</sup> Nonce mask is an 8-bit number. 1st bit set indicates that account_a's nonce was incremented. 2nd bit set
+indicates that account_b's nonce was incremented. Other bits are always 0.
 
 ##### Example
 
@@ -1575,12 +1574,15 @@ swapped tokens #7. account #42 has submitted the swap and payed the fee of 0x058
 | submitter_id      | AccountId      | Unique id of the sender rollup account in the state tree                   |
 | submitter_address | ETHAddress     | Unique address of the rollup account that submitted the transaction        |
 | nonce             | Nonce          | A one-time code that specifies the order of transactions                   |
-| orders_hash       | Hash           | Rescue hash of 2 serialized concatenated orders                            |
+| orders_hash       | Hash           | Rescue hash of 2 serialized concatenated orders <sup>\*</sup>              |
 | fee_token         | TokenId        | Unique identifier of the token in which submitter is paying fees           |
 | fee               | PackedFee      | Packed amount of fee paid                                                  |
-| amount_a          | PackedTxAmount | Amount of funds to be swapped by account_a                                 |
-| amount_b          | PackedTxAmount | Amount of funds to be swapped by account_b                                 |
+| amount_a          | PackedTxAmount | Amount of funds to be swapped by `account_a`                               |
+| amount_b          | PackedTxAmount | Amount of funds to be swapped by `account_b`                               |
 | signature         | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below |
+
+<sup>\*</sup> In the submitted transaction both orders are present in their full form, but only their hash is signed by
+the user.
 
 ##### Example
 
@@ -1681,8 +1683,8 @@ Signed bytes: 0xf40100fffffea143fc5851d93cdc72e90d63cfb7286395ce20d57c1077578d2f
 account_a = get_tree_account(SwapOp.orders.0.account_id)
 account_b = get_tree_account(SwapOp.orders.1.account_id)
 submitter = get_tree_account(SwapOp.submitter_id)
-received_a = get_account_by_address(SwapOp.orders.0.receiver)
-received_b = get_account_by_address(SwapOp.orders.1.receiver)
+recipient_a = get_account_by_address(SwapOp.orders.0.recipient)
+recipient_b = get_account_by_address(SwapOp.orders.1.recipient)
 fee_account = get_tree_account(Block.fee_account)
 
 fee = unpack_fee(SwapOp.tx.packed_fee)
@@ -1731,9 +1733,9 @@ def tree_invariants():
 
 def tree_updates():
     account_a.balance[SwapOp.orders.0.token_sell] -= SwapOp.amounts.0
-    receiver_b.balance[SwapOp.orders.1.token_buy] += SwapOp.amounts.0
+    recipient_b.balance[SwapOp.orders.1.token_buy] += SwapOp.amounts.0
     account_b.balance[SwapOp.orders.1.token_sell] -= SwapOp.amounts.1
-    receiver_a.balance[SwapOp.orders.0.token_buy] += SwapOp.amounts.1
+    recipient_a.balance[SwapOp.orders.0.token_buy] += SwapOp.amounts.1
 
     submitter.balance[SwapOp.fee_token] -= SwapOp.fee
     fee_account.balance[SwapOp.fee_token] += SwapOp.fee
