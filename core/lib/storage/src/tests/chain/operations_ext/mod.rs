@@ -959,6 +959,15 @@ async fn tx_data_for_web3(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     setup.add_block(1);
     commit_schema_data(&mut storage, &setup).await?;
+    storage
+        .chain()
+        .block_schema()
+        .save_block(gen_sample_block(
+            BlockNumber(1),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
+        .await?;
 
     // Test data for L1 op.
     let eth_hash = match setup.blocks[0].block_transactions[0].clone() {
