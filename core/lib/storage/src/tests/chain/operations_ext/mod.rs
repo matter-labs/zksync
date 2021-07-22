@@ -992,21 +992,5 @@ async fn tx_data_for_web3(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         .await?;
     assert_eq!(l2_data.unwrap().tx_hash, tx_hash);
 
-    // Test data for tx from mempool.
-    setup.add_block(2);
-    let tx = match setup.blocks[1].block_transactions[2].clone() {
-        ExecutedOperations::Tx(tx) => tx.signed_tx,
-        ExecutedOperations::PriorityOp(_) => {
-            panic!("Should be L2 tx")
-        }
-    };
-    storage.chain().mempool_schema().insert_tx(&tx).await?;
-    let l2_data = storage
-        .chain()
-        .operations_ext_schema()
-        .tx_data_for_web3(tx.hash().as_ref())
-        .await?;
-    assert_eq!(l2_data.unwrap().tx_hash, tx.hash().as_ref().to_vec());
-
     Ok(())
 }

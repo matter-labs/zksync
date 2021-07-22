@@ -18,7 +18,6 @@ use zksync_api_types::{
 use zksync_crypto::params;
 use zksync_types::{
     aggregated_operations::AggregatedActionType, tx::TxHash, Address, BlockNumber, TokenId,
-    ZkSyncTx,
 };
 
 // Local imports
@@ -1356,15 +1355,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     pub async fn tx_data_for_web3(&mut self, hash: &[u8]) -> QueryResult<Option<Web3TxData>> {
         let start = Instant::now();
 
-        let hash_str = hex::encode(hash);
-        let mut tx: Option<Web3TxData> = sqlx::query_as!(
+        let result: Option<Web3TxData> = sqlx::query_as!(
             Web3TxData,
             r#"
                 WITH transaction AS (
                     SELECT
                         tx_hash,
                         block_number,
-                        tx,
                         nonce,
                         block_index,
                         from_account,
@@ -1375,65 +1372,37 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     SELECT
                         tx_hash,
                         block_number,
-                        operation as tx,
                         priority_op_serialid as nonce,
                         block_index,
                         from_account,
                         to_account
                     FROM executed_priority_operations
                     WHERE tx_hash = $1 OR eth_hash = $1
-                ), mempool_tx AS (
-                    SELECT
-                        decode(tx_hash, 'hex'),
-                        Null::bigint as block_number,
-                        tx,
-                        0 as nonce,
-                        Null::integer as block_index,
-                        ''::bytea as from_account,
-                        ''::bytea as to_account
-                    FROM mempool_txs
-                    WHERE tx_hash = $2
                 ),
                 everything AS (
                     SELECT * FROM transaction
                     UNION ALL
                     SELECT * FROM priority_op
-                    UNION ALL
-                    SELECT * FROM mempool_tx
                 )
                 SELECT
                     tx_hash as "tx_hash!",
-                    block_number as "block_number?",
-                    tx as "tx!",
+                    block_number as "block_number!",
                     nonce as "nonce!",
                     block_index as "block_index?",
                     from_account as "from_account!",
                     to_account as "to_account?",
-                    root_hash as "block_hash?"
+                    root_hash as "block_hash!"
                 FROM everything
                 LEFT JOIN blocks
                     ON everything.block_number = blocks.number
             "#,
             hash,
-            &hash_str
         )
         .fetch_optional(self.0.conn())
         .await?;
 
-        // `nonce`, `from_account`, `to_account` of mempool tx can be retrieved only from `tx` json value.
-        if let Some(tx) = tx.as_mut() {
-            if tx.block_number.is_none() {
-                let zksync_tx: ZkSyncTx = serde_json::from_value(tx.tx.clone()).unwrap();
-                tx.nonce = zksync_tx.nonce().0 as i64;
-                tx.from_account = zksync_tx.from_account().as_bytes().to_vec();
-                tx.to_account = zksync_tx
-                    .to_account()
-                    .map(|address| address.as_bytes().to_vec());
-            }
-        }
-
         metrics::histogram!("sql.chain.block.tx_data_for_web3", start.elapsed());
-        Ok(tx)
+        Ok(result)
     }
 
     pub async fn web3_receipt_by_hash(

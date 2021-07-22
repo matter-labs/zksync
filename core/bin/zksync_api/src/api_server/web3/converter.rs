@@ -61,8 +61,8 @@ pub fn transaction_from_tx_data(tx: TxData) -> Transaction {
     Transaction {
         hash: tx.tx_hash,
         nonce: tx.nonce.into(),
-        block_hash: tx.block_hash,
-        block_number: tx.block_number.map(Into::into),
+        block_hash: Some(tx.block_hash),
+        block_number: Some(tx.block_number.into()),
         transaction_index: tx.block_index.map(Into::into),
         from: tx.from,
         to: tx.to,

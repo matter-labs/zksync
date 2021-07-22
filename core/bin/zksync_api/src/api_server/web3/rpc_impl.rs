@@ -500,8 +500,8 @@ impl Web3RpcApp {
                 .map(|tx| {
                     let tx = match tx {
                         ExecutedOperations::Tx(tx) => TxData {
-                            block_hash: Some(hash),
-                            block_number: Some(block_number.0),
+                            block_hash: hash,
+                            block_number: block_number.0,
                             block_index: tx.block_index,
                             from: tx.signed_tx.tx.from_account(),
                             to: tx.signed_tx.tx.to_account(),
@@ -509,8 +509,8 @@ impl Web3RpcApp {
                             tx_hash: H256::from_slice(tx.signed_tx.tx.hash().as_ref()),
                         },
                         ExecutedOperations::PriorityOp(op) => TxData {
-                            block_hash: Some(hash),
-                            block_number: Some(block_number.0),
+                            block_hash: hash,
+                            block_number: block_number.0,
                             block_index: Some(op.block_index),
                             from: op.priority_op.data.from_account(),
                             to: op.priority_op.data.to_account(),
