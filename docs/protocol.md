@@ -1626,11 +1626,13 @@ performExodus(
 Cancels open priority requests, accrues users balances from deposit priority requests in Exodus mode.
 
 ```solidity
-cancelOutstandingDepositsForExodusMode(uint64 _number)
+cancelOutstandingDepositsForExodusMode(uint64 _number, bytes[] memory _depositsPubdata)
 ```
 
 - `_number`: Supposed number of requests to cancel (if there are less request than provided number - will be canceled
   exact number of requests)
+- `_depositsPubdata`: The array of the pubdata for the deposits to be cancelled. Please note, that it should not contain
+  any (even empty) pubdata for `FullExit` priority operations.
 
 #### Rollup Operations
 
