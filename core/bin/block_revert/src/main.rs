@@ -40,7 +40,7 @@ async fn revert_blocks_in_storage(
     transaction
         .chain()
         .block_schema()
-        .remove_account_tree_cache(last_block)
+        .remove_new_account_tree_cache(last_block)
         .await?;
     println!("`account_tree_cache` table is cleaned");
 

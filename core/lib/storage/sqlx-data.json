@@ -902,6 +902,18 @@
       "nullable": []
     }
   },
+  "1fbfd087b4c05dc6a682c0020bfae07b3eea537e3e96f0316a7ec3ed63df9f88": {
+    "query": "DELETE FROM account_tree_cache WHERE block < $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {
