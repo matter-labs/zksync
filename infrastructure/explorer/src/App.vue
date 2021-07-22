@@ -1,15 +1,22 @@
 <template>
-    <router-view></router-view>
+    <div>
+        <Navbar />
+        <keep-alive max="10" include="home,tokens">
+            <router-view></router-view>
+        </keep-alive>
+    </div>
 </template>
 
 <script>
+import Navbar from './Navbar.vue';
 export default {
-    name: "app",
+    components: { Navbar },
+    name: 'app'
 };
 </script>
 
 <style lang="scss">
-@import "../scss/common.scss";
+@import '../scss/common.scss';
 input::placeholder {
     color: lightgrey !important;
     font-style: italic !important;

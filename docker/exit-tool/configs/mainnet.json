@@ -1,0 +1,14 @@
+{
+    "eth_network": "mainnet",
+    "governance_addr": "0x34460C0EB5074C29A9F6FE13b8e7E23A0D08aF01",
+    "upgrade_gatekeeper_addr": "0x38A43F4330f24fe920F943409709fc9A6084C939",
+    "genesis_tx_hash": "0x21dfeea6c82d47203f91aba30af5e5ef3d623aa8206596fbd8c466a5b1586f02",
+    "contract_addr": "0xaBEA9132b05A70803a4E85094fD0e1800777fBEF",
+    "init_contract_version": 0,
+    "upgrade_eth_blocks": [
+        10272040,
+        10508551,
+        10995556,
+        11823044
+    ]
+}

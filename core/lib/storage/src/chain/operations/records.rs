@@ -4,17 +4,18 @@ use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
 // Local imports
+use crate::StorageActionType;
 
 #[derive(Debug, Clone, FromRow)]
 pub struct StoredOperation {
     pub id: i64,
     pub block_number: i64,
-    pub action_type: String,
+    pub action_type: StorageActionType,
     pub created_at: DateTime<Utc>,
     pub confirmed: bool,
 }
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct StoredExecutedPriorityOperation {
     pub block_number: i64,
     pub block_index: i32,
@@ -26,6 +27,9 @@ pub struct StoredExecutedPriorityOperation {
     pub eth_hash: Vec<u8>,
     pub eth_block: i64,
     pub created_at: DateTime<Utc>,
+    /// This field must be optional because of backward compatibility.
+    pub eth_block_index: Option<i64>,
+    pub tx_hash: Vec<u8>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -49,7 +53,7 @@ pub struct StoredExecutedTransaction {
 #[derive(Debug, Clone)]
 pub struct NewOperation {
     pub block_number: i64,
-    pub action_type: String,
+    pub action_type: StorageActionType,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +68,9 @@ pub struct NewExecutedPriorityOperation {
     pub eth_hash: Vec<u8>,
     pub eth_block: i64,
     pub created_at: DateTime<Utc>,
+    /// This field must be optional because of backward compatibility.
+    pub eth_block_index: Option<i64>,
+    pub tx_hash: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,4 +89,28 @@ pub struct NewExecutedTransaction {
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
     pub batch_id: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StoredPendingWithdrawal {
+    pub id: i64,
+    pub withdrawal_hash: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StoredCompleteWithdrawalsTransaction {
+    pub tx_hash: Vec<u8>,
+    pub pending_withdrawals_queue_start_index: i64,
+    pub pending_withdrawals_queue_end_index: i64,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct StoredAggregatedOperation {
+    pub id: i64,
+    pub action_type: String,
+    pub arguments: serde_json::Value,
+    pub from_block: i64,
+    pub to_block: i64,
+    pub created_at: DateTime<Utc>,
+    pub confirmed: bool,
 }

@@ -4,9 +4,9 @@
       "constant": true,
       "inputs": [
         {
-          "internalType": "bytes",
-          "name": "_data",
-          "type": "bytes"
+          "internalType": "bytes32",
+          "name": "_hash",
+          "type": "bytes32"
         },
         {
           "internalType": "bytes",

@@ -1,14 +1,15 @@
 use crate::playground::get_path_in_file_dump_dir;
-use crate::witness::tests::test_utils::{PlasmaStateGenerator, WitnessTestAccount};
+use crate::witness::tests::test_utils::{WitnessTestAccount, ZkSyncStateGenerator};
 use crate::witness::utils::WitnessBuilder;
 use crate::witness::{deposit::DepositWitness, Witness};
-use models::node::{Deposit, DepositOp, Fr};
-use models::prover_utils::fs_utils::{
-    get_universal_setup_lagrange_form, get_universal_setup_monomial_form,
-};
 use num::BigUint;
 use rayon::prelude::*;
 use std::time::Instant;
+use zksync_crypto::Fr;
+use zksync_types::prover_utils::fs_utils::{
+    get_universal_setup_lagrange_form, get_universal_setup_monomial_form,
+};
+use zksync_types::{Deposit, DepositOp};
 
 #[test]
 fn test_transpile_deposit_franklin_existing_account() {
@@ -17,7 +18,7 @@ fn test_transpile_deposit_franklin_existing_account() {
     let deposit_to_account_id = account.id;
     let deposit_to_account_address = account.account.address;
     let (mut plasma_state, mut circuit_account_tree) =
-        PlasmaStateGenerator::generate(&vec![account]);
+        ZkSyncStateGenerator::generate(&vec![account]);
 
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
@@ -50,11 +51,11 @@ fn test_transpile_deposit_franklin_existing_account() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::adaptor::alternative::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::plonk::generator::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::plonk::prover::*;
-    use crypto_exports::franklin_crypto::bellman::Circuit;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::adaptor::alternative::*;
+    use zksync_crypto::franklin_crypto::bellman::plonk::plonk::generator::*;
+    use zksync_crypto::franklin_crypto::bellman::plonk::plonk::prover::*;
+    use zksync_crypto::franklin_crypto::bellman::Circuit;
 
     let mut transpiler = Transpiler::new();
 
@@ -66,9 +67,9 @@ fn test_transpile_deposit_franklin_existing_account() {
 
     let hints = transpiler.into_hints();
 
-    use crypto_exports::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
+    use zksync_crypto::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
 
-    let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
+    let adapted_curcuit = Adaptorcircuit::new(c.clone(), &hints);
 
     let mut assembly = GeneratorAssembly::<Bn256>::new();
     adapted_curcuit.synthesize(&mut assembly).unwrap();
@@ -78,7 +79,7 @@ fn test_transpile_deposit_franklin_existing_account() {
 
     println!("Trying to prove");
 
-    let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
+    let adapted_curcuit = Adaptorcircuit::new(c.clone(), &hints);
 
     let mut prover = ProvingAssembly::<Bn256>::new();
     adapted_curcuit.synthesize(&mut prover).unwrap();
@@ -100,7 +101,7 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
 
     let deposit_to_account_id = account.id;
     let deposit_to_account_address = account.account.address;
-    let (mut plasma_state, mut circuit_tree) = PlasmaStateGenerator::generate(&vec![account]);
+    let (mut plasma_state, mut circuit_tree) = ZkSyncStateGenerator::generate(&vec![account]);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_tree, 0, 1);
 
     let deposit_op = DepositOp {
@@ -133,9 +134,9 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::*;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
+    use zksync_crypto::franklin_crypto::bellman::plonk::*;
 
     // let mut transpiler = Transpiler::new();
 
@@ -157,7 +158,7 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
     hints_hist.insert("into quadratic gate".to_owned(), 0);
     hints_hist.insert("into multiplication gate".to_owned(), 0);
 
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
 
     for (_, h) in hints.iter() {
         match h {
@@ -208,7 +209,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
     let deposit_to_account_id = account.id;
     let deposit_to_account_address = account.account.address;
     let (mut plasma_state, mut circuit_account_tree) =
-        PlasmaStateGenerator::generate(&vec![account]);
+        ZkSyncStateGenerator::generate(&vec![account]);
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
@@ -243,9 +244,9 @@ fn test_new_transpile_deposit_franklin_existing_account() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-    use crypto_exports::franklin_crypto::bellman::plonk::*;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
+    use zksync_crypto::franklin_crypto::bellman::plonk::*;
 
     // let mut transpiler = Transpiler::new();
 
@@ -265,7 +266,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
     hints_hist.insert("into quadratic gate".to_owned(), 0);
     hints_hist.insert("into multiplication gate".to_owned(), 0);
 
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
 
     for (_, h) in hints.iter() {
         match h {
@@ -343,7 +344,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
         make_precomputations(&setup).expect("must make precomputations for proving");
     println!("Precomputations generated: {}s", timer.elapsed().as_secs());
 
-    use crypto_exports::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
+    use zksync_crypto::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
 
     let omegas_bitreversed = BitReversedOmegas::<Fr>::new_for_domain_size(size);
     let omegas_inv_bitreversed =
@@ -384,7 +385,7 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
 
     let deposit_to_account_id = account.id;
     let deposit_to_account_address = account.account.address;
-    let (mut plasma_state, mut circuit_tree) = PlasmaStateGenerator::generate(&vec![account]);
+    let (mut plasma_state, mut circuit_tree) = ZkSyncStateGenerator::generate(&vec![account]);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_tree, 0, 1);
 
     let deposit_op = DepositOp {
@@ -417,15 +418,15 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::cs::PlonkCsWidth4WithNextStepParams;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::Transpiler;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::cs::PlonkCsWidth4WithNextStepParams;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::Transpiler;
 
     let mut transpiler = Transpiler::<Bn256, PlonkCsWidth4WithNextStepParams>::new();
 
     let c = witness_accum.into_circuit_instance();
 
-    use crypto_exports::franklin_crypto::bellman::Circuit;
+    use zksync_crypto::franklin_crypto::bellman::Circuit;
     c.clone().synthesize(&mut transpiler).unwrap();
 
     let hints = transpiler.into_hints();
@@ -437,7 +438,7 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
     hints_hist.insert("into multiplication gate".to_owned(), 0);
     hints_hist.insert("into fma gate".to_owned(), 0);
 
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::TranspilationVariant;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::TranspilationVariant;
 
     for (_, h) in hints.iter() {
         match h {
@@ -472,12 +473,12 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
 
 #[test]
 fn print_available_setup_powers() {
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::*;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::*;
 
     let calculate_setup_power = |chunks: usize| -> (usize, u32) {
         let circuit = {
-            let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&[]);
+            let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&[]);
             let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1);
             witness_accum.extend_pubdata_with_noops(chunks);
             witness_accum.collect_fees(&[]);

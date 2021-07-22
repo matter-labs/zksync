@@ -2,19 +2,27 @@
 
 [package]
 name = "zksync-crypto"
-version = "0.1.0"
-authors = ["Vitalii Drohan <vitaliy.drogan@gmail.com>"]
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # This library is not published stand-alone, it is bundled with `zksync.js`.
 
 [lib]
 crate-type = ["cdylib"]
 
 [features]
-#default = ["console_error_panic_hook"]
+# default = ["console_error_panic_hook"]
 
 [dependencies]
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta"}
+rand = "0.4"
+
 wasm-bindgen = "=0.2.65"
-crypto_exports = { path = "../../core/lib/crypto_exports", version = "0.1.0" }
 hex = "0.4"
 sha2 = "0.8"
 
@@ -22,7 +30,7 @@ sha2 = "0.8"
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
-#console_error_panic_hook = { version = "0.1.1", optional = true }
+# console_error_panic_hook = { version = "0.1.6", optional = true }
 
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
 # compared to the default allocator's ~10K. It is slower than the default
@@ -34,7 +42,8 @@ wee_alloc = { version = "0.4.2", optional = true }
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
 rand = { version = "0.7.3", features = ["wasm-bindgen"] }
-models = { path = "../../core/lib/models" }
+zksync_types = { path = "../../core/lib/types" }
+crypto_lib = { package = "zksync_crypto", path = "../../core/lib/crypto" }
 
 [profile.release]
 panic = "abort"
@@ -42,4 +51,4 @@ panic = "abort"
 opt-level = "s"
 
 [package.metadata.wasm-pack.profile.release]
-#wasm-opt = false
+# wasm-opt = false

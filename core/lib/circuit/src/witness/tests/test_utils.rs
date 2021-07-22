@@ -1,26 +1,27 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use num::BigUint;
+use zksync_crypto::franklin_crypto::{
     bellman::{pairing::ff::PrimeField, Circuit},
     circuit::test::TestConstraintSystem,
 };
-use num::BigUint;
 // Workspace deps
-use models::{
-    circuit::{account::CircuitAccount, CircuitAccountTree},
-    node::{Account, AccountId, AccountMap, Address, Engine, Fr},
-};
-use plasma::state::{CollectedFee, PlasmaState};
-use testkit::zksync_account::ZksyncAccount;
+use zksync_crypto::circuit::{account::CircuitAccount, CircuitAccountTree};
+use zksync_crypto::{Engine, Fr};
+use zksync_state::state::{CollectedFee, ZkSyncState};
+use zksync_test_account::ZkSyncAccount;
+use zksync_types::{Account, AccountId, AccountMap, Address, BlockNumber, TokenId};
 // Local deps
-use crate::{circuit::FranklinCircuit, witness::Witness};
+use crate::{circuit::ZkSyncCircuit, witness::Witness};
+use std::str::FromStr;
 
 // Public re-exports
 pub use crate::witness::utils::WitnessBuilder;
 
-pub const FEE_ACCOUNT_ID: u32 = 0;
+pub const FEE_ACCOUNT_ID: AccountId = AccountId(0);
+pub const BLOCK_TIMESTAMP: u64 = 0x12345678u64;
 
 /// Verifies that circuit has no unsatisfied constraints, and returns an error otherwise.
-pub fn check_circuit_non_panicking(circuit: FranklinCircuit<Engine>) -> Result<(), String> {
+pub fn check_circuit_non_panicking(circuit: ZkSyncCircuit<Engine>) -> Result<(), String> {
     let mut cs = TestConstraintSystem::<Engine>::new();
     circuit.synthesize(&mut cs).unwrap();
 
@@ -34,7 +35,7 @@ pub fn check_circuit_non_panicking(circuit: FranklinCircuit<Engine>) -> Result<(
 }
 
 /// Verifies that circuit has no unsatisfied constraints, and panics otherwise.
-pub fn check_circuit(circuit: FranklinCircuit<Engine>) {
+pub fn check_circuit(circuit: ZkSyncCircuit<Engine>) {
     check_circuit_non_panicking(circuit).expect("ERROR satisfying the constraints:")
 }
 
@@ -43,16 +44,16 @@ pub fn incorrect_fr() -> Fr {
     Fr::from_str("12345").unwrap()
 }
 
-/// Helper structure to generate `PlasmaState` and `CircuitAccountTree`.
+/// Helper structure to generate `ZkSyncState` and `CircuitAccountTree`.
 #[derive(Debug)]
-pub struct PlasmaStateGenerator;
+pub struct ZkSyncStateGenerator;
 
-impl PlasmaStateGenerator {
-    fn create_state(accounts: AccountMap) -> (PlasmaState, CircuitAccountTree) {
-        let plasma_state = PlasmaState::from_acc_map(accounts, 1);
+impl ZkSyncStateGenerator {
+    fn create_state(accounts: AccountMap) -> (ZkSyncState, CircuitAccountTree) {
+        let plasma_state = ZkSyncState::from_acc_map(accounts, BlockNumber(1));
 
         let mut circuit_account_tree =
-            CircuitAccountTree::new(models::params::account_tree_depth());
+            CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
         for (id, account) in plasma_state.get_accounts() {
             circuit_account_tree.insert(id, CircuitAccount::from(account))
         }
@@ -60,7 +61,7 @@ impl PlasmaStateGenerator {
         (plasma_state, circuit_account_tree)
     }
 
-    pub fn generate(accounts: &[WitnessTestAccount]) -> (PlasmaState, CircuitAccountTree) {
+    pub fn generate(accounts: &[WitnessTestAccount]) -> (ZkSyncState, CircuitAccountTree) {
         let accounts: Vec<_> = accounts
             .iter()
             .map(|acc| (acc.id, acc.account.clone()))
@@ -69,13 +70,15 @@ impl PlasmaStateGenerator {
         let accounts = if accounts.iter().any(|(id, _)| *id == FEE_ACCOUNT_ID) {
             println!(
                 "Note: AccountId {} is an existing fee account",
-                FEE_ACCOUNT_ID
+                *FEE_ACCOUNT_ID
             );
             accounts.into_iter().collect()
         } else {
             std::iter::once((
                 FEE_ACCOUNT_ID,
-                Account::default_with_address(&Address::default()),
+                Account::default_with_address(
+                    &Address::from_str("feeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee").unwrap(),
+                ),
             ))
             .chain(accounts)
             .collect()
@@ -87,22 +90,26 @@ impl PlasmaStateGenerator {
 
 /// A helper structure for witness tests which contains both testkit
 /// zkSync account and an actual zkSync account.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WitnessTestAccount {
-    pub zksync_account: ZksyncAccount,
+    pub zksync_account: ZkSyncAccount,
     pub id: AccountId,
     pub account: Account,
 }
 
 impl WitnessTestAccount {
     pub fn new(id: AccountId, balance: u64) -> Self {
-        let zksync_account = ZksyncAccount::rand();
+        Self::new_with_token(id, TokenId(0), balance)
+    }
+
+    pub fn new_with_token(id: AccountId, token: TokenId, balance: u64) -> Self {
+        let zksync_account = ZkSyncAccount::rand();
         zksync_account.set_account_id(Some(id));
 
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
-            account.add_balance(0, &BigUint::from(balance));
-            account.pub_key_hash = zksync_account.pubkey_hash.clone();
+            account.add_balance(token, &BigUint::from(balance));
+            account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };
 
@@ -111,6 +118,11 @@ impl WitnessTestAccount {
             id,
             account,
         }
+    }
+
+    pub fn set_empty_pubkey_hash(&mut self) {
+        self.zksync_account.pubkey_hash = Default::default();
+        self.account.pub_key_hash = Default::default();
     }
 
     pub fn new_empty(id: AccountId) -> Self {
@@ -131,11 +143,16 @@ pub fn generic_test_scenario<W, F>(
     apply_op_on_plasma: F,
 ) where
     W: Witness,
-    F: FnOnce(&mut PlasmaState, &W::OperationType) -> Vec<CollectedFee>,
+    F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        BlockNumber(1),
+        BLOCK_TIMESTAMP,
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -145,9 +162,14 @@ pub fn generic_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 
@@ -167,20 +189,27 @@ pub fn generic_test_scenario<W, F>(
 /// Does the same operations as the `generic_test_scenario`, but assumes
 /// that input for `calculate_operations` is corrupted and will lead to an error.
 /// The error is caught and checked to match the provided message.
-pub fn corrupted_input_test_scenario<W, F>(
+pub fn corrupted_input_test_scenario<W, F, B>(
     accounts: &[WitnessTestAccount],
     op: W::OperationType,
     input: W::CalculateOpsInput,
     expected_msg: &str,
     apply_op_on_plasma: F,
+    corrupt_witness_builder: B,
 ) where
     W: Witness,
     W::CalculateOpsInput: Clone + std::fmt::Debug,
-    F: FnOnce(&mut PlasmaState, &W::OperationType) -> Vec<CollectedFee>,
+    F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
+    B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        BlockNumber(1),
+        BLOCK_TIMESTAMP,
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -190,11 +219,18 @@ pub fn corrupted_input_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input.clone());
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
+
+    corrupt_witness_builder(&mut witness_accum);
 
     let result = check_circuit_non_panicking(witness_accum.into_circuit_instance());
 
@@ -221,20 +257,27 @@ pub fn corrupted_input_test_scenario<W, F>(
 /// Performs the operation on the circuit, but not on the plasma,
 /// since the operation is meant to be incorrect and should result in an error.
 /// The error is caught and checked to match the provided message.
-pub fn incorrect_op_test_scenario<W, F>(
+pub fn incorrect_op_test_scenario<W, F, B>(
     accounts: &[WitnessTestAccount],
     op: W::OperationType,
     input: W::CalculateOpsInput,
     expected_msg: &str,
     collect_fees: F,
+    corrupt_witness_builder: B,
 ) where
     W: Witness,
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce() -> Vec<CollectedFee>,
+    B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize WitnessBuilder.
-    let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        BlockNumber(1),
+        BLOCK_TIMESTAMP,
+    );
 
     // Collect fees without actually applying the tx on plasma
     let fees = collect_fees();
@@ -243,11 +286,18 @@ pub fn incorrect_op_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input.clone());
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
+
+    corrupt_witness_builder(&mut witness_accum);
 
     let result = check_circuit_non_panicking(witness_accum.into_circuit_instance());
 

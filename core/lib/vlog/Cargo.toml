@@ -1,10 +1,21 @@
 [package]
 name = "vlog"
-version = "0.1.0"
-authors = ["Oleg Syniakevych <olegsyniakevych@gmail.com>"]
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # This is an utility crate, not to be used by libraries.
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+actix = ['sentry-actix']
 
 [dependencies]
-log = "0.4"
+tracing = { version = "0.1.22", features = ["log"] }
+tracing-subscriber = { version = "0.2.15", features = ["fmt", "chrono"] }
+sentry = "0.21.0"
+
+sentry-actix = { version = "0.21.0", optional = true }

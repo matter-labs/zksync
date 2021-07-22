@@ -1,0 +1,50 @@
+{
+  "name": "zksync-root",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "sdk/zksync.js",
+      "sdk/zksync-crypto",
+      "contracts",
+      "infrastructure/zcli",
+      "infrastructure/explorer",
+      "infrastructure/zk",
+      "infrastructure/reading-tool",
+      "infrastructure/token-lists-manager",
+      "infrastructure/api-docs",
+      "core/tests/ts-tests"
+    ],
+    "nohoist": [
+      "**/@vue/**",
+      "**/vue-template-compiler/**",
+      "**/bootstrap-vue/**",
+      "**/@vue",
+      "**/vue-template-compiler",
+      "**/bootstrap-vue"
+    ]
+  },
+  "scripts": {
+    "zksync": "yarn workspace zksync",
+    "crypto": "yarn workspace zksync-crypto",
+    "contracts": "yarn workspace franklin-contracts",
+    "zcli": "yarn workspace zcli",
+    "ts-tests": "yarn workspace ts-tests",
+    "explorer": "yarn workspace sync-explorer",
+    "zk": "yarn workspace zk",
+    "reading-tool": "yarn workspace reading-tool",
+    "api-docs": "yarn workspace api-docs"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.10.0",
+    "@typescript-eslint/parser": "^4.10.0",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^7.16.0",
+    "eslint-config-alloy": "^3.8.2",
+    "markdownlint-cli": "^0.24.0",
+    "prettier": "^2.2.1",
+    "prettier-plugin-solidity": "^1.0.0-alpha.60",
+    "solhint": "^3.3.2"
+  }
+}

@@ -1,3 +1,20 @@
+type ChangePubKeyOnchain = {
+    type: 'Onchain';
+};
+
+type ChangePubKeyECDSA = {
+    type: 'ECDSA';
+    ethSignature: string;
+    batchHash?: string;
+};
+
+type ChangePubKeyCREATE2 = {
+    type: 'CREATE2';
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+};
+
 type Deposit = {
     tx_id: string;
     hash: string;
@@ -11,10 +28,10 @@ type Deposit = {
             to: string;
             token: string;
         };
-        type: "Deposit";
+        type: 'Deposit';
     };
-    success: null;
-    fail_reason: null;
+    success: boolean;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -26,16 +43,20 @@ type FullExit = {
     eth_block: number;
     pq_id: number;
     tx: {
+        type: 'FullExit';
+        serial_id: number | null;
         priority_op: {
             token: string;
             account_id: number;
             eth_address: string;
         };
+        content_hash: string | null;
+        creator_address: string | null;
         withdraw_amount: string;
-        type: "FullExit";
+        creator_account_id: number | null;
     };
-    success: null;
-    fail_reason: null;
+    success: boolean;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -58,10 +79,12 @@ type Transfer = {
         };
         to: string;
         token: string;
-        type: "Transfer";
+        type: 'Transfer';
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -75,13 +98,22 @@ type ChangePubKey = {
     tx: {
         account: string;
         accountId: number;
-        ethSignature?: string;
         newPkHash: string;
         nonce: number;
         type: string;
+        feeToken: number;
+        fee: string;
+        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2 | null;
+        ethSignature: string | null;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -104,14 +136,42 @@ type Withdraw = {
         };
         to: string;
         token: string;
-        type: "Withdraw";
-        fast?: boolean;
+        type: 'Withdraw';
+        fast: boolean;
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
 };
 
-export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit)[];
+type ForcedExit = {
+    tx_id: string;
+    hash: string;
+    eth_block: null;
+    pq_id: null;
+    tx: {
+        initiatorAccountId: number;
+        target: string;
+        token: string;
+        fee: string;
+        nonce: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        type: 'ForcedExit';
+        validFrom: number;
+        validUntil: number;
+    };
+    success: boolean;
+    fail_reason: string | null;
+    commited: boolean;
+    verified: boolean;
+    created_at: string;
+};
+
+export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit | ForcedExit)[];

@@ -1,7 +1,6 @@
 /build
 # /contracts/keys
-/flat
-/flat_build
-/dev-contracts/generated
 /contracts/KeysWithPlonkVerifier.sol
-/contracts/TokenInit.sol
+/artifacts
+/cache
+/typechain

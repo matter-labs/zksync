@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{
         pairing::{
             ff::{BitIterator, Field, PrimeField},
@@ -18,11 +18,14 @@ use crypto_exports::franklin_crypto::{
     rescue::{rescue_hash, RescueEngine},
 };
 // Workspace deps
-use models::{
+use zksync_crypto::{
     circuit::utils::le_bit_vector_into_field_element, params as franklin_constants, primitives::*,
 };
 // Local deps
-use crate::operation::{SignatureData, TransactionSignature};
+use crate::{
+    element::CircuitElement,
+    operation::{SignatureData, TransactionSignature},
+};
 
 pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
     bits.chunks(8)
@@ -43,7 +46,7 @@ pub fn sign_sha256<E>(
 where
     E: JubjubEngine,
 {
-    let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
+    let message_bytes = BitConvert::into_bytes(msg_data.to_vec());
 
     let seed = Seed::deterministic_seed(&private_key, &message_bytes);
     let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
@@ -51,14 +54,14 @@ where
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let _is_valid_signature = pk.verify_musig_sha256(&message_bytes, &signature, p_g, params);
 
-    // TODO: handle the case where it is not valid
+    // TODO: handle the case where it is not valid (ZKS-101)
     // if !is_valid_signature {
     //     return None;
     // }
     let (sig_r_x, sig_r_y) = signature.r.into_xy();
-    debug!("signature.s: {}", signature.s);
-    debug!("signature.r.x: {}", sig_r_x);
-    debug!("signature.r.y: {}", sig_r_y);
+    vlog::debug!("signature.s: {}", signature.s);
+    vlog::debug!("signature.r.x: {}", sig_r_x);
+    vlog::debug!("signature.r.y: {}", sig_r_y);
 
     convert_signature_to_representation(signature)
 }
@@ -73,7 +76,7 @@ pub fn sign_rescue<E>(
 where
     E: RescueEngine + JubjubEngine,
 {
-    let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
+    let message_bytes = BitConvert::into_bytes(msg_data.to_vec());
 
     let seed = Seed::deterministic_seed(&private_key, &message_bytes);
     let signature =
@@ -88,14 +91,14 @@ where
         jubjub_params,
     );
 
-    // TODO: handle the case where it is not valid
+    // TODO: handle the case where it is not valid (ZKS-101)
     // if !is_valid_signature {
     //     return None;
     // }
     let (sig_r_x, sig_r_y) = signature.r.into_xy();
-    debug!("signature.s: {}", signature.s);
-    debug!("signature.r.x: {}", sig_r_x);
-    debug!("signature.r.y: {}", sig_r_y);
+    vlog::debug!("signature.s: {}", signature.s);
+    vlog::debug!("signature.r.x: {}", sig_r_x);
+    vlog::debug!("signature.r.y: {}", sig_r_y);
 
     convert_signature_to_representation(signature)
 }
@@ -129,8 +132,8 @@ where
         false,
     );
     signature_r_y_be_bits.reverse();
-    let mut sig_r_packed_bits = vec![];
-    sig_r_packed_bits.push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]);
+    let mut sig_r_packed_bits =
+        vec![signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]];
     sig_r_packed_bits.extend(signature_r_y_be_bits[1..].iter());
     let sig_r_packed_bits = reverse_bytes(&sig_r_packed_bits);
 
@@ -166,7 +169,7 @@ where
         let mut byte = 0u8;
         for (i, bit) in byte_chunk.iter().enumerate() {
             if *bit {
-                byte |= 1 << (7 - i); //TODO: ask shamatar why do we need rev here, but not in pedersen
+                byte |= 1 << (7 - i);
             }
         }
         message_bytes.push(byte);
@@ -360,8 +363,6 @@ pub fn print_boolean_vec(bits: &[Boolean]) {
         }
         bytes.push(b);
     }
-
-    debug!("Hex: {}", hex::encode(&bytes));
 }
 
 pub fn resize_grow_only<T: Clone>(to_resize: &mut Vec<T>, new_size: usize, pad_with: T) {
@@ -375,12 +376,7 @@ pub fn boolean_or<E: Engine, CS: ConstraintSystem<E>>(
     y: &Boolean,
 ) -> Result<Boolean, SynthesisError> {
     // A OR B = ( A NAND A ) NAND ( B NAND B ) = (NOT(A)) NAND (NOT (B))
-    let result = Boolean::and(
-        cs.namespace(|| "lhs_valid nand rhs_valid"),
-        &x.not(),
-        &y.not(),
-    )?
-    .not();
+    let result = Boolean::and(cs.namespace(|| "x.not() nand y.not()"), &x.not(), &y.not())?.not();
 
     Ok(result)
 }
@@ -398,7 +394,8 @@ pub fn calculate_empty_account_tree_hashes<E: RescueEngine>(
     tree_depth: usize,
 ) -> Vec<E::Fr> {
     // manually calcualte empty subtree hashes
-    let empty_account_packed = models::circuit::account::empty_account_as_field_elements::<E>();
+    let empty_account_packed =
+        zksync_crypto::circuit::account::empty_account_as_field_elements::<E>();
     calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &empty_account_packed)
 }
 
@@ -454,4 +451,38 @@ pub fn vectorized_compare<E: Engine, CS: ConstraintSystem<E>>(
     let is_equal = multi_and(cs.namespace(|| "all data is equal"), &equality_bits)?;
 
     Ok((is_equal, packed))
+}
+
+pub fn sequences_equal<E: Engine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    lhs: &[CircuitElement<E>],
+    rhs: &[CircuitElement<E>],
+) -> Result<Boolean, SynthesisError> {
+    assert_eq!(lhs.len(), rhs.len());
+    let equality_flags = lhs
+        .iter()
+        .zip(rhs.iter())
+        .enumerate()
+        .map(|(idx, (lhs, rhs))| {
+            CircuitElement::equals(
+                cs.namespace(|| format!("element with index {}", idx)),
+                &lhs,
+                &rhs,
+            )
+        })
+        .collect::<Result<Vec<_>, SynthesisError>>()?;
+    multi_and(cs, &equality_flags)
+}
+
+pub fn u8_into_bits_be(a: u8) -> Vec<Boolean> {
+    let mut res = Vec::new();
+    for i in 0..8 {
+        if (a & (1u8 << (7 - i))) != 0 {
+            res.push(Boolean::constant(true));
+        } else {
+            res.push(Boolean::constant(false));
+        }
+    }
+
+    res
 }

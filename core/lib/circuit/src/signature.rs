@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{pairing::ff::PrimeField, ConstraintSystem, SynthesisError},
     circuit::{
         baby_eddsa::EddsaSignature,
@@ -12,7 +12,7 @@ use crypto_exports::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::params::{self as franklin_constants, FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
+use zksync_crypto::params::{self as franklin_constants, FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
 // Local deps
 use crate::{
     allocated_structures::*,
@@ -34,8 +34,7 @@ pub struct AllocatedSignatureData<E: JubjubEngine> {
 
 impl<E: JubjubEngine> AllocatedSignatureData<E> {
     pub fn get_packed_r(&self) -> Vec<Boolean> {
-        let mut r_packed_bits = vec![];
-        r_packed_bits.push(self.sig_r_x_bit.clone());
+        let mut r_packed_bits = vec![self.sig_r_x_bit.clone()];
         r_packed_bits.extend(self.sig_r_y_bits.clone());
         reverse_bytes(&r_packed_bits)
     }
@@ -73,7 +72,7 @@ pub fn unpack_point_if_possible<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         &r_y.get_number(),
         &jubjub_params,
     )?;
-    debug!(
+    vlog::debug!(
         "r_recovered.x={:?} \n r_recovered.y={:?}",
         r_recovered.get_x().get_value(),
         r_recovered.get_y().get_value()
@@ -147,12 +146,12 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         pk: signer_key.point.clone(),
     };
 
-    debug!(
+    vlog::debug!(
         "signature_r_x={:?} \n signature_r_y={:?}",
         signature.r.get_x().get_value(),
         signature.r.get_y().get_value()
     );
-    debug!("s={:?}", signature.s.get_value());
+    vlog::debug!("s={:?}", signature.s.get_value());
 
     let serialized_tx_bits = {
         let mut temp_bits = op_data.first_sig_msg.get_bits_le();
@@ -189,9 +188,9 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         generator,
     )?;
 
-    debug!("is_sig_verified={:?}", is_sig_verified.get_value());
-    debug!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
-    debug!(
+    vlog::debug!("is_sig_verified={:?}", is_sig_verified.get_value());
+    vlog::debug!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
+    vlog::debug!(
         "signer_key.is_correctly_unpacked={:?}",
         signer_key.is_correctly_unpacked.get_value()
     );
@@ -371,7 +370,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
     bits.extend_from_slice(&s1_bits[0..take_bits]);
     assert!(bits.len() == E::Fs::CAPACITY as usize);
 
-    let max_message_len = 32 as usize; //since it is the result of sha256 hash
+    let max_message_len = 32_usize; //since it is the result of sha256 hash
 
     // we can use lowest bits of the challenge
     let is_sig_verified = verify_schnorr_relationship(
@@ -438,10 +437,10 @@ where
         Expression::from(rhs_y),
         Expression::from(sb_y),
     )?);
-    Ok(multi_and(
+    multi_and(
         cs.namespace(|| "is signature correct"),
         &[r_is_not_small_order, is_x_correct, is_y_correct],
-    )?)
+    )
 }
 
 pub fn is_not_small_order<CS, E>(

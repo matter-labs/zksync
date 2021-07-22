@@ -1,6 +1,6 @@
 //! Storage crate provides the interfaces to interact with the database.
 //! The backend database used in this crate is `Postgres`, and interaction
-//! with it is based on the `diesel` crate.
+//! with it is based on the `sqlx` crate.
 //!
 //! The essential structure of this crate is the `StorageProcessor`, which
 //! holds down the connection to the database and provides abstract interfaces
@@ -61,7 +61,7 @@
 //!
 //! Tests for the storage use the actual empty Postgres database.
 //! Because of that, these tests are disabled by default, to run them you must use
-//! `zksync db-test` (or `zksync db-test-no-reset`, if this is not a first run)
+//! `zk test db` (or `zk test db --no-reset`, if this is not a first run)
 //! command, which will setup the database and enable the tests by passing a feature flag.
 //!
 //! Tests are implemented in a form of "test transactions", which are database transactions
@@ -73,12 +73,14 @@
 #![allow(clippy::toplevel_ref_arg, clippy::suspicious_else_formatting)]
 
 // Built-in deps
-// use std::env;
+use std::env;
 // External imports
-use sqlx::{pool::PoolConnection, postgres::Postgres, Connection, PgConnection, Transaction};
+use sqlx::{postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
+use zksync_basic_types::BlockNumber;
+use zksync_types::ActionType;
 // Local imports
-use crate::connection::holder::ConnectionHolder;
+use crate::connection::{holder::ConnectionHolder, PooledConnection};
 
 // mod schema;
 #[cfg(test)]
@@ -90,12 +92,29 @@ pub mod connection;
 pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
+pub mod event;
+pub mod forced_exit_requests;
+pub mod listener;
 pub mod prover;
+pub mod test_data;
 pub mod tokens;
-pub mod utils;
+mod utils;
+
+use forced_exit_requests::ForcedExitRequestsSchema;
 
 pub use crate::connection::ConnectionPool;
-pub type QueryResult<T> = Result<T, failure::Error>;
+pub use sqlx::types::BigDecimal;
+pub type QueryResult<T, E = anyhow::Error> = Result<T, E>;
+
+/// The maximum possible block number in the storage.
+pub const MAX_BLOCK_NUMBER: BlockNumber = BlockNumber(u32::MAX);
+/// The maximum possible index value in block in the storage.
+pub const MAX_BLOCK_INDEX: u32 = i32::MAX as u32;
+
+/// Obtains the database URL from the environment variable.
+pub fn get_database_url() -> String {
+    env::var("DATABASE_URL").expect("DATABASE_URL must be set")
+}
 
 /// Storage processor is the main storage interaction point.
 /// It holds down the connection (either direct or pooled) to the database
@@ -106,10 +125,26 @@ pub struct StorageProcessor<'a> {
     in_transaction: bool,
 }
 
+#[derive(sqlx::Type, Debug, Clone, PartialEq, Eq)]
+#[sqlx(rename = "action_type")]
+pub enum StorageActionType {
+    COMMIT,
+    VERIFY,
+}
+
+impl From<ActionType> for StorageActionType {
+    fn from(action_type: ActionType) -> Self {
+        match action_type {
+            ActionType::COMMIT => StorageActionType::COMMIT,
+            ActionType::VERIFY => StorageActionType::VERIFY,
+        }
+    }
+}
+
 impl<'a> StorageProcessor<'a> {
     /// Creates a `StorageProcessor` using an unique sole connection to the database.
     pub async fn establish_connection<'b>() -> QueryResult<StorageProcessor<'b>> {
-        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let database_url = get_database_url();
         let connection = PgConnection::connect(&database_url).await?;
         Ok(StorageProcessor {
             conn: ConnectionHolder::Direct(connection),
@@ -119,7 +154,7 @@ impl<'a> StorageProcessor<'a> {
 
     pub async fn start_transaction<'c: 'b, 'b>(
         &'c mut self,
-    ) -> Result<StorageProcessor<'b>, failure::Error> {
+    ) -> Result<StorageProcessor<'b>, anyhow::Error> {
         let transaction = self.conn().begin().await?;
 
         let mut processor = StorageProcessor::from_transaction(transaction);
@@ -152,7 +187,7 @@ impl<'a> StorageProcessor<'a> {
     /// Creates a `StorageProcessor` using a pool of connections.
     /// This method borrows one of the connections from the pool, and releases it
     /// after `drop`.
-    pub fn from_pool(conn: PoolConnection<Postgres>) -> Self {
+    pub fn from_pool(conn: PooledConnection) -> Self {
         Self {
             conn: ConnectionHolder::Pooled(conn),
             in_transaction: false,
@@ -187,6 +222,14 @@ impl<'a> StorageProcessor<'a> {
     /// Gains access to the `Tokens` schema.
     pub fn tokens_schema(&mut self) -> tokens::TokensSchema<'_, 'a> {
         tokens::TokensSchema(self)
+    }
+
+    pub fn forced_exit_requests_schema(&mut self) -> ForcedExitRequestsSchema<'_, 'a> {
+        ForcedExitRequestsSchema(self)
+    }
+
+    pub fn event_schema(&mut self) -> event::EventSchema<'_, 'a> {
+        event::EventSchema(self)
     }
 
     fn conn(&mut self) -> &mut PgConnection {

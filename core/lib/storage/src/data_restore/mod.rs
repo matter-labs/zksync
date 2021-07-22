@@ -1,18 +1,23 @@
 // Built-in deps
+use std::time::Instant;
 // External imports
-use itertools::Itertools;
 // Workspace imports
-use models::node::block::Block;
-use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
-use models::{NewTokenEvent, Operation};
+use zksync_types::{
+    aggregated_operations::{
+        AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
+    },
+    AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp,
+};
 // Local imports
 use self::records::{
-    NewBlockEvent, NewFranklinOp, NewStorageState, StoredBlockEvent, StoredFranklinOp,
+    NewBlockEvent, NewRollupOpsBlock, NewStorageState, NewTokenEvent, StoredBlockEvent,
     StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState,
 };
+
+use crate::chain::operations::OperationsSchema;
 use crate::{
-    chain::{block::BlockSchema, state::StateSchema},
-    tokens::TokensSchema,
+    chain::state::StateSchema,
+    tokens::{StoreTokenError, TokensSchema},
 };
 use crate::{QueryResult, StorageProcessor};
 
@@ -26,101 +31,98 @@ pub mod records;
 pub struct DataRestoreSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> DataRestoreSchema<'a, 'c> {
-    pub async fn save_block_transactions(&mut self, block: Block) -> QueryResult<()> {
-        let new_state = self.new_storage_state("None");
-        let mut transaction = self.0.start_transaction().await?;
-
-        BlockSchema(&mut transaction)
-            .save_block_transactions(block.block_number, block.block_transactions)
-            .await?;
-        DataRestoreSchema(&mut transaction)
-            .update_storage_state(new_state)
-            .await?;
-        transaction.commit().await?;
-        Ok(())
-    }
-
     pub async fn save_block_operations(
         &mut self,
-        commit_op: Operation,
-        verify_op: Operation,
+        commit_op: BlocksCommitOperation,
+        execute_op: BlocksExecuteOperation,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let new_state = self.new_storage_state("None");
         let mut transaction = self.0.start_transaction().await?;
 
-        let commit_op = BlockSchema(&mut transaction)
-            .execute_operation(commit_op)
+        OperationsSchema(&mut transaction)
+            .store_aggregated_action(AggregatedOperation::CommitBlocks(commit_op.clone()))
             .await?;
-        let verify_op = BlockSchema(&mut transaction)
-            .execute_operation(verify_op)
+        OperationsSchema(&mut transaction)
+            .store_aggregated_action(AggregatedOperation::ExecuteBlocks(execute_op.clone()))
             .await?;
-        sqlx::query!(
-            "UPDATE operations
-            SET confirmed = $1
-            WHERE id = $2 OR id = $3",
-            true,
-            commit_op.id.unwrap(),
-            verify_op.id.unwrap()
-        )
-        .execute(transaction.conn())
-        .await?;
+        // The state is expected to be updated, so it's necessary
+        // to do it here.
+        for block in commit_op.blocks.iter() {
+            StateSchema(&mut transaction)
+                .apply_state_update(block.block_number)
+                .await?;
+        }
+
+        OperationsSchema(&mut transaction)
+            .confirm_aggregated_operations(
+                commit_op.blocks.first().unwrap().block_number,
+                commit_op.blocks.last().unwrap().block_number,
+                AggregatedActionType::CommitBlocks,
+            )
+            .await?;
+
+        OperationsSchema(&mut transaction)
+            .confirm_aggregated_operations(
+                execute_op.blocks.first().unwrap().block_number,
+                execute_op.blocks.last().unwrap().block_number,
+                AggregatedActionType::ExecuteBlocks,
+            )
+            .await?;
 
         DataRestoreSchema(&mut transaction)
             .update_storage_state(new_state)
             .await?;
         transaction.commit().await?;
+        metrics::histogram!("sql.data_restore.save_block_operations", start.elapsed());
         Ok(())
     }
 
     pub async fn save_genesis_state(
         &mut self,
-        genesis_acc_update: AccountUpdate,
+        genesis_updates: &[(AccountId, AccountUpdate)],
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         StateSchema(&mut transaction)
-            .commit_state_update(0, &[(0, genesis_acc_update)])
+            .commit_state_update(BlockNumber(0), genesis_updates, 0)
             .await?;
-        StateSchema(&mut transaction).apply_state_update(0).await?;
+        StateSchema(&mut transaction)
+            .apply_state_update(BlockNumber(0))
+            .await?;
         transaction.commit().await?;
+        metrics::histogram!("sql.data_restore.save_genesis_state", start.elapsed());
         Ok(())
     }
 
     pub async fn load_rollup_ops_blocks(&mut self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
-        let stored_operations = sqlx::query_as!(
-            StoredFranklinOp,
-            "SELECT * FROM data_restore_rollup_ops
-            ORDER BY id ASC"
+        let start = Instant::now();
+        // For each block aggregate its operations from the
+        // `data_restore_rollup_block_ops` table into array and
+        // match it by the block number from `data_restore_rollup_blocks`.
+        // The contract version is obtained from block events.
+        let stored_blocks = sqlx::query_as!(
+            StoredRollupOpsBlock,
+            "SELECT blocks.block_num AS block_num, ops, fee_account,
+            timestamp, previous_block_root_hash, contract_version
+            FROM data_restore_rollup_blocks AS blocks
+            JOIN (
+                SELECT block_num, array_agg(operation) as ops
+                FROM data_restore_rollup_block_ops
+                GROUP BY block_num
+            ) ops
+                ON blocks.block_num = ops.block_num
+            JOIN (
+                SELECT DISTINCT block_num, contract_version
+                FROM data_restore_events_state
+            ) events
+                ON blocks.block_num = events.block_num
+            ORDER BY blocks.block_num ASC"
         )
         .fetch_all(self.0.conn())
         .await?;
-
-        // let stored_operations = data_restore_rollup_ops::table
-        //     .order(data_restore_rollup_ops::id.asc())
-        //     .load::<StoredFranklinOp>(self.0.conn())?;
-        let ops_blocks: Vec<StoredRollupOpsBlock> = stored_operations
-            .into_iter()
-            .group_by(|op| op.block_num)
-            .into_iter()
-            .map(|(_, stored_ops)| {
-                // let stored_ops = group.clone();
-                // let mut ops: Vec<FranklinOp> = vec![];
-                let mut block_num: i64 = 0;
-                let mut fee_account: i64 = 0;
-                let ops: Vec<FranklinOp> = stored_ops
-                    .map(|stored_op| {
-                        block_num = stored_op.block_num;
-                        fee_account = stored_op.fee_account;
-                        stored_op.into_franklin_op()
-                    })
-                    .collect();
-                StoredRollupOpsBlock {
-                    block_num: block_num as u32,
-                    ops,
-                    fee_account: fee_account as u32,
-                }
-            })
-            .collect();
-        Ok(ops_blocks)
+        metrics::histogram!("sql.data_restore.load_rollup_ops_blocks", start.elapsed());
+        Ok(stored_blocks)
     }
 
     /// Stores the last seen Ethereum block number.
@@ -128,6 +130,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         block_number: &str,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_last_watched_eth_block")
             .execute(transaction.conn())
@@ -141,6 +144,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .await?;
         transaction.commit().await?;
 
+        metrics::histogram!(
+            "sql.data_restore.update_last_watched_block_number",
+            start.elapsed()
+        );
         Ok(())
     }
 
@@ -148,6 +155,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     pub async fn load_last_watched_block_number(
         &mut self,
     ) -> QueryResult<StoredLastWatchedEthBlockNumber> {
+        let start = Instant::now();
         let stored = sqlx::query_as!(
             StoredLastWatchedEthBlockNumber,
             "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
@@ -155,6 +163,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
+        metrics::histogram!(
+            "sql.data_restore.load_last_watched_block_number",
+            start.elapsed()
+        );
         Ok(stored)
     }
 
@@ -170,6 +182,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         token_events: &[NewTokenEvent],
         last_watched_eth_number: &str,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let new_state = self.new_storage_state("Events");
         let mut transaction = self.0.start_transaction().await?;
         DataRestoreSchema(&mut transaction)
@@ -180,8 +193,12 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             // The only way to know decimals is to query ERC20 contract 'decimals' function
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
-            let token = Token::new(id, address, &format!("ERC20-{}", id), decimals);
-            TokensSchema(&mut transaction).store_token(token).await?;
+            let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
+            let try_insert_token = TokensSchema(&mut transaction).store_token(token).await;
+
+            if let Err(StoreTokenError::Other(anyhow_err)) = try_insert_token {
+                return Err(anyhow_err);
+            }
         }
 
         DataRestoreSchema(&mut transaction)
@@ -193,32 +210,65 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql.data_restore.save_events_state", start.elapsed());
         Ok(())
     }
 
     pub async fn save_rollup_ops(
         &mut self,
-        ops: &[(BlockNumber, &FranklinOp, AccountId)],
+        rollup_blocks: &[NewRollupOpsBlock<'_>],
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let new_state = self.new_storage_state("Operations");
         let mut transaction = self.0.start_transaction().await?;
-        sqlx::query!("DELETE FROM data_restore_rollup_ops")
+        // Clean up the blocks table. Operations will be removed too since there
+        // is a foreign-key constraint on the block number.
+        sqlx::query!("DELETE FROM data_restore_rollup_blocks")
             .execute(transaction.conn())
             .await?;
 
-        for op in ops.iter() {
-            let stored_op = NewFranklinOp::prepare_stored_op(&op.1, op.0, op.2);
-
+        for block in rollup_blocks {
             sqlx::query!(
-                "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account) VALUES ($1, $2, $3)",
-                stored_op.block_num, stored_op.operation, stored_op.fee_account
-            ).execute(transaction.conn())
-                .await?;
+                "INSERT INTO data_restore_rollup_blocks
+                VALUES ($1, $2, $3, $4)",
+                i64::from(*block.block_num),
+                i64::from(*block.fee_account),
+                block.timestamp.map(|t| t as i64),
+                Some(block.previous_block_root_hash.as_bytes().to_vec())
+            )
+            .execute(transaction.conn())
+            .await?;
+
+            let operations: Vec<_> = block
+                .ops
+                .iter()
+                .map(|op| {
+                    let mut value = serde_json::to_value(op.clone()).unwrap();
+                    if let ZkSyncOp::FullExit(full_exit) = op {
+                        // In general, this field is not expected to be serialized,
+                        // however it is used in data_restore to determine the number of
+                        // required chunks
+                        value["priority_op"]["is_legacy"] = full_exit.priority_op.is_legacy.into();
+                    }
+                    value
+                })
+                .collect();
+            sqlx::query!(
+                "INSERT INTO data_restore_rollup_block_ops (block_num, operation)
+                SELECT $1, u.operation
+                    FROM UNNEST ($2::jsonb[])
+                    AS u(operation)",
+                i64::from(*block.block_num),
+                &operations,
+            )
+            .execute(transaction.conn())
+            .await?;
         }
         DataRestoreSchema(&mut transaction)
             .update_storage_state(new_state)
             .await?;
         transaction.commit().await?;
+        metrics::histogram!("sql.data_restore.save_rollup_ops", start.elapsed());
         Ok(())
     }
 
@@ -229,24 +279,27 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         last_committed_block: BlockNumber,
         last_verified_block: BlockNumber,
+        last_executed_block: BlockNumber,
     ) -> QueryResult<()> {
-        // Withdraw ops counter is set equal to the `verify` ops counter
-        // since we assume that we've sent a withdraw for every `verify` op.
+        let start = Instant::now();
+
         sqlx::query!(
             "UPDATE eth_parameters
-            SET commit_ops = $1, verify_ops = $2, withdraw_ops = $3
+            SET last_committed_block = $1, last_verified_block = $2, last_executed_block = $3
             WHERE id = true",
-            last_committed_block as i64,
-            last_verified_block as i64,
-            last_verified_block as i64
+            *last_committed_block as i64,
+            *last_verified_block as i64,
+            *last_executed_block as i64
         )
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.data_restore.initialize_eth_stats", start.elapsed());
         Ok(())
     }
 
     async fn load_events_state(&mut self, state: &str) -> QueryResult<Vec<StoredBlockEvent>> {
+        let start = Instant::now();
         let events = sqlx::query_as!(
             StoredBlockEvent,
             "SELECT * FROM data_restore_events_state
@@ -257,6 +310,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.data_restore.load_events_state", start.elapsed());
         Ok(events)
     }
 
@@ -269,6 +323,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     }
 
     pub async fn load_storage_state(&mut self) -> QueryResult<StoredStorageState> {
+        let start = Instant::now();
         let state = sqlx::query_as!(
             StoredStorageState,
             "SELECT * FROM data_restore_storage_state_update
@@ -277,10 +332,12 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.data_restore.load_storage_state", start.elapsed());
         Ok(state)
     }
 
     pub(crate) async fn update_storage_state(&mut self, state: NewStorageState) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_storage_state_update")
             .execute(transaction.conn())
@@ -294,6 +351,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .await?;
         transaction.commit().await?;
 
+        metrics::histogram!("sql.data_restore.update_storage_state", start.elapsed());
         Ok(())
     }
 
@@ -301,6 +359,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         events: &[NewBlockEvent],
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_events_state")
             .execute(transaction.conn())
@@ -308,13 +367,14 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
         for event in events.iter() {
             sqlx::query!(
-                "INSERT INTO data_restore_events_state (block_type, transaction_hash, block_num) VALUES ($1, $2, $3)",
-                event.block_type, event.transaction_hash, event.block_num
+                "INSERT INTO data_restore_events_state (block_type, transaction_hash, block_num, contract_version) VALUES ($1, $2, $3, $4)",
+                event.block_type, event.transaction_hash, event.block_num, event.contract_version
             )
             .execute(transaction.conn())
             .await?;
         }
         transaction.commit().await?;
+        metrics::histogram!("sql.data_restore.update_block_events", start.elapsed());
         Ok(())
     }
 }

@@ -5,25 +5,49 @@ members = [
     "core/bin/key_generator",
     "core/bin/server",
     "core/bin/prover",
-    "core/bin/gen_token_add_contract",
     "core/bin/parse_pub_data",
+    "core/bin/regen-root-hash",
+    "core/bin/block_revert",
+    "core/bin/hashes_migration",
+
+    # Server micro-services
+    "core/bin/zksync_api",
+    "core/bin/zksync_core",
+    "core/bin/zksync_eth_sender",
+    "core/bin/zksync_event_listener",
+    "core/bin/zksync_witness_generator",
+    "core/bin/zksync_forced_exit_requests",
 
     # Libraries
     "core/lib/circuit",
-    "core/lib/crypto_exports",
     "core/lib/eth_client",
-    "core/lib/models",
-    "core/lib/plasma",
+    "core/lib/eth_signer",
+    "core/lib/gateway_watcher",
+    "core/lib/prometheus_exporter",
+    "core/lib/types",
+    "core/lib/state",
     "core/lib/storage",
     "core/lib/vlog",
+    "core/lib/crypto",
+    "core/lib/utils",
+    "core/lib/basic_types",
+    "core/lib/prover_utils",
+    "core/lib/config",
+    "core/lib/contracts",
+    "core/lib/api_client",
+    "core/lib/notifier",
+    "core/lib/api_types",
+    "core/lib/balancer",
 
     # Test infrastructure
+    "core/tests/test_account",
     "core/tests/testkit",
     "core/tests/loadtest",
-
-    # Infrastructure applications
-    "infrastructure/tok_cli",
+    "core/tests/loadnext",
 
     # SDK section
-    "sdk/zksync-rs",
+    "sdk/zksync-rs"
 ]
+
+[patch.crates-io]
+ethabi = { git = "https://github.com/dvush/ethabi.git" }

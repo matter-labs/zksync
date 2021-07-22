@@ -1,51 +1,50 @@
 // Built-in deps
-use std::{
-    sync::{
-        atomic::{AtomicI32, Ordering},
-        mpsc, Arc,
-    },
-    thread,
-    time::Duration,
-};
+use std::time::Duration;
 // External deps
-use clap::{App, Arg};
+use structopt::StructOpt;
 // Workspace deps
-use models::config_options::{parse_env, ProverOptions};
+use zksync_config::configs::ProverConfig as EnvProverConfig;
+use zksync_utils::{get_env, parse_env};
 // Local deps
-use crate::{client, start, ApiClient, ProverConfig, ProverImpl, ShutdownRequest};
+use crate::{client, prover_work_cycle, ProverConfig, ProverImpl, ShutdownRequest};
 
-fn api_client_from_env(worker_name: &str) -> client::ApiClient {
-    let server_api_url = parse_env("PROVER_SERVER_URL");
-    let request_timout = Duration::from_secs(parse_env::<u64>("REQ_SERVER_TIMEOUT"));
-    client::ApiClient::new(&server_api_url, worker_name, request_timout)
+fn api_client_from_env() -> client::ApiClient {
+    let server_api_url = parse_env("API_PROVER_URL");
+    let request_timout = Duration::from_secs(parse_env::<u64>("PROVER_PROVER_REQUEST_TIMEOUT"));
+    let secret = get_env("API_PROVER_SECRET_AUTH");
+    client::ApiClient::new(&server_api_url, request_timout, &secret)
 }
 
-pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + Sync>() {
-    let cli = App::new("Plonk step by step prover")
-        .author("Matter Labs")
-        .arg(
-            Arg::with_name("worker_name")
-                .help("Name of the worker. Must be unique!")
-                .required(true)
-                .index(1),
-        )
-        .get_matches();
-    let worker_name = cli.value_of("worker_name").unwrap();
+#[derive(StructOpt)]
+#[structopt(
+    name = "zkSync operator node",
+    author = "Matter Labs",
+    rename_all = "snake_case"
+)]
+struct Opt {
+    /// Name of the worker. Must be unique!
+    #[structopt(index = 1)]
+    worker_name: String,
+}
+
+pub async fn main_for_prover_impl<PROVER>()
+where
+    PROVER: ProverImpl + Send + Sync + 'static,
+{
+    let opt = Opt::from_args();
+    let worker_name = opt.worker_name;
 
     // used env
-    let heartbeat_interval = ProverOptions::from_env().heartbeat_interval;
-    let prover_config = <P as ProverImpl<client::ApiClient>>::Config::from_env();
-    let api_client = api_client_from_env(&worker_name);
-    let prover = P::create_from_config(prover_config, api_client.clone(), heartbeat_interval);
+    let prover_options = EnvProverConfig::from_env();
+    let prover_config = <PROVER as ProverImpl>::Config::from_env();
+    let api_client = api_client_from_env();
+    let prover = PROVER::create_from_config(prover_config);
 
-    env_logger::init();
-    const ABSENT_PROVER_ID: i32 = -1;
+    let _sentry_guard = vlog::init();
 
-    log::info!("creating prover, worker name: {}", worker_name);
+    vlog::info!("creating prover, worker name: {}", worker_name);
 
-    // Create client
-
-    let prover_id_arc = Arc::new(AtomicI32::new(ABSENT_PROVER_ID));
+    // Create client.
 
     let shutdown_request = ShutdownRequest::new();
 
@@ -53,17 +52,12 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
     {
         let shutdown_request = shutdown_request.clone();
         ctrlc::set_handler(move || {
-            log::info!(
+            vlog::info!(
                 "Termination signal received. It will be handled after the currently working round"
             );
 
-            if shutdown_request.prover_id() == ABSENT_PROVER_ID {
-                log::warn!("Prover is not registered, shutting down immediately");
-                std::process::exit(0);
-            }
-
             if shutdown_request.get() {
-                log::warn!("Second shutdown request received, shutting down without waiting for round to be completed");
+                vlog::warn!("Second shutdown request received, shutting down without waiting for round to be completed");
                 std::process::exit(0);
             }
 
@@ -72,29 +66,12 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
         .expect("Failed to register ctrlc handler");
     }
 
-    // Register prover
-    let prover_id = api_client
-        .register_prover(0)
-        .expect("failed to register prover");
-    shutdown_request.set_prover_id(prover_id);
-
-    // Start prover
-    let (exit_err_tx, exit_err_rx) = mpsc::channel();
-    let jh = thread::spawn(move || {
-        start(prover, exit_err_tx, shutdown_request);
-    });
-
-    // Handle prover exit errors.
-    let err = exit_err_rx.recv();
-    jh.join().expect("failed to join on worker thread");
-    log::error!("prover exited with error: {:?}", err);
-    {
-        let prover_id = prover_id_arc.load(Ordering::SeqCst);
-        if prover_id != ABSENT_PROVER_ID {
-            match api_client.prover_stopped(prover_id) {
-                Ok(_) => {}
-                Err(e) => log::error!("failed to send prover stop request: {}", e),
-            }
-        }
-    }
+    prover_work_cycle(
+        prover,
+        api_client,
+        shutdown_request,
+        prover_options,
+        &worker_name,
+    )
+    .await;
 }

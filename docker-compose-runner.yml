@@ -1,0 +1,41 @@
+version: '3.2'
+services:
+  postgres:
+    image: "postgres:12"
+    environment:
+        - POSTGRES_HOST_AUTH_METHOD=trust
+
+  geth:
+    image: "matterlabs/geth:latest"
+    environment:
+      - PLUGIN_CONFIG
+
+  dev-ticker:
+    image: "matterlabs/dev-ticker:latest"
+    volumes:
+      - ./etc/tokens/:/etc/tokens
+
+  dev-liquidity-token-watcher:
+    image: "matterlabs/dev-liquidity-token-watcher:latest"
+    env_file:
+      - ./etc/env/docker.env
+    volumes:
+      - ./etc/tokens/:/etc/tokens
+
+  zk:
+    image: "matterlabs/zk-environment:latest"
+    depends_on:
+      - postgres
+      - geth
+      - dev-ticker
+      - dev-liquidity-token-watcher
+    command: tail -f /dev/null
+    volumes:
+      - .:/usr/src/zksync
+      - /usr/src/cache:/usr/src/cache
+      - /usr/src/keys:/usr/src/keys
+    environment:
+      - IN_DOCKER=true
+      - CACHE_DIR=/usr/src/cache
+      - SCCACHE_CACHE_SIZE=50g
+      - CI=1

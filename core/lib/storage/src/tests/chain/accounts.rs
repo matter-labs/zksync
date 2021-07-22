@@ -1,37 +1,117 @@
 // External imports
 // Workspace imports
-use models::node::AccountMap;
-use models::Action;
+use zksync_types::{
+    aggregated_operations::AggregatedActionType, AccountId, AccountMap, BlockNumber,
+};
 // Local imports
-use super::{block::apply_random_updates, utils::get_operation};
-use crate::tests::{create_rng, db_test};
+use super::block::apply_random_updates;
+use crate::chain::operations::OperationsSchema;
+use crate::test_data::{gen_sample_block, gen_unique_aggregated_operation, generate_nft};
+use crate::tests::{create_rng, db_test, ACCOUNT_MUTEX};
 use crate::{
-    chain::{account::AccountSchema, block::BlockSchema},
-    prover::ProverSchema,
+    chain::{
+        account::{records::EthAccountType, AccountSchema},
+        block::BlockSchema,
+        state::StateSchema,
+    },
     QueryResult, StorageProcessor,
 };
+use zksync_types::helpers::apply_updates;
+
+/// The save/load routine for EthAccountType
+#[db_test]
+async fn eth_account_type(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // check that function returns None by default
+    let non_existent = AccountSchema(&mut storage)
+        .account_type_by_id(AccountId(18))
+        .await?;
+    assert!(non_existent.is_none());
+
+    // store account type and then load it
+    AccountSchema(&mut storage)
+        .set_account_type(AccountId(18), EthAccountType::CREATE2)
+        .await?;
+    let loaded = AccountSchema(&mut storage)
+        .account_type_by_id(AccountId(18))
+        .await?;
+    assert!(matches!(loaded, Some(EthAccountType::CREATE2)));
+
+    Ok(())
+}
 
 /// Checks that stored accounts can be obtained once they're committed.
 #[db_test]
 async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let _ = env_logger::try_init();
+    let _lock = ACCOUNT_MUTEX.lock().await;
     let mut rng = create_rng();
 
     let block_size = 100;
 
-    // Create several accounts.
-    let (accounts_block, updates_block) = apply_random_updates(AccountMap::default(), &mut rng);
+    let (last_finalized, _) = AccountSchema(&mut storage)
+        .account_and_last_block(AccountId(1))
+        .await?;
+    let last_committed = AccountSchema(&mut storage)
+        .last_committed_block_with_update_for_acc(AccountId(1))
+        .await?;
+    assert_eq!(last_finalized, 0);
+    assert_eq!(*last_committed, 0);
 
+    // Create several accounts.
+    let accounts = AccountMap::default();
+    let (last_finalized, _) = AccountSchema(&mut storage)
+        .account_and_last_block(AccountId(1))
+        .await?;
+    let last_committed = AccountSchema(&mut storage)
+        .last_committed_block_with_update_for_acc(AccountId(1))
+        .await?;
+    assert_eq!(last_finalized, 0);
+    assert_eq!(*last_committed, 0);
+
+    // Create several accounts.
+    let (mut accounts_block, mut updates_block) = apply_random_updates(accounts, &mut rng);
+
+    let mut nft_updates = vec![];
+    accounts_block
+        .iter()
+        .enumerate()
+        .for_each(|(id, (account_id, account))| {
+            nft_updates.append(&mut generate_nft(
+                *account_id,
+                account,
+                accounts_block.len() as u32 + id as u32,
+            ));
+        });
+    apply_updates(&mut accounts_block, nft_updates.clone());
+
+    updates_block.extend(nft_updates);
     // Execute and commit block with them.
+    // Also store account updates.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, updates_block, block_size))
+        .save_block(gen_sample_block(
+            BlockNumber(1),
+            block_size,
+            Default::default(),
+        ))
+        .await?;
+    StateSchema(&mut storage)
+        .commit_state_update(BlockNumber(1), &updates_block, 0)
         .await?;
 
     // Get the accounts by their addresses.
     for (account_id, account) in accounts_block.iter() {
         let mut account = account.clone();
+
+        let (last_finalized, _) = AccountSchema(&mut storage)
+            .account_and_last_block(*account_id)
+            .await?;
+        let last_committed = AccountSchema(&mut storage)
+            .last_committed_block_with_update_for_acc(*account_id)
+            .await?;
+        assert_eq!(last_finalized, 0);
+        assert_eq!(*last_committed, 1);
+
         let account_state = AccountSchema(&mut storage)
-            .account_state_by_address(&account.address)
+            .account_state_by_address(account.address)
             .await?;
 
         // Check that committed state is available, but verified is not.
@@ -48,7 +128,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         let (got_account_id, got_account) = account_state.committed.unwrap();
 
         // We have to copy this field, since it is not initialized by default.
-        account.pub_key_hash = got_account.pub_key_hash.clone();
+        account.pub_key_hash = got_account.pub_key_hash;
 
         assert_eq!(got_account_id, *account_id);
         assert_eq!(got_account, account);
@@ -57,30 +137,51 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         assert_eq!(
             AccountSchema(&mut storage)
                 .last_committed_state_for_account(*account_id)
-                .await?,
+                .await?
+                .1,
             Some(got_account)
+        );
+
+        // Check account address and ID getters.
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .account_address_by_id(*account_id)
+                .await?,
+            Some(account.address)
+        );
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .account_id_by_address(account.address)
+                .await?,
+            Some(*account_id)
         );
     }
 
     // Now add a proof, verify block and apply a state update.
-    ProverSchema(&mut storage)
-        .store_proof(1, &Default::default())
-        .await?;
-    BlockSchema(&mut storage)
-        .execute_operation(get_operation(
-            1,
-            Action::Verify {
-                proof: Default::default(),
-            },
-            Vec::new(),
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            BlockNumber(1),
+            AggregatedActionType::ExecuteBlocks,
             block_size,
         ))
+        .await?;
+    StateSchema(&mut storage)
+        .apply_state_update(BlockNumber(1))
         .await?;
 
     // After that all the accounts should have a verified state.
     for (account_id, account) in accounts_block {
+        let (last_finalized, _) = AccountSchema(&mut storage)
+            .account_and_last_block(account_id)
+            .await?;
+        let last_committed = AccountSchema(&mut storage)
+            .last_committed_block_with_update_for_acc(account_id)
+            .await?;
+        assert_eq!(last_finalized, 1);
+        assert_eq!(*last_committed, 1);
+
         let account_state = AccountSchema(&mut storage)
-            .account_state_by_address(&account.address)
+            .account_state_by_id(account_id)
             .await?;
 
         assert!(
@@ -90,6 +191,11 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         assert!(
             account_state.verified.is_some(),
             "No verified state for the account"
+        );
+
+        assert!(
+            !account_state.committed.unwrap().1.minted_nfts.is_empty(),
+            "Some NFTs should be minted by account"
         );
 
         // Compare the obtained stored account with expected one.

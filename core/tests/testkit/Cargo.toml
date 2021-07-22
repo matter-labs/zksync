@@ -1,25 +1,37 @@
 [package]
-name = "testkit"
-version = "0.1.0"
-authors = ["Vitaly Drogan <vd@matterlabs.dev>"]
+name = "zksync_testkit"
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our tests.
 
 [dependencies]
-server = { path = "../../bin/server", version = "0.0.1" }
-prover = { path = "../../bin/prover", version = "0.0.1" }
-models = { path = "../../lib/models", version = "0.0.1" }
-crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
-eth_client = { path = "../../lib/eth_client", version = "0.1.0"  }
+zksync_core = { path = "../../bin/zksync_core", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_circuit = { path = "../../lib/circuit", version = "1.0" }
+zksync_prover_utils = { path = "../../lib/prover_utils", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
+zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0"  }
+zksync_test_account = { path = "../test_account", version = "1.0" }
+zksync_data_restore = { path = "../../bin/data_restore", version = "1.0" }
 
 tokio = { version = "0.2", features = ["full"] }
-futures = { version = "0.3", features = ["compat"] }
-log = "0.4"
-env_logger = "0.6"
-num = { version = "0.2", features = ["serde"] }
-ethabi = "9.0.0"
+vlog = { path = "../../lib/vlog", version = "1.0" }
+num = { version = "0.3.1", features = ["serde"] }
+futures = "0.3"
+ethabi = "12.0.0"
 web3 = "0.13.0"
-failure = "0.1"
+anyhow = "1.0"
 serde = "1.0.90"
-serde_derive = "1.0.90"
 serde_json = "1.0.0"
 itertools = "0.9.0"
+structopt = { version = "0.3" }

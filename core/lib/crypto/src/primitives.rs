@@ -1,0 +1,564 @@
+// Built-in deps
+use std::{convert::TryInto, mem};
+// External deps
+use crate::franklin_crypto::bellman::pairing::{
+    bn256::Bn256,
+    ff::{PrimeField, PrimeFieldRepr, ScalarEngine},
+    CurveAffine, Engine,
+};
+use num::{BigUint, ToPrimitive};
+use zksync_basic_types::U256;
+// Workspace deps
+use crate::{
+    circuit::utils::append_le_fixed_width,
+    error::PackingError,
+    merkle_tree::{hasher::Hasher, rescue_hasher::BabyRescueHasher},
+    params,
+};
+
+pub trait GetBits {
+    fn get_bits_le(&self) -> Vec<bool>;
+}
+
+impl GetBits for u64 {
+    fn get_bits_le(&self) -> Vec<bool> {
+        let mut acc = Vec::new();
+        let mut i = *self + 1;
+        for _ in 0..16 {
+            acc.push(i & 1 == 1);
+            i >>= 1;
+        }
+        acc
+    }
+}
+
+pub trait GetBitsFixed {
+    /// Get exactly `n` bits from the value in little endian order
+    /// If `n` is larger than value bit length, it is padded with `false`
+    /// for the result to exactly match `n`
+    fn get_bits_le_fixed(&self, n: usize) -> Vec<bool>;
+}
+
+impl<Fr: PrimeField> GetBitsFixed for Fr {
+    fn get_bits_le_fixed(&self, n: usize) -> Vec<bool> {
+        let mut r: Vec<bool> = Vec::with_capacity(n);
+        r.extend(BitIteratorLe::new(self.into_repr()).take(n));
+        let len = r.len();
+        r.extend((len..n).map(|_| false));
+        r
+    }
+}
+
+pub struct EthereumSerializer;
+
+impl EthereumSerializer {
+    pub fn serialize_g1(point: &<Bn256 as Engine>::G1Affine) -> (U256, U256) {
+        if point.is_zero() {
+            return (U256::zero(), U256::zero());
+        }
+        let uncompressed = point.into_uncompressed();
+
+        let uncompressed_slice = uncompressed.as_ref();
+
+        // bellman serializes points as big endian and in the form x, y
+        // ethereum expects the same order in memory
+        let x = U256::from_big_endian(&uncompressed_slice[0..32]);
+        let y = U256::from_big_endian(&uncompressed_slice[32..64]);
+
+        (x, y)
+    }
+
+    pub fn serialize_g2(point: &<Bn256 as Engine>::G2Affine) -> ((U256, U256), (U256, U256)) {
+        let uncompressed = point.into_uncompressed();
+
+        let uncompressed_slice = uncompressed.as_ref();
+
+        // bellman serializes points as big endian and in the form x1*u, x0, y1*u, y0
+        // ethereum expects the same order in memory
+        let x_1 = U256::from_big_endian(&uncompressed_slice[0..32]);
+        let x_0 = U256::from_big_endian(&uncompressed_slice[32..64]);
+        let y_1 = U256::from_big_endian(&uncompressed_slice[64..96]);
+        let y_0 = U256::from_big_endian(&uncompressed_slice[96..128]);
+
+        ((x_1, x_0), (y_1, y_0))
+    }
+
+    pub fn serialize_fe(field_element: &<Bn256 as ScalarEngine>::Fr) -> U256 {
+        let mut be_bytes = [0u8; 32];
+        field_element
+            .into_repr()
+            .write_be(&mut be_bytes[..])
+            .expect("get new root BE bytes");
+        U256::from_big_endian(&be_bytes[..])
+    }
+}
+
+// Resulting iterator is little endian: lowest bit first
+
+#[derive(Debug)]
+pub struct BitIteratorLe<E> {
+    t: E,
+    n: usize,
+    len: usize,
+}
+
+impl<E: AsRef<[u64]>> BitIteratorLe<E> {
+    pub fn new(t: E) -> Self {
+        let len = t.as_ref().len() * 64;
+
+        BitIteratorLe { t, n: 0, len }
+    }
+}
+
+impl<E: AsRef<[u64]>> Iterator for BitIteratorLe<E> {
+    type Item = bool;
+
+    fn next(&mut self) -> Option<bool> {
+        if self.n == self.len {
+            None
+        } else {
+            let part = self.n / 64;
+            let bit = self.n - (64 * part);
+            self.n += 1;
+
+            Some(self.t.as_ref()[part] & (1 << bit) > 0)
+        }
+    }
+}
+
+pub struct BitConvert;
+
+impl BitConvert {
+    /// Сonverts a set of bits to a set of bytes in direct order.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_bytes(bits: Vec<bool>) -> Vec<u8> {
+        assert_eq!(bits.len() % 8, 0);
+        let mut message_bytes: Vec<u8> = vec![];
+
+        let byte_chunks = bits.chunks(8);
+        for byte_chunk in byte_chunks {
+            let mut byte = 0u8;
+            for (i, bit) in byte_chunk.iter().enumerate() {
+                if *bit {
+                    byte |= 1 << i;
+                }
+            }
+            message_bytes.push(byte);
+        }
+
+        message_bytes
+    }
+
+    /// Сonverts a set of bits to a set of bytes in reverse order for each byte.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_bytes_ordered(bits: Vec<bool>) -> Vec<u8> {
+        assert_eq!(bits.len() % 8, 0);
+        let mut message_bytes: Vec<u8> = vec![];
+
+        let byte_chunks = bits.chunks(8);
+        for byte_chunk in byte_chunks {
+            let mut byte = 0u8;
+            for (i, bit) in byte_chunk.iter().rev().enumerate() {
+                if *bit {
+                    byte |= 1 << i;
+                }
+            }
+            message_bytes.push(byte);
+        }
+
+        message_bytes
+    }
+
+    /// Сonverts a set of Big Endian bytes to a set of bits.
+    pub fn from_be_bytes(bytes: &[u8]) -> Vec<bool> {
+        let mut bits = vec![];
+        for byte in bytes {
+            let mut temp = *byte;
+            for _ in 0..8 {
+                bits.push(temp & 0x80 == 0x80);
+                temp <<= 1;
+            }
+        }
+        bits
+    }
+}
+
+/// Convert Uint to the floating-point and vice versa.
+pub struct FloatConversions;
+
+impl FloatConversions {
+    /// Packs a BigUint less than 2 ^ 128 to a floating-point number with an exponent base = 10 that is less or equal to initial number.
+    /// Can lose accuracy with small parameters `exponent_len` and `mantissa_len`.
+    pub fn pack(number: &BigUint, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
+        let uint = number.to_u128().expect("Only u128 allowed");
+
+        let mut vec = Self::to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
+        vec.reverse();
+        BitConvert::into_bytes_ordered(vec)
+    }
+
+    /// Packs a BigUint less than 2 ^ 128 to a floating-point number with an exponent base = 10 that is greater or equal to initial number.
+    /// Can lose accuracy with small parameters `exponent_len` and `mantissa_len`.
+    pub fn pack_up(number: &BigUint, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
+        let uint = number.to_u128().expect("Only u128 allowed");
+
+        let mut vec =
+            Self::to_float_up(uint, exponent_len, mantissa_len, 10).expect("packing error");
+        vec.reverse();
+        BitConvert::into_bytes_ordered(vec)
+    }
+
+    /// Unpacks a floating point number with the given parameters.
+    /// Returns `None` for numbers greater than 2 ^ 128.
+    pub fn unpack(data: &[u8], exponent_len: usize, mantissa_len: usize) -> Option<u128> {
+        if exponent_len + mantissa_len != data.len() * 8 {
+            return None;
+        }
+
+        let bits = BitConvert::from_be_bytes(data);
+
+        let mut mantissa = 0u128;
+        for (i, bit) in bits[0..mantissa_len].iter().rev().enumerate() {
+            if *bit {
+                mantissa = mantissa.checked_add(1u128 << i)?;
+            }
+        }
+
+        let mut exponent_pow = 0u32;
+        for (i, bit) in bits[mantissa_len..(mantissa_len + exponent_len)]
+            .iter()
+            .rev()
+            .enumerate()
+        {
+            if *bit {
+                exponent_pow = exponent_pow.checked_add(1u32 << i)?;
+            }
+        }
+
+        let exponent = 10u128.checked_pow(exponent_pow)?;
+
+        mantissa.checked_mul(exponent)
+    }
+
+    /// Packs a u128 to a floating-point number with the given parameters that is less or equal to integer.
+    /// Can lose accuracy with small parameters `exponent_length` and `mantissa_length`.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_float(
+        integer: u128,
+        exponent_length: usize,
+        mantissa_length: usize,
+        exponent_base: u32,
+    ) -> Result<Vec<bool>, PackingError> {
+        let exponent_base = u128::from(exponent_base);
+
+        let max_power = (1 << exponent_length) - 1;
+
+        let max_exponent = (exponent_base as u128).saturating_pow(max_power);
+
+        let max_mantissa = (1u128 << mantissa_length) - 1;
+
+        let limit = max_mantissa.saturating_mul(max_exponent);
+        if integer > limit {
+            return Err(PackingError::IntegerTooBig { integer, limit });
+        }
+
+        // The algortihm is as follows: calculate minimal exponent
+        // such that integer <= max_mantissa * exponent_base ^ exponent,
+        // then if this minimal exponent is 0 we can choose mantissa equals integer and exponent equals 0
+        // else we need to check two variants:
+        // 1) with that minimal exponent
+        // 2) with that minimal exponent minus 1
+        let mut exponent: usize = 0;
+        let mut exponent_temp: u128 = 1;
+        while integer > max_mantissa * exponent_temp {
+            exponent_temp *= exponent_base;
+            exponent += 1;
+        }
+        let (exponent, mantissa) = if exponent == 0 {
+            (0, integer)
+        } else {
+            let mantissa = integer / exponent_temp;
+            let variant1 = mantissa * exponent_temp;
+            let variant2 = max_mantissa * exponent_temp / exponent_base;
+            let diff1 = integer - variant1;
+            let diff2 = integer - variant2;
+            if diff1 < diff2 {
+                (exponent, mantissa)
+            } else {
+                (exponent - 1, max_mantissa)
+            }
+        };
+
+        // encode into bits. First bits of mantissa in LE order
+
+        let mut encoding = Vec::with_capacity(exponent_length + mantissa_length);
+
+        for i in 0..exponent_length {
+            if exponent & (1 << i) != 0 {
+                encoding.push(true);
+            } else {
+                encoding.push(false);
+            }
+        }
+
+        for i in 0..mantissa_length {
+            if mantissa & (1 << i) != 0 {
+                encoding.push(true);
+            } else {
+                encoding.push(false);
+            }
+        }
+
+        debug_assert_eq!(encoding.len(), exponent_length + mantissa_length);
+        Ok(encoding)
+    }
+
+    /// Packs a u128 to a floating-point number with the given parameters that is greater or equal to integer.
+    /// Can lose accuracy with small parameters `exponent_len` and `mantissa_len`.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_float_up(
+        integer: u128,
+        exponent_length: usize,
+        mantissa_length: usize,
+        exponent_base: u32,
+    ) -> Result<Vec<bool>, PackingError> {
+        let exponent_base = u128::from(exponent_base);
+
+        let max_power = (1 << exponent_length) - 1;
+
+        let max_exponent = (exponent_base as u128).saturating_pow(max_power);
+
+        let max_mantissa = (1u128 << mantissa_length) - 1;
+
+        let limit = max_mantissa.saturating_mul(max_exponent);
+        if integer > limit {
+            return Err(PackingError::IntegerTooBig { integer, limit });
+        }
+
+        // The algortihm is as follows: calculate minimal exponent
+        // such that integer <= max_mantissa * exponent_base ^ exponent,
+        // then mantissa is calculated as integer divided by exponent_base ^ exponent and rounded up
+        let mut exponent: usize = 0;
+        let mut exponent_temp: u128 = 1;
+        while integer > max_mantissa * exponent_temp {
+            exponent_temp *= exponent_base;
+            exponent += 1;
+        }
+        let mut mantissa = integer / exponent_temp;
+        if integer % exponent_temp != 0 {
+            mantissa += 1;
+        }
+
+        // encode into bits. First bits of mantissa in LE order
+
+        let mut encoding = Vec::with_capacity(exponent_length + mantissa_length);
+
+        for i in 0..exponent_length {
+            if exponent & (1 << i) != 0 {
+                encoding.push(true);
+            } else {
+                encoding.push(false);
+            }
+        }
+
+        for i in 0..mantissa_length {
+            if mantissa & (1 << i) != 0 {
+                encoding.push(true);
+            } else {
+                encoding.push(false);
+            }
+        }
+
+        debug_assert_eq!(encoding.len(), exponent_length + mantissa_length);
+        Ok(encoding)
+    }
+}
+
+pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
+    let mut msg_bits = BitConvert::from_be_bytes(msg);
+    assert!(msg_bits.len() <= params::PAD_MSG_BEFORE_HASH_BITS_LEN);
+    msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
+    let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
+    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
+    let mut hash_bits = Vec::new();
+    append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
+    BitConvert::into_bytes(hash_bits)
+}
+
+// This differs from `rescue_hash_tx_msg` in several ways:
+// - It does not constrain its input to be <= 92 bytes
+//   In fact, it only accepts inputs of 176 bytes (2 * order_size)
+// - It does not pad its message
+// - It encodes the resulting Fr a bit differently
+// - It returns 31 byte instead of 32
+pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
+    assert_eq!(msg.len(), 178);
+    let msg_bits = BitConvert::from_be_bytes(msg);
+    let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
+    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
+    // 248 == bits in max whole number of bytes that fit into Fr
+    let hash_bits = hash_fr.get_bits_le_fixed(248);
+    BitConvert::into_bytes_ordered(hash_bits)
+}
+
+pub trait FromBytes: Sized {
+    /// Converts a sequence of bytes to a number.
+    fn from_bytes(bytes: &[u8]) -> Option<Self>;
+}
+
+macro_rules! impl_from_bytes_for_primitive {
+    ($Type:ty) => {
+        impl FromBytes for $Type {
+            fn from_bytes(bytes: &[u8]) -> Option<Self> {
+                const COUNT: usize = mem::size_of::<$Type>();
+                let mut vec: Vec<u8> = bytes.to_vec();
+                vec.reverse();
+                vec.extend(vec![0; COUNT - bytes.len()]);
+                vec.reverse();
+                let new_bytes = vec.as_slice();
+                Some(Self::from_be_bytes(new_bytes.try_into().ok()?))
+            }
+        }
+    };
+}
+
+impl_from_bytes_for_primitive!(u16);
+impl_from_bytes_for_primitive!(u32);
+impl_from_bytes_for_primitive!(u128);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::franklin_crypto::bellman::pairing::ff::BitIterator;
+
+    #[test]
+    fn test_get_bits() {
+        use crate::franklin_crypto::bellman::pairing::bn256::Fr;
+
+        // 12 = b1100, 3 lowest bits in little endian encoding are: 0, 0, 1.
+        let bits = Fr::from_str("12").unwrap().get_bits_le_fixed(3);
+        assert_eq!(bits, vec![false, false, true]);
+
+        let bits = Fr::from_str("0").unwrap().get_bits_le_fixed(512);
+        assert_eq!(bits, vec![false; 512]);
+    }
+
+    #[test]
+    fn test_bits_conversions() {
+        let mut bits = vec![];
+
+        bits.extend(vec![true, false, false, true, true, false, true, false]);
+        bits.extend(vec![false, false, true, true, false, true, true, false]);
+        bits.extend(vec![false, false, false, false, false, false, false, true]);
+
+        let bytes = BitConvert::into_bytes(bits.clone());
+        assert_eq!(bytes, vec![89, 108, 128]);
+
+        let bytes = BitConvert::into_bytes_ordered(bits.clone());
+        assert_eq!(bytes, vec![154, 54, 1]);
+
+        assert_eq!(BitConvert::from_be_bytes(&[154, 54, 1]), bits);
+    }
+
+    #[test]
+    fn test_float_conversions() {
+        let (number, exponent_len, mantissa_len, exponent_base): (u128, usize, usize, u32) =
+            (0xDEADBEAF, 5, 35, 10);
+
+        let packed_number =
+            FloatConversions::pack(&num::BigUint::from(number), exponent_len, mantissa_len);
+        let unpacked_number = FloatConversions::unpack(&packed_number, exponent_len, mantissa_len);
+        let convert_number =
+            FloatConversions::to_float(number, exponent_len, mantissa_len, exponent_base);
+
+        assert_eq!(unpacked_number, Some(number));
+        assert_eq!(packed_number, vec![27, 213, 183, 213, 224]);
+        assert_eq!(
+            convert_number.ok(),
+            Some(vec![
+                false, false, false, false, false, true, true, true, true, false, true, false,
+                true, false, true, true, true, true, true, false, true, true, false, true, true,
+                false, true, false, true, false, true, true, true, true, false, true, true, false,
+                false, false
+            ])
+        );
+
+        // Check if 2048 is converted to 2047*10^0 with given parameters
+        let convert_number = FloatConversions::to_float(2048, 5, 11, 10);
+        assert_eq!(
+            convert_number.ok(),
+            Some(vec![
+                false, false, false, false, false, true, true, true, true, true, true, true, true,
+                true, true, true
+            ])
+        );
+
+        // Check if 2051 is converted to 205*10^1 with given parameters
+        let convert_number = FloatConversions::to_float(2051, 5, 11, 10);
+        assert_eq!(
+            convert_number.ok(),
+            Some(vec![
+                true, false, false, false, false, true, false, true, true, false, false, true,
+                true, false, false, false
+            ])
+        );
+
+        // Check if 2051 is converted up to 206*10^1 with given parameters
+        let convert_number = FloatConversions::to_float_up(2051, 5, 11, 10);
+        assert_eq!(
+            convert_number.ok(),
+            Some(vec![
+                true, false, false, false, false, false, true, true, true, false, false, true,
+                true, false, false, false
+            ])
+        );
+
+        // Test behaviour when too large integer is passed
+        let convert_number = FloatConversions::to_float_up(20000, 2, 4, 10);
+        assert_eq!(
+            convert_number.err(),
+            Some(PackingError::IntegerTooBig {
+                integer: 20000,
+                limit: 15000
+            })
+        );
+    }
+
+    #[test]
+    fn test_rescue_hash_tx_msg() {
+        let msg = [1u8, 2u8, 3u8, 4u8];
+        let hash = rescue_hash_tx_msg(&msg);
+
+        assert_eq!(
+            hash,
+            vec![
+                249, 154, 208, 123, 96, 89, 132, 235, 231, 63, 56, 200, 153, 131, 27, 183, 128, 71,
+                26, 245, 208, 120, 49, 246, 233, 72, 230, 84, 66, 150, 170, 27
+            ]
+        );
+    }
+
+    #[test]
+    fn test_uint_from_bytes() {
+        let bytes = vec![1; 1];
+        let number: u32 = FromBytes::from_bytes(&bytes).unwrap();
+        assert_eq!(number, 1);
+
+        let bytes = [1u8, 2u8, 3u8, 4u8];
+        let number: u32 = FromBytes::from_bytes(&bytes).unwrap();
+        assert_eq!(number, 0x01020304);
+
+        let bytes = [1u8, 2u8, 3u8, 4u8, 5u8];
+        let number: u128 = FromBytes::from_bytes(&bytes).unwrap();
+        assert_eq!(number, 0x0102030405);
+    }
+
+    #[test]
+    fn test_bit_iterator_e() {
+        let test_vector = [0xa953_d79b_83f6_ab59, 0x6dea_2059_e200_bd39];
+        let mut reference: Vec<bool> = BitIterator::new(&test_vector).collect();
+        reference.reverse();
+        let out: Vec<bool> = BitIteratorLe::new(&test_vector).collect();
+        assert_eq!(reference, out);
+    }
+}

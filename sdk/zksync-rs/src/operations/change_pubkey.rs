@@ -1,48 +1,75 @@
-use models::node::{
-    closest_packable_fee_amount, is_fee_amount_packable, FranklinTx, Nonce, Token, TokenLike,
-};
 use num::BigUint;
+use zksync_eth_signer::EthereumSigner;
+use zksync_types::{
+    helpers::{closest_packable_fee_amount, is_fee_amount_packable},
+    tokens::TxFeeTypes,
+    tx::ChangePubKeyType,
+    Nonce, Token, TokenLike, ZkSyncTx,
+};
 
-use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
+use crate::{
+    error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
+};
+use zksync_types::tokens::ChangePubKeyFeeTypeArg;
 
 #[derive(Debug)]
-pub struct ChangePubKeyBuilder<'a> {
-    wallet: &'a Wallet,
+pub struct ChangePubKeyBuilder<'a, S: EthereumSigner, P: Provider> {
+    wallet: &'a Wallet<S, P>,
     onchain_auth: bool,
     fee_token: Option<Token>,
     fee: Option<BigUint>,
     nonce: Option<Nonce>,
+    valid_from: Option<u32>,
+    valid_until: Option<u32>,
 }
 
-impl<'a> ChangePubKeyBuilder<'a> {
-    /// Initializes a transfer transaction building process.
-    pub fn new(wallet: &'a Wallet) -> Self {
+impl<'a, S, P> ChangePubKeyBuilder<'a, S, P>
+where
+    S: EthereumSigner,
+    P: Provider + Clone,
+{
+    /// Initializes a change public key transaction building process.
+    pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
             onchain_auth: false,
             fee_token: None,
             fee: None,
             nonce: None,
+            valid_from: None,
+            valid_until: None,
         }
     }
 
-    /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
-        // Currently fees aren't supported by ChangePubKey tx, but they will be in the near future.
-        // let fee = match self.fee {
-        //     Some(fee) => fee,
-        //     None => {
-        //         let fee = self
-        //             .wallet
-        //             .provider
-        //             .get_tx_fee(TxFeeTypes::Transfer, self.wallet.address(), fee_token.id)
-        //             .await?;
-        //         fee.total_fee
-        //     }
-        // };
-        // let _fee_token = self
-        //     .fee_token
-        //     .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
+    /// Directly returns the signed change pubkey transaction for the subsequent usage.
+    pub async fn tx(self) -> Result<ZkSyncTx, ClientError> {
+        let fee_token = self
+            .fee_token
+            .ok_or_else(|| ClientError::MissingRequiredField("fee_token".into()))?;
+
+        let fee = match self.fee {
+            Some(fee) => fee,
+            None => {
+                let fee = self
+                    .wallet
+                    .provider
+                    .get_tx_fee(
+                        if self.onchain_auth {
+                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                                ChangePubKeyType::Onchain,
+                            ))
+                        } else {
+                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                                ChangePubKeyType::ECDSA,
+                            ))
+                        },
+                        self.wallet.address(),
+                        fee_token.id,
+                    )
+                    .await?;
+                fee.total_fee
+            }
+        };
 
         let nonce = match self.nonce {
             Some(nonce) => nonce,
@@ -56,18 +83,25 @@ impl<'a> ChangePubKeyBuilder<'a> {
             }
         };
 
-        let change_pubkey = self
-            .wallet
-            .signer
-            .sign_change_pubkey_tx(nonce, self.onchain_auth)
-            .map_err(ClientError::SigningError)?;
+        let time_range = Default::default();
 
-        let tx = FranklinTx::ChangePubKey(Box::new(change_pubkey));
-        let tx_hash = self.wallet.provider.send_tx(tx, None).await?;
+        Ok(ZkSyncTx::from(
+            self.wallet
+                .signer
+                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee, time_range)
+                .await
+                .map_err(ClientError::SigningError)?,
+        ))
+    }
 
-        let handle = SyncTransactionHandle::new(tx_hash, self.wallet.provider.clone());
+    /// Sends the transaction, returning the handle for its awaiting.
+    pub async fn send(self) -> Result<SyncTransactionHandle<P>, ClientError> {
+        let provider = self.wallet.provider.clone();
 
-        Ok(handle)
+        let tx = self.tx().await?;
+        let tx_hash = provider.send_tx(tx, None).await?;
+
+        Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
 
     /// Sets the transaction fee token. Returns an error if token is not supported by zkSync.
@@ -112,6 +146,18 @@ impl<'a> ChangePubKeyBuilder<'a> {
     /// Sets the transaction nonce.
     pub fn nonce(mut self, nonce: Nonce) -> Self {
         self.nonce = Some(nonce);
+        self
+    }
+
+    /// Sets the unix format timestamp of the first moment when transaction execution is valid.
+    pub fn valid_from(mut self, valid_from: u32) -> Self {
+        self.valid_from = Some(valid_from);
+        self
+    }
+
+    /// Sets the unix format timestamp of the last moment when transaction execution is valid.
+    pub fn valid_until(mut self, valid_until: u32) -> Self {
+        self.valid_until = Some(valid_until);
         self
     }
 }

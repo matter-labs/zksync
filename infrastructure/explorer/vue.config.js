@@ -1,7 +1,7 @@
 module.exports = {
     publicPath: '/',
-    chainWebpack: config => {
+    chainWebpack: (config) => {
         config.optimization.minimize(process.env.NODE_ENV === 'production');
         config.resolve.symlinks(false);
-    },
+    }
 };

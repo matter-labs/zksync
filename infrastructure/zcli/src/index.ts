@@ -14,20 +14,21 @@ async function main() {
     const program = new Command();
 
     const handler = async (
-        operation: 'transfer' | 'deposit',
+        operation: 'transfer' | 'deposit' | 'withdraw',
         fast: boolean,
         json?: string,
         amount?: string,
         token?: string,
-        recipient?: string
+        recipient?: string,
+        fastProcessing?: boolean
     ) => {
         if (json && (amount || token || recipient)) {
             throw new Error('--json option and positional arguments are mutually exclusive');
         }
         if (!config.defaultWallet && !json) {
-            throw new Error('recipient is not provided');
+            throw new Error('sender is not provided');
         }
-        if (operation == 'deposit') {
+        if (operation == 'deposit' || operation == 'withdraw') {
             recipient = recipient || config.defaultWallet || '';
         }
         // prettier-ignore
@@ -35,7 +36,8 @@ async function main() {
             privkey: config.wallets[config.defaultWallet as any],
             to: recipient,
             amount,
-            token
+            token,
+            fastProcessing,
         };
         const hash = await commands.submitTx(operation, txDetails, fast, program.network);
         print(fast ? hash : await commands.txInfo(hash, program.network));
@@ -77,6 +79,16 @@ async function main() {
         .option('--fast', 'do not wait for transaction commitment')
         .action(async (amount, token, recipient, cmd) => {
             await handler('deposit', cmd.fast, cmd.json, amount, token, recipient);
+        });
+
+    program
+        .command('withdraw [amount] [token] [recipient]')
+        .description('make a withdraw')
+        .option('--json <string>', 'supply transfer info as json string')
+        .option('--fast', 'do not wait for transaction commitment')
+        .option('--fastWithdrawal', 'requests block with tx to be executed as fast as possible')
+        .action(async (amount, token, recipient, cmd) => {
+            await handler('withdraw', cmd.fast, cmd.json, amount, token, recipient, cmd.fastWithdrawal);
         });
 
     program

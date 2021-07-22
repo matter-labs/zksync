@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{
         pairing::{ff::PrimeField, Engine},
         ConstraintSystem, SynthesisError,
@@ -9,7 +9,8 @@ use crypto_exports::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::params as franklin_constants;
+use zksync_crypto::ff::Field;
+use zksync_crypto::params as franklin_constants;
 // Local deps
 use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
 
@@ -216,11 +217,11 @@ impl<E: Engine> CircuitElement<E> {
             &y.get_number(),
         )?;
 
-        Ok(CircuitElement::from_number_with_known_length(
+        CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen nonce"),
             selected_number,
             x.length,
-        )?)
+        )
     }
 
     // doesn't enforce length by design, though applied to both strict values will give strict result
@@ -240,11 +241,11 @@ impl<E: Engine> CircuitElement<E> {
             &condition,
         )?;
 
-        Ok(CircuitElement::from_number_with_known_length(
+        CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen number as ce"),
             selected_number,
             x.length,
-        )?)
+        )
     }
 
     // doesn't enforce length by design, though applied to both strict values will give strict result
@@ -264,11 +265,11 @@ impl<E: Engine> CircuitElement<E> {
             &condition,
         )?;
 
-        Ok(CircuitElement::from_number_with_known_length(
+        CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen number as ce"),
             selected_number,
             y.length,
-        )?)
+        )
     }
 
     pub fn equals<CS: ConstraintSystem<E>>(
@@ -279,6 +280,31 @@ impl<E: Engine> CircuitElement<E> {
         let is_equal =
             AllocatedNum::equals(cs.namespace(|| "equals"), &x.get_number(), &y.get_number())?;
         Ok(Boolean::from(is_equal))
+    }
+
+    pub fn less_than_fixed<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        x: &Self,
+        y: &Self,
+    ) -> Result<Boolean, SynthesisError> {
+        let length = std::cmp::max(x.length, y.length);
+        assert!(
+            length < E::Fr::CAPACITY as usize,
+            "comparison is only supported for fixed-length elements"
+        );
+
+        let two = E::Fr::from_str("2").unwrap();
+        let power = E::Fr::from_str(&length.to_string()).unwrap();
+        let mut base = two.pow(&power.into_repr());
+        base.sub_assign(&E::Fr::one());
+
+        let expr = Expression::constant::<CS>(base) - &x.get_number() + &y.get_number();
+        let bits = expr.into_bits_le_fixed(cs.namespace(|| "diff bits"), length + 1)?;
+
+        Ok(bits
+            .last()
+            .expect("expr bit representation should always contain at least one bit")
+            .clone())
     }
 
     pub fn get_number(&self) -> AllocatedNum<E> {
@@ -300,10 +326,9 @@ impl<E: Engine> CircuitElement<E> {
     }
 
     pub fn grab(&self) -> Result<E::Fr, SynthesisError> {
-        match self.number.get_value() {
-            Some(v) => Ok(v),
-            None => Err(SynthesisError::AssignmentMissing),
-        }
+        self.number
+            .get_value()
+            .ok_or(SynthesisError::AssignmentMissing)
     }
 }
 
@@ -347,7 +372,7 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
 
         let hash = sponge_output.pop().expect("must get an element");
 
-        debug!("hash when fromxy: {:?}", hash.get_value());
+        vlog::debug!("hash when fromxy: {:?}", hash.get_value());
         let mut hash_bits = hash.into_bits_le_strict(cs.namespace(|| "pubkey hash into bits"))?;
         hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
         let element = CircuitElement::from_le_bits(cs.namespace(|| "repack_hash"), hash_bits)?;
@@ -368,8 +393,7 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
         self.hash.clone()
     }
     pub fn get_external_packing(&self) -> Vec<Boolean> {
-        let mut ext_bits = vec![];
-        ext_bits.push(self.get_x().get_bits_le()[0].clone());
+        let mut ext_bits = vec![self.get_x().get_bits_le()[0].clone()];
         ext_bits.extend(self.get_y().get_bits_be()[1..].to_vec());
         reverse_bytes(&ext_bits)
     }
@@ -416,8 +440,8 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
 
         let is_equal_y = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_equal_y"),
-            &a.get_x().get_number(),
-            &b.get_x().get_number(),
+            &a.get_y().get_number(),
+            &b.get_y().get_number(),
         )?);
         Boolean::and(cs.namespace(|| "is_equal"), &is_equal_x, &is_equal_y)
     }

@@ -1,26 +1,43 @@
 [package]
-name = "data_restore"
-version = "0.1.0"
+name = "zksync_data_restore"
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
+
+[features]
+db_test = []
 
 [dependencies]
-num = { version = "0.2", features = ["serde"] }
+vlog = { path = "../../lib/vlog", version = "1.0" }
+
+num = { version = "0.3.1", features = ["serde"] }
 tiny-keccak = "1.4.2"
-ethabi = "9.0.0"
+ethabi = "12.0.0"
 web3 = "0.13.0"
 hex = "0.4"
-lazy_static = "1.2.0"
-log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.0"
-env_logger = "0.6"
-signal-hook = { version = "0.1.8", features = ["tokio-support"] }
-failure = "0.1"
-clap = "2.33.0"
-futures = { version = "0.3", features = ["compat"] }
+anyhow = "1.0"
+structopt = "0.3.20"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 tokio = { version = "0.2", features = ["full"] }
+async-trait = "0.1"
 
-crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
-plasma = { path = "../../lib/plasma", version = "0.1.1" }
-models = { path = "../../lib/models", version = "0.0.1" }
-storage = { path = "../../lib/storage", version = "0.0.1" }
+zksync_state = { path = "../../lib/state", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+
+[dev-dependencies]
+jsonrpc-core = "14.0.0"
+db_test_macro = { path = "../../lib/storage/db_test_macro" }
+futures = "0.3.5"

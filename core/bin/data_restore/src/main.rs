@@ -1,130 +1,140 @@
-#[macro_use]
-extern crate log;
-
-pub mod contract_functions;
-pub mod data_restore_driver;
-pub mod eth_tx_helpers;
-pub mod events;
-pub mod events_state;
-pub mod rollup_ops;
-pub mod storage_interactor;
-pub mod tree_state;
-
-use crate::data_restore_driver::DataRestoreDriver;
-use clap::{App, Arg};
-use models::{
-    config_options::ConfigurationOptions,
-    fe_from_hex,
-    node::{
-        tokens::{get_genesis_token_list, Token},
-        TokenId,
-    },
-};
-use storage::ConnectionPool;
+use serde::Deserialize;
+use structopt::StructOpt;
 use web3::transports::Http;
+use zksync_config::configs::{ChainConfig, ContractsConfig as EnvContractsConfig, ETHClientConfig};
+use zksync_crypto::convert::FeConvert;
+use zksync_storage::ConnectionPool;
+use zksync_types::{Address, H256};
 
-const ETH_BLOCKS_STEP: u64 = 1;
-const END_ETH_BLOCKS_OFFSET: u64 = 40;
+use web3::Web3;
+use zksync_data_restore::contract::ZkSyncDeployedContract;
+use zksync_data_restore::{
+    add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
+    database_storage_interactor::DatabaseStorageInteractor, END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
+};
+use zksync_types::network::Network;
 
-async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
-    let genesis_tokens =
-        get_genesis_token_list(&eth_network).expect("Initial token list not found");
-    for (id, token) in (1..).zip(genesis_tokens) {
-        log::info!(
-            "Adding token: {}, id:{}, address: {}, decimals: {}",
-            token.symbol,
-            id,
-            token.address,
-            token.decimals
-        );
-        pool.access_storage()
-            .await
-            .expect("failed to access db")
-            .tokens_schema()
-            .store_token(Token {
-                id: id as TokenId,
-                symbol: token.symbol,
-                address: token.address[2..]
-                    .parse()
-                    .expect("failed to parse token address"),
-                decimals: token.decimals,
-            })
-            .await
-            .expect("failed to store token");
+#[derive(StructOpt)]
+#[structopt(
+    name = "Data restore driver",
+    author = "Matter Labs",
+    rename_all = "snake_case"
+)]
+struct Opt {
+    /// Restores data with provided genesis (zero) block
+    #[structopt(long)]
+    genesis: bool,
+
+    /// Continues data restoring
+    #[structopt(long = "continue", name = "continue")]
+    continue_mode: bool,
+
+    /// Restore data until the last verified block and exit
+    #[structopt(long)]
+    finite: bool,
+
+    /// Expected tree root hash after restoring. This argument is ignored if mode is not `finite`
+    #[structopt(long)]
+    final_hash: Option<String>,
+
+    /// Sets the web3 API to be used to interact with the Ethereum blockchain
+    #[structopt(long = "web3", name = "web3")]
+    web3_url: Option<String>,
+
+    /// Provides a path to the configuration file for data restore
+    #[structopt(long = "config", name = "config")]
+    config_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ContractsConfig {
+    eth_network: Network,
+    governance_addr: Address,
+    genesis_tx_hash: H256,
+    contract_addr: Address,
+    init_contract_version: u32,
+    upgrade_eth_blocks: Vec<u64>,
+}
+
+impl ContractsConfig {
+    pub fn from_file(path: &str) -> Self {
+        let content =
+            std::fs::read_to_string(path).expect("Unable to find the specified config file");
+        serde_json::from_str(&content).expect("Invalid configuration file provided")
+    }
+
+    pub fn from_env() -> Self {
+        let contracts_opts = EnvContractsConfig::from_env();
+        let chain_opts = ChainConfig::from_env();
+
+        Self {
+            eth_network: chain_opts.eth.network,
+            governance_addr: contracts_opts.governance_addr,
+            genesis_tx_hash: contracts_opts.genesis_tx_hash,
+            contract_addr: contracts_opts.contract_addr,
+            init_contract_version: contracts_opts.init_contract_version,
+            upgrade_eth_blocks: contracts_opts.upgrade_eth_blocks,
+        }
     }
 }
 
 #[tokio::main]
 async fn main() {
-    info!("Restoring zkSync state from the contract");
-    env_logger::init();
-    let connection_pool = ConnectionPool::new(Some(1)).await;
-    let config_opts = ConfigurationOptions::from_env();
+    vlog::info!("Restoring zkSync state from the contract");
+    let _sentry_guard = vlog::init();
+    let connection_pool = ConnectionPool::new(Some(1));
+    let config_opts = ETHClientConfig::from_env();
 
-    let cli = App::new("Data restore driver")
-        .author("Matter Labs")
-        .arg(
-            Arg::with_name("genesis")
-                .long("genesis")
-                .help("Restores data with provided genesis (zero) block"),
-        )
-        .arg(
-            Arg::with_name("continue")
-                .long("continue")
-                .help("Continues data restoring"),
-        )
-        .arg(
-            Arg::with_name("finite")
-                .long("finite")
-                .help("Restore data until the last verified block and exit"),
-        )
-        .arg(
-            Arg::with_name("final_hash")
-                .long("final_hash")
-                .takes_value(true)
-                .help("Expected tree root hash after restoring. This argument is ignored if mode is not `finite`")
-        )
-        .get_matches();
+    let opt = Opt::from_args();
 
-    let (_event_loop, transport) =
-        Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
-    let governance_addr = config_opts.governance_eth_addr;
-    let genesis_tx_hash = config_opts.genesis_tx_hash;
-    let contract_addr = config_opts.contract_eth_addr;
-    let available_block_chunk_sizes = config_opts.available_block_chunk_sizes;
+    let web3_url = opt.web3_url.unwrap_or_else(|| config_opts.web3_url());
 
-    let finite_mode = cli.is_present("finite");
+    let transport = Http::new(&web3_url).expect("failed to start web3 transport");
+
+    let config = opt
+        .config_path
+        .map(|path| ContractsConfig::from_file(&path))
+        .unwrap_or_else(ContractsConfig::from_env);
+
+    vlog::info!("Using the following config: {:#?}", config);
+
+    let finite_mode = opt.finite;
     let final_hash = if finite_mode {
-        cli.value_of("final_hash")
-            .map(|value| fe_from_hex(value).expect("Can't parse the final hash"))
+        opt.final_hash
+            .map(|value| FeConvert::from_hex(&value).expect("Can't parse the final hash"))
     } else {
         None
     };
-
+    let storage = connection_pool.access_storage().await.unwrap();
+    let web3 = Web3::new(transport);
+    let contract = ZkSyncDeployedContract::version4(web3.eth(), config.contract_addr);
     let mut driver = DataRestoreDriver::new(
-        connection_pool,
-        transport,
-        governance_addr,
-        contract_addr,
+        web3,
+        config.governance_addr,
+        config.upgrade_eth_blocks,
+        config.init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        available_block_chunk_sizes,
         finite_mode,
         final_hash,
+        contract,
     );
 
+    let mut interactor = DatabaseStorageInteractor::new(storage);
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
-    if cli.is_present("genesis") {
+    if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_db(&driver.connection_pool, &config_opts.eth_network).await;
+        add_tokens_to_storage(&mut interactor, &config.eth_network.to_string()).await;
 
-        driver.set_genesis_state(genesis_tx_hash).await;
+        driver
+            .set_genesis_state(&mut interactor, config.genesis_tx_hash)
+            .await;
     }
 
-    if cli.is_present("continue") {
-        driver.load_state_from_storage().await;
+    if opt.continue_mode && driver.load_state_from_storage(&mut interactor).await {
+        std::process::exit(0);
     }
 
-    driver.run_state_update().await;
+    driver.run_state_update(&mut interactor).await;
 }

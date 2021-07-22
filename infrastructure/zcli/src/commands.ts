@@ -70,7 +70,8 @@ export async function txInfo(
     const tokenInfo = Object.values(tokens).find((value) => value.id == tx.token);
     if (tokenInfo) {
         const token = tokenInfo.symbol; // @ts-ignore
-        info.transaction.amount = provider.tokenSet.formatToken(token, tx.amount);
+        info.transaction.amount =
+            tx.amount == 'unknown amount' ? null : provider.tokenSet.formatToken(token, tx.amount);
         if (tx.fee) {
             // @ts-ignore
             info.transaction.fee = provider.tokenSet.formatToken(token, tx.fee);
@@ -149,13 +150,19 @@ class TxSubmitter {
     private constructor(private syncProvider: zksync.Provider, private syncWallet: zksync.Wallet) {}
 
     static async submit(
-        type: 'deposit' | 'transfer',
+        type: 'deposit' | 'transfer' | 'withdraw',
         txDetails: TxDetails,
         fast: boolean = false,
         network: Network = 'localhost'
     ) {
-        const ethProvider =
-            network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
+        let ethProvider;
+        if (process.env.CI == '1') {
+            ethProvider = new ethers.providers.JsonRpcProvider('http://geth:8545');
+        } else if (network == 'localhost') {
+            ethProvider = new ethers.providers.JsonRpcProvider();
+        } else {
+            ethProvider = ethers.getDefaultProvider(network);
+        }
         const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
         const ethWallet = new ethers.Wallet(txDetails.privkey).connect(ethProvider);
         const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
@@ -168,7 +175,10 @@ class TxSubmitter {
     private async transfer(txDetails: TxDetails, fast: boolean) {
         const { to, token, amount } = txDetails;
         if (!(await this.syncWallet.isSigningKeySet())) {
-            const changePubkey = await this.syncWallet.setSigningKey();
+            const changePubkey = await this.syncWallet.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'ECDSA'
+            });
             await changePubkey.awaitReceipt();
         }
         const txHandle = await this.syncWallet.syncTransfer({
@@ -190,6 +200,25 @@ class TxSubmitter {
         });
         if (!fast) await depositHandle.awaitReceipt();
         return depositHandle.ethTx.hash;
+    }
+
+    private async withdraw(txDetails: TxDetails, fast: boolean) {
+        const { to: ethAddress, token, amount, fastProcessing } = txDetails;
+        if (!(await this.syncWallet.isSigningKeySet())) {
+            const changePubkey = await this.syncWallet.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'ECDSA'
+            });
+            await changePubkey.awaitReceipt();
+        }
+        const txHandle = await this.syncWallet.withdrawFromSyncToEthereum({
+            ethAddress,
+            token,
+            amount: this.syncProvider.tokenSet.parseToken(token, amount),
+            fastProcessing
+        });
+        if (!fast) await txHandle.awaitReceipt();
+        return txHandle.txHash;
     }
 }
 

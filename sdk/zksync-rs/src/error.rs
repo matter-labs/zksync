@@ -1,11 +1,12 @@
 pub use jsonrpc_core::types::response::Failure as RpcFailure;
 use thiserror::Error;
+use zksync_eth_signer::error::SignerError;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum ClientError {
     #[error("Network '{0}' is not supported")]
     NetworkNotSupported(String),
-    #[error("Unable to decode server response")]
+    #[error("Unable to decode server response: {0}")]
     MalformedResponse(String),
     #[error("RPC error: {0:?}")]
     RpcError(RpcFailure),
@@ -36,14 +37,10 @@ pub enum ClientError {
 
     #[error("Provided value is not packable")]
     NotPackableValue,
-}
 
-#[derive(Debug, Error)]
-pub enum SignerError {
-    #[error("Ethereum private key required to perform an operation")]
-    MissingEthPrivateKey,
-    #[error("Signing failed: {0}")]
-    SigningFailed(String),
-    #[error("Signing key is not set in account")]
-    NoSigningKey,
+    #[error("Provided function arguments are incorrect")]
+    IncorrectInput,
+
+    #[error("Other")]
+    Other,
 }

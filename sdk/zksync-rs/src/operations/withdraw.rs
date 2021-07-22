@@ -1,24 +1,37 @@
-use models::node::{
-    closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
-    is_token_amount_packable, Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
-};
 use num::BigUint;
+use zksync_eth_signer::EthereumSigner;
+use zksync_types::{
+    helpers::{
+        closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
+        is_token_amount_packable,
+    },
+    tx::{PackedEthSignature, TimeRange},
+    Address, Nonce, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+};
 
-use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
+use crate::{
+    error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
+};
 
 #[derive(Debug)]
-pub struct WithdrawBuilder<'a> {
-    wallet: &'a Wallet,
+pub struct WithdrawBuilder<'a, S: EthereumSigner, P: Provider> {
+    wallet: &'a Wallet<S, P>,
     token: Option<Token>,
     amount: Option<BigUint>,
     fee: Option<BigUint>,
     to: Option<Address>,
     nonce: Option<Nonce>,
+    valid_from: Option<u64>,
+    valid_until: Option<u64>,
 }
 
-impl<'a> WithdrawBuilder<'a> {
-    /// Initializes a transfer transaction building process.
-    pub fn new(wallet: &'a Wallet) -> Self {
+impl<'a, S, P> WithdrawBuilder<'a, S, P>
+where
+    S: EthereumSigner,
+    P: Provider + Clone,
+{
+    /// Initializes a withdraw transaction building process.
+    pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
             token: None,
@@ -26,11 +39,13 @@ impl<'a> WithdrawBuilder<'a> {
             fee: None,
             to: None,
             nonce: None,
+            valid_from: None,
+            valid_until: None,
         }
     }
 
-    /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+    /// Directly returns the signed withdraw transaction for the subsequent usage.
+    pub async fn tx(self) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let token = self
             .token
             .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
@@ -65,18 +80,32 @@ impl<'a> WithdrawBuilder<'a> {
             }
         };
 
-        let (withdraw, eth_signature) = self
-            .wallet
+        let valid_from = self.valid_from.unwrap_or(0);
+        let valid_until = self.valid_until.unwrap_or(u64::MAX);
+
+        self.wallet
             .signer
-            .sign_withdraw(token, amount, fee, to, nonce)
-            .map_err(ClientError::SigningError)?;
+            .sign_withdraw(
+                token,
+                amount,
+                fee,
+                to,
+                nonce,
+                TimeRange::new(valid_from, valid_until),
+            )
+            .await
+            .map(|(tx, sign)| (ZkSyncTx::Withdraw(Box::new(tx)), sign))
+            .map_err(ClientError::SigningError)
+    }
 
-        let tx = FranklinTx::Withdraw(Box::new(withdraw));
-        let tx_hash = self.wallet.provider.send_tx(tx, eth_signature).await?;
+    /// Sends the transaction, returning the handle for its awaiting.
+    pub async fn send(self) -> Result<SyncTransactionHandle<P>, ClientError> {
+        let provider = self.wallet.provider.clone();
 
-        let handle = SyncTransactionHandle::new(tx_hash, self.wallet.provider.clone());
+        let (tx, eth_signature) = self.tx().await?;
+        let tx_hash = provider.send_tx(tx, eth_signature).await?;
 
-        Ok(handle)
+        Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
 
     /// Sets the transaction token. Returns an error if token is not supported by zkSync.
@@ -166,6 +195,18 @@ impl<'a> WithdrawBuilder<'a> {
     /// Sets the transaction nonce.
     pub fn nonce(mut self, nonce: Nonce) -> Self {
         self.nonce = Some(nonce);
+        self
+    }
+
+    /// Sets the unix format timestamp of the first moment when transaction execution is valid.
+    pub fn valid_from(mut self, valid_from: u64) -> Self {
+        self.valid_from = Some(valid_from);
+        self
+    }
+
+    /// Sets the unix format timestamp of the last moment when transaction execution is valid.
+    pub fn valid_until(mut self, valid_until: u64) -> Self {
+        self.valid_until = Some(valid_until);
         self
     }
 }

@@ -1,0 +1,18 @@
+[package]
+name = "zksync_test_account"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+# This Crate must be published, as it's a dev-dependency of some our library crates.
+
+[dependencies]
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_basic_types = { path = "../../lib/basic_types", version = "1.0" }
+
+num = { version = "0.3.1", features = ["serde"] }

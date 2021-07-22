@@ -1,20 +1,21 @@
 // Built-in deps
+use std::time::Instant;
 // External imports
 use sqlx::Acquire;
-use web3::types::Address;
 // Workspace imports
-use models::node::{Account, AccountId, AccountUpdates};
+use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;
 use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
-mod restore_account;
+pub mod restore_account;
 mod stored_state;
 
 pub(crate) use self::restore_account::restore_account;
 pub use self::stored_state::StoredAccountState;
+use crate::tokens::records::StorageNFT;
 
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
@@ -22,68 +23,112 @@ pub use self::stored_state::StoredAccountState;
 pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
+    /// Stores account type in the databse
+    /// There are 2 types: Owned and CREATE2
+    pub async fn set_account_type(
+        &mut self,
+        account_id: AccountId,
+        account_type: EthAccountType,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO eth_account_types VALUES ( $1, $2 )
+            ON CONFLICT (account_id) DO UPDATE SET account_type = $2
+            "#,
+            i64::from(*account_id),
+            account_type as EthAccountType
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.state.set_account_type", start.elapsed());
+        Ok(())
+    }
+
+    /// Fetches account type from the database
+    pub async fn account_type_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<EthAccountType>> {
+        let start = Instant::now();
+
+        let result = sqlx::query_as!(
+            StorageAccountType,
+            r#"
+            SELECT account_id, account_type as "account_type!: EthAccountType" 
+            FROM eth_account_types WHERE account_id = $1
+            "#,
+            i64::from(*account_id)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let account_type = result.map(|record| record.account_type as EthAccountType);
+        metrics::histogram!("sql.chain.account.account_type_by_id", start.elapsed());
+        Ok(account_type)
+    }
+
+    /// Obtains both committed and verified state for the account by its ID.
+    pub async fn account_state_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<StoredAccountState> {
+        let start = Instant::now();
+        // Load committed & verified states, and return them.
+        let (verified_state, committed_state) = self
+            .0
+            .chain()
+            .account_schema()
+            .last_committed_state_for_account(account_id)
+            .await?;
+
+        metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
+        Ok(StoredAccountState {
+            committed: committed_state.map(|a| (account_id, a)),
+            verified: verified_state.1.map(|a| (account_id, a)),
+        })
+    }
+
     /// Obtains both committed and verified state for the account by its address.
     pub async fn account_state_by_address(
         &mut self,
-        address: &Address,
+        address: Address,
     ) -> QueryResult<StoredAccountState> {
-        // Find the account in `account_creates` table.
-        let mut results = sqlx::query_as!(
-            StorageAccountCreation,
-            "
-                SELECT * FROM account_creates
-                WHERE address = $1 AND is_create = $2
-                ORDER BY block_number desc
-                LIMIT 1
-            ",
-            address.as_bytes(),
-            true
-        )
-        .fetch_all(self.0.conn())
-        .await?;
+        let start = Instant::now();
 
-        assert!(results.len() <= 1, "LIMIT 1 is in query");
-        let account_create_record = results.pop();
-
-        // If account wasn't found, we return no state for it.
-        // Otherwise we obtain the account ID for the state lookup.
-        let account_id = if let Some(account_create_record) = account_create_record {
-            account_create_record.account_id as AccountId
+        let account_state = if let Some(account_id) = self.account_id_by_address(address).await? {
+            self.account_state_by_id(account_id).await
         } else {
-            return Ok(StoredAccountState {
+            Ok(StoredAccountState {
                 committed: None,
                 verified: None,
-            });
+            })
         };
 
-        // Load committed & verified states, and return them.
-        let committed = self
-            .last_committed_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
-        let verified = self
-            .last_verified_state_for_account(account_id)
-            .await?
-            .map(|a| (account_id, a));
-        Ok(StoredAccountState {
-            committed,
-            verified,
-        })
+        metrics::histogram!(
+            "sql.chain.account.account_state_by_address",
+            start.elapsed()
+        );
+        account_state
     }
 
     /// Loads the last committed (e.g. just added but no necessarily verified) state for
     /// account given its ID.
+    /// Returns both verified and committed states.
     pub async fn last_committed_state_for_account(
         &mut self,
         account_id: AccountId,
-    ) -> QueryResult<Option<Account>> {
+    ) -> QueryResult<((i64, Option<Account>), Option<Account>)> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         // Get the last certain state of the account.
         // Note that `account` can be `None` here (if it wasn't verified yet), since
         // we will update the committed changes below.
         let (last_block, account) = AccountSchema(&mut transaction)
-            .get_account_and_last_block(account_id)
+            .account_and_last_block(account_id)
             .await?;
 
         let account_balance_diff = sqlx::query_as!(
@@ -92,7 +137,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 SELECT * FROM account_balance_updates
                 WHERE account_id = $1 AND block_number > $2
             ",
-            i64::from(account_id),
+            i64::from(*account_id),
             last_block
         )
         .fetch_all(transaction.conn())
@@ -104,7 +149,30 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 SELECT * FROM account_creates
                 WHERE account_id = $1 AND block_number > $2
             ",
-            i64::from(account_id),
+            i64::from(*account_id),
+            last_block
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+
+        let account_pubkey_diff = sqlx::query_as!(
+            StorageAccountPubkeyUpdate,
+            "
+                SELECT * FROM account_pubkey_updates
+                WHERE account_id = $1 AND block_number > $2
+            ",
+            i64::from(*account_id),
+            last_block
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+        let mint_nft_updates = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            "
+                SELECT * FROM mint_nft_updates
+                WHERE creator_account_id = $1 AND block_number > $2
+            ",
+            *account_id as i32,
             last_block
         )
         .fetch_all(transaction.conn())
@@ -123,7 +191,14 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                     .into_iter()
                     .map(StorageAccountDiff::from),
             );
+            account_diff.extend(
+                account_pubkey_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
+            account_diff.extend(mint_nft_updates.into_iter().map(StorageAccountDiff::from));
             account_diff.sort_by(StorageAccountDiff::cmp_order);
+
             account_diff
                 .into_iter()
                 .map(Into::into)
@@ -134,53 +209,53 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let account_state = account_diff
             .into_iter()
             .map(|(_, upd)| upd)
-            .fold(account, Account::apply_update);
+            .fold(account.clone(), Account::apply_update);
 
         transaction.commit().await?;
 
-        Ok(account_state)
+        metrics::histogram!(
+            "sql.chain.account.last_committed_state_for_account",
+            start.elapsed()
+        );
+        Ok(((last_block, account), account_state))
     }
 
-    /// Loads the last verified state for the account (e.g. the one obtained in the last block
+    /// Loads the last verified state for the account (i.e. the one obtained in the last block
     /// which was both committed and verified).
     pub async fn last_verified_state_for_account(
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
-        let (_, account) = self.get_account_and_last_block(account_id).await?;
+        let start = Instant::now();
+        let (_, account) = self.account_and_last_block(account_id).await?;
+        metrics::histogram!(
+            "sql.chain.account.last_verified_state_for_account",
+            start.elapsed()
+        );
         Ok(account)
     }
 
     /// Obtains the last verified state of the account.
-    async fn get_account_and_last_block(
+    pub async fn account_and_last_block(
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
+        let start = Instant::now();
         let mut transaction = self.0.conn().begin().await?;
 
         // `accounts::table` is updated only after the block verification, so we should
         // just load the account with the provided ID.
-        let mut results = sqlx::query_as!(
+        let maybe_account = sqlx::query_as!(
             StorageAccount,
             "
                 SELECT * FROM accounts
                 WHERE id = $1
-                LIMIT 1
             ",
-            i64::from(account_id)
+            i64::from(*account_id)
         )
-        .fetch_all(&mut transaction)
+        .fetch_optional(&mut transaction)
         .await?;
 
-        assert!(results.len() <= 1, "LIMIT 1 is in query");
-        let maybe_account = results.pop();
-
-        // let maybe_account = self.0.conn().transaction(|| {
-        //     accounts::table
-        //         .find(i64::from(account_id))
-        //         .first::<StorageAccount>(self.0.conn())
-        //         .optional()
-        // })?;
         let result = if let Some(account) = maybe_account {
             let balances = sqlx::query_as!(
                 StorageBalance,
@@ -188,19 +263,138 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                     SELECT * FROM balances
                     WHERE account_id = $1
                 ",
-                i64::from(account_id)
+                i64::from(*account_id)
             )
             .fetch_all(&mut transaction)
             .await?;
 
             let last_block = account.last_block;
-            let (_, account) = restore_account(&account, balances);
+            let (_, mut account) = restore_account(&account, balances);
+            let nfts: Vec<StorageNFT> = sqlx::query_as!(
+                StorageNFT,
+                "
+                    SELECT * FROM nft
+                    WHERE creator_account_id = $1
+                ",
+                *account_id as i32
+            )
+            .fetch_all(&mut transaction)
+            .await?;
+            account.minted_nfts.extend(
+                nfts.into_iter()
+                    .map(|nft| (TokenId(nft.token_id as u32), nft.into())),
+            );
             Ok((last_block, Some(account)))
         } else {
             Ok((0, None))
         };
 
         transaction.commit().await?;
+        metrics::histogram!(
+            "sql.chain.account.get_account_and_last_block",
+            start.elapsed()
+        );
         result
+    }
+
+    pub async fn account_id_by_address(
+        &mut self,
+        address: Address,
+    ) -> QueryResult<Option<AccountId>> {
+        let start = Instant::now();
+        // Find the account ID in `account_creates` table.
+        let result = sqlx::query!(
+            r#"
+                SELECT account_id FROM account_creates
+                WHERE address = $1 AND is_create = $2
+                ORDER BY block_number desc
+                LIMIT 1
+            "#,
+            address.as_bytes(),
+            true
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let account_id = result.map(|record| AccountId(record.account_id as u32));
+        metrics::histogram!("sql.chain.account.account_id_by_address", start.elapsed());
+        Ok(account_id)
+    }
+
+    pub async fn account_address_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<Address>> {
+        let start = Instant::now();
+        // Find the account address in `account_creates` table.
+        let result = sqlx::query!(
+            "SELECT address FROM account_creates WHERE account_id = $1",
+            i64::from(*account_id)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let address = result.map(|record| Address::from_slice(&record.address));
+        metrics::histogram!("sql.chain.account.account_address_by_id", start.elapsed());
+        Ok(address)
+    }
+
+    /// Obtains the last committed block that affects the account.
+    pub async fn last_committed_block_with_update_for_acc(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+
+        let block_number = sqlx::query!(
+            "
+                SELECT MAX(block_number)
+                FROM(
+                    SELECT block_number FROM account_balance_updates
+                    WHERE account_id = $1
+                    UNION ALL
+                    SELECT block_number FROM account_creates
+                    WHERE account_id = $1
+                    UNION ALL
+                    SELECT block_number FROM account_pubkey_updates
+                    WHERE account_id = $1
+                ) as subquery
+            ",
+            i64::from(*account_id),
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max
+        .unwrap_or(0);
+
+        metrics::histogram!(
+            "sql.chain.account.last_committed_block_with_update_for_acc",
+            start.elapsed()
+        );
+        Ok(BlockNumber(block_number as u32))
+    }
+
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // needed anymore: ZKS-663
+    pub async fn get_all_accounts(&mut self) -> QueryResult<Vec<StorageAccount>> {
+        let result = sqlx::query_as!(StorageAccount, "SELECT * FROM accounts")
+            .fetch_all(self.0.conn())
+            .await?;
+
+        Ok(result)
+    }
+
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // needed anymore: ZKS-663
+    pub async fn get_all_balances(&mut self) -> QueryResult<Vec<StorageBalance>> {
+        let result = sqlx::query_as!(StorageBalance, "SELECT * FROM balances",)
+            .fetch_all(self.0.conn())
+            .await?;
+
+        Ok(result)
     }
 }

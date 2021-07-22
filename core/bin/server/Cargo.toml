@@ -1,59 +1,42 @@
 [package]
-name = "server"
-version = "0.0.1"
+name = "zksync_server"
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
 
 [dependencies]
-crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
-eth_client = { path = "../../lib/eth_client", version = "0.1.0"  }
-plasma = { path = "../../lib/plasma", version = "0.1.1" }
-models = { path = "../../lib/models", version = "0.0.1" }
-storage = { path = "../../lib/storage", version = "0.0.1" }
-circuit = { path = "../../lib/circuit", version = "0.1.1"}
-vlog = { path = "../../lib/vlog", version = "0.1.0"}
-prover = { path = "../prover", version = "0.0.1" }
+zksync_api = { path = "../zksync_api", version = "1.0" }
+zksync_core = { path = "../zksync_core", version = "1.0" }
+zksync_witness_generator = { path = "../zksync_witness_generator", version = "1.0" }
+zksync_eth_sender = { path = "../zksync_eth_sender", version = "1.0" }
+zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
+zksync_forced_exit_requests = { path = "../zksync_forced_exit_requests", version = "1.0" }
 
-hex = "0.4"
-ethabi = "9.0.0"
-web3 = "0.13.0"
-serde = "1.0.90"
-serde_derive = "1.0.90"
-serde_json = "1.0.0"
-log = "0.4"
-env_logger = "0.6"
-itertools = "0.8"
-clap = "2.33.0"
-jsonrpc-core = "14.0.3"
-jsonrpc-core-client = "14.0.3"
-jsonrpc-pubsub = "14.0.3"
-jsonrpc-ws-server = "14.0.3"
-jsonrpc-http-server = "14.0.3"
-jsonrpc-derive = "14.0.3"
+zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+zksync_gateway_watcher = { path = "../../lib/gateway_watcher", version = "1.0" }
 
-tokio = { version = "0.2", features = ["full"] }
-tokio_old = { package = "tokio", version = "0.1.22" }
-futures = { version = "0.3", features = ["compat"] }
-actix-rt = "1.1.1"
-actix-cors = "0.3.0"
-actix-web = "3.0.0"
-actix-web-httpauth = "0.5.0"
-
-num = { version = "0.2", features = ["serde"] }
-bigdecimal = { version = "0.1", features = ["serde"]}
-chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+anyhow = "1.0"
+structopt = "0.3.20"
 ctrlc = { version = "3.1", features = ["termination"] }
-failure = "0.1"
-# TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
-futures01 = { package = "futures", version = "0.1" }
-reqwest = { version = "0.10", features = ["blocking"] }
-tiny-keccak = "1.4.2"
-async-trait = "0.1.31"
-prometheus_exporter_base = "0.31.0"
-jsonwebtoken = "7"
+futures = "0.3"
+tokio = { version = "0.2", features = ["full"] }
 
-rand = "0.7"
-
-lru-cache = "0.1.2"
+vlog = { path = "../../lib/vlog", version = "1.0" }
 
 [dev-dependencies]
-lazy_static = "1.4"
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_prover = { path = "../prover", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+
+num = { version = "0.3.1", features = ["serde"] }
+serde = "1.0.90"
+serde_json = "1.0.0"

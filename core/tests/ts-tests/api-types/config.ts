@@ -1,3 +1,3 @@
 export type Interface = {
-    "contractAddress": string,
-}
+    contractAddress: string;
+};

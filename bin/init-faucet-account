@@ -1,4 +1,0 @@
-#!/bin/bash
-
-cd contracts/
-npx ts-node scripts/init-faucet-account.ts

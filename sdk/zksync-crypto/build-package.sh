@@ -12,8 +12,8 @@ WSM=dist/zksync_crypto_bg.wasm
 OPT=dist/zksync_crypto_opt.wasm
 ASM=dist/zksync_crypto_asm.js
 
-#which wasm-pack || cargo install wasm-pack
-#which wasm-opt || cargo install wasm-opt
+# which wasm-pack || cargo install wasm-pack
+# which wasm-opt || cargo install wasm-opt
 
 echo "*** Building package"
 
@@ -51,9 +51,7 @@ cp src/js/* dist/
 
 echo "const crypto = require('crypto');
 const { stringToU8a, u8aToString } = require('@polkadot/util');
-
 const requires = { crypto };
-
 $(cat $SRC_WASM)
 " > $SRC_WASM
 
@@ -87,13 +85,10 @@ sed -i -e '/^wasm = wasmInstance/d' $SRC_WASM
 
 # construct our promise and add ready helpers (WASM)
 echo "module.exports.abort = function () { throw new Error('abort'); };
-
 const createPromise = require('./zksync_crypto_promise');
 const wasmPromise = createPromise().catch(() => null);
-
 module.exports.isReady = function () { return !!wasm; }
 module.exports.waitReady = function () { return wasmPromise.then(() => !!wasm); }
-
 wasmPromise.then((_wasm) => { wasm = _wasm });
 " >> $SRC_WASM
 

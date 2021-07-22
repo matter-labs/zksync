@@ -1,6 +1,7 @@
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import fs from 'fs';
+import * as path from 'path';
 import mock from 'mock-fs';
 import type { Network, Config } from '../src/types';
 import * as ethers from 'ethers';
@@ -9,6 +10,9 @@ import * as commands from '../src/commands';
 import { saveConfig, loadConfig, configLocation, DEFAULT_CONFIG } from '../src/config';
 
 use(chaiAsPromised);
+
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 describe('Fetching Information', () => {
     let ethDepositor: string;
@@ -19,9 +23,14 @@ describe('Fetching Information', () => {
     let transfer_hash: string;
 
     before('make some deposits & transactions', async () => {
-        const ethProvider = new ethers.providers.JsonRpcProvider();
+        let ethProvider;
+        if (process.env.CI == '1') {
+            ethProvider = new ethers.providers.JsonRpcProvider('http://geth:8545');
+        } else {
+            ethProvider = new ethers.providers.JsonRpcProvider();
+        }
         const syncProvider = await zksync.getDefaultProvider('localhost', 'HTTP');
-        const ethWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC as string, "m/44'/60'/0'/0/0").connect(
+        const ethWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0").connect(
             ethProvider
         );
         ethDepositor = ethWallet.address;
@@ -43,7 +52,10 @@ describe('Fetching Information', () => {
             approveDepositAmountForERC20: true
         });
         await Promise.all([ethDeposit.awaitReceipt(), daiDeposit.awaitReceipt()]);
-        const changePubkey = await aliceWallet.setSigningKey();
+        const changePubkey = await aliceWallet.setSigningKey({
+            feeToken: 'ETH',
+            ethAuthType: 'ECDSA'
+        });
         await changePubkey.awaitReceipt();
         const txHandle = await aliceWallet.syncTransfer({
             to: bob.address,
@@ -65,7 +77,7 @@ describe('Fetching Information', () => {
             expect(info.nonce).to.equal(2);
             expect(info.balances).to.have.property('DAI', '18.0');
             expect(info.balances.ETH).to.exist;
-            expect(+info.balances.ETH).to.be.within(0.79, 0.8);
+            expect(+info.balances.ETH).to.be.within(0.77, 0.8);
             expect(info.account_id).to.be.a('number');
         });
 
@@ -109,9 +121,9 @@ describe('Fetching Information', () => {
             expect(tx?.from).to.equal(alice.address.toLowerCase());
             expect(tx?.to).to.be.a('string');
             expect(tx?.nonce).to.equal(0);
-            expect(tx?.token).to.not.exist;
+            expect(tx?.token).to.equal('ETH');
             expect(tx?.amount).to.not.exist;
-            expect(tx?.fee).to.not.exist;
+            expect(tx?.fee).to.exist;
         });
 
         it('should fetch correct info - deposit', async () => {
@@ -253,7 +265,7 @@ describe('Config Management', () => {
 });
 
 describe('Making Transactions', () => {
-    const rich = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC as string, "m/44'/60'/0'/0/0");
+    const rich = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0");
     const poor1 = ethers.Wallet.createRandom();
     const poor2 = ethers.Wallet.createRandom();
 
@@ -341,26 +353,6 @@ describe('Making Transactions', () => {
             token: 'MLTT',
             amount: '73.0'
         })).to.be.rejected;
-    });
-
-    it('should not wait for commitment', async () => {
-        await commands.deposit({
-            to: poor1.address,
-            privkey: rich.privateKey,
-            token: 'DAI',
-            amount: '2.0'
-        });
-        const hash = await commands.transfer(
-            {
-                to: poor2.address,
-                privkey: poor1.privateKey,
-                token: 'DAI',
-                amount: '1.0'
-            },
-            true
-        );
-        const info = await commands.txInfo(hash);
-        expect(info.transaction).to.be.null;
     });
 
     it('should wait for commitment', async () => {

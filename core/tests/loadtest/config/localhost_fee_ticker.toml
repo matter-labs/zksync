@@ -1,0 +1,60 @@
+[network]
+# Network kind used for testing.
+name = 'localhost'
+# Fee for the Ethereum transactions in gwei.
+eth_fee = 10000000
+
+# Information about Ethereum account.
+[main_wallet]
+address = '0x36615cf349d7f6344891b1e7ca7c72883f5dc049'
+private_key = '0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110'
+# The token that is used to pay fees for the main wallet operations.
+fee_token = "BAT"
+# Fee for the zkSync transactions in gwei.
+zksync_fee = 100000000000
+
+[[scenarios]]
+name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'BAT'
+# Fee for the zkSync transactions in gwei.
+zksync_fee = 100000000000
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 10
+wallets_amount = 40
+max_batch_size = 15
+
+[[scenarios]]
+name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'ETH'
+# Fee for the zkSync transactions in gwei.
+zksync_fee = 100000000000
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 10
+wallets_amount = 40
+
+[[scenarios]]
+name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'DAI'
+# Fee for the zkSync transactions in gwei.
+zksync_fee = 100000000000
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 10
+wallets_amount = 40
+max_batch_size = 15
+
+[[scenarios]]
+name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'tGLM'
+# Fee for the zkSync transactions in gwei.
+zksync_fee = 100000000000
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 10
+wallets_amount = 40

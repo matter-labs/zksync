@@ -1,136 +1,153 @@
-// Built-in deps
-use std::{convert::TryFrom, str::FromStr};
-// External deps
+use std::{collections::HashMap, convert::TryFrom};
+
 use web3::types::H256;
-// Workspace deps
-use models::{
-    node::{block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
-    prover_utils::EncodedProofPlonk,
-    Action, NewTokenEvent, Operation,
+
+use zksync_storage::data_restore::records::{
+    NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock,
 };
-use storage::{
-    data_restore::records::{NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock},
-    ConnectionPool,
+use zksync_types::{
+    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
+    Token, TokenId, TokenInfo, NFT,
 };
-// Local deps
+
 use crate::{
+    contract::ZkSyncContractVersion,
     data_restore_driver::StorageUpdateState,
     events::{BlockEvent, EventType},
     events_state::EventsState,
     rollup_ops::RollupOpsBlock,
 };
 
-/// Saves genesis account state in storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database connection pool
-/// * `genesis_acc_update` - Genesis account update
-///
-pub async fn save_genesis_tree_state(
-    connection_pool: &ConnectionPool,
-    genesis_acc_update: AccountUpdate,
-) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-    let (_last_committed, mut _accounts) = storage
-        .chain()
-        .state_schema()
-        .load_committed_state(None)
-        .await
-        .expect("Cant load comitted state");
-    assert!(
-        _last_committed == 0 && _accounts.is_empty(),
-        "db should be empty"
+pub struct StoredTreeState {
+    pub last_block_number: BlockNumber,
+    pub account_map: AccountMap,
+    pub unprocessed_prior_ops: u64,
+    pub fee_acc_id: AccountId,
+}
+
+pub struct CachedTreeState {
+    pub tree_cache: serde_json::Value,
+    pub account_map: AccountMap,
+    pub current_block: Block,
+    pub nfts: HashMap<TokenId, NFT>,
+}
+
+#[async_trait::async_trait]
+pub trait StorageInteractor {
+    /// Saves Rollup operations blocks in storage
+    ///
+    /// # Arguments
+    ///
+    /// * `blocks` - Rollup operations blocks
+    ///
+    async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]);
+
+    /// Updates stored tree state: saves block transactions in storage, stores blocks and account updates
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - Rollup block
+    /// * `accounts_updated` - accounts updates
+    ///
+    async fn update_tree_state(&mut self, block: Block, accounts_updated: AccountUpdates);
+
+    /// Store token to the storage  
+    /// # Arguments
+    ///
+    /// * `token` - Token that added when deploying contract
+    /// * `token_id` - Id for token in our system
+    ///
+    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId);
+
+    /// Saves Rollup contract events in storage (includes block events, new tokens and last watched eth block number)
+    ///
+    /// # Arguments
+    ///
+    /// * `eveblock_eventsnts` - Rollup contract block events descriptions
+    /// * `tokens` - Tokens that had been added to system
+    /// * `last_watched_eth_block_number` - Last watched ethereum block
+    ///
+    async fn save_events_state(
+        &mut self,
+        block_events: &[BlockEvent],
+        tokens: &[NewTokenEvent],
+        last_watched_eth_block_number: u64,
     );
-    storage
-        .data_restore_schema()
-        .save_genesis_state(genesis_acc_update)
-        .await
-        .expect("Cant update genesis state");
+
+    /// Saves genesis accounts state in storage
+    ///
+    /// # Arguments
+    ///
+    /// * `genesis_updates` - Genesis account updates
+    ///
+    async fn save_genesis_tree_state(&mut self, genesis_updates: &[(AccountId, AccountUpdate)]);
+
+    /// Saves special NFT token in storage
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - Special token to be stored
+    ///
+    async fn save_special_token(&mut self, token: Token);
+
+    /// Returns Rollup contract events state from storage
+    async fn get_block_events_state_from_storage(&mut self) -> EventsState;
+
+    /// Returns the current Rollup block, tree accounts map, unprocessed priority ops and the last fee acc from storage
+    async fn get_tree_state(&mut self) -> StoredTreeState;
+
+    /// Returns Rollup operations blocks from storage
+    async fn get_ops_blocks_from_storage(&mut self) -> Vec<RollupOpsBlock>;
+
+    /// Updates the `eth_stats` table with the currently last available committed/verified blocks
+    /// data for `eth_sender` module to operate correctly.
+    async fn update_eth_state(&mut self);
+
+    /// Returns last recovery state update step from storage
+    async fn get_storage_state(&mut self) -> StorageUpdateState;
+
+    /// Returns cached tree state from storage. It's expected to be valid
+    /// after completing `finite` restore mode and may be used to speed up the
+    /// `continue` mode.
+    async fn get_cached_tree_state(&mut self) -> Option<CachedTreeState>;
+
+    /// Saves the tree cache in the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - The corresponding block number
+    /// * `tree_cache` - Merkle tree cache
+    ///
+    async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: serde_json::Value);
 }
 
-/// Updates stored tree state: saves block transactions in storage, stores blocks and account updates
+/// Returns Rollup contract event from its stored representation
 ///
 /// # Arguments
 ///
-/// * `connection_pool` - Database Connection Pool
-/// * `block` - Rollup block
-/// * `accounts_updated` - accounts updates
+/// * `block` - Stored representation of ZkSync Contract event
 ///
-pub async fn update_tree_state(
-    connection_pool: &ConnectionPool,
-    block: Block,
-    accounts_updated: AccountUpdates,
-) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
-    if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
-        storage
-            .data_restore_schema()
-            .save_block_transactions(block)
-            .await
-            .expect("Cant save block transactions");
-    } else {
-        let commit_op = Operation {
-            action: Action::Commit,
-            block: block.clone(),
-            accounts_updated,
-            id: None,
-        };
-
-        let verify_op = Operation {
-            action: Action::Verify {
-                proof: Box::new(EncodedProofPlonk::default()),
-            },
-            block,
-            accounts_updated: Vec::new(),
-            id: None,
-        };
-
-        storage
-            .data_restore_schema()
-            .save_block_operations(commit_op, verify_op)
-            .await
-            .expect("Cant execute verify operation");
+pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> BlockEvent {
+    BlockEvent {
+        block_num: BlockNumber(
+            u32::try_from(block.block_num).expect("Wrong block number - cant convert into u32"),
+        ),
+        transaction_hash: H256::from_slice(block.transaction_hash.as_slice()),
+        block_type: match &block.block_type {
+            c if c == "Committed" => EventType::Committed,
+            v if v == "Verified" => EventType::Verified,
+            _ => panic!("Wrong block type"),
+        },
+        contract_version: ZkSyncContractVersion::try_from(block.contract_version as u32)
+            .unwrap_or(ZkSyncContractVersion::V0),
     }
-}
-
-/// Saves Rollup contract events in storage (includes block events, new tokens and last watched eth block number)
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-/// * `eveblock_eventsnts` - Rollup contract block events descriptions
-/// * `tokens` - Tokens that had been added to system
-/// * `last_watched_eth_block_number` - Last watched ethereum block
-///
-pub async fn save_events_state(
-    connection_pool: &ConnectionPool,
-    block_events: &[BlockEvent],
-    tokens: &[NewTokenEvent],
-    last_watched_eth_block_number: u64,
-) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
-    let mut new_events: Vec<NewBlockEvent> = vec![];
-    for event in block_events {
-        new_events.push(block_event_into_stored_block_event(event));
-    }
-
-    let block_number = last_watched_eth_block_number.to_string();
-
-    storage
-        .data_restore_schema()
-        .save_events_state(new_events.as_slice(), tokens, &block_number)
-        .await
-        .expect("Cant update events state");
 }
 
 /// Get new stored representation of the Rollup contract event from itself
 ///
 /// # Arguments
 ///
-/// * `evnet` - Rollup contract event description
+/// * `event` - Rollup contract event description
 ///
 pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent {
     NewBlockEvent {
@@ -139,222 +156,38 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
             EventType::Verified => "Verified".to_string(),
         },
         transaction_hash: event.transaction_hash.as_bytes().to_vec(),
-        block_num: i64::from(event.block_num),
+        block_num: i64::from(*event.block_num),
+        contract_version: event.contract_version.into(),
     }
-}
-
-/// Saves Rollup operations blocks in storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-/// * `blocks` - Rollup operations blocks
-///
-pub async fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupOpsBlock]) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-    let mut ops: Vec<(u32, &FranklinOp, u32)> = vec![];
-
-    for block in blocks {
-        for op in &block.ops {
-            ops.push((block.block_num, op, block.fee_account));
-        }
-    }
-
-    storage
-        .data_restore_schema()
-        .save_rollup_ops(ops.as_slice())
-        .await
-        .expect("Cant update rollup operations");
-}
-
-/// Returns Rollup operations blocks from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub async fn get_ops_blocks_from_storage(connection_pool: &ConnectionPool) -> Vec<RollupOpsBlock> {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-    storage
-        .data_restore_schema()
-        .load_rollup_ops_blocks()
-        .await
-        .expect("Cant load operation blocks")
-        .iter()
-        .map(|block| stored_ops_block_into_ops_block(&block))
-        .collect()
 }
 
 /// Returns Rollup operations block from its stored representation
 ///
 /// # Arguments
 ///
-/// * `op_block` - Stored Franklin operations block description
+/// * `op_block` - Stored ZkSync operations block description
 ///
-pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> RollupOpsBlock {
+pub fn stored_ops_block_into_ops_block(op_block: StoredRollupOpsBlock) -> RollupOpsBlock {
     RollupOpsBlock {
-        block_num: op_block.block_num,
-        ops: op_block.ops.clone(),
-        fee_account: op_block.fee_account,
+        block_num: BlockNumber::from(op_block.block_num as u32),
+        ops: op_block
+            .ops
+            .unwrap_or_default()
+            .into_iter()
+            .map(|op| {
+                serde_json::from_value(op)
+                    .expect("couldn't deserialize `ZkSyncOp` from the database")
+            })
+            .collect(),
+        fee_account: AccountId::from(op_block.fee_account as u32),
+        timestamp: op_block.timestamp.map(|t| t as u64),
+        previous_block_root_hash: op_block
+            .previous_block_root_hash
+            .map(|h| H256::from_slice(&h))
+            .unwrap_or_default(),
+        contract_version: Some(
+            ZkSyncContractVersion::try_from(op_block.contract_version as u32)
+                .expect("invalid contract version in the database"),
+        ),
     }
-}
-
-/// Returns last recovery state update step from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub async fn get_storage_state(connection_pool: &ConnectionPool) -> StorageUpdateState {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
-    let storage_state_string = storage
-        .data_restore_schema()
-        .load_storage_state()
-        .await
-        .expect("Cant load storage state")
-        .storage_state;
-
-    match storage_state_string.as_ref() {
-        "Events" => StorageUpdateState::Events,
-        "Operations" => StorageUpdateState::Operations,
-        "None" => StorageUpdateState::None,
-        _ => panic!("Unknown storage state"),
-    }
-}
-
-/// Returns last watched ethereum block number from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub async fn get_last_watched_block_number_from_storage(connection_pool: &ConnectionPool) -> u64 {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
-    let last_watched_block_number_string = storage
-        .data_restore_schema()
-        .load_last_watched_block_number()
-        .await
-        .expect("Cant load last watched block number")
-        .block_number;
-
-    u64::from_str(last_watched_block_number_string.as_str())
-        .expect("Сant make u256 block_number in get_last_watched_block_number_from_storage")
-}
-
-/// Returns Rollup contract events state from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub async fn get_block_events_state_from_storage(connection_pool: &ConnectionPool) -> EventsState {
-    let last_watched_eth_block_number =
-        get_last_watched_block_number_from_storage(&connection_pool).await;
-
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
-    let committed = storage
-        .data_restore_schema()
-        .load_committed_events_state()
-        .await
-        .expect("Cant load committed state");
-
-    let mut committed_events: Vec<BlockEvent> = vec![];
-    for event in committed {
-        let block_event = stored_block_event_into_block_event(event.clone());
-        committed_events.push(block_event);
-    }
-
-    let verified = storage
-        .data_restore_schema()
-        .load_verified_events_state()
-        .await
-        .expect("Cant load verified state");
-    let mut verified_events: Vec<BlockEvent> = vec![];
-    for event in verified {
-        let block_event = stored_block_event_into_block_event(event.clone());
-        verified_events.push(block_event);
-    }
-
-    EventsState {
-        committed_events,
-        verified_events,
-        last_watched_eth_block_number,
-    }
-}
-
-/// Returns Rollup contract event from its stored representation
-///
-/// # Arguments
-///
-/// * `block` - Stored representation of Franklin Contract event
-///
-pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> BlockEvent {
-    BlockEvent {
-        block_num: u32::try_from(block.block_num)
-            .expect("Wrong block number - cant convert into u32"),
-        transaction_hash: H256::from_slice(block.transaction_hash.as_slice()),
-        block_type: match &block.block_type {
-            c if c == "Committed" => EventType::Committed,
-            v if v == "Verified" => EventType::Verified,
-            _ => panic!("Wrong block type"),
-        },
-    }
-}
-
-/// Returns the current Rollup block, tree accounts map, unprocessed priority ops and the last fee acc from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-/// connection_pool: &ConnectionPool,
-pub async fn get_tree_state(connection_pool: &ConnectionPool) -> (u32, AccountMap, u64, u32) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
-    let (last_block, account_map) = storage
-        .chain()
-        .state_schema()
-        .load_verified_state()
-        .await
-        .expect("There are no last verified state in storage");
-
-    let block = storage
-        .chain()
-        .block_schema()
-        .get_block(last_block)
-        .await
-        .expect("Cant get the last block from storage")
-        .expect("There are no last block in storage - restart driver");
-    let (unprocessed_prior_ops, fee_acc_id) = (block.processed_priority_ops.1, block.fee_account);
-
-    (last_block, account_map, unprocessed_prior_ops, fee_acc_id)
-}
-
-/// Updates the `eth_stats` table with the currently last available committed/verified blocks
-/// data for `eth_sender` module to operate correctly.
-pub async fn update_eth_stats(connection_pool: &ConnectionPool) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
-    let last_committed_block = storage
-        .chain()
-        .block_schema()
-        .get_last_committed_block()
-        .await
-        .expect("Can't get the last committed block");
-
-    let last_verified_block = storage
-        .chain()
-        .block_schema()
-        .get_last_verified_block()
-        .await
-        .expect("Can't get the last verified block");
-
-    storage
-        .data_restore_schema()
-        .initialize_eth_stats(last_committed_block, last_verified_block)
-        .await
-        .expect("Can't update the eth_stats table")
 }

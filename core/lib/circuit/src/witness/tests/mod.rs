@@ -7,54 +7,73 @@
 //! - Generic tests for the combinations of different operations are placed in this module.
 
 // External deps
-use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 use num::BigUint;
+use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
 // Workspace deps
-use models::node::{
-    operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},
-    Address, Deposit, FullExit,
+use zksync_state::{
+    handler::TxHandler,
+    state::{TransferOutcome, ZkSyncState},
+};
+use zksync_types::{
+    operations::{
+        DepositOp, FullExitOp, MintNFTOp, TransferOp, TransferToNewOp, WithdrawNFTOp, WithdrawOp,
+    },
+    AccountId, Address, BlockNumber, Deposit, FullExit, MintNFT, TokenId, Transfer, Withdraw,
+    WithdrawNFT, H256,
 };
 // Local deps
 use crate::{
-    circuit::FranklinCircuit,
+    circuit::ZkSyncCircuit,
     witness::{
         tests::test_utils::{
-            check_circuit, check_circuit_non_panicking, PlasmaStateGenerator, WitnessTestAccount,
+            check_circuit, check_circuit_non_panicking, WitnessTestAccount, ZkSyncStateGenerator,
             FEE_ACCOUNT_ID,
         },
         utils::{SigDataInput, WitnessBuilder},
-        DepositWitness, FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness,
-        Witness,
+        DepositWitness, FullExitWitness, MintNFTWitness, TransferToNewWitness, TransferWitness,
+        WithdrawNFTWitness, WithdrawWitness, Witness,
     },
 };
 
 mod change_pubkey_offchain;
 mod deposit;
+mod forced_exit;
 mod full_exit;
+mod mint_nft;
 mod noop;
+mod swap;
 pub(crate) mod test_utils;
 mod transfer;
 mod transfer_to_new;
 mod withdraw;
+mod withdraw_nft;
 
 /// Executes the following operations:
 ///
 /// - Deposit several types of token on the account.
 /// - Transfer some funds to different accounts, both existing and new.
-/// - Change the public key of account.
 /// - Withdraw some funds.
+/// - FullExit operation
+/// - MintNFT operation
+/// - WithdrawNFT operation
 ///
-/// Returns the resulting `WitnessBuilder` and the hash obtained
-/// from `PlasmaState` for further correctness checks.
-fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
-    const ETH_TOKEN: u16 = 0;
-    const NNM_TOKEN: u16 = 2;
+fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
+    const ETH_TOKEN: TokenId = TokenId(0);
+    const NNM_TOKEN: TokenId = TokenId(2);
 
     // Create two accounts: we will perform all the operations with the first one,
     // while the second one will be used as "target" account for transfers.
     let accounts = vec![
-        WitnessTestAccount::new_empty(1),
-        WitnessTestAccount::new_empty(2),
+        WitnessTestAccount::new_empty(AccountId(1)),
+        WitnessTestAccount::new_empty(AccountId(2)),
+        WitnessTestAccount::new(AccountId(3), 10u64), // nft creator account
+        WitnessTestAccount::new(AccountId(4), 10u64), // account to withdraw nft
+        WitnessTestAccount::new_with_token(
+            NFT_STORAGE_ACCOUNT_ID,
+            NFT_TOKEN_ID,
+            MIN_NFT_TOKEN_ID as u64,
+        ),
     ];
     let (account, account_to) = (&accounts[0], &accounts[1]);
 
@@ -87,6 +106,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account.id,
@@ -96,7 +116,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
         SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
 
     // Transfer token to a new account.
-    let new_account = WitnessTestAccount::new_empty(3);
+    let new_account = WitnessTestAccount::new_empty(AccountId(5));
     let transfer_to_new_op = TransferToNewOp {
         tx: account
             .zksync_account
@@ -108,6 +128,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account.id,
@@ -129,6 +150,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
                 &Address::zero(),
                 None,
                 true,
+                Default::default(),
             )
             .0,
         account_id: account.id,
@@ -142,69 +164,148 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
         priority_op: FullExit {
             account_id: account.id,
             eth_address: account.account.address,
-            token: 0,
+            token: TokenId(0),
+            is_legacy: false,
         },
         withdraw_amount: Some(BigUint::from(900u32).into()),
+        creator_account_id: None,
+        creator_address: None,
+        serial_id: None,
+        content_hash: None,
     };
     let full_exit_success = true;
 
+    let nft_content_hash = H256::random();
+
+    // Mint NFT.
+    let mint_nft_op = MintNFTOp {
+        tx: accounts[2]
+            .zksync_account
+            .sign_mint_nft(
+                TokenId(0),
+                "",
+                nft_content_hash,
+                BigUint::from(10u64),
+                &accounts[3].account.address,
+                None,
+                true,
+            )
+            .0,
+        creator_account_id: accounts[2].id,
+        recipient_account_id: accounts[3].id,
+    };
+    let mint_nft_input =
+        SigDataInput::from_mint_nft_op(&mint_nft_op).expect("SigDataInput creation failed");
+
+    // Withdraw NFT.
+    let withdraw_nft_op = WithdrawNFTOp {
+        tx: accounts[3]
+            .zksync_account
+            .sign_withdraw_nft(
+                TokenId(MIN_NFT_TOKEN_ID),
+                TokenId(0),
+                "",
+                BigUint::from(10u64),
+                &accounts[3].account.address,
+                None,
+                true,
+                Default::default(),
+            )
+            .0,
+        creator_id: accounts[2].id,
+        creator_address: accounts[2].account.address,
+        content_hash: nft_content_hash,
+        serial_id: 0,
+    };
+    let withdraw_nft_input =
+        SigDataInput::from_withdraw_nft_op(&withdraw_nft_op).expect("SigDataInput creation failed");
+
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1), 0);
 
     // Fees to be collected.
     let mut fees = vec![];
 
     // Apply deposit ops.
     for deposit_op in deposit_ops {
-        plasma_state.apply_deposit_op(&deposit_op);
+        <ZkSyncState as TxHandler<Deposit>>::apply_op(&mut plasma_state, &deposit_op)
+            .expect("Deposit failed");
 
         let witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
         let circuit_operations = witness.calculate_operations(());
         let pub_data_from_witness = witness.get_pubdata();
+        let offset_commitment = witness.get_offset_commitment_data();
 
-        witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+        witness_accum.add_operation_with_pubdata(
+            circuit_operations,
+            pub_data_from_witness,
+            offset_commitment,
+        );
     }
 
     // Apply transfer op.
-    let (fee, _) = plasma_state
-        .apply_transfer_op(&transfer_op)
-        .expect("Transfer failed");
+    let raw_op = TransferOutcome::Transfer(transfer_op.clone());
+    let fee = <ZkSyncState as TxHandler<Transfer>>::apply_op(&mut plasma_state, &raw_op)
+        .expect("Operation failed")
+        .0
+        .unwrap();
     fees.push(fee);
 
     let witness = TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer_op);
     let circuit_operations = witness.calculate_operations(transfer_input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
 
     // Apply transfer to new op.
-    let (fee, _) = plasma_state
-        .apply_transfer_to_new_op(&transfer_to_new_op)
-        .expect("Transfer to new failed");
+    let raw_op = TransferOutcome::TransferToNew(transfer_to_new_op.clone());
+    let fee = <ZkSyncState as TxHandler<Transfer>>::apply_op(&mut plasma_state, &raw_op)
+        .expect("Operation failed")
+        .0
+        .unwrap();
     fees.push(fee);
 
     let witness =
         TransferToNewWitness::apply_tx(&mut witness_accum.account_tree, &transfer_to_new_op);
     let circuit_operations = witness.calculate_operations(transfer_to_new_input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
 
     // Apply withdraw op.
-    let (fee, _) = plasma_state
-        .apply_withdraw_op(&withdraw_op)
-        .expect("Withdraw failed");
+    let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(&mut plasma_state, &withdraw_op)
+        .expect("Operation failed")
+        .0
+        .unwrap();
     fees.push(fee);
 
     let witness = WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_op);
     let circuit_operations = witness.calculate_operations(withdraw_input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
 
     // Apply full exit op.
-    plasma_state.apply_full_exit_op(&full_exit_op);
+
+    <ZkSyncState as TxHandler<FullExit>>::apply_op(&mut plasma_state, &full_exit_op)
+        .expect("Operation failed");
 
     let witness = FullExitWitness::apply_tx(
         &mut witness_accum.account_tree,
@@ -212,8 +313,50 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     );
     let circuit_operations = witness.calculate_operations(());
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
+
+    // Apply MintNFT op.
+    let fee = <ZkSyncState as TxHandler<MintNFT>>::apply_op(&mut plasma_state, &mint_nft_op)
+        .expect("Operation failed")
+        .0
+        .unwrap();
+    fees.push(fee);
+
+    let witness = MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft_op);
+    let circuit_operations = witness.calculate_operations(mint_nft_input);
+    let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
+
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
+
+    // Apply WithdrawNFT op.
+    let fee =
+        <ZkSyncState as TxHandler<WithdrawNFT>>::apply_op(&mut plasma_state, &withdraw_nft_op)
+            .expect("Operation failed")
+            .0
+            .unwrap();
+    fees.push(fee);
+
+    let witness = WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft_op);
+    let circuit_operations = witness.calculate_operations(withdraw_nft_input);
+    let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
+
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
 
     // Collect fees.
     plasma_state.collect_fee(&fees, FEE_ACCOUNT_ID);
@@ -235,9 +378,10 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
 /// Composite test combines all the witness types applied together within one block:
 /// - Deposit several types of token on the account.
 /// - Transfer some funds to different accounts, both existing and new.
-/// - Change the public key of account.
 /// - Withdraw some funds.
 /// - Perform full exit for an account.
+/// - Mint an NFT.
+/// - Withdraw minted NFT.
 /// - Check the root hash and circuit constraints.
 ///
 /// All the actions are performed within one block.
@@ -314,7 +458,7 @@ fn corrupted_intermediate_operation() {
     let mut circuit = apply_many_ops();
 
     // Now replace the operation in the middle with incorrect operation.
-    let corrupted_op_chunk = circuit.operations.len() / 2;
+    let corrupted_op_chunk = circuit.operations.len() - 1;
     circuit.operations[corrupted_op_chunk] = circuit.operations[0].clone();
 
     // Create an error message with the exact chunk number.

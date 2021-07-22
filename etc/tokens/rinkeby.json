@@ -92,8 +92,8 @@
   {
     "address": "0xd94e3DC39d4Cad1DAd634e7eb585A57A19dC7EFE",
     "decimals": 18,
-    "symbol": "GNT",
-    "name": "New Golem Network Token"
+    "symbol": "tGLM",
+    "name": "Test Golem Network Token"
   },
   {
     "address": "0x690f4886c6911d81beb8130DB30C825c27281F22",

@@ -1,0 +1,24 @@
+[package]
+name = "zksync_config"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+
+[dependencies]
+zksync_types = { path = "../types", version = "1.0" }
+zksync_utils = { path = "../utils", version = "1.0" }
+zksync_crypto = { path = "../crypto", version = "1.0" }
+chrono = "0.4"
+url = "2.1"
+tracing = "0.1.22"
+num = "0.3.1"
+serde = { version = "1.0", features = ["derive"] }
+reqwest = "0.10.0"
+serde_json = "1.0"
+envy = "0.4"
+toml = "0.5"

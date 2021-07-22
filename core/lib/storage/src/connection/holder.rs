@@ -1,15 +1,15 @@
 // Built-in deps
 use std::fmt;
 // External imports
-// use diesel::r2d2::{ConnectionManager, PooledConnection};
-use sqlx::{pool::PoolConnection, postgres::Postgres, PgConnection, Transaction};
+use sqlx::{postgres::Postgres, PgConnection, Transaction};
 // Workspace imports
 // Local imports
+use super::PooledConnection;
 
 /// Connection holder unifies the type of underlying connection, which
 /// can be either pooled or direct.
 pub enum ConnectionHolder<'a> {
-    Pooled(PoolConnection<Postgres>),
+    Pooled(PooledConnection),
     Direct(PgConnection),
     Transaction(Transaction<'a, Postgres>),
 }

@@ -1,4 +1,6 @@
-pragma solidity >=0.5.0 <0.7.0;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./Governance.sol";
 import "./Proxy.sol";
@@ -6,9 +8,9 @@ import "./UpgradeGatekeeper.sol";
 import "./ZkSync.sol";
 import "./Verifier.sol";
 import "./TokenInit.sol";
+import "./AdditionalZkSync.sol";
 
 contract DeployFactory is TokenDeployInit {
-
     // Why do we deploy contracts in the constructor?
     //
     // If we want to deploy Proxy and UpgradeGatekeeper (using new) we have to deploy their contract code with this contract
@@ -26,14 +28,18 @@ contract DeployFactory is TokenDeployInit {
     // genesis state, as the very first account in tree is a fee account, and we need its address before
     // we're able to start recovering the data from the Ethereum blockchain.
     constructor(
-        Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget,
-        bytes32 _genesisRoot, address _firstValidator, address _governor,
+        Governance _govTarget,
+        Verifier _verifierTarget,
+        ZkSync _zkSyncTarget,
+        bytes32 _genesisRoot,
+        address _firstValidator,
+        address _governor,
         address _feeAccountAddress
-    ) public {
-        require(_firstValidator != address(0));
-        require(_governor != address(0));
-        require(_feeAccountAddress != address(0));
-        
+    ) {
+        require(_firstValidator != address(0), "validator check");
+        require(_governor != address(0), "governor check");
+        require(_feeAccountAddress != address(0), "fee acc address check");
+
         deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _genesisRoot, _firstValidator, _governor);
 
         selfdestruct(msg.sender);
@@ -41,16 +47,23 @@ contract DeployFactory is TokenDeployInit {
 
     event Addresses(address governance, address zksync, address verifier, address gatekeeper);
 
-
     function deployProxyContracts(
-        Governance _governanceTarget, Verifier _verifierTarget, ZkSync _zksyncTarget,
-        bytes32 _genesisRoot, address _validator, address _governor
+        Governance _governanceTarget,
+        Verifier _verifierTarget,
+        ZkSync _zksyncTarget,
+        bytes32 _genesisRoot,
+        address _validator,
+        address _governor
     ) internal {
-
         Proxy governance = new Proxy(address(_governanceTarget), abi.encode(this));
         // set this contract as governor
         Proxy verifier = new Proxy(address(_verifierTarget), abi.encode());
-        Proxy zkSync = new Proxy(address(_zksyncTarget), abi.encode(address(governance), address(verifier), _genesisRoot));
+        AdditionalZkSync additionalZkSync = new AdditionalZkSync();
+        Proxy zkSync =
+            new Proxy(
+                address(_zksyncTarget),
+                abi.encode(address(governance), address(verifier), address(additionalZkSync), _genesisRoot)
+            );
 
         UpgradeGatekeeper upgradeGatekeeper = new UpgradeGatekeeper(zkSync);
 
@@ -70,11 +83,16 @@ contract DeployFactory is TokenDeployInit {
         finalizeGovernance(Governance(address(governance)), _validator, _governor);
     }
 
-    function finalizeGovernance(Governance _governance, address _validator, address _finalGovernor) internal {
+    function finalizeGovernance(
+        Governance _governance,
+        address _validator,
+        address _finalGovernor
+    ) internal {
         address[] memory tokens = getTokens();
-        for (uint i = 0; i < tokens.length; ++i) {
+        for (uint256 i = 0; i < tokens.length; ++i) {
             _governance.addToken(tokens[i]);
         }
+        _governance.changeTokenGovernance(TokenGovernance(_finalGovernor));
         _governance.setValidator(_validator, true);
         _governance.changeGovernor(_finalGovernor);
     }

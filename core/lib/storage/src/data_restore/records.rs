@@ -1,63 +1,41 @@
 // External imports
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-// Workspace imports
-use models::node::{AccountId, BlockNumber, FranklinOp};
-use serde_derive::{Deserialize, Serialize};
 use sqlx::FromRow;
+// Workspace imports
+use zksync_types::{AccountId, Address, BlockNumber, TokenId, ZkSyncOp, H256};
 // Workspace imports
 // Local imports
 
-#[derive(Debug, Clone, FromRow)]
-pub struct StoredRollupOpsBlock {
-    pub block_num: BlockNumber,
-    pub ops: Vec<FranklinOp>,
-    pub fee_account: AccountId,
+#[derive(Debug)]
+pub struct NewTokenEvent {
+    pub address: Address,
+    pub id: TokenId,
 }
 
-// #[derive(Debug, Insertable, PartialEq)]
-// #[table_name = "data_restore_last_watched_eth_block"]
-// pub struct NewLastWatchedEthBlockNumber {
-//     pub block_number: String,
-// }
+#[derive(Debug)]
+pub struct NewRollupOpsBlock<'a> {
+    pub block_num: BlockNumber,
+    pub ops: &'a [ZkSyncOp],
+    pub fee_account: AccountId,
+    pub timestamp: Option<u64>,
+    pub previous_block_root_hash: H256,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct StoredRollupOpsBlock {
+    pub block_num: i64,
+    pub ops: Option<Vec<Value>>,
+    pub fee_account: i64,
+    pub timestamp: Option<i64>,
+    pub previous_block_root_hash: Option<Vec<u8>>,
+    pub contract_version: i32,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, FromRow, PartialEq)]
 pub struct StoredLastWatchedEthBlockNumber {
     pub id: i32,
     pub block_number: String,
-}
-
-#[derive(Debug, Clone, FromRow)]
-pub struct StoredFranklinOp {
-    pub id: i32,
-    pub block_num: i64,
-    pub operation: Value,
-    pub fee_account: i64,
-}
-
-impl StoredFranklinOp {
-    pub fn into_franklin_op(self) -> FranklinOp {
-        serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db")
-    }
-}
-#[derive(Debug, Clone)]
-pub struct NewFranklinOp {
-    pub block_num: i64,
-    pub operation: Value,
-    pub fee_account: i64,
-}
-
-impl NewFranklinOp {
-    pub fn prepare_stored_op(
-        franklin_op: &FranklinOp,
-        block: BlockNumber,
-        fee_account: AccountId,
-    ) -> Self {
-        Self {
-            block_num: i64::from(block),
-            operation: serde_json::to_value(franklin_op.clone()).unwrap(),
-            fee_account: i64::from(fee_account),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -76,6 +54,7 @@ pub struct NewBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
+    pub contract_version: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -84,4 +63,5 @@ pub struct StoredBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
+    pub contract_version: i32,
 }

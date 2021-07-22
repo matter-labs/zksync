@@ -1,30 +1,53 @@
 // Built-in deps
-use std::env;
-use std::fmt;
-// use std::ops::Deref;
+use std::{fmt, time::Instant};
 // External imports
-// use diesel::pg::PgConnection;
-// use diesel::r2d2::{ConnectionManager, Pool, PoolError};
-use sqlx::{
-    postgres::{PgPool, PgPoolOptions},
-    Error as SqlxError,
-};
+use async_trait::async_trait;
+use deadpool::managed::{Manager, PoolConfig, RecycleResult, Timeouts};
+use sqlx::{Connection, Error as SqlxError, PgConnection};
 // Local imports
 // use self::recoverable_connection::RecoverableConnection;
-use crate::StorageProcessor;
-use failure::_core::time::Duration;
-use models::config_options::parse_env;
+use crate::{get_database_url, StorageProcessor};
+use zksync_utils::parse_env;
 
 pub mod holder;
+
+type Pool = deadpool::managed::Pool<PgConnection, SqlxError>;
+
+pub type PooledConnection = deadpool::managed::Object<PgConnection, SqlxError>;
+
+#[derive(Clone)]
+struct DbPool {
+    url: String,
+}
+
+impl DbPool {
+    fn create(url: impl Into<String>, max_size: usize) -> Pool {
+        let pool_config = PoolConfig {
+            max_size,
+            timeouts: Timeouts::wait_millis(20_000), // wait 20 seconds before returning error
+        };
+        Pool::from_config(DbPool { url: url.into() }, pool_config)
+    }
+}
+
+#[async_trait]
+impl Manager<PgConnection, SqlxError> for DbPool {
+    async fn create(&self) -> Result<PgConnection, SqlxError> {
+        PgConnection::connect(&self.url).await
+    }
+    async fn recycle(&self, obj: &mut PgConnection) -> RecycleResult<SqlxError> {
+        Ok(obj.ping().await?)
+    }
+}
 
 /// `ConnectionPool` is a wrapper over a `diesel`s `Pool`, encapsulating
 /// the fixed size pool of connection to the database.
 ///
 /// The size of the pool and the database URL are configured via environment
-/// variables `DB_POOL_SIZE` and `DATABASE_URL` respectively.
+/// variables `DATABASE_POOL_SIZE` and `DATABASE_URL` respectively.
 #[derive(Clone)]
 pub struct ConnectionPool {
-    pool: PgPool,
+    pool: Pool,
 }
 
 impl fmt::Debug for ConnectionPool {
@@ -36,17 +59,12 @@ impl fmt::Debug for ConnectionPool {
 impl ConnectionPool {
     /// Establishes a pool of the connections to the database and
     /// creates a new `ConnectionPool` object.
-    /// pool_max_size - number of connections in pool, if not set env variable "DB_POOL_SIZE" is going to be used.
-    pub async fn new(pool_max_size: Option<u32>) -> Self {
-        let database_url = Self::get_database_url();
-        let max_size = pool_max_size.unwrap_or_else(|| parse_env("DB_POOL_SIZE"));
+    /// pool_max_size - number of connections in pool, if not set env variable "DATABASE_POOL_SIZE" is going to be used.
+    pub fn new(pool_max_size: Option<u32>) -> Self {
+        let database_url = get_database_url();
+        let max_size = pool_max_size.unwrap_or_else(|| parse_env("DATABASE_POOL_SIZE"));
 
-        let pool = PgPoolOptions::new()
-            .max_connections(max_size)
-            .connect_timeout(Duration::from_secs(3))
-            .connect(&database_url)
-            .await
-            .expect("Failed to create connection pool");
+        let pool = DbPool::create(database_url, max_size as usize);
 
         Self { pool }
     }
@@ -60,21 +78,10 @@ impl ConnectionPool {
     /// This method is intended to be used in crucial contexts, where the
     /// database access is must-have (e.g. block committer).
     pub async fn access_storage(&self) -> Result<StorageProcessor<'_>, SqlxError> {
-        let connection = self.pool.acquire().await?;
+        let start = Instant::now();
+        let connection = self.pool.get().await.unwrap();
+        metrics::histogram!("sql.connection_acquire", start.elapsed());
 
         Ok(StorageProcessor::from_pool(connection))
-    }
-
-    /// Creates a `StorageProcessor` entity using non-recoverable connection, which
-    /// will not handle the database outages. This method is intended to be used in
-    /// non-crucial contexts, such as API endpoint handlers.
-    pub async fn access_storage_fragile(&self) -> Result<StorageProcessor<'_>, SqlxError> {
-        // TODO: Remove this method
-        self.access_storage().await
-    }
-
-    /// Obtains the database URL from the environment variable.
-    fn get_database_url() -> String {
-        env::var("DATABASE_URL").expect("DATABASE_URL must be set")
     }
 }

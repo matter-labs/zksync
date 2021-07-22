@@ -1,19 +1,13 @@
 // External imports
 // Workspace imports
-use models::{
-    node::{apply_updates, AccountMap},
-    Action, ActionType,
-};
+use zksync_types::aggregated_operations::AggregatedActionType;
+use zksync_types::{helpers::apply_updates, AccountMap, BlockNumber};
 // Local imports
-use super::{block::apply_random_updates, utils::get_operation};
-use crate::tests::{create_rng, db_test};
+use super::block::apply_random_updates;
 use crate::{
-    chain::{
-        block::BlockSchema,
-        operations::{records::NewOperation, OperationsSchema},
-        state::StateSchema,
-    },
-    prover::ProverSchema,
+    chain::{operations::OperationsSchema, state::StateSchema},
+    test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS},
+    tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
 };
 
@@ -37,80 +31,111 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
 
     // Store the states in schema.
     StateSchema(&mut storage)
-        .commit_state_update(1, &updates_block_1)
+        .commit_state_update(BlockNumber(1), &updates_block_1, 0)
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(2, &updates_block_2)
+        .commit_state_update(BlockNumber(2), &updates_block_2, 0)
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(3, &updates_block_3)
+        .commit_state_update(BlockNumber(3), &updates_block_3, 0)
         .await?;
 
     // We have to store the operations as well (and for verify below too).
     for block_number in 1..=3 {
         OperationsSchema(&mut storage)
-            .store_operation(NewOperation {
-                block_number,
-                action_type: ActionType::COMMIT.to_string(),
-            })
+            .store_aggregated_action(gen_unique_aggregated_operation(
+                BlockNumber(block_number),
+                AggregatedActionType::CommitBlocks,
+                BLOCK_SIZE_CHUNKS,
+            ))
             .await?;
     }
 
     // Check that they are stored in state.
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(1))
+        .load_committed_state(Some(BlockNumber(1)))
         .await?;
-    assert_eq!((block, &state), (1, &accounts_block_1));
+    assert_eq!((block, &state), (BlockNumber(1), &accounts_block_1));
 
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(2))
+        .load_committed_state(Some(BlockNumber(2)))
         .await?;
-    assert_eq!((block, &state), (2, &accounts_block_2));
+    assert_eq!((block, &state), (BlockNumber(2), &accounts_block_2));
 
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(3))
+        .load_committed_state(Some(BlockNumber(3)))
         .await?;
-    assert_eq!((block, &state), (3, &accounts_block_3));
+    assert_eq!((block, &state), (BlockNumber(3), &accounts_block_3));
 
     // Apply one state.
-    StateSchema(&mut storage).apply_state_update(1).await?;
+    StateSchema(&mut storage)
+        .apply_state_update(BlockNumber(1))
+        .await?;
     OperationsSchema(&mut storage)
-        .store_operation(NewOperation {
-            block_number: 1,
-            action_type: ActionType::VERIFY.to_string(),
-        })
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            BlockNumber(1),
+            AggregatedActionType::ExecuteBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    OperationsSchema(&mut storage)
+        .confirm_aggregated_operations(
+            BlockNumber(1),
+            BlockNumber(1),
+            AggregatedActionType::ExecuteBlocks,
+        )
         .await?;
 
     // Check that the verified state is now equals to the committed state.
     let committed_1 = StateSchema(&mut storage)
-        .load_committed_state(Some(1))
+        .load_committed_state(Some(BlockNumber(1)))
         .await?;
     let verified_1 = StateSchema(&mut storage).load_verified_state().await?;
     assert_eq!(committed_1, verified_1);
 
     // Apply the rest of states and check that `load_verified_state` updates as well.
-    StateSchema(&mut storage).apply_state_update(2).await?;
+    StateSchema(&mut storage)
+        .apply_state_update(BlockNumber(2))
+        .await?;
     OperationsSchema(&mut storage)
-        .store_operation(NewOperation {
-            block_number: 2,
-            action_type: ActionType::VERIFY.to_string(),
-        })
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            BlockNumber(2),
+            AggregatedActionType::ExecuteBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    OperationsSchema(&mut storage)
+        .confirm_aggregated_operations(
+            BlockNumber(2),
+            BlockNumber(2),
+            AggregatedActionType::ExecuteBlocks,
+        )
         .await?;
     let committed_2 = StateSchema(&mut storage)
-        .load_committed_state(Some(2))
+        .load_committed_state(Some(BlockNumber(2)))
         .await?;
     let verified_2 = StateSchema(&mut storage).load_verified_state().await?;
     assert_eq!(verified_2, committed_2);
 
-    StateSchema(&mut storage).apply_state_update(3).await?;
+    StateSchema(&mut storage)
+        .apply_state_update(BlockNumber(3))
+        .await?;
     OperationsSchema(&mut storage)
-        .store_operation(NewOperation {
-            block_number: 3,
-            action_type: ActionType::VERIFY.to_string(),
-        })
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            BlockNumber(3),
+            AggregatedActionType::ExecuteBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    OperationsSchema(&mut storage)
+        .confirm_aggregated_operations(
+            BlockNumber(3),
+            BlockNumber(3),
+            AggregatedActionType::ExecuteBlocks,
+        )
         .await?;
     let committed_3 = StateSchema(&mut storage)
-        .load_committed_state(Some(3))
+        .load_committed_state(Some(BlockNumber(3)))
         .await?;
     let verified_3 = StateSchema(&mut storage).load_verified_state().await?;
     assert_eq!(verified_3, committed_3);
@@ -122,8 +147,8 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
 async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     async fn check_diff_applying(
         storage: &mut StorageProcessor<'_>,
-        start_block: u32,
-        end_block: Option<u32>,
+        start_block: BlockNumber,
+        end_block: Option<BlockNumber>,
     ) -> QueryResult<()> {
         let (block, updates) = StateSchema(storage)
             .load_state_diff(start_block, end_block)
@@ -140,7 +165,7 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         assert_eq!(
             obtained_state, expected_state,
             "Applying diff {} -> {:?} failed",
-            start_block, end_block
+            *start_block, end_block
         );
         Ok(())
     }
@@ -153,44 +178,90 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create and apply several blocks to work with.
     for block_number in 1..=blocks_amount {
+        let block_number = BlockNumber(block_number);
         let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
         accounts_map = new_accounts_map;
 
-        BlockSchema(&mut storage)
-            .execute_operation(get_operation(
+        OperationsSchema(&mut storage)
+            .store_aggregated_action(gen_unique_aggregated_operation(
                 block_number,
-                Action::Commit,
-                updates,
+                AggregatedActionType::CommitBlocks,
                 block_size,
             ))
             .await?;
-
-        ProverSchema(&mut storage)
-            .store_proof(block_number, &Default::default())
+        StateSchema(&mut storage)
+            .commit_state_update(block_number, &updates, 0)
             .await?;
-        BlockSchema(&mut storage)
-            .execute_operation(get_operation(
+
+        OperationsSchema(&mut storage)
+            .store_aggregated_action(gen_unique_aggregated_operation(
                 block_number,
-                Action::Verify {
-                    proof: Default::default(),
-                },
-                Vec::new(),
+                AggregatedActionType::ExecuteBlocks,
                 block_size,
             ))
             .await?;
     }
 
     // Now let's load some diffs and apply them.
-    check_diff_applying(&mut storage, 1, Some(2)).await?;
-    check_diff_applying(&mut storage, 2, Some(3)).await?;
-    check_diff_applying(&mut storage, 1, Some(3)).await?;
+    check_diff_applying(&mut storage, BlockNumber(1), Some(BlockNumber(2))).await?;
+    check_diff_applying(&mut storage, BlockNumber(2), Some(BlockNumber(3))).await?;
+    check_diff_applying(&mut storage, BlockNumber(1), Some(BlockNumber(3))).await?;
 
     // Go in the reverse order.
-    check_diff_applying(&mut storage, 2, Some(1)).await?;
-    check_diff_applying(&mut storage, 3, Some(1)).await?;
+    check_diff_applying(&mut storage, BlockNumber(2), Some(BlockNumber(1))).await?;
+    check_diff_applying(&mut storage, BlockNumber(3), Some(BlockNumber(1))).await?;
 
     // Apply diff with uncertain end target.
-    check_diff_applying(&mut storage, 1, None).await?;
+    check_diff_applying(&mut storage, BlockNumber(1), None).await?;
 
+    Ok(())
+}
+
+/// Checks if account updates are removed correctly.
+#[db_test]
+async fn test_remove_account_updates(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut rng = create_rng();
+
+    let (accounts_block_1, updates_block_1) = apply_random_updates(AccountMap::default(), &mut rng);
+    let (accounts_block_2, updates_block_2) =
+        apply_random_updates(accounts_block_1.clone(), &mut rng);
+    let (_accounts_block_3, updates_block_3) =
+        apply_random_updates(accounts_block_2.clone(), &mut rng);
+
+    // Commit updates for 3 blocks.
+    StateSchema(&mut storage)
+        .commit_state_update(BlockNumber(1), &updates_block_1, 0)
+        .await?;
+    StateSchema(&mut storage)
+        .commit_state_update(BlockNumber(2), &updates_block_2, 0)
+        .await?;
+    StateSchema(&mut storage)
+        .commit_state_update(BlockNumber(3), &updates_block_3, 0)
+        .await?;
+
+    // Remove updates for blocks with number greater than 2.
+    StateSchema(&mut storage)
+        .remove_account_balance_updates(BlockNumber(2))
+        .await?;
+    StateSchema(&mut storage)
+        .remove_account_creates(BlockNumber(2))
+        .await?;
+    StateSchema(&mut storage)
+        .remove_account_pubkey_updates(BlockNumber(2))
+        .await?;
+
+    let diff1 = StateSchema(&mut storage)
+        .load_state_diff(BlockNumber(0), Some(BlockNumber(1)))
+        .await?;
+    let diff2 = StateSchema(&mut storage)
+        .load_state_diff(BlockNumber(0), Some(BlockNumber(2)))
+        .await?;
+    let diff3 = StateSchema(&mut storage)
+        .load_state_diff(BlockNumber(0), Some(BlockNumber(3)))
+        .await?;
+
+    // Check that there are updates for the 2nd block and there are not for the 3rd by comparing diffs.
+    assert_ne!(diff1, diff2);
+    assert_eq!(diff2, diff3);
     Ok(())
 }

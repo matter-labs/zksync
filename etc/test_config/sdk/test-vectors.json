@@ -1,0 +1,657 @@
+{
+  "cryptoPrimitivesTest": {
+    "description": "Contains the seed for private key and the message for signing",
+    "items": [
+      {
+        "inputs": {
+          "seed": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "message": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
+        },
+        "outputs": {
+          "privateKey": "0x0552a69519d1f3043611126c13489ff4a2a867a1c667b1d9d9031cd27fdcff5a",
+          "pubKey": "17f3708f5e2b2c39c640def0cf0010fd9dd9219650e389114ea9da47f5874184",
+          "signature": "5462c3083d92b832d540c9068eed0a0450520f6dd2e4ab169de1a46585b394a4292896a2ebca3c0378378963a6bc1710b64c573598e73de3a33d6cec2f5d7403"
+        }
+      }
+    ]
+  },
+  "txTest": {
+    "description": "Contains various zkSync transactions as inputs and zkSync and Ethereum signature data as outputs",
+    "items": [
+      {
+        "inputs": {
+          "type": "Transfer",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "accountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "tokenId": 0,
+            "amount": "1000000000000",
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          },
+          "ethSignData": {
+            "stringAmount": "1000000000000.0",
+            "stringToken": "ETH",
+            "stringFee": "1000000.0",
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "accountId": 44,
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "signBytes": "0xfa010000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000000004a817c80027d030000000c000000000000000000000000ffffffff",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "b3211c7e15d31d64619e0c7f65fce8c6e45637b5cfc8711478c5a151e6568d875ec7f48e040225fe3cc7f1e7294625cad6d98b4595d007d36ef62122de16ae01"
+          },
+          "ethSignMessage": "0x5472616e7366657220313030303030303030303030302e302045544820746f3a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
+          "ethSignature": "0x4684a8f03c5da84676ff4eae89984f20057ce288b3a072605cbf93ef4bcc8a021306b13a88c6d3adc68347f4b68b1cbdf967861005e934afa50ce2e0c5bced791b"
+        }
+      },
+      {
+        "inputs": {
+          "type": "ChangePubKey",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "accountId": 55,
+            "account": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "newPkHash": "sync:18e8446d7748f2de52b28345bdbc76160e6b35eb",
+            "feeTokenId": 0,
+            "fee": "1000000000",
+            "nonce": 13,
+            "validFrom": 0,
+            "validUntil": 4294967295,
+            "ethAuthData": {
+              "type": "Onchain"
+            }
+          },
+          "ethSignData": {
+            "pubKeyHash": "sync:18e8446d7748f2de52b28345bdbc76160e6b35eb",
+            "accountId": 55,
+            "nonce": 13
+          }
+        },
+        "outputs": {
+          "signBytes": "0xf80100000037ede35562d3555e61120a151b3c8e8e91d83a378a18e8446d7748f2de52b28345bdbc76160e6b35eb000000007d060000000d000000000000000000000000ffffffff",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "85782959384c1728192b0fe9466a4273b6d0e78e913eea894b780e0236fc4c9d673d3833e895bce992fc113a4d16bba47ef73fed9c4fca2af09ed06cd6885802"
+          },
+          "ethSignMessage": "0x18e8446d7748f2de52b28345bdbc76160e6b35eb0000000d000000370000000000000000000000000000000000000000000000000000000000000000",
+          "ethSignature": "0xba3fab6cd1ecebe7249f99138c5c804e23553bda91134a77eee02f577419606e33f5b2451c56e7fae80996a21f63b8ee15bb09ecbce84cbdad3158792705aa3c1c"
+        }
+      },
+      {
+        "inputs": {
+          "type": "Withdraw",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "accountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "ethAddress": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "tokenId": 0,
+            "amount": "1000000000000",
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          },
+          "ethSignData": {
+            "stringAmount": "1000000000000.0",
+            "stringToken": "ETH",
+            "stringFee": "1000000.0",
+            "ethAddress": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "accountId": 44,
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "signBytes": "0xfc010000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000000000000000000000000000000e8d4a510007d030000000c000000000000000000000000ffffffff",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "11dc47fced9e6ffabe33112a4280c02d0c1ffa649ba3843eec256d427b90ed82e495c0cee2138d5a9e20328d31cb97b70d7e2ede0d8d967678803f4b5896f701"
+          },
+          "ethSignMessage": "0x576974686472617720313030303030303030303030302e302045544820746f3a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
+          "ethSignature": "0xa87d458c96f2b78c8b615c7703540d5af0c0b5266b12dbd648d8f6824958ed907f40cae683fa77e7a8a5780381cae30a94acf67f880ed30483c5a8480816fc9d1c"
+        }
+      },
+      {
+        "inputs": {
+          "type": "ForcedExit",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "initiatorAccountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "target": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "tokenId": 0,
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          },
+          "ethSignData": null
+        },
+        "outputs": {
+          "signBytes": "0xf7010000002c19aa2ed8712072e918632259780e587698ef58df000000007d030000000c000000000000000000000000ffffffff",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "b1b82f7ac37e2d4bd675e4a5cd5e48d9fad1739282db8a979c3e4d9e39d794915667ee2c125ba24f4fe81ad6d19491eef0be849a823ea6567517b7e207214705"
+          },
+          "ethSignMessage": null,
+          "ethSignature": null
+        }
+      },
+      {
+        "inputs": {
+          "type": "MintNFT",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "creatorId": 44,
+            "creatorAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "fee": "1000000",
+            "feeTokenId": 0,
+            "nonce": 12
+          },
+          "ethSignData": {
+            "stringFeeToken": "ETH",
+            "stringFee": "1000000.0",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "signBytes": "0xf6010000002cede35562d3555e61120a151b3c8e8e91d83a378a000000000000000000000000000000000000000000000000000000000000012319aa2ed8712072e918632259780e587698ef58df000000007d030000000c",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "5cf4ef4680d58e23ede08cc2f8dd33123c339788721e307a813cdf82bc0bac1c10bc861c68d0b5328e4cb87b610e4dfdc13ddf8a444a4a2ac374ac3c73dbec05"
+          },
+          "ethSignMessage": "0x4d696e744e46542030783030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303031323320666f723a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
+          "ethSignature": "0xac4f8b1ad65ea143dd2a940c72dd778ba3e07ee766355ed237a89a0b7e925fe76ead0a04e23db1cc1593399ee69faeb31b2e7e0c6fbec70d5061d6fbc431d64a1b"
+        }
+      },
+      {
+        "inputs": {
+          "type": "WithdrawNFT",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "accountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "tokenId": 100000,
+            "feeTokenId": 0,
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          },
+          "ethSignData": {
+            "token": 100000,
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "stringFee": "1000000.0",
+            "stringFeeToken": "ETH",
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "signBytes": "0xf5010000002cede35562d3555e61120a151b3c8e8e91d83a378a19aa2ed8712072e918632259780e587698ef58df000186a0000000007d030000000c000000000000000000000000ffffffff",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "1236180fe01b42c0c3c084d152b0582e714fa19da85900777e811f484a5b3ea434af320f66c7c657a33024d7be22cea44b7406d0af88c097a9d7d6b5d7154d02"
+          },
+          "ethSignMessage": "0x57697468647261774e46542031303030303020746f3a203078313961613265643837313230373265393138363332323539373830653538373639386566353864660a4665653a20313030303030302e30204554480a4e6f6e63653a203132",
+          "ethSignature": "0x4a50341da6d2b1f0b64a4e37f753c02c43623e89cb0a291026c37fdcc723da9665453ce622f4dd6237bd98430ef0d75755694b1968f3b2d0ea8598f8bc43accf1b"
+        }
+      },
+      {
+        "inputs": {
+          "type": "Order",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "accountId": 6,
+            "nonce": 18,
+            "tokenSell": 0,
+            "tokenBuy": 2,
+            "ratio": [
+              "1",
+              "2"
+            ],
+            "amount": "1000000",
+            "recipient": "0x823b6a996cea19e0c41e250b20e2e804ea72ccdf",
+            "validFrom": 0,
+            "validUntil": 4294967295
+          },
+          "ethSignData": {
+            "tokenSell": "ETH",
+            "tokenBuy": "DAI",
+            "recipient": "0x823b6a996cea19e0c41e250b20e2e804ea72ccdf",
+            "amount": "1000.0",
+            "nonce": 18,
+            "ratio": [
+              "1",
+              "2"
+            ]
+          }
+        },
+        "outputs": {
+          "signBytes": "0x6f0100000006823b6a996cea19e0c41e250b20e2e804ea72ccdf0000001200000000000000020000000000000000000000000000010000000000000000000000000000020001e84800000000000000000000000000ffffffff",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "b76c83011ea9e14cf679d35b9a7084832a78bf3f975c5b5c3315f80993c227afb7a1cd7e7b8fc225a48d8c9be78335736115890df5bbacfc52ecf47b4e089500"
+          },
+          "ethSignMessage": "0x4f7264657220666f7220313030302e3020455448202d3e204441490a526174696f3a20313a320a416464726573733a203078383233623661393936636561313965306334316532353062323065326538303465613732636364660a4e6f6e63653a203138",
+          "ethSignature": "0x841a4ed62572883b2272a56164eb33f7b0649029ba588a7230928cff698b49383045b47d35dcdee1beb33dd4ca6b944b945314a206f3f2838ddbe389a34fc8cb1c"
+        }
+      },
+      {
+        "inputs": {
+          "type": "Swap",
+          "ethPrivateKey": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "data": {
+            "type": "Swap",
+            "orders": [
+              {
+                "accountId": 6,
+                "nonce": 18,
+                "tokenSell": 1,
+                "tokenBuy": 2,
+                "ratio": [
+                  "1",
+                  "2"
+                ],
+                "amount": "1000000",
+                "recipient": "0x823b6a996cea19e0c41e250b20e2e804ea72ccdf",
+                "validFrom": 0,
+                "validUntil": 4294967295
+              },
+              {
+                "accountId": 44,
+                "nonce": 101,
+                "tokenSell": 2,
+                "tokenBuy": 1,
+                "ratio": [
+                  "3",
+                  "1"
+                ],
+                "amount": "2500000",
+                "recipient": "0x63adbb48d1bc2cf54562910ce54b7ca06b87f319",
+                "validFrom": 0,
+                "validUntil": 4294967295
+              }
+            ],
+            "nonce": 1,
+            "amounts": [
+              "1000000",
+              "2500000"
+            ],
+            "submitterId": 5,
+            "submitterAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "feeToken": 3,
+            "fee": "123"
+          },
+          "ethSignData": {
+            "fee": "12.3",
+            "feeToken": "USDT",
+            "nonce": 1
+          }
+        },
+        "outputs": {
+          "signBytes": "0xf40100000005ede35562d3555e61120a151b3c8e8e91d83a378a000000017b1e76f6f124bae1917435a02cfbf5571d79ddb8380bc4bf4858c9e9969487000000030f600001e848000004c4b400",
+          "signature": {
+            "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
+            "signature": "c13aabacf96448efb47763554753bfe2acc303a8297c8af59e718d685d422a901a43c42448f95cca632821df1ccb754950196e8444c0acef253c42c1578b5401"
+          },
+          "ethSignMessage": "0x53776170206665653a2031322e3320555344540a4e6f6e63653a2031",
+          "ethSignature": "0x3a459b40838e9445adc59e0cba4bf769b68deda8dadfedfe415f9e8be1c55443090f66cfbd13d96019b9faafb996a5a69d1bc0d1061f08ebf7cb8a1687e09a0f1c"
+        }
+      }
+    ]
+  },
+  "utils": {
+    "amountPacking": {
+      "description": "Checks for amount packing",
+      "items": [
+        {
+          "inputs": {
+            "value": "0"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "0",
+            "packedValue": "0x0000000000"
+          }
+        },
+        {
+          "inputs": {
+            "value": "1000"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "1000",
+            "packedValue": "0x0000007d00"
+          }
+        },
+        {
+          "inputs": {
+            "value": "1111"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "1111",
+            "packedValue": "0x0000008ae0"
+          }
+        },
+        {
+          "inputs": {
+            "value": "474732833474"
+          },
+          "outputs": {
+            "packable": false,
+            "closestPackable": "474732833400",
+            "packedValue": "0x235ecf69c2"
+          }
+        },
+        {
+          "inputs": {
+            "value": "474732833400"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "474732833400",
+            "packedValue": "0x235ecf69c2"
+          }
+        },
+        {
+          "inputs": {
+            "value": "10000000000000"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "10000000000000",
+            "packedValue": "0x4a817c8003"
+          }
+        }
+      ]
+    },
+    "feePacking": {
+      "description": "Checks for fee packing",
+      "items": [
+        {
+          "inputs": {
+            "value": "0"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "0",
+            "packedValue": "0x0000"
+          }
+        },
+        {
+          "inputs": {
+            "value": "1000"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "1000",
+            "packedValue": "0x7d00"
+          }
+        },
+        {
+          "inputs": {
+            "value": "1111"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "1111",
+            "packedValue": "0x8ae0"
+          }
+        },
+        {
+          "inputs": {
+            "value": "474732833474"
+          },
+          "outputs": {
+            "packable": false,
+            "closestPackable": "474000000000",
+            "packedValue": "0x3b49"
+          }
+        },
+        {
+          "inputs": {
+            "value": "474732833400"
+          },
+          "outputs": {
+            "packable": false,
+            "closestPackable": "474000000000",
+            "packedValue": "0x3b49"
+          }
+        },
+        {
+          "inputs": {
+            "value": "10000000000000"
+          },
+          "outputs": {
+            "packable": true,
+            "closestPackable": "10000000000000",
+            "packedValue": "0x7d0a"
+          }
+        }
+      ]
+    },
+    "tokenFormatting": {
+      "description": "Checks for token amount formatting",
+      "items": [
+        {
+          "inputs": {
+            "token": "NNM",
+            "decimals": 0,
+            "amount": "1000000000000000100000"
+          },
+          "outputs": {
+            "formatted": "1000000000000000100000.0 NNM"
+          }
+        },
+        {
+          "inputs": {
+            "token": "DAI",
+            "decimals": 6,
+            "amount": "1000000"
+          },
+          "outputs": {
+            "formatted": "1.0 DAI"
+          }
+        },
+        {
+          "inputs": {
+            "token": "ZRO",
+            "decimals": 11,
+            "amount": "0"
+          },
+          "outputs": {
+            "formatted": "0.0 ZRO"
+          }
+        },
+        {
+          "inputs": {
+            "token": "ETH",
+            "decimals": 18,
+            "amount": "1000000000000000100000"
+          },
+          "outputs": {
+            "formatted": "1000.0000000000001 ETH"
+          }
+        }
+      ]
+    }
+  },
+  "txHashTest": {
+    "description": "Contains various zkSync transactions as inputs and their hashes as outputs",
+    "items": [
+      {
+        "inputs": {
+          "tx": {
+            "type": "Transfer",
+            "accountId": 123,
+            "from": "0xdddddddddddddddddddddddddddddddddddddddd",
+            "to": "0xeddddddddddddddddddddddddddddddddddddddd",
+            "token": 0,
+            "amount": 23,
+            "fee": 88,
+            "nonce": 123,
+            "validFrom": 12,
+            "validUntil": 1232321
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:cece8340367ab65fa489ba877443f43750dbd06355e7a023b7fd27dd13bb4272"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "Withdraw",
+            "accountId": 1,
+            "from": "0xddddddddddddddddddddddddddddddddddddddde",
+            "to": "0xadddddddddddddddddddddddddddddddddddddde",
+            "token": 12,
+            "amount": "123",
+            "fee": "897",
+            "nonce": 1,
+            "validFrom": 90809,
+            "validUntil": 873712938
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:e148131aa7426b7e0d561d19cdca201cda8b86233c9aa9b04f745c09519f5b44"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "ChangePubKey",
+            "accountId": 2,
+            "account": "0xaddddddddddddddddddddddddddddddddddddd0e",
+            "newPkHash": "0xadddddddd1234ddddddddddddddddddddddddd0e",
+            "feeToken": 20,
+            "fee": 98,
+            "nonce": 32,
+            "validFrom": 177,
+            "validUntil": 52443
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:b4585b31ac55c017cc8d98e69b05e7ac6b93f76dc12a08f5e9c2d9a1b2ce01a9"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "ForcedExit",
+            "initiatorAccountId": 776,
+            "target": "0xadddddddd1234ddddd777ddddddddddddddddd0e",
+            "token": 5,
+            "fee": 123,
+            "nonce": 5,
+            "validFrom": 8978,
+            "validUntil": 57382678
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:69ffbd4dbd2ab32fbafd7702c71ad9c95c883258468c77eb1435c33d29a99a26"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "MintNFT",
+            "creatorId": 44,
+            "creatorAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "recipient": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "contentHash": "0x0000000000000000000000000000000000000000000000000000000000000123",
+            "fee": "1000000",
+            "feeToken": 0,
+            "nonce": 12
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:3fd8d3ac3231407900d157d60d392e32293ea0f9bb216559fd31e25e2e7bc28b"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "WithdrawNFT",
+            "accountId": 44,
+            "from": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "to": "0x19aa2ed8712072e918632259780e587698ef58df",
+            "token": 100000,
+            "feeToken": 0,
+            "fee": "1000000",
+            "nonce": 12,
+            "validFrom": 0,
+            "validUntil": 4294967295
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:4733d4c84fab86520f1e6d217ef0fb9247079257cda40a26a398d18a66cfec16"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "Swap",
+            "orders": [
+              {
+                "accountId": 6,
+                "nonce": 18,
+                "tokenSell": 1,
+                "tokenBuy": 2,
+                "ratio": [
+                  "1",
+                  "2"
+                ],
+                "amount": "1000000",
+                "recipient": "0x823b6a996cea19e0c41e250b20e2e804ea72ccdf",
+                "validFrom": 0,
+                "validUntil": 4294967295
+              },
+              {
+                "accountId": 44,
+                "nonce": 101,
+                "tokenSell": 2,
+                "tokenBuy": 1,
+                "ratio": [
+                  "3",
+                  "1"
+                ],
+                "amount": "2500000",
+                "recipient": "0x63adbb48d1bc2cf54562910ce54b7ca06b87f319",
+                "validFrom": 0,
+                "validUntil": 4294967295
+              }
+            ],
+            "nonce": 1,
+            "amounts": [
+              "1000000",
+              "2500000"
+            ],
+            "submitterId": 5,
+            "submitterAddress": "0xedE35562d3555e61120a151B3c8e8e91d83a378a",
+            "feeToken": 3,
+            "fee": "123"
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:a6c8e66c6d86351d8ed820f2dff2de148146e4d9a1b193bc35ebb7f045119a0f"
+        }
+      }
+    ]
+  }
+}
+

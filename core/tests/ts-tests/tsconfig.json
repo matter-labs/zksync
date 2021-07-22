@@ -1,9 +1,9 @@
 {
     "compilerOptions": {
-        "types" : ["node", "ethers", "zksync"],
-        "downlevelIteration": true,
-        "lib": [
-            "es2019"
-        ],
-    },
+        "target": "es2019",
+        "module": "commonjs",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true
+    }
 }

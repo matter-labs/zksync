@@ -1,12 +1,12 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{ConstraintSystem, SynthesisError},
     circuit::Assignment,
 };
 // Workspace deps
 use crate::element::CircuitElement;
-use crypto_exports::franklin_crypto::rescue::RescueEngine;
-use models::circuit::account::CircuitAccount;
+use zksync_crypto::circuit::account::CircuitAccount;
+use zksync_crypto::franklin_crypto::rescue::RescueEngine;
 
 #[derive(Clone, Debug)]
 pub struct AccountWitness<E: RescueEngine> {
@@ -38,20 +38,20 @@ impl<E: RescueEngine> AccountContent<E> {
     ) -> Result<Self, SynthesisError> {
         let nonce = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "nonce"),
-            || Ok(witness.nonce.grab()?),
-            models::params::NONCE_BIT_WIDTH,
+            || witness.nonce.grab(),
+            zksync_crypto::params::NONCE_BIT_WIDTH,
         )?;
 
         let pub_key_hash = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "pub_key_hash"),
             || witness.pub_key_hash.grab(),
-            models::params::NEW_PUBKEY_HASH_WIDTH,
+            zksync_crypto::params::NEW_PUBKEY_HASH_WIDTH,
         )?;
 
         let address = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "address"),
             || witness.address.grab(),
-            models::params::ETH_ADDRESS_BIT_WIDTH,
+            zksync_crypto::params::ETH_ADDRESS_BIT_WIDTH,
         )?;
 
         Ok(Self {

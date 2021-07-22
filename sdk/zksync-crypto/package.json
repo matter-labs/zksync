@@ -14,8 +14,8 @@
 		"dist/*"
 	],
 	"scripts": {
-		"build": "./build-package.sh",
-		"test": "f cargo test"
+		"build": "./build-package.sh && node web-wasm.js",
+		"test": "zk f cargo test"
 	},
 	"dependencies": {
 		"@polkadot/util": "^3.3.1"

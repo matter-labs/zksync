@@ -1,17 +1,27 @@
 [package]
-name = "eth_client"
-version = "0.1.0"
+name = "zksync_eth_client"
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
 
 [dependencies]
-models = {  path = "../models", version = "0.0.1" }
+zksync_types = { path = "../types", version = "1.0" }
+zksync_eth_signer = { path = "../eth_signer", version = "1.0" }
+zksync_config = { path = "../config", version = "1.0" }
+zksync_contracts = { path = "../contracts", version = "1.0" }
+vlog = { path = "../../lib/vlog", version = "1.0" }
+
 serde = "1.0.90"
-serde_derive = "1.0.90"
-ethabi = "9.0.0"
+ethabi = "12.0.0"
 web3 = "0.13.0"
-parity-crypto = {version = "0.5.0", features = ["publickey"] }
-futures = { version = "0.3", features = ["compat"] }
-rlp = "0.4.0"
-tiny-keccak = "1.4.2"
-log = "0.4"
-failure = "0.1"
+parity-crypto = {version = "0.6.2", features = ["publickey"] }
+hex = "0.4"
+
+anyhow = "1.0"
+tokio = { version = "0.2", features = ["full"] }
+metrics = "=0.13.0-alpha.8"

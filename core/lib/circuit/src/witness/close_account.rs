@@ -1,29 +1,26 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
+        ff::Field,
     },
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::{
+use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, le_bit_vector_into_field_element},
     },
-    node::operations::CloseOp,
-    params::{
-        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH,
-        NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
-    },
+    params::{account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, TX_TYPE_BIT_WIDTH},
 };
+use zksync_types::operations::CloseOp;
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
     witness::{
-        utils::{apply_leaf_operation, get_audits, SigDataInput},
+        utils::{apply_leaf_operation, fr_from, get_audits, SigDataInput},
         Witness,
     },
 };
@@ -46,7 +43,7 @@ impl Witness for CloseAccountWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, close_account: &CloseOp) -> Self {
         let close_acoount_data = CloseAccountData {
-            account_address: close_account.account_id as u32,
+            account_address: *close_account.account_id,
         };
         Self::apply_data(tree, &close_acoount_data)
     }
@@ -65,6 +62,10 @@ impl Witness for CloseAccountWitness<Bn256> {
         pubdata_bits
     }
 
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        vec![false; CloseOp::CHUNKS * 8]
+    }
+
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()
@@ -74,7 +75,7 @@ impl Witness for CloseAccountWitness<Bn256> {
         let operation_zero = Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("0").unwrap()),
+            chunk: Some(fr_from(0)),
             pubdata_chunk: Some(pubdata_chunks[0]),
             first_sig_msg: Some(input.first_sig_msg),
             second_sig_msg: Some(input.second_sig_msg),
@@ -91,40 +92,17 @@ impl Witness for CloseAccountWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> CloseAccountWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        let mut sig_bits = vec![];
-        append_be_fixed_width(
-            &mut sig_bits,
-            &Fr::from_str("4").unwrap(), //Corresponding tx_type
-            TX_TYPE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.pub_key_hash.unwrap(),
-            NEW_PUBKEY_HASH_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
-            NONCE_BIT_WIDTH,
-        );
-        sig_bits
-    }
-}
-
 impl CloseAccountWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, close_account: &CloseAccountData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        debug!("Initial root = {}", before_root);
+        vlog::debug!("Initial root = {}", before_root);
         let (audit_path_before, audit_balance_path_before) =
             get_audits(tree, close_account.account_address, 0);
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
-        let account_address_fe = Fr::from_str(&close_account.account_address.to_string()).unwrap();
+        let account_address_fe = fr_from(close_account.account_address);
 
         //calculate a and b
         let a = Fr::zero();
@@ -144,7 +122,7 @@ impl CloseAccountWitness<Bn256> {
             );
 
         let after_root = tree.root_hash();
-        debug!("After root = {}", after_root);
+        vlog::debug!("After root = {}", after_root);
         let (audit_path_after, audit_balance_path_after) =
             get_audits(tree, close_account.account_address, 0);
 
@@ -170,18 +148,13 @@ impl CloseAccountWitness<Bn256> {
                 },
             },
             args: OperationArguments {
-                eth_address: Some(Fr::zero()),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(Fr::zero()),
-                pub_nonce: Some(Fr::zero()),
-                fee: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
+                ..Default::default()
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("4").unwrap()),
+            tx_type: Some(fr_from(CloseOp::OP_CODE)),
         }
     }
 }
@@ -192,20 +165,20 @@ impl CloseAccountWitness<Bn256> {
 //mod test {
 //    use super::*;
 //    use crate::witness::utils::public_data_commitment;
-//    use models::merkle_tree::PedersenHasher;
-//    use models::primitives::bytes_into_be_bits;
+//    use zksync_types::merkle_tree::PedersenHasher;
+//    use zksync_types::primitives::BitConvert::from_be_bytes;
 //
-//    use crate::circuit::FranklinCircuit;
+//    use crate::circuit::ZkSyncCircuit;
 //    use bellman::Circuit;
-//    use crypto_exports::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-//    use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-//    use crypto_exports::franklin_crypto::circuit::test::*;
-//    use crypto_exports::franklin_crypto::eddsa::{PrivateKey, PublicKey};
-//    use crypto_exports::franklin_crypto::jubjub::FixedGenerators;
-//    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
-//    use models::circuit::utils::*;
-//    use models::node::tx::PackedPublicKey;
-//    use models::params as franklin_constants;
+//    use zksync_crypto::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+//    use zksync_crypto::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+//    use zksync_crypto::franklin_crypto::circuit::test::*;
+//    use zksync_crypto::franklin_crypto::eddsa::{PrivateKey, PublicKey};
+//    use zksync_crypto::franklin_crypto::jubjub::FixedGenerators;
+//    use zksync_types::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
+//    use zksync_types::circuit::utils::*;
+//    use zksync_types::tx::PackedPublicKey;
+//    use zksync_types::params as franklin_constants;
 //    use rand::{Rng, SeedableRng, XorShiftRng};
 
 //    #[test]
@@ -214,8 +187,8 @@ impl CloseAccountWitness<Bn256> {
 //        let params = &AltJubjubBn256::new();
 //        let p_g = FixedGenerators::SpendingKeyGenerator;
 //        let validator_address_number = 7;
-//        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-//        let block_number = Fr::from_str("1").unwrap();
+//        let validator_address = fr_from(validator_address_number);
+//        let block_number = fr_from(1);
 //        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 //        let phasher = PedersenHasher::<Bn256>::default();
 //
@@ -267,7 +240,7 @@ impl CloseAccountWitness<Bn256> {
 //        );
 //        let packed_public_key = PackedPublicKey(sender_pk);
 //        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-//        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+//        let signer_packed_key_bits: Vec<_> = BitConvert::from_be_bytes(&packed_public_key_bytes)
 //            .iter()
 //            .map(|x| Some(input.x))
 //            .collect();
@@ -299,7 +272,7 @@ impl CloseAccountWitness<Bn256> {
 //        {
 //            let mut cs = TestConstraintSystem::<Bn256>::new();
 //
-//            let instance = FranklinCircuit {
+//            let instance = ZkSyncCircuit {
 //                params,
 //                old_root: close_account_witness.before_root,
 //                operations,
