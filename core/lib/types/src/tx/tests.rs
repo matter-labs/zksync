@@ -6,7 +6,9 @@ use zksync_crypto::{
         eddsa::{PrivateKey, PublicKey},
         jubjub::FixedGenerators,
     },
+    pairing::bn256::Bn256,
     params::{max_account_id, max_fungible_token_id, CURRENT_TX_VERSION, JUBJUB_PARAMS},
+    primitives::rescue_hash_orders,
     public_key_from_private,
     rand::{Rng, SeedableRng, XorShiftRng},
 };
@@ -37,6 +39,105 @@ fn gen_token_id<T: Rng>(rng: &mut T) -> TokenId {
 
 fn gen_nft_token_id<T: Rng>(rng: &mut T) -> TokenId {
     TokenId(rng.gen::<u32>().max(*max_fungible_token_id() + 1))
+}
+
+#[test]
+fn test_print_swap_for_protocol() {
+    let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+    let key_0 = gen_pk_and_msg().0;
+    let key_1 = gen_pk_and_msg().0;
+    let key_2 = gen_pk_and_msg().0;
+    let token_a = gen_token_id(&mut rng);
+    let token_b = gen_token_id(&mut rng);
+
+    let order_0 = Order::new_signed(
+        gen_account_id(&mut rng),
+        Address::from(rng.gen::<[u8; 20]>()),
+        Nonce(rng.gen()),
+        token_a,
+        token_b,
+        (BigUint::from(12u8), BigUint::from(18u8)),
+        BigUint::from(12_000_000_000u64),
+        Default::default(),
+        &key_0,
+    )
+    .expect("failed to sign order");
+
+    let order_1 = Order::new_signed(
+        gen_account_id(&mut rng),
+        Address::from(rng.gen::<[u8; 20]>()),
+        Nonce(rng.gen()),
+        token_b,
+        token_a,
+        (BigUint::from(18u8), BigUint::from(12u8)),
+        BigUint::from(18_000_000_000u64),
+        Default::default(),
+        &key_1,
+    )
+    .expect("failed to sign order");
+
+    let swap = Swap::new_signed(
+        gen_account_id(&mut rng),
+        Address::from(rng.gen::<[u8; 20]>()),
+        Nonce(rng.gen()),
+        (order_0.clone(), order_1.clone()),
+        (
+            BigUint::from(12_000_000_000u64),
+            BigUint::from(18_000_000_000u64),
+        ),
+        BigUint::from(56_000_000u64),
+        gen_token_id(&mut rng),
+        &key_2,
+    )
+    .expect("failed to sign transfer");
+
+    println!(
+        "User representation:\n{}\n",
+        serde_json::to_string_pretty(&swap).expect("json serialize")
+    );
+
+    let print_signer = |name, key: PrivateKey<Bn256>| {
+        println!("Signer ({}):", name);
+        println!("Private key: {}", key.0.to_string());
+        let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
+        println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
+    };
+
+    print_signer("account_a", key_0);
+    print_signer("account_b", key_1);
+    print_signer("submitter", key_2);
+
+    let mut orders_bytes = Vec::new();
+    orders_bytes.extend(order_0.get_bytes());
+    orders_bytes.extend(order_1.get_bytes());
+
+    let signed_fields = vec![
+        ("type", vec![255u8 - Swap::TX_TYPE]),
+        ("version", vec![CURRENT_TX_VERSION]),
+        ("submitterId", swap.submitter_id.to_be_bytes().to_vec()),
+        (
+            "submitterAddress",
+            swap.submitter_address.as_bytes().to_vec(),
+        ),
+        ("nonce", swap.nonce.to_be_bytes().to_vec()),
+        ("orders_hash", rescue_hash_orders(&orders_bytes)),
+        ("fee_token", swap.fee_token.to_be_bytes().to_vec()),
+        ("fee", pack_fee_amount(&swap.fee)),
+        ("amounts[0]", pack_token_amount(&swap.amounts.0)),
+        ("amounts[1]", pack_token_amount(&swap.amounts.1)),
+    ];
+    println!("Signed transaction fields:");
+    let mut field_concat = Vec::new();
+    for (field, value) in signed_fields.into_iter() {
+        println!("{}: 0x{}", field, hex::encode(&value));
+        field_concat.extend(value);
+    }
+    println!("Signed bytes: 0x{}", hex::encode(&field_concat));
+    assert_eq!(
+        field_concat,
+        swap.get_sign_bytes(),
+        "Protocol serialization mismatch"
+    );
 }
 
 #[test]
