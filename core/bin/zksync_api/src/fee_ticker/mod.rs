@@ -585,24 +585,25 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         };
 
         // We have to calculate how much from base price for operations has already paid in blocks and add remain cost to fast withdrawal operation
-        let commit_cost = GasCounter::BASE_COMMIT_BLOCKS_TX_COST
-            - (GasCounter::BASE_COMMIT_BLOCKS_TX_COST
-                / self.config.max_blocks_to_aggregate as usize)
-                * future_blocks
-                    .blocks_to_commit
-                    .rem_euclid(self.config.max_blocks_to_aggregate) as usize;
-        let execute_cost = GasCounter::BASE_EXECUTE_BLOCKS_TX_COST
-            - (GasCounter::BASE_EXECUTE_BLOCKS_TX_COST
-                / self.config.max_blocks_to_aggregate as usize)
-                * future_blocks
-                    .blocks_to_execute
-                    .rem_euclid(self.config.max_blocks_to_aggregate) as usize;
-        let proof_cost = GasCounter::BASE_PROOF_BLOCKS_TX_COST
-            - (GasCounter::BASE_PROOF_BLOCKS_TX_COST
-                / self.config.max_blocks_to_aggregate as usize)
-                * future_blocks
-                    .blocks_to_prove
-                    .rem_euclid(self.config.max_blocks_to_aggregate) as usize;
+        let commit_cost = calculate_cost(
+            GasCounter::BASE_COMMIT_BLOCKS_TX_COST,
+            self.config.max_blocks_to_aggregate,
+            future_blocks.blocks_to_commit,
+        );
+        let execute_cost = calculate_cost(
+            GasCounter::BASE_EXECUTE_BLOCKS_TX_COST,
+            self.config.max_blocks_to_aggregate,
+            future_blocks.blocks_to_execute,
+        );
+        let proof_cost = calculate_cost(
+            GasCounter::BASE_PROOF_BLOCKS_TX_COST,
+            self.config.max_blocks_to_aggregate,
+            future_blocks.blocks_to_prove,
+        );
         BigUint::from(commit_cost + execute_cost + proof_cost + additional_cost)
     }
+}
+
+fn calculate_cost(base_cost: usize, max_blocks: u32, future_blocks: u32) -> usize {
+    base_cost - (base_cost / max_blocks as usize) * future_blocks.rem_euclid(max_blocks) as usize
 }
