@@ -534,8 +534,8 @@ impl ApiV01 {
             + average_proof_generating_time * 2i32;
         let fast = block.timestamp_utc() + average_proof_generating_time * 2i32;
         let processing_time = WithdrawalProcessingTimeResponse {
-            normal: normal.timestamp(),
-            fast: fast.timestamp(),
+            normal: normal.timestamp() as u64,
+            fast: fast.timestamp() as u64,
         };
 
         metrics::histogram!("api.v01.withdrawal_processing_time", start.elapsed());
