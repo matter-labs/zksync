@@ -572,13 +572,13 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
     async fn calculate_fast_withdrawal_gas_cost(&mut self, chunk_size: usize) -> BigUint {
         let mut future_blocks = self.info.blocks_in_future_aggregated_operations().await;
         let remaining_pending_chunks = self.info.remaining_chunks_in_pending_block().await;
-        let additional_cost = if remaining_pending_chunks.is_none()
-            || chunk_size > remaining_pending_chunks.unwrap()
-        {
-            0
-        } else {
-            remaining_pending_chunks.unwrap() * AMORTIZED_COST_PER_CHUNK as usize
-        };
+        let additional_cost = remaining_pending_chunks.map_or(0, |chunks| {
+            if chunk_size > chunks {
+                0
+            } else {
+                chunks * AMORTIZED_COST_PER_CHUNK as usize
+            }
+        });
 
         // We have to calculate how much from base price for operations has already paid in blocks and add remain cost to fast withdrawal operation
         let commit_cost = calculate_cost(
