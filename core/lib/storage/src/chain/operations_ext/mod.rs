@@ -1610,7 +1610,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         &mut self,
         from_block: BlockNumber,
         to_block: BlockNumber,
-        token_addresses: &Vec<Address>,
+        token_addresses: &[Address],
     ) -> QueryResult<Vec<Web3TxReceipt>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
