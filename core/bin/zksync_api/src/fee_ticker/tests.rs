@@ -379,7 +379,7 @@ fn test_ticker_formula() {
             None,
         );
 
-        for i in 1..4 {
+        for i in 1..5 {
             let future_blocks = BlocksInFutureAggregatedOperations {
                 blocks_to_commit: i,
                 blocks_to_prove: i,
@@ -423,27 +423,27 @@ fn test_ticker_formula() {
             );
             last_fast_withdraw_fee = fast_withdraw_fee;
         }
-        // 5 future blocks and one full pending block
+
         let fast_withdraw_fee_for_6_block = get_token_fee_in_usd(
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
             Some(BlocksInFutureAggregatedOperations {
-                blocks_to_commit: 5,
-                blocks_to_prove: 5,
-                blocks_to_execute: 5,
+                blocks_to_commit: 6,
+                blocks_to_prove: 6,
+                blocks_to_execute: 6,
             }),
             None,
         );
-        // one full pending block
+
         let fast_withdraw_fee_for_1_block = get_token_fee_in_usd(
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
             Some(BlocksInFutureAggregatedOperations {
-                blocks_to_commit: 0,
-                blocks_to_prove: 0,
-                blocks_to_execute: 0,
+                blocks_to_commit: 1,
+                blocks_to_prove: 1,
+                blocks_to_execute: 1,
             }),
             None,
         );

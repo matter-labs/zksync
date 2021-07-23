@@ -575,10 +575,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let additional_cost = if remaining_pending_chunks.is_none()
             || chunk_size > remaining_pending_chunks.unwrap()
         {
-            // This operation doesn't fit to current pending block, so we need to commit, prove and execute another full block
-            future_blocks.blocks_to_prove += 1;
-            future_blocks.blocks_to_commit += 1;
-            future_blocks.blocks_to_execute += 1;
             0
         } else {
             remaining_pending_chunks.unwrap() * AMORTIZED_COST_PER_CHUNK as usize
