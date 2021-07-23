@@ -37,6 +37,7 @@ use zksync_types::{
 use zksync_utils::ratio_to_big_decimal;
 
 // Local deps
+use crate::fee_ticker::constants::AMORTIZED_COST_PER_CHUNK;
 use crate::fee_ticker::{
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
@@ -548,21 +549,12 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             }
             TxFeeTypes::MintNFT => (OutputFeeType::MintNFT, MintNFTOp::CHUNKS),
         };
-        // Convert chunks amount to `BigUint`.
-        let op_chunks = BigUint::from(op_chunks);
 
         let gas_tx_amount = if matches!(
             fee_type,
             OutputFeeType::FastWithdraw | OutputFeeType::FastWithdrawNFT
         ) {
-            self.calculate_fast_withdrawal_gas_cost().await
-                + self
-                    .config
-                    .gas_cost_tx
-                    .standard_cost
-                    .get(&fee_type)
-                    .cloned()
-                    .unwrap()
+            self.calculate_fast_withdrawal_gas_cost(op_chunks).await
         } else {
             self.config
                 .gas_cost_tx
@@ -572,10 +564,26 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                 .unwrap()
         };
 
+        // Convert chunks amount to `BigUint`.
+        let op_chunks = BigUint::from(op_chunks);
+
         (fee_type, gas_tx_amount, op_chunks)
     }
-    async fn calculate_fast_withdrawal_gas_cost(&mut self) -> BigUint {
-        let future_blocks = self.info.blocks_in_future_aggregated_operations().await;
+    async fn calculate_fast_withdrawal_gas_cost(&mut self, chunk_size: usize) -> BigUint {
+        let mut future_blocks = self.info.blocks_in_future_aggregated_operations().await;
+        let remaining_pending_chunks = self.info.remaining_chunks_in_pending_block().await;
+        let additional_cost = if remaining_pending_chunks.is_none()
+            || chunk_size > remaining_pending_chunks.unwrap()
+        {
+            // This operation doesn't fit to current pending block, so we need to commit, prove and execute another full block
+            future_blocks.blocks_to_prove += 1;
+            future_blocks.blocks_to_commit += 1;
+            future_blocks.blocks_to_execute += 1;
+            0
+        } else {
+            remaining_pending_chunks.unwrap() * AMORTIZED_COST_PER_CHUNK as usize
+        };
+
         // We have to calculate how much from base price for operations has already paid in blocks and add remain cost to fast withdrawal operation
         let commit_cost = GasCounter::BASE_COMMIT_BLOCKS_TX_COST
             - (GasCounter::BASE_COMMIT_BLOCKS_TX_COST
@@ -595,6 +603,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                 * future_blocks
                     .blocks_to_prove
                     .rem_euclid(self.config.max_blocks_to_aggregate) as usize;
-        BigUint::from(commit_cost + execute_cost + proof_cost)
+        BigUint::from(commit_cost + execute_cost + proof_cost + additional_cost)
     }
 }

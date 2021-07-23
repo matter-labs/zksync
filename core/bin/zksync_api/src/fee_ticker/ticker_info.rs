@@ -19,6 +19,8 @@ pub trait FeeTickerInfo {
     async fn blocks_in_future_aggregated_operations(
         &mut self,
     ) -> BlocksInFutureAggregatedOperations;
+
+    async fn remaining_chunks_in_pending_block(&mut self) -> Option<usize>;
 }
 
 #[derive(Clone)]
@@ -100,5 +102,20 @@ impl FeeTickerInfo for TickerInfo {
             blocks_to_prove: *last_block - *last_proven_block,
             blocks_to_execute: *last_block - *last_executed_block,
         }
+    }
+
+    async fn remaining_chunks_in_pending_block(&mut self) -> Option<usize> {
+        let mut storage = self
+            .db
+            .access_storage()
+            .await
+            .expect("Unable to establish connection to db");
+        let block = storage
+            .chain()
+            .block_schema()
+            .load_pending_block()
+            .await
+            .expect("Error loading pending block");
+        block.map_or(None, |block| Some(block.chunks_left))
     }
 }
