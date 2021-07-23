@@ -11,8 +11,8 @@ pub struct TestnetConfigResponse {
 
 #[derive(Debug, Serialize)]
 pub struct WithdrawalProcessingTimeResponse {
-    pub normal: u64,
-    pub fast: u64,
+    pub normal: i64,
+    pub fast: i64,
 }
 
 #[derive(Debug, Serialize)]

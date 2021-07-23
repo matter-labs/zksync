@@ -529,11 +529,13 @@ impl ApiV01 {
             .expect("Should exist");
         let state_keeper_config = &self_.config.chain.state_keeper;
         let average_proof_generating_time = Duration::minutes(30);
+        let normal = block.timestamp_utc()
+            + Duration::from_std(state_keeper_config.block_execute_deadline()).unwrap()
+            + average_proof_generating_time * 2i32;
+        let fast = block.timestamp_utc() + average_proof_generating_time * 2i32;
         let processing_time = WithdrawalProcessingTimeResponse {
-            normal: (block.timestamp_utc()
-                + Duration::from_std(state_keeper_config.block_execute_deadline()).unwrap())
-            .timestamp() as u64,
-            fast: (block.timestamp_utc() + average_proof_generating_time * 2i32).timestamp() as u64,
+            normal: normal.timestamp(),
+            fast: fast.timestamp(),
         };
 
         metrics::histogram!("api.v01.withdrawal_processing_time", start.elapsed());
