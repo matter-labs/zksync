@@ -570,7 +570,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         (fee_type, gas_tx_amount, op_chunks)
     }
     async fn calculate_fast_withdrawal_gas_cost(&mut self, chunk_size: usize) -> BigUint {
-        let mut future_blocks = self.info.blocks_in_future_aggregated_operations().await;
+        let future_blocks = self.info.blocks_in_future_aggregated_operations().await;
         let remaining_pending_chunks = self.info.remaining_chunks_in_pending_block().await;
         let additional_cost = remaining_pending_chunks.map_or(0, |chunks| {
             if chunk_size > chunks {
