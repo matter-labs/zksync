@@ -116,6 +116,6 @@ impl FeeTickerInfo for TickerInfo {
             .load_pending_block()
             .await
             .expect("Error loading pending block");
-        block.map_or(None, |block| Some(block.chunks_left))
+        block.map(|block| block.chunks_left)
     }
 }
