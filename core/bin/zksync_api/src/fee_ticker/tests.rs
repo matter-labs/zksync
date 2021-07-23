@@ -156,6 +156,7 @@ impl FeeTickerAPI for MockApiProvider {
 
 struct MockTickerInfo {
     pub future_blocks: BlocksInFutureAggregatedOperations,
+    pub remaining_chunks: Option<usize>,
 }
 
 impl Default for MockTickerInfo {
@@ -166,6 +167,7 @@ impl Default for MockTickerInfo {
                 blocks_to_prove: 0,
                 blocks_to_execute: 0,
             },
+            remaining_chunks: None,
         }
     }
 }
@@ -181,6 +183,10 @@ impl FeeTickerInfo for MockTickerInfo {
         &mut self,
     ) -> BlocksInFutureAggregatedOperations {
         self.future_blocks.clone()
+    }
+
+    async fn remaining_chunks_in_pending_block(&mut self) -> Option<usize> {
+        self.remaining_chunks
     }
 }
 
@@ -271,11 +277,13 @@ fn test_ticker_formula() {
     let mut get_token_fee_in_usd = |tx_type: TxFeeTypes,
                                     token: TokenLike,
                                     address: Address,
-                                    future_blocks: Option<BlocksInFutureAggregatedOperations>|
+                                    future_blocks: Option<BlocksInFutureAggregatedOperations>,
+                                    remaining_chunks: Option<usize>|
      -> Ratio<BigUint> {
         if let Some(blocks) = future_blocks {
             ticker.info.future_blocks = blocks;
         }
+        ticker.info.remaining_chunks = remaining_chunks;
         let fee_in_token =
             block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
                 .expect("failed to get fee in token");
@@ -309,11 +317,13 @@ fn test_ticker_formula() {
         TokenId(0).into(),
         Address::default(),
         None,
+        None,
     );
     let expected_price_of_eth_token_withdraw_usd = get_token_fee_in_usd(
         TxFeeTypes::Withdraw,
         TokenId(0).into(),
         Address::default(),
+        None,
         None,
     );
 
@@ -325,6 +335,7 @@ fn test_ticker_formula() {
             TxFeeTypes::Transfer,
             token.id.into(),
             Address::default(),
+            None,
             None,
         );
         let expected_fee = expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();
@@ -342,6 +353,7 @@ fn test_ticker_formula() {
             TxFeeTypes::Withdraw,
             token.id.into(),
             Address::default(),
+            None,
             None,
         );
         let expected_fee = expected_price_of_eth_token_withdraw_usd.clone() * token.risk_factor();
@@ -364,9 +376,10 @@ fn test_ticker_formula() {
                 blocks_to_prove: 0,
                 blocks_to_execute: 0,
             }),
+            None,
         );
 
-        for i in 1..5 {
+        for i in 1..4 {
             let future_blocks = BlocksInFutureAggregatedOperations {
                 blocks_to_commit: i,
                 blocks_to_prove: i,
@@ -377,6 +390,7 @@ fn test_ticker_formula() {
                 token.id.into(),
                 Address::default(),
                 Some(future_blocks.clone()),
+                None,
             );
 
             let expected_price_of_eth_token_fast_withdraw_usd = get_token_fee_in_usd(
@@ -384,6 +398,7 @@ fn test_ticker_formula() {
                 TokenId(0).into(),
                 Address::default(),
                 Some(future_blocks.clone()),
+                None,
             );
             let expected_fee =
                 expected_price_of_eth_token_fast_withdraw_usd.clone() * token.risk_factor();
@@ -408,29 +423,92 @@ fn test_ticker_formula() {
             );
             last_fast_withdraw_fee = fast_withdraw_fee;
         }
+        // 5 future blocks and one full pending block
         let fast_withdraw_fee_for_6_block = get_token_fee_in_usd(
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
             Some(BlocksInFutureAggregatedOperations {
-                blocks_to_commit: 6,
-                blocks_to_prove: 6,
-                blocks_to_execute: 6,
+                blocks_to_commit: 5,
+                blocks_to_prove: 5,
+                blocks_to_execute: 5,
             }),
+            None,
         );
+        // one full pending block
         let fast_withdraw_fee_for_1_block = get_token_fee_in_usd(
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
             Some(BlocksInFutureAggregatedOperations {
-                blocks_to_commit: 1,
-                blocks_to_prove: 1,
-                blocks_to_execute: 1,
+                blocks_to_commit: 0,
+                blocks_to_prove: 0,
+                blocks_to_execute: 0,
             }),
+            None,
         );
+
         assert_eq!(
             fast_withdraw_fee_for_1_block, fast_withdraw_fee_for_6_block,
             "Fee should be the same because 5 blocks should aggregate independent"
+        );
+
+        let mut last_fast_withdraw_fee = get_token_fee_in_usd(
+            TxFeeTypes::FastWithdraw,
+            token.id.into(),
+            Address::default(),
+            Some(BlocksInFutureAggregatedOperations {
+                blocks_to_commit: 1,
+                blocks_to_prove: 2,
+                blocks_to_execute: 3,
+            }),
+            Some(50),
+        );
+        for i in 2..=4 {
+            let fast_withdraw_fee = get_token_fee_in_usd(
+                TxFeeTypes::FastWithdraw,
+                token.id.into(),
+                Address::default(),
+                Some(BlocksInFutureAggregatedOperations {
+                    blocks_to_commit: 1,
+                    blocks_to_prove: 2,
+                    blocks_to_execute: 3,
+                }),
+                Some((50 * i) as usize),
+            );
+            assert!(
+                fast_withdraw_fee > last_fast_withdraw_fee,
+                "Fast withdraw should depend on remaining chunks"
+            );
+            last_fast_withdraw_fee = fast_withdraw_fee;
+        }
+        let not_enough_chunks_fee = get_token_fee_in_usd(
+            TxFeeTypes::FastWithdraw,
+            token.id.into(),
+            Address::default(),
+            Some(BlocksInFutureAggregatedOperations {
+                blocks_to_commit: 1,
+                blocks_to_prove: 2,
+                blocks_to_execute: 3,
+            }),
+            Some(1),
+        );
+
+        let no_pending_block_fee = get_token_fee_in_usd(
+            TxFeeTypes::FastWithdraw,
+            token.id.into(),
+            Address::default(),
+            Some(BlocksInFutureAggregatedOperations {
+                blocks_to_commit: 1,
+                blocks_to_prove: 2,
+                blocks_to_execute: 3,
+            }),
+            None,
+        );
+
+        assert_eq!(
+            not_enough_chunks_fee, no_pending_block_fee,
+            "Fee should be the same because we have to add one full block for this withdraw in both options"
         );
     }
 }
