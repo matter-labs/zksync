@@ -391,7 +391,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
         .name("prover_server".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            let mut actix_runtime = actix_rt::System::new();
+            let actix_runtime = actix_rt::System::new();
 
             actix_runtime.block_on(async move {
                 tokio::spawn(update_prover_job_queue_loop(database.clone()));

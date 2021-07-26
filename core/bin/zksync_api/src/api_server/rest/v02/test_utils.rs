@@ -81,7 +81,7 @@ pub struct TestTransactions {
 }
 
 impl TestServerConfig {
-    pub fn start_server_with_scope<F, D>(
+    pub async fn start_server_with_scope<F, D>(
         &self,
         scope: String,
         scope_factory: F,
@@ -92,16 +92,17 @@ impl TestServerConfig {
         D: Clone + Send + 'static,
     {
         let this = self.clone();
-        let server = actix_web::test::start(move || {
+        let server = actix_web::test::init_service(move || {
             let app = App::new();
             let shared_data = shared_data.clone();
             let app = if let Some(shared_data) = shared_data {
-                app.data(shared_data)
+                app.app_data(shared_data)
             } else {
                 app
             };
             app.service(web::scope(scope.as_ref()).service(scope_factory(&this)))
-        });
+        })
+        .await;
 
         let url = server.url("").trim_end_matches('/').to_owned();
 
@@ -109,7 +110,7 @@ impl TestServerConfig {
         (client, server)
     }
 
-    pub fn start_server<F, D>(
+    pub async fn start_server<F, D>(
         &self,
         scope_factory: F,
         shared_data: Option<D>,
@@ -119,6 +120,7 @@ impl TestServerConfig {
         D: Clone + Send + 'static,
     {
         self.start_server_with_scope(String::from("/api/v0.2"), scope_factory, shared_data)
+            .await
     }
 
     /// Creates several transactions and the corresponding executed operations.

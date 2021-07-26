@@ -121,7 +121,7 @@ async fn handle_graphql(
 fn main() {
     vlog::init();
 
-    let mut runtime = actix_rt::System::new("dev-liquidity-token-watcher");
+    let mut runtime = actix_rt::System::new();
     let config = DevLiquidityTokenWatcherConfig::from_env();
 
     let storage = match config.regime {
@@ -138,9 +138,9 @@ fn main() {
     runtime.block_on(async {
         HttpServer::new(move || {
             App::new()
-                .data(storage.clone())
+                .app_data(storage.clone())
                 .wrap(middleware::Logger::default())
-                .wrap(Cors::default().send_wildcard().max_age(3600))
+                // .wrap(Cors::default().send_wildcard().max_age(3600))
                 .route("/graphql", web::post().to(handle_graphql))
         })
         .bind("0.0.0.0:9975")

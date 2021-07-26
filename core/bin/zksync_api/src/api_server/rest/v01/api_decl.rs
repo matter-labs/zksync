@@ -7,6 +7,7 @@ use crate::{
     },
     core_api_client::CoreApiClient,
 };
+use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
 use zksync_api_types::PriorityOpLookupQuery;
@@ -107,13 +108,13 @@ impl ApiV01 {
     pub(crate) async fn access_storage(&self) -> ActixResult<StorageProcessor<'_>> {
         self.connection_pool.access_storage().await.map_err(|err| {
             vlog::warn!("DB await timeout: '{}';", err);
-            HttpResponse::RequestTimeout().finish().into()
+            actix_web::error::ErrorRequestTimeout(err)
         })
     }
 
-    pub(crate) fn db_error(error: anyhow::Error) -> HttpResponse {
+    pub(crate) fn db_error(error: anyhow::Error) -> InternalError<anyhow::Error> {
         vlog::warn!("DB error: '{}';", error);
-        HttpResponse::InternalServerError().finish()
+        InternalError::from_response(error, HttpResponse::InternalServerError().finish())
     }
 
     // Spawns future updating SharedNetworkStatus in the current `actix::System`
@@ -168,7 +169,7 @@ impl ApiV01 {
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, id);
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // Unverified blocks can still change, so we can't cache them.
@@ -196,7 +197,7 @@ impl ApiV01 {
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         if let Ok(block_details) = transaction
@@ -233,7 +234,7 @@ impl ApiV01 {
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
-                H
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         if !blocks.is_empty()

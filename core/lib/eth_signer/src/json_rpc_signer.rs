@@ -447,7 +447,7 @@ mod tests {
             // Try to bind to some port, hope that 999 variants will be enough
             let tmp_state = state.clone();
             if let Ok(ser) =
-                HttpServer::new(move || App::new().data(tmp_state.clone()).service(index))
+                HttpServer::new(move || App::new().app_data(tmp_state.clone()).service(index))
                     .bind(new_url.clone())
             {
                 server = Some(ser);

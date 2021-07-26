@@ -8,6 +8,7 @@
 //! for correctness.
 
 use crate::{eth_watch::EthWatchRequest, mempool::MempoolTransactionRequest};
+use actix_web::error::InternalError;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::{
     channel::{mpsc, oneshot},
@@ -40,14 +41,13 @@ async fn new_tx(
     let (sender, receiver) = oneshot::channel();
     let item = MempoolTransactionRequest::NewTx(Box::new(tx), sender);
     let mut mempool_sender = data.mempool_tx_sender.clone();
-    mempool_sender
-        .send(item)
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    mempool_sender.send(item).await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
-    let response = receiver
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    let response = receiver.await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -63,14 +63,13 @@ async fn new_txs_batch(
     let (sender, receiver) = oneshot::channel();
     let item = MempoolTransactionRequest::NewTxsBatch(txs, eth_signatures, sender);
     let mut mempool_sender = data.mempool_tx_sender.clone();
-    mempool_sender
-        .send(item)
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    mempool_sender.send(item).await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
-    let response = receiver
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    let response = receiver.await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -87,14 +86,13 @@ async fn unconfirmed_deposits(
         resp: sender,
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender
-        .send(item)
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    eth_watch_sender.send(item).await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
-    let response = receiver
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    let response = receiver.await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -120,8 +118,9 @@ async fn unconfirmed_ops(
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
     // Serializing enum query parameters doesn't work, so parse it separately.
-    let serial_id = ApiEither::from_str(&params.serial_id)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    let serial_id = ApiEither::from_str(&params.serial_id).map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
     let query = PaginationQuery {
         from: PendingOpsRequest {
             address: params.address,
@@ -136,14 +135,13 @@ async fn unconfirmed_ops(
         resp: sender,
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender
-        .send(item)
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    eth_watch_sender.send(item).await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
-    let response = receiver
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    let response = receiver.await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -169,14 +167,13 @@ async fn unconfirmed_op(
         }
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender
-        .send(item)
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    eth_watch_sender.send(item).await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
-    let response = receiver
-        .await
-        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+    let response = receiver.await.map_err(|err| {
+        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    })?;
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -192,7 +189,7 @@ pub fn start_private_core_api(
         .name("core-private-api".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            let mut actix_runtime = actix_rt::System::new();
+            let actix_runtime = actix_rt::System::new();
 
             actix_runtime.block_on(async move {
                 // Start HTTP server.

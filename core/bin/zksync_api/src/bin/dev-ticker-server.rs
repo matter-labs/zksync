@@ -231,7 +231,7 @@ fn main() {
         HttpServer::new(move || {
             App::new()
                 .wrap(middleware::Logger::default())
-                .wrap(Cors::default().send_wildcard().max_age(3600))
+                // .wrap(Cors::default().allow_any_origin().max_age(3600))
                 .service(main_scope(opts.sloppy))
         })
         .bind("0.0.0.0:9876")

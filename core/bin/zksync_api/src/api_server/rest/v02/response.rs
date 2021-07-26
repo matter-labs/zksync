@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use std::convert::From;
 
 // External uses
-use actix_web::{web::Data, Error as ActixError, HttpRequest, HttpResponse, Responder};
+use actix_web::{web::Data, HttpRequest, HttpResponse, Responder};
 use chrono::Utc;
-use futures::future::{ready, Ready};
 use qstring::QString;
 use serde::{Deserialize, Serialize};
 

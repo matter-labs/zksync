@@ -2,6 +2,7 @@
 use std::time::Duration;
 // External deps
 use anyhow::format_err;
+use backoff::future::retry_notify;
 use backoff::Error::{Permanent, Transient};
 use futures::Future;
 use reqwest::Url;
@@ -46,7 +47,7 @@ impl ApiClient {
     }
 
     /// Repeats the function execution on the exponential backoff principle.
-    async fn with_retries<I, E, Fn, Fut>(&self, mut operation: Fn) -> anyhow::Result<I>
+    async fn with_retries<I, E, Fn, Fut>(&self, operation: Fn) -> anyhow::Result<I>
     where
         Fn: FnMut() -> Fut,
         Fut: Future<Output = Result<I, backoff::Error<E>>>,
@@ -61,9 +62,7 @@ impl ApiClient {
                 duration_secs,
             )
         };
-
-        operation
-            .retry_notify(Self::get_backoff(), notify)
+        retry_notify(Self::get_backoff(), operation, notify)
             .await
             .map_err(|e| {
                 format_err!(

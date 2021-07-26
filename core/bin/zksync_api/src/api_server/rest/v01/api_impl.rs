@@ -11,12 +11,11 @@ use crate::api_server::{
         v01::{api_decl::ApiV01, types::*},
     },
 };
-use actix_web::body::AnyBody;
+use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use chrono::Duration;
 use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
-use zksync_storage::chain::operations_ext::records::TxByHashResponse;
 use zksync_storage::chain::operations_ext::SearchDirection;
 use zksync_types::{Address, BlockNumber, Token, TokenId};
 
@@ -98,7 +97,7 @@ impl ApiV01 {
         let start = Instant::now();
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish().into());
         }
 
         let tokens = self_
@@ -115,7 +114,7 @@ impl ApiV01 {
                     offset,
                     limit,
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // Fetch ongoing deposits, since they must be reported within the transactions history.
@@ -131,7 +130,7 @@ impl ApiV01 {
                     offset,
                     limit,
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // Sort operations by block number from smaller (older) to greater (newer).
@@ -176,7 +175,7 @@ impl ApiV01 {
                     offset,
                     limit,
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // Append ongoing operations to the end of the end of the list, as the history
@@ -198,7 +197,7 @@ impl ApiV01 {
 
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish().into());
         }
         let mut storage = self_.access_storage().await?;
         let mut transaction = storage.start_transaction().await.map_err(Self::db_error)?;
@@ -219,7 +218,7 @@ impl ApiV01 {
                     tx_id,
                     limit,
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         transaction.commit().await.map_err(Self::db_error)?;
@@ -239,7 +238,7 @@ impl ApiV01 {
 
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish().into());
         }
 
         let direction = SearchDirection::Newer;
@@ -259,7 +258,7 @@ impl ApiV01 {
                         tx_id,
                         limit,
                     );
-                    HttpResponse::InternalServerError().finish()
+                    InternalError::from_response(err, HttpResponse::InternalServerError().finish())
                 })?
         };
 
@@ -282,7 +281,7 @@ impl ApiV01 {
                         tx_id,
                         limit,
                     );
-                    HttpResponse::InternalServerError().finish()
+                    InternalError::from_response(err, HttpResponse::InternalServerError().finish())
                 })?;
 
             // Sort operations by block number from smaller (older) to greater (newer).
@@ -302,7 +301,7 @@ impl ApiV01 {
                         tx_id,
                         limit,
                     );
-                    HttpResponse::InternalServerError().finish()
+                    InternalError::from_response(err, HttpResponse::InternalServerError().finish())
                 })?;
             // Collect the unconfirmed priority operations with respect to the
             // `limit` parameters.
@@ -328,10 +327,10 @@ impl ApiV01 {
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         if tx_hash_hex.len() < 2 {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish().into());
         }
         let transaction_hash =
-            hex::decode(&tx_hash_hex[2..]).map_err(|_| HttpResponse::BadRequest().finish())?;
+            hex::decode(&tx_hash_hex[2..]).map_err(|err| actix_web::error::ErrorBadRequest(err))?;
 
         let tx_receipt = self_.get_tx_receipt(transaction_hash).await?;
 
@@ -345,9 +344,9 @@ impl ApiV01 {
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let hash = try_parse_hash(&hash_hex_with_prefix)
-            .map_err(|_| HttpResponse::BadRequest().finish())?;
+            .map_err(|err| actix_web::error::ErrorBadRequest(err))?;
 
-        let mut res = match self_
+        let mut res = self_
             .access_storage()
             .await?
             .chain()
@@ -360,11 +359,8 @@ impl ApiV01 {
                     err,
                     hex::encode(&hash)
                 );
-                HttpResponse::InternalServerError().finish()
-            }) {
-            Ok(res) => res,
-            Err(_) => return Ok(HttpResponse::InternalServerError().finish()),
-        };
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+            })?;
 
         // If storage returns Some, return the result.
         if res.is_some() {
@@ -381,7 +377,7 @@ impl ApiV01 {
                     err,
                     hex::encode(&hash)
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // If eth watcher has a priority op with given hash, transform it
@@ -395,7 +391,7 @@ impl ApiV01 {
                 .await
                 .map_err(|err| {
                     vlog::warn!("Internal Server Error: '{}';", err);
-                    HttpResponse::InternalServerError().finish()
+                    InternalError::from_response(err, HttpResponse::InternalServerError().finish())
                 })?;
 
             res = deposit_op_to_tx_by_hash(&tokens, &priority_op);
@@ -442,7 +438,7 @@ impl ApiV01 {
         let max_block = block_query.max_block.unwrap_or(999_999_999);
         let limit = block_query.limit.unwrap_or(20);
         if limit > 100 {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish().into());
         }
         let mut storage = self_.access_storage().await?;
 
@@ -458,7 +454,7 @@ impl ApiV01 {
                     max_block,
                     limit
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         metrics::histogram!("api.v01.blocks", start.elapsed());
@@ -494,7 +490,7 @@ impl ApiV01 {
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         metrics::histogram!("api.v01.block_transactions", start.elapsed());

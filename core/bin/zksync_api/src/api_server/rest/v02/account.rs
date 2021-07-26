@@ -470,7 +470,7 @@ mod tests {
         let server = actix_web::test::start(move || {
             App::new().service(
                 web::scope("unconfirmed_ops")
-                    .data(ops_handle.clone())
+                    .app_data(ops_handle.clone())
                     .route("", web::get().to(get_ops)),
             )
         });
