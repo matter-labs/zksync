@@ -1,23 +1,25 @@
-name: test
+name: Loadtest
 
-on: 
+on:
   push:
   pull_request:
     types: [opened]
 
 env:
   ZKSYNC_ENV: loadtest
-  hfArgs: -e zksync-loadtest
+  HF_ARGS: -e loadtest
+  HF_CMDARGS: --args "timeout 180s"
 
 jobs:
   sqlproxy:
     name: Provision SQLProxy
     runs-on: [k8s, stage, deployer]
     container:
-      image: dysnix/kubectl:v1.16-gcloud
+      image: dysnix/kubectl:v1.19-gcloud
 
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+      HF_DEPLOYS: -l name=sqlproxy
 
     steps:
       - uses: actions/checkout@v2
@@ -35,9 +37,6 @@ jobs:
       -
         name: Setup helm and loadtest.env
         run: |
-          set -o pipefail
-          cp -rf /dysnix/kubectl/.local $HOME/.local
-
           .github/scripts/zksync-env.sh --kube loadtest > etc/env/loadtest.env
           echo -n "ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY=" >> etc/env/loadtest.env
           kubectl get secret -n loadtest server-env -o jsonpath='{.data.ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY}' | base64 -d >> etc/env/loadtest.env
@@ -45,15 +44,14 @@ jobs:
         name: Deploy SQLProxy
         working-directory: helm-infra
         run: |
-          UPDATE_REPOS=y helmfile $hfArgs repos
-          helmfile $hfArgs -l name=sqlproxy sync
+          UPDATE_REPOS=y helmfile $HF_ARGS repos
+          helmfile $HF_ARGS $HF_DEPLOYS sync
 
   init:
     name: Cleanup the database, compile and update contracts
     runs-on: [k8s, stage, deployer]
     needs: sqlproxy
     env:
-      ZKSYNC_ENV: loadtest
       RUSTUP_HOME: /usr/share/rust/.rustup
       CARGO_HOME: /usr/share/rust/.cargo
 
@@ -95,14 +93,11 @@ jobs:
     runs-on: [k8s, stage, deployer]
     needs: init
     container:
-      image: dysnix/kubectl:v1.16-gcloud
-
+      image: dysnix/kubectl:v1.19-gcloud
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-      DEPLOY_APPS: -l name=server -l name=prover
       IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
-      HFENV: zksync-loadtest
-
+      HF_DEPLOYS: -l name=server -l name=prover
     steps:
       -
         name: Create ~/.kube/config
@@ -116,35 +111,30 @@ jobs:
         name: Deploy apps
         working-directory: helm-infra
         run: |
-          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
-
-          UPDATE_REPOS=y helmfile -e $HFENV repos
-          IMAGE_TAG=b2f056a helmfile -e $HFENV $DEPLOY_APPS diff --args "timeout 180s"
-          IMAGE_TAG=b2f056a helmfile -e $HFENV $DEPLOY_APPS sync --args "timeout 180s"
-
-      - name: Sleep for initializating server
-        uses: juliangruber/sleep-action@v1
-        with:
-          time: 60s
+          UPDATE_REPOS=y helmfile $HF_ARGS repos
+          # deploy and wait for server to settle
+          IMAGE_TAG=b2f056a helmfile $HF_ARGS $HF_DEPLOYS apply $HF_CMDARGS \
+            && sleep 60
 
   loadtest:
     name: Perform loadtest
     runs-on: [self-hosted, CI-worker]
     needs: deploy
+    container: rust:1.53
     env:
-      WEB3_URL: ${{secrets.CI_LOADTEST_WEB3_URL}}
-      MASTER_WALLET_PK: ${{secrets.CI_LOADTEST_MAIN_PRIVKEY}}
+      WEB3_URL: ${{ secrets.CI_LOADTEST_WEB3_URL }}
+      MASTER_WALLET_PK: ${{ secrets.CI_LOADTEST_MAIN_PRIVKEY }}
       ACCOUNTS_AMOUNT: 20
       OPERATIONS_PER_ACCOUNT: 20
       MAIN_TOKEN: "USDT"
       ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
       ETH_NETWORK: "rinkeby"
+      RUST_LOG: info
     steps:
       - uses: actions/checkout@v2
-      -
-        name: Run loadtest
-        run: |
-          docker run -e RUST_LOG=info -e WEB3_URL -e MASTER_WALLET_PK -e ACCOUNTS_AMOUNT -e OPERATIONS_PER_ACCOUNT -e MAIN_TOKEN -e ZKSYNC_RPC_ADDR -e ETH_NETWORK -v $(pwd):/usr/zksync-dev -w /usr/zksync-dev  rust:1.53 cargo run --bin loadnext
+      - name: Run loadtest
+        run: cargo run --bin loadnext
+
   cleanup:
     name: Cleanup loadtest environment
     runs-on: [k8s, stage, deployer]
@@ -162,6 +152,5 @@ jobs:
       -
         name: Scale loadtest to 0 replicas
         run: |
-          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/explorer
           kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/server
           kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/prover
