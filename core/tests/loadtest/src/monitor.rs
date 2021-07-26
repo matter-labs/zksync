@@ -156,7 +156,7 @@ macro_rules! await_condition {
             if cond {
                 break;
             }
-            tokio::time::delay_for($d).await;
+            tokio::time::sleep($d).await;
         }
     };
 }
@@ -182,7 +182,7 @@ impl Monitor {
         let monitor = self.clone();
         async move {
             loop {
-                tokio::time::delay_for(Self::SAMPLE_INTERVAL).await;
+                tokio::time::sleep(Self::SAMPLE_INTERVAL).await;
 
                 monitor.inner().await.store_stats();
             }

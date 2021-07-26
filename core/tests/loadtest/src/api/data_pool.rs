@@ -34,9 +34,9 @@ fn gen_offset_limit_pair(count: usize) -> (usize, usize) {
     let mut rng = thread_rng();
     // First argument of `gen_range` should be less than the second,
     // so if count is zero we should return zero to create a correct pair.
-    let offset = rng.gen_range(0, max(1, count));
+    let offset = rng.gen_range(0..max(1, count));
     // We can safely use any value in range `[0, MAX_REQUEST_LIMIT]` as the limit.
-    let limit = rng.gen_range(1, MAX_REQUEST_LIMIT + 1);
+    let limit = rng.gen_range(1..= MAX_REQUEST_LIMIT);
     (offset, limit)
 }
 
@@ -77,7 +77,7 @@ impl ApiDataPoolInner {
     }
 
     pub fn random_address(&self) -> (Address, &AddressData) {
-        let idx = thread_rng().gen_range(0, self.addresses.len());
+        let idx = thread_rng().gen_range(0.. self.addresses.len());
         let address = self.addresses[idx];
         (address, &self.data_by_address[&address])
     }
@@ -92,7 +92,7 @@ impl ApiDataPoolInner {
     }
 
     pub fn random_tx_hash(&self) -> TxHash {
-        let idx = thread_rng().gen_range(0, self.txs.len());
+        let idx = thread_rng().gen_range(0..self.txs.len());
         self.txs[idx]
     }
 
@@ -108,7 +108,7 @@ impl ApiDataPoolInner {
     }
 
     pub fn random_priority_op(&self) -> PriorityOp {
-        let idx = thread_rng().gen_range(0, self.priority_ops.len());
+        let idx = thread_rng().gen_range(0..self.priority_ops.len());
         self.priority_ops[idx].clone()
     }
 
@@ -138,9 +138,9 @@ impl ApiDataPoolInner {
         // Sometimes we have gaps in the block list, so it is not always
         // possible to randomly generate an existing block number.
         for _ in 0..MAX_REQUEST_LIMIT {
-            let number = BlockNumber(rng.gen_range(*from, *to + 1));
+            let number = BlockNumber(rng.gen_range(*from..=*to + 1));
             if let Some(&block_txs) = self.blocks.get(&number) {
-                let tx_id = rng.gen_range(0, block_txs);
+                let tx_id = rng.gen_range(0..=block_txs);
                 return (number, tx_id);
             }
         }

@@ -165,7 +165,7 @@ impl Scenario for BatchTransferScenario {
 /// Returns infinite iterator over the following batch sizes:
 /// `[2, max_batch_size / 2, max_batch_size]`
 pub fn batch_sizes_iter(max_batch_size: usize) -> impl Iterator<Item = usize> {
-    std::iter::repeat_with(move || match thread_rng().gen_range(0, 3) {
+    std::iter::repeat_with(move || match thread_rng().gen_range(0..=3) {
         0 => 2,
         1 => max_batch_size / 2,
         2 => max_batch_size,

@@ -36,7 +36,7 @@ fn parse_knobs(mut input: syn::ItemFn) -> Result<TokenStream, syn::Error> {
     // Remove argument, as the test function must not have one.
     sig.inputs.pop();
 
-    let rt = quote! { tokio::runtime::Builder::new().basic_scheduler() };
+    let rt = quote! { tokio::runtime::Builder::new_current_thread() };
 
     let header = quote! {
         #[::core::prelude::v1::test]

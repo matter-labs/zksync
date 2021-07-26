@@ -55,7 +55,7 @@ impl ApiV01 {
     /// Creates an actix-web `Scope`, which can be mounted to the Http server.
     pub fn into_scope(self) -> actix_web::Scope {
         web::scope("/api/v0.1")
-            .data(self)
+            .app_data(self)
             .route("/testnet_config", web::get().to(Self::testnet_config))
             .route("/status", web::get().to(Self::status))
             .route("/tokens", web::get().to(Self::tokens))
@@ -233,7 +233,7 @@ impl ApiV01 {
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
-                HttpResponse::InternalServerError().finish()
+                H
             })?;
 
         if !blocks.is_empty()

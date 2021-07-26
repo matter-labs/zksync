@@ -199,7 +199,7 @@ async fn token_pagination(
 
 async fn token_by_id_or_address(
     data: web::Data<ApiTokenData>,
-    web::Path(token_like_string): web::Path<String>,
+    token_like_string: web::Path<String>,
 ) -> ApiResult<ApiToken> {
     let token_like = TokenLike::parse(&token_like_string);
     let token_like = match token_like {
@@ -219,8 +219,9 @@ async fn token_by_id_or_address(
 // Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318 (ZKS-628)
 async fn token_price(
     data: web::Data<ApiTokenData>,
-    web::Path((token_like_string, currency)): web::Path<(String, String)>,
+    path: web::Path<(String, String)>,
 ) -> ApiResult<TokenPrice> {
+    let (token_like_string, currency) = path.into_inner();
     let first_token = TokenLike::parse(&token_like_string);
     let first_token = match first_token {
         TokenLike::Symbol(_) => {
@@ -238,7 +239,7 @@ async fn token_price(
     ApiResult::Ok(TokenPrice {
         token_id: token.id,
         token_symbol: token.symbol,
-        price_in: currency,
+        price_in: currency.to_string(),
         decimals: token.decimals,
         price,
     })
@@ -246,12 +247,12 @@ async fn token_price(
 
 async fn get_nft(
     data: web::Data<ApiTokenData>,
-    web::Path(id): web::Path<TokenId>,
+    id: web::Path<TokenId>,
 ) -> ApiResult<Option<ApiNFT>> {
     let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
     let nft = api_try!(storage
         .tokens_schema()
-        .get_nft_with_factories(id)
+        .get_nft_with_factories(*id)
         .await
         .map_err(Error::storage));
     ApiResult::Ok(nft)
@@ -266,7 +267,7 @@ pub fn api_scope(
     let data = ApiTokenData::new(config, pool, tokens_db, fee_ticker);
 
     web::scope("tokens")
-        .data(data)
+        .app_data(data)
         .route("", web::get().to(token_pagination))
         .route(
             "{token_id_or_address}",

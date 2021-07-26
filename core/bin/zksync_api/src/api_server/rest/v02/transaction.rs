@@ -132,16 +132,16 @@ impl ApiTransactionData {
 
 async fn tx_status(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<TxHash>,
+    tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<Receipt>> {
-    data.tx_status(tx_hash).await.into()
+    data.tx_status(*tx_hash).await.into()
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<TxHash>,
+    tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TxData>> {
-    data.tx_data(tx_hash).await.into()
+    data.tx_data(*tx_hash).await.into()
 }
 
 async fn submit_tx(
@@ -171,16 +171,16 @@ async fn submit_batch(
 
 async fn get_batch(
     data: web::Data<ApiTransactionData>,
-    web::Path(batch_hash): web::Path<TxHash>,
+    batch_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<ApiTxBatch>> {
-    data.get_batch(batch_hash).await.into()
+    data.get_batch(*batch_hash).await.into()
 }
 
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
     web::scope("transactions")
-        .data(data)
+        .app_data(data)
         .route("", web::post().to(submit_tx))
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))

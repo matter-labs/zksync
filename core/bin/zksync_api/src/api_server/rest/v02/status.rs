@@ -70,7 +70,7 @@ pub fn api_scope(pool: ConnectionPool) -> Scope {
     let data = ApiStatusData::new(pool);
 
     web::scope("networkStatus")
-        .data(data)
+        .app_data(data)
         .route("", web::get().to(get_status))
 }
 

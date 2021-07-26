@@ -159,7 +159,7 @@ async fn block_pagination(
 // Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318 (ZKS-628)
 async fn block_by_position(
     data: web::Data<ApiBlockData>,
-    web::Path(block_position): web::Path<String>,
+    block_position: web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
     data.block_info(block_number).await.into()
@@ -167,7 +167,7 @@ async fn block_by_position(
 
 async fn block_transactions(
     data: web::Data<ApiBlockData>,
-    web::Path(block_position): web::Path<String>,
+    block_position: web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
@@ -179,7 +179,7 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
     let data = ApiBlockData::new(pool, cache);
 
     web::scope("blocks")
-        .data(data)
+        .app_data(data)
         .route("", web::get().to(block_pagination))
         .route("{block_position}", web::get().to(block_by_position))
         .route(

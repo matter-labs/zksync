@@ -1,6 +1,5 @@
 //! Storage for subscription objects.
 use super::SubscriptionSender;
-use futures::{compat::Future01CompatExt, FutureExt};
 use std::{cmp::Ord, collections::BTreeMap, str::FromStr};
 use zksync_types::{tx::TxHash, AccountId, ActionType, PriorityOpId};
 
@@ -53,7 +52,7 @@ where
     }
 
     fn send_once(&self, sink: &Sink<RESP>, val: RESP) {
-        tokio::spawn(sink.notify(Ok(val)).compat().map(drop));
+        // tokio::spawn(sink.notify(Ok(val)).compat().map(drop));
     }
 
     pub fn generate_sub_id(&mut self, action_id: ID, action_type: ActionType) -> SubscriptionId {

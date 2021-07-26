@@ -48,7 +48,7 @@ pub fn api_scope(config: &ZkSyncConfig) -> Scope {
     let data = ApiConfigData::new(config);
 
     web::scope("config")
-        .data(data)
+        .app_data(data)
         .route("", web::get().to(config_endpoint))
 }
 

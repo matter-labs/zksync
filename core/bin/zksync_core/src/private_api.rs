@@ -79,11 +79,11 @@ async fn new_txs_batch(
 #[actix_web::get("/unconfirmed_deposits/{address}")]
 async fn unconfirmed_deposits(
     data: web::Data<AppState>,
-    web::Path(address): web::Path<Address>,
+    address: web::Path<Address>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
     let item = EthWatchRequest::GetUnconfirmedDeposits {
-        address,
+        address: *address,
         resp: sender,
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
@@ -192,7 +192,7 @@ pub fn start_private_core_api(
         .name("core-private-api".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            let mut actix_runtime = actix_rt::System::new("core-private-api-server");
+            let mut actix_runtime = actix_rt::System::new();
 
             actix_runtime.block_on(async move {
                 // Start HTTP server.
@@ -206,7 +206,6 @@ pub fn start_private_core_api(
                     // `Arc` wrapping of the object.
                     App::new()
                         .wrap(actix_web::middleware::Logger::default())
-                        .wrap(vlog::actix_middleware())
                         .app_data(web::Data::new(app_state))
                         .app_data(web::JsonConfig::default().limit(2usize.pow(32)))
                         .service(new_tx)

@@ -11,12 +11,12 @@ use zksync_utils::parse_env;
 
 pub mod holder;
 
-type Pool = deadpool::managed::Pool<PgConnection, SqlxError>;
+pub type Pool = deadpool::managed::Pool<DbPool>;
 
-pub type PooledConnection = deadpool::managed::Object<PgConnection, SqlxError>;
+pub type PooledConnection = deadpool::managed::Object<DbPool>;
 
 #[derive(Clone)]
-struct DbPool {
+pub struct DbPool {
     url: String,
 }
 
@@ -25,13 +25,16 @@ impl DbPool {
         let pool_config = PoolConfig {
             max_size,
             timeouts: Timeouts::wait_millis(20_000), // wait 20 seconds before returning error
+            runtime: Default::default(),
         };
         Pool::from_config(DbPool { url: url.into() }, pool_config)
     }
 }
 
 #[async_trait]
-impl Manager<PgConnection, SqlxError> for DbPool {
+impl Manager for DbPool {
+    type Type = PgConnection;
+    type Error = SqlxError;
     async fn create(&self) -> Result<PgConnection, SqlxError> {
         PgConnection::connect(&self.url).await
     }

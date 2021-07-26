@@ -13,20 +13,20 @@ zksync_crypto = { path = "../../core/lib/crypto", version = "1.0" }
 zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
 
 sha2 = "0.8"
-web3 = "0.13.0"
-ethabi = "12.0.0"
-tokio = { version = "0.2", features = ["time"] }
+web3 = "0.16.0"
+ethabi = "14.0.0"
+tokio = { version = "1", features = ["time"] }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-jsonrpc-core = "14.0.3"
+jsonrpc-core = "18"
 num = { version = "0.3.1", features = ["serde"] }
-reqwest = { version = "0.10", features = ["json", "blocking"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
 thiserror = "1.0"
 async-trait = "0.1"
 
 [dev-dependencies]
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 anyhow = "1.0"
 hex = "0.4"
 

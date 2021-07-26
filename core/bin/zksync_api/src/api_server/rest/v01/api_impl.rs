@@ -11,10 +11,12 @@ use crate::api_server::{
         v01::{api_decl::ApiV01, types::*},
     },
 };
+use actix_web::body::AnyBody;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use chrono::Duration;
 use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
+use zksync_storage::chain::operations_ext::records::TxByHashResponse;
 use zksync_storage::chain::operations_ext::SearchDirection;
 use zksync_types::{Address, BlockNumber, Token, TokenId};
 
@@ -90,8 +92,9 @@ impl ApiV01 {
 
     pub async fn tx_history(
         self_: web::Data<Self>,
-        web::Path((address, mut offset, mut limit)): web::Path<(Address, u64, u64)>,
+        path: web::Path<(Address, u64, u64)>,
     ) -> ActixResult<HttpResponse> {
+        let (address, mut offset, mut limit) = path.into_inner();
         let start = Instant::now();
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
@@ -186,7 +189,7 @@ impl ApiV01 {
 
     pub async fn tx_history_older_than(
         self_: web::Data<Self>,
-        web::Path(address): web::Path<Address>,
+        address: web::Path<Address>,
         web::Query(query): web::Query<TxHistoryQuery>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
@@ -227,7 +230,7 @@ impl ApiV01 {
 
     pub async fn tx_history_newer_than(
         self_: web::Data<Self>,
-        web::Path(address): web::Path<Address>,
+        address: web::Path<Address>,
         web::Query(query): web::Query<TxHistoryQuery>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
@@ -269,7 +272,7 @@ impl ApiV01 {
             // Fetch ongoing deposits, since they must be reported within the transactions history.
             let mut ongoing_ops = self_
                 .api_client
-                .get_unconfirmed_deposits(address)
+                .get_unconfirmed_deposits(*address)
                 .await
                 .map_err(|err| {
                     vlog::warn!(
@@ -321,7 +324,7 @@ impl ApiV01 {
 
     pub async fn executed_tx_by_hash(
         self_: web::Data<Self>,
-        web::Path(tx_hash_hex): web::Path<String>,
+        tx_hash_hex: web::Path<String>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         if tx_hash_hex.len() < 2 {
@@ -338,13 +341,13 @@ impl ApiV01 {
 
     pub async fn tx_by_hash(
         self_: web::Data<Self>,
-        web::Path(hash_hex_with_prefix): web::Path<String>,
+        hash_hex_with_prefix: web::Path<String>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let hash = try_parse_hash(&hash_hex_with_prefix)
             .map_err(|_| HttpResponse::BadRequest().finish())?;
 
-        let mut res = self_
+        let mut res = match self_
             .access_storage()
             .await?
             .chain()
@@ -358,7 +361,10 @@ impl ApiV01 {
                     hex::encode(&hash)
                 );
                 HttpResponse::InternalServerError().finish()
-            })?;
+            }) {
+            Ok(res) => res,
+            Err(_) => return Ok(HttpResponse::InternalServerError().finish()),
+        };
 
         // If storage returns Some, return the result.
         if res.is_some() {
@@ -401,25 +407,26 @@ impl ApiV01 {
 
     pub async fn priority_op(
         self_: web::Data<Self>,
-        web::Path(pq_id): web::Path<u32>,
+        pq_id: web::Path<u32>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
-        let receipt = self_.get_priority_op_receipt(pq_id).await?;
+        let receipt = self_.get_priority_op_receipt(*pq_id).await?;
         metrics::histogram!("api.v01.priority_op", start.elapsed());
         ok_json!(receipt)
     }
 
     pub async fn block_tx(
         self_: web::Data<Self>,
-        web::Path((block_id, tx_id)): web::Path<(BlockNumber, u32)>,
+        path: web::Path<(BlockNumber, u32)>,
     ) -> ActixResult<HttpResponse> {
+        let (block_id, tx_id) = path.into_inner();
         let start = Instant::now();
         let exec_ops = self_.get_block_executed_ops(block_id).await?;
 
         let result = if let Some(exec_op) = exec_ops.get(tx_id as usize) {
             ok_json!(exec_op.clone())
         } else {
-            Err(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish().into())
         };
 
         metrics::histogram!("api.v01.block_tx", start.elapsed());
@@ -460,14 +467,14 @@ impl ApiV01 {
 
     pub async fn block_by_id(
         self_: web::Data<Self>,
-        web::Path(block_id): web::Path<BlockNumber>,
+        block_id: web::Path<BlockNumber>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
-        let block = self_.get_block_info(block_id).await?;
+        let block = self_.get_block_info(*block_id).await?;
         let result = if let Some(block) = block {
             ok_json!(block)
         } else {
-            Err(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish().into())
         };
         metrics::histogram!("api.v01.block_by_id", start.elapsed());
         result
@@ -475,7 +482,7 @@ impl ApiV01 {
 
     pub async fn block_transactions(
         self_: web::Data<Self>,
-        web::Path(block_id): web::Path<BlockNumber>,
+        block_id: web::Path<BlockNumber>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let mut storage = self_.access_storage().await?;
@@ -483,7 +490,7 @@ impl ApiV01 {
         let txs = storage
             .chain()
             .block_schema()
-            .get_block_transactions(block_id)
+            .get_block_transactions(*block_id)
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
@@ -504,7 +511,7 @@ impl ApiV01 {
         let result = if let Some(block) = block {
             ok_json!(block)
         } else {
-            Err(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish().into())
         };
 
         metrics::histogram!("api.v01.explorer_search", start.elapsed());

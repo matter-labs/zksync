@@ -40,8 +40,7 @@ async fn start_server(
             v02::api_scope(tx_sender, &api_v01.config)
         };
         App::new()
-            .wrap(Cors::new().send_wildcard().max_age(3600).finish())
-            .wrap(vlog::actix_middleware())
+            .wrap(Cors::default().send_wildcard().max_age(3600))
             .service(api_v01.into_scope())
             .service(forced_exit_requests_api_scope)
             .service(api_v02_scope)
@@ -76,7 +75,7 @@ pub(super) fn start_server_thread_detached(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
-            actix_rt::System::new("api-server").block_on(async move {
+            actix_rt::System::new().block_on(async move {
                 let api_v01 = ApiV01::new(connection_pool, contract_address, config.clone());
                 api_v01.spawn_network_status_updater(panic_notify);
 

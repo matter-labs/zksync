@@ -29,7 +29,7 @@ impl AddressPool {
 
     /// Randomly chooses one of the addresses stored in the pool.
     pub fn random_address(&self, rng: &mut LoadtestRng) -> Address {
-        let index = rng.gen_range(0, self.addresses.len());
+        let index = rng.gen_range(0..=self.addresses.len());
         self.addresses[index]
     }
 }

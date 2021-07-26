@@ -17,11 +17,11 @@ zksync_contracts = { path = "../contracts", version = "1.0" }
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 serde = "1.0.90"
-ethabi = "12.0.0"
-web3 = "0.13.0"
-parity-crypto = {version = "0.6.2", features = ["publickey"] }
+ethabi = "14.0.0"
+web3 = "0.16.0"
+parity-crypto = {version = "0.8", features = ["publickey"] }
 hex = "0.4"
 
 anyhow = "1.0"
-tokio = { version = "0.2", features = ["full"] }
-metrics = "=0.13.0-alpha.8"
+tokio = { version = "1", features = ["full"] }
+metrics = "0.17"

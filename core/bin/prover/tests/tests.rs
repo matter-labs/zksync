@@ -165,7 +165,7 @@ async fn test_shutdown_request() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(prover_options.prover.cycle_wait()).fuse();
+    let timeout = tokio::time::sleep(prover_options.prover.cycle_wait()).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 
@@ -203,7 +203,7 @@ async fn test_receiving_heartbeats() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(Duration::from_secs(10)).fuse();
+    let timeout = tokio::time::sleep(Duration::from_secs(10)).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 
@@ -240,7 +240,7 @@ async fn test_publishing_proof() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(Duration::from_secs(10)).fuse();
+    let timeout = tokio::time::sleep(Duration::from_secs(10)).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 

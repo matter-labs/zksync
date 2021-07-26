@@ -140,7 +140,7 @@ fn main() {
             App::new()
                 .data(storage.clone())
                 .wrap(middleware::Logger::default())
-                .wrap(Cors::new().send_wildcard().max_age(3600).finish())
+                .wrap(Cors::default().send_wildcard().max_age(3600))
                 .route("/graphql", web::post().to(handle_graphql))
         })
         .bind("0.0.0.0:9975")

@@ -18,10 +18,10 @@ vlog = { path = "../../lib/vlog", version = "1.0" }
 
 serde = { version = "1.0", features = ["derive"] }
 num = { version = "0.3.1", features = ["serde"] }
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 anyhow = "1.0"
-rand = { version = "0.7", features = ["small_rng"] }
+rand = { version = "0.8", features = ["small_rng"] }
 envy = "0.4"
 hex = "0.4"
 static_assertions = "1.1"
