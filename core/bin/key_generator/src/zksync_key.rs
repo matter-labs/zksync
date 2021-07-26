@@ -51,24 +51,29 @@ pub(crate) fn make_plonk_blocks_verify_keys(config: ChainConfig) {
 
 /// Creates instance of the exodus mode zkSync circuit.
 fn exit_circuit() -> impl Circuit<Engine> + Clone {
+    let empty_branch = OperationBranch {
+        address: None,
+        token: None,
+        witness: OperationBranchWitness {
+            account_witness: AccountWitness {
+                nonce: None,
+                pub_key_hash: None,
+                address: None,
+            },
+            account_path: vec![None; params::account_tree_depth()],
+            balance_value: None,
+            balance_subtree_path: vec![None; params::balance_tree_depth()],
+        },
+    };
     ZkSyncExitCircuit::<'_, Engine> {
         params: &params::RESCUE_PARAMS,
         pub_data_commitment: None,
         root_hash: None,
-        account_audit_data: OperationBranch {
-            address: None,
-            token: None,
-            witness: OperationBranchWitness {
-                account_witness: AccountWitness {
-                    nonce: None,
-                    pub_key_hash: None,
-                    address: None,
-                },
-                account_path: vec![None; params::account_tree_depth()],
-                balance_value: None,
-                balance_subtree_path: vec![None; params::balance_tree_depth()],
-            },
-        },
+        account_audit_data: empty_branch.clone(),
+        special_account_audit_data: empty_branch.clone(),
+        creator_account_audit_data: empty_branch,
+        serial_id: None,
+        content_hash: vec![None; params::CONTENT_HASH_WIDTH],
     }
 }
 
@@ -88,6 +93,13 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             a: None,
             b: None,
             amount_packed: None,
+            second_amount_packed: None,
+            special_amounts: vec![None; 2],
+            special_prices: vec![None; 4],
+            special_nonces: vec![None; 3],
+            special_tokens: vec![None; 3],
+            special_accounts: vec![None; 5],
+            special_eth_addresses: vec![None; 2],
             full_amount: None,
             fee: None,
             pub_nonce: None,
@@ -95,6 +107,10 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             eth_address: None,
             valid_from: None,
             valid_until: None,
+            second_valid_from: None,
+            second_valid_until: None,
+            special_content_hash: vec![None; params::CONTENT_HASH_WIDTH],
+            special_serial_id: None,
         },
         lhs: OperationBranch {
             address: None,
@@ -135,8 +151,20 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
         block_number: None,
         block_timestamp: None,
         pub_data_commitment: None,
-        validator_balances: vec![None; params::total_tokens()],
+        validator_balances: vec![None; params::number_of_processable_tokens()],
         validator_audit_path: vec![None; params::account_tree_depth()],
+        validator_non_processable_tokens_audit_before_fees: vec![
+            None;
+            params::balance_tree_depth()
+                - params::PROCESSABLE_TOKENS_DEPTH
+                    as usize
+        ],
+        validator_non_processable_tokens_audit_after_fees: vec![
+            None;
+            params::balance_tree_depth()
+                - params::PROCESSABLE_TOKENS_DEPTH
+                    as usize
+        ],
         operations: vec![empty_operation; block_chunks],
         validator_account: AccountWitness {
             nonce: None,

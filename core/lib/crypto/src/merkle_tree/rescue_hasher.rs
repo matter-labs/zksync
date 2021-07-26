@@ -1,8 +1,10 @@
 // Pedersen hash implementation of the Hasher trait
 
-use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
-use crate::franklin_crypto::circuit::multipack;
-use crate::franklin_crypto::rescue::{rescue_hash, RescueEngine};
+use crate::franklin_crypto::{
+    bellman::pairing::bn256::Bn256,
+    circuit::multipack,
+    rescue::{rescue_hash, RescueEngine},
+};
 
 use super::hasher::Hasher;
 use core::fmt;
@@ -35,7 +37,6 @@ impl<E: RescueEngine> Hasher<E::Fr> for RescueHasher<E> {
         let bits: Vec<bool> = input.into_iter().collect();
         let packed = multipack::compute_multipacking::<E>(&bits);
         let sponge_output = rescue_hash::<E>(self.params, &packed);
-
         assert_eq!(sponge_output.len(), 1);
         sponge_output[0]
     }

@@ -1,5 +1,7 @@
 use num::BigUint;
+use std::convert::Infallible;
 use std::time::Instant;
+
 use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, FullExit, FullExitOp, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
@@ -12,29 +14,47 @@ use crate::{
 impl TxHandler<FullExit> for ZkSyncState {
     type Op = FullExitOp;
 
-    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, anyhow::Error> {
+    type OpError = Infallible;
+
+    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, Infallible> {
         // NOTE: Authorization of the FullExit is verified on the contract.
         assert!(
             priority_op.token <= params::max_token_id(),
             "Full exit token is out of range, this should be enforced by contract"
         );
-        vlog::debug!("Processing {:?}", priority_op);
         let account_balance = self
             .get_account(priority_op.account_id)
             .filter(|account| account.address == priority_op.eth_address)
             .map(|acccount| acccount.get_balance(priority_op.token))
             .map(BigUintSerdeWrapper);
 
-        vlog::debug!("Balance: {:?}", account_balance);
-        let op = FullExitOp {
-            priority_op,
-            withdraw_amount: account_balance,
+        let op = if priority_op.token > params::max_fungible_token_id()
+            && self.nfts.get(&priority_op.token).is_some()
+        {
+            let nft = self.nfts.get(&priority_op.token).unwrap();
+            FullExitOp {
+                priority_op,
+                withdraw_amount: account_balance,
+                creator_account_id: Some(nft.creator_id),
+                creator_address: Some(nft.creator_address),
+                serial_id: Some(nft.serial_id),
+                content_hash: Some(nft.content_hash),
+            }
+        } else {
+            FullExitOp {
+                priority_op,
+                withdraw_amount: account_balance,
+                creator_account_id: None,
+                creator_address: None,
+                serial_id: None,
+                content_hash: None,
+            }
         };
 
         Ok(op)
     }
 
-    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, Infallible> {
         let op = self.create_op(priority_op)?;
 
         let (fee, updates) = <Self as TxHandler<FullExit>>::apply_op(self, &op)?;
@@ -50,7 +70,7 @@ impl TxHandler<FullExit> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), Infallible> {
         let start = Instant::now();
         let mut updates = Vec::new();
         let amount = if let Some(amount) = &op.withdraw_amount {
@@ -61,7 +81,7 @@ impl TxHandler<FullExit> for ZkSyncState {
 
         let account_id = op.priority_op.account_id;
 
-        // expect is ok since account since existence was verified before
+        // expect is ok since account's existence was verified before
         let mut account = self
             .get_account(account_id)
             .expect("Full exit account not found");

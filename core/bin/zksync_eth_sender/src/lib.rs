@@ -173,9 +173,9 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         drop(connection);
 
         Self {
-            ethereum,
             ongoing_ops,
             db,
+            ethereum,
             tx_queue,
             gas_adjuster,
             options,
@@ -184,20 +184,21 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
+        // `eth_sender` must perform some of the activities only once per block change.
+        // Having `0` as an initial value is to ensure that on the first iteration we will run all the activities.
+        let mut last_used_block = 0;
         loop {
-            let load_new_operation_future = time::timeout(
-                self.options.sender.tx_poll_period(),
-                self.load_new_operations(),
-            );
-            // If the time has expired then we do nothing, but if we received an error
-            // when loading an new operation, then panic.
-            if let Ok(load_new_operation) = load_new_operation_future.await {
-                load_new_operation.unwrap_or_else(|e| panic!("Failed load new operations: {}", e));
+            // We perform a loading routine every X seconds.
+            tokio::time::delay_for(self.options.sender.tx_poll_period()).await;
+            // If we received an error when loading a new operation, we can't do anything about it and should panic.
+            if let Err(error) = self.load_new_operations().await {
+                vlog::error!("Unable to restore operations from the database: {}", error);
+                panic!("Unable to restore operations from the database: {}", error);
             }
 
             if self.options.sender.is_enabled {
                 // ...and proceed them.
-                self.proceed_next_operations().await;
+                last_used_block = self.proceed_next_operations(last_used_block).await;
                 // Update the gas adjuster to maintain the up-to-date max gas price limit.
                 self.gas_adjuster
                     .keep_updated(&self.ethereum, &self.db)
@@ -214,6 +215,12 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         let mut transaction = connection.start_transaction().await?;
 
         let new_operations = self.db.load_new_operations(&mut transaction).await?;
+
+        if !new_operations.is_empty() {
+            vlog::info!("Loaded {} new operations", new_operations.len());
+        } else {
+            vlog::debug!("No new operations are loaded from the database");
+        }
 
         // let's mark the operations as successful processed.
         // So that next time you do not add them to the queue again.
@@ -238,13 +245,24 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     /// 1. Pops all the available transactions from the `TxQueue` and sends them.
     /// 2. Sifts all the ongoing operations, filtering the completed ones and
     ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
-    async fn proceed_next_operations(&mut self) {
+    ///
+    /// It returns ethereum block number for which these things were done.
+    async fn proceed_next_operations(&mut self, last_used_block: u64) -> u64 {
         let start = Instant::now();
+
+        let current_block = match self.ethereum.block_number().await {
+            Ok(current_block) => current_block.as_u64(),
+            Err(e) => {
+                Self::process_error(e).await;
+                return last_used_block;
+            }
+        };
+
         // Queue for storing all the operations that were not finished at this iteration.
         let mut new_ongoing_ops = VecDeque::new();
 
         while let Some(tx) = self.tx_queue.pop_front() {
-            if let Err(e) = self.initialize_operation(tx.clone()).await {
+            if let Err(e) = self.initialize_operation(tx.clone(), current_block).await {
                 Self::process_error(e).await;
                 // Return the unperformed operation to the queue, since failing the
                 // operation initialization means that it was not stored in the database.
@@ -257,28 +275,37 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             }
         }
 
-        // Commit the next operations (if any).
-        while let Some(mut current_op) = self.ongoing_ops.pop_front() {
-            // We perform a commitment step here. In case of error, we suppose that this is some
-            // network issue which won't appear the next time, so we report the situation to the
-            // log and consider the operation pending (meaning that we won't process it on this
-            // step, but will try to do so on the next one).
-            let commitment = match self.perform_commitment_step(&mut current_op).await {
-                Ok(commitment) => commitment,
-                Err(e) => {
-                    Self::process_error(e).await;
-                    OperationCommitment::Pending
-                }
-            };
+        // In `perform_commitment_step` we request the states of transactions. We have requested
+        // states for the block with number `last_used_block` on the previous call of
+        // `proceed_next_operations`, so if the block number hasn't changed we shouldn't request
+        // states because it would be spare requests.
+        if last_used_block != current_block {
+            // Commit the next operations (if any).
+            while let Some(mut current_op) = self.ongoing_ops.pop_front() {
+                // We perform a commitment step here. In case of error, we suppose that this is some
+                // network issue which won't appear the next time, so we report the situation to the
+                // log and consider the operation pending (meaning that we won't process it on this
+                // step, but will try to do so on the next one).
+                let commitment = match self
+                    .perform_commitment_step(&mut current_op, current_block)
+                    .await
+                {
+                    Ok(commitment) => commitment,
+                    Err(e) => {
+                        Self::process_error(e).await;
+                        OperationCommitment::Pending
+                    }
+                };
 
-            match commitment {
-                OperationCommitment::Committed => {
-                    // Free a slot for the next tx in the queue.
-                    self.tx_queue.report_commitment();
-                }
-                OperationCommitment::Pending => {
-                    // Poll this operation on the next iteration.
-                    new_ongoing_ops.push_back(current_op);
+                match commitment {
+                    OperationCommitment::Committed => {
+                        // Free a slot for the next tx in the queue.
+                        self.tx_queue.report_commitment();
+                    }
+                    OperationCommitment::Pending => {
+                        // Poll this operation on the next iteration.
+                        new_ongoing_ops.push_back(current_op);
+                    }
                 }
             }
         }
@@ -291,6 +318,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         // Store the ongoing operations for the next round.
         self.ongoing_ops = new_ongoing_ops;
         metrics::histogram!("eth_sender.proceed_next_operations", start.elapsed());
+        current_block
     }
 
     async fn process_error(err: anyhow::Error) {
@@ -308,9 +336,8 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
-    async fn initialize_operation(&mut self, tx: TxData) -> anyhow::Result<()> {
-        let current_block = self.ethereum.block_number().await?;
-        let deadline_block = self.get_deadline_block(current_block.as_u64());
+    async fn initialize_operation(&mut self, tx: TxData, current_block: u64) -> anyhow::Result<()> {
+        let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self
             .gas_adjuster
             .get_gas_price(&self.ethereum, None)
@@ -419,14 +446,13 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     async fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
+        current_block: u64,
     ) -> anyhow::Result<OperationCommitment> {
         let start = Instant::now();
         assert!(
             !op.used_tx_hashes.is_empty(),
             "OperationETHState should have at least one transaction"
         );
-
-        let current_block = self.ethereum.block_number().await?;
 
         // Check statuses of existing transactions.
         // Go through every transaction in a loop. We will exit this method early
@@ -439,7 +465,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             };
 
             match self
-                .check_transaction_state(mode, op, *tx_hash, current_block.as_u64())
+                .check_transaction_state(mode, op, *tx_hash, current_block)
                 .await?
             {
                 TxCheckOutcome::Pending => {
@@ -505,7 +531,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 
         // Reaching this point will mean that the latest transaction got stuck.
         // We should create another tx based on it, and send it.
-        let deadline_block = self.get_deadline_block(current_block.as_u64());
+        let deadline_block = self.get_deadline_block(current_block);
         // Raw tx contents are the same for every transaction, so we just
         // create a new one from the old one with updated parameters.
         let new_tx = self.create_supplement_tx(deadline_block, op).await?;
@@ -566,7 +592,10 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         tx_hash: H256,
         current_block: u64,
     ) -> anyhow::Result<TxCheckOutcome> {
-        let status = self.ethereum.get_tx_status(tx_hash).await?;
+        let status = self
+            .ethereum
+            .get_tx_status(tx_hash, Some(current_block))
+            .await?;
 
         let outcome = match status {
             // Successful execution.
@@ -766,12 +795,15 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 }
 
 #[must_use]
-pub fn run_eth_sender(pool: ConnectionPool, options: ZkSyncConfig) -> JoinHandle<()> {
-    let ethereum = EthereumGateway::from_config(&options);
+pub fn run_eth_sender(
+    pool: ConnectionPool,
+    eth_gateway: EthereumGateway,
+    options: ZkSyncConfig,
+) -> JoinHandle<()> {
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(options.eth_sender, db, ethereum).await;
+        let eth_sender = ETHSender::new(options.eth_sender, db, eth_gateway).await;
 
         eth_sender.run().await
     })

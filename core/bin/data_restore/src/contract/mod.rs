@@ -13,6 +13,7 @@ pub use crate::contract::version::ZkSyncContractVersion;
 pub mod default;
 pub mod utils;
 pub mod v4;
+pub mod v6;
 pub mod version;
 
 #[derive(Debug)]
@@ -28,7 +29,7 @@ impl<T: Transport> ZkSyncDeployedContract<T> {
         use ZkSyncContractVersion::*;
         let func = match self.version {
             V0 | V1 | V2 | V3 => "totalBlocksVerified",
-            V4 => "totalBlocksExecuted",
+            V4 | V5 | V6 => "totalBlocksExecuted",
         };
         self.web3_contract
             .query::<U256, Option<Address>, Option<BlockId>, ()>(

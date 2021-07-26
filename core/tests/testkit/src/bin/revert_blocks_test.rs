@@ -3,6 +3,7 @@ use web3::transports::Http;
 use zksync_core::state_keeper::ZkSyncStateInitParams;
 use zksync_types::{block::Block, AccountId, AccountMap, AccountTree};
 
+use zksync_testkit::zksync_account::ZkSyncETHAccountData;
 use zksync_testkit::*;
 use zksync_testkit::{
     data_restore::verify_restore,
@@ -46,15 +47,16 @@ fn create_test_setup_state(
         .collect::<Vec<_>>();
 
     let zksync_accounts = {
-        let mut zksync_accounts = Vec::new();
-        zksync_accounts.push(fee_account.clone());
+        let mut zksync_accounts = vec![fee_account.clone()];
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
                 Nonce(0),
                 eth_account.address,
-                eth_account.private_key,
+                ZkSyncETHAccountData::EOA {
+                    eth_private_key: eth_account.private_key,
+                },
             )
         }));
         zksync_accounts
@@ -230,7 +232,7 @@ async fn revert_blocks_test() {
     handler.join().expect("sk thread join");
 
     verify_restore(
-        test_config.web3_url.as_str(),
+        &test_config,
         &contracts,
         fee_account.address,
         balance_tree_to_account_map(&state.tree),

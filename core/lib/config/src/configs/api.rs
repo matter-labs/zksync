@@ -2,6 +2,8 @@
 use serde::Deserialize;
 /// Built-in uses
 use std::net::SocketAddr;
+// Workspace uses
+use zksync_types::AccountId;
 // Local uses
 use crate::envy_load;
 
@@ -46,6 +48,8 @@ pub struct Common {
     // Determines the required minimum account age for `ForcedExit` operation to be allowed.
     // Type of value is seconds.
     pub forced_exit_minimum_account_age_secs: u64,
+    /// List of account IDs that do not have to pay fees for operations.
+    pub fee_free_accounts: Vec<AccountId>,
     pub enforce_pubkey_change_fee: bool,
 
     pub max_number_of_transactions_per_batch: u64,
@@ -154,6 +158,7 @@ mod tests {
                 enforce_pubkey_change_fee: true,
                 max_number_of_transactions_per_batch: 200,
                 max_number_of_authors_per_batch: 10,
+                fee_free_accounts: vec![AccountId(4078), AccountId(387)],
             },
             admin: AdminApi {
                 port: 8080,
@@ -188,6 +193,7 @@ mod tests {
         let config = r#"
 API_COMMON_CACHES_SIZE="10000"
 API_COMMON_FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS="0"
+API_COMMON_FEE_FREE_ACCOUNTS=4078,387
 API_COMMON_ENFORCE_PUBKEY_CHANGE_FEE=true
 API_COMMON_MAX_NUMBER_OF_TRANSACTIONS_PER_BATCH=200
 API_COMMON_MAX_NUMBER_OF_AUTHORS_PER_BATCH=10

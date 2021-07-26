@@ -34,10 +34,7 @@ jobs:
         run: |
           ci_run zk
           ci_run zk fmt --check
-          ci_run zk lint rust --check
-          ci_run zk lint js --check
-          ci_run zk lint ts --check
-          ci_run zk lint md --check
+          ci_run zk lint --check
 
   unit-tests:
     runs-on: [self-hosted, CI-worker]
@@ -53,7 +50,7 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose pull
+          docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
           ci_run sccache --start-server
 
@@ -68,8 +65,8 @@ jobs:
           ci_run zk db basic-setup
           ci_run zk run yarn
 
-      - name: liquidity-token
-        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
+      - name: restart dev-liquidity-token-watcher and dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
       - name: contracts-unit-tests
         run: ci_run zk test contracts
@@ -78,7 +75,7 @@ jobs:
         run: ci_run zk test js
 
       - name: rust-unit-tests
-        run: ci_run zk test rust
+        run: ci_run zk test server-rust
 
   integration:
     runs-on: [self-hosted, FAST]
@@ -94,7 +91,7 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose pull
+          docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
           ci_run sccache --start-server
 
@@ -105,8 +102,8 @@ jobs:
           ci_run zk dummy-prover enable --no-redeploy
           ci_run zk init
 
-      - name: liquidity-token
-        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
+      - name: restart dev-liquidity-token-watcher and dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
       - name: run-services
         run: |
@@ -118,35 +115,45 @@ jobs:
       - name: integration-server
         run: ci_run zk test i server
 
-      - name: Show logs
-        run: |
-          ci_run cat server.log
-          ci_run cat dummy_prover.log
-
       - name: integration-api
-        run: ci_run zk test i api
-
-      - name: Show logs
         run: |
-          ci_run cat server.log
-          ci_run cat dummy_prover.log
+          ci_run zk test i api
+          ci_run zk test i api-docs
 
       - name: integration-zcli
         run: ci_run zk test i zcli
 
-      - name: Show logs
-        run: |
-          ci_run cat server.log
-          ci_run cat dummy_prover.log
-
       - name: integration-rust-sdk
         run: ci_run zk test i rust-sdk
+      
+      - name: integration-withdrawal-helpers
+        run: ci_run zk test i withdrawal-helpers
 
       - name: Show logs
+        if: always()
         run: |
           ci_run cat server.log
           ci_run cat dummy_prover.log
 
+  circuit-tests:
+    runs-on: [self-hosted, CI-worker]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: prepare
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
+      - name: init
+        run: |
+          ci_run ln -s /usr/src/keys/setup keys/setup
+          ci_run zk
+          ci_run zk run verify-keys unpack
+
+      - name: circuit-tests
+        run: ci_run zk test crypto-rust
 
   testkit:
     runs-on: [self-hosted, CI-worker]
@@ -158,11 +165,12 @@ jobs:
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
+          echo PLUGIN_CONFIG=fast >> $GITHUB_ENV # use fast mode for geth image (instant tx commit)
 
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose pull
+          docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d zk
           ci_run sccache --start-server
 

@@ -2,6 +2,45 @@
 
 All notable changes to the contracts will be documented in this file.
 
+## 2021-31-05
+
+**Version 5.1** is scheduled for upgrade.
+
+### Added
+
+- `MintNFT`, `WithdrawNFT` operations, which enable native NFT support.
+- `Swap` operation, which depending on the implementation may serve either order book or atomic swaps functionality.
+- The security council, which is able to shorten the upgrade notice period. More on that
+  [here](https://medium.com/matter-labs/keeping-funds-safe-a-3-factor-approach-to-security-in-zksync-2-0-a70b0f53f360).
+- `RegeneisMultisig.sol` to handle submissions of the new root hash by the security council during the upgrade.
+- A special account with id `2**24 - 1`. It is used to ensure the correctness of the NFT data.
+
+### Changed
+
+- The maximum amount of tokens that can be used to pay transaction fees is increased to 1023.
+- The account tree depth for each account increased to `32`.
+- Due to the smart contract size limitations, `ZkSync.sol` was split into two parts: the original `ZkSync.sol` and the
+  `AdditionalZkSync.sol`, to which some functionality is delegated.
+- `ZkSyncNFTFactory.sol` which serves as a default NFT factory, where all the NFTs are withdrawn by default.
+
+## 2021-25-02
+
+**Version 5** is scheduled for upgrade.
+
+### Added
+
+- `tokenGovernance` address is added to the `Governance` contract. `tokenGovernance` can list new tokens.
+- `TokenGovernance` contract is added to allow anybody to pay fee and list new tokens.
+
+### Changed
+
+- Maximum amount of tokens that can be used to pay tx fee is increased to 512.
+- Circuit now enforces that `ForcedExit` target account pubkey hash is empty.
+
+## 2021-09-02
+
+**Version 4** is released.
+
 ## 2021-14-01
 
 **Version 4** is scheduled for upgrade.

@@ -107,6 +107,15 @@ impl ExecutedOperations {
             .map(|op| op.get_updated_account_ids())
             .unwrap_or_else(Vec::new)
     }
+
+    /// Returns `true` if the operation was successful.
+    pub fn is_successful(&self) -> bool {
+        // L1 priority operations cannot fail in L2.
+        match self {
+            ExecutedOperations::Tx(exec_tx) => exec_tx.success,
+            ExecutedOperations::PriorityOp(_) => true,
+        }
+    }
 }
 
 /// zkSync network block.
@@ -452,4 +461,10 @@ pub fn smallest_block_size_for_chunks(
 pub struct OnchainOperationsBlockInfo {
     pub public_data_offset: u32,
     pub eth_witness: Vec<u8>,
+}
+
+/// Additional data attached to block that is not related to the core protocol
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlockMetadata {
+    pub fast_processing: bool,
 }

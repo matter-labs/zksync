@@ -98,13 +98,18 @@ async fn add_token(
     // if id is None then set it to next available ID from server.
     let id = match token_request.id {
         Some(id) => id,
-        None => TokenId(storage.tokens_schema().get_count().await.map_err(|e| {
-            vlog::warn!(
-                "failed get number of token from database in progress request: {}",
-                e
-            );
-            actix_web::error::ErrorInternalServerError("storage layer error")
-        })? as u16),
+        None => {
+            let last_token_id = storage.tokens_schema().get_count().await.map_err(|e| {
+                vlog::warn!(
+                    "failed get number of token from database in progress request: {}",
+                    e
+                );
+                actix_web::error::ErrorInternalServerError("storage layer error")
+            })?;
+            let next_available_id = last_token_id + 1;
+
+            TokenId(next_available_id)
+        }
     };
 
     let token = tokens::Token {
@@ -112,11 +117,12 @@ async fn add_token(
         address: token_request.address,
         symbol: token_request.symbol.clone(),
         decimals: token_request.decimals,
+        is_nft: false,
     };
 
     storage
         .tokens_schema()
-        .store_token(token.clone())
+        .store_or_update_token(token.clone())
         .await
         .map_err(|e| {
             vlog::warn!("failed add token to database in progress request: {}", e);
@@ -141,6 +147,7 @@ async fn run_server(app_state: AppState, bind_to: SocketAddr) {
 
         App::new()
             .wrap(auth)
+            .wrap(vlog::actix_middleware())
             .app_data(web::Data::new(app_state.clone()))
             .route("/tokens", web::post().to(add_token))
     })
@@ -164,8 +171,8 @@ pub fn start_admin_server(
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
             actix_rt::System::new("api-server").block_on(async move {
                 let app_state = AppState {
-                    connection_pool,
                     secret_auth,
+                    connection_pool,
                 };
 
                 run_server(app_state, bind_to).await;

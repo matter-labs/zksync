@@ -13,13 +13,20 @@ async function main() {
         addresses.ZkSyncTarget,
         addresses.VerifierTarget,
         addresses.GovernanceTarget,
-        addresses.UpgradeGatekeeper
+        addresses.AdditionalZkSync
     ]) {
         try {
-            await hre.run('verify', { address });
+            await hre.run('verify:verify', { address });
         } catch (e) {
             console.error(e);
         }
+    }
+
+    {
+        const address = addresses.UpgradeGatekeeper;
+        const constructorArguments = [addresses.ZkSync];
+
+        await hre.run('verify:verify', { address, constructorArguments });
     }
 
     {
@@ -32,7 +39,7 @@ async function main() {
         const constructorArguments = [addresses.ZkSyncTarget, zkSyncEncodedArguments];
 
         try {
-            await hre.run('verify', { address, constructorArguments });
+            await hre.run('verify:verify', { address, constructorArguments });
         } catch (e) {
             console.error(e);
         }
@@ -45,7 +52,7 @@ async function main() {
         const constructorArguments = [addresses.GovernanceTarget, governanceEncodedArguments];
 
         try {
-            await hre.run('verify', { address, constructorArguments });
+            await hre.run('verify:verify', { address, constructorArguments });
         } catch (e) {
             console.error(e);
         }
@@ -58,7 +65,53 @@ async function main() {
         const constructorArguments = [addresses.VerifierTarget, verifierEncodedArguments];
 
         try {
-            await hre.run('verify', { address, constructorArguments });
+            await hre.run('verify:verify', { address, constructorArguments });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    {
+        const address = addresses.RegenesisMultisig;
+
+        const constructorArguments = [process.env.MISC_REGENESIS_THRESHOLD];
+
+        try {
+            await hre.run('verify:verify', { address, constructorArguments });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    {
+        const address = addresses.NFTFactory;
+
+        const name = process.env.NFT_FACTORY_NAME;
+        const symbol = process.env.NFT_FACTORY_SYMBOL;
+        const zksyncAddress = addresses.ZkSync;
+
+        const constructorArguments = [name, symbol, zksyncAddress];
+
+        try {
+            await hre.run('verify:verify', { address, constructorArguments });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    {
+        const address = addresses.TokenGovernance;
+
+        const governance = addresses.Governance;
+        const listingFeeToken = process.env.MISC_LISTING_FEE_TOKEN;
+        const listingFee = process.env.MISC_LISTING_FEE;
+        const listingCap = process.env.MISC_LISTING_CAP;
+        const treasury = process.env.MISC_LISTING_TREASURY;
+
+        const constructorArguments = [governance, listingFeeToken, listingFee, listingCap, treasury];
+
+        try {
+            await hre.run('verify:verify', { address, constructorArguments });
         } catch (e) {
             console.error(e);
         }

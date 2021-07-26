@@ -9,9 +9,11 @@ use bigdecimal::BigDecimal;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::{collections::HashMap, fs::read_to_string, path::Path};
 use std::{convert::TryFrom, time::Duration};
 use structopt::StructOpt;
 use zksync_crypto::rand::{thread_rng, Rng};
+use zksync_types::Address;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct CoinMarketCapTokenQuery {
@@ -20,7 +22,7 @@ struct CoinMarketCapTokenQuery {
 
 macro_rules! make_sloppy {
     ($f: ident) => {{
-        |query| async {
+        |query, data| async {
             if thread_rng().gen_range(0, 100) < 5 {
                 vlog::debug!("`{}` has been errored", stringify!($f));
                 return Ok(HttpResponse::InternalServerError().finish());
@@ -42,7 +44,7 @@ macro_rules! make_sloppy {
             );
             tokio::time::delay_for(duration).await;
 
-            let resp = $f(query).await;
+            let resp = $f(query, data).await;
             resp
         }
     }};
@@ -50,6 +52,7 @@ macro_rules! make_sloppy {
 
 async fn handle_coinmarketcap_token_price_query(
     query: web::Query<CoinMarketCapTokenQuery>,
+    _data: web::Data<Vec<TokenData>>,
 ) -> Result<HttpResponse> {
     let symbol = query.symbol.clone();
     let base_price = match symbol.as_str() {
@@ -57,6 +60,8 @@ async fn handle_coinmarketcap_token_price_query(
         "wBTC" => BigDecimal::from(9000),
         "BAT" => BigDecimal::try_from(0.2).unwrap(),
         "DAI" => BigDecimal::from(1),
+        "tGLM" => BigDecimal::from(1),
+        "GLM" => BigDecimal::from(1),
         _ => BigDecimal::from(0),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
@@ -80,27 +85,68 @@ async fn handle_coinmarketcap_token_price_query(
     Ok(HttpResponse::Ok().json(resp))
 }
 
-async fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> {
-    let resp = json!([
-        {"id": "ethereum", "symbol": "eth", "name": "Ethereum"},
-        {"id": "dai", "symbol":"dai", "name": "Dai"},
-        {"id": "gnt", "symbol":"gnt", "name": "Golem"},
-        {"id": "basic-attention-token", "symbol": "bat", "name": "Basic Attention Token"},
-        {"id": "wrapped-bitcoin", "symbol": "wbtc", "name": "Wrapped Bitcoin"},
-    ]);
-
-    Ok(HttpResponse::Ok().json(resp))
+#[derive(Debug, Deserialize)]
+struct Token {
+    pub address: Address,
+    pub decimals: u8,
+    pub symbol: String,
 }
 
-async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResponse> {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct TokenData {
+    id: String,
+    symbol: String,
+    name: String,
+    platforms: HashMap<String, Address>,
+}
+
+fn load_tokens(path: impl AsRef<Path>) -> Vec<TokenData> {
+    if let Ok(text) = read_to_string(path) {
+        let tokens: Vec<Token> = serde_json::from_str(&text).unwrap();
+        let tokens_data: Vec<TokenData> = tokens
+            .into_iter()
+            .map(|token| {
+                let symbol = token.symbol.to_lowercase();
+                let mut platforms = HashMap::new();
+                platforms.insert(String::from("ethereum"), token.address);
+                let id = match symbol.as_str() {
+                    "eth" => String::from("ethereum"),
+                    "wbtc" => String::from("wrapped-bitcoin"),
+                    "bat" => String::from("basic-attention-token"),
+                    _ => symbol.clone(),
+                };
+
+                TokenData {
+                    id,
+                    symbol: symbol.clone(),
+                    name: symbol,
+                    platforms,
+                }
+            })
+            .collect();
+        tokens_data
+    } else {
+        Vec::new()
+    }
+}
+
+async fn handle_coingecko_token_list(
+    _req: HttpRequest,
+    data: web::Data<Vec<TokenData>>,
+) -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok().json((*data.into_inner()).clone()))
+}
+
+async fn handle_coingecko_token_price_query(
+    req: HttpRequest,
+    _data: web::Data<Vec<TokenData>>,
+) -> Result<HttpResponse> {
     let coin_id = req.match_info().get("coin_id");
     let base_price = match coin_id {
         Some("ethereum") => BigDecimal::from(200),
         Some("wrapped-bitcoin") => BigDecimal::from(9000),
         Some("basic-attention-token") => BigDecimal::try_from(0.2).unwrap(),
-        Some("dai") => BigDecimal::from(1),
-        Some("gnt") => BigDecimal::from(1),
-        _ => BigDecimal::from(0),
+        _ => BigDecimal::from(1),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
     let price = base_price * BigDecimal::try_from(random_multiplier).unwrap();
@@ -116,8 +162,17 @@ async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResp
 }
 
 fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
+    let localhost_tokens = load_tokens(&"etc/tokens/localhost.json");
+    let rinkeby_tokens = load_tokens(&"etc/tokens/rinkeby.json");
+    let ropsten_tokens = load_tokens(&"etc/tokens/ropsten.json");
+    let data: Vec<TokenData> = localhost_tokens
+        .into_iter()
+        .chain(rinkeby_tokens.into_iter())
+        .chain(ropsten_tokens.into_iter())
+        .collect();
     if sloppy_mode {
         web::scope("/")
+            .data(data)
             .route(
                 "/cryptocurrency/quotes/latest",
                 web::get().to(make_sloppy!(handle_coinmarketcap_token_price_query)),
@@ -132,6 +187,7 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
             )
     } else {
         web::scope("/")
+            .data(data)
             .route(
                 "/cryptocurrency/quotes/latest",
                 web::get().to(handle_coinmarketcap_token_price_query),

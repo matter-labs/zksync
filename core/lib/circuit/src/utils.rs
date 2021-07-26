@@ -22,7 +22,10 @@ use zksync_crypto::{
     circuit::utils::le_bit_vector_into_field_element, params as franklin_constants, primitives::*,
 };
 // Local deps
-use crate::operation::{SignatureData, TransactionSignature};
+use crate::{
+    element::CircuitElement,
+    operation::{SignatureData, TransactionSignature},
+};
 
 pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
     bits.chunks(8)
@@ -129,8 +132,8 @@ where
         false,
     );
     signature_r_y_be_bits.reverse();
-    let mut sig_r_packed_bits = vec![];
-    sig_r_packed_bits.push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]);
+    let mut sig_r_packed_bits =
+        vec![signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]];
     sig_r_packed_bits.extend(signature_r_y_be_bits[1..].iter());
     let sig_r_packed_bits = reverse_bytes(&sig_r_packed_bits);
 
@@ -373,12 +376,7 @@ pub fn boolean_or<E: Engine, CS: ConstraintSystem<E>>(
     y: &Boolean,
 ) -> Result<Boolean, SynthesisError> {
     // A OR B = ( A NAND A ) NAND ( B NAND B ) = (NOT(A)) NAND (NOT (B))
-    let result = Boolean::and(
-        cs.namespace(|| "lhs_valid nand rhs_valid"),
-        &x.not(),
-        &y.not(),
-    )?
-    .not();
+    let result = Boolean::and(cs.namespace(|| "x.not() nand y.not()"), &x.not(), &y.not())?.not();
 
     Ok(result)
 }
@@ -453,4 +451,38 @@ pub fn vectorized_compare<E: Engine, CS: ConstraintSystem<E>>(
     let is_equal = multi_and(cs.namespace(|| "all data is equal"), &equality_bits)?;
 
     Ok((is_equal, packed))
+}
+
+pub fn sequences_equal<E: Engine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    lhs: &[CircuitElement<E>],
+    rhs: &[CircuitElement<E>],
+) -> Result<Boolean, SynthesisError> {
+    assert_eq!(lhs.len(), rhs.len());
+    let equality_flags = lhs
+        .iter()
+        .zip(rhs.iter())
+        .enumerate()
+        .map(|(idx, (lhs, rhs))| {
+            CircuitElement::equals(
+                cs.namespace(|| format!("element with index {}", idx)),
+                &lhs,
+                &rhs,
+            )
+        })
+        .collect::<Result<Vec<_>, SynthesisError>>()?;
+    multi_and(cs, &equality_flags)
+}
+
+pub fn u8_into_bits_be(a: u8) -> Vec<Boolean> {
+    let mut res = Vec::new();
+    for i in 0..8 {
+        if (a & (1u8 << (7 - i))) != 0 {
+            res.push(Boolean::constant(true));
+        } else {
+            res.push(Boolean::constant(false));
+        }
+    }
+
+    res
 }

@@ -9,10 +9,15 @@ import {
     Withdraw,
     ForcedExit,
     ChangePubKey,
+    MintNFT,
+    WithdrawNFT,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,
-    Create2Data
+    Create2Data,
+    Swap,
+    Order,
+    Ratio
 } from './types';
 
 export class Signer {
@@ -24,6 +29,57 @@ export class Signer {
 
     async pubKeyHash(): Promise<PubKeyHash> {
         return await privateKeyToPubKeyHash(this.#privateKey);
+    }
+
+    async signMintNFT(mintNft: {
+        creatorId: number;
+        creatorAddress: Address;
+        recipient: Address;
+        contentHash: string;
+        feeTokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<MintNFT> {
+        const tx: MintNFT = {
+            ...mintNft,
+            type: 'MintNFT',
+            feeToken: mintNft.feeTokenId
+        };
+        const msgBytes = utils.serializeMintNFT(tx);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...tx,
+            fee: BigNumber.from(mintNft.fee).toString(),
+            signature
+        };
+    }
+
+    async signWithdrawNFT(withdrawNft: {
+        accountId: number;
+        from: Address;
+        to: Address;
+        tokenId: number;
+        feeTokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<WithdrawNFT> {
+        const tx: WithdrawNFT = {
+            ...withdrawNft,
+            type: 'WithdrawNFT',
+            token: withdrawNft.tokenId,
+            feeToken: withdrawNft.feeTokenId
+        };
+        const msgBytes = utils.serializeWithdrawNFT(tx);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...tx,
+            fee: BigNumber.from(withdrawNft.fee).toString(),
+            signature
+        };
     }
 
     /**
@@ -45,6 +101,43 @@ export class Signer {
             type: 'Transfer',
             token: transfer.tokenId
         });
+    }
+
+    async signSyncOrder(order: Order): Promise<Order> {
+        const msgBytes = utils.serializeOrder(order);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...order,
+            amount: BigNumber.from(order.amount).toString(),
+            ratio: order.ratio.map((p) => BigNumber.from(p).toString()) as Ratio,
+            signature
+        };
+    }
+
+    async signSyncSwap(swap: {
+        orders: [Order, Order];
+        amounts: [BigNumberish, BigNumberish];
+        submitterId: number;
+        submitterAddress: Address;
+        nonce: number;
+        feeToken: number;
+        fee: BigNumberish;
+    }): Promise<Swap> {
+        const tx: Swap = {
+            ...swap,
+            type: 'Swap'
+        };
+
+        const msgBytes = await utils.serializeSwap(tx);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...tx,
+            amounts: [BigNumber.from(tx.amounts[0]).toString(), BigNumber.from(tx.amounts[1]).toString()],
+            fee: BigNumber.from(tx.fee).toString(),
+            signature
+        };
     }
 
     async signSyncTransfer(transfer: {
@@ -195,7 +288,8 @@ export class Signer {
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
-        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethSignature?: string;
         validFrom: number;
         validUntil: number;
     }): Promise<ChangePubKey> {

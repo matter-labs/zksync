@@ -44,7 +44,7 @@ export async function contracts() {
 
 export async function circuit(threads: number = 1, testName?: string, ...args: string[]) {
     await utils.spawn(
-        `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''} 
+        `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''}
          -- --ignored --test-threads ${threads} ${args.join(' ')}`
     );
 }
@@ -59,7 +59,6 @@ export async function witness_generator() {
 
 export async function js() {
     await utils.spawn('yarn zksync tests');
-    await utils.spawn('yarn fee-seller tests');
 }
 
 async function rustCryptoTests() {
@@ -68,14 +67,21 @@ async function rustCryptoTests() {
     process.chdir(process.env.ZKSYNC_HOME as string);
 }
 
-export async function rust() {
+export async function serverRust() {
     await utils.spawn('cargo test --release');
     await db(true);
     await rustApi(true);
     await prover();
-    const { stdout: threads } = await utils.exec('nproc');
-    await circuit(parseInt(threads));
+}
+
+export async function cryptoRust() {
+    await circuit(4);
     await rustCryptoTests();
+}
+
+export async function rust() {
+    await serverRust();
+    await cryptoRust();
 }
 
 export const command = new Command('test').description('run test suites').addCommand(integration.command);
@@ -85,6 +91,8 @@ command.command('prover').description('run unit-tests for the prover').action(pr
 command.command('witness-generator').description('run unit-tests for the witness-generator').action(witness_generator);
 command.command('contracts').description('run unit-tests for the contracts').action(contracts);
 command.command('rust').description('run unit-tests for all rust binaries and libraries').action(rust);
+command.command('server-rust').description('run unit-tests for server binaries and libraries').action(serverRust);
+command.command('crypto-rust').description('run unit-tests for rust crypto binaries and libraries').action(cryptoRust);
 
 command
     .command('db')

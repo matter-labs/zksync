@@ -1,14 +1,17 @@
 // External deps
 use web3::{
     contract::Contract,
-    types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H160, H256},
+    types::{H160, H256},
     Transport, Web3,
 };
 // Workspace deps
-use zksync_contracts::{governance_contract, upgrade_gatekeeper};
-use zksync_crypto::Fr;
+use zksync_contracts::governance_contract;
+use zksync_crypto::{
+    params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
+    Fr,
+};
+use zksync_types::{Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Token};
 
-use zksync_types::{AccountId, AccountMap, AccountUpdate, BlockNumber};
 // Local deps
 use crate::{
     contract::{get_genesis_account, ZkSyncDeployedContract},
@@ -18,7 +21,6 @@ use crate::{
     storage_interactor::StorageInteractor,
     tree_state::TreeState,
 };
-use ethabi::Address;
 
 use std::marker::PhantomData;
 
@@ -50,9 +52,14 @@ pub enum StorageUpdateState {
 pub struct DataRestoreDriver<T: Transport, I> {
     /// Web3 provider endpoint
     pub web3: Web3<T>,
-    /// Provides Ethereum Governance contract unterface
+    /// Provides Ethereum Governance contract interface
     pub governance_contract: (ethabi::Contract, Contract<T>),
-    /// Provides Ethereum Rollup contract unterface
+    /// Ethereum blocks that include correct UpgradeComplete events.
+    /// Should be provided via config.
+    pub contract_upgrade_eth_blocks: Vec<u64>,
+    /// The initial version of the deployed zkSync contract.
+    pub init_contract_version: u32,
+    /// Provides Ethereum Rollup contract interface
     pub zksync_contract: ZkSyncDeployedContract<T>,
     /// Rollup contract events state
     pub events_state: EventsState,
@@ -83,6 +90,8 @@ where
     ///
     /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
+    /// * `upgrade_eth_blocks` - Ethereum blocks that include correct UpgradeComplete events
+    /// * `init_contract_version` - The initial version of the deployed zkSync contract
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     /// * `finite_mode` - Finite mode flag.
@@ -93,6 +102,8 @@ where
     pub fn new(
         web3: Web3<T>,
         governance_contract_eth_addr: H160,
+        contract_upgrade_eth_blocks: Vec<u64>,
+        init_contract_version: u32,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         finite_mode: bool,
@@ -113,6 +124,8 @@ where
         Self {
             web3,
             governance_contract,
+            contract_upgrade_eth_blocks,
+            init_contract_version,
             zksync_contract,
             events_state,
             tree_state,
@@ -122,32 +135,6 @@ where
             final_hash,
             phantom_data: Default::default(),
         }
-    }
-
-    pub async fn get_gatekeeper_logs(
-        &self,
-        upgrade_gatekeeper_contract_address: Address,
-    ) -> anyhow::Result<Vec<Log>> {
-        let gatekeeper_abi = upgrade_gatekeeper();
-        let upgrade_contract_event = gatekeeper_abi
-            .event("UpgradeComplete")
-            .expect("Upgrade Gatekeeper contract abi error")
-            .signature();
-
-        let filter = FilterBuilder::default()
-            .address(vec![upgrade_gatekeeper_contract_address])
-            .from_block(Web3BlockNumber::Earliest)
-            .to_block(Web3BlockNumber::Latest)
-            .topics(Some(vec![upgrade_contract_event]), None, None, None)
-            .build();
-
-        let result = self
-            .web3
-            .eth()
-            .logs(filter)
-            .await
-            .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
-        Ok(result)
     }
 
     /// Sets the 'genesis' state.
@@ -182,13 +169,47 @@ where
             hex::encode(genesis_fee_account.address.as_ref())
         );
 
-        let account_update = AccountUpdate::Create {
-            address: genesis_fee_account.address,
-            nonce: genesis_fee_account.nonce,
-        };
+        interactor
+            .save_special_token(Token {
+                id: NFT_TOKEN_ID,
+                symbol: "SPECIAL".to_string(),
+                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
+                decimals: 18,
+                is_nft: true,
+            })
+            .await;
+        vlog::info!("Special token added");
 
+        let mut account_updates = Vec::with_capacity(3);
         let mut account_map = AccountMap::default();
+
+        account_updates.push((
+            AccountId(0),
+            AccountUpdate::Create {
+                address: genesis_fee_account.address,
+                nonce: genesis_fee_account.nonce,
+            },
+        ));
         account_map.insert(AccountId(0), genesis_fee_account);
+
+        let (mut special_account, special_account_create) =
+            Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
+        special_account.set_balance(NFT_TOKEN_ID, num::BigUint::from(MIN_NFT_TOKEN_ID));
+
+        account_updates.push(special_account_create[0].clone());
+        account_updates.push((
+            NFT_STORAGE_ACCOUNT_ID,
+            AccountUpdate::UpdateBalance {
+                old_nonce: special_account.nonce,
+                new_nonce: special_account.nonce,
+                balance_update: (
+                    NFT_TOKEN_ID,
+                    num::BigUint::from(0u64),
+                    num::BigUint::from(MIN_NFT_TOKEN_ID),
+                ),
+            },
+        ));
+        account_map.insert(NFT_STORAGE_ACCOUNT_ID, special_account);
 
         let current_block = BlockNumber(0);
         let current_unprocessed_priority_op = 0;
@@ -204,11 +225,26 @@ where
         vlog::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         vlog::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
-        interactor.save_genesis_tree_state(account_update).await;
+        interactor.save_genesis_tree_state(&account_updates).await;
 
         vlog::info!("Saved genesis tree state\n");
 
         self.tree_state = tree_state;
+    }
+
+    async fn store_tree_cache(&mut self, interactor: &mut I) {
+        vlog::info!(
+            "Storing the tree cache, block number: {}",
+            self.tree_state.state.block_number
+        );
+        self.tree_state.state.root_hash();
+        let tree_cache = self.tree_state.state.get_balance_tree().get_internals();
+        interactor
+            .store_tree_cache(
+                self.tree_state.state.block_number,
+                serde_json::to_value(tree_cache).expect("failed to serialize tree cache"),
+            )
+            .await;
     }
 
     /// Stops states from storage
@@ -216,13 +252,27 @@ where
         vlog::info!("Loading state from storage");
         let state = interactor.get_storage_state().await;
         self.events_state = interactor.get_block_events_state_from_storage().await;
-        let tree_state = interactor.get_tree_state().await;
-        self.tree_state = TreeState::load(
-            tree_state.last_block_number,     // current block
-            tree_state.account_map,           // account map
-            tree_state.unprocessed_prior_ops, // unprocessed priority op
-            tree_state.fee_acc_id,            // fee account
-        );
+
+        let mut is_cached = false;
+        // Try to load tree cache from the database.
+        self.tree_state = if let Some(cache) = interactor.get_cached_tree_state().await {
+            vlog::info!("Using tree cache from the database");
+            is_cached = true;
+            TreeState::restore_from_cache(
+                cache.tree_cache,
+                cache.account_map,
+                cache.current_block,
+                cache.nfts,
+            )
+        } else {
+            let tree_state = interactor.get_tree_state().await;
+            TreeState::load(
+                tree_state.last_block_number,
+                tree_state.account_map,
+                tree_state.unprocessed_prior_ops,
+                tree_state.fee_acc_id,
+            )
+        };
         match state {
             StorageUpdateState::Events => {
                 // Update operations
@@ -247,7 +297,12 @@ where
             self.tree_state.root_hash()
         );
 
-        self.finite_mode && (total_verified_blocks == *last_verified_block)
+        let is_finished = self.finite_mode && (total_verified_blocks == *last_verified_block);
+        // Save tree cache if necessary.
+        if is_finished && !is_cached {
+            self.store_tree_cache(interactor).await;
+        }
+        is_finished
     }
 
     /// Activates states updates
@@ -303,7 +358,10 @@ where
                             panic!("Final hash was not met during the state restoring process");
                         }
 
-                        // We've restored all the blocks, our job is done.
+                        // We've restored all the blocks, our job is done. Store the tree cache for
+                        // consequent usage.
+                        self.store_tree_cache(interactor).await;
+
                         break;
                     }
                 }
@@ -327,8 +385,10 @@ where
                 &self.web3,
                 &self.zksync_contract,
                 &self.governance_contract,
+                &self.contract_upgrade_eth_blocks,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
+                self.init_contract_version,
             )
             .await
             .expect("Updating events state: cant update events state");
@@ -353,10 +413,21 @@ where
         let mut blocks = vec![];
         let mut updates = vec![];
         let mut count = 0;
+
+        // TODO Fix event state and delete this code (ZKS-722)
+        let new_ops_blocks: Vec<RollupOpsBlock> = new_ops_blocks
+            .into_iter()
+            .filter(|bl| bl.block_num > self.tree_state.state.block_number)
+            .collect();
         for op_block in new_ops_blocks {
+            // Take the contract version into account when choosing block chunk sizes.
+            let available_block_chunk_sizes = op_block
+                .contract_version
+                .expect("contract version must be set")
+                .available_block_chunk_sizes();
             let (block, acc_updates) = self
                 .tree_state
-                .update_tree_states_from_ops_block(&op_block)
+                .update_tree_states_from_ops_block(&op_block, available_block_chunk_sizes)
                 .expect("Updating tree state: cant update tree from operations");
             blocks.push(block);
             updates.push(acc_updates);

@@ -1,0 +1,32 @@
+[package]
+name = "regen-root-hash"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
+readme = "README.md"
+
+[dependencies]
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+zksync_circuit = { path = "../../lib/circuit", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+ethabi = "12.0.0"
+
+once_cell = "1.4"
+anyhow = "1.0"
+bigdecimal = { version = "0.2.0", features = ["serde"]}
+num = { version = "0.3.1", features = ["serde"] }
+hex = "0.4"
+structopt = "0.3.20"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0.0" }
+
+tokio = { version = "0.2", features = ["full"] }

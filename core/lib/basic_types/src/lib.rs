@@ -15,7 +15,7 @@ pub use web3::types::{Address, Log, TransactionReceipt, H160, H256, U128, U256};
 basic_type!(
     /// Unique identifier of the token in the zkSync network.
     TokenId,
-    u16
+    u32
 );
 
 basic_type!(
@@ -45,5 +45,11 @@ basic_type!(
 basic_type!(
     /// Block number in the Ethereum network.
     EthBlockId,
+    u64
+);
+
+basic_type!(
+    /// Unique identifier of the zkSync event.
+    EventId,
     u64
 );

@@ -18,7 +18,8 @@ const IGNORED_DIRS = [
     'lint-config',
     'cache',
     'artifacts',
-    'typechain'
+    'typechain',
+    'binaryen'
 ];
 const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol', '.tslintrc.js'];
 
@@ -131,4 +132,15 @@ export async function getUnignoredFiles(extension: string) {
 export function web3Url() {
     // @ts-ignore
     return process.env.ETH_CLIENT_WEB3_URL.split(',')[0] as string;
+}
+
+export async function readZkSyncAbi() {
+    const zksync = process.env.ZKSYNC_HOME;
+    const path = `${zksync}/contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json`;
+
+    const fileContent = (await fs.promises.readFile(path)).toString();
+
+    const abi = JSON.parse(fileContent).abi;
+
+    return abi;
 }

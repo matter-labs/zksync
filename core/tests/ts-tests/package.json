@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "mocha": {
-    "timeout": 240000,
+    "timeout": 300000,
     "exit": true,
     "color": false,
     "slow": 0,

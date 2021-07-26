@@ -4,16 +4,18 @@ use crate::{
 };
 use num::{BigUint, Zero};
 
-use crate::account::PubKeyHash;
-use crate::Engine;
+use crate::{account::PubKeyHash, Engine};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
-use zksync_crypto::params::{max_account_id, max_token_id};
+use zksync_crypto::{
+    franklin_crypto::eddsa::PrivateKey,
+    params::{max_account_id, max_fungible_token_id, max_processable_token, CURRENT_TX_VERSION},
+};
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
-use crate::tx::TimeRange;
+use crate::tx::version::TxVersion;
+use crate::tx::{error::TransactionSignatureError, TimeRange};
 
 /// `ForcedExit` transaction is used to withdraw funds from an unowned
 /// account to its corresponding L1 address.
@@ -92,7 +94,7 @@ impl ForcedExit {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, TransactionSignatureError> {
         let mut tx = Self::new(
             initiator_account_id,
             target,
@@ -104,15 +106,33 @@ impl ForcedExit {
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
+            return Err(TransactionSignatureError);
         }
         Ok(tx)
     }
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
-    pub fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_old_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
+        out.extend_from_slice(&self.target.as_bytes());
+        out.extend_from_slice(&(self.token.0 as u16).to_be_bytes());
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out.extend_from_slice(&self.time_range.to_be_bytes());
+        out
+    }
+
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
+    pub fn get_bytes(&self) -> Vec<u8> {
+        self.get_bytes_with_version(CURRENT_TX_VERSION)
+    }
+
+    pub fn get_bytes_with_version(&self, version: u8) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
+        out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
         out.extend_from_slice(&self.target.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -131,10 +151,14 @@ impl ForcedExit {
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = is_fee_amount_packable(&self.fee)
             && self.initiator_account_id <= max_account_id()
-            && self.token <= max_token_id()
+            && self.token <= max_fungible_token_id()
             && self.time_range.check_correctness();
 
         if valid {
+            if self.fee != BigUint::zero() {
+                // Fee can only be paid in processable tokens
+                valid = self.token <= max_processable_token();
+            }
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
             self.cached_signer = VerifiedSignatureCache::Cached(signer);
@@ -143,13 +167,20 @@ impl ForcedExit {
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
-    pub fn verify_signature(&self) -> Option<PubKeyHash> {
+    pub fn verify_signature(&self) -> Option<(PubKeyHash, TxVersion)> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             *cached_signer
         } else {
+            if let Some(res) = self
+                .signature
+                .verify_musig(&self.get_old_bytes())
+                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+            {
+                return Some((res, TxVersion::Legacy));
+            }
             self.signature
                 .verify_musig(&self.get_bytes())
-                .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+                .map(|pub_key| (PubKeyHash::from_pubkey(&pub_key), TxVersion::V1))
         }
     }
 

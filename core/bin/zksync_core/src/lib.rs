@@ -1,5 +1,4 @@
-use zksync_types::{tokens::get_genesis_token_list, Token, TokenId};
-
+use crate::register_factory_handler::run_register_factory_handler;
 use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
     block_proposer::run_block_proposer_task,
@@ -9,22 +8,27 @@ use crate::{
     private_api::start_private_core_api,
     rejected_tx_cleaner::run_rejected_tx_cleaner,
     state_keeper::{start_state_keeper, ZkSyncStateKeeper},
+    token_handler::run_token_handler,
 };
 use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
+use zksync_eth_client::EthereumGateway;
+use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_storage::ConnectionPool;
+use zksync_types::{tokens::get_genesis_token_list, Token, TokenId};
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
-pub mod balancer;
 pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
 pub mod mempool;
 pub mod private_api;
+pub mod register_factory_handler;
 pub mod rejected_tx_cleaner;
 pub mod state_keeper;
+pub mod token_handler;
 
 /// Waits for *any* of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
@@ -71,12 +75,11 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
             .expect("failed to access db")
             .tokens_schema()
             .store_token(Token {
-                id: TokenId(id as u16),
+                id: TokenId(id as u32),
                 symbol: token.symbol,
-                address: token.address[2..]
-                    .parse()
-                    .expect("failed to parse token address"),
+                address: token.address,
                 decimals: token.decimals,
+                is_nft: false,
             })
             .await
             .expect("failed to store token");
@@ -94,6 +97,7 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
 pub async fn run_core(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
+    eth_gateway: EthereumGateway,
     config: &ZkSyncConfig,
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let (proposed_blocks_sender, proposed_blocks_receiver) =
@@ -108,9 +112,10 @@ pub async fn run_core(
 
     // Start Ethereum Watcher.
     let eth_watch_task = start_eth_watch(
-        &config,
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
+        eth_gateway.clone(),
+        &config,
     );
 
     // Insert pending withdrawals into database (if required)
@@ -153,6 +158,21 @@ pub async fn run_core(
         DEFAULT_CHANNEL_CAPACITY,
     );
 
+    let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config);
+
+    // Start token handler.
+    let token_handler_task = run_token_handler(
+        connection_pool.clone(),
+        eth_watch_req_sender.clone(),
+        &config,
+    );
+
+    // Start token handler.
+    let register_factory_task = run_register_factory_handler(
+        connection_pool.clone(),
+        eth_watch_req_sender.clone(),
+        &config,
+    );
     // Start rejected transactions cleaner task.
     let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
 
@@ -171,14 +191,20 @@ pub async fn run_core(
         config.api.private.clone(),
     );
 
-    let task_futures = vec![
+    let mut task_futures = vec![
         eth_watch_task,
         state_keeper_task,
         committer_task,
         mempool_task,
         proposer_task,
         rejected_tx_cleaner_task,
+        token_handler_task,
+        register_factory_task,
     ];
+
+    if let Some(task) = gateway_watcher_task_opt {
+        task_futures.push(task);
+    }
 
     Ok(task_futures)
 }

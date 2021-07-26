@@ -4,6 +4,7 @@ use crate::zksync_account::ZkSyncAccount;
 use std::time::Instant;
 use web3::transports::Http;
 use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
+use zksync_testkit::zksync_account::ZkSyncETHAccountData;
 use zksync_testkit::*;
 use zksync_types::{Nonce, TokenId};
 
@@ -49,15 +50,16 @@ async fn migration_test() {
         .collect::<Vec<_>>();
 
     let zksync_accounts = {
-        let mut zksync_accounts = Vec::new();
-        zksync_accounts.push(fee_account);
+        let mut zksync_accounts = vec![fee_account];
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
                 Nonce(0),
                 eth_account.address,
-                eth_account.private_key,
+                ZkSyncETHAccountData::EOA {
+                    eth_private_key: eth_account.private_key,
+                },
             )
         }));
         zksync_accounts

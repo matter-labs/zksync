@@ -7,7 +7,9 @@ import {
     ChangePubKeyFee,
     SignedTransaction,
     TxEthSignature,
-    ChangePubkeyTypes
+    ChangePubkeyTypes,
+    TotalFee,
+    Order
 } from './types';
 import { MAX_TIMESTAMP } from './utils';
 import { Wallet } from './wallet';
@@ -16,24 +18,33 @@ import { Wallet } from './wallet';
  * Used by `BatchBuilder` to store transactions until the `build()` call.
  */
 interface InternalTx {
-    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit';
+    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT' | 'WithdrawNFT' | 'Swap';
     tx: any;
-    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee;
+    feeType:
+        | 'Withdraw'
+        | 'Transfer'
+        | 'FastWithdraw'
+        | 'ForcedExit'
+        | ChangePubKeyFee
+        | 'Swap'
+        | 'MintNFT'
+        | 'WithdrawNFT'
+        | 'ForcedExit';
     address: Address;
     token: TokenLike;
+    // Whether or not the tx has been signed.
+    // Considered false by default
+    alreadySigned?: boolean;
 }
 
-type TotalFee = Map<TokenLike, BigNumber>;
-
 /**
- * Provides iterface for constructing batches of transactions.
+ * Provides interface for constructing batches of transactions.
  */
 export class BatchBuilder {
     private constructor(private wallet: Wallet, private nonce: Nonce, private txs: InternalTx[] = []) {}
 
     static fromWallet(wallet: Wallet, nonce?: Nonce): BatchBuilder {
-        const batchBuilder = new BatchBuilder(wallet, nonce, []);
-        return batchBuilder;
+        return new BatchBuilder(wallet, nonce, []);
     }
 
     /**
@@ -55,6 +66,10 @@ export class BatchBuilder {
         const totalFee: TotalFee = new Map();
         for (const tx of this.txs) {
             const fee = tx.tx.fee;
+            // Signed transactions store token ids instead of symbols.
+            if (tx.alreadySigned) {
+                tx.token = this.wallet.provider.tokenSet.resolveTokenSymbol(tx.tx.feeToken);
+            }
             const token = tx.token;
             const curr: BigNumber = totalFee.get(token) || BigNumber.from(0);
             totalFee.set(token, curr.add(fee));
@@ -72,20 +87,22 @@ export class BatchBuilder {
     }
 
     private async setFeeToken(feeToken: TokenLike) {
-        // If user specified a token he wants to pay with, we expect all fees to be zero.
-        if (this.txs.find((tx) => !BigNumber.from(tx.tx.fee).isZero()) != undefined) {
-            throw new Error('Fees are expected to be zero');
+        // If user specified a token he wants to pay with, we expect all fees to be zero
+        // and no signed transactions in the batch.
+        if (this.txs.find((tx) => tx.alreadySigned || !BigNumber.from(tx.tx.fee).isZero()) != undefined) {
+            throw new Error('All transactions are expected to be unsigned with zero fees');
         }
-        let txWithFeeToken = this.txs.find((tx) => tx.token == feeToken);
-        // If there's no transaction with the given token, create dummy transfer.
-        if (txWithFeeToken == undefined) {
+        // We use the last transaction in the batch for paying fees.
+        // If it uses different token, create dummy transfer to self.
+        if (this.txs[this.txs.length - 1].token !== feeToken) {
             this.addTransfer({
                 to: this.wallet.address(),
                 token: feeToken,
                 amount: 0
             });
-            txWithFeeToken = this.txs[this.txs.length - 1];
         }
+        const txWithFeeToken = this.txs[this.txs.length - 1];
+
         const txTypes = this.txs.map((tx) => tx.feeType);
         const addresses = this.txs.map((tx) => tx.address);
 
@@ -97,7 +114,6 @@ export class BatchBuilder {
         token: TokenLike;
         amount: BigNumberish;
         fee?: BigNumberish;
-        fastProcessing?: boolean;
         validFrom?: number;
         validUntil?: number;
     }): BatchBuilder {
@@ -110,13 +126,85 @@ export class BatchBuilder {
             validFrom: withdraw.validFrom || 0,
             validUntil: withdraw.validUntil || MAX_TIMESTAMP
         };
-        const feeType = withdraw.fastProcessing === true ? 'FastWithdraw' : 'Withdraw';
         this.txs.push({
             type: 'Withdraw',
             tx: _withdraw,
-            feeType: feeType,
+            feeType: 'Withdraw',
             address: _withdraw.ethAddress,
             token: _withdraw.token
+        });
+        return this;
+    }
+
+    addMintNFT(mintNFT: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+    }): BatchBuilder {
+        const _mintNft = {
+            recipient: mintNFT.recipient,
+            contentHash: mintNFT.contentHash,
+            feeToken: mintNFT.feeToken,
+            fee: mintNFT.fee || 0
+        };
+        this.txs.push({
+            type: 'MintNFT',
+            tx: _mintNft,
+            feeType: 'MintNFT',
+            address: _mintNft.recipient,
+            token: _mintNft.feeToken
+        });
+
+        return this;
+    }
+
+    addWithdrawNFT(withdrawNFT: {
+        to: string;
+        token: TokenLike;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        validFrom?: number;
+        validUntil?: number;
+    }): BatchBuilder {
+        const _withdrawNFT = {
+            to: withdrawNFT.to,
+            token: withdrawNFT.token,
+            feeToken: withdrawNFT.feeToken,
+            fee: withdrawNFT.fee || 0,
+            validFrom: withdrawNFT.validFrom || 0,
+            validUntil: withdrawNFT.validUntil || MAX_TIMESTAMP
+        };
+        this.txs.push({
+            type: 'WithdrawNFT',
+            tx: _withdrawNFT,
+            feeType: 'WithdrawNFT',
+            address: _withdrawNFT.to,
+            token: _withdrawNFT.feeToken
+        });
+
+        return this;
+    }
+
+    addSwap(swap: {
+        orders: [Order, Order];
+        amounts: [BigNumberish, BigNumberish];
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+    }): BatchBuilder {
+        const _swap = {
+            orders: swap.orders,
+            amounts: swap.amounts,
+            nonce: null,
+            fee: swap.fee || 0,
+            feeToken: swap.feeToken
+        };
+        this.txs.push({
+            type: 'Swap',
+            tx: _swap,
+            feeType: 'Swap',
+            address: this.wallet.address(),
+            token: swap.feeToken
         });
         return this;
     }
@@ -148,21 +236,39 @@ export class BatchBuilder {
         return this;
     }
 
-    addChangePubKey(changePubKey: {
-        feeToken: TokenLike;
-        ethAuthType: ChangePubkeyTypes;
-        fee?: BigNumberish;
-        validFrom?: number;
-        validUntil?: number;
-    }): BatchBuilder {
+    addChangePubKey(
+        changePubKey:
+            | {
+                  feeToken: TokenLike;
+                  ethAuthType: ChangePubkeyTypes;
+                  fee?: BigNumberish;
+                  validFrom?: number;
+                  validUntil?: number;
+              }
+            | SignedTransaction
+    ): BatchBuilder {
+        if ('tx' in changePubKey) {
+            if (changePubKey.tx.type !== 'ChangePubKey') {
+                throw new Error('Invalid transaction type: expected ChangePubKey');
+            }
+            // Already signed.
+            this.txs.push({
+                type: 'ChangePubKey',
+                tx: changePubKey.tx,
+                feeType: null, // Not needed.
+                address: this.wallet.address(),
+                token: null, // Will be resolved later.
+                alreadySigned: true
+            });
+            return this;
+        }
         const _changePubKey = {
             feeToken: changePubKey.feeToken,
             fee: changePubKey.fee || 0,
             nonce: null,
             ethAuthType: changePubKey.ethAuthType,
             validFrom: changePubKey.validFrom || 0,
-            validUntil: changePubKey.validUntil || MAX_TIMESTAMP,
-            pubKeyHash: null
+            validUntil: changePubKey.validUntil || MAX_TIMESTAMP
         };
         const feeType = {
             ChangePubKey: changePubKey.ethAuthType
@@ -195,7 +301,7 @@ export class BatchBuilder {
         this.txs.push({
             type: 'ForcedExit',
             tx: _forcedExit,
-            feeType: 'Withdraw',
+            feeType: 'ForcedExit',
             address: _forcedExit.target,
             token: _forcedExit.token
         });
@@ -219,24 +325,55 @@ export class BatchBuilder {
                     processedTxs.push(withdraw);
                     break;
                 case 'Transfer':
-                    messages.push(this.wallet.getTransferEthMessagePart(tx.tx));
+                    messages.push(await this.wallet.getTransferEthMessagePart(tx.tx));
                     const transfer = { tx: await this.wallet.getTransfer(tx.tx) };
                     processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
-                    const changePubKey = await this.wallet.signSetSigningKey(tx.tx);
-                    tx.tx.pubKeyHash = (changePubKey.tx as ChangePubKey).newPkHash;
+                    // ChangePubKey requires its own Ethereum signature, we either expect
+                    // it to be signed already or do it here.
+                    const changePubKey: ChangePubKey = tx.alreadySigned
+                        ? tx.tx
+                        : (await this.wallet.signSetSigningKey(tx.tx)).tx;
                     const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
-                    if (currentPubKeyHash === tx.tx.pubKeyHash) {
+                    if (currentPubKeyHash === changePubKey.newPkHash) {
                         throw new Error('Current signing key is already set');
                     }
-                    messages.push(this.wallet.getChangePubKeyEthMessagePart(tx.tx));
-                    processedTxs.push(changePubKey);
+                    messages.push(
+                        this.wallet.getChangePubKeyEthMessagePart({
+                            pubKeyHash: changePubKey.newPkHash,
+                            feeToken: tx.token,
+                            fee: changePubKey.fee
+                        })
+                    );
+                    processedTxs.push({ tx: changePubKey });
                     break;
                 case 'ForcedExit':
                     messages.push(this.wallet.getForcedExitEthMessagePart(tx.tx));
                     const forcedExit = { tx: await this.wallet.getForcedExit(tx.tx) };
                     processedTxs.push(forcedExit);
+                    break;
+                case 'MintNFT':
+                    messages.push(this.wallet.getMintNFTEthMessagePart(tx.tx));
+                    const mintNft = { tx: await this.wallet.getMintNFT(tx.tx) };
+                    processedTxs.push(mintNft);
+                    break;
+                case 'Swap':
+                    messages.push(this.wallet.getSwapEthSignMessagePart(tx.tx));
+                    const swap = {
+                        tx: await this.wallet.getSwap(tx.tx),
+                        ethereumSignature: [
+                            null,
+                            tx.tx.orders[0].ethSignature || null,
+                            tx.tx.orders[1].ethSignature || null
+                        ]
+                    };
+                    processedTxs.push(swap);
+                    break;
+                case 'WithdrawNFT':
+                    messages.push(this.wallet.getWithdrawNFTEthMessagePart(tx.tx));
+                    const withdrawNft = { tx: await this.wallet.getWithdrawNFT(tx.tx) };
+                    processedTxs.push(withdrawNft);
                     break;
             }
         }

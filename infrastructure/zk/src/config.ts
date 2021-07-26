@@ -13,12 +13,17 @@ const CONFIG_FILES = [
     'eth_client.toml',
     'eth_sender.toml',
     'eth_watch.toml',
+    'event_listener.toml',
+    'gateway_watcher.toml',
     'fee_ticker.toml',
     'misc.toml',
     'dev_liquidity_token_watcher.toml',
     'prover.toml',
     'rust.toml',
-    'private.toml'
+    'private.toml',
+    'forced_exit_requests.toml',
+    'token_handler.toml',
+    'nft_factory.toml'
 ];
 
 async function getEnvironment(): Promise<string> {
@@ -129,7 +134,8 @@ async function loadAllConfigs(environment?: string) {
 
 export async function printAllConfigs(environment?: string) {
     const config = await loadAllConfigs(environment);
-    console.log(`${JSON.stringify(config, null, 2)}`);
+    const json = JSON.stringify(config, (_key, value) => (typeof value === 'bigint' ? value.toString() : value), 2);
+    console.log(json);
 }
 
 export async function compileConfig(environment?: string) {

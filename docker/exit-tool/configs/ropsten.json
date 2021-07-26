@@ -1,7 +1,12 @@
 {
     "eth_network": "ropsten",
-    "governance_addr": "0x0C5C6cD4E2436B1b308A0C11942705418F41F730",
-    "genesis_tx_hash": "0xd37743975fbad2d8be5fc75ecb4299c2eef36e483ad1a12f74777e8b86a952b5",
-    "contract_addr": "0x17dE8874259c59cd9f7E6ec86b6813Bda661A57c",
-    "available_block_chunk_sizes": [6,30,74,150,320,630]
+    "governance_addr": "0xa7276Ef2Cb4Cbb069d94597251182d722E8e0940",
+    "upgrade_gatekeeper_addr": "0x3d3cDd04acBf3EcFb3c207F77b14C51Ea4E00c4b",
+    "genesis_tx_hash": "0xae5943cc4ff60ee85c91d317a2f144df40ff2689eef9528348601ed630428ac1",
+    "contract_addr": "0xc332679D243439048c8395DEfDe74D71cf5151e7",
+    "init_contract_version": 4,
+    "upgrade_eth_blocks": [
+        10277852,
+        10277852
+    ]
 }

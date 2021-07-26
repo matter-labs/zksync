@@ -52,8 +52,8 @@ pub struct ContractsConfig {
     governance_addr: Address,
     genesis_tx_hash: H256,
     contract_addr: Address,
-    upgrade_gatekeeper_addr: Address,
-    available_block_chunk_sizes: Vec<usize>,
+    init_contract_version: u32,
+    upgrade_eth_blocks: Vec<u64>,
 }
 
 impl ContractsConfig {
@@ -72,8 +72,8 @@ impl ContractsConfig {
             governance_addr: contracts_opts.governance_addr,
             genesis_tx_hash: contracts_opts.genesis_tx_hash,
             contract_addr: contracts_opts.contract_addr,
-            upgrade_gatekeeper_addr: contracts_opts.upgrade_gatekeeper_addr,
-            available_block_chunk_sizes: chain_opts.state_keeper.block_chunk_sizes,
+            init_contract_version: contracts_opts.init_contract_version,
+            upgrade_eth_blocks: contracts_opts.upgrade_eth_blocks,
         }
     }
 }
@@ -81,7 +81,7 @@ impl ContractsConfig {
 #[tokio::main]
 async fn main() {
     vlog::info!("Restoring zkSync state from the contract");
-    vlog::init();
+    let _sentry_guard = vlog::init();
     let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ETHClientConfig::from_env();
 
@@ -96,6 +96,8 @@ async fn main() {
         .map(|path| ContractsConfig::from_file(&path))
         .unwrap_or_else(ContractsConfig::from_env);
 
+    vlog::info!("Using the following config: {:#?}", config);
+
     let finite_mode = opt.finite;
     let final_hash = if finite_mode {
         opt.final_hash
@@ -109,6 +111,8 @@ async fn main() {
     let mut driver = DataRestoreDriver::new(
         web3,
         config.governance_addr,
+        config.upgrade_eth_blocks,
+        config.init_contract_version,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         finite_mode,

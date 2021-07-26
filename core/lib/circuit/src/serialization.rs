@@ -40,6 +40,10 @@ pub struct ProverData {
     pub operations: Vec<Operation<Engine>>,
     #[serde(with = "AccountWitnessDef")]
     pub validator_account: AccountWitness<Engine>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub validator_non_processable_tokens_audit_before_fees: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub validator_non_processable_tokens_audit_after_fees: Vec<Option<Fr>>,
 }
 
 impl From<WitnessBuilder<'_>> for ProverData {
@@ -59,6 +63,12 @@ impl From<WitnessBuilder<'_>> for ProverData {
             validator_balances: witness_builder.fee_account_balances.unwrap(),
             validator_audit_path: witness_builder.fee_account_audit_path.unwrap(),
             validator_account: witness_builder.fee_account_witness.unwrap(),
+            validator_non_processable_tokens_audit_before_fees: witness_builder
+                .validator_non_processable_tokens_audit_before_fees
+                .unwrap(),
+            validator_non_processable_tokens_audit_after_fees: witness_builder
+                .validator_non_processable_tokens_audit_after_fees
+                .unwrap(),
         }
     }
 }
@@ -78,6 +88,10 @@ impl ProverData {
             validator_balances: self.validator_balances,
             validator_audit_path: self.validator_audit_path,
             validator_account: self.validator_account,
+            validator_non_processable_tokens_audit_before_fees: self
+                .validator_non_processable_tokens_audit_before_fees,
+            validator_non_processable_tokens_audit_after_fees: self
+                .validator_non_processable_tokens_audit_after_fees,
         }
     }
 }
@@ -130,6 +144,24 @@ pub struct OperationArgumentsDef {
     pub b: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]
     pub amount_packed: Option<Fr>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_content_hash: Vec<Option<Fr>>,
+    #[serde(with = "OptionalFrSerde")]
+    pub special_serial_id: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub second_amount_packed: Option<Fr>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_tokens: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_accounts: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_amounts: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_nonces: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_prices: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_eth_addresses: Vec<Option<Fr>>,
     #[serde(with = "OptionalFrSerde")]
     pub full_amount: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]
@@ -144,6 +176,10 @@ pub struct OperationArgumentsDef {
     pub valid_from: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]
     pub valid_until: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub second_valid_from: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub second_valid_until: Option<Fr>,
 }
 
 #[derive(Serialize, Deserialize)]

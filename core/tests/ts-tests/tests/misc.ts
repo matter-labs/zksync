@@ -4,20 +4,49 @@ import { Wallet, types } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
-import { MAX_TIMESTAMP, serializeTx } from 'zksync/build/utils';
+import { MAX_TIMESTAMP } from 'zksync/build/utils';
+import { Transfer, Withdraw } from 'zksync/build/types';
+import {
+    serializeAccountId,
+    serializeAddress,
+    serializeAmountFull,
+    serializeAmountPacked,
+    serializeFeePacked,
+    serializeNonce,
+    serializeTimestamp,
+    numberToBytesBE
+} from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testWrongSignature(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
-        testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testMultipleWalletsWrongSignature(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
         testBackwardCompatibleEthMessages(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
-Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber) {
+Tester.prototype.testWrongSignature = async function (
+    from: Wallet,
+    to: Wallet,
+    token: TokenLike,
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
+) {
     const signedTransfer = await from.signSyncTransfer({
         to: to.address(),
         token: token,
@@ -37,7 +66,11 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet, 
         await from.provider.submitTx(signedTransfer.tx, fakeEthSignature);
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
+        } else {
+            expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        }
     }
     expect(thrown, 'Sending tx with incorrect ETH signature must throw').to.be.true;
 
@@ -55,7 +88,11 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet, 
         await from.provider.submitTx(signedWithdraw.tx, fakeEthSignature);
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
+        } else {
+            expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        }
     }
     expect(thrown, 'Sending tx with incorrect ETH signature must throw').to.be.true;
 };
@@ -92,7 +129,7 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
         const transfer = await sender.getTransfer(transferArgs);
         batch.push({ tx: transfer });
 
-        const messagePart = sender.getTransferEthMessagePart(transferArgs);
+        const messagePart = await sender.getTransferEthMessagePart(transferArgs);
         messages.push(`From: ${sender.address().toLowerCase()}\n${messagePart}\nNonce: ${nonce}`);
     }
 
@@ -117,7 +154,8 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
     from: Wallet,
     to: Wallet,
     token: TokenLike,
-    amount: BigNumber
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
 ) {
     const fee = await this.syncProvider.getTransactionsBatchFee(
         ['Transfer', 'Transfer'],
@@ -157,7 +195,11 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
         await submitSignedTransactionsBatch(from.provider, batch, [ethSignature]);
         thrown = false; // this line should be unreachable
     } catch (e) {
-        expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
+        } else {
+            expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+        }
     }
     expect(thrown, 'Sending batch with incorrect ETH signature must throw').to.be.true;
 };
@@ -222,9 +264,12 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     const signedWithdraw = { tx: withdraw, ethereumSignature: await to.getEthMessageSignature(withdrawMessage) }; // Withdraw
 
     const batch = [signedTransfer, signedWithdraw];
+
     // The message is keccak256(batchBytes).
-    // Transactions are serialized in the new format, the server will take this into account.
-    const batchBytes = ethers.utils.concat(batch.map((signedTx) => serializeTx(signedTx.tx)));
+    // Transactions are serialized in the old format, the server will take this into account.
+    const transferBytes = serializeOldTransfer(transfer);
+    const withdrawBytes = serializeOldWithdraw(withdraw);
+    const batchBytes = ethers.utils.concat([transferBytes, withdrawBytes]);
     const batchHash = ethers.utils.keccak256(batchBytes).slice(2);
     const message = Uint8Array.from(Buffer.from(batchHash, 'hex'));
 
@@ -236,3 +281,42 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     this.runningFee = this.runningFee.add(totalFee);
 };
+
+export function serializeOldTransfer(transfer: Transfer): Uint8Array {
+    const type = new Uint8Array([5]); // tx type
+    const accountId = serializeAccountId(transfer.accountId);
+    const from = serializeAddress(transfer.from);
+    const to = serializeAddress(transfer.to);
+    const token = numberToBytesBE(transfer.token, 2);
+    const amount = serializeAmountPacked(transfer.amount);
+    const fee = serializeFeePacked(transfer.fee);
+    const nonce = serializeNonce(transfer.nonce);
+    const validFrom = serializeTimestamp(transfer.validFrom);
+    const validUntil = serializeTimestamp(transfer.validUntil);
+    return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce, validFrom, validUntil]);
+}
+
+export function serializeOldWithdraw(withdraw: Withdraw): Uint8Array {
+    const type = new Uint8Array([3]);
+    const accountId = serializeAccountId(withdraw.accountId);
+    const accountBytes = serializeAddress(withdraw.from);
+    const ethAddressBytes = serializeAddress(withdraw.to);
+    const tokenIdBytes = numberToBytesBE(withdraw.token, 2);
+    const amountBytes = serializeAmountFull(withdraw.amount);
+    const feeBytes = serializeFeePacked(withdraw.fee);
+    const nonceBytes = serializeNonce(withdraw.nonce);
+    const validFrom = serializeTimestamp(withdraw.validFrom);
+    const validUntil = serializeTimestamp(withdraw.validUntil);
+    return ethers.utils.concat([
+        type,
+        accountId,
+        accountBytes,
+        ethAddressBytes,
+        tokenIdBytes,
+        amountBytes,
+        feeBytes,
+        nonceBytes,
+        validFrom,
+        validUntil
+    ]);
+}

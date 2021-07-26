@@ -1,14 +1,15 @@
-use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::{
-    eddsa::{PrivateKey, PublicKey},
-    jubjub::FixedGenerators,
-};
-use zksync_crypto::params::{max_account_id, max_token_id, JUBJUB_PARAMS};
-use zksync_crypto::public_key_from_private;
-use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
-
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
+use zksync_basic_types::Address;
+use zksync_crypto::{
+    franklin_crypto::{
+        eddsa::{PrivateKey, PublicKey},
+        jubjub::FixedGenerators,
+    },
+    params::{max_account_id, max_fungible_token_id, CURRENT_TX_VERSION, JUBJUB_PARAMS},
+    public_key_from_private,
+    rand::{Rng, SeedableRng, XorShiftRng},
+};
 
 use super::*;
 use crate::{
@@ -21,9 +22,7 @@ fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
 
     let pk = PrivateKey(rng.gen());
 
-    let mut messages = Vec::new();
-    messages.push(Vec::<u8>::new());
-    messages.push(b"hello world".to_vec());
+    let messages = vec![Vec::<u8>::new(), b"hello world".to_vec()];
 
     (pk, messages)
 }
@@ -33,7 +32,7 @@ fn gen_account_id<T: Rng>(rng: &mut T) -> AccountId {
 }
 
 fn gen_token_id<T: Rng>(rng: &mut T) -> TokenId {
-    TokenId(rng.gen::<u16>().min(*max_token_id()))
+    TokenId(rng.gen::<u32>().min(*max_fungible_token_id()))
 }
 
 #[test]
@@ -64,7 +63,8 @@ fn test_print_transfer_for_protocol() {
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
     let signed_fields = vec![
-        ("type", vec![Transfer::TX_TYPE]),
+        ("type", vec![255u8 - Transfer::TX_TYPE]),
+        ("version", vec![CURRENT_TX_VERSION]),
         ("accountId", transfer.account_id.to_be_bytes().to_vec()),
         ("from", transfer.from.as_bytes().to_vec()),
         ("to", transfer.to.as_bytes().to_vec()),
@@ -123,7 +123,8 @@ fn test_print_withdraw_for_protocol() {
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
     let signed_fields = vec![
-        ("type", vec![Withdraw::TX_TYPE]),
+        ("type", vec![255u8 - Withdraw::TX_TYPE]),
+        ("version", vec![CURRENT_TX_VERSION]),
         ("accountId", withdraw.account_id.to_be_bytes().to_vec()),
         ("from", withdraw.from.as_bytes().to_vec()),
         ("to", withdraw.to.as_bytes().to_vec()),

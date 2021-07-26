@@ -4,12 +4,13 @@ use tokio::sync::RwLock;
 
 use zksync_storage::StorageProcessor;
 use zksync_types::tokens::TokenMarketVolume;
-use zksync_types::{Token, TokenId, TokenLike};
+use zksync_types::{Token, TokenId, TokenLike, NFT};
 
 #[derive(Debug, Clone, Default)]
 pub struct TokenDBCache {
     // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-97)
     cache: Arc<RwLock<HashMap<TokenLike, Token>>>,
+    nft_tokens: Arc<RwLock<HashMap<TokenId, NFT>>>,
 }
 
 impl TokenDBCache {
@@ -22,30 +23,7 @@ impl TokenDBCache {
         storage: &mut StorageProcessor<'_>,
         token_query: impl Into<TokenLike>,
     ) -> anyhow::Result<Option<Token>> {
-        let token_query = token_query.into();
-        // HACK: Special case for the Golem:
-        //
-        // Currently, their token on Rinkeby is called GNT, but it's being renamed to the GLM.
-        // So, for some period of time, we should consider GLM token name as an alias to the GNT token.
-        //
-        // TODO: Remove this case after Golem update [ZKS-173]
-        match token_query {
-            TokenLike::Symbol(symbol) if symbol == "tGLM" => {
-                // Try to lookup Golem token as "tGLM".
-                if let Some(token) = self
-                    .get_token_impl(storage, TokenLike::Symbol(symbol))
-                    .await?
-                {
-                    // If such token exists, use it.
-                    Ok(Some(token))
-                } else {
-                    // Otherwise to lookup Golem token as "GNT".
-                    self.get_token_impl(storage, TokenLike::Symbol("GNT".to_string()))
-                        .await
-                }
-            }
-            other => self.get_token_impl(storage, other).await,
-        }
+        self.get_token_impl(storage, token_query.into()).await
     }
 
     async fn get_token_impl(
@@ -79,6 +57,31 @@ impl TokenDBCache {
     ) -> anyhow::Result<Option<String>> {
         let token = self.get_token(storage, token_id).await?;
         Ok(token.map(|token| token.symbol))
+    }
+
+    pub async fn get_nft_by_id(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        token_id: TokenId,
+    ) -> anyhow::Result<Option<NFT>> {
+        if let Some(nft) = self.nft_tokens.read().await.get(&token_id) {
+            return Ok(Some(nft.clone()));
+        }
+        // It's safe to get from `mint_nft_updates` because the availability of token in balance is regulated
+        // by the balance of this token.
+        if let Some(token) = storage
+            .chain()
+            .state_schema()
+            .get_mint_nft_update(token_id)
+            .await?
+        {
+            self.nft_tokens
+                .write()
+                .await
+                .insert(token_id, token.clone());
+            return Ok(Some(token));
+        }
+        Ok(None)
     }
 
     pub async fn get_all_tokens(

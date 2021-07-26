@@ -1,5 +1,7 @@
 import store from './store';
+import config from './env-config';
 import { Readiness } from './Readiness';
+import { getDefaultProvider } from 'zksync';
 
 export const sleep = async (ms) => await new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -116,6 +118,46 @@ export function accountStateToBalances(account) {
     balances.sort((a, b) => a.tokenSymbol.localeCompare(b.tokenSymbol));
 
     return balances;
+}
+
+function getForcedExitEndpoint(str) {
+    const FORCED_EXIT_API = `${config.API_SERVER}/api/forced_exit_requests/v0.1`;
+    return FORCED_EXIT_API + str;
+}
+
+async function checkEligibilty(address) {
+    const endpoint = getForcedExitEndpoint(`/checks/eligibility/${address}`);
+
+    const response = await fetch(endpoint);
+
+    const responseObj = await response.json();
+
+    return responseObj.eligible;
+}
+
+export async function isEligibleForForcedExit(address) {
+    if (!window.provider) {
+        window.provider = await getDefaultProvider(config.ETH_NETWORK);
+    }
+
+    const state = await window.provider.getState(address);
+
+    if (!state.id || state.id === -1) {
+        // The account does not exist
+        return false;
+    }
+
+    if (state.committed.nonce) {
+        // The account has done some txs before
+        return false;
+    }
+
+    const existedForEnoughTime = await checkEligibilty(address);
+    if (!existedForEnoughTime) {
+        return false;
+    }
+
+    return true;
 }
 
 // Note that this class follows Builder pattern

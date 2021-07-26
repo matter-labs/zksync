@@ -36,16 +36,16 @@ async function clippy() {
     // We don't want clippy to require running database.
     process.env.SQLX_OFFLINE = 'true';
     process.chdir(process.env.ZKSYNC_HOME as string);
-    await utils.spawn('cargo clippy --all --tests --benches -- -D warnings');
+    await utils.spawn('cargo clippy  --all --tests --benches -- -D warnings -A clippy::upper-case-acronyms');
     delete process.env.SQLX_OFFLINE;
 
     process.chdir('sdk/zksync-crypto');
-    await utils.spawn('cargo clippy --all --tests --benches -- -D warnings');
+    await utils.spawn('cargo clippy  --all --tests --benches -- -D warnings -A clippy::upper-case-acronyms');
     process.chdir(process.env.ZKSYNC_HOME as string);
 }
 
 export const command = new Command('lint')
-    .description('lint non-rust code')
+    .description('lint code')
     .option('--check')
     .arguments('[extension]')
     .action(async (extension: string | null, cmd: Command) => {
@@ -55,7 +55,6 @@ export const command = new Command('lint')
             for (const ext of EXTENSIONS) {
                 await lint(ext, cmd.check);
             }
-
             await clippy();
         }
     });

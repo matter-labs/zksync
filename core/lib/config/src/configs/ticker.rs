@@ -1,4 +1,3 @@
-// Built-in uses
 // External uses
 use serde::Deserialize;
 // Workspace uses
@@ -21,6 +20,8 @@ pub struct TickerConfig {
     pub coinmarketcap_base_url: String,
     /// URL of CoinGecko API. Can be set to the mock server for local development.
     pub coingecko_base_url: String,
+    /// Coefficient for scaling all fees in percent.
+    pub scale_fee_percent: u32,
     /// Coefficient for the fee price for fast withdrawal requests.
     pub fast_processing_coeff: f64,
     /// Url to uniswap api
@@ -35,8 +36,6 @@ pub struct TickerConfig {
     pub token_market_update_time: u64,
     /// Number of tickers for load balancing.
     pub number_of_ticker_actors: u8,
-    /// List of tokens for which subsidions are disabled.
-    pub not_subsidized_tokens: Vec<Address>,
 }
 
 impl TickerConfig {
@@ -50,7 +49,6 @@ impl TickerConfig {
             TokenPriceSource::CoinGecko => self.coingecko_base_url.as_ref(),
             TokenPriceSource::CoinMarketCap => self.coinmarketcap_base_url.as_ref(),
         };
-
         (self.token_price_source, url)
     }
 }
@@ -65,6 +63,7 @@ mod tests {
             token_price_source: TokenPriceSource::CoinGecko,
             coinmarketcap_base_url: "http://127.0.0.1:9876".into(),
             coingecko_base_url: "http://127.0.0.1:9876".into(),
+            scale_fee_percent: 100,
             fast_processing_coeff: 10.0f64,
             uniswap_url: "http://127.0.0.1:9975/graphql".to_string(),
             liquidity_volume: 100.0,
@@ -72,10 +71,6 @@ mod tests {
             unconditionally_valid_tokens: vec![addr("0000000000000000000000000000000000000000")],
             token_market_update_time: 120,
             number_of_ticker_actors: 4,
-            not_subsidized_tokens: vec![
-                addr("2b591e99afe9f32eaa6214f7b7629768c40eeb39"),
-                addr("34083bbd70d394110487feaa087da875a54624ec"),
-            ],
         }
     }
 
@@ -87,12 +82,13 @@ FEE_TICKER_COINMARKETCAP_BASE_URL="http://127.0.0.1:9876"
 FEE_TICKER_COINGECKO_BASE_URL="http://127.0.0.1:9876"
 FEE_TICKER_FAST_PROCESSING_COEFF="10"
 FEE_TICKER_UNISWAP_URL=http://127.0.0.1:9975/graphql
-FEE_TICKER_NOT_SUBSIDIZED_TOKENS="0x2b591e99afe9f32eaa6214f7b7629768c40eeb39,0x34083bbd70d394110487feaa087da875a54624ec"
 FEE_TICKER_AVAILABLE_LIQUIDITY_SECONDS=1000
 FEE_TICKER_TOKEN_MARKET_UPDATE_TIME=120
 FEE_TICKER_UNCONDITIONALLY_VALID_TOKENS="0x0000000000000000000000000000000000000000"
 FEE_TICKER_LIQUIDITY_VOLUME=100
 FEE_TICKER_NUMBER_OF_TICKER_ACTORS="4"
+FEE_TICKER_SUBSIDIZED_TOKENS_LIMITS=156
+FEE_TICKER_SCALE_FEE_PERCENT=100
         "#;
         set_env(config);
 

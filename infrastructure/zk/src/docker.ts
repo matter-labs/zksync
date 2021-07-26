@@ -10,10 +10,12 @@ const IMAGES = [
     'dev-ticker',
     'keybase',
     'ci',
-    'fee-seller',
     'exit-tool',
     'dev-liquidity-token-watcher',
-    'ci-integration-test'
+    'ci-integration-test',
+    'zk-environment',
+    'event-listener',
+    'data-restore'
 ];
 
 async function dockerCommand(command: 'push' | 'build', image: string) {
@@ -50,7 +52,7 @@ async function _build(image: string) {
 
 async function _push(image: string) {
     await utils.spawn(`docker push matterlabs/${image}:latest`);
-    if (['nginx', 'server', 'prover'].includes(image)) {
+    if (['nginx', 'server', 'prover', 'event-listener'].includes(image)) {
         const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
         await utils.spawn(`docker push matterlabs/${image}:${imageTag}`);
     }

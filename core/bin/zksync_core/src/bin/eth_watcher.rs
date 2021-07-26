@@ -10,7 +10,7 @@ use zksync_eth_client::EthereumGateway;
 fn main() {
     let mut main_runtime = Runtime::new().expect("main runtime start");
 
-    vlog::init();
+    let _sentry_guard = vlog::init();
     vlog::info!("ETH watcher started");
 
     let config = ZkSyncConfig::from_env();
@@ -18,7 +18,11 @@ fn main() {
 
     let (eth_req_sender, eth_req_receiver) = mpsc::channel(256);
 
-    let eth_client = EthHttpClient::new(client, config.contracts.contract_addr);
+    let eth_client = EthHttpClient::new(
+        client,
+        config.contracts.contract_addr,
+        config.contracts.governance_addr,
+    );
     let watcher = EthWatch::new(eth_client, 0);
 
     main_runtime.spawn(watcher.run(eth_req_receiver));

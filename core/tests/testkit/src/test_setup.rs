@@ -5,7 +5,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use num::{bigint::Sign, BigInt, BigUint, Zero};
+use num::{bigint::Sign, BigInt, BigUint, ToPrimitive, Zero};
 use std::collections::HashMap;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
@@ -27,7 +27,9 @@ use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
 
+use zksync_crypto::params::{NFT_STORAGE_ACCOUNT_ADDRESS, NFT_TOKEN_ID};
 use zksync_types::tx::TimeRange;
+
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
 /// and end with `execute_commit_and_verify_block()`
@@ -259,21 +261,18 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
     ) -> (Vec<TransactionReceipt>, PriorityOp, Vec<AccountTransfer>) {
-        let mut transfers = vec![];
-
-        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
-            account_id: from,
-            token_id: token.0,
-            amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
-        }));
-
-        transfers.push(AccountTransfer::ZkSyncAccountTransfer(
-            ZkSyncAccountTransfer {
+        let mut transfers = vec![
+            AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+                account_id: from,
+                token_id: token.0,
+                amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
+            }),
+            AccountTransfer::ZkSyncAccountTransfer(ZkSyncAccountTransfer {
                 account_id: to,
                 token_id: token.0,
                 amount: BigInt::from_biguint(Sign::Plus, amount.clone()),
-            },
-        ));
+            }),
+        ];
 
         let token_address = if token.0 == TokenId(0) {
             None
@@ -292,7 +291,7 @@ impl TestSetup {
 
         for r in &receipts {
             let current_fee =
-                get_executed_tx_fee(self.commit_account.main_contract_eth_client.web3.eth(), &r)
+                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
                     .await
                     .expect("Failed to get transaction fee");
 
@@ -349,13 +348,11 @@ impl TestSetup {
         amount: BigUint,
         rng: &mut impl Rng,
     ) -> (Vec<TransactionReceipt>, Vec<AccountTransfer>) {
-        let mut transfers = vec![];
-
-        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+        let mut transfers = vec![AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: from,
             token_id: token.0,
             amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
-        }));
+        })];
 
         let token_address = if token.0 == TokenId(0) {
             None
@@ -377,7 +374,7 @@ impl TestSetup {
 
         for r in &receipts {
             let current_fee =
-                get_executed_tx_fee(self.commit_account.main_contract_eth_client.web3.eth(), &r)
+                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
                     .await
                     .expect("Failed to get transaction fee");
 
@@ -417,11 +414,19 @@ impl TestSetup {
         account_id: AccountId,
         token_id: Token,
         amount: &BigUint,
+        zero_account_address: Address,
         proof: EncodedSingleProof,
     ) -> ETHExecResult {
         let last_block = &self.last_committed_block;
         self.accounts.eth_accounts[sending_account.0]
-            .exit(last_block, account_id, token_id.0, amount, proof)
+            .exit(
+                last_block,
+                account_id,
+                token_id.0,
+                amount,
+                zero_account_address,
+                proof,
+            )
             .await
             .expect("Exit failed")
     }
@@ -480,12 +485,9 @@ impl TestSetup {
             .full_exit(post_by, token_address, account_id)
             .await;
 
-        let gas_fee = get_executed_tx_fee(
-            self.commit_account.main_contract_eth_client.web3.eth(),
-            &receipt,
-        )
-        .await
-        .expect("Failed to get transaction fee");
+        let gas_fee = get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &receipt)
+            .await
+            .expect("Failed to get transaction fee");
 
         transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: post_by,
@@ -570,6 +572,102 @@ impl TestSetup {
             .await;
 
         self.execute_tx(tx).await;
+    }
+    pub async fn mint_nft(
+        &mut self,
+        creator: ZKSyncAccountId,
+        recipient: ZKSyncAccountId,
+        fee_token: Token,
+        content_hash: H256,
+        fee: BigUint,
+    ) {
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(creator, fee_token.0)
+            .await;
+        zksync0_old -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((creator, fee_token.0), zksync0_old);
+
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0)
+            .await;
+        zksync0_old += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, fee_token.0), zksync0_old);
+
+        let token_id = self.get_last_committed_nft_id().await;
+        let mint_nft =
+            self.accounts
+                .mint_nft(creator, recipient, fee_token, content_hash, fee, None, true);
+
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((recipient, TokenId(token_id + 1)), BigUint::from(1u32));
+
+        self.execute_tx(mint_nft).await;
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn swap(
+        &mut self,
+        accounts: (ZKSyncAccountId, ZKSyncAccountId),
+        recipients: (ZKSyncAccountId, ZKSyncAccountId),
+        submitter: ZKSyncAccountId,
+        tokens: (Token, Token, Token),
+        amounts: (BigUint, BigUint),
+        fee: BigUint,
+        time_range: TimeRange,
+    ) {
+        let account_0_old = self
+            .get_expected_zksync_account_balance(accounts.0, tokens.0 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((accounts.0, tokens.0 .0), account_0_old - &amounts.0);
+        let account_1_old = self
+            .get_expected_zksync_account_balance(accounts.1, tokens.1 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((accounts.1, tokens.1 .0), account_1_old - &amounts.1);
+
+        let recipient_0_old = self
+            .get_expected_zksync_account_balance(recipients.0, tokens.1 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((recipients.0, tokens.1 .0), recipient_0_old + &amounts.1);
+        let recipient_1_old = self
+            .get_expected_zksync_account_balance(recipients.1, tokens.0 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((recipients.1, tokens.0 .0), recipient_1_old + &amounts.0);
+
+        let submitter_old = self
+            .get_expected_zksync_account_balance(submitter, tokens.2 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((submitter, tokens.2 .0), submitter_old - &fee);
+
+        let fee_account_old = self
+            .get_expected_zksync_account_balance(self.accounts.fee_account_id, tokens.2 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert(
+                (self.accounts.fee_account_id, tokens.2 .0),
+                fee_account_old + &fee,
+            );
+
+        let swap = self.accounts.swap(
+            accounts, recipients, submitter, tokens, amounts, fee, None, true, time_range,
+        );
+
+        self.execute_tx(swap).await;
     }
 
     pub async fn transfer(
@@ -681,6 +779,43 @@ impl TestSetup {
         self.execute_tx(withdraw).await;
     }
 
+    pub async fn withdraw_nft(
+        &mut self,
+        from: ZKSyncAccountId,
+        token: Token,
+        fee_token: Token,
+        fee: BigUint,
+        rng: &mut impl Rng,
+    ) {
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(from, fee_token.0)
+            .await;
+        zksync0_old -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((from, fee_token.0), zksync0_old);
+        let zksync0_old = self
+            .get_expected_zksync_account_balance(from, token.0)
+            .await;
+        assert_eq!(zksync0_old, BigUint::from(1u32));
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((from, token.0), BigUint::zero());
+
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0)
+            .await;
+        zksync0_old += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, fee_token.0), zksync0_old);
+
+        let withdraw = self
+            .accounts
+            .withdraw_nft(from, token, fee_token, fee, None, true, rng);
+
+        self.execute_tx(withdraw).await;
+    }
     pub async fn withdraw_to_random_account(
         &mut self,
         from: ZKSyncAccountId,
@@ -967,31 +1102,19 @@ impl TestSetup {
             &self.expected_changes_for_current_block.sync_accounts_state
         {
             let real = self.get_zksync_balance(*zksync_account, *token).await;
-            if balance > &real {
+            if balance != &real {
                 println!(
-                    "wrong zksync acc {} balance {}, real: {}",
+                    "zksync acc {} balance {}, real: {} token: {}",
                     zksync_account.0,
                     balance,
-                    real.clone()
-                );
-            }
-            let is_diff_valid = real.clone() - balance == BigUint::from(0u32);
-            if !is_diff_valid {
-                println!(
-                    "zksync acc {} diff {}, real: {}",
-                    zksync_account.0,
-                    real.clone() - balance,
-                    real.clone()
+                    real.clone(),
+                    token.0
                 );
                 block_checks_failed = true;
             }
         }
 
         if block_checks_failed {
-            println!(
-                "Failed block exec_operations: {:#?}",
-                new_block.block_transactions
-            );
             bail!("Block checks failed")
         }
 
@@ -1007,6 +1130,17 @@ impl TestSetup {
             withdrawals_result,
             block_chunks,
         ))
+    }
+
+    pub async fn get_last_committed_nft_id(&self) -> u32 {
+        let (_, account) = state_keeper_get_account(
+            self.state_keeper_request_sender.clone(),
+            &NFT_STORAGE_ACCOUNT_ADDRESS,
+        )
+        .await
+        .unwrap();
+        let balance = account.get_balance(NFT_TOKEN_ID).to_u32().unwrap();
+        balance - 1
     }
 
     pub async fn get_zksync_account_committed_state(
@@ -1130,10 +1264,21 @@ impl TestSetup {
                 account_map.insert(id, account);
             }
         }
+
+        // Also adding nft account
+        if let Some((id, account)) = state_keeper_get_account(
+            self.state_keeper_request_sender.clone(),
+            &NFT_STORAGE_ACCOUNT_ADDRESS,
+        )
+        .await
+        {
+            account_map.insert(id, account);
+        }
+
         account_map
     }
 
-    pub fn gen_exit_proof(
+    pub fn gen_exit_proof_fungible(
         &self,
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
@@ -1144,7 +1289,7 @@ impl TestSetup {
             .get_account_id()
             .expect("Account should have id to exit");
         // restore account state
-        zksync_prover_utils::exit_proof::create_exit_proof(
+        zksync_prover_utils::exit_proof::create_exit_proof_fungible(
             accounts,
             owner_id,
             owner.address,

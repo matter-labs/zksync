@@ -90,9 +90,7 @@ This section provides an overview on folders / sub-projects that exist in this r
   - `/tesseracts`: Configuration for `tesseracts` minimalistic blockchain explorer (used for development).
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
 - `/infrastructure`: Application that aren't naturally a part of zkSync core, but are related to it.
-  - `/analytics`: Script that analyzes the costs of zkSync network maintaining.
   - `/explorer`: A blockchain explorer for zkSync network.
-  - `/fee-seller`: Script to sell the collected fees.
   - `/zcli`: A command-line interface and development wallet for zkSync network.
 - `/keys`: Verification keys for `circuit` module.
 - `/sdk`: Implementation of client libraries for zkSync network in different programming languages.

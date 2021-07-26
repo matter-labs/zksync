@@ -3,17 +3,19 @@ use zksync_crypto::params;
 use zksync_types::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, ZkSyncOp};
 
 use crate::{
-    handler::TxHandler,
+    handler::{error::DepositOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
 impl TxHandler<Deposit> for ZkSyncState {
     type Op = DepositOp;
 
-    fn create_op(&self, priority_op: Deposit) -> Result<Self::Op, anyhow::Error> {
-        assert!(
-            priority_op.token <= params::max_token_id(),
-            "Deposit token is out of range, this should be enforced by contract"
+    type OpError = DepositOpError;
+
+    fn create_op(&self, priority_op: Deposit) -> Result<Self::Op, DepositOpError> {
+        invariant!(
+            priority_op.token <= params::max_fungible_token_id(),
+            DepositOpError::InvalidToken
         );
         let account_id = if let Some((account_id, _)) = self.get_account_by_address(&priority_op.to)
         {
@@ -30,7 +32,7 @@ impl TxHandler<Deposit> for ZkSyncState {
         Ok(op)
     }
 
-    fn apply_tx(&mut self, priority_op: Deposit) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, priority_op: Deposit) -> Result<OpSuccess, DepositOpError> {
         let op = self.create_op(priority_op)?;
 
         let (fee, updates) = <Self as TxHandler<Deposit>>::apply_op(self, &op)?;
@@ -46,7 +48,7 @@ impl TxHandler<Deposit> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), DepositOpError> {
         let start = Instant::now();
         let mut updates = Vec::new();
 

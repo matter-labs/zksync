@@ -4,13 +4,13 @@ use chrono::{DateTime, Duration, Utc};
 use num::BigUint;
 // Workspace imports
 use zksync_basic_types::H256;
-use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
-use zksync_crypto::Fr;
+use zksync_crypto::{franklin_crypto::bellman::pairing::ff::Field, Fr};
 use zksync_test_account::ZkSyncAccount;
-use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use zksync_types::operations::{ChangePubKeyOp, ZkSyncOp};
-use zksync_types::priority_ops::PriorityOp;
 use zksync_types::{
+    block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx},
+    operations::{ChangePubKeyOp, ZkSyncOp},
+    priority_ops::PriorityOp,
+    tx::{ChangePubKeyType, TxHash},
     AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token,
     TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
@@ -59,6 +59,13 @@ impl TransactionsHistoryTestSetup {
         }
     }
 
+    pub fn get_tx_hash(&self, block_number: usize, block_index: usize) -> TxHash {
+        match &self.blocks[block_number].block_transactions[block_index] {
+            ExecutedOperations::PriorityOp(op) => op.priority_op.tx_hash(),
+            ExecutedOperations::Tx(tx) => tx.signed_tx.hash(),
+        }
+    }
+
     pub fn add_block(&mut self, block_id: u32) {
         let prior_op_unique_serial_id = u64::from(block_id * 2);
         let executed_deposit_op = self.create_deposit_op(prior_op_unique_serial_id, block_id, 0);
@@ -72,12 +79,12 @@ impl TransactionsHistoryTestSetup {
 
         let operations = vec![
             executed_deposit_op,
-            executed_full_exit_op,
             executed_transfer_to_new_op,
             executed_transfer_op,
-            executed_withdraw_op,
             executed_close_op,
             executed_change_pubkey_op,
+            executed_withdraw_op,
+            executed_full_exit_op,
         ];
 
         let block = Block::new(
@@ -109,13 +116,41 @@ impl TransactionsHistoryTestSetup {
 
         let operations = vec![
             executed_deposit_op,
-            executed_full_exit_op,
             executed_transfer_to_new_op,
             rejected_transfer_op,
-            executed_withdraw_op,
             executed_close_op,
             executed_change_pubkey_op,
+            executed_withdraw_op,
+            executed_full_exit_op,
         ];
+
+        let block = Block::new(
+            BlockNumber(block_id),
+            Fr::zero(),
+            AccountId(0),
+            operations,
+            (0, 0), // Not important
+            100,
+            1_000_000.into(), // Not important
+            1_500_000.into(), // Not important
+            Default::default(),
+            0,
+        );
+
+        self.blocks.push(block);
+    }
+
+    pub fn add_block_with_batch(&mut self, block_id: u32, success: bool) {
+        let block_indexes = if success {
+            vec![Some(0), Some(1), Some(2)]
+        } else {
+            vec![None, None, None]
+        };
+        let transfer_op_0 = self.create_transfer_tx(block_indexes[0]);
+        let transfer_op_1 = self.create_transfer_tx(block_indexes[1]);
+        let transfer_op_2 = self.create_transfer_tx(block_indexes[2]);
+
+        let operations = vec![transfer_op_0, transfer_op_1, transfer_op_2];
 
         let block = Block::new(
             BlockNumber(block_id),
@@ -158,6 +193,7 @@ impl TransactionsHistoryTestSetup {
                     &hex::decode(format!("{:0>64}", format!("{}{}", block, block_index))).unwrap(),
                 ),
                 eth_block: 10,
+                eth_block_index: Some(1),
             },
             op: deposit_op,
             block_index,
@@ -178,8 +214,13 @@ impl TransactionsHistoryTestSetup {
                 account_id: self.from_zksync_account.get_account_id().unwrap(),
                 eth_address: self.from_zksync_account.address,
                 token: self.tokens[2].id,
+                is_legacy: false,
             },
             withdraw_amount: Some(self.amount.clone().into()),
+            creator_account_id: None,
+            creator_address: None,
+            serial_id: None,
+            content_hash: None,
         }));
 
         let executed_op = ExecutedPriorityOp {
@@ -191,6 +232,7 @@ impl TransactionsHistoryTestSetup {
                     &hex::decode(format!("{:0>64}", format!("{}{}", block, block_index))).unwrap(),
                 ),
                 eth_block: 11,
+                eth_block_index: Some(1),
             },
             op: full_exit_op,
             block_index,
@@ -321,7 +363,7 @@ impl TransactionsHistoryTestSetup {
                 false,
                 TokenId(0),
                 Default::default(),
-                false,
+                ChangePubKeyType::ECDSA,
                 Default::default(),
             ),
             account_id: self.from_zksync_account.get_account_id().unwrap(),

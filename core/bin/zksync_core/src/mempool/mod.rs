@@ -13,7 +13,6 @@
 //!
 //! Communication with db:
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
-//! on accepting ChangePubKey tx saves account type - Owned or CREATE2
 
 // Built-in deps
 use std::{collections::HashMap, sync::Arc};
@@ -32,22 +31,19 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 // Workspace uses
+use zksync_balancer::{Balancer, BuildBalancedItem};
 use zksync_config::ZkSyncConfig;
-use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool, StorageProcessor};
+use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
-    tx::{ChangePubKey, TxEthSignature},
+    tx::TxEthSignature,
     AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
     TransferOp, TransferToNewOp, ZkSyncTx,
 };
 
 // Local uses
 use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
-use crate::{
-    balancer::{Balancer, BuildBalancedItem},
-    eth_watch::EthWatchRequest,
-    wait_for_tasks,
-};
+use crate::{eth_watch::EthWatchRequest, wait_for_tasks};
 
 mod mempool_transactions_queue;
 
@@ -100,6 +96,10 @@ pub struct ProposedBlock {
 }
 
 impl ProposedBlock {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.priority_ops.is_empty() && self.txs.is_empty()
     }
@@ -202,17 +202,18 @@ impl MempoolState {
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
-        let all_mempool_txs = transaction
+        let (mempool_txs, reverted_txs) = transaction
             .chain()
             .mempool_schema()
             .load_txs()
             .await
             .expect("Attempt to restore mempool txs from DB failed");
+        let (mempool_size, reverted_queue_size) = (mempool_txs.len(), reverted_txs.len());
 
-        // Transactions can become ready when knowing the block timestamp
-        let mut transactions_queue = MempoolTransactionsQueue::new();
+        // Initialize the queue with reverted transactions loaded from the database.
+        let mut transactions_queue = MempoolTransactionsQueue::new(reverted_txs);
 
-        for tx in all_mempool_txs.clone() {
+        for tx in mempool_txs {
             transactions_queue.add_tx_variant(tx);
         }
 
@@ -222,8 +223,8 @@ impl MempoolState {
             .expect("mempool db transaction commit");
 
         vlog::info!(
-            "{} transactions were restored from the persistent mempool storage",
-            all_mempool_txs.len()
+            "{} transactions were restored from the persistent mempool storage, reverted queue size: {}",
+            mempool_size, reverted_queue_size
         );
 
         Self {
@@ -237,31 +238,15 @@ impl MempoolState {
         *self.account_nonces.get(address).unwrap_or(&Nonce(0))
     }
 
-    fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
-        // Correctness should be checked by `signature_checker`, thus
-        // `tx.check_correctness()` is not invoked here.
-
-        if tx.nonce() >= self.nonce(&tx.account()) {
-            self.transactions_queue.add_tx_variant(tx.into());
-            Ok(())
-        } else {
-            Err(TxAddError::NonceMismatch)
-        }
+    fn add_tx(&mut self, tx: SignedZkSyncTx) {
+        self.transactions_queue.add_tx_variant(tx.into());
     }
 
-    fn add_batch(&mut self, batch: SignedTxsBatch) -> Result<(), TxAddError> {
+    fn add_batch(&mut self, batch: SignedTxsBatch) {
         assert_ne!(batch.batch_id, 0, "Batch ID was not set");
-
-        for tx in batch.txs.iter() {
-            if tx.nonce() < self.nonce(&tx.account()) {
-                return Err(TxAddError::NonceMismatch);
-            }
-        }
 
         self.transactions_queue
             .add_tx_variant(SignedTxVariant::Batch(batch));
-
-        Ok(())
     }
 }
 
@@ -273,12 +258,89 @@ struct MempoolBlocksHandler {
 }
 
 impl MempoolBlocksHandler {
+    async fn select_reverted_operations(
+        &mut self,
+        current_unprocessed_priority_op: u64,
+    ) -> (usize, ProposedBlock) {
+        let mut chunks_left = self.max_block_size_chunks;
+        let mut proposed_block = ProposedBlock::new();
+        let mut next_serial_id = current_unprocessed_priority_op;
+
+        let mut mempool_state = self.mempool_state.write().await;
+        // Peek into the reverted queue.
+        let reverted_tx = match mempool_state.transactions_queue.reverted_queue_front() {
+            Some(reverted_tx) => reverted_tx,
+            None => return (chunks_left, proposed_block),
+        };
+        // First, fill the block with missing priority operations.
+        // Unlike transactions, they are requested from the Eth watch.
+        while next_serial_id < reverted_tx.next_priority_op_id {
+            let (sender, receiver) = oneshot::channel();
+            self.eth_watch_req
+                .send(EthWatchRequest::GetPriorityOpBySerialId {
+                    serial_id: next_serial_id,
+                    resp: sender,
+                })
+                .await
+                .expect("Eth watch requests receiver is dropped");
+            let priority_op = receiver
+                .await
+                .expect("Failed to receive priority operation from Eth watch")
+                .expect("Operation not found in the priority queue");
+            // If the operation doesn't fit, return the proposed block.
+            if priority_op.data.chunks() <= chunks_left {
+                chunks_left -= priority_op.data.chunks();
+                proposed_block.priority_ops.push(priority_op);
+                next_serial_id += 1;
+            } else {
+                return (chunks_left, proposed_block);
+            }
+        }
+
+        while let Some(reverted_tx) = mempool_state.transactions_queue.reverted_queue_front() {
+            // To prevent state keeper from executing priority operations
+            // out of order, we finish the miniblock if the serial id counter
+            // is greater than the current one. Such transactions will be included
+            // on the next block proposer request.
+            if next_serial_id < reverted_tx.next_priority_op_id {
+                break;
+            }
+            // If the transaction fits into the block, pop it from the queue.
+            let required_chunks = mempool_state.required_chunks(reverted_tx.as_ref());
+            if required_chunks <= chunks_left {
+                chunks_left -= required_chunks;
+                let reverted_tx = mempool_state
+                    .transactions_queue
+                    .reverted_queue_pop_front()
+                    .unwrap();
+                proposed_block.txs.push(reverted_tx.into_inner());
+            } else {
+                break;
+            }
+        }
+
+        (chunks_left, proposed_block)
+    }
+
     async fn propose_new_block(
         &mut self,
         current_unprocessed_priority_op: u64,
         block_timestamp: u64,
     ) -> ProposedBlock {
         let start = std::time::Instant::now();
+        // Try to exhaust the reverted transactions queue. Most of the time it
+        // will be empty unless the server is restarted after reverting blocks.
+        let (chunks_left, reverted_block) = self
+            .select_reverted_operations(current_unprocessed_priority_op)
+            .await;
+        if !reverted_block.is_empty() {
+            vlog::debug!(
+                "Proposing new block with reverted operations, chunks used: {}",
+                self.max_block_size_chunks - chunks_left
+            );
+            return reverted_block;
+        }
+
         let (chunks_left, priority_ops) = self
             .select_priority_ops(current_unprocessed_priority_op)
             .await;
@@ -301,18 +363,18 @@ impl MempoolBlocksHandler {
         &self,
         current_unprocessed_priority_op: u64,
     ) -> (usize, Vec<PriorityOp>) {
-        let eth_watch_resp = oneshot::channel();
+        let (sender, receiver) = oneshot::channel();
         self.eth_watch_req
             .clone()
             .send(EthWatchRequest::GetPriorityQueueOps {
                 op_start_id: current_unprocessed_priority_op,
                 max_chunks: self.max_block_size_chunks,
-                resp: eth_watch_resp.0,
+                resp: sender,
             })
             .await
             .expect("ETH watch req receiver dropped");
 
-        let priority_ops = eth_watch_resp.1.await.expect("Err response from eth watch");
+        let priority_ops = receiver.await.expect("Err response from eth watch");
 
         (
             self.max_block_size_chunks
@@ -422,6 +484,9 @@ impl MempoolBlocksHandler {
                                     }
                                 }
                             }
+                            AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveNFT { .. } => {
+                                // Minting nft affects only tokens, mempool doesn't contain them
+                            }
                         }
                     }
                 }
@@ -459,34 +524,20 @@ impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
     }
 }
 
-async fn store_account_type(
-    tx: &ChangePubKey,
-    storage: &mut StorageProcessor<'_>,
-) -> Result<(), TxAddError> {
-    let account_type = match &tx.eth_auth_data {
-        Some(auth) if auth.is_create2() => EthAccountType::CREATE2,
-        _ => EthAccountType::Owned,
-    };
-    storage
-        .chain()
-        .account_schema()
-        .set_account_type(tx.account_id, account_type)
-        .await
-        .map_err(|_| TxAddError::DbError)
-}
-
 impl MempoolTransactionsHandler {
     async fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
+        // Correctness should be checked by `signature_checker`, thus
+        // `tx.check_correctness()` is not invoked here.
+        if tx.nonce() < self.mempool_state.read().await.nonce(&tx.account()) {
+            return Err(TxAddError::NonceMismatch);
+        }
+
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 
-        let mut transaction = storage.start_transaction().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-        transaction
+        storage
             .chain()
             .mempool_schema()
             .insert_tx(&tx)
@@ -496,18 +547,8 @@ impl MempoolTransactionsHandler {
                 TxAddError::DbError
             })?;
 
-        // FIXME: we are saving account type in mempool, this presents
-        // a possibility for users to spam our database using lots of invalid txs (ZKS-429)
-        if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
-            store_account_type(&tx, &mut transaction).await?;
-        }
-
-        transaction.commit().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-
-        self.mempool_state.write().await.add_tx(tx)
+        self.mempool_state.write().await.add_tx(tx);
+        Ok(())
     }
 
     async fn add_batch(
@@ -515,10 +556,13 @@ impl MempoolTransactionsHandler {
         txs: Vec<SignedZkSyncTx>,
         eth_signatures: Vec<TxEthSignature>,
     ) -> Result<(), TxAddError> {
-        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
+        for tx in txs.iter() {
+            // Correctness should be checked by `signature_checker`, thus
+            // `tx.check_correctness()` is not invoked here.
+            if tx.nonce() < self.mempool_state.read().await.nonce(&tx.account()) {
+                return Err(TxAddError::NonceMismatch);
+            }
+        }
 
         let mut batch: SignedTxsBatch = SignedTxsBatch {
             txs: txs.clone(),
@@ -530,16 +574,12 @@ impl MempoolTransactionsHandler {
             return Err(TxAddError::BatchTooBig);
         }
 
-        let mut transaction = storage.start_transaction().await.map_err(|err| {
+        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
-        for tx in txs {
-            if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
-                store_account_type(&tx, &mut transaction).await?;
-            }
-        }
-        let batch_id = transaction
+
+        let batch_id = storage
             .chain()
             .mempool_schema()
             .insert_batch(&batch.txs, eth_signatures)
@@ -548,14 +588,11 @@ impl MempoolTransactionsHandler {
                 vlog::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
-        transaction.commit().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
 
         batch.batch_id = batch_id;
 
-        self.mempool_state.write().await.add_batch(batch)
+        self.mempool_state.write().await.add_batch(batch);
+        Ok(())
     }
 
     async fn run(mut self) {

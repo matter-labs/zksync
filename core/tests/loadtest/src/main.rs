@@ -89,7 +89,7 @@ fn print_counters(failed: usize, total: usize) {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    vlog::init();
+    let _sentry_guard = vlog::init();
     let env_config = ETHClientConfig::from_env();
     let web3_url = env_config.web3_url();
 

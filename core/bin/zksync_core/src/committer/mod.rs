@@ -10,7 +10,7 @@ use crate::mempool::MempoolBlocksRequest;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    block::{Block, ExecutedOperations, PendingBlock},
+    block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
     AccountUpdates, BlockNumber,
 };
 
@@ -25,6 +25,7 @@ pub enum CommitRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlockCommitRequest {
     pub block: Block,
+    pub block_metadata: BlockMetadata,
     pub accounts_updated: AccountUpdates,
 }
 
@@ -127,6 +128,7 @@ async fn commit_block(
     let start = Instant::now();
     let BlockCommitRequest {
         block,
+        block_metadata,
         accounts_updated,
     } = block_commit_request;
 
@@ -165,12 +167,21 @@ async fn commit_block(
 
     vlog::info!("commit block #{}", block.block_number);
 
+    let block_number = block.block_number;
+
     transaction
         .chain()
         .block_schema()
         .save_block(block)
         .await
         .expect("committer must commit the op into db");
+
+    transaction
+        .chain()
+        .block_schema()
+        .save_block_metadata(block_number, block_metadata)
+        .await
+        .expect("committer must commit block block metadata into db");
 
     mempool_req_sender
         .send(MempoolBlocksRequest::UpdateNonces(accounts_updated))

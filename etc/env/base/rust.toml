@@ -8,7 +8,9 @@ RUST_LOG="""\
 zksync_api=debug,\
 zksync_core=debug,\
 zksync_eth_sender=debug,\
+zksync_event_listener=info,\
 zksync_witness_generator=debug,\
+zksync_gateway_watcher=info,\
 zksync_server=debug,\
 zksync_prover=debug,\
 dummy_prover=info,\
@@ -19,10 +21,11 @@ zksync_storage=info,\
 zksync_state=info,\
 zksync_types=info,\
 exodus_test=info,\
-loadtest=info,\
+loadtest=debug,\
 kube=debug,\
 dev_ticker=info,\
-block_sizes_test=info\
+block_sizes_test=info,\
+zksync_forced_exit_requests=info\
 """
 
 # `RUST_BACKTRACE` variable

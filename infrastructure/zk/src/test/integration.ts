@@ -94,12 +94,23 @@ export async function inDocker(command: string, timeout: number) {
 export async function all() {
     await server();
     await api();
+    await apiDocs();
     await withdrawalHelpers();
     await zcli();
     await rustSDK();
     // have to kill server before running data-restore
     await utils.spawn('killall zksync_server');
     await run.dataRestore.checkExisting();
+}
+
+export async function apiDocs() {
+    await utils.spawn('api_docs');
+    // Checks that documentation can be built successfully.
+    await utils.spawn('api_docs compile');
+    await utils.spawn('api_docs generate-docs');
+    // Checks that response structures of endpoints match structures defined in the documentation.
+    await utils.spawn('api_docs compile --test');
+    await utils.spawn('api_docs test');
 }
 
 export async function api() {
@@ -120,7 +131,7 @@ export async function withdrawalHelpers() {
 
 export async function testkit(command: string, timeout: number) {
     let containerID = '';
-    const prevUrls = process.env.ETH_CLIENT_WEB3_URL;
+    const prevUrls = process.env.ETH_CLIENT_WEB3_URL?.split(',')[0];
     if (process.env.ZKSYNC_ENV == 'dev' && process.env.CI != '1') {
         const { stdout } = await utils.exec('docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast');
         containerID = stdout;
@@ -165,11 +176,11 @@ export async function testkit(command: string, timeout: number) {
     if (command.includes('block_sizes_test ')) {
         await utils.spawn(`cargo run --release --bin ${command}`);
     } else if (command == 'fast') {
-        await utils.spawn('cargo run --bin testkit_tests --release');
+        // await utils.spawn('cargo run --bin testkit_tests --release');
         await utils.spawn('cargo run --bin gas_price_test --release');
-        await utils.spawn('cargo run --bin revert_blocks_test --release');
-        await utils.spawn('cargo run --bin migration_test --release');
-        await utils.spawn('cargo run --bin exodus_test --release');
+        // await utils.spawn('cargo run --bin revert_blocks_test --release');
+        // await utils.spawn('cargo run --bin migration_test --release');
+        // await utils.spawn('cargo run --bin exodus_test --release');
     } else {
         await utils.spawn(`cargo run --bin ${command} --release`);
     }
@@ -235,6 +246,14 @@ command
     .option('--with-server')
     .action(async (cmd: Command) => {
         cmd.withServer ? await withServer(api, 240) : await api();
+    });
+
+command
+    .command('api-docs')
+    .description('run api-docs integration tests')
+    .option('--with-server')
+    .action(async (cmd: Command) => {
+        cmd.withServer ? await withServer(apiDocs, 240) : await apiDocs();
     });
 
 command

@@ -4,7 +4,9 @@ use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
 
+use zksync_test_account::ZkSyncETHAccountData;
 use zksync_types::block::Block;
+use zksync_types::{Nonce, TokenId};
 
 use crate::{
     data_restore::verify_restore,
@@ -13,8 +15,6 @@ use crate::{
     state_keeper_utils::spawn_state_keeper,
     zksync_account::ZkSyncAccount,
 };
-
-use zksync_types::{Nonce, TokenId};
 
 use super::*;
 
@@ -68,15 +68,16 @@ pub async fn perform_basic_tests() {
         .collect::<Vec<_>>();
 
     let zksync_accounts = {
-        let mut zksync_accounts = Vec::new();
-        zksync_accounts.push(fee_account);
+        let mut zksync_accounts = vec![fee_account];
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
                 Nonce(0),
                 eth_account.address,
-                eth_account.private_key,
+                ZkSyncETHAccountData::EOA {
+                    eth_private_key: eth_account.private_key,
+                },
             )
         }));
         zksync_accounts
@@ -110,7 +111,7 @@ pub async fn perform_basic_tests() {
     let tokens = vec![token];
 
     verify_restore(
-        &testkit_config.web3_url,
+        &testkit_config,
         &contracts,
         fee_account_address,
         test_setup.get_accounts_state().await,

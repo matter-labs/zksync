@@ -28,6 +28,7 @@ fn gen_aggregated_operation(
             account_id: AccountId(0),
             eth_address: Address::zero(),
             token: TokenId(0),
+            is_legacy: false,
         };
         ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
             priority_op: PriorityOp {
@@ -36,10 +37,15 @@ fn gen_aggregated_operation(
                 deadline_block: 0,
                 eth_hash: H256::zero(),
                 eth_block: 0,
+                eth_block_index: None,
             },
             op: ZkSyncOp::FullExit(Box::new(FullExitOp {
                 priority_op,
                 withdraw_amount: None,
+                creator_account_id: None,
+                creator_address: None,
+                serial_id: None,
+                content_hash: None,
             })),
             block_index: 0,
             created_at: DateTime::from(SystemTime::UNIX_EPOCH),
@@ -113,10 +119,8 @@ lazy_static! {
 pub fn commit_blocks_operation(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
         idx < COMMIT_BLOCKS_OPERATIONS.len(),
-        format!(
-            "Index {} is out of bounds for commit blocks operations",
-            idx
-        )
+        "Index {} is out of bounds for commit blocks operations",
+        idx
     );
 
     COMMIT_BLOCKS_OPERATIONS[idx].clone()
@@ -125,10 +129,8 @@ pub fn commit_blocks_operation(idx: usize) -> (i64, AggregatedOperation) {
 pub fn publish_proof_blocks_onchain_operations(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
         idx < PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS.len(),
-        format!(
-            "Index {} is out of bounds for publish proof blocks onchain operations",
-            idx
-        )
+        "Index {} is out of bounds for publish proof blocks onchain operations",
+        idx
     );
 
     PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS[idx].clone()
@@ -137,10 +139,8 @@ pub fn publish_proof_blocks_onchain_operations(idx: usize) -> (i64, AggregatedOp
 pub fn execute_blocks_operations(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
         idx < EXECUTE_BLOCKS_OPERATIONS.len(),
-        format!(
-            "Index {} is out of bounds for execute blocks onchain operations",
-            idx
-        )
+        "Index {} is out of bounds for execute blocks onchain operations",
+        idx
     );
 
     EXECUTE_BLOCKS_OPERATIONS[idx].clone()

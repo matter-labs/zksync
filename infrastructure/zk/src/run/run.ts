@@ -4,6 +4,7 @@ import { Wallet } from 'ethers';
 import fs from 'fs';
 import * as path from 'path';
 import * as verifyKeys from './verify-keys';
+import * as eventListener from './event-listener';
 import * as dataRestore from './data-restore';
 import * as docker from '../docker';
 
@@ -21,6 +22,7 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
             ]' > ./etc/tokens/localhost.json`);
         if (!process.env.CI) {
             await docker.restart('dev-liquidity-token-watcher');
+            await docker.restart('dev-ticker');
         }
     } else if (command == 'new') {
         await utils.spawn(
@@ -50,6 +52,7 @@ export async function tokenInfo(address: string) {
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn');
+    await utils.spawn('yarn crypto build');
     await utils.spawn('yarn reading-tool build');
     await utils.spawn('yarn zksync prepublish');
 }
@@ -144,7 +147,8 @@ export async function readVariable(address: string, contractName: string, variab
 export const command = new Command('run')
     .description('run miscellaneous applications')
     .addCommand(verifyKeys.command)
-    .addCommand(dataRestore.command);
+    .addCommand(dataRestore.command)
+    .addCommand(eventListener.command);
 
 command.command('test-accounts').description('print ethereum test accounts').action(testAccounts);
 command.command('explorer').description('run zksync explorer locally').action(explorer);

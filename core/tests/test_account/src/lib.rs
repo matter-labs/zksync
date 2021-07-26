@@ -6,20 +6,46 @@ use num::BigUint;
 use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
-use zksync_types::tx::{
-    ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature, TimeRange,
-    TxSignature,
-};
 use zksync_types::{
-    AccountId, Address, Close, ForcedExit, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
+    tx::{
+        ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
+        ChangePubKeyType, PackedEthSignature, TimeRange, TxSignature,
+    },
+    AccountId, Address, Close, ForcedExit, MintNFT, Nonce, Order, PubKeyHash, Swap, TokenId,
+    Transfer, Withdraw, WithdrawNFT,
 };
+
+#[derive(Debug, Clone)]
+pub enum ZkSyncETHAccountData {
+    /// Externally Owned Account that have private key
+    EOA { eth_private_key: H256 },
+    /// Smart contract accounts that can be created with CREATE2
+    Create2(ChangePubKeyCREATE2Data),
+}
+
+impl ZkSyncETHAccountData {
+    pub fn is_eoa(&self) -> bool {
+        matches!(self, ZkSyncETHAccountData::EOA { .. })
+    }
+
+    pub fn unwrap_eoa_pk(&self) -> H256 {
+        match self {
+            Self::EOA { eth_private_key } => *eth_private_key,
+            _ => panic!("Not an EOA"),
+        }
+    }
+
+    pub fn is_create2(&self) -> bool {
+        matches!(self, ZkSyncETHAccountData::Create2(..))
+    }
+}
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZkSyncAccount {
     pub private_key: PrivateKey,
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
-    pub eth_private_key: H256,
+    pub eth_account_data: ZkSyncETHAccountData,
     account_id: Mutex<Option<AccountId>>,
     nonce: Mutex<Nonce>,
 }
@@ -30,7 +56,7 @@ impl Clone for ZkSyncAccount {
             private_key: priv_key_from_fs(self.private_key.0),
             pubkey_hash: self.pubkey_hash,
             address: self.address,
-            eth_private_key: self.eth_private_key,
+            eth_account_data: self.eth_account_data.clone(),
             account_id: Mutex::new(*self.account_id.lock().unwrap()),
             nonce: Mutex::new(*self.nonce.lock().unwrap()),
         }
@@ -49,7 +75,7 @@ impl fmt::Debug for ZkSyncAccount {
             .field("private_key", &pk_contents)
             .field("pubkey_hash", &self.pubkey_hash)
             .field("address", &self.address)
-            .field("eth_private_key", &self.eth_private_key)
+            .field("eth_account_data", &self.eth_account_data)
             .field("nonce", &self.nonce)
             .finish()
     }
@@ -61,7 +87,7 @@ impl ZkSyncAccount {
         let rng = &mut thread_rng();
 
         let pk = priv_key_from_fs(rng.gen());
-        let (eth_pk, eth_address) = {
+        let (eth_private_key, eth_address) = {
             let eth_pk = rng.gen::<[u8; 32]>().into();
             let eth_address;
             loop {
@@ -72,28 +98,35 @@ impl ZkSyncAccount {
             }
             (eth_pk, eth_address)
         };
-        Self::new(pk, Nonce(0), eth_address, eth_pk)
+        Self::new(
+            pk,
+            Nonce(0),
+            eth_address,
+            ZkSyncETHAccountData::EOA { eth_private_key },
+        )
     }
 
     pub fn new(
         private_key: PrivateKey,
         nonce: Nonce,
         address: Address,
-        eth_private_key: H256,
+        eth_account_data: ZkSyncETHAccountData,
     ) -> Self {
         let pubkey_hash = PubKeyHash::from_privkey(&private_key);
-        assert_eq!(
-            address,
-            PackedEthSignature::address_from_private_key(&eth_private_key)
-                .expect("private key is incorrect"),
-            "address should correspond to private key"
-        );
+        if let ZkSyncETHAccountData::EOA { eth_private_key } = &eth_account_data {
+            assert_eq!(
+                address,
+                PackedEthSignature::address_from_private_key(&eth_private_key)
+                    .expect("private key is incorrect"),
+                "address should correspond to private key"
+            );
+        }
         Self {
             account_id: Mutex::new(None),
             address,
             private_key,
             pubkey_hash,
-            eth_private_key,
+            eth_account_data,
             nonce: Mutex::new(nonce),
         }
     }
@@ -116,6 +149,173 @@ impl ZkSyncAccount {
     }
 
     #[allow(clippy::too_many_arguments)]
+    pub fn sign_mint_nft(
+        &self,
+        fee_token: TokenId,
+        token_symbol: &str,
+        content_hash: H256,
+        fee: BigUint,
+        recipient: &Address,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> (MintNFT, Option<PackedEthSignature>) {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let mint_nft = MintNFT::new_signed(
+            self.account_id
+                .lock()
+                .unwrap()
+                .expect("can't sign tx without account id"),
+            self.address,
+            content_hash,
+            *recipient,
+            fee,
+            fee_token,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            &self.private_key,
+        )
+        .expect("Failed to sign mint nft");
+
+        if increment_nonce {
+            **stored_nonce += 1;
+        }
+
+        let eth_signature =
+            if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                let message = mint_nft.get_ethereum_sign_message(token_symbol, 18);
+                Some(
+                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                        .expect("Signing the mint nft unexpectedly failed"),
+                )
+            } else {
+                None
+            };
+        (mint_nft, eth_signature)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_withdraw_nft(
+        &self,
+        token: TokenId,
+        fee_token: TokenId,
+        token_symbol: &str,
+        fee: BigUint,
+        recipient: &Address,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        time_range: TimeRange,
+    ) -> (WithdrawNFT, Option<PackedEthSignature>) {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let withdraw_nft = WithdrawNFT::new_signed(
+            self.account_id
+                .lock()
+                .unwrap()
+                .expect("can't sign tx without account id"),
+            self.address,
+            *recipient,
+            token,
+            fee_token,
+            fee,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            time_range,
+            &self.private_key,
+        )
+        .expect("Failed to sign withdraw nft");
+
+        if increment_nonce {
+            **stored_nonce += 1;
+        }
+
+        let eth_signature =
+            if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                let message = withdraw_nft.get_ethereum_sign_message(token_symbol, 18);
+                Some(
+                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                        .expect("Signing the withdraw nft unexpectedly failed"),
+                )
+            } else {
+                None
+            };
+        (withdraw_nft, eth_signature)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_order(
+        &self,
+        token_sell: TokenId,
+        token_buy: TokenId,
+        price_sell: BigUint,
+        price_buy: BigUint,
+        amount: BigUint,
+        recipient: &Address,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        time_range: TimeRange,
+    ) -> Order {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let order = Order::new_signed(
+            self.get_account_id()
+                .expect("can't sign tx without account id"),
+            *recipient,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            token_sell,
+            token_buy,
+            (price_sell, price_buy),
+            amount,
+            time_range,
+            &self.private_key,
+        )
+        .expect("Failed to sign order");
+
+        if increment_nonce {
+            **stored_nonce += 1;
+        }
+
+        order
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_swap(
+        &self,
+        orders: (Order, Order),
+        amounts: (BigUint, BigUint),
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        fee_token: TokenId,
+        fee_token_symbol: &str,
+        fee: BigUint,
+    ) -> (Swap, Option<PackedEthSignature>) {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let swap = Swap::new_signed(
+            self.get_account_id()
+                .expect("can't sign tx without account id"),
+            self.address,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            orders,
+            amounts,
+            fee,
+            fee_token,
+            &self.private_key,
+        )
+        .expect("Failed to sign swap");
+
+        if increment_nonce {
+            **stored_nonce += 1;
+        }
+
+        let eth_signature =
+            if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                let message = swap.get_ethereum_sign_message(fee_token_symbol, 18);
+                Some(
+                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                        .expect("Signing the swap unexpectedly failed"),
+                )
+            } else {
+                None
+            };
+        (swap, eth_signature)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn sign_transfer(
         &self,
         token_id: TokenId,
@@ -126,7 +326,7 @@ impl ZkSyncAccount {
         nonce: Option<Nonce>,
         increment_nonce: bool,
         time_range: TimeRange,
-    ) -> (Transfer, PackedEthSignature) {
+    ) -> (Transfer, Option<PackedEthSignature>) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let transfer = Transfer::new_signed(
             self.account_id
@@ -148,9 +348,16 @@ impl ZkSyncAccount {
             **stored_nonce += 1;
         }
 
-        let message = transfer.get_ethereum_sign_message(token_symbol, 18);
-        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message.as_bytes())
-            .expect("Signing the transfer unexpectedly failed");
+        let eth_signature =
+            if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                let message = transfer.get_ethereum_sign_message(token_symbol, 18);
+                Some(
+                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                        .expect("Signing the transfer unexpectedly failed"),
+                )
+            } else {
+                None
+            };
         (transfer, eth_signature)
     }
 
@@ -196,7 +403,7 @@ impl ZkSyncAccount {
         nonce: Option<Nonce>,
         increment_nonce: bool,
         time_range: TimeRange,
-    ) -> (Withdraw, PackedEthSignature) {
+    ) -> (Withdraw, Option<PackedEthSignature>) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let withdraw = Withdraw::new_signed(
             self.account_id
@@ -218,9 +425,16 @@ impl ZkSyncAccount {
             **stored_nonce += 1;
         }
 
-        let message = withdraw.get_ethereum_sign_message(token_symbol, 18);
-        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message.as_bytes())
-            .expect("Signing the withdraw unexpectedly failed");
+        let eth_signature =
+            if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                let message = withdraw.get_ethereum_sign_message(token_symbol, 18);
+                Some(
+                    PackedEthSignature::sign(eth_private_key, &message.as_bytes())
+                        .expect("Signing the withdraw unexpectedly failed"),
+                )
+            } else {
+                None
+            };
         (withdraw, eth_signature)
     }
 
@@ -246,7 +460,7 @@ impl ZkSyncAccount {
         increment_nonce: bool,
         fee_token: TokenId,
         fee: BigUint,
-        auth_onchain: bool,
+        auth_type: ChangePubKeyType,
         time_range: TimeRange,
     ) -> ChangePubKey {
         let account_id = self
@@ -269,19 +483,33 @@ impl ZkSyncAccount {
             &self.private_key,
         )
         .expect("Can't sign ChangePubKey operation");
-        change_pubkey.eth_auth_data = if auth_onchain {
-            Some(ChangePubKeyEthAuthData::Onchain)
-        } else {
-            let sign_bytes = change_pubkey
-                .get_eth_signed_data()
-                .expect("Failed to construct change pubkey signed message.");
-            let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
-                .expect("Signature should succeed");
-            Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
-                eth_signature,
-                batch_hash: H256::zero(),
-            }))
+
+        let eth_auth_data = match auth_type {
+            ChangePubKeyType::Onchain => ChangePubKeyEthAuthData::Onchain,
+            ChangePubKeyType::ECDSA => {
+                if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                    let sign_bytes = change_pubkey
+                        .get_eth_signed_data()
+                        .expect("Failed to construct change pubkey signed message.");
+                    let eth_signature = PackedEthSignature::sign(eth_private_key, &sign_bytes)
+                        .expect("Signature should succeed");
+                    ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                        eth_signature,
+                        batch_hash: H256::zero(),
+                    })
+                } else {
+                    panic!("ECDSA ChangePubKey can only be executed for EOA account");
+                }
+            }
+            ChangePubKeyType::CREATE2 => {
+                if let ZkSyncETHAccountData::Create2(create2_data) = &self.eth_account_data {
+                    ChangePubKeyEthAuthData::CREATE2(create2_data.clone())
+                } else {
+                    panic!("CREATE2 ChangePubKey can only be executed for CREATE2 account");
+                }
+            }
         };
+        change_pubkey.eth_auth_data = Some(eth_auth_data);
 
         assert!(
             change_pubkey.is_eth_auth_data_valid(),
@@ -293,5 +521,13 @@ impl ZkSyncAccount {
         }
 
         change_pubkey
+    }
+
+    pub fn try_get_eth_private_key(&self) -> Option<&H256> {
+        if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+            Some(eth_private_key)
+        } else {
+            None
+        }
     }
 }

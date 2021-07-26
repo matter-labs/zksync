@@ -22,6 +22,16 @@
                     </template>
                     <template v-slot:cell(decimals)="data"><span v-html="data.item['decimals']" /></template>
                     <template v-slot:cell(id)="data"><span v-html="data.item['id']" /></template>
+                    <template v-slot:cell(acceptableForFees)="data">
+                        <span v-if="data.item['acceptableForFees']">
+                            <i class="far fa-credit-card fee-status green"></i>
+                            Available
+                        </span>
+                        <span v-else>
+                            <i class="fas fa-ban fee-status gray"></i>
+                            <a class="unavailable-text">Unavailable</a>
+                        </span>
+                    </template>
                 </b-table>
             </div>
         </b-container>
@@ -71,6 +81,10 @@ export default {
                 {
                     key: 'id',
                     label: 'Internal Id'
+                },
+                {
+                    key: 'acceptableForFees',
+                    label: 'Can be used to pay fees'
                 }
             ]
         };
@@ -79,7 +93,6 @@ export default {
         async update() {
             const client = await clientPromise;
             this.tokens = await client.loadTokens();
-            this.tokens.sort((a, b) => a.symbol.localeCompare(b.symbol));
             this.loading = false;
         },
         urlForToken(address) {
@@ -91,4 +104,20 @@ export default {
 };
 </script>
 
-<style></style>
+<style>
+.fee-status {
+    font-size: 1.25em;
+    display: inline-block;
+    margin-right: 5px;
+}
+.green {
+    color: rgba(5, 122, 85, 1);
+}
+.gray {
+    color: rgba(107, 114, 128, 1);
+}
+.unavailable-text {
+    opacity: 0.75;
+    color: #999 !important;
+}
+</style>

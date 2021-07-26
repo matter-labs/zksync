@@ -94,7 +94,7 @@ fn privkey_to_pubkey_internal(private_key: &[u8]) -> Result<PublicKey<Engine>, J
 #[wasm_bindgen(js_name = pubKeyHash)]
 pub fn pub_key_hash(pubkey: &[u8]) -> Result<Vec<u8>, JsValue> {
     let pubkey = JUBJUB_PARAMS
-        .with(|params| PublicKey::read(&pubkey[..], params))
+        .with(|params| PublicKey::read(pubkey, params))
         .map_err(|_| JsValue::from_str("couldn't read public key"))?;
     Ok(utils::pub_key_hash(&pubkey))
 }
@@ -122,6 +122,13 @@ pub fn private_key_to_pubkey(private_key: &[u8]) -> Result<Vec<u8>, JsValue> {
 #[wasm_bindgen(js_name = "rescueHash")]
 pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     utils::rescue_hash_tx_msg(msg)
+}
+
+/// `msg` should be represented by 2 concatenated
+/// serialized orders of the swap transaction
+#[wasm_bindgen(js_name = "rescueHashOrders")]
+pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
+    utils::rescue_hash_orders(msg)
 }
 
 #[wasm_bindgen]

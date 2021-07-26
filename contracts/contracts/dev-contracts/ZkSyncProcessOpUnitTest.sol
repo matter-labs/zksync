@@ -22,4 +22,16 @@ contract ZkSyncProcessOpUnitTest is ZkSync {
     function commitPriorityRequests() external {
         totalCommittedPriorityRequests = totalOpenPriorityRequests;
     }
+
+    function getTotalOpenPriorityRequests() external view returns (uint64) {
+        return totalOpenPriorityRequests;
+    }
+
+    function getTotalCommittedPriorityRequests() external view returns (uint64) {
+        return totalCommittedPriorityRequests;
+    }
+
+    function getAuthFact(address _address, uint32 nonce) external view returns (bytes32) {
+        return authFacts[_address][nonce];
+    }
 }

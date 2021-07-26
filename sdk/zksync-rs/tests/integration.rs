@@ -20,13 +20,15 @@
 //!    Also, if there will be many tests running at once, and the server will die, it will be
 //!    hard to distinguish which test exactly caused this problem.
 
-use std::env;
 use std::time::{Duration, Instant};
+use std::{convert::TryFrom, env};
+
+use num::Zero;
 
 use zksync::operations::SyncTransactionHandle;
 use zksync::{
     error::ClientError,
-    ethereum::ierc20_contract,
+    ethereum::{ierc20_contract, PriorityOpHandle},
     provider::Provider,
     types::BlockStatus,
     web3::{
@@ -34,7 +36,9 @@ use zksync::{
         transports::Http,
         types::{Address, H160, H256, U256},
     },
-    zksync_types::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes, ZkSyncTx},
+    zksync_types::{
+        tx::PackedEthSignature, PriorityOp, PriorityOpId, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    },
     EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
@@ -636,93 +640,6 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    // Test for tGLM token in ETH signatures workaround
-    // TODO: Remove this code after Golem update [ZKS-173]
-    let token_gnt = sync_depositor_wallet
-        .tokens
-        .resolve("GNT".into())
-        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
-    let token_tglm = sync_depositor_wallet
-        .tokens
-        .resolve("tGLM".into())
-        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
-
-    let tglm_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 tGLM
-    transfer_to("tGLM", tglm_deposit_amount, sync_depositor_wallet.address()).await?;
-
-    assert_eq!(
-        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_gnt).await?,
-        tglm_deposit_amount
-    );
-
-    assert_eq!(
-        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_tglm).await?,
-        tglm_deposit_amount
-    );
-
-    let mut alice_wallet2 = make_wallet(provider.clone(), eth_random_account_credentials()).await?;
-
-    test_deposit(
-        &sync_depositor_wallet,
-        &mut alice_wallet2,
-        &token_gnt,
-        200_000_000_000_000_000_000u128,
-    )
-    .await?;
-    test_change_pubkey(&alice_wallet2, "GNT").await?;
-    test_transfer(
-        &alice_wallet2,
-        &bob_wallet1,
-        "GNT",
-        20_000_000_000_000_000_000u128,
-    )
-    .await?;
-    // Check that sending transaction using tGLM token name works and transaction gets processed by server.
-    test_transfer(
-        &alice_wallet2,
-        &bob_wallet1,
-        "tGLM",
-        20_000_000_000_000_000_000u128,
-    )
-    .await?;
-
-    // Test batch with single transaction
-    let total_fee = alice_wallet2
-        .provider
-        .get_tx_fee(TxFeeTypes::Transfer, bob_wallet1.address(), "tGLM")
-        .await?
-        .total_fee;
-
-    let mut nonce = alice_wallet2.account_info().await?.committed.nonce;
-    let (transfer, signature) = alice_wallet2
-        .signer
-        .sign_transfer(
-            token_tglm.clone(),
-            20_000_000_000_000_000_000u128.into(),
-            total_fee,
-            bob_wallet1.address(),
-            nonce,
-            Default::default(),
-        )
-        .await?;
-    *nonce += 1;
-
-    let signed_transfers = vec![(
-        ZkSyncTx::Transfer(Box::new(transfer.clone())),
-        signature.clone(),
-    )];
-
-    let tx_hashes = alice_wallet2
-        .provider
-        .send_txs_batch(signed_transfers, None)
-        .await?;
-    let batch_handle = SyncTransactionHandle::new(tx_hashes[0], alice_wallet2.provider.clone());
-
-    batch_handle
-        .commit_timeout(Duration::from_secs(180))
-        .wait_for_commit()
-        .await?;
-
     Ok(())
 }
 
@@ -744,6 +661,180 @@ async fn simple_transfer() -> Result<(), anyhow::Error> {
         .commit_timeout(Duration::from_secs(180))
         .wait_for_commit()
         .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg_attr(not(feature = "integration-tests"), ignore)]
+async fn nft_test() -> Result<(), anyhow::Error> {
+    let alice = init_account_with_one_ether().await?;
+    let bob = init_account_with_one_ether().await?;
+
+    let alice_balance_before = alice.get_balance(BlockStatus::Committed, "ETH").await?;
+    let bob_balance_before = bob.get_balance(BlockStatus::Committed, "ETH").await?;
+
+    // Perform a mint nft transaction.
+    let fee = alice
+        .provider
+        .get_tx_fee(TxFeeTypes::MintNFT, alice.address(), "ETH")
+        .await?
+        .total_fee;
+
+    let handle = alice
+        .start_mint_nft()
+        .recipient(alice.signer.address)
+        .content_hash(H256::zero())
+        .fee_token("ETH")?
+        .fee(fee.clone())
+        .send()
+        .await?;
+
+    handle
+        .verify_timeout(Duration::from_secs(180))
+        .wait_for_verify()
+        .await?;
+
+    let nft = alice
+        .account_info()
+        .await?
+        .verified
+        .nfts
+        .values()
+        .last()
+        .expect("NFT was not minted")
+        .clone();
+    let alice_balance_after_mint = alice.get_balance(BlockStatus::Committed, "ETH").await?;
+    assert_eq!(fee + alice_balance_after_mint.clone(), alice_balance_before);
+
+    // Perform a transfer nft transaction.
+    let fee = alice
+        .provider
+        .get_txs_batch_fee(
+            vec![TxFeeTypes::Transfer, TxFeeTypes::Transfer],
+            vec![bob.address(), bob.address()],
+            "ETH",
+        )
+        .await?;
+    let handles = alice
+        .start_transfer_nft()
+        .to(bob.signer.address)
+        .nft(nft.clone())
+        .fee_token("ETH")?
+        .fee(fee.clone())
+        .send()
+        .await?;
+
+    for handle in handles {
+        handle
+            .commit_timeout(Duration::from_secs(180))
+            .wait_for_commit()
+            .await?;
+    }
+
+    let alice_balance_after_transfer = alice.get_balance(BlockStatus::Committed, "ETH").await?;
+    let alice_nft_balance = alice.get_nft(BlockStatus::Committed, nft.id).await?;
+    let bob_nft_balance = bob.get_nft(BlockStatus::Committed, nft.id).await?;
+    assert_eq!(fee + alice_balance_after_transfer, alice_balance_after_mint);
+    assert!(alice_nft_balance.is_none());
+    assert!(bob_nft_balance.is_some());
+
+    //Perform a withdraw nft transaction.
+    let fee = alice
+        .provider
+        .get_tx_fee(TxFeeTypes::WithdrawNFT, bob.address(), "ETH")
+        .await?
+        .total_fee;
+
+    let handle = bob
+        .start_withdraw_nft()
+        .to(bob.signer.address)
+        .token(nft.id)?
+        .fee_token("ETH")?
+        .fee(fee.clone())
+        .send()
+        .await?;
+
+    handle
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
+        .await?;
+    let bob_balance_after_withdraw = bob.get_balance(BlockStatus::Committed, "ETH").await?;
+    let bob_nft_balance = bob.get_nft(BlockStatus::Committed, nft.id).await?;
+    assert_eq!(fee + bob_balance_after_withdraw, bob_balance_before);
+    assert!(bob_nft_balance.is_none());
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg_attr(not(feature = "integration-tests"), ignore)]
+async fn full_exit_test() -> Result<(), anyhow::Error> {
+    let wallet = init_account_with_one_ether().await?;
+    let ethereum = wallet.ethereum(web3_addr()).await?;
+
+    // Mint NFT
+    let handle = wallet
+        .start_mint_nft()
+        .recipient(wallet.signer.address)
+        .content_hash(H256::zero())
+        .fee_token("ETH")?
+        .send()
+        .await?;
+
+    handle
+        .verify_timeout(Duration::from_secs(180))
+        .wait_for_verify()
+        .await?;
+
+    // ETH full exit
+    let full_exit_tx_hash = ethereum
+        .full_exit("ETH", wallet.account_id().unwrap())
+        .await?;
+    let receipt = ethereum.wait_for_tx(full_exit_tx_hash).await?;
+    let mut serial_id = None;
+    for log in receipt.logs {
+        if let Ok(op) = PriorityOp::try_from(log) {
+            serial_id = Some(op.serial_id);
+        }
+    }
+    let handle = PriorityOpHandle::new(PriorityOpId(serial_id.unwrap()), wallet.provider.clone());
+    handle
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
+        .await?;
+
+    let balance = wallet.get_balance(BlockStatus::Committed, "ETH").await?;
+    assert!(balance.is_zero());
+
+    // NFT full exit
+    let token_id = wallet
+        .account_info()
+        .await?
+        .verified
+        .nfts
+        .values()
+        .last()
+        .expect("NFT was not minted")
+        .id;
+    let full_exit_nft_tx_hash = ethereum
+        .full_exit_nft(token_id, wallet.account_id().unwrap())
+        .await?;
+    let receipt = ethereum.wait_for_tx(full_exit_nft_tx_hash).await?;
+    let mut serial_id = None;
+    for log in receipt.logs {
+        if let Ok(op) = PriorityOp::try_from(log) {
+            serial_id = Some(op.serial_id);
+        }
+    }
+    let handle = PriorityOpHandle::new(PriorityOpId(serial_id.unwrap()), wallet.provider.clone());
+    handle
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
+        .await?;
+
+    let nft_balance = wallet.get_nft(BlockStatus::Committed, token_id).await?;
+    assert!(nft_balance.is_none());
 
     Ok(())
 }

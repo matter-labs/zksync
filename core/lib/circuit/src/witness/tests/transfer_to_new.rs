@@ -115,7 +115,7 @@ fn corrupted_ops_input() {
     let test_vector = input.corrupted_variations();
 
     for input in test_vector {
-        corrupted_input_test_scenario::<TransferToNewWitness<Bn256>, _>(
+        corrupted_input_test_scenario::<TransferToNewWitness<Bn256>, _, _>(
             &accounts,
             transfer_op.clone(),
             input,
@@ -128,6 +128,7 @@ fn corrupted_ops_input() {
                     .unwrap();
                 vec![fee]
             },
+            |_| {},
         );
     }
 }
@@ -173,7 +174,7 @@ fn test_incorrect_transfer_account_from() {
     let input =
         SigDataInput::from_transfer_to_new_op(&transfer_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _, _>(
         &accounts,
         transfer_op,
         input,
@@ -184,6 +185,7 @@ fn test_incorrect_transfer_account_from() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -229,7 +231,7 @@ fn test_incorrect_transfer_account_to() {
     let input =
         SigDataInput::from_transfer_to_new_op(&transfer_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _, _>(
         &accounts,
         transfer_op,
         input,
@@ -240,6 +242,7 @@ fn test_incorrect_transfer_account_to() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -288,7 +291,7 @@ fn test_incorrect_transfer_amount() {
         let input = SigDataInput::from_transfer_to_new_op(&transfer_op)
             .expect("SigDataInput creation failed");
 
-        incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _>(
+        incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _, _>(
             &accounts,
             transfer_op,
             input,
@@ -299,6 +302,7 @@ fn test_incorrect_transfer_amount() {
                     amount: fee_amount.into(),
                 }]
             },
+            |_| {},
         );
     }
 }
@@ -353,7 +357,7 @@ fn test_transfer_replay() {
     let input =
         SigDataInput::from_transfer_to_new_op(&transfer_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _, _>(
         &accounts,
         transfer_op,
         input,
@@ -364,6 +368,7 @@ fn test_transfer_replay() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -413,7 +418,7 @@ fn test_incorrect_transfer_to_new_timestamp() {
         // Operation is not valid, since transaction timestamp is invalid.
         const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
-        incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _>(
+        incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _, _>(
             &accounts,
             transfer_op,
             input,
@@ -424,6 +429,7 @@ fn test_incorrect_transfer_to_new_timestamp() {
                     amount: fee_amount.into(),
                 }]
             },
+            |_| {},
         );
     }
 }

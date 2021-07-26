@@ -6,7 +6,15 @@ All notable changes to `zksync_rs` will be documented in this file.
 
 ### Added
 
+- `PriorityOpHandle` structure, allowing awaiting for the priority operations execution.
+- `PriorityOpHolder::priority_op_handle` method, allowing to get `PriorityOpHandle` out of the Ethereum transaction
+  logs.
+- `mint` feature with `mint_erc20` for minting ERC-20 tokens.
+- `EthereumProvider::erc20_balance` method for getting the balance of ERC-20 token.
+
 ### Changed
+
+- Hardcode gas limit for `depositERC20` for each token.
 
 ### Deprecated
 

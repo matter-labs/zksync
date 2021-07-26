@@ -1,5 +1,7 @@
+use parity_crypto::digest::sha256;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryInto, str::FromStr};
+use thiserror::Error;
 
 /// Transaction hash.
 /// Essentially, a SHA-256 hash of transaction bytes encoded according to the zkSync protocol.
@@ -22,6 +24,11 @@ impl TxHash {
             Some(out)
         }
     }
+
+    pub fn batch_hash(tx_hashes: &[TxHash]) -> TxHash {
+        let bytes: Vec<u8> = tx_hashes.iter().flat_map(AsRef::as_ref).cloned().collect();
+        TxHash::from_slice(&*sha256(&bytes)).unwrap()
+    }
 }
 
 impl AsRef<[u8]> for TxHash {
@@ -37,19 +44,34 @@ impl ToString for TxHash {
 }
 
 impl FromStr for TxHash {
-    type Err = anyhow::Error;
+    type Err = TxHashDecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        anyhow::ensure!(
-            s.starts_with("sync-tx:"),
-            "TxHash should start with sync-tx:"
-        );
-        let bytes = hex::decode(&s[8..])?;
-        anyhow::ensure!(bytes.len() == 32, "Size mismatch");
+        let s = if let Some(s) = s.strip_prefix("0x") {
+            s
+        } else if let Some(s) = s.strip_prefix("sync-tx:") {
+            s
+        } else {
+            return Err(TxHashDecodeError::PrefixError);
+        };
+        let bytes = hex::decode(&s)?;
+        if bytes.len() != 32 {
+            return Err(TxHashDecodeError::IncorrectHashLength);
+        }
         Ok(TxHash {
             data: bytes.as_slice().try_into().unwrap(),
         })
     }
+}
+
+#[derive(Debug, Error)]
+pub enum TxHashDecodeError {
+    #[error("TxHash should start with 0x or sync-tx:")]
+    PrefixError,
+    #[error("Cannot decode Hex: {0}")]
+    DecodeHex(#[from] hex::FromHexError),
+    #[error("TxHash size should be equal to 32")]
+    IncorrectHashLength,
 }
 
 impl Serialize for TxHash {

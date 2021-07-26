@@ -13,7 +13,7 @@ use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
 use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
-use zksync_testkit::zksync_account::ZkSyncAccount;
+use zksync_testkit::zksync_account::{ZkSyncAccount, ZkSyncETHAccountData};
 use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
     ZKSyncAccountId,
@@ -35,7 +35,7 @@ struct Opt {
 
 #[tokio::main]
 async fn main() {
-    vlog::init();
+    let _sentry_guard = vlog::init();
 
     let opt = Opt::from_args();
 
@@ -130,15 +130,16 @@ async fn main() {
         .collect::<Vec<_>>();
 
     let zksync_accounts = {
-        let mut zksync_accounts = Vec::new();
-        zksync_accounts.push(fee_account);
+        let mut zksync_accounts = vec![fee_account];
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
                 Nonce(0),
                 eth_account.address,
-                eth_account.private_key,
+                ZkSyncETHAccountData::EOA {
+                    eth_private_key: eth_account.private_key,
+                },
             )
         }));
         zksync_accounts

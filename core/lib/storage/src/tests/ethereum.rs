@@ -85,6 +85,12 @@ async fn ethereum_empty_load(mut storage: StorageProcessor<'_>) -> QueryResult<(
 async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     EthereumSchema(&mut storage).initialize_eth_data().await?;
 
+    for expected_next_nonce in 0..5 {
+        let actual_next_nonce = EthereumSchema(&mut storage).get_next_nonce().await?;
+
+        assert_eq!(actual_next_nonce, expected_next_nonce);
+    }
+
     let unconfirmed_operations = EthereumSchema(&mut storage)
         .load_unconfirmed_operations()
         .await?;
@@ -187,20 +193,6 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     assert_eq!(updated_stats.last_committed_block, 1);
     assert_eq!(updated_stats.last_verified_block, 0);
     assert_eq!(updated_stats.last_executed_block, 0);
-
-    Ok(())
-}
-
-/// Check that stored nonce starts with 0 and is incremented after every getting.
-#[db_test]
-async fn eth_nonce(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    EthereumSchema(&mut storage).initialize_eth_data().await?;
-
-    for expected_next_nonce in 0..5 {
-        let actual_next_nonce = EthereumSchema(&mut storage).get_next_nonce().await?;
-
-        assert_eq!(actual_next_nonce, expected_next_nonce);
-    }
 
     Ok(())
 }
@@ -386,6 +378,25 @@ async fn ethereum_gas_update(mut storage: StorageProcessor<'_>) -> QueryResult<(
 
     assert_eq!(new_price_limit, old_price_limit + 1i32);
     assert_eq!(new_average_price, Some(old_price_limit - 1i32));
+
+    Ok(())
+}
+
+/// Check update eth parameters
+#[db_test]
+async fn test_update_eth_parameters(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    storage.ethereum_schema().initialize_eth_data().await?;
+
+    // Updates eth parameters and checks if they were really saved.
+    storage
+        .ethereum_schema()
+        .update_eth_parameters(BlockNumber(5))
+        .await?;
+
+    let stats = storage.ethereum_schema().load_stats().await?;
+    assert_eq!(stats.last_committed_block, 5);
+    assert_eq!(stats.last_verified_block, 0);
+    assert_eq!(stats.last_executed_block, 0);
 
     Ok(())
 }

@@ -10,6 +10,12 @@ keywords = ["blockchain", "zksync"]
 categories = ["cryptography"]
 publish = false # This is an utility crate, not to be used by libraries.
 
+[features]
+actix = ['sentry-actix']
+
 [dependencies]
-tracing = {version= "0.1.22", features = ["log"]}
-tracing-subscriber = "0.2.15"
+tracing = { version = "0.1.22", features = ["log"] }
+tracing-subscriber = { version = "0.2.15", features = ["fmt", "chrono"] }
+sentry = "0.21.0"
+
+sentry-actix = { version = "0.21.0", optional = true }

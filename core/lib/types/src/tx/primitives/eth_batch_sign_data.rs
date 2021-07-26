@@ -1,11 +1,11 @@
 // External uses
-use anyhow::ensure;
 use itertools::Itertools;
 // Workspace uses
 use zksync_basic_types::Address;
 // Local uses
 use super::eth_signature::TxEthSignature;
 use crate::{Token, ZkSyncTx};
+use thiserror::Error;
 
 /// Encapsulates transactions batch signature data. Should only be created via `new()`
 /// as long as errors are possible.
@@ -24,8 +24,10 @@ impl EthBatchSignData {
     pub fn new(
         txs: Vec<(ZkSyncTx, Token, Address)>,
         signatures: Vec<TxEthSignature>,
-    ) -> anyhow::Result<EthBatchSignData> {
-        ensure!(!txs.is_empty(), "Transaction batch cannot be empty");
+    ) -> Result<EthBatchSignData, EmptyTxBatch> {
+        if txs.is_empty() {
+            return Err(EmptyTxBatch);
+        }
 
         let message = EthBatchSignData::get_batch_sign_message(txs);
 
@@ -99,10 +101,14 @@ impl EthBatchSignData {
         I: Iterator<Item = &'a ZkSyncTx>,
     {
         tiny_keccak::keccak256(
-            txs.flat_map(ZkSyncTx::get_bytes)
+            txs.flat_map(ZkSyncTx::get_old_bytes)
                 .collect::<Vec<u8>>()
                 .as_slice(),
         )
         .to_vec()
     }
 }
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Transaction batch cannot be empty")]
+pub struct EmptyTxBatch;

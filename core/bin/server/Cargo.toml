@@ -15,10 +15,13 @@ zksync_api = { path = "../zksync_api", version = "1.0" }
 zksync_core = { path = "../zksync_core", version = "1.0" }
 zksync_witness_generator = { path = "../zksync_witness_generator", version = "1.0" }
 zksync_eth_sender = { path = "../zksync_eth_sender", version = "1.0" }
+zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
+zksync_forced_exit_requests = { path = "../zksync_forced_exit_requests", version = "1.0" }
 
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
+zksync_gateway_watcher = { path = "../../lib/gateway_watcher", version = "1.0" }
 
 anyhow = "1.0"
 structopt = "0.3.20"

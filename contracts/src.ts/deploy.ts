@@ -16,7 +16,11 @@ import {
     Verifier,
     VerifierFactory,
     ZkSync,
-    ZkSyncFactory
+    ZkSyncFactory,
+    ForcedExit,
+    ForcedExitFactory,
+    TokenGovernanceFactory,
+    TokenGovernance
 } from '../typechain';
 
 export interface Contracts {
@@ -25,6 +29,11 @@ export interface Contracts {
     verifier;
     proxy;
     upgradeGatekeeper;
+    forcedExit;
+    regenesisMultisig;
+    nftFactory;
+    additionalZkSync;
+    tokenGovernance;
 }
 
 export interface DeployedAddresses {
@@ -36,6 +45,11 @@ export interface DeployedAddresses {
     ZkSync: string;
     ZkSyncTarget: string;
     DeployFactory: string;
+    ForcedExit: string;
+    RegenesisMultisig: string;
+    NFTFactory: string;
+    AdditionalZkSync: string;
+    TokenGovernance: string;
 }
 
 export interface DeployerConfig {
@@ -54,26 +68,22 @@ export function readContractCode(name: string) {
 
 export function readProductionContracts(): Contracts {
     return {
+        nftFactory: readContractCode('ZkSyncNFTFactory'),
         governance: readContractCode('Governance'),
         zkSync: readContractCode('ZkSync'),
         verifier: readContractCode('Verifier'),
         proxy: readContractCode('Proxy'),
-        upgradeGatekeeper: readContractCode('UpgradeGatekeeper')
-    };
-}
-
-export function readTestContracts(): Contracts {
-    return {
-        governance: readContractCode('GovernanceTest'),
-        zkSync: readContractCode('ZkSyncTest'),
-        verifier: readContractCode('VerifierTest'),
-        proxy: readContractCode('Proxy'),
-        upgradeGatekeeper: readContractCode('UpgradeGatekeeperTest')
+        upgradeGatekeeper: readContractCode('UpgradeGatekeeper'),
+        forcedExit: readContractCode('ForcedExit'),
+        regenesisMultisig: readContractCode('RegenesisMultisig'),
+        additionalZkSync: readContractCode('AdditionalZkSync'),
+        tokenGovernance: readContractCode('TokenGovernance')
     };
 }
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
     return {
+        NFTFactory: process.env.CONTRACTS_NFT_FACTORY_ADDR,
         DeployFactory: process.env.CONTRACTS_DEPLOY_FACTORY_ADDR,
         Governance: process.env.CONTRACTS_GOVERNANCE_ADDR,
         GovernanceTarget: process.env.CONTRACTS_GOVERNANCE_TARGET_ADDR,
@@ -81,7 +91,11 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         Verifier: process.env.CONTRACTS_VERIFIER_ADDR,
         VerifierTarget: process.env.CONTRACTS_VERIFIER_TARGET_ADDR,
         ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
-        ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR
+        ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
+        ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
+        RegenesisMultisig: process.env.MISC_REGENESIS_MULTISIG_ADDRESS,
+        AdditionalZkSync: process.env.MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS,
+        TokenGovernance: process.env.CONTRACTS_LISTING_GOVERNANCE
     };
 }
 
@@ -108,7 +122,7 @@ export class Deployer {
         }
 
         const govContract = await deployContract(this.deployWallet, this.contracts.governance, [], {
-            gasLimit: 600000,
+            gasLimit: 1500000,
             ...ethTxOptions
         });
         const govRec = await govContract.deployTransaction.wait();
@@ -183,7 +197,7 @@ export class Deployer {
                 this.governorAddress,
                 process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
             ],
-            { gasLimit: 5000000, ...ethTxOptions }
+            { gasLimit: 6000000, ...ethTxOptions }
         );
         const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
         const deployFactoryInterface = new Interface(this.deployFactoryCode.abi);
@@ -215,6 +229,155 @@ export class Deployer {
         }
     }
 
+    public async deployNFTFactory(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying NFT FACTORY contract');
+        }
+        const name = process.env.NFT_FACTORY_NAME;
+        const symbol = process.env.NFT_FACTORY_SYMBOL;
+
+        const nftFactoryContarct = await deployContract(
+            this.deployWallet,
+            this.contracts.nftFactory,
+            [name, symbol, this.addresses.ZkSync],
+            {
+                gasLimit: 6000000,
+                ...ethTxOptions
+            }
+        );
+        const zksRec = await nftFactoryContarct.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = nftFactoryContarct.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`CONTRACTS_NFT_FACTORY_ADDR=${nftFactoryContarct.address}`);
+            console.log(
+                `NFT Factory contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.NFTFactory = nftFactoryContarct.address;
+        await this.governanceContract(this.deployWallet).setDefaultNFTFactory(nftFactoryContarct.address);
+    }
+
+    public async deployTokenGovernance(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying Token Governance contract');
+        }
+
+        const governance = this.addresses.Governance;
+        const listingFeeToken = process.env.MISC_LISTING_FEE_TOKEN;
+        const listingFee = process.env.MISC_LISTING_FEE;
+        const listingCap = process.env.MISC_LISTING_CAP;
+        const treasury = process.env.MISC_LISTING_TREASURY;
+
+        const tokenGovernanceContract = await deployContract(
+            this.deployWallet,
+            this.contracts.tokenGovernance,
+            [governance, listingFeeToken, listingFee, listingCap, treasury],
+            {
+                gasLimit: 6000000,
+                ...ethTxOptions
+            }
+        );
+        const zksRec = await tokenGovernanceContract.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = tokenGovernanceContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`\nCONTRACTS_LISTING_GOVERNANCE=${tokenGovernanceContract.address}\n`);
+            console.log(
+                `Token governance contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.TokenGovernance = tokenGovernanceContract.address;
+        await this.governanceContract(this.deployWallet).changeTokenGovernance(tokenGovernanceContract.address);
+    }
+
+    public async deployForcedExit(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying ForcedExit contract');
+        }
+
+        // Choose the this.deployWallet.address as the default receiver if the
+        // FORCED_EXIT_REQUESTS_SENDER_ACCOUNT_ADDRESS is not present
+        const receiver = process.env.FORCED_EXIT_REQUESTS_SENDER_ACCOUNT_ADDRESS || this.deployWallet.address;
+
+        const forcedExitContract = await deployContract(
+            this.deployWallet,
+            this.contracts.forcedExit,
+            [this.deployWallet.address, receiver],
+            {
+                gasLimit: 6000000,
+                ...ethTxOptions
+            }
+        );
+        const zksRec = await forcedExitContract.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = forcedExitContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`CONTRACTS_FORCED_EXIT_ADDR=${forcedExitContract.address}`);
+            console.log(
+                `ForcedExit contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.ForcedExit = forcedExitContract.address;
+    }
+
+    public async deployAdditionalZkSync(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying Additional Zksync contract');
+        }
+
+        const additionalZkSyncContract = await deployContract(this.deployWallet, this.contracts.additionalZkSync, [], {
+            gasLimit: 6000000,
+            ...ethTxOptions
+        });
+        const zksRec = await additionalZkSyncContract.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = additionalZkSyncContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS=${additionalZkSyncContract.address}`);
+            console.log(
+                `Additiinal zkSync contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.RegenesisMultisig = additionalZkSyncContract.address;
+    }
+
+    public async deployRegenesisMultisig(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying Regenesis Multisig contract');
+        }
+
+        const regenesisMultisigContract = await deployContract(
+            this.deployWallet,
+            this.contracts.regenesisMultisig,
+            [process.env.MISC_REGENESIS_THRESHOLD],
+            {
+                gasLimit: 6000000,
+                ...ethTxOptions
+            }
+        );
+        const zksRec = await regenesisMultisigContract.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = regenesisMultisigContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`MISC_REGENESIS_MULTISIG_ADDRESS=${regenesisMultisigContract.address}`);
+            console.log(
+                `Regenesis Multisig contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.RegenesisMultisig = regenesisMultisigContract.address;
+    }
+
     public async publishSourcesToTesseracts() {
         console.log('Publishing ABI for UpgradeGatekeeper');
         await publishAbiToTesseracts(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper);
@@ -224,6 +387,8 @@ export class Deployer {
         await publishAbiToTesseracts(this.addresses.Verifier, this.contracts.verifier);
         console.log('Publishing ABI for Governance (proxy)');
         await publishAbiToTesseracts(this.addresses.Governance, this.contracts.governance);
+        console.log('Publishing ABI for ForcedExit');
+        await publishAbiToTesseracts(this.addresses.ForcedExit, this.contracts.forcedExit);
     }
 
     public async publishSourcesToEtherscan() {
@@ -271,6 +436,9 @@ export class Deployer {
                 ['address']
             )
         );
+
+        console.log('Publishing sourcecode for ForcedExit', this.addresses.ForcedExit);
+        await publishSourceCodeToEtherscan(this.addresses.ForcedExit, 'ForcedExit', '');
     }
 
     public async deployAll(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -278,10 +446,16 @@ export class Deployer {
         await this.deployGovernanceTarget(ethTxOptions);
         await this.deployVerifierTarget(ethTxOptions);
         await this.deployProxiesAndGatekeeper(ethTxOptions);
+        await this.deployForcedExit(ethTxOptions);
+        await this.deployNFTFactory(ethTxOptions);
     }
 
     public governanceContract(signerOrProvider: Signer | providers.Provider): Governance {
         return GovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
+    }
+
+    public tokenGovernanceContract(signerOrProvider: Signer | providers.Provider): TokenGovernance {
+        return TokenGovernanceFactory.connect(this.addresses.TokenGovernance, signerOrProvider);
     }
 
     public zkSyncContract(signerOrProvider: Signer | providers.Provider): ZkSync {
@@ -294,5 +468,9 @@ export class Deployer {
 
     public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): UpgradeGatekeeper {
         return UpgradeGatekeeperFactory.connect(this.addresses.UpgradeGatekeeper, signerOrProvider);
+    }
+
+    public forcedExitContract(signerOrProvider: Signer | providers.Provider): ForcedExit {
+        return ForcedExitFactory.connect(this.addresses.ForcedExit, signerOrProvider);
     }
 }

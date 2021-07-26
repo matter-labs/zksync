@@ -5,17 +5,16 @@ use web3::types::Address;
 
 use zksync_types::block::Block;
 use zksync_types::{
-    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber, Operation,
-    Token, TokenGenesisListItem, TokenId,
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
+    NewTokenEvent, Operation, Token, TokenId, TokenInfo,
 };
 
 use crate::{
     data_restore_driver::StorageUpdateState,
     events::{BlockEvent, EventType},
-    events_state::{EventsState, NewTokenEvent},
+    events_state::EventsState,
     rollup_ops::RollupOpsBlock,
-    storage_interactor::StorageInteractor,
-    storage_interactor::StoredTreeState,
+    storage_interactor::{CachedTreeState, StorageInteractor, StoredTreeState},
 };
 
 pub struct InMemoryStorageInteractor {
@@ -24,6 +23,7 @@ pub struct InMemoryStorageInteractor {
     tokens: HashMap<TokenId, Token>,
     events_state: Vec<BlockEvent>,
     last_watched_block: u64,
+    #[allow(dead_code)]
     last_committed_block: BlockNumber,
     last_verified_block: BlockNumber,
     accounts: AccountMap,
@@ -65,14 +65,13 @@ impl StorageInteractor for InMemoryStorageInteractor {
         // TODO save operations
     }
 
-    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId) {
+    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         let token = Token {
             id: token_id,
             symbol: token.symbol,
-            address: token.address[2..]
-                .parse()
-                .expect("failed to parse token address"),
+            address: token.address,
             decimals: token.decimals,
+            is_nft: false,
         };
         self.tokens.insert(token_id, token);
     }
@@ -85,7 +84,12 @@ impl StorageInteractor for InMemoryStorageInteractor {
     ) {
         self.events_state = block_events.to_vec();
 
-        for &NewTokenEvent { id, address } in tokens {
+        for &NewTokenEvent {
+            id,
+            address,
+            eth_block_number: _,
+        } in tokens
+        {
             self.tokens.insert(
                 id,
                 Token {
@@ -93,6 +97,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
                     address,
                     symbol: format!("ERC20-{}", *id),
                     decimals: 18,
+                    is_nft: false,
                 },
             );
         }
@@ -101,8 +106,12 @@ impl StorageInteractor for InMemoryStorageInteractor {
         self.storage_state = StorageUpdateState::Events;
     }
 
-    async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate) {
-        self.commit_state_update(0, vec![(AccountId(0), genesis_acc_update)]);
+    async fn save_genesis_tree_state(&mut self, genesis_updates: &[(AccountId, AccountUpdate)]) {
+        self.commit_state_update(0, genesis_updates.to_vec());
+    }
+
+    async fn save_special_token(&mut self, token: Token) {
+        self.tokens.insert(token.id, token);
     }
 
     async fn get_block_events_state_from_storage(&mut self) -> EventsState {
@@ -137,6 +146,18 @@ impl StorageInteractor for InMemoryStorageInteractor {
 
     async fn get_storage_state(&mut self) -> StorageUpdateState {
         self.storage_state
+    }
+
+    async fn get_cached_tree_state(&mut self) -> Option<CachedTreeState> {
+        None
+    }
+
+    async fn store_tree_cache(
+        &mut self,
+        _block_number: BlockNumber,
+        _tree_cache: serde_json::Value,
+    ) {
+        // Inmemory storage doesn't support caching.
     }
 }
 
@@ -236,6 +257,21 @@ impl InMemoryStorageInteractor {
                         .expect("In tests this account should be stored");
                     account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = *new_pub_key_hash;
+                }
+                AccountUpdate::MintNFT { ref token } => {
+                    self.tokens.insert(
+                        token.id,
+                        Token {
+                            id: token.id,
+                            address: token.address,
+                            symbol: token.symbol.clone(),
+                            decimals: 0,
+                            is_nft: true,
+                        },
+                    );
+                }
+                AccountUpdate::RemoveNFT { ref token } => {
+                    self.tokens.remove(&token.id);
                 }
             }
         }

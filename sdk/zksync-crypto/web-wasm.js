@@ -2,6 +2,8 @@ const fs = require('fs');
 
 const wasmFile = './dist/zksync-crypto-web_bg.wasm';
 const jsFile = './dist/zksync-crypto-web.js';
+// The output of wasm2js with a fixed import.
+const asmJsFile = './zksync-crypto-bundler_asm.js';
 
 const wasmData = fs.readFileSync(wasmFile);
 
@@ -46,7 +48,21 @@ const wasmResponseInit = {
   }
 };
 
+export function wasmSupported() {
+  try {
+    if (typeof WebAssembly === 'object') {
+      return true;
+    }
+  } catch (e) {
+  }
+  return false;
+}
+
 export async function loadZkSyncCrypto(wasmFileUrl) {
+  if (!wasmSupported()) {
+    // Use the bundler build.
+    return require(\'${asmJsFile}\');
+  }
   if (!wasmFileUrl) {
     const wasmResponse = new Response(wasmBytes, wasmResponseInit);
     await init(wasmResponse);

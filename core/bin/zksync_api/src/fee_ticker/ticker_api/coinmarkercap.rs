@@ -1,7 +1,6 @@
 // Built-in deps
 use std::collections::HashMap;
 // External deps
-use anyhow::format_err;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
@@ -9,7 +8,8 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use super::{TokenPriceAPI, REQUEST_TIMEOUT};
-use zksync_types::{TokenLike, TokenPrice};
+use crate::fee_ticker::PriceError;
+use zksync_types::{Token, TokenLike, TokenPrice};
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 #[derive(Debug)]
@@ -26,7 +26,8 @@ impl CoinMarketCapAPI {
 
 #[async_trait]
 impl TokenPriceAPI for CoinMarketCapAPI {
-    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, anyhow::Error> {
+    async fn get_price(&self, token: &Token) -> Result<TokenPrice, PriceError> {
+        let token_symbol = token.symbol.as_str();
         let request_url = self
             .base_url
             .join(&format!(
@@ -41,18 +42,21 @@ impl TokenPriceAPI for CoinMarketCapAPI {
             .timeout(REQUEST_TIMEOUT)
             .send()
             .await
-            .map_err(|err| anyhow::format_err!("Coinmarketcap API request failed: {}", err))?
+            .map_err(|err| {
+                PriceError::api_error(format!("Coinmarketcap API request failed: {}", err))
+            })?
             .json::<CoinmarketCapResponse>()
-            .await?;
+            .await
+            .map_err(PriceError::api_error)?;
 
         let mut token_info = api_response
             .data
             .remove(&TokenLike::Symbol(token_symbol.to_string()))
-            .ok_or_else(|| format_err!("Could not found token in response"))?;
+            .ok_or_else(|| PriceError::token_not_found("Could not found token in response"))?;
         let usd_quote = token_info
             .quote
             .remove(&TokenLike::Symbol("USD".to_string()))
-            .ok_or_else(|| format_err!("Could not found usd quote in response"))?;
+            .ok_or_else(|| PriceError::api_error("Could not found usd quote in response"))?;
         Ok(TokenPrice {
             usd_price: usd_quote.price,
             last_updated: usd_quote.last_updated,
@@ -81,6 +85,7 @@ pub(super) struct CoinmarketCapResponse {
 mod test {
     use super::*;
     use std::str::FromStr;
+    use zksync_types::TokenId;
     use zksync_utils::parse_env;
 
     #[test]
@@ -94,8 +99,9 @@ mod test {
         let ticker_url = parse_env("FEE_TICKER_COINMARKETCAP_BASE_URL");
         let client = reqwest::Client::new();
         let api = CoinMarketCapAPI::new(client, ticker_url);
+        let token = Token::new(TokenId(0), Default::default(), "ETH", 18);
         runtime
-            .block_on(api.get_price("ETH"))
+            .block_on(api.get_price(&token))
             .expect("Failed to get data from ticker");
     }
 

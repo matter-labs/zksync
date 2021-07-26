@@ -27,7 +27,9 @@ use crate::{
     witness::{
         noop::noop_operation,
         tests::test_utils::{check_circuit, check_circuit_non_panicking},
-        utils::{apply_fee, get_audits, get_used_subtree_root_hash, public_data_commitment},
+        utils::{
+            apply_fee, fr_from, get_audits, get_used_subtree_root_hash, public_data_commitment,
+        },
         WitnessBuilder,
     },
 };
@@ -55,7 +57,7 @@ fn insert_validator(
 ) -> (u32, Fr, Vec<Option<Fr>>) {
     // Validator account credentials
     let validator_address_number = 7;
-    let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+    let validator_address = fr_from(validator_address_number);
     let validator_pub_key_hash = generate_pubkey_hash(rng, p_g, &jubjub_params, &phasher);
 
     // Create a validator account as an account tree leaf.
@@ -68,7 +70,7 @@ fn insert_validator(
 
     // Initialize all the validator balances as 0.
     let empty_balance = Some(Fr::zero());
-    let validator_balances = vec![empty_balance; params::total_tokens()];
+    let validator_balances = vec![empty_balance; params::number_of_processable_tokens()];
 
     // Insert account into tree.
     tree.insert(validator_address_number, validator_leaf);
@@ -90,7 +92,7 @@ fn insert_sender(
     let sender_address: u32 = rng.gen::<u32>() % 2u32.pow(used_account_subtree_depth() as u32);
     let sender_balance_token_id: u32 = 2;
     let sender_balance_value: u128 = 2000;
-    let sender_balance = Fr::from_str(&sender_balance_value.to_string()).unwrap();
+    let sender_balance = fr_from(sender_balance_value);
     let sender_pub_key_hash = generate_pubkey_hash(rng, p_g, &jubjub_params, &phasher);
 
     // Create a sender account as an account tree leaf.
@@ -168,7 +170,7 @@ fn incorrect_circuit_pubdata() {
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let phasher = RescueHasher::<Bn256>::default();
 
-    let timestamp = Fr::from_str(&rng.gen::<u64>().to_string()).unwrap();
+    let timestamp = fr_from(rng.gen::<u64>());
 
     // Account tree, which we'll manually fill
     let mut tree: CircuitAccountTree = CircuitAccountTree::new(params::account_tree_depth());
@@ -187,6 +189,16 @@ fn incorrect_circuit_pubdata() {
     let operation = noop_operation(&tree, validator_address_number);
     let (_, validator_account_witness) = apply_fee(&mut tree, validator_address_number, 0, 0);
     let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
+    let validator_non_processable_tokens_audit = tree
+        .get(validator_address_number)
+        .unwrap_or(&CircuitAccount::default())
+        .subtree
+        .merkle_path(0)
+        .into_iter()
+        .map(|e| Some(e.0))
+        .collect::<Vec<_>>()
+        .as_slice()[zksync_crypto::params::PROCESSABLE_TOKENS_DEPTH as usize..]
+        .to_vec();
 
     let correct_hash = tree.root_hash();
     let incorrect_hash = Default::default();
@@ -248,6 +260,10 @@ fn incorrect_circuit_pubdata() {
             validator_address: Some(validator_address),
             validator_balances: validator_balances.clone(),
             validator_audit_path: validator_audit_path.clone(),
+            validator_non_processable_tokens_audit_before_fees:
+                validator_non_processable_tokens_audit.clone(),
+            validator_non_processable_tokens_audit_after_fees:
+                validator_non_processable_tokens_audit.clone(),
             block_timestamp: Some(timestamp),
         };
 
@@ -288,6 +304,10 @@ fn incorrect_circuit_pubdata() {
         validator_address: Some(validator_address),
         validator_balances: validator_balances.clone(),
         validator_audit_path: validator_audit_path.clone(),
+        validator_non_processable_tokens_audit_before_fees: validator_non_processable_tokens_audit
+            .clone(),
+        validator_non_processable_tokens_audit_after_fees: validator_non_processable_tokens_audit
+            .clone(),
         block_timestamp: Some(timestamp),
     };
 
@@ -333,6 +353,9 @@ fn incorrect_circuit_pubdata() {
         validator_address: Some(validator_address),
         validator_balances,
         validator_audit_path,
+        validator_non_processable_tokens_audit_before_fees: validator_non_processable_tokens_audit
+            .clone(),
+        validator_non_processable_tokens_audit_after_fees: validator_non_processable_tokens_audit,
         block_timestamp: Some(timestamp),
     };
 

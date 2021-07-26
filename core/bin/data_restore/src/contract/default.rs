@@ -1,6 +1,6 @@
 use ethabi::ParamType;
 
-use zksync_types::{AccountId, BlockNumber, ZkSyncOp};
+use zksync_types::{AccountId, BlockNumber, ZkSyncOp, H256};
 
 use crate::rollup_ops::RollupOpsBlock;
 
@@ -43,6 +43,9 @@ pub fn rollup_ops_blocks_from_bytes(input_data: Vec<u8>) -> Result<RollupOpsBloc
             block_num: BlockNumber(block_num.as_u32()),
             ops,
             fee_account,
+            timestamp: None,
+            previous_block_root_hash: H256::default(),
+            contract_version: None,
         };
         Ok(block)
     } else {
@@ -54,18 +57,38 @@ pub fn rollup_ops_blocks_from_bytes(input_data: Vec<u8>) -> Result<RollupOpsBloc
     }
 }
 
+/// Attempts to restore block operations from the public data.
+/// Should be used for contracts V1-V5.
 pub fn get_rollup_ops_from_data(data: &[u8]) -> Result<Vec<ZkSyncOp>, anyhow::Error> {
+    parse_pub_data(
+        data,
+        ZkSyncOp::from_legacy_public_data,
+        ZkSyncOp::legacy_public_data_length,
+    )
+}
+
+pub(super) fn parse_pub_data<Parse, ParseErr, GetSize, GetSizeErr>(
+    data: &[u8],
+    parse: Parse,
+    get_data_size: GetSize,
+) -> Result<Vec<ZkSyncOp>, anyhow::Error>
+where
+    Parse: Fn(&[u8]) -> Result<ZkSyncOp, ParseErr>,
+    ParseErr: std::error::Error + Send + Sync + 'static,
+    GetSize: Fn(u8) -> Result<usize, GetSizeErr>,
+    GetSizeErr: std::error::Error + Send + Sync + 'static,
+{
     let mut current_pointer = 0;
-    let mut ops = vec![];
+    let mut ops = Vec::new();
     while current_pointer < data.len() {
         let op_type: u8 = data[current_pointer];
 
-        let pub_data_size = ZkSyncOp::public_data_length(op_type)?;
+        let pub_data_size = get_data_size(op_type)?;
 
         let pre = current_pointer;
         let post = pre + pub_data_size;
 
-        let op = ZkSyncOp::from_public_data(&data[pre..post])?;
+        let op = parse(&data[pre..post])?;
 
         ops.push(op);
         current_pointer += pub_data_size;
@@ -84,7 +107,7 @@ mod test {
         TokenId, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp, ZkSyncOp,
     };
 
-    use super::*;
+    use crate::contract::v6;
 
     #[test]
     fn test_deposit() {
@@ -99,7 +122,7 @@ mod test {
             account_id: AccountId(6),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -125,7 +148,7 @@ mod test {
             account_id: AccountId(3),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -139,13 +162,18 @@ mod test {
             account_id: AccountId(11),
             eth_address: [9u8; 20].into(),
             token: TokenId(1),
+            is_legacy: false,
         };
         let op1 = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op,
             withdraw_amount: Some(BigUint::from(444u32).into()),
+            creator_account_id: None,
+            creator_address: None,
+            serial_id: None,
+            content_hash: None,
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -159,13 +187,18 @@ mod test {
             account_id: AccountId(11),
             eth_address: [9u8; 20].into(),
             token: TokenId(1),
+            is_legacy: false,
         };
         let op1 = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op,
             withdraw_amount: None,
+            creator_account_id: None,
+            creator_address: None,
+            serial_id: None,
+            content_hash: None,
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -192,7 +225,7 @@ mod test {
             to: AccountId(12),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -219,7 +252,7 @@ mod test {
             to: AccountId(12),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -240,7 +273,7 @@ mod test {
             account_id: AccountId(11),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -266,7 +299,7 @@ mod test {
             account_id: AccountId(11),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = get_rollup_ops_from_data(&pub_data1)
+        let op2 = v6::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");

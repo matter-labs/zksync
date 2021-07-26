@@ -11,7 +11,8 @@ pub struct TestkitConfig {
     pub chain_id: u8,
     pub gas_price_factor: f64,
     pub web3_url: String,
-    pub available_block_chunk_sizes: Vec<usize>,
+    pub contract_upgrade_eth_blocks: Vec<u64>,
+    pub init_contract_version: u32,
 }
 
 impl TestkitConfig {
@@ -21,7 +22,8 @@ impl TestkitConfig {
             chain_id: config.eth_client.chain_id,
             gas_price_factor: config.eth_client.gas_price_factor,
             web3_url: config.eth_client.web3_url(),
-            available_block_chunk_sizes: config.chain.state_keeper.block_chunk_sizes,
+            contract_upgrade_eth_blocks: config.contracts.upgrade_eth_blocks,
+            init_contract_version: config.contracts.init_contract_version,
         }
     }
 }

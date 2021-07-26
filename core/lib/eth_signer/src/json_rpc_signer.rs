@@ -318,9 +318,10 @@ mod messages {
 
         // Unlocks the address, after that the server can sign messages and transactions.
         pub fn unlock_account(address: Address, password: &str) -> Self {
-            let mut params = Vec::new();
-            params.push(serde_json::to_value(address).expect("serialization fail"));
-            params.push(serde_json::to_value(password).expect("serialization fail"));
+            let params = vec![
+                serde_json::to_value(address).expect("serialization fail"),
+                serde_json::to_value(password).expect("serialization fail"),
+            ];
             Self::create("personal_unlockAccount", params)
         }
 
@@ -328,11 +329,10 @@ mod messages {
         /// sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
         /// The address to sign with must be unlocked.
         pub fn sign_message(address: Address, message: &[u8]) -> Self {
-            let mut params = Vec::new();
-            params.push(serde_json::to_value(address).expect("serialization fail"));
-            params.push(
+            let params = vec![
+                serde_json::to_value(address).expect("serialization fail"),
                 serde_json::to_value(format!("0x{}", encode(message))).expect("serialization fail"),
-            );
+            ];
             Self::create("eth_sign", params)
         }
 

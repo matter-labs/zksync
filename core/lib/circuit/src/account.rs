@@ -38,7 +38,7 @@ impl<E: RescueEngine> AccountContent<E> {
     ) -> Result<Self, SynthesisError> {
         let nonce = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "nonce"),
-            || Ok(witness.nonce.grab()?),
+            || witness.nonce.grab(),
             zksync_crypto::params::NONCE_BIT_WIDTH,
         )?;
 

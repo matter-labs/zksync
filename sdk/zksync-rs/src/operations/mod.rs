@@ -11,12 +11,16 @@ use crate::{
 };
 
 pub use self::{
-    change_pubkey::ChangePubKeyBuilder, transfer::TransferBuilder, withdraw::WithdrawBuilder,
+    change_pubkey::ChangePubKeyBuilder, mint_nft::MintNFTBuilder, transfer::TransferBuilder,
+    transfer_nft::TransferNFTBuilder, withdraw::WithdrawBuilder, withdraw_nft::WithdrawNFTBuilder,
 };
 
 mod change_pubkey;
+mod mint_nft;
 mod transfer;
+mod transfer_nft;
 mod withdraw;
+mod withdraw_nft;
 
 /// Handle for transaction, providing an interface to control its execution.
 /// For obtained handle it's possible to set the polling interval, commit timeout

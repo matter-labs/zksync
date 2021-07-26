@@ -7,9 +7,13 @@ services:
 
   geth:
     image: "matterlabs/geth:latest"
+    environment:
+      - PLUGIN_CONFIG
 
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
+    volumes:
+      - ./etc/tokens/:/etc/tokens
 
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
@@ -19,9 +23,7 @@ services:
       - ./etc/tokens/:/etc/tokens
 
   zk:
-    build:
-      context: .
-      dockerfile: docker/zk/Dockerfile
+    image: "matterlabs/zk-environment:latest"
     depends_on:
       - postgres
       - geth

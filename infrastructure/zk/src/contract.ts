@@ -44,7 +44,10 @@ export async function deploy() {
         'CONTRACTS_VERIFIER_ADDR',
         'CONTRACTS_UPGRADE_GATEKEEPER_ADDR',
         'CONTRACTS_DEPLOY_FACTORY_ADDR',
-        'CONTRACTS_GENESIS_TX_HASH'
+        'CONTRACTS_FORCED_EXIT_ADDR',
+        'CONTRACTS_NFT_FACTORY_ADDR',
+        'CONTRACTS_GENESIS_TX_HASH',
+        'CONTRACTS_LISTING_GOVERNANCE'
     ];
     let updatedContracts = '';
     for (const envVar of envVars) {

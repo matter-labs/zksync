@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use web3::types::H256;
 
@@ -6,15 +6,15 @@ use zksync_storage::data_restore::records::{
     NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock,
 };
 use zksync_types::{
-    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
-    TokenGenesisListItem, TokenId,
+    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
+    Token, TokenId, TokenInfo, NFT,
 };
 
 use crate::{
     contract::ZkSyncContractVersion,
     data_restore_driver::StorageUpdateState,
     events::{BlockEvent, EventType},
-    events_state::{EventsState, NewTokenEvent},
+    events_state::EventsState,
     rollup_ops::RollupOpsBlock,
 };
 
@@ -23,6 +23,13 @@ pub struct StoredTreeState {
     pub account_map: AccountMap,
     pub unprocessed_prior_ops: u64,
     pub fee_acc_id: AccountId,
+}
+
+pub struct CachedTreeState {
+    pub tree_cache: serde_json::Value,
+    pub account_map: AccountMap,
+    pub current_block: Block,
+    pub nfts: HashMap<TokenId, NFT>,
 }
 
 #[async_trait::async_trait]
@@ -50,7 +57,7 @@ pub trait StorageInteractor {
     /// * `token` - Token that added when deploying contract
     /// * `token_id` - Id for token in our system
     ///
-    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId);
+    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId);
 
     /// Saves Rollup contract events in storage (includes block events, new tokens and last watched eth block number)
     ///
@@ -67,13 +74,21 @@ pub trait StorageInteractor {
         last_watched_eth_block_number: u64,
     );
 
-    /// Saves genesis account state in storage
+    /// Saves genesis accounts state in storage
     ///
     /// # Arguments
     ///
-    /// * `genesis_acc_update` - Genesis account update
+    /// * `genesis_updates` - Genesis account updates
     ///
-    async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate);
+    async fn save_genesis_tree_state(&mut self, genesis_updates: &[(AccountId, AccountUpdate)]);
+
+    /// Saves special NFT token in storage
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - Special token to be stored
+    ///
+    async fn save_special_token(&mut self, token: Token);
 
     /// Returns Rollup contract events state from storage
     async fn get_block_events_state_from_storage(&mut self) -> EventsState;
@@ -90,6 +105,20 @@ pub trait StorageInteractor {
 
     /// Returns last recovery state update step from storage
     async fn get_storage_state(&mut self) -> StorageUpdateState;
+
+    /// Returns cached tree state from storage. It's expected to be valid
+    /// after completing `finite` restore mode and may be used to speed up the
+    /// `continue` mode.
+    async fn get_cached_tree_state(&mut self) -> Option<CachedTreeState>;
+
+    /// Saves the tree cache in the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - The corresponding block number
+    /// * `tree_cache` - Merkle tree cache
+    ///
+    async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: serde_json::Value);
 }
 
 /// Returns Rollup contract event from its stored representation
@@ -138,10 +167,27 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
 ///
 /// * `op_block` - Stored ZkSync operations block description
 ///
-pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> RollupOpsBlock {
+pub fn stored_ops_block_into_ops_block(op_block: StoredRollupOpsBlock) -> RollupOpsBlock {
     RollupOpsBlock {
-        block_num: op_block.block_num,
-        ops: op_block.ops.clone(),
-        fee_account: op_block.fee_account,
+        block_num: BlockNumber::from(op_block.block_num as u32),
+        ops: op_block
+            .ops
+            .unwrap_or_default()
+            .into_iter()
+            .map(|op| {
+                serde_json::from_value(op)
+                    .expect("couldn't deserialize `ZkSyncOp` from the database")
+            })
+            .collect(),
+        fee_account: AccountId::from(op_block.fee_account as u32),
+        timestamp: op_block.timestamp.map(|t| t as u64),
+        previous_block_root_hash: op_block
+            .previous_block_root_hash
+            .map(|h| H256::from_slice(&h))
+            .unwrap_or_default(),
+        contract_version: Some(
+            ZkSyncContractVersion::try_from(op_block.contract_version as u32)
+                .expect("invalid contract version in the database"),
+        ),
     }
 }

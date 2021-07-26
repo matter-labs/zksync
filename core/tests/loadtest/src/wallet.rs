@@ -9,18 +9,15 @@ use zksync::{
     provider::Provider,
     types::BlockStatus,
     utils::{biguint_to_u256, closest_packable_fee_amount, u256_to_biguint},
-    web3::{
-        contract::{Contract, Options},
-        types::H256,
-    },
-    EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
+    web3::{contract::Options, types::H256},
+    EthereumProvider, Network, RpcProvider, Wallet,
 };
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{
     tx::PackedEthSignature, AccountId, Address, Nonce, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
-use crate::{config::AccountInfo, monitor::Monitor, session::save_wallet};
+use crate::{config::WalletCredentials, monitor::Monitor, session::save_wallet};
 
 /// A main loadtest wallet with the enough amount of gas and tokens to perform scenarios.
 #[derive(Debug)]
@@ -36,21 +33,26 @@ impl MainWallet {
     const FEE_FACTOR: u64 = 3;
 
     /// Creates a new wallet from the given account information and Ethereum configuration options.
-    pub async fn from_info(monitor: Monitor, info: &AccountInfo, web3_url: &str) -> Self {
-        let credentials = WalletCredentials::from_eth_signer(
-            info.address,
-            PrivateKeySigner::new(info.private_key),
-            Network::Localhost,
+    pub async fn new(
+        monitor: Monitor,
+        network: Network,
+        credentials: WalletCredentials,
+        web3_url: &str,
+    ) -> Self {
+        let zksync_credentials = zksync::WalletCredentials::from_eth_signer(
+            credentials.address,
+            PrivateKeySigner::new(credentials.private_key),
+            network,
         )
         .await
         .unwrap();
 
-        let inner = Wallet::new(monitor.provider.clone(), credentials)
+        let inner = Wallet::new(monitor.provider.clone(), zksync_credentials)
             .await
             .unwrap();
 
         let wallet = Self::from_wallet(monitor, inner, web3_url).await;
-        save_wallet(info.clone());
+        save_wallet(credentials);
         wallet
     }
 
@@ -167,11 +169,10 @@ impl MainWallet {
             .resolve(token_name.into())
             .ok_or(ClientError::UnknownToken)?;
 
-        let contract = Contract::new(
-            self.eth_provider.client().web3.eth(),
-            token.address,
-            ierc20_contract(),
-        );
+        let contract = self
+            .eth_provider
+            .client()
+            .create_contract(token.address, ierc20_contract());
 
         let balance = contract
             .query("balanceOf", self.address(), None, Options::default(), None)
@@ -256,7 +257,6 @@ impl MainWallet {
             .eth_provider
             .deposit(token_name, biguint_to_u256(amount.into()), self.address())
             .await?;
-        println!("{:?}", eth_tx_hash);
 
         self.monitor
             .get_priority_op(&self.eth_provider, eth_tx_hash)
@@ -319,18 +319,25 @@ pub struct ScenarioWallet {
 
 impl ScenarioWallet {
     /// Creates a random scenario wallet.
-    pub async fn new_random(token_name: TokenLike, monitor: Monitor, web3_url: &str) -> Self {
+    pub async fn new_random(
+        monitor: Monitor,
+        network: Network,
+        token_name: TokenLike,
+        web3_url: &str,
+    ) -> Self {
         let eth_private_key = gen_random_eth_private_key();
         let address_from_pk =
             PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
 
-        let info = AccountInfo {
+        let credentials = WalletCredentials {
             address: address_from_pk,
             private_key: eth_private_key,
         };
 
-        let inner = MainWallet::from_info(monitor, &info, web3_url).await;
-        Self { inner, token_name }
+        Self {
+            inner: MainWallet::new(monitor, network, credentials, web3_url).await,
+            token_name,
+        }
     }
 
     /// Returns an underlying wallet.

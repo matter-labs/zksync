@@ -13,9 +13,14 @@ use futures::{
     channel::{mpsc, oneshot},
     sink::SinkExt,
 };
-use std::thread;
+use serde::Deserialize;
+use std::{str::FromStr, thread};
+use zksync_api_types::{
+    v02::pagination::{ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest},
+    PriorityOpLookupQuery,
+};
 use zksync_config::configs::api::PrivateApi;
-use zksync_types::{tx::TxEthSignature, Address, SignedZkSyncTx, H256};
+use zksync_types::{tx::TxEthSignature, AccountId, Address, SignedZkSyncTx};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
@@ -94,15 +99,40 @@ async fn unconfirmed_deposits(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Obtains information about unconfirmed operations known for a certain address.
-#[actix_web::get("/unconfirmed_ops/{address}")]
+#[derive(Debug, Deserialize)]
+struct PendingOpsFlattenRequest {
+    pub address: Address,
+    pub account_id: Option<AccountId>,
+    pub serial_id: String,
+    pub limit: u32,
+    pub direction: PaginationDirection,
+}
+
+/// Obtains information about unconfirmed operations known for a certain account.
+/// Pending deposits can be matched only with addresses,
+/// while pending full exits can be matched only with account ids.
+/// If the account isn't created yet it doesn't have an id
+/// but we can still find pending deposits for its address that is why account_id is Option.
+#[actix_web::get("/unconfirmed_ops")]
 async fn unconfirmed_ops(
     data: web::Data<AppState>,
-    web::Path(address): web::Path<Address>,
+    web::Query(params): web::Query<PendingOpsFlattenRequest>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
+    // Serializing enum query parameters doesn't work, so parse it separately.
+    let serial_id = ApiEither::from_str(&params.serial_id)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    let query = PaginationQuery {
+        from: PendingOpsRequest {
+            address: params.address,
+            account_id: params.account_id,
+            serial_id,
+        },
+        limit: params.limit,
+        direction: params.direction,
+    };
     let item = EthWatchRequest::GetUnconfirmedOps {
-        address,
+        query,
         resp: sender,
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
@@ -118,16 +148,25 @@ async fn unconfirmed_ops(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Obtains information about unconfirmed deposits known for a certain address.
-#[actix_web::get("/unconfirmed_op/{tx_hash}")]
+/// Returns information about unconfirmed operation.
+#[actix_web::post("/unconfirmed_op")]
 async fn unconfirmed_op(
     data: web::Data<AppState>,
-    web::Path(eth_hash): web::Path<H256>,
+    web::Json(query): web::Json<PriorityOpLookupQuery>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
-    let item = EthWatchRequest::GetUnconfirmedOpByHash {
-        eth_hash: eth_hash.as_ref().to_vec(),
-        resp: sender,
+    let item = match query {
+        PriorityOpLookupQuery::ByEthHash(eth_hash) => EthWatchRequest::GetUnconfirmedOpByEthHash {
+            eth_hash,
+            resp: sender,
+        },
+        PriorityOpLookupQuery::BySyncHash(tx_hash) => EthWatchRequest::GetUnconfirmedOpByTxHash {
+            tx_hash,
+            resp: sender,
+        },
+        PriorityOpLookupQuery::ByAnyHash(hash) => {
+            EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp: sender }
+        }
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();
     eth_watch_sender
@@ -167,7 +206,9 @@ pub fn start_private_core_api(
                     // `Arc` wrapping of the object.
                     App::new()
                         .wrap(actix_web::middleware::Logger::default())
+                        .wrap(vlog::actix_middleware())
                         .app_data(web::Data::new(app_state))
+                        .app_data(web::JsonConfig::default().limit(2usize.pow(32)))
                         .service(new_tx)
                         .service(new_txs_batch)
                         .service(unconfirmed_op)

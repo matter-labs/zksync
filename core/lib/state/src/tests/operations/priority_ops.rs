@@ -1,8 +1,11 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use num::{BigUint, Zero};
 use web3::types::H160;
-use zksync_types::priority_ops::{Deposit, FullExit};
-use zksync_types::{account::AccountUpdate, AccountId, Nonce, TokenId, ZkSyncPriorityOp};
+use zksync_types::{
+    account::AccountUpdate,
+    priority_ops::{Deposit, FullExit},
+    AccountId, Nonce, TokenId, ZkSyncPriorityOp,
+};
 
 /// Check Deposit to existing account
 #[test]
@@ -81,6 +84,7 @@ fn full_exit_non_existent() {
         token,
         eth_address,
         account_id: AccountId(145),
+        is_legacy: false,
     };
 
     tb.test_priority_op_success(ZkSyncPriorityOp::FullExit(full_exit), &[])
@@ -99,6 +103,7 @@ fn full_exit_success() {
         token,
         eth_address: account.address,
         account_id,
+        is_legacy: false,
     };
 
     tb.test_priority_op_success(

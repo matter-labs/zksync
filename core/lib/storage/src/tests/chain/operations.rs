@@ -104,6 +104,8 @@ async fn executed_priority_operations(mut storage: StorageProcessor<'_>) -> Quer
         eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
         eth_block: 10,
         created_at: chrono::Utc::now(),
+        tx_hash: Default::default(),
+        eth_block_index: Some(1),
     };
     OperationsSchema(&mut storage)
         .store_executed_priority_op(executed_tx.clone())
@@ -162,6 +164,8 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
         eth_block: 10,
         created_at: chrono::Utc::now(),
+        tx_hash: Default::default(),
+        eth_block_index: Some(1),
     };
 
     // Save the same operations twice.
@@ -367,6 +371,129 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .count_total_transactions()
         .await?;
     assert_eq!(count, 1);
+
+    Ok(())
+}
+
+/// Checks that getting executed priority operation by `eth_hash` is working correctly.
+#[db_test]
+async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let executed_priority_op = NewExecutedPriorityOperation {
+        block_number: 1,
+        block_index: 1,
+        operation: Default::default(),
+        from_account: Default::default(),
+        to_account: Default::default(),
+        priority_op_serialid: 1,
+        deadline_block: 100,
+        eth_hash: vec![0xAA, 0xAA, 0xAA, 0xAA],
+        eth_block: 10,
+        created_at: chrono::Utc::now(),
+        tx_hash: vec![0xBB, 0xBB, 0xBB, 0xBB],
+        eth_block_index: Some(1),
+    };
+    // Store executed priority op and try to get it by `eth_hash`.
+    storage
+        .chain()
+        .operations_schema()
+        .store_executed_priority_op(executed_priority_op.clone())
+        .await?;
+    let op_by_eth_hash = storage
+        .chain()
+        .operations_schema()
+        .get_executed_priority_operation_by_eth_hash(&executed_priority_op.eth_hash)
+        .await?;
+    assert_eq!(
+        op_by_eth_hash.unwrap().priority_op_serialid,
+        executed_priority_op.priority_op_serialid
+    );
+
+    // Checks that it doesn't find unexisting operation
+    let op = storage
+        .chain()
+        .operations_schema()
+        .get_executed_priority_operation_by_eth_hash(&[0xDE, 0xAD, 0xBE, 0xEF])
+        .await?;
+    assert!(op.is_none());
+
+    Ok(())
+}
+
+/// Checks if executed_priority_operations are removed correctly.
+#[db_test]
+async fn test_remove_executed_priority_operations(
+    mut storage: StorageProcessor<'_>,
+) -> QueryResult<()> {
+    // Insert 5 priority operations.
+    for block_number in 1..=5 {
+        let executed_priority_op = NewExecutedPriorityOperation {
+            block_number,
+            block_index: 1,
+            operation: Default::default(),
+            from_account: Default::default(),
+            to_account: Default::default(),
+            priority_op_serialid: block_number,
+            deadline_block: 100,
+            eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            eth_block: 10,
+            created_at: chrono::Utc::now(),
+            eth_block_index: Some(1),
+            tx_hash: Default::default(),
+        };
+        OperationsSchema(&mut storage)
+            .store_executed_priority_op(executed_priority_op)
+            .await?;
+    }
+
+    // Remove priority operation with block numbers greater than 3.
+    OperationsSchema(&mut storage)
+        .remove_executed_priority_operations(BlockNumber(3))
+        .await?;
+
+    // Check that priority operation from the 3rd block is present and from the 4th is not.
+    let block3_txs = BlockSchema(&mut storage)
+        .get_block_transactions(BlockNumber(3))
+        .await?;
+    assert!(!block3_txs.is_empty());
+
+    let block4_txs = BlockSchema(&mut storage)
+        .get_block_transactions(BlockNumber(4))
+        .await?;
+    assert!(block4_txs.is_empty());
+
+    Ok(())
+}
+
+/// Checks if ethereum unprocessed aggregated operations are removed correctly.
+#[db_test]
+async fn test_remove_eth_unprocessed_aggregated_ops(
+    mut storage: StorageProcessor<'_>,
+) -> QueryResult<()> {
+    let block_number = 1;
+    let action_type = AggregatedActionType::CommitBlocks;
+    // Save commit aggregated operation.
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            BlockNumber(block_number),
+            action_type,
+            100,
+        ))
+        .await?;
+    // Add this operation to eth_unprocessed_aggregated_ops table.
+    storage
+        .ethereum_schema()
+        .restore_unprocessed_operations()
+        .await?;
+    // Remove ethereum unprocessed aggregated operations.
+    OperationsSchema(&mut storage)
+        .remove_eth_unprocessed_aggregated_ops()
+        .await?;
+    let unprocessed_op_count = storage
+        .ethereum_schema()
+        .load_unconfirmed_operations()
+        .await?
+        .len();
+    assert_eq!(unprocessed_op_count, 0);
 
     Ok(())
 }

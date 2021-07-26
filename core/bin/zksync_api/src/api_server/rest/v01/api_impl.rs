@@ -15,7 +15,7 @@ use actix_web::{web, HttpResponse, Result as ActixResult};
 use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
-use zksync_types::{Address, BlockNumber};
+use zksync_types::{Address, BlockNumber, Token, TokenId};
 
 /// Helper macro which wraps the serializable object into `Ok(HttpResponse::Ok().json(...))`.
 macro_rules! ok_json {
@@ -64,13 +64,23 @@ impl ApiV01 {
         );
 
         let mut storage = self_.access_storage().await?;
-        let tokens = storage
+        let mut tokens = storage
             .tokens_schema()
             .load_tokens_by_market_volume(liquidity_volume)
             .await
             .map_err(Self::db_error)?;
 
+        // Add ETH for tokens allowed for fee
+        // Different APIs have different views on how to represent ETH in their system.
+        // But ETH is always allowed to pay fee, and in all cases it should be on the list.
+
+        if tokens.get(&TokenId(0)).is_none() {
+            let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
+            tokens.insert(eth.id, eth);
+        }
+
         let mut tokens = tokens.values().cloned().collect::<Vec<_>>();
+
         tokens.sort_by_key(|t| t.id);
 
         metrics::histogram!("api.v01.tokens_acceptable_for_fees", start.elapsed());
@@ -369,7 +379,7 @@ impl ApiV01 {
 
         // If eth watcher has a priority op with given hash, transform it
         // to TxByHashResponse and assign it to res.
-        if let Some((eth_block, priority_op)) = unconfirmed_op {
+        if let Some(priority_op) = unconfirmed_op {
             let tokens = self_
                 .access_storage()
                 .await?
@@ -381,7 +391,7 @@ impl ApiV01 {
                     HttpResponse::InternalServerError().finish()
                 })?;
 
-            res = deposit_op_to_tx_by_hash(&tokens, &priority_op, eth_block);
+            res = deposit_op_to_tx_by_hash(&tokens, &priority_op);
         }
 
         metrics::histogram!("api.v01.tx_by_hash", start.elapsed());
@@ -431,7 +441,7 @@ impl ApiV01 {
         let resp = storage
             .chain()
             .block_schema()
-            .load_block_range(BlockNumber(max_block), limit)
+            .load_block_range_desc(BlockNumber(max_block), limit)
             .await
             .map_err(|err| {
                 vlog::warn!(

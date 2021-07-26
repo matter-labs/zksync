@@ -2,10 +2,8 @@
 use std::cmp::Ordering;
 // External imports
 use num::bigint::ToBigInt;
-use zksync_basic_types::Address;
 // Workspace imports
-use zksync_types::PubKeyHash;
-use zksync_types::{AccountId, AccountUpdate, Nonce, TokenId};
+use zksync_types::{AccountId, AccountUpdate, Address, Nonce, PubKeyHash, TokenId, H256, NFT};
 // Local imports
 use crate::chain::account::records::*;
 
@@ -24,11 +22,18 @@ pub enum StorageAccountDiff {
     Create(StorageAccountCreation),
     Delete(StorageAccountCreation),
     ChangePubKey(StorageAccountPubkeyUpdate),
+    MintNFT(StorageMintNFTUpdate),
 }
 
 impl From<StorageAccountUpdate> for StorageAccountDiff {
     fn from(update: StorageAccountUpdate) -> Self {
         StorageAccountDiff::BalanceUpdate(update)
+    }
+}
+
+impl From<StorageMintNFTUpdate> for StorageAccountDiff {
+    fn from(mint_nft: StorageMintNFTUpdate) -> Self {
+        Self::MintNFT(mint_nft)
     }
 }
 
@@ -48,9 +53,9 @@ impl From<StorageAccountPubkeyUpdate> for StorageAccountDiff {
     }
 }
 
-impl Into<(AccountId, AccountUpdate)> for StorageAccountDiff {
-    fn into(self) -> (AccountId, AccountUpdate) {
-        match self {
+impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
+    fn from(val: StorageAccountDiff) -> Self {
+        match val {
             StorageAccountDiff::BalanceUpdate(upd) => {
                 let old_balance = upd.old_balance.to_bigint().unwrap();
                 let old_balance = old_balance.to_biguint().unwrap();
@@ -63,7 +68,7 @@ impl Into<(AccountId, AccountUpdate)> for StorageAccountDiff {
                     AccountUpdate::UpdateBalance {
                         old_nonce: Nonce(upd.old_nonce as u32),
                         new_nonce: Nonce(upd.new_nonce as u32),
-                        balance_update: (TokenId(upd.coin_id as u16), old_balance, new_balance),
+                        balance_update: (TokenId(upd.coin_id as u32), old_balance, new_balance),
                     },
                 )
             }
@@ -90,6 +95,20 @@ impl Into<(AccountId, AccountUpdate)> for StorageAccountDiff {
                         .expect("PubkeyHash update from db deserialize"),
                     new_pub_key_hash: PubKeyHash::from_bytes(&upd.new_pubkey_hash)
                         .expect("PubkeyHash update from db deserialize"),
+                },
+            ),
+            StorageAccountDiff::MintNFT(upd) => (
+                AccountId(upd.creator_account_id as u32),
+                AccountUpdate::MintNFT {
+                    token: NFT::new(
+                        TokenId(upd.token_id as u32),
+                        upd.serial_id as u32,
+                        AccountId(upd.creator_account_id as u32),
+                        Address::from_slice(&upd.creator_address.as_slice()),
+                        Address::from_slice(&upd.address.as_slice()),
+                        Some(upd.symbol),
+                        H256::from_slice(&upd.content_hash.as_slice()),
+                    ),
                 },
             ),
         }
@@ -120,6 +139,9 @@ impl StorageAccountDiff {
                 update_order_id,
                 ..
             }) => *update_order_id,
+            StorageAccountDiff::MintNFT(StorageMintNFTUpdate {
+                update_order_id, ..
+            }) => *update_order_id,
         }
     }
 
@@ -134,6 +156,7 @@ impl StorageAccountDiff {
             StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate {
                 block_number, ..
             }) => block_number,
+            StorageAccountDiff::MintNFT(StorageMintNFTUpdate { block_number, .. }) => block_number,
         }
     }
 }

@@ -7,15 +7,18 @@ use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
 
-use super::Fr;
-use super::{AccountId, AccountUpdates, Nonce, TokenId};
+use super::{AccountId, AccountUpdates, Fr, Nonce, TokenId};
 use zksync_basic_types::Address;
-use zksync_crypto::circuit::account::{Balance, CircuitAccount};
-use zksync_crypto::circuit::utils::eth_address_to_fr;
+use zksync_crypto::circuit::{
+    account::{Balance, CircuitAccount},
+    utils::eth_address_to_fr,
+};
 
 pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
+use crate::NFT;
 
 mod account_update;
+pub mod error;
 mod pubkey_hash;
 
 /// zkSync network account.
@@ -32,6 +35,7 @@ pub struct Account {
     /// Current nonce of the account. All the transactions require nonce field to be set in
     /// order to not allow double spend, and the nonce must increment by one after each operation.
     pub nonce: Nonce,
+    pub minted_nfts: HashMap<TokenId, NFT>,
 }
 
 impl PartialEq for Account {
@@ -58,7 +62,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
             .collect();
 
         for (i, b) in balances.into_iter() {
-            circuit_account.subtree.insert(u32::from(*i), b);
+            circuit_account.subtree.insert(*i, b);
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
@@ -75,6 +79,7 @@ impl Default for Account {
             nonce: Nonce(0),
             pub_key_hash: PubKeyHash::default(),
             address: Address::zero(),
+            minted_nfts: HashMap::new(),
         }
     }
 }
@@ -167,6 +172,14 @@ impl Account {
                     account.nonce = new_nonce;
                     Some(account)
                 }
+                AccountUpdate::MintNFT { token } => {
+                    account.minted_nfts.insert(token.id, token);
+                    Some(account)
+                }
+                AccountUpdate::RemoveNFT { token } => {
+                    account.minted_nfts.remove(&token.id);
+                    Some(account)
+                }
                 _ => {
                     vlog::error!(
                         "Incorrect update received {:?} for account {:?}",
@@ -203,7 +216,7 @@ mod test {
     use super::*;
     use crate::{
         helpers::{apply_updates, reverse_updates},
-        AccountMap, AccountUpdates,
+        AccountMap,
     };
 
     #[test]
@@ -308,32 +321,30 @@ mod test {
             map
         };
 
-        let updates = {
-            let mut updates = AccountUpdates::new();
-            updates.push((
+        let updates = vec![
+            (
                 AccountId(0),
                 AccountUpdate::Delete {
                     address: Address::default(),
                     nonce: Nonce(8),
                 },
-            ));
-            updates.push((
+            ),
+            (
                 AccountId(1),
                 AccountUpdate::UpdateBalance {
                     old_nonce: Nonce(16),
                     new_nonce: Nonce(17),
                     balance_update: (TokenId(0), 0u32.into(), 256u32.into()),
                 },
-            ));
-            updates.push((
+            ),
+            (
                 AccountId(2),
                 AccountUpdate::Create {
                     address: Address::default(),
                     nonce: Nonce(36),
                 },
-            ));
-            updates
-        };
+            ),
+        ];
 
         let account_map_updated = {
             let mut map = account_map_initial.clone();

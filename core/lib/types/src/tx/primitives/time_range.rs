@@ -35,6 +35,10 @@ impl TimeRange {
     pub fn is_valid(&self, block_timestamp: u64) -> bool {
         self.valid_from <= block_timestamp && block_timestamp <= self.valid_until
     }
+
+    pub fn intersects(&self, other: Self) -> bool {
+        self.valid_from <= other.valid_until && other.valid_from <= self.valid_until
+    }
 }
 
 impl Default for TimeRange {

@@ -1,13 +1,14 @@
 use std::convert::TryInto;
 use zksync_crypto::params;
 
-use anyhow::ensure;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff;
 
-use zksync_crypto::circuit::utils::pub_key_hash_bytes;
-use zksync_crypto::merkle_tree::rescue_hasher::BabyRescueHasher;
-use zksync_crypto::{public_key_from_private, Fr, PrivateKey, PublicKey};
+use crate::account::error::PubkeyHashDecodingError;
+use zksync_crypto::{
+    circuit::utils::pub_key_hash_bytes, merkle_tree::rescue_hasher::BabyRescueHasher,
+    public_key_from_private, Fr, PrivateKey, PublicKey,
+};
 
 /// Hash of the account's owner public key.
 ///
@@ -64,15 +65,19 @@ impl PubKeyHash {
     /// let pubkey_hash = PubKeyHash::from_hex("sync:0000000000000000000000000000000000000000").unwrap();
     /// assert_eq!(pubkey_hash, PubKeyHash::zero());
     /// ```
-    pub fn from_hex(s: &str) -> Result<Self, anyhow::Error> {
-        ensure!(s.starts_with("sync:"), "PubKeyHash should start with sync:");
+    pub fn from_hex(s: &str) -> Result<Self, PubkeyHashDecodingError> {
+        if !s.starts_with("sync:") {
+            return Err(PubkeyHashDecodingError::PrefixFormatError);
+        }
         let bytes = hex::decode(&s[5..])?;
         Self::from_bytes(&bytes)
     }
 
     /// Decodes `PubKeyHash` from the byte sequence.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PubkeyHashDecodingError> {
+        if bytes.len() != params::FR_ADDRESS_LEN {
+            return Err(PubkeyHashDecodingError::SizeMismatch);
+        }
         Ok(PubKeyHash {
             data: bytes.try_into().unwrap(),
         })
