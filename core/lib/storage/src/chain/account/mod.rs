@@ -273,7 +273,9 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             let nfts: Vec<StorageNFT> = sqlx::query_as!(
                 StorageNFT,
                 "
-                    SELECT * FROM nft
+                    SELECT nft.*, tokens.symbol FROM nft
+                    INNER JOIN tokens
+                    ON tokens.id = nft.token_id
                     WHERE creator_account_id = $1
                 ",
                 *account_id as i32
