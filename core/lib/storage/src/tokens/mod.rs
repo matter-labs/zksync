@@ -206,11 +206,11 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let start = Instant::now();
         let nfts = sqlx::query_as!(
             StorageNFT,
-            "
-                    SELECT nft.*, tokens.symbol FROM nft
-                    INNER JOIN tokens
-                    ON tokens.id = nft.token_id
- ",
+            r#"
+            SELECT nft.*, tokens.symbol FROM nft
+            INNER JOIN tokens
+            ON tokens.id = nft.token_id
+            "#,
         )
         .fetch_all(self.0.conn())
         .await?
