@@ -309,7 +309,7 @@ export class Deployer {
             this.contracts.forcedExit,
             [this.deployWallet.address, receiver],
             {
-                gasLimit: 6000000,
+                gasLimit: 8000000,
                 ...ethTxOptions
             }
         );
@@ -347,7 +347,7 @@ export class Deployer {
                 )}`
             );
         }
-        this.addresses.RegenesisMultisig = additionalZkSyncContract.address;
+        this.addresses.AdditionalZkSync = additionalZkSyncContract.address;
     }
 
     public async deployRegenesisMultisig(ethTxOptions?: ethers.providers.TransactionRequest) {
