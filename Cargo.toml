@@ -48,4 +48,5 @@ members = [
 ]
 
 [patch.crates-io]
-ethabi = { git = "https://github.com/dvush/ethabi.git" }
+web3 = { git = "https://github.com/Deniallugo/rust-web3", branch = "update_ethabi"}
+
