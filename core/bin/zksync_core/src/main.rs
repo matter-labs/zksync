@@ -9,7 +9,8 @@ use zksync_storage::ConnectionPool;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _sentry_guard = vlog::init();
-    // handle ctrl+c
+    
+    // Handle ctrl+c.
     let config = ZkSyncConfig::from_env();
     let eth_gateway = EthereumGateway::from_config(&config);
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
