@@ -39,12 +39,12 @@ serde = "1.0.90"
 serde_json = "1.0.0"
 serde_repr = "0.1"
 itertools = "0.8"
-jsonrpc-core = "18"
-jsonrpc-core-client = {version= "18", features=["ws", "http"]}
-jsonrpc-pubsub = "18.0.0"
-jsonrpc-ws-server = "18"
-jsonrpc-http-server = "18"
-jsonrpc-derive = "18"
+jsonrpc-core = "17"
+jsonrpc-core-client = {version= "17", features=["ws", "http"]}
+jsonrpc-pubsub = "17.0.0"
+jsonrpc-ws-server = "17"
+jsonrpc-http-server = "17"
+jsonrpc-derive = "17"
 qstring = "0.7.2"
 
 tokio = { version = "1", features = ["full"] }

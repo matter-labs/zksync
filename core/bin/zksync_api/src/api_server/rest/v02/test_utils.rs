@@ -86,7 +86,10 @@ impl TestServerConfig {
         scope: String,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (
+        Client,
+        Box<impl actix_web::dev::Service<actix_web::HttpRequest>>,
+    )
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,

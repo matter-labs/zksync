@@ -23,7 +23,7 @@ rlp = "0.5.0"
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 thiserror = "1.0"
 
-jsonrpc-core = "18"
+jsonrpc-core = "17"
 async-trait = "0.1"
 
 [dev-dependencies]
@@ -31,4 +31,3 @@ actix-rt = "2"
 tokio = { version = "1", features = ["full"] }
 actix-web = "4.0.0-beta.8"
 futures = "0.3"
-
