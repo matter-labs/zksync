@@ -60,7 +60,7 @@ impl TryFrom<Log> for FundsReceivedEvent {
             &event.data.0,
         )?;
 
-        let amount = dec_ev.remove(0).to_uint().unwrap();
+        let amount = dec_ev.remove(0).into_uint().unwrap();
         let block_number = event
             .block_number
             .ok_or(FundsReceivedEventParseError::UnfinalizedBlockAccess)?

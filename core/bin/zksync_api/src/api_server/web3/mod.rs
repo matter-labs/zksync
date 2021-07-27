@@ -52,21 +52,25 @@ impl Web3RpcApp {
             .map_err(|_| Error::internal_error())
     }
 
-    async fn resolve_block_number(
+    async fn last_saved_block(
         storage: &mut StorageProcessor<'_>,
-        number: Option<self::types::BlockNumber>,
-    ) -> Result<Option<zksync_types::BlockNumber>> {
-        let last_saved_block = storage
+    ) -> Result<zksync_types::BlockNumber> {
+        storage
             .chain()
             .block_schema()
             .get_last_saved_block()
             .await
-            .map_err(|_| Error::internal_error())?;
+            .map_err(|_| Error::internal_error())
+    }
 
+    async fn resolve_block_number(
+        storage: &mut StorageProcessor<'_>,
+        number: Option<self::types::BlockNumber>,
+    ) -> Result<Option<zksync_types::BlockNumber>> {
         let number = match number {
             Some(number) => number,
             None => {
-                return Ok(Some(last_saved_block));
+                return Ok(Some(Self::last_saved_block(storage).await?));
             }
         };
 
@@ -85,10 +89,10 @@ impl Web3RpcApp {
                 .await
                 .map_err(|_| Error::internal_error())?,
             self::types::BlockNumber::Latest | self::types::BlockNumber::Pending => {
-                last_saved_block
+                Self::last_saved_block(storage).await?
             }
             self::types::BlockNumber::Number(number) => {
-                if number.as_u64() > last_saved_block.0 as u64 {
+                if number.as_u64() > Self::last_saved_block(storage).await?.0 as u64 {
                     return Ok(None);
                 }
                 // Unwrap can be safely used because `number` is not greater than `last_saved_block`

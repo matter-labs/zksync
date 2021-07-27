@@ -6,9 +6,7 @@ members = [
     "core/bin/server",
     "core/bin/prover",
     "core/bin/parse_pub_data",
-    "core/bin/regen-root-hash",
     "core/bin/block_revert",
-    "core/bin/hashes_migration",
 
     # Server micro-services
     "core/bin/zksync_api",
@@ -50,4 +48,5 @@ members = [
 ]
 
 [patch.crates-io]
-ethabi = { git = "https://github.com/dvush/ethabi.git" }
+web3 = { git = "https://github.com/Deniallugo/rust-web3", branch = "update_ethabi"}
+

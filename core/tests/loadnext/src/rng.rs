@@ -7,8 +7,8 @@ use zksync_types::H256;
 
 use crate::all::AllWeighted;
 
-// SmallRng seed type is [u8; 16].
-const SEED_SIZE: usize = 16;
+// SmallRng seed type is [u8; 32].
+const SEED_SIZE: usize = 32;
 
 #[derive(Debug)]
 pub struct LoadtestRng {

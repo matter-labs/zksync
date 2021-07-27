@@ -16,10 +16,9 @@ use futures::{
     StreamExt,
 };
 use num::{
-    bigint::ToBigInt,
     rational::Ratio,
     traits::{Inv, Pow},
-    BigUint, CheckedDiv, CheckedSub, Zero,
+    BigUint, CheckedDiv, Zero,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -38,6 +37,7 @@ use zksync_types::{
 use zksync_utils::ratio_to_big_decimal;
 
 // Local deps
+use crate::fee_ticker::constants::AMORTIZED_COST_PER_CHUNK;
 use crate::fee_ticker::{
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
@@ -50,6 +50,7 @@ use crate::fee_ticker::{
     },
 };
 use crate::utils::token_db_cache::TokenDBCache;
+use zksync_types::gas_counter::GasCounter;
 
 mod constants;
 mod ticker_api;
@@ -65,7 +66,6 @@ static TICKER_CHANNEL_SIZE: usize = 32000;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GasOperationsCost {
     standard_cost: HashMap<OutputFeeType, BigUint>,
-    subsidize_cost: HashMap<OutputFeeType, BigUint>,
 }
 
 impl GasOperationsCost {
@@ -74,12 +74,8 @@ impl GasOperationsCost {
         // size, resulting in us paying more gas than for bigger block.
         let standard_fast_withdrawal_cost =
             (constants::BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
-        let subsidy_fast_withdrawal_cost =
-            (constants::SUBSIDY_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
         let standard_fast_withdrawal_nft_cost =
             (constants::BASE_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
-        let subsidy_fast_withdrawal_nft_cost =
-            (constants::SUBSIDY_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
 
         let standard_cost = vec![
             (
@@ -143,74 +139,7 @@ impl GasOperationsCost {
         .into_iter()
         .collect::<HashMap<_, _>>();
 
-        let subsidize_cost = vec![
-            (
-                OutputFeeType::Transfer,
-                constants::SUBSIDY_TRANSFER_COST.into(),
-            ),
-            (
-                OutputFeeType::TransferToNew,
-                constants::SUBSIDY_TRANSFER_TO_NEW_COST.into(),
-            ),
-            (
-                OutputFeeType::Withdraw,
-                constants::SUBSIDY_WITHDRAW_COST.into(),
-            ),
-            (
-                OutputFeeType::FastWithdraw,
-                subsidy_fast_withdrawal_cost.into(),
-            ),
-            (OutputFeeType::Swap, constants::SUBSIDY_SWAP_COST.into()),
-            (
-                OutputFeeType::WithdrawNFT,
-                constants::SUBSIDY_WITHDRAW_NFT_COST.into(),
-            ),
-            (
-                OutputFeeType::FastWithdrawNFT,
-                subsidy_fast_withdrawal_nft_cost.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
-                    onchain_pubkey_auth: false,
-                }),
-                constants::SUBSIDY_OLD_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
-                    onchain_pubkey_auth: true,
-                }),
-                constants::SUBSIDY_CHANGE_PUBKEY_ONCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyType::Onchain,
-                )),
-                constants::SUBSIDY_CHANGE_PUBKEY_ONCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyType::ECDSA,
-                )),
-                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyType::CREATE2,
-                )),
-                constants::SUBSIDY_CHANGE_PUBKEY_CREATE2_COST.into(),
-            ),
-            (
-                OutputFeeType::MintNFT,
-                constants::SUBSIDY_MINT_NFT_COST.into(),
-            ),
-        ]
-        .into_iter()
-        .collect::<HashMap<_, _>>();
-
-        Self {
-            standard_cost,
-            subsidize_cost,
-        }
+        Self { standard_cost }
     }
 }
 
@@ -219,8 +148,8 @@ pub struct TickerConfig {
     zkp_cost_chunk_usd: Ratio<BigUint>,
     gas_cost_tx: GasOperationsCost,
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
-    not_subsidized_tokens: HashSet<Address>,
     scale_fee_coefficient: Ratio<BigUint>,
+    max_blocks_to_aggregate: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -232,65 +161,11 @@ pub enum TokenPriceRequestType {
 #[derive(Debug)]
 pub struct ResponseFee {
     pub normal_fee: Fee,
-    pub subsidy_fee: Fee,
-    pub subsidy_size_usd: Ratio<BigUint>,
-}
-
-fn get_max_subsidy(
-    max_subsidy_usd: &Ratio<BigUint>,
-    subsidy_usd: &Ratio<BigUint>,
-    normal_fee_token: &BigUint,
-    subsidy_fee_token: &BigUint,
-) -> BigDecimal {
-    if max_subsidy_usd > subsidy_usd {
-        let subsidy_uint = normal_fee_token
-            .checked_sub(subsidy_fee_token)
-            .unwrap_or_else(|| {
-                vlog::error!(
-                    "Subisdy fee is bigger then normal fee, subsidy: {:?}, noraml_fee: {:?}",
-                    subsidy_fee_token,
-                    normal_fee_token
-                );
-                0u32.into()
-            });
-
-        BigDecimal::from(
-            subsidy_uint
-                .to_bigint()
-                .expect("biguint should convert to bigint"),
-        )
-    } else {
-        BigDecimal::from(0)
-    }
-}
-
-impl ResponseFee {
-    pub fn get_max_subsidy(&self, allowed_subsidy: &Ratio<BigUint>) -> BigDecimal {
-        get_max_subsidy(
-            allowed_subsidy,
-            &self.subsidy_size_usd,
-            &self.normal_fee.total_fee,
-            &self.subsidy_fee.total_fee,
-        )
-    }
 }
 
 #[derive(Debug)]
 pub struct ResponseBatchFee {
     pub normal_fee: BatchFee,
-    pub subsidy_fee: BatchFee,
-    pub subsidy_size_usd: Ratio<BigUint>,
-}
-
-impl ResponseBatchFee {
-    pub fn get_max_subsidy(&self, allowed_subsidy: &Ratio<BigUint>) -> BigDecimal {
-        get_max_subsidy(
-            allowed_subsidy,
-            &self.subsidy_size_usd,
-            &self.normal_fee.total_fee,
-            &self.subsidy_fee.total_fee,
-        )
-    }
 }
 
 #[derive(Debug)]
@@ -384,11 +259,14 @@ pub fn run_ticker_task(
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: GasOperationsCost::from_constants(config.ticker.fast_processing_coeff),
         tokens_risk_factors: HashMap::new(),
-        not_subsidized_tokens: HashSet::from_iter(config.ticker.not_subsidized_tokens.clone()),
         scale_fee_coefficient: Ratio::new(
             BigUint::from(config.ticker.scale_fee_percent),
             BigUint::from(100u32),
         ),
+        max_blocks_to_aggregate: std::cmp::max(
+            config.chain.state_keeper.max_aggregated_blocks_to_commit,
+            config.chain.state_keeper.max_aggregated_blocks_to_execute,
+        ) as u32,
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
@@ -565,41 +443,22 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let wei_price_usd = self.wei_price_usd().await?;
         let token_usd_risk = self.token_usd_risk(&token).await?;
 
-        let (fee_type, (normal_gas_tx_amount, subsidy_gas_tx_amount), op_chunks) =
-            self.gas_tx_amount(tx_type, recipient).await;
+        let (fee_type, gas_tx_amount, op_chunks) = self.gas_tx_amount(tx_type, recipient).await;
 
         let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
-        let normal_gas_fee =
-            (&wei_price_usd * normal_gas_tx_amount.clone() * scale_gas_price.clone())
-                * self.config.scale_fee_coefficient.clone()
-                * &token_usd_risk;
-        let subsidy_gas_fee =
-            (wei_price_usd * subsidy_gas_tx_amount.clone() * scale_gas_price.clone())
-                * &token_usd_risk;
+        let normal_gas_fee = (&wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone())
+            * self.config.scale_fee_coefficient.clone()
+            * &token_usd_risk;
 
         let normal_fee = Fee::new(
             fee_type,
-            zkp_fee.clone(),
+            zkp_fee,
             normal_gas_fee,
-            normal_gas_tx_amount,
+            gas_tx_amount,
             gas_price_wei.clone(),
         );
 
-        let subsidy_fee = Fee::new(
-            fee_type,
-            zkp_fee,
-            subsidy_gas_fee,
-            subsidy_gas_tx_amount,
-            gas_price_wei,
-        );
-
-        let subsidy_size_usd =
-            Ratio::from_integer(&normal_fee.total_fee - &subsidy_fee.total_fee) / &token_usd_risk;
-        Ok(ResponseFee {
-            normal_fee,
-            subsidy_fee,
-            subsidy_size_usd,
-        })
+        Ok(ResponseFee { normal_fee })
     }
 
     async fn get_batch_from_ticker_in_wei(
@@ -616,14 +475,11 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let token_usd_risk = self.token_usd_risk(&token).await?;
 
         let mut total_normal_gas_tx_amount = BigUint::zero();
-        let mut total_subsidy_gas_tx_amount = BigUint::zero();
         let mut total_op_chunks = BigUint::zero();
 
         for (tx_type, recipient) in txs {
-            let (_, (normal_gas_tx_amount, subsidy_gas_tx_amount), op_chunks) =
-                self.gas_tx_amount(tx_type, recipient).await;
-            total_normal_gas_tx_amount += normal_gas_tx_amount;
-            total_subsidy_gas_tx_amount += subsidy_gas_tx_amount;
+            let (_, gas_tx_amount, op_chunks) = self.gas_tx_amount(tx_type, recipient).await;
+            total_normal_gas_tx_amount += gas_tx_amount;
             total_op_chunks += op_chunks;
         }
 
@@ -631,18 +487,9 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let total_normal_gas_fee = (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price)
             * &token_usd_risk
             * self.config.scale_fee_coefficient.clone();
-        let total_subsidy_gas_fee =
-            (wei_price_usd * total_subsidy_gas_tx_amount * scale_gas_price) * &token_usd_risk;
-        let normal_fee = BatchFee::new(total_zkp_fee.clone(), total_normal_gas_fee);
-        let subsidy_fee = BatchFee::new(total_zkp_fee, total_subsidy_gas_fee);
+        let normal_fee = BatchFee::new(total_zkp_fee, total_normal_gas_fee);
 
-        let subsidy_size_usd =
-            Ratio::from_integer(&normal_fee.total_fee - &subsidy_fee.total_fee) / &token_usd_risk;
-        Ok(ResponseBatchFee {
-            normal_fee,
-            subsidy_fee,
-            subsidy_size_usd,
-        })
+        Ok(ResponseBatchFee { normal_fee })
     }
 
     async fn wei_price_usd(&mut self) -> anyhow::Result<Ratio<BigUint>> {
@@ -683,7 +530,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         &mut self,
         tx_type: TxFeeTypes,
         recipient: Address,
-    ) -> (OutputFeeType, (BigUint, BigUint), BigUint) {
+    ) -> (OutputFeeType, BigUint, BigUint) {
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
@@ -702,23 +549,57 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             }
             TxFeeTypes::MintNFT => (OutputFeeType::MintNFT, MintNFTOp::CHUNKS),
         };
-        // Convert chunks amount to `BigUint`.
-        let op_chunks = BigUint::from(op_chunks);
 
-        let gas_tx_amount = (
+        let gas_tx_amount = if matches!(
+            fee_type,
+            OutputFeeType::FastWithdraw | OutputFeeType::FastWithdrawNFT
+        ) {
+            self.calculate_fast_withdrawal_gas_cost(op_chunks).await
+        } else {
             self.config
                 .gas_cost_tx
                 .standard_cost
                 .get(&fee_type)
                 .cloned()
-                .unwrap(),
-            self.config
-                .gas_cost_tx
-                .subsidize_cost
-                .get(&fee_type)
-                .cloned()
-                .unwrap(),
-        );
+                .unwrap()
+        };
+
+        // Convert chunks amount to `BigUint`.
+        let op_chunks = BigUint::from(op_chunks);
+
         (fee_type, gas_tx_amount, op_chunks)
     }
+    async fn calculate_fast_withdrawal_gas_cost(&mut self, chunk_size: usize) -> BigUint {
+        let future_blocks = self.info.blocks_in_future_aggregated_operations().await;
+        let remaining_pending_chunks = self.info.remaining_chunks_in_pending_block().await;
+        let additional_cost = remaining_pending_chunks.map_or(0, |chunks| {
+            if chunk_size > chunks {
+                0
+            } else {
+                chunks * AMORTIZED_COST_PER_CHUNK as usize
+            }
+        });
+
+        // We have to calculate how much from base price for operations has already paid in blocks and add remain cost to fast withdrawal operation
+        let commit_cost = calculate_cost(
+            GasCounter::BASE_COMMIT_BLOCKS_TX_COST,
+            self.config.max_blocks_to_aggregate,
+            future_blocks.blocks_to_commit,
+        );
+        let execute_cost = calculate_cost(
+            GasCounter::BASE_EXECUTE_BLOCKS_TX_COST,
+            self.config.max_blocks_to_aggregate,
+            future_blocks.blocks_to_execute,
+        );
+        let proof_cost = calculate_cost(
+            GasCounter::BASE_PROOF_BLOCKS_TX_COST,
+            self.config.max_blocks_to_aggregate,
+            future_blocks.blocks_to_prove,
+        );
+        BigUint::from(commit_cost + execute_cost + proof_cost + additional_cost)
+    }
+}
+
+fn calculate_cost(base_cost: usize, max_blocks: u32, future_blocks: u32) -> usize {
+    base_cost - (base_cost / max_blocks as usize) * future_blocks.rem_euclid(max_blocks) as usize
 }
