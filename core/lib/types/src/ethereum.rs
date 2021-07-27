@@ -142,13 +142,13 @@ impl TryFrom<Log> for CompleteWithdrawalsTx {
                 .ok_or(CompleteWithdrawalsTxParseError::TransactionHashMissing)?,
             pending_withdrawals_queue_start_index: decoded_event
                 .remove(0)
-                .to_uint()
+                .into_uint()
                 .as_ref()
                 .map(U256::as_u32)
                 .ok_or(CompleteWithdrawalsTxParseError::PendingWithdrawalsQueueStartConversion)?,
             pending_withdrawals_queue_end_index: decoded_event
                 .remove(0)
-                .to_uint()
+                .into_uint()
                 .as_ref()
                 .map(U256::as_u32)
                 .ok_or(CompleteWithdrawalsTxParseError::PendingWithdrawalsQueueEndConversion)?,

@@ -276,7 +276,6 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                     .next()
                     .unwrap()
                     .to_string()
-                    .unwrap()
                 } else {
                     "unknown".to_string()
                 };
