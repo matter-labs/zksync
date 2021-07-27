@@ -49,7 +49,7 @@ impl Random for CommandType {
         const_assert!(
             -f32::EPSILON <= (_CHANCES_SUM - 1.0f32) && (_CHANCES_SUM - 1.0f32) <= f32::EPSILON
         );
-        let chance = rng.gen_range(0.0f32..=1.0f32);
+        let chance = rng.gen_range(0.0f32..1.0f32);
 
         if chance <= SINGLE_TX_CHANCE {
             Self::SingleTx
@@ -68,7 +68,7 @@ impl Command {
             CommandType::Batch => {
                 // TODO: For some reason, batches of size 1 are being rejected because of nonce mistmatch.
                 // It may be either bug in loadtest or server code, thus it should be investigated.
-                let batch_size = rng.gen_range(2..=MAX_BATCH_SIZE + 1);
+                let batch_size = rng.gen_range(2..=MAX_BATCH_SIZE);
                 let mut batch_command: Vec<_> = (0..batch_size)
                     .map(|_| TxCommand::random_batchable(rng, own_address, addresses))
                     .collect();
