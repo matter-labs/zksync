@@ -6,23 +6,23 @@ use zksync_types::{AccountId, BlockNumber, H256};
 
 fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token>> {
     let commit_operation = ParamType::Tuple(vec![
-        Box::new(ParamType::FixedBytes(32)), // bytes32 encoded_root,
-        Box::new(ParamType::Bytes),          // bytes calldata _publicData,
-        Box::new(ParamType::Uint(256)),      // uint256 _timestamp,
-        Box::new(ParamType::Array(Box::new(ParamType::Tuple(vec![
-            Box::new(ParamType::Bytes),    // bytes eht_witness
-            Box::new(ParamType::Uint(32)), //uint32 public_data_offset
-        ])))),
-        Box::new(ParamType::Uint(32)), // uint32 _blockNumber,
-        Box::new(ParamType::Uint(32)), // uint32 _feeAccount,
+        ParamType::FixedBytes(32), // bytes32 encoded_root,
+        ParamType::Bytes,          // bytes calldata _publicData,
+        ParamType::Uint(256),      // uint256 _timestamp,
+        ParamType::Array(Box::new(ParamType::Tuple(vec![
+            ParamType::Bytes,    // bytes eht_witness
+            ParamType::Uint(32), //uint32 public_data_offset
+        ]))),
+        ParamType::Uint(32), // uint32 _blockNumber,
+        ParamType::Uint(32), // uint32 _feeAccount,
     ]);
     let stored_block = ParamType::Tuple(vec![
-        Box::new(ParamType::Uint(32)),       // uint32 blockNumber
-        Box::new(ParamType::Uint(64)),       // uint32 priorityOperations
-        Box::new(ParamType::FixedBytes(32)), // bytes32  pendingOnchainOperationsHash
-        Box::new(ParamType::Uint(256)),      // uint256 timestamp
-        Box::new(ParamType::FixedBytes(32)), // bytes32 stateHash
-        Box::new(ParamType::FixedBytes(32)), // bytes32 commitment
+        (ParamType::Uint(32)),       // uint32 blockNumber
+        (ParamType::Uint(64)),       // uint32 priorityOperations
+        (ParamType::FixedBytes(32)), // bytes32  pendingOnchainOperationsHash
+        (ParamType::Uint(256)),      // uint256 timestamp
+        (ParamType::FixedBytes(32)), // bytes32 stateHash
+        (ParamType::FixedBytes(32)), // bytes32 commitment
     ]);
     ethabi::decode(
         vec![stored_block, ParamType::Array(Box::new(commit_operation))].as_slice(),
