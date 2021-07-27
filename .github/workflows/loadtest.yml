@@ -28,8 +28,6 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: matter-labs/helm-infra
-          path: helm-infra
-          ref: new-health-check
           token: ${{ secrets.GH_TOKEN }}
       -
         name: Create ~/.kube/config
