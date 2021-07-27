@@ -176,4 +176,9 @@ contract Storage {
     /// @dev Will store zeroes in case of not active upgrade mode
     mapping(uint256 => bool) internal securityCouncilApproves;
     uint256 internal numberOfApprovalsFromSecurityCouncil;
+
+    /// @notice Checks that current state not is exodus mode
+    function requireActive() internal view {
+        require(!exodusMode, "L"); // exodus mode activated
+    }
 }

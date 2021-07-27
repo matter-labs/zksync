@@ -6,6 +6,11 @@ All notable changes to the contracts will be documented in this file.
 
 **Version 5.2** is scheduled for upgrade.
 
+### Added
+
+- Additional method for CREATE2 `ChangePubKey` authorization.
+- Events for pending withdrawals.
+
 ### Changed
 
 - Cleanup after previous upgrade with regenesis.
