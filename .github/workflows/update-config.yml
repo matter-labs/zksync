@@ -30,7 +30,7 @@ jobs:
         id: regex-match
         with:
           text: ${{ steps.config.outputs.ref }}
-          regex: '^refs\/tags\/((v[0-9]+\.[0-9]+\.[0-9])(-?.*)?)$'
+          regex: '^((v[0-9]+\.[0-9]+\.[0-9])(-?.*)?)$'
       -
         name: Map runtime environment data
         id: envMap
