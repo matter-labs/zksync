@@ -37,7 +37,9 @@ vlog = { path = "../../lib/vlog", version = "1.0" }
 
 async-trait = "0.1"
 futures-util = "0.3"
-deadpool = "0.8"
+deadpool = { version = "0.8", features = [
+    "rt_tokio_1",
+] }
 sqlx = { version = "0.5", default-features = false, features = [
     "runtime-tokio-native-tls",
     "macros",

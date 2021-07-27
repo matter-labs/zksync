@@ -3,6 +3,7 @@ use std::{fmt, time::Instant};
 // External imports
 use async_trait::async_trait;
 use deadpool::managed::{Manager, PoolConfig, RecycleResult, Timeouts};
+use deadpool::Runtime;
 use sqlx::{Connection, Error as SqlxError, PgConnection};
 // Local imports
 // use self::recoverable_connection::RecoverableConnection;
@@ -25,7 +26,7 @@ impl DbPool {
         let pool_config = PoolConfig {
             max_size,
             timeouts: Timeouts::wait_millis(20_000), // wait 20 seconds before returning error
-            runtime: Default::default(),
+            runtime: Runtime::Tokio1,
         };
         Pool::from_config(DbPool { url: url.into() }, pool_config)
     }
