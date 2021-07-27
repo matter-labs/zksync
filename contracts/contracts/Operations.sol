@@ -46,8 +46,6 @@ library Operations {
     /// @dev Signature (for example full exit signature) bytes length
     uint8 internal constant SIGNATURE_BYTES = 64;
 
-    uint256 internal constant LEGACY_MAX_TOKEN = 65535; // 2^16 - 1
-
     // Deposit pubdata
     struct Deposit {
         // uint8 opType
@@ -83,29 +81,9 @@ library Operations {
         );
     }
 
-    /// Serialize legacy deposit pubdata
-    function writeLegacyDepositPubdataForPriorityQueue(Deposit memory op) internal pure returns (bytes memory buf) {
-        buf = abi.encodePacked(
-            uint8(OpType.Deposit),
-            bytes4(0), // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
-            uint16(op.tokenId), // tokenId
-            op.amount, // amount
-            op.owner // owner
-        );
-    }
-
     /// @notice Write deposit pubdata for priority queue check.
     function checkDepositInPriorityQueue(Deposit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        if (Utils.hashBytesToBytes20(writeDepositPubdataForPriorityQueue(op)) == hashedPubdata) {
-            return true;
-        } else if (
-            op.tokenId <= LEGACY_MAX_TOKEN &&
-            Utils.hashBytesToBytes20(writeLegacyDepositPubdataForPriorityQueue(op)) == hashedPubdata
-        ) {
-            return true;
-        } else {
-            return false;
-        }
+        return Utils.hashBytesToBytes20(writeDepositPubdataForPriorityQueue(op)) == hashedPubdata;
     }
 
     // FullExit pubdata
@@ -162,27 +140,8 @@ library Operations {
         );
     }
 
-    function writeLegacyFullExitPubdataForPriorityQueue(FullExit memory op) internal pure returns (bytes memory buf) {
-        buf = abi.encodePacked(
-            uint8(OpType.FullExit),
-            op.accountId, // accountId
-            op.owner, // owner
-            uint16(op.tokenId), // tokenId
-            uint128(0) // amount -- ignored
-        );
-    }
-
     function checkFullExitInPriorityQueue(FullExit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        if (Utils.hashBytesToBytes20(writeFullExitPubdataForPriorityQueue(op)) == hashedPubdata) {
-            return true;
-        } else if (
-            op.tokenId <= LEGACY_MAX_TOKEN &&
-            Utils.hashBytesToBytes20(writeLegacyFullExitPubdataForPriorityQueue(op)) == hashedPubdata
-        ) {
-            return true;
-        } else {
-            return false;
-        }
+        return Utils.hashBytesToBytes20(writeFullExitPubdataForPriorityQueue(op)) == hashedPubdata;
     }
 
     // PartialExit pubdata
