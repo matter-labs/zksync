@@ -63,14 +63,6 @@ jobs:
           echo $(pwd)/bin >> $GITHUB_PATH
           echo $CARGO_HOME/bin >> $GITHUB_PATH
       -
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      -
         name: Update cargo dependencies
         run: |
           cargo install --version=0.5.2 sqlx-cli
