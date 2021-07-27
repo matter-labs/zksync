@@ -2,6 +2,15 @@
 
 All notable changes to the contracts will be documented in this file.
 
+## 2021-27-07
+
+**Version 5.2** is scheduled for upgrade.
+
+### Changed
+
+- Cleanup after previous upgrade with regenesis.
+- Minor issues from audit fixed.
+
 ## 2021-31-05
 
 **Version 5.1** is scheduled for upgrade.
