@@ -207,29 +207,6 @@ async fn get_balance() -> anyhow::Result<()> {
 )]
 async fn get_block_transaction_count() -> anyhow::Result<()> {
     let pool = ConnectionPool::new(Some(1));
-    let (expected_for_first_block, expected_for_last_block) = {
-        let mut storage = pool.access_storage().await?;
-        let count_first = U256::from(
-            storage
-                .chain()
-                .block_schema()
-                .get_block_transactions_count(BlockNumber(1))
-                .await?,
-        );
-        let last_block = storage
-            .chain()
-            .block_schema()
-            .get_last_saved_block()
-            .await?;
-        let count_last = U256::from(
-            storage
-                .chain()
-                .block_schema()
-                .get_block_transactions_count(last_block)
-                .await?,
-        );
-        (count_first, count_last)
-    };
     // Checks that `eth_getBlockTransactionCountByHash` works correctly.
     let fut = {
         let (client, server) = local_client().await?;
@@ -244,9 +221,19 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
             .join(server)
     };
     let (count_by_hash, _) = fut.wait().unwrap();
+    let expected = {
+        let mut storage = pool.access_storage().await?;
+        U256::from(
+            storage
+                .chain()
+                .block_schema()
+                .get_block_transactions_count(BlockNumber(1))
+                .await?,
+        )
+    };
     assert_eq!(
         serde_json::from_value::<U256>(count_by_hash).unwrap(),
-        expected_for_first_block
+        expected
     );
 
     // Checks that `eth_getBlockTransactionCountByNumber` works correctly for provided block.
@@ -262,7 +249,7 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
     let (count_by_number, _) = fut.wait().unwrap();
     assert_eq!(
         serde_json::from_value::<U256>(count_by_number).unwrap(),
-        expected_for_first_block
+        expected
     );
 
     // Checks that `eth_getBlockTransactionCountByNumber` works correctly for the last block.
@@ -273,9 +260,24 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
             .join(server)
     };
     let (count_in_last_block, _) = fut.wait().unwrap();
+    let expected = {
+        let mut storage = pool.access_storage().await?;
+        let last_block = storage
+            .chain()
+            .block_schema()
+            .get_last_saved_block()
+            .await?;
+        U256::from(
+            storage
+                .chain()
+                .block_schema()
+                .get_block_transactions_count(last_block)
+                .await?,
+        )
+    };
     assert_eq!(
         serde_json::from_value::<U256>(count_in_last_block).unwrap(),
-        expected_for_last_block
+        expected
     );
 
     Ok(())
