@@ -8,7 +8,6 @@ use std::{
     path::Path,
 };
 
-use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, Result};
 use bigdecimal::BigDecimal;
 use regex::Regex;
@@ -121,7 +120,7 @@ async fn handle_graphql(
 fn main() {
     vlog::init();
 
-    let mut runtime = actix_rt::System::new();
+    let runtime = actix_rt::System::new();
     let config = DevLiquidityTokenWatcherConfig::from_env();
 
     let storage = match config.regime {

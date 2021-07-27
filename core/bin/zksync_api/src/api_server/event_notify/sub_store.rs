@@ -51,7 +51,7 @@ where
         }
     }
 
-    fn send_once(&self, sink: &Sink<RESP>, val: RESP) {
+    fn send_once(&self, _sink: &Sink<RESP>, _val: RESP) {
         // tokio::spawn(sink.notify(Ok(val)).compat().map(drop));
     }
 

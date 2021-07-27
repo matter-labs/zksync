@@ -212,10 +212,12 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
-        let (client, server) = cfg.start_server(
-            |cfg: &TestServerConfig| api_scope(cfg.pool.clone(), BlockDetailsCache::new(10)),
-            Some(shared_data),
-        );
+        let (client, server) = cfg
+            .start_server(
+                |cfg: &TestServerConfig| api_scope(cfg.pool.clone(), BlockDetailsCache::new(10)),
+                Some(shared_data),
+            )
+            .await;
 
         let query = PaginationQuery {
             from: ApiEither::from(BlockNumber(1)),

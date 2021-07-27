@@ -459,7 +459,7 @@ mod tests {
 
     fn get_unconfirmed_ops_loopback(
         ops_handle: PendingOpsHandle,
-    ) -> (CoreApiClient, actix_web::test::TestServer) {
+    ) -> (CoreApiClient, actix_test::TestServer) {
         async fn get_ops(
             data: web::Data<PendingOpsHandle>,
             web::Query(_query): web::Query<PendingOpsFlattenRequest>,
@@ -467,7 +467,7 @@ mod tests {
             Json(data.lock().await.clone())
         }
 
-        let server = actix_web::test::start(move || {
+        let server = actix_test::start(move || {
             App::new().service(
                 web::scope("unconfirmed_ops")
                     .app_data(ops_handle.clone())
@@ -480,8 +480,8 @@ mod tests {
     }
 
     struct TestServer {
-        core_server: actix_web::test::TestServer,
-        api_server: actix_web::test::TestServer,
+        core_server: actix_test::TestServer,
+        api_server: actix_test::TestServer,
         pool: ConnectionPool,
         pending_ops: PendingOpsHandle,
     }
@@ -500,12 +500,14 @@ mod tests {
                 net: cfg.config.chain.eth.network,
                 api_version: ApiVersion::V02,
             };
-            let (api_client, api_server) = cfg.start_server(
-                move |cfg: &TestServerConfig| {
-                    api_scope(cfg.pool.clone(), TokenDBCache::new(), core_client.clone())
-                },
-                Some(shared_data),
-            );
+            let (api_client, api_server) = cfg
+                .start_server(
+                    move |cfg: &TestServerConfig| {
+                        api_scope(cfg.pool.clone(), TokenDBCache::new(), core_client.clone())
+                    },
+                    Some(shared_data),
+                )
+                .await;
 
             Ok((
                 api_client,

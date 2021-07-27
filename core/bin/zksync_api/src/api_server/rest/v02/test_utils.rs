@@ -86,16 +86,14 @@ impl TestServerConfig {
         scope: String,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (
-        Client,
-        Box<impl actix_web::dev::Service<actix_web::HttpRequest>>,
-    )
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,
     {
         let this = self.clone();
-        let server = actix_web::test::init_service(move || {
+
+        let server = actix_test::start(move || {
             let app = App::new();
             let shared_data = shared_data.clone();
             let app = if let Some(shared_data) = shared_data {
@@ -104,8 +102,7 @@ impl TestServerConfig {
                 app
             };
             app.service(web::scope(scope.as_ref()).service(scope_factory(&this)))
-        })
-        .await;
+        });
 
         let url = server.url("").trim_end_matches('/').to_owned();
 
@@ -117,7 +114,7 @@ impl TestServerConfig {
         &self,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,

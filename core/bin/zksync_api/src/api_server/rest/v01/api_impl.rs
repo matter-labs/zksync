@@ -97,7 +97,7 @@ impl ApiV01 {
         let start = Instant::now();
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Ok(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
 
         let tokens = self_
@@ -197,7 +197,7 @@ impl ApiV01 {
 
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Ok(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
         let mut storage = self_.access_storage().await?;
         let mut transaction = storage.start_transaction().await.map_err(Self::db_error)?;
@@ -238,7 +238,7 @@ impl ApiV01 {
 
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Ok(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
 
         let direction = SearchDirection::Newer;
@@ -327,10 +327,10 @@ impl ApiV01 {
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         if tx_hash_hex.len() < 2 {
-            return Ok(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
         let transaction_hash =
-            hex::decode(&tx_hash_hex[2..]).map_err(|err| actix_web::error::ErrorBadRequest(err))?;
+            hex::decode(&tx_hash_hex[2..]).map_err(actix_web::error::ErrorBadRequest)?;
 
         let tx_receipt = self_.get_tx_receipt(transaction_hash).await?;
 
@@ -343,8 +343,8 @@ impl ApiV01 {
         hash_hex_with_prefix: web::Path<String>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
-        let hash = try_parse_hash(&hash_hex_with_prefix)
-            .map_err(|err| actix_web::error::ErrorBadRequest(err))?;
+        let hash =
+            try_parse_hash(&hash_hex_with_prefix).map_err(actix_web::error::ErrorBadRequest)?;
 
         let mut res = self_
             .access_storage()
@@ -422,7 +422,7 @@ impl ApiV01 {
         let result = if let Some(exec_op) = exec_ops.get(tx_id as usize) {
             ok_json!(exec_op.clone())
         } else {
-            Ok(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish())
         };
 
         metrics::histogram!("api.v01.block_tx", start.elapsed());
@@ -438,7 +438,7 @@ impl ApiV01 {
         let max_block = block_query.max_block.unwrap_or(999_999_999);
         let limit = block_query.limit.unwrap_or(20);
         if limit > 100 {
-            return Ok(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
         let mut storage = self_.access_storage().await?;
 
@@ -470,7 +470,7 @@ impl ApiV01 {
         let result = if let Some(block) = block {
             ok_json!(block)
         } else {
-            Ok(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish())
         };
         metrics::histogram!("api.v01.block_by_id", start.elapsed());
         result
@@ -507,7 +507,7 @@ impl ApiV01 {
         let result = if let Some(block) = block {
             ok_json!(block)
         } else {
-            Ok(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish())
         };
 
         metrics::histogram!("api.v01.explorer_search", start.elapsed());

@@ -216,7 +216,7 @@ mod tests {
         BlockNumber, SignedZkSyncTx, TokenId,
     };
 
-    fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
+    fn submit_txs_loopback() -> (CoreApiClient, actix_test::TestServer) {
         async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
             Json(Ok(()))
         }
@@ -231,7 +231,7 @@ mod tests {
             Json(None)
         }
 
-        let server = actix_web::test::start(move || {
+        let server = actix_test::start(move || {
             App::new()
                 .route("new_tx", web::post().to(send_tx))
                 .route("new_txs_batch", web::post().to(send_txs_batch))
@@ -258,18 +258,20 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
-        let (client, server) = cfg.start_server(
-            move |cfg: &TestServerConfig| {
-                api_scope(TxSender::with_client(
-                    core_client.clone(),
-                    cfg.pool.clone(),
-                    dummy_sign_verifier(),
-                    dummy_fee_ticker(&[]),
-                    &cfg.config,
-                ))
-            },
-            Some(shared_data),
-        );
+        let (client, server) = cfg
+            .start_server(
+                move |cfg: &TestServerConfig| {
+                    api_scope(TxSender::with_client(
+                        core_client.clone(),
+                        cfg.pool.clone(),
+                        dummy_sign_verifier(),
+                        dummy_fee_ticker(&[]),
+                        &cfg.config,
+                    ))
+                },
+                Some(shared_data),
+            )
+            .await;
 
         let tx = TestServerConfig::gen_zk_txs(100_u64).txs[0].0.clone();
         let response = client

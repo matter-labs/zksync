@@ -96,10 +96,12 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
-        let (client, server) = cfg.start_server(
-            |cfg: &TestServerConfig| api_scope(cfg.pool.clone()),
-            Some(shared_data),
-        );
+        let (client, server) = cfg
+            .start_server(
+                |cfg: &TestServerConfig| api_scope(cfg.pool.clone()),
+                Some(shared_data),
+            )
+            .await;
 
         let expected_status = {
             let mut storage = cfg.pool.access_storage().await?;

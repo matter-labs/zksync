@@ -151,10 +151,7 @@ pub async fn parse_tx_id(
 
     let parts: Vec<u64> = data
         .split(',')
-        .map(|val| {
-            val.parse()
-                .map_err(|err| actix_web::error::ErrorBadRequest(err))
-        })
+        .map(|val| val.parse().map_err(actix_web::error::ErrorBadRequest))
         .collect::<Result<Vec<u64>, actix_web::error::Error>>()?;
     if parts.len() != 2 {
         return Err(actix_web::error::ErrorBadRequest(anyhow::anyhow!(

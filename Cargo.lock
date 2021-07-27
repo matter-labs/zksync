@@ -78,6 +78,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-http-test"
+version = "3.0.0-beta.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de9835413053be8baa710936dda9f55d7e0486b7412c9f94ac12b023c38602d4"
+dependencies = [
+ "actix-codec",
+ "actix-rt",
+ "actix-server",
+ "actix-service",
+ "actix-tls",
+ "actix-utils",
+ "awc",
+ "base64 0.13.0",
+ "bytes 1.0.1",
+ "futures-core",
+ "http",
+ "log 0.4.14",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "slab",
+ "socket2 0.4.0",
+ "time 0.2.27",
+]
+
+[[package]]
 name = "actix-macros"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -137,6 +163,28 @@ dependencies = [
  "futures-core",
  "paste",
  "pin-project-lite 0.2.7",
+]
+
+[[package]]
+name = "actix-test"
+version = "0.1.0-beta.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "064a60dac8eb7221e461952432ead7165b34ce5b19e9d80e29ca40103cdb3e7b"
+dependencies = [
+ "actix-codec",
+ "actix-http",
+ "actix-http-test",
+ "actix-rt",
+ "actix-service",
+ "actix-utils",
+ "actix-web",
+ "awc",
+ "futures-core",
+ "futures-util",
+ "log 0.4.14",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
 ]
 
 [[package]]
@@ -430,6 +478,33 @@ name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+
+[[package]]
+name = "awc"
+version = "3.0.0-beta.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "364ef81705bf38403a3c3da4fab9eeec1e1503cd72dd6cd7c4259d2a6b08aa98"
+dependencies = [
+ "actix-codec",
+ "actix-http",
+ "actix-rt",
+ "actix-service",
+ "base64 0.13.0",
+ "bytes 1.0.1",
+ "cfg-if 1.0.0",
+ "cookie",
+ "derive_more",
+ "futures-core",
+ "itoa",
+ "log 0.4.14",
+ "mime 0.3.16",
+ "percent-encoding 2.1.0",
+ "pin-project-lite 0.2.7",
+ "rand 0.8.4",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+]
 
 [[package]]
 name = "backoff"
@@ -5603,6 +5678,7 @@ version = "1.0.0"
 dependencies = [
  "actix-cors",
  "actix-rt",
+ "actix-test",
  "actix-web",
  "actix-web-httpauth",
  "anyhow",
