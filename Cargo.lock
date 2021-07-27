@@ -2119,19 +2119,6 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc-core"
-version = "14.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0747307121ffb9703afd93afbd0fb4f854c38fb873f2c8b90e0e902f27c7b62"
-dependencies = [
- "futures 0.1.31",
- "log 0.4.14",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
-name = "jsonrpc-core"
 version = "17.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4467ab6dfa369b69e52bd0692e480c4d117410538526a57a304a0f2250fd95e"
@@ -5694,7 +5681,7 @@ dependencies = [
  "ethabi",
  "futures 0.3.16",
  "hex",
- "jsonrpc-core 14.2.0",
+ "jsonrpc-core 17.1.0",
  "num",
  "serde",
  "serde_json",
