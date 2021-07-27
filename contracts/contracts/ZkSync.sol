@@ -87,9 +87,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(block.timestamp >= upgradeStartTimestamp.add(approvedUpgradeNoticePeriod));
     }
 
-    /// @notice Notification that upgrade canceled
-    /// @dev Can be external because Proxy contract intercepts illegal calls of this function
-    function upgradeCanceled() external override {
+    /// @dev When upgrade is finished or canceled we must clean upgrade-related state.
+    function clearUpgradeStatus() internal {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
@@ -101,18 +100,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         numberOfApprovalsFromSecurityCouncil = 0;
     }
 
+    /// @notice Notification that upgrade canceled
+    /// @dev Can be external because Proxy contract intercepts illegal calls of this function
+    function upgradeCanceled() external override {
+        clearUpgradeStatus();
+    }
+
     /// @notice Notification that upgrade finishes
     /// @dev Can be external because Proxy contract intercepts illegal calls of this function
     function upgradeFinishes() external override {
-        upgradePreparationActive = false;
-        upgradePreparationActivationTime = 0;
-        approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
-        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
-        upgradeStartTimestamp = 0;
-        for (uint256 i = 0; i < SECURITY_COUNCIL_MEMBERS_NUMBER; ++i) {
-            securityCouncilApproves[i] = false;
-        }
-        numberOfApprovalsFromSecurityCouncil = 0;
+        clearUpgradeStatus();
     }
 
     /// @notice Checks that contract is ready for upgrade
@@ -129,12 +126,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function initialize(bytes calldata initializationParameters) external {
         initializeReentrancyGuard();
 
-        (address _governanceAddress, address _verifierAddress, address _additionalZkSync, bytes32 _genesisStateHash) =
-            abi.decode(initializationParameters, (address, address, address, bytes32));
+        (
+            Governance _governanceAddress,
+            Verifier _verifierAddress,
+            AdditionalZkSync _additionalZkSync,
+            bytes32 _genesisStateHash
+        ) = abi.decode(initializationParameters, (Governance, Verifier, AdditionalZkSync, bytes32));
 
-        verifier = Verifier(_verifierAddress);
-        governance = Governance(_governanceAddress);
-        additionalZkSync = AdditionalZkSync(_additionalZkSync);
+        verifier = _verifierAddress;
+        governance = _governanceAddress;
+        additionalZkSync = _additionalZkSync;
 
         StoredBlockInfo memory storedBlockZero =
             StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, 0, _genesisStateHash, bytes32(0));
@@ -148,28 +149,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
     // solhint-disable-next-line no-empty-blocks
-    function upgrade(bytes calldata upgradeParameters) external nonReentrant {
-        require(totalBlocksCommitted == totalBlocksProven, "wq1"); // All the blocks must be proven
-        require(totalBlocksCommitted == totalBlocksExecuted, "w12"); // All the blocks must be executed
-
-        StoredBlockInfo memory lastBlockInfo;
-        (lastBlockInfo) = abi.decode(upgradeParameters, (StoredBlockInfo));
-        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
-
-        RegenesisMultisig multisig = RegenesisMultisig($$(REGENESIS_MULTISIG_ADDRESS));
-        bytes32 oldRootHash = multisig.oldRootHash();
-        require(oldRootHash == lastBlockInfo.stateHash, "wqqe");
-
-        bytes32 newRootHash = multisig.newRootHash();
-
-        // Overriding the old block's root hash with the new one
-        lastBlockInfo.stateHash = newRootHash;
-        storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(lastBlockInfo);
-        additionalZkSync = AdditionalZkSync(address($$(NEW_ADDITIONAL_ZKSYNC_ADDRESS)));
-
-        approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
-        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
-    }
+    function upgrade(bytes calldata upgradeParameters) external nonReentrant {}
 
     function cutUpgradeNoticePeriod() external {
         /// All functions delegated to additional contract should NOT be nonReentrant
@@ -971,7 +951,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Should be only use to delegate the external calls as it passes the calldata
     /// @notice All functions delegated to additional contract should NOT be nonReentrant
     function delegateAdditional() internal {
-        address _target = address(additionalZkSync);
+        AdditionalZkSync _target = additionalZkSync;
         assembly {
             // The pointer to the free memory slot
             let ptr := mload(0x40)
