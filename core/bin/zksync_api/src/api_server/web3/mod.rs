@@ -18,6 +18,8 @@ use self::{
 
 mod rpc_impl;
 mod rpc_trait;
+#[cfg(test)]
+mod tests;
 mod types;
 
 #[derive(Clone)]
