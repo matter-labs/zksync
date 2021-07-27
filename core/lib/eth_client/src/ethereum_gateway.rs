@@ -182,8 +182,12 @@ impl EthereumGateway {
         delegate_call!(self.allowance(token_address, erc20_abi))
     }
 
-    pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
-        delegate_call!(self.get_tx_status(hash))
+    pub async fn get_tx_status(
+        &self,
+        hash: H256,
+        current_block: Option<u64>,
+    ) -> anyhow::Result<Option<ExecutedTxStatus>> {
+        delegate_call!(self.get_tx_status(hash, current_block))
     }
 
     /// Encodes the transaction data (smart contract method and its input) to the bytes

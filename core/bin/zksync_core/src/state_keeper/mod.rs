@@ -10,13 +10,8 @@ use itertools::Itertools;
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_crypto::{
-    convert::FeConvert,
     ff::{self, PrimeField, PrimeFieldRepr},
-    params::{
-        ETH_TOKEN_ID, MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID,
-        NFT_TOKEN_ID,
-    },
-    PrivateKey,
+    params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
 };
 use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
 use zksync_storage::ConnectionPool;
@@ -26,11 +21,10 @@ use zksync_types::{
         PendingBlock as SendablePendingBlock,
     },
     gas_counter::GasCounter,
-    helpers::reverse_updates,
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
-    PriorityOp, SignedZkSyncTx, Token, TokenId, Transfer, TransferOp, H256, NFT,
+    PriorityOp, SignedZkSyncTx, Token, TokenId, H256, NFT,
 };
 // Local uses
 use crate::{
@@ -82,16 +76,12 @@ impl PendingBlock {
         available_chunks_sizes: &[usize],
         previous_block_root_hash: H256,
         timestamp: u64,
-        should_include_last_transfer: bool,
     ) -> Self {
         // TransferOp chunks are subtracted to reserve space for last transfer.
-        let mut chunks_left = *available_chunks_sizes
+        let chunks_left = *available_chunks_sizes
             .iter()
             .max()
             .expect("Expected at least one block chunks size");
-        if should_include_last_transfer {
-            chunks_left -= TransferOp::CHUNKS;
-        }
         Self {
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
@@ -140,9 +130,6 @@ pub struct ZkSyncStateKeeper {
     success_txs_pending_len: usize,
     /// Amount of failed transactions in the pending block at the last pending block synchronization step.
     failed_txs_pending_len: usize,
-
-    /// ZK sync account that is used to create last transfer before sealing block (e.g. to change block hash)
-    tx_signer: Option<(Address, PrivateKey)>,
 }
 
 #[derive(Debug, Clone)]
@@ -413,7 +400,6 @@ impl ZkSyncStateKeeper {
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
-        tx_signer: Option<(Address, PrivateKey)>,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -453,7 +439,6 @@ impl ZkSyncStateKeeper {
                 &available_block_chunk_sizes,
                 previous_root_hash,
                 system_time_timestamp(),
-                tx_signer.is_some(),
             ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
@@ -461,7 +446,6 @@ impl ZkSyncStateKeeper {
 
             success_txs_pending_len: 0,
             failed_txs_pending_len: 0,
-            tx_signer,
         };
 
         let root = keeper.state.root_hash();
@@ -1053,10 +1037,6 @@ impl ZkSyncStateKeeper {
             .account_updates
             .extend(fee_updates.into_iter());
 
-        // This last tx does not pay any fee
-        if let Err(e) = self.execute_transfer_to_change_block_hash() {
-            vlog::error!("Failed to execute transfer to change block hash: {}", e);
-        }
         let mut pending_block = std::mem::replace(
             &mut self.pending_block,
             PendingBlock::new(
@@ -1064,7 +1044,6 @@ impl ZkSyncStateKeeper {
                 &self.available_block_chunk_sizes,
                 H256::default(),
                 system_time_timestamp(),
-                self.tx_signer.is_some(),
             ),
         );
         // Once block is sealed, we refresh the counters for the next block.
@@ -1203,102 +1182,7 @@ impl ZkSyncStateKeeper {
             unprocessed_priority_op: self.current_unprocessed_priority_op,
         }
     }
-
-    /// Should be applied after fee is collected when block is being sealed.
-    fn execute_transfer_to_change_block_hash(&mut self) -> anyhow::Result<()> {
-        let (signer_id, signer_account, signer_pk) = {
-            let (address, pk) = if let Some((address, pk)) = self.tx_signer.as_ref() {
-                (address, pk)
-            } else {
-                return Ok(());
-            };
-            let (id, account) = self.state.get_account_by_address(&address).ok_or_else(|| {
-                anyhow::format_err!("Signer account is not in the tree: {:?}", address)
-            })?;
-            (id, account, pk)
-        };
-        let (target_id, target_account) = {
-            (
-                self.fee_account_id,
-                self.state
-                    .get_account(self.fee_account_id)
-                    .expect("Fee account must be present in the tree"),
-            )
-        };
-
-        let mut tx_value = 0u32;
-        let mut first_byte = self.state.root_hash().to_bytes()[0];
-        while first_byte > 0x1F {
-            tx_value += 1;
-            anyhow::ensure!(
-                signer_account.get_balance(ETH_TOKEN_ID) > tx_value.into(),
-                "Not enough balance on signer account"
-            );
-
-            let expected_updates = vec![
-                (
-                    signer_id,
-                    AccountUpdate::UpdateBalance {
-                        old_nonce: signer_account.nonce,
-                        new_nonce: signer_account.nonce + 1,
-                        balance_update: (
-                            ETH_TOKEN_ID,
-                            signer_account.get_balance(ETH_TOKEN_ID),
-                            signer_account.get_balance(ETH_TOKEN_ID) - tx_value,
-                        ),
-                    },
-                ),
-                (
-                    target_id,
-                    AccountUpdate::UpdateBalance {
-                        old_nonce: target_account.nonce,
-                        new_nonce: target_account.nonce,
-                        balance_update: (
-                            ETH_TOKEN_ID,
-                            target_account.get_balance(ETH_TOKEN_ID),
-                            target_account.get_balance(ETH_TOKEN_ID) + tx_value,
-                        ),
-                    },
-                ),
-            ];
-            self.state.apply_account_updates(expected_updates.clone());
-
-            first_byte = self.state.root_hash().to_bytes()[0];
-
-            let reverse_updates = {
-                let mut rev_updates = expected_updates;
-                reverse_updates(&mut rev_updates);
-                rev_updates
-            };
-            self.state.apply_account_updates(reverse_updates);
-        }
-
-        if tx_value == 0 {
-            return Ok(());
-        }
-
-        let transfer = Transfer::new_signed(
-            signer_id,
-            signer_account.address,
-            target_account.address,
-            ETH_TOKEN_ID,
-            tx_value.into(),
-            0u32.into(),
-            signer_account.nonce,
-            Default::default(),
-            &signer_pk,
-        )?;
-
-        self.apply_tx(&SignedZkSyncTx {
-            tx: transfer.into(),
-            eth_sign_data: None,
-        })
-        .map_err(|_| anyhow::format_err!("Transaction execution failed"))?;
-
-        Ok(())
-    }
 }
-
 #[must_use]
 pub fn start_state_keeper(
     sk: ZkSyncStateKeeper,

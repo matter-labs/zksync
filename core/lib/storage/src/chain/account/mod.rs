@@ -376,30 +376,6 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         Ok(BlockNumber(block_number as u32))
     }
 
-    // This method does not have metrics, since it is used only for the
-    // migration for the nft regenesis.
-    // Remove this function once the regenesis is complete and the tool is not
-    // needed anymore: ZKS-663
-    pub async fn get_all_accounts(&mut self) -> QueryResult<Vec<StorageAccount>> {
-        let result = sqlx::query_as!(StorageAccount, "SELECT * FROM accounts")
-            .fetch_all(self.0.conn())
-            .await?;
-
-        Ok(result)
-    }
-
-    // This method does not have metrics, since it is used only for the
-    // migration for the nft regenesis.
-    // Remove this function once the regenesis is complete and the tool is not
-    // needed anymore: ZKS-663
-    pub async fn get_all_balances(&mut self) -> QueryResult<Vec<StorageBalance>> {
-        let result = sqlx::query_as!(StorageBalance, "SELECT * FROM balances",)
-            .fetch_all(self.0.conn())
-            .await?;
-
-        Ok(result)
-    }
-
     pub async fn get_account_eth_balance_for_block(
         &mut self,
         address: Address,

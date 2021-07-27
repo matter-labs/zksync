@@ -869,29 +869,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    // This method does not have metrics, since it is used only for the
-    // migration for the nft regenesis.
-    // Remove this function once the regenesis is complete and the tool is not
-    // needed anymore: ZKS-663
-    pub async fn change_block_root_hash(
-        &mut self,
-        block_number: BlockNumber,
-        new_root_hash: Fr,
-    ) -> QueryResult<()> {
-        let root_hash_bytes = new_root_hash.to_bytes();
-        sqlx::query!(
-            "UPDATE blocks
-                SET root_hash = $1
-                WHERE number = $2",
-            root_hash_bytes,
-            *block_number as i64
-        )
-        .execute(self.0.conn())
-        .await?;
-
-        Ok(())
-    }
-
     pub async fn save_block_metadata(
         &mut self,
         block_number: BlockNumber,
@@ -939,24 +916,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.chain.block.store_account_tree_cache", start.elapsed());
-        Ok(())
-    }
-
-    // This method does not have metrics, since it is used only for the
-    // migration for the nft regenesis.
-    // Remove this function once the regenesis is complete and the tool is not
-    // needed anymore: ZKS-663
-    pub async fn reset_account_tree_cache(&mut self, block_number: BlockNumber) -> QueryResult<()> {
-        sqlx::query!(
-            "
-            DELETE FROM account_tree_cache 
-            WHERE block = $1
-            ",
-            *block_number as u32
-        )
-        .execute(self.0.conn())
-        .await?;
-
         Ok(())
     }
 
@@ -1265,7 +1224,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     // Removes account tree cache for blocks with number greater than `last_block`
-    pub async fn remove_account_tree_cache(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+    pub async fn remove_new_account_tree_cache(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
             "DELETE FROM account_tree_cache WHERE block > $1",
@@ -1274,7 +1236,30 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain.block.remove_account_tree_cache", start.elapsed());
+        metrics::histogram!(
+            "sql.chain.block.remove_new_account_tree_cache",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    // Removes account tree cache for blocks with number less than `last_block`
+    pub async fn remove_old_account_tree_cache(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM account_tree_cache WHERE block < $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.block.remove_old_account_tree_cache",
+            start.elapsed()
+        );
         Ok(())
     }
 

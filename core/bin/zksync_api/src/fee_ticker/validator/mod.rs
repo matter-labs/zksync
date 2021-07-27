@@ -337,9 +337,9 @@ mod tests {
             .token_allowed(TokenLike::Address(eth_address))
             .await
             .unwrap();
-        assert_eq!(dai_allowed, true);
-        assert_eq!(phnx_allowed, false);
-        assert_eq!(eth_allowed, true);
+        assert!(dai_allowed);
+        assert!(!phnx_allowed);
+        assert!(eth_allowed);
         assert!(validator.tokens.get(&dai_token_address).unwrap().allowed);
         assert!(!validator.tokens.get(&phnx_token_address).unwrap().allowed);
     }

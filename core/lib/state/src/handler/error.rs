@@ -56,6 +56,8 @@ pub enum ForcedExitOpError {
     InvalidTokenId,
     #[error("Target account is not locked; forced exit is forbidden")]
     TargetAccountNotLocked,
+    #[error("Target account is invalid")]
+    InvalidTargetAccount,
     #[error("Nonce mismatch")]
     NonceMismatch,
     #[error("Initiator account: Not enough balance to cover fees")]

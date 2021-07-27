@@ -38,7 +38,7 @@ impl SharedNetworkStatus {
                 let mut runtime = Runtime::new().expect("tokio runtime creation");
 
                 let state_update_task = async move {
-                    let mut timer = time::interval(Duration::from_millis(1000));
+                    let mut timer = time::interval(Duration::from_millis(30000));
                     loop {
                         timer.tick().await;
 

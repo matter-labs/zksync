@@ -120,7 +120,7 @@ impl ForcedExit {
         out.extend_from_slice(&(self.token.0 as u16).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.time_range.to_be_bytes());
+        out.extend_from_slice(&self.time_range.as_be_bytes());
         out
     }
 
@@ -138,7 +138,7 @@ impl ForcedExit {
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.time_range.to_be_bytes());
+        out.extend_from_slice(&self.time_range.as_be_bytes());
         out
     }
 

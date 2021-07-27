@@ -504,7 +504,6 @@ export class RestProvider extends SyncProvider {
                     nfts: fullInfo.committed.nfts,
                     mintedNfts: fullInfo.committed.mintedNfts
                 },
-                accountType: fullInfo.committed.accountType,
                 verified: {
                     balances: fullInfo.finalized.balances,
                     nonce: fullInfo.finalized.nonce,
