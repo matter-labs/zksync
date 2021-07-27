@@ -141,7 +141,7 @@ jobs:
     needs: loadtest
     if: always()
     container:
-      image: dysnix/kubectl:v1.16-gcloud
+      image: dysnix/kubectl:v1.19-gcloud
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
 
