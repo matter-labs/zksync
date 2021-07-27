@@ -273,6 +273,6 @@ impl TxCommand {
     }
 
     fn random_amount(rng: &mut LoadtestRng) -> BigUint {
-        rng.gen_range(0u64, 2u64.pow(18)).into()
+        rng.gen_range(0u64..2u64.pow(18)).into()
     }
 }
