@@ -14,11 +14,17 @@ interface Events {
     /// @notice Event emitted when a block is verified
     event BlockVerification(uint32 indexed blockNumber);
 
-    /// @notice Event emitted when user funds are withdrawn from the zkSync contract
+    /// @notice Event emitted when user funds are withdrawn from the zkSync state and contract
     event Withdrawal(uint16 indexed tokenId, uint128 amount);
 
-    /// @notice Event emitted when user NFT is withdrawn from the zkSync contract
+    /// @notice Event emitted when user funds are withdrawn from the zkSync state but not from contract
+    event WithdrawalPending(uint16 indexed tokenId, uint128 amount);
+
+    /// @notice Event emitted when user NFT is withdrawn from the zkSync state and contract
     event WithdrawalNFT(uint32 indexed tokenId);
+
+    /// @notice Event emitted when user NFT is withdrawn from the zkSync state but not from contract
+    event WithdrawalNFTPending(uint32 indexed tokenId);
 
     /// @notice Event emitted when user funds are deposited to the zkSync contract
     event Deposit(uint16 indexed tokenId, uint128 amount);
