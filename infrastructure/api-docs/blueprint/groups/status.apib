@@ -1,0 +1,13 @@
+# Group Network status
+
+## api/v0.2/networkStatus [/networkStatus]
+
+### Get network status [GET]
+Returns the status of the network
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (NetworkStatus, required{{isResultNullable}})
+        + error (Error, required, nullable)

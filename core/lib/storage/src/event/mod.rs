@@ -121,7 +121,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let block_details = transaction
             .chain()
             .block_schema()
-            .load_block_range(block_number, 1)
+            .load_block_range_desc(block_number, 1)
             .await?;
         // If there're no block details for the given block number,
         // ignore the event. Since the `eth_sender` is currently
@@ -130,12 +130,14 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let block_details = match block_details.into_iter().next() {
             Some(block_details) => block_details,
             None => {
-                vlog::warn!(
-                    "Couldn't create block event, no block details found in the database. \
-                    Block number: {}, status: {:?}",
-                    *block_number,
-                    status
-                );
+                // Logging is currently disabled.
+                //
+                // vlog::warn!(
+                //     "Couldn't create block event, no block details found in the database. \
+                //     Block number: {}, status: {:?}",
+                //     *block_number,
+                //     status
+                // );
                 return Ok(());
             }
         };
@@ -186,8 +188,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                     },
                 )
             })
-            .filter(|x| x.is_some())
-            .map(|x| x.unwrap())
+            .flatten()
             .collect();
 
         transaction
@@ -258,11 +259,13 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             {
                 Ok(account_id) => account_id,
                 _ => {
-                    vlog::warn!(
-                        "Couldn't create transaction event, no account id exists \
-                        in the database. Operation: {:?}",
-                        executed_operation
-                    );
+                    // Logging is currently disabled.
+                    //
+                    // vlog::warn!(
+                    //     "Couldn't create transaction event, no account id exists \
+                    //     in the database. Operation: {:?}",
+                    //     executed_operation
+                    // );
                     continue;
                 }
             };
@@ -315,11 +318,13 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             {
                 Ok(account_id) => account_id,
                 _ => {
-                    vlog::warn!(
-                        "Couldn't create transaction event, no account id exists \
-                        in the database. Operation: {:?}",
-                        executed_tx
-                    );
+                    // Logging is currently disabled.
+                    //
+                    // vlog::warn!(
+                    //     "Couldn't create transaction event, no account id exists \
+                    //     in the database. Operation: {:?}",
+                    //     rejected_tx
+                    // );
                     continue;
                 }
             };

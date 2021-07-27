@@ -12,6 +12,7 @@ use crate::api_server::{
     },
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
+use chrono::Duration;
 use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
@@ -379,7 +380,7 @@ impl ApiV01 {
 
         // If eth watcher has a priority op with given hash, transform it
         // to TxByHashResponse and assign it to res.
-        if let Some((eth_block, priority_op)) = unconfirmed_op {
+        if let Some(priority_op) = unconfirmed_op {
             let tokens = self_
                 .access_storage()
                 .await?
@@ -391,7 +392,7 @@ impl ApiV01 {
                     HttpResponse::InternalServerError().finish()
                 })?;
 
-            res = deposit_op_to_tx_by_hash(&tokens, &priority_op, eth_block);
+            res = deposit_op_to_tx_by_hash(&tokens, &priority_op);
         }
 
         metrics::histogram!("api.v01.tx_by_hash", start.elapsed());
@@ -441,7 +442,7 @@ impl ApiV01 {
         let resp = storage
             .chain()
             .block_schema()
-            .load_block_range(BlockNumber(max_block), limit)
+            .load_block_range_desc(BlockNumber(max_block), limit)
             .await
             .map_err(|err| {
                 vlog::warn!(
@@ -512,14 +513,29 @@ impl ApiV01 {
 
     pub async fn withdrawal_processing_time(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
+        let mut storage = self_.access_storage().await?;
+        let block_number = storage
+            .chain()
+            .block_schema()
+            .get_last_saved_block()
+            .await
+            .expect("Database error");
+        let block = storage
+            .chain()
+            .block_schema()
+            .get_block(block_number)
+            .await
+            .expect("Database error")
+            .expect("Should exist");
         let state_keeper_config = &self_.config.chain.state_keeper;
+        let average_proof_generating_time = Duration::minutes(30);
+        let normal = block.timestamp_utc()
+            + Duration::from_std(state_keeper_config.block_execute_deadline()).unwrap()
+            + average_proof_generating_time * 2i32;
+        let fast = block.timestamp_utc() + average_proof_generating_time * 2i32;
         let processing_time = WithdrawalProcessingTimeResponse {
-            normal: (state_keeper_config.miniblock_iteration_interval()
-                * state_keeper_config.miniblock_iterations as u32)
-                .as_secs(),
-            fast: (state_keeper_config.miniblock_iteration_interval()
-                * state_keeper_config.fast_block_miniblock_iterations as u32)
-                .as_secs(),
+            normal: normal.timestamp() as u64,
+            fast: fast.timestamp() as u64,
         };
 
         metrics::histogram!("api.v01.withdrawal_processing_time", start.elapsed());

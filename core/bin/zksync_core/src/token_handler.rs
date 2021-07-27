@@ -19,7 +19,7 @@ use zksync_notifier::Notifier;
 use zksync_storage::{tokens::StoreTokenError, ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{NewTokenEvent, Token, TokenInfo},
-    Address,
+    Address, TokenId,
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;
@@ -81,7 +81,7 @@ impl TokenHandler {
         let mut transaction = storage.start_transaction().await?;
         let mut token_schema = transaction.tokens_schema();
 
-        let last_token_id = token_schema.get_last_token_id().await?;
+        let last_token_id = TokenId(token_schema.get_count().await?);
         let mut new_tokens = Vec::new();
 
         for token_event in tokens {

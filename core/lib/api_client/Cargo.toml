@@ -10,9 +10,11 @@ keywords = ["blockchain", "zksync"]
 categories = ["cryptography"]
 
 [dependencies]
-zksync_types = { path = "../../lib/types", version = "1.0" }
-zksync_utils = { path = "../../lib/utils", version = "1.0" }
-zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_api_types = { path = "../api_types", version = "1.0" }
+zksync_types = { path = "../types", version = "1.0" }
+zksync_utils = { path = "../utils", version = "1.0" }
+zksync_crypto = { path = "../crypto", version = "1.0" }
+zksync_config = { path = "../config", version = "1.0" }
 
 serde = "1.0.90"
 serde_json = "1.0.0"

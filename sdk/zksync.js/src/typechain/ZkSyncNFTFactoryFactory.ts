@@ -2,9 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Signer } from "ethers";
-import { Provider, TransactionRequest } from "@ethersproject/providers";
-import { Contract, ContractFactory, Overrides } from "@ethersproject/contracts";
+import { Signer, Contract, ContractFactory, Overrides, providers } from "ethers";
+
+type TransactionRequest = providers.TransactionRequest;
+type Provider = providers.Provider;
 
 import type { ZkSyncNFTFactory } from "./ZkSyncNFTFactory";
 

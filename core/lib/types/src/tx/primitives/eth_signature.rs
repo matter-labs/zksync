@@ -1,5 +1,6 @@
 use crate::tx::{EIP1271Signature, PackedEthSignature};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 /// Representation of the signature secured by L1.
 /// May be either a signature generated via Ethereum private key
@@ -52,6 +53,17 @@ impl TxEthSignatureVariant {
         match self {
             Self::Single(_) => panic!("called orders_signatures() on a Single variant"),
             Self::Triple(_, order0, order1) => (order0, order1),
+        }
+    }
+}
+
+impl Display for TxEthSignature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EthereumSignature(sign) => {
+                write!(f, "0x{}", hex::encode(sign.serialize_packed()))
+            }
+            Self::EIP1271Signature(sign) => write!(f, "0x{}", hex::encode(sign.0.clone())),
         }
     }
 }

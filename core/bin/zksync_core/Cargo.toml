@@ -14,6 +14,7 @@ publish = false # We don't want to publish our binaries.
 zksync_state = { path = "../../lib/state", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_notifier = { path = "../../lib/notifier", version = "1.0" }
+zksync_api_types = { path = "../../lib/api_types", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }

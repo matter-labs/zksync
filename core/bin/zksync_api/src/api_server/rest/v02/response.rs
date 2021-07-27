@@ -1,54 +1,32 @@
-use actix_web::web::Data;
-use actix_web::{Error, HttpRequest, HttpResponse, Responder};
-use chrono::{DateTime, Utc};
+// Built-in uses
+use std::collections::HashMap;
+use std::convert::From;
+
+// External uses
+use actix_web::{web::Data, Error as ActixError, HttpRequest, HttpResponse, Responder};
+use chrono::Utc;
 use futures::future::{ready, Ready};
 use qstring::QString;
-use serde::Serialize;
-use serde_json::Value;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
-use zksync_types::network::Network;
+// Workspace uses
+use zksync_api_types::v02::{Request, Response, ResultStatus};
 
-use crate::api_server::rest::v02::error::UnreachableError;
-use crate::api_server::rest::v02::{error, ApiVersion, SharedData};
+// Local uses
+use super::{error::Error, SharedData};
 
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-enum ResultStatus {
-    Success,
-    Error,
-}
-
-#[derive(Serialize)]
-struct Request {
-    network: Network,
-    api_version: ApiVersion,
-    resource: String,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    args: HashMap<String, String>,
-    timestamp: DateTime<Utc>,
-}
-
-#[derive(Serialize)]
-struct Response {
-    request: Request,
-    status: ResultStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<error::Error>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    result: Option<Value>,
-}
-
-// TODO: remove #[allow(dead_code)] after adding endpoint that can return an error. (ZKS-572)
-#[allow(dead_code)]
-pub enum ApiResult<R: Serialize, E: error::ApiError = UnreachableError> {
+// This struct is needed to wrap all api responses is `Response` struct by implementing `Responder` trait for it.
+// We can't use simple `Result`, because `actix-web` has already `Responder` implementation for it.
+// Because of this we can't use '?' operator in implementations of endpoints.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum ApiResult<R: Serialize> {
     Ok(R),
-    Error(E),
+    Error(Error),
 }
 
-impl<R: Serialize, E: error::ApiError> Responder for ApiResult<R, E> {
-    type Error = Error;
-    type Future = Ready<Result<HttpResponse, Error>>;
+impl<R: Serialize> Responder for ApiResult<R> {
+    type Error = ActixError;
+    type Future = Ready<Result<HttpResponse, ActixError>>;
 
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
         let data = req
@@ -82,7 +60,7 @@ impl<R: Serialize, E: error::ApiError> Responder for ApiResult<R, E> {
                 request,
                 status: ResultStatus::Error,
                 result: None,
-                error: Some(err.into()),
+                error: Some(serde_json::to_value(err).unwrap()),
             },
         };
 
@@ -94,8 +72,29 @@ impl<R: Serialize, E: error::ApiError> Responder for ApiResult<R, E> {
     }
 }
 
-impl<R: Serialize> From<R> for ApiResult<R, UnreachableError> {
-    fn from(res: R) -> Self {
-        Self::Ok(res)
+impl<R: Serialize> From<Error> for ApiResult<R> {
+    fn from(err: Error) -> Self {
+        Self::Error(err)
     }
+}
+
+impl<R: Serialize> From<Result<R, Error>> for ApiResult<R> {
+    fn from(result: Result<R, Error>) -> Self {
+        match result {
+            Ok(ok) => Self::Ok(ok),
+            Err(err) => Self::Error(err),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! api_try {
+    ($e:expr) => {
+        match $e {
+            Ok(res) => res,
+            Err(err) => {
+                return ApiResult::from(err);
+            }
+        };
+    };
 }

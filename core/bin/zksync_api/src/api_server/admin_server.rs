@@ -99,18 +99,14 @@ async fn add_token(
     let id = match token_request.id {
         Some(id) => id,
         None => {
-            let last_token_id = storage
-                .tokens_schema()
-                .get_last_token_id()
-                .await
-                .map_err(|e| {
-                    vlog::warn!(
-                        "failed get number of token from database in progress request: {}",
-                        e
-                    );
-                    actix_web::error::ErrorInternalServerError("storage layer error")
-                })?;
-            let next_available_id = last_token_id.0 + 1;
+            let last_token_id = storage.tokens_schema().get_count().await.map_err(|e| {
+                vlog::warn!(
+                    "failed get number of token from database in progress request: {}",
+                    e
+                );
+                actix_web::error::ErrorInternalServerError("storage layer error")
+            })?;
+            let next_available_id = last_token_id + 1;
 
             TokenId(next_available_id)
         }

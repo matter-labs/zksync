@@ -1,0 +1,39 @@
+## ChangePubKeyType (enum)
+- Onchain
+- ECDSA
+- CREATE2
+
+## ChangePubKeyFee (object)
++ ChangePubKey (ChangePubKeyType, required)
+
+## LegacyChangePubKeyFeeType (object)
++ onchainPubkeyAuth (boolean, required)
+
+## LegacyChangePubKeyFee (object)
++ ChangePubKey (LegacyChangePubKeyFeeType, required)
+
+## Fee.Type (enum)
+- Transfer
+- Withdraw
+- FastWithdraw
+- ForcedExit
+- Swap
+- MintNFT
+- WithdrawNFT
+- FastWithdrawNFT
+- (ChangePubKeyFee)
+- (LegacyChangePubKeyFee)
+
+## Fee.Single (object)
++ gasFee: `12000000000` (string, required),
++ zkpFee: `12000000` (string, required),
++ totalFee: `12012000000` (string, required),
+
+## Fee.Batch (object)
++ gasFee: `12000000000` (string, required),
++ zkpFee: `12000000` (string, required),
++ totalFee: `12012000000` (string, required),
+
+## Fee.Type.with.Address (object)
++ txType (Fee.Type, required)
++ address: `0xF659D25A06607Da53e62DAA5842499316A4e2548` (string, required)

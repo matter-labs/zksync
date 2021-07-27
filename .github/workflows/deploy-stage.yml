@@ -42,7 +42,7 @@ jobs:
         echo $(pwd)/bin >> $GITHUB_PATH
     - name: init
       run: |
-        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
+        cargo sqlx --version || cargo install sqlx-cli
         zk
         zk run yarn
         cp etc/tokens/{test,localhost}.json
@@ -53,11 +53,9 @@ jobs:
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zk docker push rust
 
-
+  ##  !!! TODO: fix stage and enable deployments back.
+  ##  !!! TODO: breaking deployment is not supported.
   # deploy:
-  #   ## TODO: fix stage and enable deployments back.
-  #   ## NOTE: breaking deployment is not supported.
-
   #   name: Deploy to the Stage enviroment
   #   runs-on: [k8s, deployer, stage]
   #   needs: [pre, build-images]

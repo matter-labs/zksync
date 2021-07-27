@@ -141,7 +141,7 @@ mod tests {
             .await
             .expect("Check failed");
 
-        assert_eq!(result, true, "Signature is incorrect");
+        assert!(result, "Signature is incorrect");
     }
 
     /// This test checks that the actual signature data taken from

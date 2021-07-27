@@ -3,7 +3,11 @@ use std::time::Instant;
 // External imports
 use chrono::{Duration, Utc};
 // Workspace imports
-use zksync_types::{tx::TxHash, BlockNumber};
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    tx::TxHash,
+    BlockNumber, H256,
+};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, StoredAggregatedOperation,
@@ -13,8 +17,6 @@ use crate::chain::operations::records::StoredExecutedTransaction;
 use crate::chain::operations_ext::OperationsExtSchema;
 use crate::ethereum::EthereumSchema;
 use crate::{chain::mempool::MempoolSchema, QueryResult, StorageProcessor};
-use zksync_basic_types::H256;
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 
 pub mod records;
 
@@ -116,8 +118,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(op)
     }
 
-    /// Retrieves priority operation from the database given its hash.
-    pub async fn get_executed_priority_operation_by_hash(
+    /// Retrieves priority operation from the database by its eth_hash.
+    pub async fn get_executed_priority_operation_by_eth_hash(
         &mut self,
         eth_hash: &[u8],
     ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
@@ -131,7 +133,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!(
-            "sql.chain.operations.get_executed_priority_operation_by_hash",
+            "sql.chain.operations.get_executed_priority_operation_by_eth_hash",
             start.elapsed()
         );
         Ok(op)
@@ -265,9 +267,11 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         operation: NewExecutedPriorityOperation,
     ) -> QueryResult<()> {
         let start = Instant::now();
+
         sqlx::query!(
-            "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account,
+                priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, eth_block_index, tx_hash)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (priority_op_serialid)
             DO NOTHING",
             operation.block_number,
@@ -280,6 +284,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             operation.eth_hash,
             operation.eth_block,
             operation.created_at,
+            operation.eth_block_index,
+            operation.tx_hash,
         )
         .execute(self.0.conn())
         .await?;

@@ -5,10 +5,11 @@ use crate::{
         helpers::*,
         v01::{caches::Caches, network_status::SharedNetworkStatus},
     },
-    core_api_client::{CoreApiClient, EthBlockId},
+    core_api_client::CoreApiClient,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
+use zksync_api_types::PriorityOpLookupQuery;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::{
@@ -201,7 +202,7 @@ impl ApiV01 {
         if let Ok(block_details) = transaction
             .chain()
             .block_schema()
-            .load_block_range(block_id, 1)
+            .load_block_range_desc(block_id, 1)
             .await
         {
             // Unverified blocks can still change, so we can't cache them.
@@ -228,7 +229,7 @@ impl ApiV01 {
         let mut blocks = storage
             .chain()
             .block_schema()
-            .load_block_range(block_id, 1)
+            .load_block_range_desc(block_id, 1)
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
@@ -274,7 +275,9 @@ impl ApiV01 {
     pub(crate) async fn get_unconfirmed_op_by_hash(
         &self,
         eth_tx_hash: H256,
-    ) -> Result<Option<(EthBlockId, PriorityOp)>, anyhow::Error> {
-        self.api_client.get_unconfirmed_op(eth_tx_hash).await
+    ) -> Result<Option<PriorityOp>, anyhow::Error> {
+        self.api_client
+            .get_unconfirmed_op(PriorityOpLookupQuery::ByEthHash(eth_tx_hash))
+            .await
     }
 }

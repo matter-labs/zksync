@@ -12,8 +12,7 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 use num::BigUint;
 
 // Local uses
-use crate::rest::v1::Client;
-use crate::rest::v1::ClientResult;
+use crate::rest::client::{Client, Result as ClientResult};
 
 // Data transfer objects.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
