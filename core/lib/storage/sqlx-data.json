@@ -1275,56 +1275,6 @@
       ]
     }
   },
-  "29d2ac9094d660ffa445ed8787f303e35deefc41b403b23557f6a0850cdbf4c6": {
-    "query": "\n                    SELECT * FROM nft\n                    WHERE creator_account_id = $1\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 3,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "2e92926816053cda2de6d571867a625fab5bb9668840db94bd18c411f96dc39b": {
     "query": "SELECT * FROM blocks WHERE number = $1",
     "describe": {
@@ -1395,6 +1345,62 @@
         false,
         false,
         true,
+        false
+      ]
+    }
+  },
+  "2fbf34144638328f53e4e96f0f044edc6af2724a2b5e846d2346b78d0cc7634e": {
+    "query": "\n                SELECT nft.*, tokens.symbol FROM nft\n                INNER JOIN tokens\n                ON tokens.id = nft.token_id\n                WHERE token_id = $1\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
         false
       ]
     }
@@ -2771,56 +2777,6 @@
       "nullable": []
     }
   },
-  "72e7f8ffef6a594e659f5d0eb02e7463612d2ff4c2b6d4db120b94ebde1c314b": {
-    "query": "\n                SELECT * FROM nft\n                WHERE token_id = $1\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 3,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "73eedd4444ef5bfbfd526c319f97d75609a65517d63e88add0a864a9f7141a02": {
     "query": "\n            INSERT INTO block_metadata (block_number, fast_processing)\n            VALUES ($1, $2)\n            ",
     "describe": {
@@ -2897,6 +2853,62 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "77a35660d36e4b67dafa930ea4cce469b73e3f6d14a67aeda89233c7aa82206a": {
+    "query": "\n                    SELECT nft.*, tokens.symbol FROM nft\n                    INNER JOIN tokens\n                    ON tokens.id = nft.token_id\n                    WHERE creator_account_id = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "790d46519ceaa7fbd152f1edf29b85c97ab491488b7302d8df3f57e5fc3eff55": {
@@ -4331,8 +4343,8 @@
       "nullable": []
     }
   },
-  "ad3353e54de7447ea420b981e09af0f44894a6cad621640c7f8aac08f441ede2": {
-    "query": "SELECT * FROM nft",
+  "aca411b7ebc9a4028b4c86b71d8cd9f205f464bf19fb23fceb81210357379160": {
+    "query": "\n            SELECT nft.*, tokens.symbol FROM nft\n            INNER JOIN tokens\n            ON tokens.id = nft.token_id\n            ",
     "describe": {
       "columns": [
         {
@@ -4364,12 +4376,18 @@
           "ordinal": 5,
           "name": "content_hash",
           "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "symbol",
+          "type_info": "Text"
         }
       ],
       "parameters": {
         "Left": []
       },
       "nullable": [
+        false,
         false,
         false,
         false,

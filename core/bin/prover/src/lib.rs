@@ -232,5 +232,8 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
             first_block,
             last_block
         );
+        if prover_options.prover.die_after_proof {
+            return;
+        }
     }
 }

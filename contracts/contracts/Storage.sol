@@ -138,7 +138,7 @@ contract Storage {
     mapping(uint32 => bytes32) public storedBlockHashes;
 
     /// @dev Total blocks proven.
-    uint32 internal totalBlocksProven;
+    uint32 public totalBlocksProven;
 
     /// @notice Priority Operation container
     /// @member hashedPubData Hashed priority operation public data
@@ -176,4 +176,9 @@ contract Storage {
     /// @dev Will store zeroes in case of not active upgrade mode
     mapping(uint256 => bool) internal securityCouncilApproves;
     uint256 internal numberOfApprovalsFromSecurityCouncil;
+
+    /// @notice Checks that current state not is exodus mode
+    function requireActive() internal view {
+        require(!exodusMode, "L"); // exodus mode activated
+    }
 }

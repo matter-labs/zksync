@@ -30,7 +30,7 @@ pub mod rejected_tx_cleaner;
 pub mod state_keeper;
 pub mod token_handler;
 
-/// Waits for *any* of the tokio tasks to be finished.
+/// Waits for any of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
 /// as application runs, any possible outcome (either `Ok` or `Err`) is considered
 /// as a reason to stop the server completely.
