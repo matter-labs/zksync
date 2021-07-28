@@ -3,6 +3,30 @@
 version = 3
 
 [[package]]
+name = "actix"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3720d0064a0ce5c0de7bd93bdb0a6caebab2a9b5668746145d7b3b0c5da02914"
+dependencies = [
+ "actix-rt",
+ "actix_derive",
+ "bitflags",
+ "bytes 1.0.1",
+ "crossbeam-channel 0.5.1",
+ "futures-core",
+ "futures-sink",
+ "futures-task",
+ "futures-util",
+ "log 0.4.14",
+ "once_cell",
+ "parking_lot 0.11.1",
+ "pin-project-lite",
+ "smallvec 1.6.1",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "actix-codec"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -256,6 +280,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-web-actors"
+version = "4.0.0-beta.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7db5c2c78a2606e6634abee4973a4924221cfab66e48f23844256e4fb8ce0f42"
+dependencies = [
+ "actix",
+ "actix-codec",
+ "actix-http",
+ "actix-web",
+ "bytes 1.0.1",
+ "bytestring",
+ "futures-core",
+ "pin-project",
+ "tokio",
+]
+
+[[package]]
 name = "actix-web-codegen"
 version = "0.5.0-beta.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -276,6 +317,17 @@ dependencies = [
  "actix-web",
  "base64 0.13.0",
  "futures-util",
+]
+
+[[package]]
+name = "actix_derive"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d44b8fee1ced9671ba043476deddef739dd0959bf77030b26b738cc591737a7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -5862,6 +5914,23 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "zksync_types",
+]
+
+[[package]]
+name = "zksync_event_listener"
+version = "1.0.0"
+dependencies = [
+ "actix",
+ "actix-web",
+ "actix-web-actors",
+ "anyhow",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "vlog",
+ "zksync_config",
+ "zksync_storage",
  "zksync_types",
 ]
 
