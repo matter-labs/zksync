@@ -8,7 +8,6 @@ on:
 env:
   ZKSYNC_ENV: loadtest
   HF_ARGS: -e loadtest
-  HF_CMDARGS: --args "timeout 180s"
 
 jobs:
   sqlproxy:
@@ -105,17 +104,16 @@ jobs:
         run: .github/scripts/write-kubeconf.sh
       -
         name: Update contracts in the ConfigMap
-        run: |
-          cat deployed_contracts.log
-          .github/scripts/zksync-env.sh --update-from deployed_contracts.log
+        run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
       -
         name: Deploy apps
         working-directory: helm-infra
         run: |
           UPDATE_REPOS=y helmfile $HF_ARGS repos
-          # deploy and wait for server to settle
-          IMAGE_TAG=b2f056a helmfile $HF_ARGS $HF_DEPLOYS apply $HF_CMDARGS \
-            && sleep 60
+          # Split apply into diff+sync (required for extra sync args), what for server to settle
+          IMAGE_TAG=b2f056a helmfile $HF_ARGS $HF_DEPLOYS diff
+          IMAGE_TAG=b2f056a helmfile $HF_ARGS $HF_DEPLOYS sync --args "--timeout 180s" && \
+            sleep 60
 
   loadtest:
     name: Perform loadtest
