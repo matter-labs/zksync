@@ -1,0 +1,95 @@
+name: Update Config
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment where to update the config'
+        required: true
+      ref:
+        description: 'Branch or tag to fetch configs from'
+        required: true
+
+defaults:
+  run:
+    shell: bash -leo pipefail {0}
+
+jobs:
+  pre:
+    runs-on: [k8s, stage]
+    steps:
+      - uses: actions/checkout@v2
+      -
+        id: config
+        run: |
+          environment=${{ github.event.inputs.environment }}
+          ref=${{ github.event.inputs.ref }}
+          echo "::set-output name=environment::${environment}"
+          echo "::set-output name=ref::${ref}"
+      -
+        uses: actions-ecosystem/action-regex-match@v2
+        id: regex-match
+        with:
+          text: ${{ steps.config.outputs.ref }}
+          regex: '^((v[0-9]+\.[0-9]+\.[0-9])(-?.*)?)$'
+      -
+        name: Map runtime environment data
+        id: envMap
+        uses: kanga333/variable-mapper@v0.2.2
+        with:
+          key: ${{ steps.config.outputs.environment }}
+          export_to: output
+          mode: overwrite
+          map: |
+            {
+              ".*": {
+                "hfEnv": "${{ steps.config.outputs.environment }}",
+                "kubeConf": "KUBECONF_STAGE",
+                "runner": "stage",
+                "namespace": "${{ steps.config.outputs.environment }}"
+              },
+              "^rinkeby$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
+              "^ropsten$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
+              "^mainnet$": { "kubeConf": "KUBECONF_MAINNET", "runner": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
+            }
+
+    outputs:
+      environment: ${{ steps.config.outputs.environment }}
+      kubeConf: ${{ steps.envMap.outputs.kubeConf }}
+      hfEnv: ${{ steps.envMap.outputs.hfEnv }}
+      namespace: ${{ steps.envMap.outputs.namespace }}
+      runner: ${{ steps.envMap.outputs.runner }}
+      configTag: ${{ steps.config.outputs.ref }}
+      isTag: ${{ steps.regex-match.outputs.group1 != '' }}
+
+  updateConfig:
+    if: ${{ needs.pre.outputs.isTag == 'true' }}
+    name: update config
+    needs: [pre]
+    runs-on: [k8s, deployer, "${{ needs.pre.outputs.runner }}"]
+    container:
+      image: dysnix/kubectl:v1.19-gcloud
+    env:
+      KUBECONF: ${{ secrets[needs.pre.outputs.kubeConf] }}
+      ENVFILE: ./compiled_envs/${{ needs.pre.outputs.environment }}.env
+    steps:
+      -
+        name: Create ~/.kube/config
+        run: mkdir -p ~/.kube && echo "$KUBECONF" | base64 -d > ~/.kube/config
+      -
+        name: Clone configs
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/configs
+          path: configs
+          ref: ${{ needs.pre.outputs.configTag }}
+          token: ${{ secrets.GH_TOKEN }}
+      -
+        name: Update Server Config
+        working-directory: configs
+        run: |
+          sudo apk --no-cache add yarn
+          ./bin/config
+          ./bin/config compile ${{ needs.pre.outputs.environment }}
+          kubectl delete configmap -n ${{ needs.pre.outputs.namespace }} server-env-custom || /bin/true
+          kubectl create configmap -n ${{ needs.pre.outputs.namespace }} server-env-custom --from-env-file=${{ env.ENVFILE }}
+          # kubectl delete pod -n ${{ needs.pre.outputs.namespace }} -l app.kubernetes.io/instance=server

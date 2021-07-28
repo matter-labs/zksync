@@ -204,13 +204,20 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Loads all finalized NFTs.
     pub async fn load_nfts(&mut self) -> QueryResult<HashMap<TokenId, NFT>> {
         let start = Instant::now();
+
         // For some reason new versions of sqlx have troubles with some macros
-        let nfts: HashMap<TokenId, NFT> = sqlx::query_as("SELECT * FROM nft")
-            .fetch_all(self.0.conn())
-            .await?
-            .into_iter()
-            .map(|nft: StorageNFT| (TokenId(nft.token_id as u32), nft.into()))
-            .collect();
+        let nfts: HashMap<TokenId, NFT> = sqlx::query_as(
+            r#"
+            SELECT nft.*, tokens.symbol FROM nft
+            INNER JOIN tokens
+            ON tokens.id = nft.token_id
+            "#,
+        )
+        .fetch_all(self.0.conn())
+        .await?
+        .into_iter()
+        .map(|nft: StorageNFT| (TokenId(nft.token_id as u32), nft.into()))
+        .collect();
 
         metrics::histogram!("sql.token.load_nfts", start.elapsed());
         Ok(nfts)
@@ -305,7 +312,9 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let db_token = sqlx::query_as!(
             StorageNFT,
             r#"
-                SELECT * FROM nft
+                SELECT nft.*, tokens.symbol FROM nft
+                INNER JOIN tokens
+                ON tokens.id = nft.token_id
                 WHERE token_id = $1
                 LIMIT 1
             "#,
