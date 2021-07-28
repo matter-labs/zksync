@@ -51,8 +51,11 @@ where
         }
     }
 
-    fn send_once(&self, _sink: &Sink<RESP>, _val: RESP) {
-        //tokio::spawn(sink.notify(Ok(val)).compat().map(drop));
+    fn send_once(&self, sink: &Sink<RESP>, val: RESP) {
+        match sink.notify(Ok(val)) {
+            Err(e) => vlog::warn!("{}", e.to_string()),
+            _ => (),
+        }
     }
 
     pub fn generate_sub_id(&mut self, action_id: ID, action_type: ActionType) -> SubscriptionId {
