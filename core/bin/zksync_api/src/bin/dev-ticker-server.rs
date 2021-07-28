@@ -171,7 +171,7 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
         .collect();
     if sloppy_mode {
         web::scope("/")
-            .app_data(data)
+            .app_data(web::Data::new(data))
             .route(
                 "/cryptocurrency/quotes/latest",
                 web::get().to(make_sloppy!(handle_coinmarketcap_token_price_query)),
@@ -186,7 +186,7 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
             )
     } else {
         web::scope("/")
-            .app_data(data)
+            .app_data(web::Data::new(data))
             .route(
                 "/cryptocurrency/quotes/latest",
                 web::get().to(handle_coinmarketcap_token_price_query),

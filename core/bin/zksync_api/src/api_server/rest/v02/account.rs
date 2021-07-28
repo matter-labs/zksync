@@ -392,7 +392,7 @@ pub fn api_scope(
     let data = ApiAccountData::new(pool, tokens, core_api_client);
 
     web::scope("accounts")
-        .app_data(data)
+        .app_data(web::Data::new(data))
         .route(
             "{account_id_or_address}/committed",
             web::get().to(account_committed_info),
@@ -470,7 +470,7 @@ mod tests {
         let server = actix_test::start(move || {
             App::new().service(
                 web::scope("unconfirmed_ops")
-                    .app_data(ops_handle.clone())
+                    .app_data(web::Data::new(ops_handle.clone()))
                     .route("", web::get().to(get_ops)),
             )
         });

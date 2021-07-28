@@ -180,7 +180,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
     web::scope("transactions")
-        .app_data(data)
+        .app_data(web::Data::new(data))
         .route("", web::post().to(submit_tx))
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))

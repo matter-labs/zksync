@@ -446,9 +446,12 @@ mod tests {
             let new_url = format!("127.0.0.1:{}", i);
             // Try to bind to some port, hope that 999 variants will be enough
             let tmp_state = state.clone();
-            if let Ok(ser) =
-                HttpServer::new(move || App::new().app_data(tmp_state.clone()).service(index))
-                    .bind(new_url.clone())
+            if let Ok(ser) = HttpServer::new(move || {
+                App::new()
+                    .app_data(web::Data::new(tmp_state.clone()))
+                    .service(index)
+            })
+            .bind(new_url.clone())
             {
                 server = Some(ser);
                 url = Some(new_url);

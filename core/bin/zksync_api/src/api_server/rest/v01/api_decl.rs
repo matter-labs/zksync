@@ -56,7 +56,7 @@ impl ApiV01 {
     /// Creates an actix-web `Scope`, which can be mounted to the Http server.
     pub fn into_scope(self) -> actix_web::Scope {
         web::scope("/api/v0.1")
-            .app_data(self)
+            .app_data(web::Data::new(self))
             .route("/testnet_config", web::get().to(Self::testnet_config))
             .route("/status", web::get().to(Self::status))
             .route("/tokens", web::get().to(Self::tokens))

@@ -97,7 +97,7 @@ impl TestServerConfig {
             let app = App::new();
             let shared_data = shared_data.clone();
             let app = if let Some(shared_data) = shared_data {
-                app.app_data(shared_data)
+                app.app_data(web::Data::new(shared_data))
             } else {
                 app
             };

@@ -228,7 +228,7 @@ pub fn api_scope(
 
     // `enabled` endpoint should always be there
     let scope = web::scope("v0.1")
-        .app_data(data)
+        .app_data(web::Data::new(data))
         .route("status", web::get().to(get_status));
 
     if config.forced_exit_requests.enabled {

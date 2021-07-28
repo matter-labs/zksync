@@ -137,7 +137,7 @@ fn main() {
     runtime.block_on(async {
         HttpServer::new(move || {
             App::new()
-                .app_data(storage.clone())
+                .app_data(web::Data::new(storage.clone()))
                 .wrap(middleware::Logger::default())
                 // .wrap(Cors::default().send_wildcard().max_age(3600))
                 .route("/graphql", web::post().to(handle_graphql))

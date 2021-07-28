@@ -179,7 +179,7 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
     let data = ApiBlockData::new(pool, cache);
 
     web::scope("blocks")
-        .app_data(data)
+        .app_data(web::Data::new(data))
         .route("", web::get().to(block_pagination))
         .route("{block_position}", web::get().to(block_by_position))
         .route(
