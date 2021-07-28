@@ -4343,60 +4343,6 @@
       "nullable": []
     }
   },
-  "aca411b7ebc9a4028b4c86b71d8cd9f205f464bf19fb23fceb81210357379160": {
-    "query": "\n            SELECT nft.*, tokens.symbol FROM nft\n            INNER JOIN tokens\n            ON tokens.id = nft.token_id\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "creator_account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "creator_address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 3,
-          "name": "serial_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "content_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 6,
-          "name": "symbol",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {
     "query": "INSERT INTO block_witness (block, witness)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING",
     "describe": {
