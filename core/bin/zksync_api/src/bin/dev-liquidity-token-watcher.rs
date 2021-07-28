@@ -8,6 +8,7 @@ use std::{
     path::Path,
 };
 
+use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, Result};
 use bigdecimal::BigDecimal;
 use regex::Regex;
@@ -138,8 +139,8 @@ fn main() {
         HttpServer::new(move || {
             App::new()
                 .app_data(web::Data::new(storage.clone()))
+                .wrap(Cors::default().send_wildcard().max_age(3600))
                 .wrap(middleware::Logger::default())
-                // .wrap(Cors::default().send_wildcard().max_age(3600))
                 .route("/graphql", web::post().to(handle_graphql))
         })
         .bind("0.0.0.0:9975")

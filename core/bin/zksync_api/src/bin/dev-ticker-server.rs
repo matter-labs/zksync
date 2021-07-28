@@ -3,6 +3,7 @@
 //! Implements coinmarketcap API for tokens deployed using `deploy-dev-erc20`
 //! Prices are randomly distributed around base values estimated from real world prices.
 
+use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use bigdecimal::BigDecimal;
 use chrono::{SecondsFormat, Utc};
@@ -229,8 +230,8 @@ fn main() {
     runtime.block_on(async move {
         HttpServer::new(move || {
             App::new()
+                .wrap(Cors::default().allow_any_origin().max_age(3600))
                 .wrap(middleware::Logger::default())
-                // .wrap(Cors::default().allow_any_origin().max_age(3600))
                 .service(main_scope(opts.sloppy))
         })
         .bind("0.0.0.0:9876")
