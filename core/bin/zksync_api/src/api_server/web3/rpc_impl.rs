@@ -386,7 +386,7 @@ impl Web3RpcApp {
         Ok(logs)
     }
 
-    async fn append_logs(
+    pub(crate) async fn append_logs(
         &self,
         storage: &mut StorageProcessor<'_>,
         receipt: Web3TxReceipt,
@@ -460,7 +460,7 @@ impl Web3RpcApp {
         })
     }
 
-    async fn block_by_number(
+    pub(crate) async fn block_by_number(
         storage: &mut StorageProcessor<'_>,
         block_number: zksync_types::BlockNumber,
         include_txs: bool,

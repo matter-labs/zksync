@@ -394,6 +394,7 @@ impl TestServerConfig {
                         *account_id,
                         account,
                         block_number.0 * accounts.len() as u32 + id as u32,
+                        &mut rng,
                     ));
                 });
             apply_updates(&mut accounts, updates.clone());
@@ -620,7 +621,9 @@ impl TestServerConfig {
                 eth_block: 10,
                 created_at: chrono::Utc::now(),
                 eth_block_index: Some(1),
-                tx_hash: Default::default(),
+                tx_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
             },
             // Committed priority operation.
             NewExecutedPriorityOperation {
@@ -641,7 +644,9 @@ impl TestServerConfig {
                 eth_block: 14,
                 created_at: chrono::Utc::now(),
                 eth_block_index: Some(1),
-                tx_hash: Default::default(),
+                tx_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
             },
         ];
 

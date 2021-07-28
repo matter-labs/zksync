@@ -14,6 +14,8 @@ mod converter;
 mod logs;
 mod rpc_impl;
 mod rpc_trait;
+#[cfg(test)]
+mod tests;
 mod types;
 
 #[derive(Clone)]

@@ -107,7 +107,7 @@ impl From<Web3TxData> for TxData {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum BlockInfo {
     BlockWithHashes(Block<H256>),

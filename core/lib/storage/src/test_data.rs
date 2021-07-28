@@ -8,7 +8,7 @@ use num::{BigUint, Zero};
 use once_cell::sync::Lazy;
 use parity_crypto::publickey::{Generator, Random};
 // Workspace imports
-use zksync_crypto::params::MIN_NFT_TOKEN_ID;
+use zksync_crypto::params::{max_account_id, MIN_NFT_TOKEN_ID};
 use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
 use zksync_crypto::{ff::PrimeField, rand::Rng, Fr};
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
@@ -45,7 +45,7 @@ pub const BLOCK_SIZE_CHUNKS: usize = 100;
 pub fn gen_acc_random_updates<R: Rng>(
     rng: &mut R,
 ) -> impl Iterator<Item = (AccountId, AccountUpdate)> {
-    let id: AccountId = AccountId(rng.gen());
+    let id: AccountId = AccountId(rng.gen::<u32>() % max_account_id().0);
     let balance = u128::from(rng.gen::<u64>());
     let nonce = Nonce(rng.gen());
     let pub_key_hash = PubKeyHash { data: rng.gen() };
@@ -90,19 +90,20 @@ pub fn gen_acc_random_updates<R: Rng>(
 }
 
 /// Generates one nft.
-pub fn generate_nft(
+pub fn generate_nft<R: Rng>(
     account_id: AccountId,
     account: &Account,
     number: u32,
+    rng: &mut R,
 ) -> Vec<(AccountId, AccountUpdate)> {
     let nft = NFT::new(
         TokenId(MIN_NFT_TOKEN_ID + number),
         number,
         account_id,
         account.address,
-        Address::random(),
+        Address::from(rng.gen::<[u8; 20]>()),
         None,
-        H256::random(),
+        H256::from(rng.gen::<[u8; 32]>()),
     );
     vec![
         (account_id, AccountUpdate::MintNFT { token: nft }),
