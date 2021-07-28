@@ -204,10 +204,9 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Loads all finalized NFTs.
     pub async fn load_nfts(&mut self) -> QueryResult<HashMap<TokenId, NFT>> {
         let start = Instant::now();
-        let nfts: Vec<NFT> = sqlx::query_as!(StorageNFT, "SELECT * FROM nft")
+        let nfts = sqlx::query_as!(StorageNFT, "SELECT * FROM nft")
             .fetch_all(self.0.conn())
-            .await?;
-        let nfts = nfts
+            .await?
             .into_iter()
             .map(|nft| (TokenId(nft.token_id as u32), nft.into()))
             .collect();

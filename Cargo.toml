@@ -12,7 +12,7 @@ members = [
     "core/bin/zksync_api",
     "core/bin/zksync_core",
     "core/bin/zksync_eth_sender",
-#    "core/bin/zksync_event_listener",
+    # "core/bin/zksync_event_listener",
     "core/bin/zksync_witness_generator",
     "core/bin/zksync_forced_exit_requests",
 
@@ -40,8 +40,8 @@ members = [
     # Test infrastructure
     "core/tests/test_account",
     "core/tests/testkit",
-#    "core/tests/loadtest",
-#    "core/tests/loadnext",
+    # "core/tests/loadtest",
+    "core/tests/loadnext",
 
     # SDK section
     "sdk/zksync-rs"
