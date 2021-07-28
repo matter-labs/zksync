@@ -52,9 +52,8 @@ where
     }
 
     fn send_once(&self, sink: &Sink<RESP>, val: RESP) {
-        match sink.notify(Ok(val)) {
-            Err(e) => vlog::warn!("{}", e.to_string()),
-            _ => (),
+        if let Err(e) = sink.notify(Ok(val)) {
+            vlog::warn!("{}", e.to_string())
         }
     }
 
