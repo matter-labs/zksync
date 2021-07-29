@@ -143,26 +143,24 @@ impl Web3RpcApp {
         let parent_hash = if block_number.0 == 0 {
             H256::zero()
         } else {
-            // It was already checked that the block is in storage, so the parent block has to be there too.
             let parent_block = storage
                 .chain()
                 .block_schema()
                 .get_storage_block(block_number - 1)
                 .await
                 .map_err(|_| Error::internal_error())?
-                .expect("Can't find parent block in storage");
+                .ok_or_else(Error::internal_error)?;
             H256::from_slice(&parent_block.root_hash)
         };
 
         if include_txs {
-            // It was already checked that the block is in storage.
             let block = storage
                 .chain()
                 .block_schema()
                 .get_block(block_number)
                 .await
                 .map_err(|_| Error::internal_error())?
-                .expect("Can't find block in storage");
+                .ok_or_else(Error::internal_error)?;
             let hash = H256::from_slice(&block.new_root_hash.to_bytes());
             let transactions = block
                 .block_transactions
@@ -200,14 +198,13 @@ impl Web3RpcApp {
                 transactions,
             ))
         } else {
-            // It was already checked that the block is in storage.
             let block = storage
                 .chain()
                 .block_schema()
                 .get_storage_block(block_number)
                 .await
                 .map_err(|_| Error::internal_error())?
-                .expect("Can't find block in storage");
+                .ok_or_else(Error::internal_error)?;
             let hash = H256::from_slice(&block.root_hash);
             let transactions = storage
                 .chain()
