@@ -325,19 +325,17 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
-        let (client, server) = cfg
-            .start_server(
-                move |cfg| {
-                    api_scope(
-                        &cfg.config,
-                        cfg.pool.clone(),
-                        TokenDBCache::new(),
-                        fee_ticker.clone(),
-                    )
-                },
-                Some(shared_data),
-            )
-            .await;
+        let (client, server) = cfg.start_server(
+            move |cfg| {
+                api_scope(
+                    &cfg.config,
+                    cfg.pool.clone(),
+                    TokenDBCache::new(),
+                    fee_ticker.clone(),
+                )
+            },
+            Some(shared_data),
+        );
 
         let token_like = TokenLike::Id(TokenId(1));
         let response = client.token_by_id(&token_like).await?;

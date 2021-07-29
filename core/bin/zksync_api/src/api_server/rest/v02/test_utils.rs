@@ -110,7 +110,7 @@ impl TestServerConfig {
         (client, server)
     }
 
-    pub async fn start_server<F, D>(
+    pub fn start_server<F, D>(
         &self,
         scope_factory: F,
         shared_data: Option<D>,
@@ -120,7 +120,6 @@ impl TestServerConfig {
         D: Clone + Send + 'static,
     {
         self.start_server_with_scope(String::from("/api/v0.2"), scope_factory, shared_data)
-            .await
     }
 
     /// Creates several transactions and the corresponding executed operations.

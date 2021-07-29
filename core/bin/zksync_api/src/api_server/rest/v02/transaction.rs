@@ -258,20 +258,18 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
-        let (client, server) = cfg
-            .start_server(
-                move |cfg: &TestServerConfig| {
-                    api_scope(TxSender::with_client(
-                        core_client.clone(),
-                        cfg.pool.clone(),
-                        dummy_sign_verifier(),
-                        dummy_fee_ticker(&[]),
-                        &cfg.config,
-                    ))
-                },
-                Some(shared_data),
-            )
-            .await;
+        let (client, server) = cfg.start_server(
+            move |cfg: &TestServerConfig| {
+                api_scope(TxSender::with_client(
+                    core_client.clone(),
+                    cfg.pool.clone(),
+                    dummy_sign_verifier(),
+                    dummy_fee_ticker(&[]),
+                    &cfg.config,
+                ))
+            },
+            Some(shared_data),
+        );
 
         let tx = TestServerConfig::gen_zk_txs(100_u64).txs[0].0.clone();
         let response = client
