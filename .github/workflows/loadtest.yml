@@ -117,7 +117,7 @@ jobs:
 
   loadtest:
     name: Perform loadtest
-    runs-on: [self-hosted, CI-worker]
+    runs-on: [self-hosted, MAIN]
     needs: deploy
     container: rust:1.53
     env:
