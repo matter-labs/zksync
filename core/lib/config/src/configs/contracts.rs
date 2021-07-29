@@ -9,6 +9,7 @@ use crate::envy_load;
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ContractsConfig {
     pub upgrade_gatekeeper_addr: Address,
+    pub additional_zksync_addr: Address,
     pub governance_target_addr: Address,
     pub verifier_target_addr: Address,
     pub contract_target_addr: Address,
@@ -36,6 +37,7 @@ mod tests {
     fn expected_config() -> ContractsConfig {
         ContractsConfig {
             upgrade_gatekeeper_addr: addr("5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"),
+            additional_zksync_addr: addr("5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"),
             governance_target_addr: addr("5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"),
             verifier_target_addr: addr("5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"),
             contract_target_addr: addr("5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"),
@@ -58,6 +60,7 @@ mod tests {
 CONTRACTS_UPGRADE_GATEKEEPER_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
 CONTRACTS_GOVERNANCE_TARGET_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
 CONTRACTS_VERIFIER_TARGET_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
+CONTRACTS_ADDITIONAL_ZKSYNC_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
 CONTRACTS_CONTRACT_TARGET_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
 CONTRACTS_CONTRACT_ADDR="0x70a0F165d6f8054d0d0CF8dFd4DD2005f0AF6B55"
 CONTRACTS_GOVERNANCE_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
