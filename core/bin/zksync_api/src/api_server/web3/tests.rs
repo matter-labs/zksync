@@ -17,7 +17,7 @@ use zksync_types::{
 // Local uses
 use super::{
     converter::transaction_from_tx_data,
-    types::{BlockInfo, Event, Transaction, H160, H256, U256, U64},
+    types::{BlockInfo, Event, Log, Transaction, TransactionReceipt, H160, H256, U256, U64},
     Web3RpcApp,
 };
 use crate::api_server::rest::v02::test_utils::TestServerConfig;
@@ -713,6 +713,177 @@ async fn create_logs() -> anyhow::Result<()> {
             );
             assert_eq!(log.data.0, hex::decode(data).unwrap());
         }
+    }
+
+    Ok(())
+}
+
+/// Tests `eth_getTransactionReceipt` method
+#[tokio::test(threaded_scheduler)]
+#[cfg_attr(
+    not(feature = "api_test"),
+    ignore = "Use `zk test rust-api` command to perform this test"
+)]
+async fn get_transaction_receipt() -> anyhow::Result<()> {
+    let pool = ConnectionPool::new(Some(1));
+    // Checks that `eth_getTransactionReceipt` returns `null` for non-existent transaction hash.
+    let fut = {
+        let (client, server) = local_client().await?;
+        client
+            .call_method(
+                "eth_getTransactionReceipt",
+                Params::Array(vec![Value::String(
+                    "0xdeadbeef00000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
+                )]),
+            )
+            .join(server)
+    };
+    let (receipt, _) = fut.wait().unwrap();
+    assert!(receipt.is_null());
+
+    // Checks that `eth_getTransactionReceipt` returns correct receipt for existent transaction.
+    let tx_hash = {
+        let mut storage = pool.access_storage().await?;
+        storage
+            .chain()
+            .block_schema()
+            .get_block_transactions_hashes(BlockNumber(1))
+            .await?
+            .remove(0)
+    };
+    let tx_hash_str = format!("0x{}", hex::encode(&tx_hash));
+    let fut = {
+        let (client, server) = local_client().await?;
+        client
+            .call_method(
+                "eth_getTransactionReceipt",
+                Params::Array(vec![Value::String(tx_hash_str)]),
+            )
+            .join(server)
+    };
+    let (receipt, _) = fut.wait().unwrap();
+    let expected = {
+        let mut storage = pool.access_storage().await?;
+        let receipt = storage
+            .chain()
+            .operations_ext_schema()
+            .web3_receipt_by_hash(&tx_hash)
+            .await?
+            .unwrap();
+        let rpc_app = Web3RpcApp::new(pool.clone(), 9);
+        rpc_app.tx_receipt(&mut storage, receipt).await?
+    };
+    assert_eq!(
+        serde_json::from_value::<TransactionReceipt>(receipt).unwrap(),
+        expected
+    );
+
+    Ok(())
+}
+
+/// Tests `eth_getLogs` method
+#[tokio::test(threaded_scheduler)]
+#[cfg_attr(
+    not(feature = "api_test"),
+    ignore = "Use `zk test rust-api` command to perform this test"
+)]
+async fn get_logs() -> anyhow::Result<()> {
+    let pool = ConnectionPool::new(Some(1));
+    let rpc_app = Web3RpcApp::new(pool.clone(), 9);
+    // Checks that block filter works correctly.
+    let fut = {
+        let (client, server) = local_client().await?;
+        client
+            .call_method(
+                "eth_getLogs",
+                Params::Array(vec![
+                    Value::String("0x1".to_string()),
+                    Value::String("0x1".to_string()),
+                ]),
+            )
+            .join(server)
+    };
+    let (logs, _) = fut.wait().unwrap();
+    let logs = serde_json::from_value::<Vec<Log>>(logs).unwrap();
+    assert_eq!(logs.len(), 8);
+    for log in logs {
+        assert_eq!(log.block_number.unwrap().as_u64(), 1);
+    }
+
+    // Checks that address filter works correctly
+    let mut addresses = Vec::new();
+    {
+        let mut storage = pool.access_storage().await?;
+        let token = storage
+            .tokens_schema()
+            .get_token(TokenId(0).into())
+            .await?
+            .unwrap();
+        addresses.push(token.address);
+    }
+    addresses.push(rpc_app.logs_helper.zksync_proxy_address);
+
+    let fut = {
+        let (client, server) = local_client().await?;
+        client
+            .call_method(
+                "eth_getLogs",
+                Params::Array(vec![
+                    Value::String("0x1".to_string()),
+                    Value::String("0x8".to_string()),
+                    serde_json::to_value(addresses.clone()).unwrap(),
+                ]),
+            )
+            .join(server)
+    };
+    let (logs, _) = fut.wait().unwrap();
+    let logs = serde_json::from_value::<Vec<Log>>(logs).unwrap();
+    assert_eq!(logs.len(), 36);
+    for log in logs {
+        assert!(addresses.contains(&log.address));
+    }
+
+    // Checks that topic filter works correctly
+    let mut topics = Vec::new();
+    topics.push(
+        rpc_app
+            .logs_helper
+            .topic_by_event(Event::ERCTransfer)
+            .unwrap(),
+    );
+    topics.push(
+        rpc_app
+            .logs_helper
+            .topic_by_event(Event::ZkSyncChangePubKey)
+            .unwrap(),
+    );
+    topics.push(
+        rpc_app
+            .logs_helper
+            .topic_by_event(Event::ZkSyncDeposit)
+            .unwrap(),
+    );
+
+    let fut = {
+        let (client, server) = local_client().await?;
+        client
+            .call_method(
+                "eth_getLogs",
+                Params::Array(vec![
+                    Value::String("0x1".to_string()),
+                    Value::String("0x8".to_string()),
+                    Value::Null,
+                    Value::Array(vec![serde_json::to_value(topics.clone()).unwrap()]),
+                ]),
+            )
+            .join(server)
+    };
+    let (logs, _) = fut.wait().unwrap();
+    let logs = serde_json::from_value::<Vec<Log>>(logs).unwrap();
+    assert_eq!(logs.len(), 19);
+    for log in logs {
+        assert!(topics.contains(&log.topics[0]));
     }
 
     Ok(())

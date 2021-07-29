@@ -435,7 +435,7 @@ impl Web3RpcApp {
         Ok(())
     }
 
-    async fn tx_receipt(
+    pub(crate) async fn tx_receipt(
         &self,
         storage: &mut StorageProcessor<'_>,
         receipt: Web3TxReceipt,

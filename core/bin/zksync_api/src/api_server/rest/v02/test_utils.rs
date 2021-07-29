@@ -608,7 +608,7 @@ impl TestServerConfig {
                 block_number: 2,
                 block_index: 2,
                 operation: serde_json::to_value(
-                    dummy_deposit_op(Address::default(), AccountId(1), VERIFIED_OP_SERIAL_ID, 2).op,
+                    dummy_deposit_op(Address::default(), AccountId(3), VERIFIED_OP_SERIAL_ID, 2).op,
                 )
                 .unwrap(),
                 from_account: Default::default(),
@@ -630,7 +630,7 @@ impl TestServerConfig {
                 block_number: EXECUTED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
                 operation: serde_json::to_value(
-                    dummy_full_exit_op(AccountId(1), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
+                    dummy_full_exit_op(AccountId(3), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
                         .op,
                 )
                 .unwrap(),
