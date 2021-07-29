@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 // External uses
+use ethabi::{encode, Token as AbiToken};
 use jsonrpc_core::Error;
 use num::BigUint;
 use tiny_keccak::keccak256;
@@ -487,38 +488,23 @@ impl LogsHelper {
         ))
     }
 
-    fn append_bytes(value: &[u8]) -> Vec<u8> {
-        let mut value = value.to_vec();
-        let mut result = Vec::new();
-        result.resize(32 - value.len(), 0);
-        result.append(&mut value);
-        result
-    }
-
-    fn u256_to_bytes(value: U256) -> Vec<u8> {
-        let mut bytes = Vec::new();
-        bytes.resize(32, 0);
-        value.to_big_endian(&mut bytes);
-        bytes
-    }
-
     fn erc_transfer_data(from: H160, to: H160, amount_or_id: U256) -> Bytes {
-        let mut bytes = Vec::new();
-
-        bytes.append(&mut Self::append_bytes(from.as_bytes()));
-        bytes.append(&mut Self::append_bytes(to.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(amount_or_id)));
+        let bytes = encode(&[
+            AbiToken::Address(from),
+            AbiToken::Address(to),
+            AbiToken::Uint(amount_or_id),
+        ]);
         bytes.into()
     }
 
     fn zksync_transfer_data(from: H160, to: H160, token: H160, amount: U256, fee: U256) -> Bytes {
-        let mut bytes = Vec::new();
-
-        bytes.append(&mut Self::append_bytes(from.as_bytes()));
-        bytes.append(&mut Self::append_bytes(to.as_bytes()));
-        bytes.append(&mut Self::append_bytes(token.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(amount)));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(fee)));
+        let bytes = encode(&[
+            AbiToken::Address(from),
+            AbiToken::Address(to),
+            AbiToken::Address(token),
+            AbiToken::Uint(amount),
+            AbiToken::Uint(fee),
+        ]);
         bytes.into()
     }
 
@@ -527,12 +513,12 @@ impl LogsHelper {
     }
 
     fn zksync_forced_exit_data(initiator: H160, target: H160, token: H160, fee: U256) -> Bytes {
-        let mut bytes = Vec::new();
-
-        bytes.append(&mut Self::append_bytes(initiator.as_bytes()));
-        bytes.append(&mut Self::append_bytes(target.as_bytes()));
-        bytes.append(&mut Self::append_bytes(token.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(fee)));
+        let bytes = encode(&[
+            AbiToken::Address(initiator),
+            AbiToken::Address(target),
+            AbiToken::Address(token),
+            AbiToken::Uint(fee),
+        ]);
         bytes.into()
     }
 
@@ -542,12 +528,12 @@ impl LogsHelper {
         token: H160,
         fee: U256,
     ) -> Bytes {
-        let mut bytes = Vec::new();
-
-        bytes.append(&mut Self::append_bytes(account.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&new_pub_key_hash));
-        bytes.append(&mut Self::append_bytes(token.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(fee)));
+        let bytes = encode(&[
+            AbiToken::Address(account),
+            AbiToken::Address(H160::from(new_pub_key_hash)),
+            AbiToken::Address(token),
+            AbiToken::Uint(fee),
+        ]);
         bytes.into()
     }
 
@@ -559,14 +545,14 @@ impl LogsHelper {
         fee: U256,
         fee_token: H160,
     ) -> Bytes {
-        let mut bytes = Vec::new();
-
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(creator_id)));
-        bytes.append(&mut Self::append_bytes(creator_address.as_bytes()));
-        bytes.append(&mut Self::append_bytes(content_hash.as_bytes()));
-        bytes.append(&mut Self::append_bytes(recipient.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(fee)));
-        bytes.append(&mut Self::append_bytes(fee_token.as_bytes()));
+        let bytes = encode(&[
+            AbiToken::Uint(creator_id),
+            AbiToken::Address(creator_address),
+            AbiToken::FixedBytes(content_hash.as_bytes().to_vec()),
+            AbiToken::Address(recipient),
+            AbiToken::Uint(fee),
+            AbiToken::Address(fee_token),
+        ]);
         bytes.into()
     }
 
@@ -581,16 +567,17 @@ impl LogsHelper {
         serial_id: U256,
         content_hash: H256,
     ) -> Bytes {
-        let mut bytes = Vec::new();
-        bytes.append(&mut Self::append_bytes(from.as_bytes()));
-        bytes.append(&mut Self::append_bytes(to.as_bytes()));
-        bytes.append(&mut Self::append_bytes(token.as_bytes()));
-        bytes.append(&mut Self::append_bytes(fee_token.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(fee)));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(creator_id)));
-        bytes.append(&mut Self::append_bytes(creator_address.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(serial_id)));
-        bytes.append(&mut Self::append_bytes(content_hash.as_bytes()));
+        let bytes = encode(&[
+            AbiToken::Address(from),
+            AbiToken::Address(to),
+            AbiToken::Address(token),
+            AbiToken::Address(fee_token),
+            AbiToken::Uint(fee),
+            AbiToken::Uint(creator_id),
+            AbiToken::Address(creator_address),
+            AbiToken::Uint(serial_id),
+            AbiToken::FixedBytes(content_hash.as_bytes().to_vec()),
+        ]);
         bytes.into()
     }
 
@@ -608,35 +595,38 @@ impl LogsHelper {
         amount1: U256,
         amount2: U256,
     ) -> Bytes {
-        let mut bytes = Vec::new();
-        bytes.append(&mut Self::append_bytes(initiator.as_bytes()));
-        bytes.append(&mut Self::append_bytes(account1.as_bytes()));
-        bytes.append(&mut Self::append_bytes(account2.as_bytes()));
-        bytes.append(&mut Self::append_bytes(recipient1.as_bytes()));
-        bytes.append(&mut Self::append_bytes(recipient2.as_bytes()));
-        bytes.append(&mut Self::append_bytes(fee_token.as_bytes()));
-        bytes.append(&mut Self::append_bytes(token1.as_bytes()));
-        bytes.append(&mut Self::append_bytes(token2.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(fee)));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(amount1)));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(amount2)));
+        let bytes = encode(&[
+            AbiToken::Address(initiator),
+            AbiToken::Address(account1),
+            AbiToken::Address(account2),
+            AbiToken::Address(recipient1),
+            AbiToken::Address(recipient2),
+            AbiToken::Address(fee_token),
+            AbiToken::Address(token1),
+            AbiToken::Address(token2),
+            AbiToken::Uint(fee),
+            AbiToken::Uint(amount1),
+            AbiToken::Uint(amount2),
+        ]);
         bytes.into()
     }
 
     fn zksync_deposit_data(to: H160, from: H160, token: H160, amount: U256) -> Bytes {
-        let mut bytes = Vec::new();
-        bytes.append(&mut Self::append_bytes(to.as_bytes()));
-        bytes.append(&mut Self::append_bytes(from.as_bytes()));
-        bytes.append(&mut Self::append_bytes(token.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(amount)));
+        let bytes = encode(&[
+            AbiToken::Address(to),
+            AbiToken::Address(from),
+            AbiToken::Address(token),
+            AbiToken::Uint(amount),
+        ]);
         bytes.into()
     }
 
     fn zksync_full_exit_data(account: H160, token: H160, amount: U256) -> Bytes {
-        let mut bytes = Vec::new();
-        bytes.append(&mut Self::append_bytes(account.as_bytes()));
-        bytes.append(&mut Self::append_bytes(token.as_bytes()));
-        bytes.append(&mut Self::append_bytes(&Self::u256_to_bytes(amount)));
+        let bytes = encode(&[
+            AbiToken::Address(account),
+            AbiToken::Address(token),
+            AbiToken::Uint(amount),
+        ]);
         bytes.into()
     }
 }
