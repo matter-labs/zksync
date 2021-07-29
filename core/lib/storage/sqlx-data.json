@@ -4343,6 +4343,60 @@
       "nullable": []
     }
   },
+  "ae418808fd5a6b6662198ed63934415a46dfada56cbd72a869e81946b1ad2ea4": {
+    "query": "\n            SELECT\n                id as \"id!\", action_type as \"action_type!\",\n                arguments as \"arguments!\", from_block as \"from_block!\",\n                to_block as \"to_block!\", created_at as \"created_at!\",\n                confirmed as \"confirmed!\"\n            FROM aggregate_operations\n            WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "confirmed!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {
     "query": "INSERT INTO block_witness (block, witness)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING",
     "describe": {
@@ -4924,6 +4978,60 @@
       },
       "nullable": [
         false
+      ]
+    }
+  },
+  "c3632674ee6614b83e258c75447dc986507481a56fbdd5e05dedd0775f21fb79": {
+    "query": "\n            SELECT\n                token_id as \"token_id!\", creator_account_id as \"creator_account_id!\",\n                creator_address as \"creator_address!\", serial_id as \"serial_id!\",\n                nft.address as \"address!\", content_hash as \"content_hash!\",\n                tokens.symbol as \"symbol!\"\n            FROM nft\n            INNER JOIN tokens\n            ON tokens.id = nft.token_id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "creator_account_id!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_address!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "serial_id!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "address!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "content_hash!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "symbol!",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
       ]
     }
   },

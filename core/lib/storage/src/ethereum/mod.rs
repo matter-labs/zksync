@@ -158,10 +158,15 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     ) -> QueryResult<Vec<(i64, AggregatedOperation)>> {
         let start = Instant::now();
 
-        // Unfortunately for some reason the new version of the sqlx can not resolve the type with macro
-        let raw_ops: Vec<StoredAggregatedOperation> = sqlx::query_as(
+        let raw_ops = sqlx::query_as!(
+            StoredAggregatedOperation,
             r#"
-            SELECT * FROM aggregate_operations
+            SELECT
+                id as "id!", action_type as "action_type!",
+                arguments as "arguments!", from_block as "from_block!",
+                to_block as "to_block!", created_at as "created_at!",
+                confirmed as "confirmed!"
+            FROM aggregate_operations
             WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)
             ORDER BY id ASC
             "#,
