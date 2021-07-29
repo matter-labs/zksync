@@ -12,6 +12,9 @@ zksync_config = { path = "../../core/lib/config", version = "1.0" }
 zksync_crypto = { path = "../../core/lib/crypto", version = "1.0" }
 zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
 
+franklin_crypto = { package = "franklin-crypto", path = "../../../franklin-crypto", version = "0.0.5" }
+bellman = { package = "bellman_ce", path = "../../../bellman", version = "0.3.2" }
+
 sha2 = "0.8"
 web3 = "0.13.0"
 ethabi = "12.0.0"

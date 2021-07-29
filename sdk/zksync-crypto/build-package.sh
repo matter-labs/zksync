@@ -28,7 +28,7 @@ mv ./pkg ./dist
 
 # optimise
 echo "*** Optimising WASM output"
-./../../binaryen/bin/wasm-opt $WSM -Os -o $OPT -O
+./../binaryen/bin/wasm-opt $WSM -Os -o $OPT -O
 
 # convert wasm to base64 structure
 echo "*** Packing WASM into base64"
@@ -36,7 +36,7 @@ node ./pack-wasm-base64.js
 
 # build asmjs version from the input (optimised) WASM
 echo "*** Building asm.js version"
-./../../binaryen/bin/wasm2js -Oz --output $ASM $OPT
+./../binaryen/bin/wasm2js -Oz --output $ASM $OPT
 
 # cleanup the generated asm, converting to cjs
 sed -i -e '/import {/d' $ASM

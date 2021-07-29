@@ -46,3 +46,7 @@ go_to_env.sh
 # Env
 .env
 .npmrc
+
+
+# binaryen
+/sdk/binaryen
