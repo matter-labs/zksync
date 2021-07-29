@@ -111,8 +111,8 @@ jobs:
         run: |
           UPDATE_REPOS=y helmfile $HF_ARGS repos
           # Split apply into diff+sync (required for extra sync args), what for server to settle
-          IMAGE_TAG=b2f056a helmfile $HF_ARGS $HF_DEPLOYS diff
-          IMAGE_TAG=b2f056a helmfile $HF_ARGS $HF_DEPLOYS sync --args "--timeout 180s" && \
+          IMAGE_TAG=868da34 helmfile $HF_ARGS $HF_DEPLOYS diff
+          IMAGE_TAG=868da34 helmfile $HF_ARGS $HF_DEPLOYS sync --args "--timeout 180s" && \
             sleep 60
 
   loadtest:
