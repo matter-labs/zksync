@@ -12,7 +12,7 @@ use zksync_utils::parse_env;
 
 pub mod holder;
 
-pub type Pool = deadpool::managed::Pool<DbPool>;
+type Pool = deadpool::managed::Pool<DbPool>;
 
 pub type PooledConnection = deadpool::managed::Object<DbPool>;
 

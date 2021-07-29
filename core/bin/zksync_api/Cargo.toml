@@ -53,7 +53,6 @@ actix-rt = "2.2.0"
 actix-cors = "0.6.0-beta.2"
 actix-web = "4.0.0-beta.8"
 actix-web-httpauth = "0.6.0-beta.2"
-actix-test = "0.1.0-beta.3"
 
 num = { version = "0.3.1", features = ["serde"] }
 bigdecimal = { version = "0.2.0", features = ["serde"]}
@@ -74,6 +73,7 @@ regex = "1"
 [dev-dependencies]
 zksync_test_account = { path = "../../tests/test_account" }
 criterion = {version =  "0.3.4", features = ["async_tokio", "async_futures"]}
+actix-test = "0.1.0-beta.3"
 
 [[bench]]
 name = "api_service"

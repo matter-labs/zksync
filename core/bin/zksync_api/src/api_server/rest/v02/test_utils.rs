@@ -81,7 +81,7 @@ pub struct TestTransactions {
 }
 
 impl TestServerConfig {
-    pub async fn start_server_with_scope<F, D>(
+    pub fn start_server_with_scope<F, D>(
         &self,
         scope: String,
         scope_factory: F,
