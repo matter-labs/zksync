@@ -5,8 +5,8 @@ use jsonrpc_derive::rpc;
 // Local uses
 use super::{
     types::{
-        BlockInfo, BlockNumber, Log, Transaction, TransactionReceipt, ValueOrArray, H160, H256,
-        U256, U64,
+        BlockInfo, BlockNumber, Filter, Log, Transaction, TransactionReceipt, ValueOrArray, H160,
+        H256, U256, U64,
     },
     Web3RpcApp,
 };
@@ -94,13 +94,7 @@ pub trait Web3Rpc {
     fn get_transaction_receipt(&self, hash: H256) -> FutureResp<Option<TransactionReceipt>>;
 
     #[rpc(name = "eth_getLogs", returns = "Vec<Log>")]
-    fn get_logs(
-        &self,
-        from_block: Option<BlockNumber>,
-        to_block: Option<BlockNumber>,
-        address: Option<ValueOrArray<H160>>,
-        topics: Option<Vec<Option<ValueOrArray<H256>>>>,
-    ) -> FutureResp<Vec<Log>>;
+    fn get_logs(&self, filter: Filter) -> FutureResp<Vec<Log>>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -179,13 +173,7 @@ impl Web3Rpc for Web3RpcApp {
         spawn! { self._impl_get_transaction_receipt(hash) }
     }
 
-    fn get_logs(
-        &self,
-        from_block: Option<BlockNumber>,
-        to_block: Option<BlockNumber>,
-        address: Option<ValueOrArray<H160>>,
-        topics: Option<Vec<Option<ValueOrArray<H256>>>>,
-    ) -> FutureResp<Vec<Log>> {
-        spawn! { self._impl_get_logs(from_block, to_block, address, topics) }
+    fn get_logs(&self, filter: Filter) -> FutureResp<Vec<Log>> {
+        spawn! { self._impl_get_logs(filter) }
     }
 }

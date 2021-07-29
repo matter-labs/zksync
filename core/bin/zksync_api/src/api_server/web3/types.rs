@@ -238,6 +238,15 @@ where
     }
 }
 
+#[derive(Default, Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Filter {
+    pub from_block: Option<BlockNumber>,
+    pub to_block: Option<BlockNumber>,
+    pub address: Option<ValueOrArray<H160>>,
+    pub topics: Option<Vec<Option<ValueOrArray<H256>>>>,
+}
+
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum Event {
     ZkSyncTransfer,

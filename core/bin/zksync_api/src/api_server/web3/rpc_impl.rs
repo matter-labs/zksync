@@ -12,8 +12,8 @@ use zksync_types::{ExecutedOperations, ZkSyncOp};
 use super::{
     converter::{resolve_block_number, transaction_from_tx_data, u256_from_biguint},
     types::{
-        BlockInfo, BlockNumber, CommonLogData, Event, Log, Transaction, TransactionReceipt, TxData,
-        ValueOrArray, H160, H2048, H256, U256, U64,
+        BlockInfo, BlockNumber, CommonLogData, Event, Filter, Log, Transaction, TransactionReceipt,
+        TxData, ValueOrArray, H160, H2048, H256, U256, U64,
     },
     Web3RpcApp,
 };
@@ -222,13 +222,7 @@ impl Web3RpcApp {
         Ok(result)
     }
 
-    pub async fn _impl_get_logs(
-        self,
-        from_block: Option<BlockNumber>,
-        to_block: Option<BlockNumber>,
-        address: Option<ValueOrArray<H160>>,
-        topics: Option<Vec<Option<ValueOrArray<H256>>>>,
-    ) -> Result<Vec<Log>> {
+    pub async fn _impl_get_logs(self, filter: Filter) -> Result<Vec<Log>> {
         let start = Instant::now();
 
         let mut storage = self.access_storage().await?;
@@ -237,8 +231,8 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
 
-        let from_block = resolve_block_number(&mut transaction, from_block).await?;
-        let to_block = resolve_block_number(&mut transaction, to_block).await?;
+        let from_block = resolve_block_number(&mut transaction, filter.from_block).await?;
+        let to_block = resolve_block_number(&mut transaction, filter.to_block).await?;
 
         let (from_block, to_block) = match (from_block, to_block) {
             (Some(from_block), Some(to_block)) => (from_block, to_block),
@@ -249,7 +243,7 @@ impl Web3RpcApp {
             }
         };
 
-        let topics = if let Some(mut topics) = topics {
+        let topics = if let Some(mut topics) = filter.topics {
             // If there is non-null topic at the non-first position then return empty vec,
             // since all our logs contain exactly one topic.
             let has_not_first = topics
@@ -264,7 +258,7 @@ impl Web3RpcApp {
         } else {
             Vec::new()
         };
-        let addresses = address.map(|a| a.0).unwrap_or_default();
+        let addresses = filter.address.map(|a| a.0).unwrap_or_default();
         let mut logs = Vec::new();
         match (addresses.is_empty(), topics.is_empty()) {
             (false, false) => {
