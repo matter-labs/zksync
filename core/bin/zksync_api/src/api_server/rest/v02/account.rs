@@ -500,14 +500,12 @@ mod tests {
                 net: cfg.config.chain.eth.network,
                 api_version: ApiVersion::V02,
             };
-            let (api_client, api_server) = cfg
-                .start_server(
-                    move |cfg: &TestServerConfig| {
-                        api_scope(cfg.pool.clone(), TokenDBCache::new(), core_client.clone())
-                    },
-                    Some(shared_data),
-                )
-                .await;
+            let (api_client, api_server) = cfg.start_server(
+                move |cfg: &TestServerConfig| {
+                    api_scope(cfg.pool.clone(), TokenDBCache::new(), core_client.clone())
+                },
+                Some(shared_data),
+            );
 
             Ok((
                 api_client,

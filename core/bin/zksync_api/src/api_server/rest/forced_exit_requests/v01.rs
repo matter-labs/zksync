@@ -272,19 +272,17 @@ mod tests {
         async fn from_config(cfg: TestServerConfig) -> anyhow::Result<(Client, Self)> {
             let pool = cfg.pool.clone();
 
-            let (api_client, api_server) = cfg
-                .start_server_with_scope(
-                    String::from("api/forced_exit_requests"),
-                    move |cfg| {
-                        api_scope(
-                            cfg.pool.clone(),
-                            &cfg.config,
-                            Box::new(DummyForcedExitChecker {}),
-                        )
-                    },
-                    Option::<SharedData>::None,
-                )
-                .await;
+            let (api_client, api_server) = cfg.start_server_with_scope(
+                String::from("api/forced_exit_requests"),
+                move |cfg| {
+                    api_scope(
+                        cfg.pool.clone(),
+                        &cfg.config,
+                        Box::new(DummyForcedExitChecker {}),
+                    )
+                },
+                Option::<SharedData>::None,
+            );
 
             Ok((api_client, Self { api_server, pool }))
         }
