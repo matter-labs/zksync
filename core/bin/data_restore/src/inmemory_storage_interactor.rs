@@ -159,6 +159,19 @@ impl StorageInteractor for InMemoryStorageInteractor {
     ) {
         // Inmemory storage doesn't support caching.
     }
+
+    async fn get_max_priority_op_serial_id(&mut self) -> i64 {
+        let mut priority_op_count = 0;
+        for rollup in self.rollups.iter() {
+            for op in rollup.ops.iter() {
+                if op.is_priority_op() {
+                    priority_op_count += 1;
+                }
+            }
+        }
+
+        priority_op_count
+    }
 }
 
 impl InMemoryStorageInteractor {
