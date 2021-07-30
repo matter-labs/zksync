@@ -126,22 +126,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function initialize(bytes calldata initializationParameters) external {
         initializeReentrancyGuard();
 
-        (
-            Governance _governanceAddress,
-            Verifier _verifierAddress,
-            AdditionalZkSync _additionalZkSync,
-            bytes32 _genesisStateHash
-        ) = abi.decode(initializationParameters, (Governance, Verifier, AdditionalZkSync, bytes32));
+        (address _governanceAddress, address _verifierAddress, address _additionalZkSync, bytes32 _genesisStateHash) =
+            abi.decode(initializationParameters, (address, address, address, bytes32));
 
-        verifier = _verifierAddress;
-        governance = _governanceAddress;
-        additionalZkSync = _additionalZkSync;
+        verifier = Verifier(_verifierAddress);
+        governance = Governance(_governanceAddress);
+        additionalZkSync = AdditionalZkSync(_additionalZkSync);
 
         StoredBlockInfo memory storedBlockZero =
             StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, 0, _genesisStateHash, bytes32(0));
-
         storedBlockHashes[0] = hashStoredBlockInfo(storedBlockZero);
-
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
     }
@@ -422,6 +416,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             emit WithdrawalNFT(op.tokenId);
         } catch {
             pendingWithdrawnNFTs[op.tokenId] = op;
+            emit WithdrawalNFTPending(op.tokenId);
         }
     }
 
@@ -453,6 +448,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             emit Withdrawal(_tokenId, _amount);
         } else {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
+            emit WithdrawalPending(_tokenId, _amount);
         }
     }
 
@@ -541,6 +537,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Blocks commitment verification.
     /// @notice Only verifies block commitments without any other processing
     function proveBlocks(StoredBlockInfo[] memory _committedBlocks, ProofInput memory _proof) external nonReentrant {
+        requireActive();
+
         uint32 currentTotalBlocksProven = totalBlocksProven;
         for (uint256 i = 0; i < _committedBlocks.length; ++i) {
             require(hashStoredBlockInfo(_committedBlocks[i]) == storedBlockHashes[currentTotalBlocksProven + 1], "o1");
@@ -759,13 +757,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             return verifyChangePubkeyCREATE2(_ethWitness, _changePk);
         } else if (changePkType == Operations.ChangePubkeyType.OldECRECOVER) {
             return verifyChangePubkeyOldECRECOVER(_ethWitness, _changePk);
+        } else if (changePkType == Operations.ChangePubkeyType.ECRECOVERV2) {
+            return verifyChangePubkeyECRECOVERV2(_ethWitness, _changePk);
         } else {
             revert("G"); // Incorrect ChangePubKey type
         }
     }
 
     /// @notice Checks that signature is valid for pubkey change message
-    /// @param _ethWitness Signature (65 bytes) + 32 bytes of the arbitrary signed data
+    /// @param _ethWitness Signature (65 bytes)
     /// @param _changePk Parsed change pubkey operation
     function verifyChangePubkeyECRECOVER(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk)
         internal
@@ -773,7 +773,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         returns (bool)
     {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
-        //        (, bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
         bytes32 messageHash =
             keccak256(
                 abi.encodePacked(
@@ -782,6 +781,31 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     _changePk.nonce,
                     _changePk.accountId,
                     bytes32(0)
+                )
+            );
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
+        return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
+    }
+
+    /// @notice Checks that signature is valid for pubkey change message
+    /// @param _ethWitness Signature (65 bytes) + 32 bytes of the arbitrary signed data
+    /// @notice additional 32 bytes can be used to sign batches and ChangePubKey with one signature
+    /// @param _changePk Parsed change pubkey operation
+    function verifyChangePubkeyECRECOVERV2(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk)
+        internal
+        pure
+        returns (bool)
+    {
+        (uint256 offset, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
+        (, bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
+        bytes32 messageHash =
+            keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n60",
+                    _changePk.pubKeyHash,
+                    _changePk.nonce,
+                    _changePk.accountId,
+                    additionalData
                 )
             );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
@@ -903,11 +927,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(Operations.checkFullExitInPriorityQueue(_fullExit, hashedPubdata), "K");
     }
 
-    /// @notice Checks that current state not is exodus mode
-    function requireActive() internal view {
-        require(!exodusMode, "L"); // exodus mode activated
-    }
-
     // Priority queue
 
     /// @notice Saves priority request in storage
@@ -951,7 +970,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Should be only use to delegate the external calls as it passes the calldata
     /// @notice All functions delegated to additional contract should NOT be nonReentrant
     function delegateAdditional() internal {
-        AdditionalZkSync _target = additionalZkSync;
+        address _target = address(additionalZkSync);
         assembly {
             // The pointer to the free memory slot
             let ptr := mload(0x40)

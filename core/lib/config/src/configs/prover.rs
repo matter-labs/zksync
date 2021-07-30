@@ -32,6 +32,8 @@ pub struct Prover {
     pub cycle_wait: u64,
     /// Timeout for the requests to the prover server in seconds.
     pub request_timeout: u64,
+    /// Flag for dying after proving cycle
+    pub die_after_proof: bool,
 }
 
 impl Prover {
@@ -93,6 +95,7 @@ mod tests {
                 heartbeat_interval: 1000,
                 cycle_wait: 500,
                 request_timeout: 10,
+                die_after_proof: false,
             },
             core: Core {
                 gone_timeout: 60000,
@@ -111,6 +114,7 @@ mod tests {
 PROVER_PROVER_HEARTBEAT_INTERVAL="1000"
 PROVER_PROVER_CYCLE_WAIT="500"
 PROVER_PROVER_REQUEST_TIMEOUT="10"
+PROVER_PROVER_DIE_AFTER_PROOF=false
 PROVER_CORE_GONE_TIMEOUT="60000"
 PROVER_CORE_IDLE_PROVERS="1"
 PROVER_WITNESS_GENERATOR_PREPARE_DATA_INTERVAL="500"
