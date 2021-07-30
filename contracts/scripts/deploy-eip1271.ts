@@ -2,7 +2,8 @@
 // Owner account address is taken from the `$ZKSYNC_HOME/etc/test_config/eip1271.json`.
 // Deployed contract address is updated in the same file.
 
-import { ethers } from 'ethers';
+import { Wallet } from 'ethers';
+
 import { readContractCode } from '../src.ts/deploy';
 import { deployContract } from 'ethereum-waffle';
 import * as fs from 'fs';
@@ -23,9 +24,12 @@ async function main() {
         const provider = web3Provider();
         provider.pollingInterval = 10;
 
-        const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(
-            provider
-        );
+        const deployWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'), provider);
+
+        // const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(
+        //provider
+        // );
+
         const smartWallet = await deployContract(
             deployWallet,
             readContractCode('dev-contracts/AccountMock'),

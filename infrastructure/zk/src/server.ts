@@ -48,11 +48,12 @@ async function prepareForcedExitRequestAccount() {
     console.log('Depositing to the forced exit sender account');
     const forcedExitAccount = process.env.FORCED_EXIT_REQUESTS_SENDER_ACCOUNT_ADDRESS as string;
 
-    // This is the private key of the first test account
+    // This is the private key of the first test account ()
     const ethProvider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
     const ethRichWallet = new ethers.Wallet(
-        '0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110'
-    ).connect(ethProvider);
+        '0x20e4a6381bd3826a14f8da63653d94e7102b38eb5f929c7a94652f41fa7ba323',
+        ethProvider
+    );
 
     const gasPrice = await ethProvider.getGasPrice();
 

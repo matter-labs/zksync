@@ -43,4 +43,4 @@ block_prove_deadline=1
 block_execute_deadline=1
 # Max gas that can be used to execute aggregated operation
 # for now (should be > 4kk which is max gas for one block commit/verify/execute)
-max_aggregated_tx_gas=5000000
+max_aggregated_tx_gas=6000000

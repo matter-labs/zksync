@@ -31,7 +31,7 @@ RUN apt-get install -y axel postgresql
 # Setup the environment
 ENV ZKSYNC_HOME=/usr/src/zksync
 ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
-ENV CI=1
+ENV CI=0
 RUN cargo install sccache
 ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
 ENV SCCACHE_DIR=/usr/src/cache/sccache

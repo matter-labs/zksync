@@ -6,8 +6,8 @@ eth_fee = 10000000
 
 # Information about Ethereum account.
 [main_wallet]
-address = '0x36615cf349d7f6344891b1e7ca7c72883f5dc049'
-private_key = '0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110'
+address = '0xc354d97642faa06781b76ffb6786f72cd7746c97'
+private_key = '0x20e4a6381bd3826a14f8da63653d94e7102b38eb5f929c7a94652f41fa7ba323'
 # The token that is used to pay fees for the main wallet operations.
 fee_token = "BAT"
 # Fee for the zkSync transactions in gwei.

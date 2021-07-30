@@ -15,7 +15,7 @@ program.parse(process.argv);
 
 function getProvider(network: string) {
     if (network === 'localhost') {
-        return new ethers.providers.JsonRpcProvider('http://localhost:8545');
+        return new ethers.providers.JsonRpcProvider('http://127.0.0.1:4444');
     }
 
     return ethers.providers.getDefaultProvider(network);
@@ -123,7 +123,7 @@ async function main() {
     console.log('Starting the perform exodus script');
 
     const provider = getProvider(network || 'mainnet');
-    const wallet = new Wallet(privateKey).connect(provider);
+    const wallet = new Wallet(privateKey, provider);
 
     console.log('Loading input file');
     const data = JSON.parse(fs.readFileSync(path, 'utf-8'));

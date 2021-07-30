@@ -29,10 +29,9 @@ async function main() {
 
     const wallet = args.deployerPrivateKey
         ? new Wallet(args.deployerPrivateKey, provider)
-        : Wallet.fromMnemonic(
-              process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-              "m/44'/60'/0'/0/1"
-          ).connect(provider);
+        : process.env.MNEMONIC
+        ? Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/137'/0'/0/1").connect(provider)
+        : new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow1_privK, 'hex'), provider);
 
     const gasPrice = args.gasPrice ? parseUnits(args.gasPrice, 'gwei') : await provider.getGasPrice();
     console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);

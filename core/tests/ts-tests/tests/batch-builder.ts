@@ -236,6 +236,7 @@ Tester.prototype.testBatchBuilderNFT = async function (from: Wallet, to: Wallet,
     const mint_handles = await wallet.submitSignedTransactionsBatch(from.provider, mint_batch.txs, [
         mint_batch.signature
     ]);
+
     await Promise.all(mint_handles.map((handle) => handle.awaitVerifyReceipt()));
 
     const state_after_mint = await to.getAccountState();

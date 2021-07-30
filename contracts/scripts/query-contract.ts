@@ -6,7 +6,8 @@ import { Deployer } from '../src.ts/deploy';
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
-const wallet = Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+const wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow1_privK, 'hex'), provider);
+
 const deployer = new Deployer({ deployWallet: wallet });
 
 async function main() {

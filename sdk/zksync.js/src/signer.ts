@@ -321,13 +321,13 @@ export class Signer {
         signer: Signer;
         ethSignatureType: EthSignerType;
     }> {
-        let chainID = 1;
+        let chainID = 30;
         if (ethSigner.provider) {
             const network = await ethSigner.provider.getNetwork();
             chainID = network.chainId;
         }
         let message = 'Access zkSync account.\n\nOnly sign this message for a trusted client!';
-        if (chainID !== 1) {
+        if (chainID !== 30) {
             message += `\nChain ID: ${chainID}.`;
         }
         const signedBytes = utils.getSignedBytesFromMessage(message, false);

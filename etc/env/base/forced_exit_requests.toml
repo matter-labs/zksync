@@ -23,7 +23,8 @@ price_per_token=30000000000000000
 wait_confirmations=1
 
 # The account of the ForcedExit sender
-sender_account_address="0xe1faB3eFD74A77C23B426c302D96372140FF7d0C"
+# The private key is defined in sender_eth_private_key
+sender_account_address="0xa4dea4d5c954f5fd9e87f0e9752911e83a3d18b3"
 
 # The time after which an invalid request is deleted in milliseconds
 expiration_period=3000

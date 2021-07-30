@@ -43,10 +43,10 @@ use zksync::{
 };
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 
-const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
-const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
-const LOCALHOST_WEB3_ADDR: &str = "http://127.0.0.1:8545";
-const DOCKER_WEB3_ADDR: &str = "http://geth:8545";
+const ETH_ADDR: &str = "c354d97642faa06781b76ffb6786f72cd7746c97";
+const ETH_PRIVATE_KEY: &str = "20e4a6381bd3826a14f8da63653d94e7102b38eb5f929c7a94652f41fa7ba323";
+const LOCALHOST_WEB3_ADDR: &str = "http://127.0.0.1:4444";
+const DOCKER_WEB3_ADDR: &str = "http://rskj:4444";
 
 fn web3_addr() -> &'static str {
     let ci: u8 = env::var("CI").map_or(0, |s| s.parse().unwrap());

@@ -57,7 +57,7 @@ mod tests {
             etherscan_api_key: "unset".into(),
             max_liquidation_fee_percent: 5,
             fee_account_private_key: hash(
-                "27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be",
+                "e88b7bfb0b3ffe2245e3293e20901022ea01ebc19898dfe468289c9a07672627",
             ),
             log_format: LogFormat::Json,
         }
@@ -72,7 +72,7 @@ MISC_DOCKER_DUMMY_PROVER="false"
 MISC_ZKSYNC_ACTION="dont_ask"
 MISC_ETHERSCAN_API_KEY="unset"
 MISC_MAX_LIQUIDATION_FEE_PERCENT="5"
-MISC_FEE_ACCOUNT_PRIVATE_KEY="0x27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"
+MISC_FEE_ACCOUNT_PRIVATE_KEY="e88b7bfb0b3ffe2245e3293e20901022ea01ebc19898dfe468289c9a07672627"
 MISC_LOG_FORMAT="json"
         "#;
         set_env(config);

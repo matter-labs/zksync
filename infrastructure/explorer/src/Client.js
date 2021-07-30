@@ -45,7 +45,7 @@ export class Client {
         const blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
         const ethersProvider =
             config.ETH_NETWORK == 'localhost'
-                ? new ethers.providers.JsonRpcProvider('http://localhost:8545')
+                ? new ethers.providers.JsonRpcProvider('http://127.0.0.1:4444')
                 : ethers.getDefaultProvider();
 
         const props = {

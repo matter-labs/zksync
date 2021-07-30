@@ -1328,7 +1328,7 @@ export class Wallet {
                         (estimate) => estimate,
                         () => BigNumber.from('0')
                     );
-                    const isMainnet = (await this.ethSigner.getChainId()) == 1;
+                    const isMainnet = (await this.ethSigner.getChainId()) == 30;
                     let recommendedGasLimit =
                         isMainnet && ERC20_DEPOSIT_GAS_LIMIT[tokenAddress]
                             ? BigNumber.from(ERC20_DEPOSIT_GAS_LIMIT[tokenAddress])
@@ -1502,7 +1502,6 @@ export class ETHOperation {
     async awaitVerifyReceipt(): Promise<PriorityOperationReceipt> {
         await this.awaitReceipt();
         if (this.state !== 'Committed') return;
-
         let query: number | string;
         if (this.zkSyncProvider.providerType === 'RPC') {
             query = this.priorityOpId.toNumber();
@@ -1552,7 +1551,10 @@ export class Transaction {
 
     async awaitVerifyReceipt(): Promise<TransactionReceipt> {
         await this.awaitReceipt();
+        console.log('Await receipt received, notifying tx: ', this.txHash);
+
         const receipt = await this.sidechainProvider.notifyTransaction(this.txHash, 'VERIFY');
+        console.log('Notification done');
 
         this.state = 'Verified';
         return receipt;

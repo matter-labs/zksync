@@ -10,15 +10,14 @@ services:
       target: /var/lib/postgresql/data
     environment:
         - POSTGRES_HOST_AUTH_METHOD=trust
-  geth:
-    image: "matterlabs/geth:latest"
-    ports:
-      - "8545:8545"
-      - "8546:8546"
-    volumes:
-    - type: bind
-      source: ./volumes/geth
-      target: /var/lib/geth/data
+  
+  #rskj:
+    #container_name: rskj
+    #image: rskj:latest
+    #command: --regtest
+    #ports:
+    #  - "4445:4445"
+  
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
     env_file:

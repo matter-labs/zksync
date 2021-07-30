@@ -25,14 +25,13 @@ describe('Fetching Information', () => {
     before('make some deposits & transactions', async () => {
         let ethProvider;
         if (process.env.CI == '1') {
-            ethProvider = new ethers.providers.JsonRpcProvider('http://geth:8545');
+            ethProvider = new ethers.providers.JsonRpcProvider('http://rskj:4444');
         } else {
-            ethProvider = new ethers.providers.JsonRpcProvider();
+            ethProvider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:4444');
         }
         const syncProvider = await zksync.getDefaultProvider('localhost', 'HTTP');
-        const ethWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0").connect(
-            ethProvider
-        );
+        const ethWallet = new ethers.Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'), ethProvider);
+
         ethDepositor = ethWallet.address;
         alice = ethers.Wallet.createRandom().connect(ethProvider);
         bob = ethers.Wallet.createRandom();
@@ -265,7 +264,7 @@ describe('Config Management', () => {
 });
 
 describe('Making Transactions', () => {
-    const rich = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0");
+    const rich = new ethers.Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'));
     const poor1 = ethers.Wallet.createRandom();
     const poor2 = ethers.Wallet.createRandom();
 

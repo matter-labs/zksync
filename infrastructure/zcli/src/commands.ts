@@ -157,14 +157,14 @@ class TxSubmitter {
     ) {
         let ethProvider;
         if (process.env.CI == '1') {
-            ethProvider = new ethers.providers.JsonRpcProvider('http://geth:8545');
+            ethProvider = new ethers.providers.JsonRpcProvider('http://rskj:4444');
         } else if (network == 'localhost') {
-            ethProvider = new ethers.providers.JsonRpcProvider();
+            ethProvider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:4444');
         } else {
             ethProvider = ethers.getDefaultProvider(network);
         }
         const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
-        const ethWallet = new ethers.Wallet(txDetails.privkey).connect(ethProvider);
+        const ethWallet = new ethers.Wallet(txDetails.privkey, ethProvider);
         const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
         const submitter = new TxSubmitter(syncProvider, syncWallet);
         const hash = await submitter[type](txDetails, fast);

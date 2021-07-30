@@ -2,7 +2,7 @@ import { ArgumentParser } from 'argparse';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as zksync from 'zksync';
-import { ethers } from 'ethers';
+import { ethers, Wallet } from 'ethers';
 import { web3Provider } from './utils';
 
 const DEPOSIT_AMOUNT = ethers.utils.parseEther('10000000000');
@@ -22,11 +22,12 @@ async function main() {
     const args = parser.parseArgs(process.argv.slice(2));
 
     const deployerEthWallet = args.deployerPrivateKey
-        ? new ethers.Wallet(args.deployerPrivateKey, provider)
-        : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+        ? new Wallet(args.deployerPrivateKey, provider)
+        : new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow1_privK, 'hex'), provider);
+
     const faucetEthWallet = args.faucetPrivateKey
         ? new ethers.Wallet(args.faucetPrivateKey, provider)
-        : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/2").connect(provider);
+        : new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow2_privK, 'hex'), provider);
 
     const syncProvider = await zksync.getDefaultProvider(network as zksync.types.Network);
     const deployerWallet = await zksync.Wallet.fromEthSigner(deployerEthWallet, syncProvider);

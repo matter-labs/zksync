@@ -1,7 +1,7 @@
 // This script deploys the contracts required both for production and
 // for testing of the contracts required for the `withdrawal-helpers` library
 
-import { ethers } from 'ethers';
+import { Wallet } from 'ethers';
 import { deployContract } from 'ethereum-waffle';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -22,9 +22,11 @@ async function main() {
         const provider = web3Provider();
         provider.pollingInterval = 10;
 
-        const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(
-            provider
-        );
+        const deployWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'), provider);
+
+        //const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(
+        // provider
+        //);
         const multicallContract = await deployContract(deployWallet, readContractCode('dev-contracts/Multicall'), [], {
             gasLimit: 5000000
         });

@@ -36,6 +36,7 @@ Cargo.lock
 /volumes
 /logs
 /loadtest-config
+/etc/rsknode/db
 
 .ipynb_checkpoints
 

@@ -58,7 +58,7 @@ impl Default for LoadtestConfig {
         // dependency on the `zk` tool and TOML config files.
         Self {
             zksync_rpc_addr: "http://127.0.0.1:3030".into(),
-            web3_url: "http://127.0.0.1:8545".into(),
+            web3_url: "http://127.0.0.1:4444".into(),
             eth_network: "localhost".into(),
             master_wallet_pk: "74d8b3a188f7260f67698eb44da07397a298df5427df681ef68c45b34b61f998"
                 .into(),

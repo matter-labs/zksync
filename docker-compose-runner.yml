@@ -5,10 +5,8 @@ services:
     environment:
         - POSTGRES_HOST_AUTH_METHOD=trust
 
-  geth:
-    image: "matterlabs/geth:latest"
-    environment:
-      - PLUGIN_CONFIG
+  #rskj:
+    #image: rskj:latest
 
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
@@ -26,7 +24,7 @@ services:
     image: "matterlabs/zk-environment:latest"
     depends_on:
       - postgres
-      - geth
+      #- rskj
       - dev-ticker
       - dev-liquidity-token-watcher
     command: tail -f /dev/null
@@ -38,4 +36,4 @@ services:
       - IN_DOCKER=true
       - CACHE_DIR=/usr/src/cache
       - SCCACHE_CACHE_SIZE=50g
-      - CI=1
+      - CI=0

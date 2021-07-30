@@ -1,6 +1,6 @@
 import { constants } from 'ethers';
 const { expect } = require('chai');
-const { getCallRevertReason } = require('./common');
+const { getCallRevertReason, evmMineMany } = require('./common');
 const { performance } = require('perf_hooks');
 const hardhat = require('hardhat');
 
@@ -122,6 +122,7 @@ describe('UpgradeGatekeeper unit tests', function () {
             if (step !== 3) {
                 await upgradeGatekeeperContract.startPreparation();
             } else {
+                await evmMineMany(2);
                 await expect(upgradeGatekeeperContract.startPreparation()).to.emit(
                     upgradeGatekeeperContract,
                     'PreparationStart'

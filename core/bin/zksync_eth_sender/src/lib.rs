@@ -342,7 +342,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             .gas_adjuster
             .get_gas_price(&self.ethereum, None)
             .await?;
-
+        //TODO RSK: let gas_price = U256::from("1000000000");
         let mut connection = self.db.acquire_connection().await?;
         let mut transaction = connection.start_transaction().await?;
 

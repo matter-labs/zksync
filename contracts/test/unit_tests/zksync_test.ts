@@ -1,4 +1,4 @@
-import { Contract, ethers, constants, BigNumber } from 'ethers';
+import { Contract, constants, BigNumber, Wallet } from 'ethers';
 import { keccak256, parseEther } from 'ethers/lib/utils';
 import { ETHProxy } from 'zksync';
 import { Address, TokenAddress } from 'zksync/build/types';
@@ -7,7 +7,7 @@ import { Deployer, readContractCode, readProductionContracts } from '../../src.t
 const hardhat = require('hardhat');
 const { simpleEncode } = require('ethereumjs-abi');
 const { expect } = require('chai');
-const { getCallRevertReason, IERC20_INTERFACE, DEFAULT_REVERT_REASON } = require('./common');
+const { getCallRevertReason, IERC20_INTERFACE, DEFAULT_REVERT_REASON, increaseTime, evmMine } = require('./common');
 import * as zksync from 'zksync';
 import {
     ZkSync,
@@ -17,6 +17,7 @@ import {
     ZKSyncSignatureUnitTestFactory,
     ZkSyncWithdrawalUnitTestFactory
 } from '../../typechain';
+import { assert } from 'chai';
 
 const TEST_PRIORITY_EXPIRATION = 101;
 const CHUNK_SIZE = 10;
@@ -27,7 +28,7 @@ describe('zkSync signature verification unit tests', function () {
     this.timeout(50000);
 
     let testContract: ZKSyncSignatureUnitTest;
-    const randomWallet = ethers.Wallet.createRandom();
+    const randomWallet = hardhat.ethers.Wallet.createRandom();
     before(async () => {
         [wallet] = await hardhat.ethers.getSigners();
 
@@ -46,7 +47,7 @@ describe('zkSync signature verification unit tests', function () {
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
-        const witness = ethers.utils.concat(['0x00', signature]);
+        const witness = hardhat.ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
             async () =>
                 await testContract.changePubkeySignatureCheckECRECOVER(
@@ -65,7 +66,7 @@ describe('zkSync signature verification unit tests', function () {
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
-        const witness = ethers.utils.concat(['0x00', signature]);
+        const witness = hardhat.ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
             async () =>
                 await testContract.changePubkeySignatureCheckECRECOVER(
@@ -89,7 +90,7 @@ describe('zkSync signature verification unit tests', function () {
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
-        const witness = ethers.utils.concat(['0x00', signature]);
+        const witness = hardhat.ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
             async () =>
                 await testContract.changePubkeySignatureCheckECRECOVER(
@@ -113,7 +114,7 @@ describe('zkSync signature verification unit tests', function () {
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
-        const witness = ethers.utils.concat(['0x00', signature]);
+        const witness = hardhat.ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
             async () =>
                 await testContract.changePubkeySignatureCheckECRECOVER(
@@ -132,7 +133,7 @@ describe('zkSync signature verification unit tests', function () {
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
-        const witness = ethers.utils.concat(['0x00', signature]);
+        const witness = hardhat.ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
             async () =>
                 await testContract.changePubkeySignatureCheckECRECOVER(
@@ -151,7 +152,7 @@ describe('zkSync signature verification unit tests', function () {
     it('signature verification success', async () => {
         for (const message of [Buffer.from('msg', 'ascii'), Buffer.alloc(0), Buffer.alloc(10, 1)]) {
             const signature = await wallet.signMessage(message);
-            const signedMessageHash = ethers.utils.keccak256(
+            const signedMessageHash = hardhat.ethers.utils.keccak256(
                 Buffer.concat([Buffer.from(`\x19Ethereum Signed Message:\n${message.length}`, 'ascii'), message])
             );
             const address = await testContract.testRecoverAddressFromEthSignature(signature, signedMessageHash);
@@ -186,7 +187,7 @@ describe('ZK priority queue ops unit tests', function () {
         const depositOwner = wallet.address;
 
         let tx;
-        if (token === ethers.constants.AddressZero) {
+        if (token === hardhat.ethers.constants.AddressZero) {
             tx = await zksyncContract.depositETH(depositOwner, {
                 value: depositAmount
             });
@@ -240,11 +241,11 @@ describe('ZK priority queue ops unit tests', function () {
 
     it('success ETH deposits', async () => {
         zksyncContract.connect(wallet);
-        const tokenAddress = ethers.constants.AddressZero;
+        const tokenAddress = hardhat.ethers.constants.AddressZero;
         const depositAmount = parseEther('1.0');
 
         await performDeposit(wallet.address, tokenAddress, depositAmount);
-        await performDeposit(ethers.Wallet.createRandom().address, tokenAddress, depositAmount);
+        await performDeposit(hardhat.ethers.Wallet.createRandom().address, tokenAddress, depositAmount);
     });
 
     it('success ERC20 deposits', async () => {
@@ -256,20 +257,20 @@ describe('ZK priority queue ops unit tests', function () {
         await tokenContract.approve(zksyncContract.address, depositAmount);
         await performDeposit(wallet.address, tokenAddress, depositAmount);
         await tokenContract.approve(zksyncContract.address, depositAmount);
-        await performDeposit(ethers.Wallet.createRandom().address, tokenAddress, depositAmount);
+        await performDeposit(hardhat.ethers.Wallet.createRandom().address, tokenAddress, depositAmount);
     });
 
     it('success FullExit request', async () => {
         zksyncContract.connect(wallet);
         const accountId = 1;
 
-        await performFullExitRequest(accountId, ethers.constants.AddressZero);
+        await performFullExitRequest(accountId, hardhat.ethers.constants.AddressZero);
         await performFullExitRequest(accountId, tokenContract.address);
     });
 });
 
-async function onchainBalance(ethWallet: ethers.Wallet, token: Address): Promise<BigNumber> {
-    if (token === ethers.constants.AddressZero) {
+async function onchainBalance(ethWallet: Wallet, token: Address): Promise<BigNumber> {
+    if (token === hardhat.ethers.constants.AddressZero) {
         return ethWallet.getBalance();
     } else {
         const erc20contract = new Contract(token, IERC20_INTERFACE.abi, ethWallet);
@@ -309,11 +310,11 @@ describe('zkSync withdraw unit tests', function () {
         await incorrectTokenContract.mint(wallet.address, parseEther('1000000'));
     });
 
-    async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
+    async function performWithdraw(ethWallet: Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
         let gasFee: BigNumber;
         const balanceBefore = await onchainBalance(ethWallet, token);
         const contractBalanceBefore = BigNumber.from(await zksyncContract.getPendingBalance(ethWallet.address, token));
-        if (token === ethers.constants.AddressZero) {
+        if (token === hardhat.ethers.constants.AddressZero) {
             const tx = await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount, {
                 gasLimit: 300000
             });
@@ -451,17 +452,18 @@ describe('zkSync auth pubkey onchain unit tests', function () {
 
         await (await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce)).wait();
 
-        const expectedAuthFact = ethers.utils.keccak256(pubkeyHash);
+        const expectedAuthFact = hardhat.ethers.utils.keccak256(pubkeyHash);
 
         const authFact = await zksyncContract.getAuthFact(wallet.address, nonce);
         expect(authFact).to.eq(expectedAuthFact);
     });
 
+    //RSK: RUN_WITH_CLEAN_NODE
     it('Auth pubkey reset', async () => {
         zksyncContract.connect(wallet);
 
         const checkSetPubkeyHash = async (pubkeyHash, address, nonce, message) => {
-            const expectedAuthFact = ethers.utils.keccak256(pubkeyHash);
+            const expectedAuthFact = hardhat.ethers.utils.keccak256(pubkeyHash);
             const authFact = await zksyncContract.getAuthFact(address, nonce);
             expect(authFact).to.eq(expectedAuthFact, message);
         };
@@ -474,11 +476,18 @@ describe('zkSync auth pubkey onchain unit tests', function () {
 
         const resetPubkeyHash = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-        await (await zksyncContract.setAuthPubkeyHash(resetPubkeyHash, nonce)).wait();
+        //Wait() waits until the transaction receipt is resolved
+        await zksyncContract.setAuthPubkeyHash(resetPubkeyHash, nonce);
         await checkSetPubkeyHash(pubkeyHash, wallet.address, nonce, 'first pubkey hash still set');
-        const resetTimestamp = Date.now() + 24 * 60 * 60;
+        //const resetTimestamp = Date.now() + 24 * 60 * 60;
+        //AUTH_FACT_RESET_TIMELOCK (1 day) has to pass before being able to change the hash
+        let newTimestampIncrement = 24 * 60 * 60 + 500;
+        // 100 seconds are added so we don't go against the RSK MinerClock
 
-        await zksyncContract.provider.send('evm_setNextBlockTimestamp', [resetTimestamp]);
+        let result = await increaseTime(newTimestampIncrement);
+        assert(result !== null, 'IncreateTime failed');
+        await evmMine();
+        //await zksyncContract.provider.send('evm_setNextBlockTimestamp', [resetTimestamp]);
         await (await zksyncContract.setAuthPubkeyHash(resetPubkeyHash, nonce)).wait();
         await checkSetPubkeyHash(resetPubkeyHash, wallet.address, nonce, 'pubkey hash changed');
     });
@@ -509,13 +518,13 @@ describe('zkSync test process next operation', function () {
     let incorrectTokenContract;
     let ethProxy;
 
-    const EMPTY_KECCAK = ethers.utils.keccak256('0x');
+    const EMPTY_KECCAK = hardhat.ethers.utils.keccak256('0x');
 
     const newBlockDataFromPubdata = (publicData) => {
         return {
             blockNumber: 0,
             feeAccount: 0,
-            newStateHash: ethers.constants.HashZero,
+            newStateHash: hardhat.ethers.constants.HashZero,
             publicData,
             timestamp: 0,
             onchainOperations: []
@@ -627,7 +636,7 @@ describe('zkSync test process next operation', function () {
             ethWitness: '0x'
         });
 
-        const expectedHash = keccak256(ethers.utils.concat([EMPTY_KECCAK, pubdata]));
+        const expectedHash = keccak256(hardhat.ethers.utils.concat([EMPTY_KECCAK, pubdata]));
         await zksyncContract.collectOnchainOpsExternal(blockData, expectedHash, 0, [1, 0, 0, 0, 0, 0]);
     });
 
@@ -671,7 +680,7 @@ describe('zkSync test process next operation', function () {
             ethWitness: '0x'
         });
 
-        const expectedHash = keccak256(ethers.utils.concat([EMPTY_KECCAK, pubdata]));
+        const expectedHash = keccak256(hardhat.ethers.utils.concat([EMPTY_KECCAK, pubdata]));
         await zksyncContract.collectOnchainOpsExternal(blockData, expectedHash, 1, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
         await zksyncContract.commitPriorityRequests();
     });
@@ -714,7 +723,7 @@ describe('zkSync test process next operation', function () {
         const accountId = 0x00ffee12;
         const _ethWitness = await wallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
         const ethWitnessBytes = Uint8Array.from(Buffer.from(_ethWitness.slice(2), 'hex'));
-        const ethWitness = ethers.utils.concat(['0x00', ethWitnessBytes, new Uint8Array(32).fill(0)]);
+        const ethWitness = hardhat.ethers.utils.concat(['0x00', ethWitnessBytes, new Uint8Array(32).fill(0)]);
 
         // construct deposit pubdata
         const pubdata = Buffer.alloc(CHUNK_SIZE * 6, 0);
@@ -750,7 +759,7 @@ describe('zkSync test process next operation', function () {
             ethWitness: '0x'
         });
 
-        const expectedHash = keccak256(ethers.utils.concat([EMPTY_KECCAK, pubdata]));
+        const expectedHash = keccak256(hardhat.ethers.utils.concat([EMPTY_KECCAK, pubdata]));
         await zksyncContract.collectOnchainOpsExternal(blockData, expectedHash, 0, [1, 0, 0, 0, 0, 0]);
 
         const committedPriorityRequestsAfter = await zksyncContract.getTotalCommittedPriorityRequests();

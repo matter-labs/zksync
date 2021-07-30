@@ -228,6 +228,7 @@ export class Provider extends SyncProvider {
         } else {
             while (true) {
                 const transactionStatus = await this.getTxReceipt(hash);
+
                 const notifyDone =
                     action == 'COMMIT'
                         ? transactionStatus.block && transactionStatus.block.committed

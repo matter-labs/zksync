@@ -37,26 +37,23 @@ mod tests {
 
     fn expected_config() -> ETHClientConfig {
         ETHClientConfig {
-            chain_id: 9,
+            chain_id: 33,
             gas_price_factor: 1.0f64,
-            web3_url: vec![
-                "http://127.0.0.1:8545".into(),
-                "http://127.0.0.1:8546".into(),
-            ],
+            web3_url: vec!["http://127.0.0.1:4444".into()],
         }
     }
 
     #[test]
     fn from_env() {
         let config = r#"
-ETH_CLIENT_CHAIN_ID="9"
+ETH_CLIENT_CHAIN_ID="33"
 ETH_CLIENT_GAS_PRICE_FACTOR="1"
-ETH_CLIENT_WEB3_URL="http://127.0.0.1:8545,http://127.0.0.1:8546"
+ETH_CLIENT_WEB3_URL="http://127.0.0.1:4444"
         "#;
         set_env(config);
 
         let actual = ETHClientConfig::from_env();
         assert_eq!(actual, expected_config());
-        assert_eq!(actual.web3_url(), "http://127.0.0.1:8545");
+        assert_eq!(actual.web3_url(), "http://127.0.0.1:4444");
     }
 }

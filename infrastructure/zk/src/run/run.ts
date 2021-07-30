@@ -116,15 +116,67 @@ export async function testAccounts() {
     const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
     const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
     const NUM_TEST_WALLETS = 10;
-    const baseWalletPath = "m/44'/60'/0'/0/";
+    const baseWalletPath = "m/44'/137'/0'/0/";
     const walletKeys = [];
-    for (let i = 0; i < NUM_TEST_WALLETS; ++i) {
+
+    let ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+    ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow1_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+    ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow2_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+    ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow3_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+    ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow4_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+    ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow5_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+    //ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow6_privK, 'hex'));
+    //walletKeys.push({
+    //    address: ethWallet.address,
+    //    privateKey: ethWallet.privateKey
+    //});
+    ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow7_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+    ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow8_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+    ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow9_privK, 'hex'));
+    walletKeys.push({
+        address: ethWallet.address,
+        privateKey: ethWallet.privateKey
+    });
+
+    /*for (let i = 0; i < NUM_TEST_WALLETS; ++i) {
         const ethWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, baseWalletPath + i);
         walletKeys.push({
             address: ethWallet.address,
             privateKey: ethWallet.privateKey
         });
-    }
+    }*/
     console.log(JSON.stringify(walletKeys, null, 4));
 }
 

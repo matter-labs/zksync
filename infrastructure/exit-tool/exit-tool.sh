@@ -16,7 +16,7 @@ If command is "run" or "continue", the following additional arguments are requir
 Example workflow:
 
 ./exit-tool.sh init
-./exit-tool.sh run rinkeby 12 ETH http://127.0.0.1:8545
+./exit-tool.sh run rinkeby 12 ETH http://127.0.0.1:4444
 '
 
 # Function to stop PostgreSQL container on exit

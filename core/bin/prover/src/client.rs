@@ -153,8 +153,6 @@ impl crate::ApiClient for ApiClient {
 
     async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()> {
         let operation = || async {
-            log::trace!("Trying publish proof: {:?}", data);
-
             let response = self
                 .http_client
                 .post(self.publish_url.clone())

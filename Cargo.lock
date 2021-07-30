@@ -6356,6 +6356,7 @@ dependencies = [
  "metrics",
  "parity-crypto",
  "serde",
+ "sha3",
  "tokio 0.2.25",
  "vlog",
  "web3",

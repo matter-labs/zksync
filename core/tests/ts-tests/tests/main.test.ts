@@ -136,14 +136,22 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
 
         await tester.testBatchBuilderInvalidUsage(david, alice, token);
+
         await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
+
         await tester.testBatchBuilderSignedChangePubKey(chris, token, TX_AMOUNT);
+
         await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
+
         await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
+
         await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+
         await tester.testBatchBuilderNFT(frank, david, token);
+
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
+
     });
 
 

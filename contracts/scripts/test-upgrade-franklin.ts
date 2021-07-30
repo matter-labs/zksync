@@ -1,6 +1,6 @@
 import { ArgumentParser } from 'argparse';
 import { deployContract } from 'ethereum-waffle';
-import { constants, ethers } from 'ethers';
+import { constants, ethers, Wallet } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { web3Provider } from './utils';
@@ -28,7 +28,7 @@ async function main() {
 
     const provider = web3Provider();
 
-    const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
+    const wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'), provider);
 
     const proxyContract = new ethers.Contract(args.contractAddress, testContracts.proxy.abi, wallet);
 
@@ -39,7 +39,7 @@ async function main() {
     );
 
     const newTargetFranklin = await deployContract(wallet, testContracts.zkSync, [], {
-        gasLimit: 6500000
+        gasLimit: 6800000
     });
 
     console.log('Starting upgrade');

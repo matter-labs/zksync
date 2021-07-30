@@ -6,7 +6,6 @@ const IMAGES = [
     'server',
     'prover',
     'nginx',
-    'geth',
     'dev-ticker',
     'keybase',
     'ci',
@@ -16,6 +15,7 @@ const IMAGES = [
     'zk-environment',
     'event-listener',
     'data-restore'
+    //,`'rskj'
 ];
 
 async function dockerCommand(command: 'push' | 'build', image: string) {
@@ -72,7 +72,7 @@ export async function restart(container: string) {
 }
 
 export async function pull() {
-    await utils.spawn('docker-compose pull');
+    await utils.spawn('docker-compose pull postgres dev-liquidity-token-watcher dev-ticker tesseracts elastic');
 }
 
 export const command = new Command('docker').description('docker management');

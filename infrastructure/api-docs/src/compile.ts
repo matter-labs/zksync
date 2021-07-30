@@ -50,9 +50,7 @@ async function setupWallet() {
     const ethProvider = new ethers.providers.JsonRpcProvider(web3Url);
     ethProvider.pollingInterval = 100;
     const syncProvider = await zksync.getDefaultRestProvider('localhost');
-    const ethWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0").connect(
-        ethProvider
-    );
+    const ethWallet = new ethers.Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'), ethProvider);
 
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
 

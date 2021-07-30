@@ -133,7 +133,7 @@ mod tests {
                 miniblock_iteration_interval: 200,
                 miniblock_iterations: 10,
                 fast_block_miniblock_iterations: 5,
-                fee_account_addr: addr("de03a0B5963f75f1C8485B355fF6D30f3093BDE7"),
+                fee_account_addr: addr("7857288e171c6159c5576d1bd9ac40c0c48a771c"),
                 aggregated_proof_sizes: vec![1, 5],
                 max_aggregated_blocks_to_commit: 3,
                 max_aggregated_blocks_to_execute: 4,
@@ -161,7 +161,7 @@ CHAIN_STATE_KEEPER_BLOCK_CHUNK_SIZES="6,30"
 CHAIN_STATE_KEEPER_MINIBLOCK_ITERATION_INTERVAL="200"
 CHAIN_STATE_KEEPER_MINIBLOCK_ITERATIONS="10"
 CHAIN_STATE_KEEPER_FAST_BLOCK_MINIBLOCK_ITERATIONS="5"
-CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR="0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7"
+CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR="0x7857288e171c6159c5576d1bd9ac40c0c48a771c"
 CHAIN_STATE_KEEPER_AGGREGATED_PROOF_SIZES="1,5"
 CHAIN_STATE_KEEPER_MAX_AGGREGATED_BLOCKS_TO_COMMIT="3"
 CHAIN_STATE_KEEPER_MAX_AGGREGATED_BLOCKS_TO_EXECUTE="4"

@@ -41,7 +41,7 @@
   },
   "scripts": {
     "build": "hardhat compile",
-    "test": "CONTRACT_TESTS=1 zk f yarn run hardhat test",
+    "test": "CONTRACT_TESTS=1 zk f yarn run hardhat --network env test",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
     "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",

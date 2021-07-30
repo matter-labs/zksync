@@ -27,9 +27,12 @@ async function main() {
     const args = parser.parseArgs(process.argv.slice(2));
 
     const provider = web3Provider();
+
     const wallet = args.deployerPrivateKey
         ? new Wallet(args.deployerPrivateKey, provider)
-        : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+        : new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow1_privK, 'hex'), provider);
+
+    //Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
     const contractCode = readContractCode('TestnetERC20Token');
 

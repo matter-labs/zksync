@@ -59,7 +59,7 @@ Example:
 
 In this example, we use Rinkeby Ethereum testnet, generate a proof for account with address
 0x3b48b21a2f4910c04c04de00a23f7c07bf3cb04f and token with ID 0 (Ether), and use the API located at
-`http://127.0.0.1:8545`
+`http://127.0.0.1:4444`
 
 If during the process you encounter any error with the database, you should reset the database and run the
 `./exit-tool init` again.

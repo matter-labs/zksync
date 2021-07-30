@@ -48,10 +48,15 @@ jobs:
           echo $(pwd)/bin >> $GITHUB_PATH
         
       - name: start-services
+        #run: |
+          #docker-compose -f docker-compose-runner.yml down
+          #docker-compose -f docker-compose-runner.yml pull
+          #docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk
+          #ci_run sccache --start-server
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull
-          docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          docker-compose -f docker-compose-runner.yml up --build -d postgres zk
           ci_run sccache --start-server
 
       - name: init
@@ -89,10 +94,15 @@ jobs:
           echo $(pwd)/bin >> $GITHUB_PATH
         
       - name: start-services
+        #run: |
+          #docker-compose -f docker-compose-runner.yml down
+          #docker-compose -f docker-compose-runner.yml pull
+          #docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk
+          #ci_run sccache --start-server
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull
-          docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          docker-compose -f docker-compose-runner.yml up --build -d postgres zk
           ci_run sccache --start-server
 
       - name: init
@@ -165,7 +175,7 @@ jobs:
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
-          echo PLUGIN_CONFIG=fast >> $GITHUB_ENV # use fast mode for geth image (instant tx commit)
+          echo PLUGIN_CONFIG=fast >> $GITHUB_ENV # use fast mode for rskj image (instant tx commit)
 
       - name: start-services
         run: |

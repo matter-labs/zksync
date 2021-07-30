@@ -13,7 +13,7 @@ expected_wait_time_block=30
 # Node polling period in seconds.
 tx_poll_period=3
 # The maximum amount of simultaneously sent Ethereum transactions.
-max_txs_in_flight=3
+max_txs_in_flight=1
 # Whether sender should interact with L1 or not.
 is_enabled=true
 

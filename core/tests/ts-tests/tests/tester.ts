@@ -52,10 +52,8 @@ export class Tester {
         const syncProvider = providerType === 'REST' 
             ? await zksync.getDefaultRestProvider(network) 
             : await zksync.getDefaultProvider(network, transport);
-        const ethWallet = ethers.Wallet.fromMnemonic(
-            ethTestConfig.test_mnemonic as string, 
-            "m/44'/60'/0'/0/0"
-        ).connect(ethProvider);
+        const ethWallet = new ethers.Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'), ethProvider);
+        
         const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
         return new Tester(network, ethProvider, syncProvider, ethWallet, syncWallet);
     }
@@ -65,7 +63,8 @@ export class Tester {
     }
 
     async fundedWallet(amount: string) {
-        const newWallet = ethers.Wallet.createRandom().connect(this.ethProvider);
+        const randomWallet = ethers.Wallet.createRandom();
+        const newWallet = new ethers.Wallet(randomWallet.privateKey, this.ethProvider);
         const syncWallet = await zksync.Wallet.fromEthSigner(newWallet, this.syncProvider);
         const handle = await this.ethWallet.sendTransaction({
             to: newWallet.address,
@@ -76,7 +75,8 @@ export class Tester {
     }
 
     async emptyWallet() {
-        let ethWallet = ethers.Wallet.createRandom().connect(this.ethProvider);
+        const randomWallet = ethers.Wallet.createRandom();
+        const ethWallet = new ethers.Wallet(randomWallet.privateKey, this.ethProvider);
         return await zksync.Wallet.fromEthSigner(ethWallet, this.syncProvider);
     }
 

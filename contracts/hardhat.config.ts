@@ -1,6 +1,6 @@
-import '@nomiclabs/hardhat-waffle';
 import '@nomiclabs/hardhat-solpp';
 import '@nomiclabs/hardhat-etherscan';
+import '@nomiclabs/hardhat-ethers';
 import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
 
@@ -75,6 +75,7 @@ const contractDefs = {
 };
 
 export default {
+    defaultNetwork: 'env',
     solidity: {
         version: '0.7.6',
         settings: {
@@ -105,7 +106,8 @@ export default {
     },
     networks: {
         env: {
-            url: process.env.ETH_CLIENT_WEB3_URL?.split(',')[0]
+            url: process.env.ETH_CLIENT_WEB3_URL?.split(',')[0],
+            chainId: 33
         },
         hardhat: {
             allowUnlimitedContractSize: true
