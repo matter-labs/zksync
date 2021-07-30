@@ -89,7 +89,6 @@ async function main() {
     if (args.contract === 'ForcedExit' || args.contract == null) {
         await deployer.deployForcedExit({ gasPrice, nonce: args.nonce });
     }
-
 }
 
 main()
