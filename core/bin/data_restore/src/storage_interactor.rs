@@ -119,6 +119,9 @@ pub trait StorageInteractor {
     /// * `tree_cache` - Merkle tree cache
     ///
     async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: serde_json::Value);
+
+    /// Retrieves the maximum serial id of a priority requests
+    async fn get_max_priority_op_serial_id(&mut self) -> i64;
 }
 
 /// Returns Rollup contract event from its stored representation

@@ -296,6 +296,26 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns the highest serial id of the executed priority ops
+    ///
+    /// Note: used only by data restore
+    pub async fn get_max_priority_op_serial_id(&mut self) -> QueryResult<i64> {
+        let start = Instant::now();
+
+        let max_serial_id = sqlx::query!(
+            r#"SELECT max(priority_op_serialid) as "max!" FROM executed_priority_operations;"#
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        let max_serial_id = max_serial_id.map(|record| record.max).unwrap_or(0);
+
+        metrics::histogram!(
+            "sql.chain.operations.get_max_priority_op_serial_id",
+            start.elapsed()
+        );
+        Ok(max_serial_id)
+    }
+
     /// On old contracts, a separate operation was used to withdraw - `CompleteWithdrawals`.
     ///
     /// NOTE: Currently `CompleteWithdrawals` is deprecated but the information is still stored

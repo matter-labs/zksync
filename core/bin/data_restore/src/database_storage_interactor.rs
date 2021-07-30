@@ -357,4 +357,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             _ => panic!("Unknown storage state"),
         }
     }
+
+    async fn get_max_priority_op_serial_id(&mut self) -> i64 {
+        self.storage
+            .chain()
+            .operations_schema()
+            .get_max_priority_op_serial_id()
+            .await
+            .expect("Failed to retrieve maximum priority op serial id")
+    }
 }
