@@ -6,7 +6,8 @@
 //! These "extensions" are required to provide more zkSync-specific information while remaining Web3-compilant.
 
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-pub use web3::types::{Address, H256, U256, U64};
+pub use web3::types::{Address, Block, Transaction, H160, H256, H64, U256, U64};
+use zksync_storage::chain::operations_ext::records::Web3TxData;
 
 /// Block Number
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -70,5 +71,103 @@ impl<'de> Deserialize<'de> for BlockNumber {
             }
         }
         deserializer.deserialize_str(V)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TxData {
+    pub block_hash: H256,
+    pub block_number: u32,
+    pub block_index: Option<u32>,
+    pub from: H160,
+    pub to: Option<H160>,
+    pub nonce: u32,
+    pub tx_hash: H256,
+}
+
+impl From<Web3TxData> for TxData {
+    fn from(tx: Web3TxData) -> TxData {
+        TxData {
+            block_hash: H256::from_slice(&tx.block_hash),
+            block_number: tx.block_number as u32,
+            block_index: tx.block_index.map(|i| i as u32),
+            from: H160::from_slice(&tx.from_account),
+            to: tx.to_account.map(|to| H160::from_slice(&to)),
+            nonce: tx.nonce as u32,
+            tx_hash: H256::from_slice(&tx.tx_hash),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum BlockInfo {
+    BlockWithHashes(Block<H256>),
+    BlockWithTxs(Block<Transaction>),
+}
+
+impl BlockInfo {
+    fn new_block<T>(
+        hash: H256,
+        parent_hash: H256,
+        block_number: zksync_types::BlockNumber,
+        timestamp: u64,
+        transactions: Vec<T>,
+    ) -> Block<T> {
+        Block {
+            hash: Some(hash),
+            parent_hash,
+            uncles_hash: H256::zero(),
+            author: H160::zero(),
+            state_root: hash,
+            transactions_root: hash,
+            receipts_root: hash,
+            number: Some(block_number.0.into()),
+            gas_used: 0.into(),
+            gas_limit: 50000.into(),
+            extra_data: Vec::new().into(),
+            logs_bloom: None,
+            timestamp: timestamp.into(),
+            difficulty: 0.into(),
+            total_difficulty: Some(0.into()),
+            seal_fields: Vec::new(),
+            uncles: Vec::new(),
+            transactions,
+            size: None,
+            mix_hash: Some(H256::zero()),
+            nonce: Some(H64::zero()),
+        }
+    }
+
+    pub fn new_with_hashes(
+        hash: H256,
+        parent_hash: H256,
+        block_number: zksync_types::BlockNumber,
+        timestamp: u64,
+        transactions: Vec<H256>,
+    ) -> Self {
+        Self::BlockWithHashes(Self::new_block(
+            hash,
+            parent_hash,
+            block_number,
+            timestamp,
+            transactions,
+        ))
+    }
+
+    pub fn new_with_txs(
+        hash: H256,
+        parent_hash: H256,
+        block_number: zksync_types::BlockNumber,
+        timestamp: u64,
+        transactions: Vec<Transaction>,
+    ) -> Self {
+        Self::BlockWithTxs(Self::new_block(
+            hash,
+            parent_hash,
+            block_number,
+            timestamp,
+            transactions,
+        ))
     }
 }

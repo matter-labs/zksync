@@ -138,6 +138,23 @@ impl ZkSyncTx {
         }
     }
 
+    pub fn from_account(&self) -> Address {
+        self.account()
+    }
+
+    pub fn to_account(&self) -> Option<Address> {
+        match self {
+            ZkSyncTx::Transfer(tx) => Some(tx.to),
+            ZkSyncTx::Withdraw(tx) => Some(tx.to),
+            ZkSyncTx::Close(tx) => Some(tx.account),
+            ZkSyncTx::ChangePubKey(tx) => Some(Address::from(tx.new_pk_hash.data)),
+            ZkSyncTx::ForcedExit(tx) => Some(tx.target),
+            ZkSyncTx::Swap(tx) => Some(tx.submitter_address),
+            ZkSyncTx::MintNFT(tx) => Some(tx.recipient),
+            ZkSyncTx::WithdrawNFT(tx) => Some(tx.to),
+        }
+    }
+
     pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ZkSyncTx::Transfer(tx) => Ok(tx.account_id),

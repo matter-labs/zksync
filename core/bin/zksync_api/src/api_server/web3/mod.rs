@@ -6,13 +6,20 @@ use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
 use zksync_config::ZkSyncConfig;
+use zksync_crypto::convert::FeConvert;
 use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::ExecutedOperations;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
-use self::{rpc_trait::Web3Rpc, types::U256};
+use self::{
+    rpc_trait::Web3Rpc,
+    types::{BlockInfo, Transaction, TxData, H256, U256},
+};
 
 mod rpc_impl;
 mod rpc_trait;
+#[cfg(test)]
+mod tests;
 mod types;
 
 #[derive(Clone)]
@@ -98,7 +105,7 @@ impl Web3RpcApp {
         Ok(Some(number))
     }
 
-    async fn get_block_transaction_count(
+    async fn block_transaction_count(
         storage: &mut StorageProcessor<'_>,
         block_number: zksync_types::BlockNumber,
     ) -> Result<U256> {
@@ -109,6 +116,114 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
         Ok(U256::from(count))
+    }
+
+    fn transaction_from_tx_data(tx: TxData) -> Transaction {
+        Transaction {
+            hash: tx.tx_hash,
+            nonce: tx.nonce.into(),
+            block_hash: Some(tx.block_hash),
+            block_number: Some(tx.block_number.into()),
+            transaction_index: tx.block_index.map(Into::into),
+            from: tx.from,
+            to: tx.to,
+            value: 0.into(),
+            gas_price: 0.into(),
+            gas: 0.into(),
+            input: Vec::new().into(),
+            raw: None,
+        }
+    }
+
+    async fn block_by_number(
+        storage: &mut StorageProcessor<'_>,
+        block_number: zksync_types::BlockNumber,
+        include_txs: bool,
+    ) -> Result<BlockInfo> {
+        let parent_hash = if block_number.0 == 0 {
+            H256::zero()
+        } else {
+            let parent_block = storage
+                .chain()
+                .block_schema()
+                .get_storage_block(block_number - 1)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .ok_or_else(Error::internal_error)?;
+            H256::from_slice(&parent_block.root_hash)
+        };
+
+        if include_txs {
+            let block = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .ok_or_else(Error::internal_error)?;
+            let hash = H256::from_slice(&block.new_root_hash.to_bytes());
+            let transactions = block
+                .block_transactions
+                .into_iter()
+                .map(|tx| {
+                    let tx = match tx {
+                        ExecutedOperations::Tx(tx) => TxData {
+                            block_hash: hash,
+                            block_number: block_number.0,
+                            block_index: tx.block_index,
+                            from: tx.signed_tx.tx.from_account(),
+                            to: tx.signed_tx.tx.to_account(),
+                            nonce: tx.signed_tx.tx.nonce().0,
+                            tx_hash: H256::from_slice(tx.signed_tx.tx.hash().as_ref()),
+                        },
+                        ExecutedOperations::PriorityOp(op) => TxData {
+                            block_hash: hash,
+                            block_number: block_number.0,
+                            block_index: Some(op.block_index),
+                            from: op.priority_op.data.from_account(),
+                            to: op.priority_op.data.to_account(),
+                            nonce: op.priority_op.serial_id as u32,
+                            tx_hash: H256::from_slice(op.priority_op.tx_hash().as_ref()),
+                        },
+                    };
+                    Self::transaction_from_tx_data(tx)
+                })
+                .collect();
+
+            Ok(BlockInfo::new_with_txs(
+                hash,
+                parent_hash,
+                block_number,
+                block.timestamp,
+                transactions,
+            ))
+        } else {
+            let block = storage
+                .chain()
+                .block_schema()
+                .get_storage_block(block_number)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .ok_or_else(Error::internal_error)?;
+            let hash = H256::from_slice(&block.root_hash);
+            let transactions = storage
+                .chain()
+                .block_schema()
+                .get_block_transactions_hashes(block_number)
+                .await
+                .map_err(|_| Error::internal_error())?
+                .into_iter()
+                .map(|hash| H256::from_slice(&hash))
+                .collect();
+
+            Ok(BlockInfo::new_with_hashes(
+                hash,
+                parent_hash,
+                block_number,
+                block.timestamp.unwrap_or_default() as u64,
+                transactions,
+            ))
+        }
     }
 }
 

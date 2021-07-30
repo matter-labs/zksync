@@ -1284,6 +1284,36 @@ async fn test_get_block_number_by_hash(mut storage: StorageProcessor<'_>) -> Que
     Ok(())
 }
 
+/// Check that `get_block_transactions_hashes` works correctly
+#[db_test]
+async fn test_get_block_transactions_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+    setup.add_block(1);
+
+    let before_commit = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions_hashes(BlockNumber(1))
+        .await?;
+    assert!(before_commit.is_empty());
+
+    commit_schema_data(&mut storage, &setup).await?;
+
+    let after_commit = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions_hashes(BlockNumber(1))
+        .await?;
+    let len = setup.blocks[0].block_transactions.len();
+    let expected: Vec<Vec<u8>> = (0..len)
+        .into_iter()
+        .map(|index| setup.get_tx_hash(0, index).as_ref().to_vec())
+        .collect();
+    assert_eq!(after_commit, expected);
+
+    Ok(())
+}
+
 /// Check that account tree cache is removed correctly.
 #[db_test]
 async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
