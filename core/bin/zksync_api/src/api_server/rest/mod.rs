@@ -40,7 +40,14 @@ async fn start_server(
             v02::api_scope(tx_sender, &api_v01.config)
         };
         App::new()
-            .wrap(Cors::default().send_wildcard().max_age(3600))
+            .wrap(
+                Cors::default()
+                    .send_wildcard()
+                    .max_age(3600)
+                    .allow_any_origin()
+                    .allow_any_header()
+                    .allow_any_method(),
+            )
             .service(api_v01.into_scope())
             .service(forced_exit_requests_api_scope)
             .service(api_v02_scope)
