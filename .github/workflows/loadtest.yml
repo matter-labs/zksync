@@ -153,5 +153,6 @@ jobs:
       -
         name: Scale loadtest to 0 replicas
         run: |
-          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/server
-          kubectl -n $ZKSYNC_ENV scale --replicas=0 deploy/prover
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 server
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 prover
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 sqlproxy-gcloud-sqlproxy
