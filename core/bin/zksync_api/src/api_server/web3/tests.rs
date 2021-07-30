@@ -162,7 +162,7 @@ async fn get_balance() -> anyhow::Result<()> {
         let balance = storage
             .chain()
             .account_schema()
-            .get_account_eth_balance_for_block(address, BlockNumber(3))
+            .get_account_balance_for_block(address, BlockNumber(3), TokenId(0))
             .await?;
         U256::from_dec_str(&balance.to_string()).unwrap()
     };
@@ -194,7 +194,7 @@ async fn get_balance() -> anyhow::Result<()> {
         let balance = storage
             .chain()
             .account_schema()
-            .get_account_eth_balance_for_block(address, last_block)
+            .get_account_balance_for_block(address, last_block, TokenId(0))
             .await?;
         U256::from_dec_str(&balance.to_string()).unwrap()
     };

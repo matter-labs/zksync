@@ -376,10 +376,11 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         Ok(BlockNumber(block_number as u32))
     }
 
-    pub async fn get_account_eth_balance_for_block(
+    pub async fn get_account_balance_for_block(
         &mut self,
         address: Address,
         block_number: BlockNumber,
+        token_id: TokenId,
     ) -> QueryResult<BigUint> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -399,12 +400,13 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let record = sqlx::query!(
             r#"
                 SELECT new_balance FROM account_balance_updates
-                WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0
+                WHERE account_id = $1 AND block_number <= $2 AND coin_id = $3
                 ORDER BY update_order_id DESC
                 LIMIT 1
             "#,
             i64::from(account_id.0),
-            i64::from(block_number.0)
+            i64::from(block_number.0),
+            token_id.0 as i32
         )
         .fetch_optional(transaction.conn())
         .await?;

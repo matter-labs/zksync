@@ -8,8 +8,9 @@ use zksync_config::ZkSyncConfig;
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
-use self::{logs::LogsHelper, rpc_trait::Web3Rpc};
+use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
 
+mod calls;
 mod converter;
 mod logs;
 mod rpc_impl;
@@ -18,11 +19,14 @@ mod rpc_trait;
 mod tests;
 mod types;
 
+pub const ZKSYNC_PROXY_ADDRESS: &str = "1000000000000000000000000000000000000000";
+
 #[derive(Clone)]
 pub struct Web3RpcApp {
     runtime_handle: tokio::runtime::Handle,
     connection_pool: ConnectionPool,
     logs_helper: LogsHelper,
+    calls_helper: CallsHelper,
     chain_id: u8,
 }
 
@@ -30,11 +34,12 @@ impl Web3RpcApp {
     pub fn new(connection_pool: ConnectionPool, chain_id: u8) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("Web3RpcApp must be created from the context of Tokio Runtime");
-
+        let calls_helper = dbg!(CallsHelper::new());
         Web3RpcApp {
             runtime_handle,
             connection_pool,
             logs_helper: LogsHelper::new(),
+            calls_helper: CallsHelper::new(),
             chain_id,
         }
     }

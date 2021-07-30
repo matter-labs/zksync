@@ -5,7 +5,8 @@ use jsonrpc_derive::rpc;
 // Local uses
 use super::{
     types::{
-        BlockInfo, BlockNumber, Filter, Log, Transaction, TransactionReceipt, H160, H256, U256, U64,
+        BlockInfo, BlockNumber, Bytes, CallRequest, Filter, Log, Transaction, TransactionReceipt,
+        H160, H256, U256, U64,
     },
     Web3RpcApp,
 };
@@ -94,6 +95,9 @@ pub trait Web3Rpc {
 
     #[rpc(name = "eth_getLogs", returns = "Vec<Log>")]
     fn get_logs(&self, filter: Filter) -> FutureResp<Vec<Log>>;
+
+    #[rpc(name = "eth_call", returns = "Bytes")]
+    fn call(&self, req: CallRequest, _block: Option<BlockNumber>) -> FutureResp<Bytes>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -174,5 +178,9 @@ impl Web3Rpc for Web3RpcApp {
 
     fn get_logs(&self, filter: Filter) -> FutureResp<Vec<Log>> {
         spawn! { self._impl_get_logs(filter) }
+    }
+
+    fn call(&self, req: CallRequest, block: Option<BlockNumber>) -> FutureResp<Bytes> {
+        spawn! { self._impl_call(req, block) }
     }
 }

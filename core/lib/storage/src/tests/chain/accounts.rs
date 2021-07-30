@@ -248,7 +248,6 @@ async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
                 balance_update: (TokenId(0), BigUint::from(200u32), BigUint::from(300u32)),
             },
         ),
-        // Balance updates of non-eth tokens should be ignored.
         (
             AccountId(1),
             AccountUpdate::UpdateBalance {
@@ -269,30 +268,36 @@ async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         .commit_state_update(BlockNumber(3), &updates2, updates1.len())
         .await?;
 
-    let balance1 = storage
+    let balance01 = storage
         .chain()
         .account_schema()
-        .get_account_eth_balance_for_block(address, BlockNumber(1))
+        .get_account_balance_for_block(address, BlockNumber(1), TokenId(0))
         .await?;
-    let balance2 = storage
+    let balance02 = storage
         .chain()
         .account_schema()
-        .get_account_eth_balance_for_block(address, BlockNumber(2))
+        .get_account_balance_for_block(address, BlockNumber(2), TokenId(0))
         .await?;
-    let balance3 = storage
+    let balance03 = storage
         .chain()
         .account_schema()
-        .get_account_eth_balance_for_block(address, BlockNumber(3))
+        .get_account_balance_for_block(address, BlockNumber(3), TokenId(0))
         .await?;
-    let balance4 = storage
+    let balance04 = storage
         .chain()
         .account_schema()
-        .get_account_eth_balance_for_block(address, BlockNumber(4))
+        .get_account_balance_for_block(address, BlockNumber(4), TokenId(0))
         .await?;
-    assert_eq!(balance1, BigUint::zero());
-    assert_eq!(balance2, BigUint::from(100u32));
-    assert_eq!(balance3, BigUint::from(300u32));
-    assert_eq!(balance4, BigUint::from(300u32));
+    let balance14 = storage
+        .chain()
+        .account_schema()
+        .get_account_balance_for_block(address, BlockNumber(4), TokenId(1))
+        .await?;
+    assert_eq!(balance01, BigUint::zero());
+    assert_eq!(balance02, BigUint::from(100u32));
+    assert_eq!(balance03, BigUint::from(300u32));
+    assert_eq!(balance04, BigUint::from(300u32));
+    assert_eq!(balance14, BigUint::from(10000u32));
 
     Ok(())
 }

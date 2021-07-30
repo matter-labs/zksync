@@ -3,15 +3,18 @@ use std::collections::HashMap;
 use std::str::FromStr;
 // External uses
 use ethabi::{encode, Token as AbiToken};
-use jsonrpc_core::Error;
+use jsonrpc_core::{Error, Result};
 use num::BigUint;
 use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_storage::StorageProcessor;
 use zksync_types::{Token, TokenId, ZkSyncOp, NFT};
 // Local uses
-use super::converter::{log, u256_from_biguint};
-use super::types::{Bytes, CommonLogData, Event, Log, H160, H256, U256};
+use super::{
+    converter::{log, u256_from_biguint},
+    types::{Bytes, CommonLogData, Event, Log, H160, H256, U256},
+    ZKSYNC_PROXY_ADDRESS,
+};
 use crate::utils::token_db_cache::TokenDBCache;
 
 #[derive(Debug, Clone)]
@@ -49,8 +52,7 @@ impl LogsHelper {
             topic_by_event,
             event_by_topic,
             tokens: TokenDBCache::new(),
-            zksync_proxy_address: H160::from_str("1000000000000000000000000000000000000000")
-                .unwrap(),
+            zksync_proxy_address: H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap(),
         }
     }
 
@@ -67,7 +69,7 @@ impl LogsHelper {
         op: ZkSyncOp,
         common_data: CommonLogData,
         storage: &mut StorageProcessor<'_>,
-    ) -> jsonrpc_core::Result<Option<Log>> {
+    ) -> Result<Option<Log>> {
         let transaction_log_index = Self::zksync_op_log_index(&op);
         let log_data = match op {
             ZkSyncOp::Transfer(op) => {
@@ -238,7 +240,7 @@ impl LogsHelper {
         op: ZkSyncOp,
         common_data: CommonLogData,
         storage: &mut StorageProcessor<'_>,
-    ) -> jsonrpc_core::Result<Vec<Log>> {
+    ) -> Result<Vec<Log>> {
         let mut logs = Vec::new();
         match op {
             ZkSyncOp::Transfer(op) => {
@@ -418,7 +420,7 @@ impl LogsHelper {
         &self,
         storage: &mut StorageProcessor<'_>,
         id: TokenId,
-    ) -> jsonrpc_core::Result<Token> {
+    ) -> Result<Token> {
         Ok(self
             .tokens
             .get_token(storage, id)
@@ -427,11 +429,7 @@ impl LogsHelper {
             .expect("Can't find token in storage"))
     }
 
-    async fn get_nft_by_id(
-        &self,
-        storage: &mut StorageProcessor<'_>,
-        id: TokenId,
-    ) -> jsonrpc_core::Result<NFT> {
+    async fn get_nft_by_id(&self, storage: &mut StorageProcessor<'_>, id: TokenId) -> Result<NFT> {
         Ok(self
             .tokens
             .get_nft_by_id(storage, id)
@@ -466,7 +464,7 @@ impl LogsHelper {
         common_data: CommonLogData,
         transaction_log_index: U256,
         storage: &mut StorageProcessor<'_>,
-    ) -> jsonrpc_core::Result<Log> {
+    ) -> Result<Log> {
         let (contract_address, amount_or_id) = if !token.is_nft {
             (token.address, u256_from_biguint(amount)?)
         } else {
