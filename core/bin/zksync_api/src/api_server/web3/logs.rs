@@ -556,6 +556,7 @@ impl LogsHelper {
         bytes.into()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn zksync_withdraw_nft_data(
         from: H160,
         to: H160,

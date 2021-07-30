@@ -1,6 +1,5 @@
 // Built-in uses
 use std::collections::HashSet;
-use std::iter::FromIterator;
 use std::time::Instant;
 // External uses
 use jsonrpc_core::{Error, Result};
@@ -272,7 +271,7 @@ impl Web3RpcApp {
                         .web3_receipts_with_token_addresses(from_block, to_block, &token_addresses)
                         .await
                         .map_err(|_| Error::internal_error())?;
-                    let token_addresses = HashSet::from_iter(token_addresses.into_iter());
+                    let token_addresses: HashSet<H160> = token_addresses.into_iter().collect();
                     for receipt in receipts {
                         self.append_logs(
                             &mut transaction,
@@ -319,7 +318,7 @@ impl Web3RpcApp {
                     .web3_receipts_with_token_addresses(from_block, to_block, &token_addresses)
                     .await
                     .map_err(|_| Error::internal_error())?;
-                let token_addresses = HashSet::from_iter(token_addresses.into_iter());
+                let token_addresses: HashSet<H160> = token_addresses.into_iter().collect();
                 for receipt in receipts {
                     self.append_logs(
                         &mut transaction,

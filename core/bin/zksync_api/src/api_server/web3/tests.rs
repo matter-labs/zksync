@@ -646,7 +646,7 @@ async fn create_logs() -> anyhow::Result<()> {
         }
     };
 
-    let test_data: Vec<(ZkSyncOp, Vec<(Event, &str, &str)>)> = vec![
+    let test_data: Vec<(ZkSyncOp, _)> = vec![
         (
             transfer_op.into(),
             vec![(Event::ERCTransfer, "000000000000000000000000a3dfe7b9dec5b30369aa5b5e53df47e95294a2d30000000000000000000000006247f65195f37229068af47775fee7355e660e400000000000000000000000000000000000000000000000000000000000000064", "erc transfer for transfer"),
@@ -844,25 +844,20 @@ async fn get_logs() -> anyhow::Result<()> {
     }
 
     // Checks that topic filter works correctly
-    let mut topics = Vec::new();
-    topics.push(
+    let topics = vec![
         rpc_app
             .logs_helper
             .topic_by_event(Event::ERCTransfer)
             .unwrap(),
-    );
-    topics.push(
         rpc_app
             .logs_helper
             .topic_by_event(Event::ZkSyncChangePubKey)
             .unwrap(),
-    );
-    topics.push(
         rpc_app
             .logs_helper
             .topic_by_event(Event::ZkSyncDeposit)
             .unwrap(),
-    );
+    ];
 
     let fut = {
         let (client, server) = local_client().await?;
