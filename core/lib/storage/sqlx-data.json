@@ -2811,6 +2811,24 @@
       "nullable": []
     }
   },
+  "77a2e1137af7e8aba1ba026ab997005b079264c13bea68054d21bb4d4f0f9195": {
+    "query": "SELECT max(priority_op_serialid) as \"max!\" FROM executed_priority_operations;",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "77a35660d36e4b67dafa930ea4cce469b73e3f6d14a67aeda89233c7aa82206a": {
     "query": "\n                    SELECT nft.*, tokens.symbol FROM nft\n                    INNER JOIN tokens\n                    ON tokens.id = nft.token_id\n                    WHERE creator_account_id = $1\n                ",
     "describe": {
