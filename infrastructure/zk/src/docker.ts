@@ -45,15 +45,13 @@ async function _build(image: string) {
         await contract.build();
     }
     const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
-    // TODO Uncomment this code, after nft deploying
-    // const latestImage = `-t matterlabs/${image}:latest`;
+    const latestImage = `-t matterlabs/${image}:latest`;
     const taggedImage = ['nginx', 'server', 'prover'].includes(image) ? `-t matterlabs/${image}:${imageTag}` : '';
-    await utils.spawn(`DOCKER_BUILDKIT=1 docker build  ${taggedImage} -f ./docker/${image}/Dockerfile .`);
+    await utils.spawn(`DOCKER_BUILDKIT=1 docker build ${latestImage} ${taggedImage} -f ./docker/${image}/Dockerfile .`);
 }
 
 async function _push(image: string) {
-    // TODO Uncomment this code, after nft deploying
-    // await utils.spawn(`docker push matterlabs/${image}:latest`);
+    await utils.spawn(`docker push matterlabs/${image}:latest`);
     if (['nginx', 'server', 'prover', 'event-listener'].includes(image)) {
         const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
         await utils.spawn(`docker push matterlabs/${image}:${imageTag}`);

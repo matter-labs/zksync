@@ -68,6 +68,10 @@ pub enum WatcherMode {
 #[derive(Debug)]
 pub enum EthWatchRequest {
     PollETHNode,
+    GetPriorityOpBySerialId {
+        serial_id: u64,
+        resp: oneshot::Sender<Option<PriorityOp>>,
+    },
     GetPriorityQueueOps {
         op_start_id: u64,
         max_chunks: usize,
@@ -212,7 +216,6 @@ impl<W: EthClient> EthWatch<W> {
             new_tokens,
             register_nft_factory_events,
         );
-
         self.set_new_state(new_state);
         Ok(())
     }
@@ -621,6 +624,15 @@ impl<W: EthClient> EthWatch<W> {
                         .await
                         .unwrap_or(false);
                     resp.send(authorized).unwrap_or_default();
+                }
+                EthWatchRequest::GetPriorityOpBySerialId { serial_id, resp } => {
+                    resp.send(
+                        self.eth_state
+                            .priority_queue()
+                            .get(&serial_id)
+                            .map(|received_op| received_op.as_ref().clone()),
+                    )
+                    .unwrap_or_default();
                 }
             }
         }

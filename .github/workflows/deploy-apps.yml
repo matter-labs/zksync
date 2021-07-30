@@ -4,7 +4,7 @@ on:
   deployment:
 
 env:
-  DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
+  DEPLOY_APPS: -l name=server -l name=prover
 
 jobs:
   pre:
@@ -89,7 +89,7 @@ jobs:
         with:
           repository: matter-labs/helm-infra
           path: helm-infra
-          ref: breaking-secrets
+          ref: new-health-and-conf
           token: ${{ secrets.GH_TOKEN }}
       -
         if: ${{ needs.pre.outputs.isTag == 'true' }}

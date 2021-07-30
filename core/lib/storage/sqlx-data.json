@@ -859,22 +859,6 @@
       ]
     }
   },
-  "1ce3fbb6c510621c830b0b4679d51fb2ac4379a474d7ee7074500d786102fcd3": {
-    "query": "INSERT INTO mempool_txs (tx_hash, tx, eth_sign_data, created_at, batch_id)\n            SELECT u.tx_hash, u.tx, u.eth_sign_data, $4, $5\n                FROM UNNEST ($1::text[], $2::jsonb[], $3::jsonb[])\n                AS u(tx_hash, tx, eth_sign_data)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "TextArray",
-          "JsonbArray",
-          "JsonbArray",
-          "Timestamptz",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "1d4884ae73b5c60662e2d778b43230a9fa2c7b683402bb67966428f70db2d900": {
     "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        success,\n                        fail_reason,\n                        created_at\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        true as success,\n                        Null as fail_reason,\n                        created_at\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    success as \"success!\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\"\n                FROM everything\n                ORDER BY created_at DESC\n            ",
     "describe": {
@@ -992,6 +976,18 @@
         null,
         false
       ]
+    }
+  },
+  "1fbfd087b4c05dc6a682c0020bfae07b3eea537e3e96f0316a7ec3ed63df9f88": {
+    "query": "DELETE FROM account_tree_cache WHERE block < $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
@@ -2157,6 +2153,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -2168,7 +2169,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
@@ -2751,6 +2753,27 @@
       "nullable": []
     }
   },
+  "608b872d00f343f4409accbc9f4eda94918de5596ae55c062fed6d8c894e7b29": {
+    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0\n                ORDER BY update_order_id DESC\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "new_balance",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {
     "query": "SELECT * FROM executed_priority_operations WHERE eth_hash = $1",
     "describe": {
@@ -2884,43 +2907,6 @@
         false,
         false
       ]
-    }
-  },
-  "6a8f81ac8f56574e5a048e6acfa04d1c9f0adf348f1eee2ac0dde84f3cf63c40": {
-    "query": "SELECT batch_id, array_agg(tx_hash) as txs\n                FROM executed_transactions\n                GROUP BY batch_id\n                HAVING batch_id IS NOT NULL AND batch_id != 0;\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "batch_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "txs",
-          "type_info": "ByteaArray"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        true,
-        null
-      ]
-    }
-  },
-  "6c25f6955c7381b5ed9bf4f2eb233adbd2923baafc688f36b66b86f44b456668": {
-    "query": "UPDATE blocks\n                SET root_hash = $1\n                WHERE number = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
@@ -4112,27 +4098,6 @@
       "nullable": []
     }
   },
-  "9cfc4a7d1b0453be30a5024f57989d57aeebd3f5304c90d6e09bc251c0e99ea9": {
-    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "new_balance",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "9fb67f0d0bc8387201e5358ca011da4b6d4d48c38c5de3f628c9818804c01376": {
     "query": "\n                                WITH transactions AS (\n                                    SELECT\n                                        tx_hash,\n                                        tx as op,\n                                        block_number,\n                                        created_at,\n                                        success,\n                                        fail_reason,\n                                        Null::bytea as eth_hash,\n                                        Null::bigint as priority_op_serialid,\n                                        block_index\n                                    FROM executed_transactions\n                                    WHERE block_number = $1 AND created_at <= $2\n                                ), priority_ops AS (\n                                    SELECT\n                                        tx_hash,\n                                        operation as op,\n                                        block_number,\n                                        created_at,\n                                        true as success,\n                                        Null as fail_reason,\n                                        eth_hash,\n                                        priority_op_serialid,\n                                        block_index\n                                    FROM executed_priority_operations\n                                    WHERE block_number = $1 AND created_at <= $2\n                                ), everything AS (\n                                    SELECT * FROM transactions\n                                    UNION ALL\n                                    SELECT * FROM priority_ops\n                                )\n                                SELECT\n                                    tx_hash as \"tx_hash!\",\n                                    block_number as \"block_number!\",\n                                    op as \"op!\",\n                                    created_at as \"created_at!\",\n                                    success as \"success!\",\n                                    fail_reason as \"fail_reason?\",\n                                    eth_hash as \"eth_hash?\",\n                                    priority_op_serialid as \"priority_op_serialid?\"\n                                FROM everything\n                                ORDER BY created_at DESC, block_index DESC\n                                LIMIT $3\n                            ",
     "describe": {
@@ -4671,6 +4636,23 @@
       "nullable": []
     }
   },
+  "b2058dc0ab15ec7fdbd2c2ca59faaadc9c826f6318851d8c3a22e8feaa4989b8": {
+    "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id, next_priority_op_serial_id)\n                VALUES ($1, $2, $3, $4, $5, $6)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Jsonb",
+          "Timestamptz",
+          "Jsonb",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "b5e0f843d267576d57f41e2c4a63335749cb40e79bdb2b2cccbbaed5200abe96": {
     "query": "\n                    SELECT * FROM tokens\n                    WHERE address = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -4802,6 +4784,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -4813,7 +4800,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
@@ -5579,6 +5567,22 @@
       ]
     }
   },
+  "cd155debc525d539341b88e30a9ba9d3f130c4934883d945fa4abcb528ffc80f": {
+    "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n                VALUES ($1, $2, $3, $4, $5)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Jsonb",
+          "Timestamptz",
+          "Jsonb",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "ceb8e4656aa76e1918a03707a1f047aed19ffcb3c70dbde61a6353b26b5a2493": {
     "query": "\n            INSERT INTO ticker_market_volume ( token_id, market_volume, last_updated )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT (token_id)\n            DO\n              UPDATE SET market_volume = $2, last_updated = $3\n            ",
     "describe": {
@@ -5696,19 +5700,6 @@
         false,
         false
       ]
-    }
-  },
-  "d5c6be595f62ef758fd39d8263139cf2ce777612bae32805daba299881d9b1e0": {
-    "query": "\n                UPDATE executed_priority_operations\n                SET tx_hash = u.tx_hash\n                FROM (\n                    SELECT * FROM\n                    UNNEST($1::bytea[], $2::bigint[])\n                    AS u(tx_hash, id)\n                ) u\n                WHERE priority_op_serialid = u.id\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "ByteaArray",
-          "Int8Array"
-        ]
-      },
-      "nullable": []
     }
   },
   "d71db9de5e4ec2dc9a511d4a1247d912b15250bbd8f834f11b252de653c73176": {
@@ -6066,6 +6057,11 @@
           "ordinal": 5,
           "name": "batch_id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -6079,7 +6075,8 @@
         false,
         false,
         true,
-        false
+        false,
+        true
       ]
     }
   },
@@ -6297,42 +6294,6 @@
       ]
     }
   },
-  "e80dba3fa7252902a9c53f7500f7e498bbe062eb833baeb271ecb1c9af468dc1": {
-    "query": "SELECT priority_op_serialid, eth_hash, eth_block, eth_block_index FROM executed_priority_operations",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "priority_op_serialid",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 2,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_block_index",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        true
-      ]
-    }
-  },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {
     "query": "\n                SELECT * FROM prover_job_queue\n                WHERE job_status = $1\n                ORDER BY (job_priority, id, first_block)\n                LIMIT 1\n            ",
     "describe": {
@@ -6454,19 +6415,6 @@
       "nullable": []
     }
   },
-  "ec07bf1dcfe77b28e753f3f145ff02ce47924ed311b2b7848b6e13c377d1a235": {
-    "query": "\n                INSERT INTO txs_batches_hashes (batch_id, batch_hash)\n                SELECT u.batch_id, u.batch_hash\n                FROM UNNEST ($1::bigint[], $2::bytea[])\n                AS u(batch_id, batch_hash)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8Array",
-          "ByteaArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "ec1b0d11c29e691e78145bf04665fd1967b329722cf0d54a0611eedc4caff866": {
     "query": "\n            SELECT * FROM tokens\n            WHERE id >= $1 AND is_nft = false\n            ORDER BY id ASC\n            LIMIT $2\n            ",
     "describe": {
@@ -6506,36 +6454,6 @@
       "nullable": [
         false,
         false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "ed39b22ac81b690c2102487ae3351915eec23b00a9cf9e409de08662c42fa20d": {
-    "query": "SELECT * FROM balances",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "account_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "coin_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "balance",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
         false,
         false,
         false
@@ -6622,18 +6540,6 @@
           "Int4",
           "Bytea",
           "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "f02021c46f5edc171f22c16e29bb028353eb0519aec1555c066fdd8dfe1d61e5": {
-    "query": "\n            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n            SELECT tx_hash, tx, created_at, eth_sign_data, COALESCE(batch_id, 0) FROM executed_transactions\n            WHERE block_number > $1\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
         ]
       },
       "nullable": []
@@ -7056,18 +6962,6 @@
       "nullable": [
         null
       ]
-    }
-  },
-  "f5bb5886974577c7f43179f77638507511ffbe1462bb75844a1f1c72414a4d83": {
-    "query": "\n            DELETE FROM account_tree_cache \n            WHERE block = $1\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {

@@ -5,7 +5,7 @@ use futures01::future::Future;
 use jsonrpc_core::{IoHandler, Params};
 use jsonrpc_core_client::{RawClient, RpcError};
 use num::BigUint;
-use serde_json::Value;
+use serde_json::{Map, Value};
 // Workspace uses
 use zksync_storage::{chain::operations_ext::records::Web3TxReceipt, ConnectionPool};
 use zksync_test_account::ZkSyncAccount;
@@ -796,14 +796,11 @@ async fn get_logs() -> anyhow::Result<()> {
     // Checks that block filter works correctly.
     let fut = {
         let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert("fromBlock".to_string(), Value::String("0x1".to_string()));
+        req.insert("toBlock".to_string(), Value::String("0x1".to_string()));
         client
-            .call_method(
-                "eth_getLogs",
-                Params::Array(vec![
-                    Value::String("0x1".to_string()),
-                    Value::String("0x1".to_string()),
-                ]),
-            )
+            .call_method("eth_getLogs", Params::Array(vec![Value::Object(req)]))
             .join(server)
     };
     let (logs, _) = fut.wait().unwrap();
@@ -828,15 +825,15 @@ async fn get_logs() -> anyhow::Result<()> {
 
     let fut = {
         let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert("fromBlock".to_string(), Value::String("0x1".to_string()));
+        req.insert("toBlock".to_string(), Value::String("0x8".to_string()));
+        req.insert(
+            "address".to_string(),
+            serde_json::to_value(addresses.clone()).unwrap(),
+        );
         client
-            .call_method(
-                "eth_getLogs",
-                Params::Array(vec![
-                    Value::String("0x1".to_string()),
-                    Value::String("0x8".to_string()),
-                    serde_json::to_value(addresses.clone()).unwrap(),
-                ]),
-            )
+            .call_method("eth_getLogs", Params::Array(vec![Value::Object(req)]))
             .join(server)
     };
     let (logs, _) = fut.wait().unwrap();
@@ -869,16 +866,16 @@ async fn get_logs() -> anyhow::Result<()> {
 
     let fut = {
         let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert("fromBlock".to_string(), Value::String("0x1".to_string()));
+        req.insert("toBlock".to_string(), Value::String("0x8".to_string()));
+        req.insert("address".to_string(), Value::Null);
+        req.insert(
+            "topics".to_string(),
+            Value::Array(vec![serde_json::to_value(topics.clone()).unwrap()]),
+        );
         client
-            .call_method(
-                "eth_getLogs",
-                Params::Array(vec![
-                    Value::String("0x1".to_string()),
-                    Value::String("0x8".to_string()),
-                    Value::Null,
-                    Value::Array(vec![serde_json::to_value(topics.clone()).unwrap()]),
-                ]),
-            )
+            .call_method("eth_getLogs", Params::Array(vec![Value::Object(req)]))
             .join(server)
     };
     let (logs, _) = fut.wait().unwrap();

@@ -37,7 +37,6 @@ impl StateKeeperTester {
             vec![available_chunk_size],
             max_iterations,
             fast_iterations,
-            None,
         );
 
         Self {
@@ -146,7 +145,7 @@ fn create_account_and_fast_withdrawal<B: Into<BigUint>>(
     )
 }
 
-#[allow(clippy::clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
     tester: &mut StateKeeperTester,
     token_id: TokenId,
@@ -254,7 +253,6 @@ fn test_create_incorrect_state_keeper() {
         vec![1, 2, 2], // `available_block_chunk_sizes` must be strictly increasing.
         MAX_ITERATIONS,
         FAST_ITERATIONS,
-        None,
     );
 }
 
@@ -339,8 +337,8 @@ mod apply_tx {
         let pending_block = tester.state_keeper.pending_block;
 
         assert!(result.is_ok());
-        assert_eq!(old_pending_block.fast_processing_required, false);
-        assert_eq!(pending_block.fast_processing_required, true);
+        assert!(!old_pending_block.fast_processing_required);
+        assert!(pending_block.fast_processing_required);
     }
 
     /// Checks if withdrawal that will fail is processed correctly

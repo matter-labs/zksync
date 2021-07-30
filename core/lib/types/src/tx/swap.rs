@@ -80,7 +80,7 @@ impl Order {
         out.extend_from_slice(&pad_front(&self.price.0.to_bytes_be(), PRICE_BIT_WIDTH / 8));
         out.extend_from_slice(&pad_front(&self.price.1.to_bytes_be(), PRICE_BIT_WIDTH / 8));
         out.extend_from_slice(&pack_token_amount(&self.amount));
-        out.extend_from_slice(&self.time_range.to_be_bytes());
+        out.extend_from_slice(&self.time_range.as_be_bytes());
         out
     }
 

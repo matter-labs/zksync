@@ -50,7 +50,7 @@ impl RawTransaction {
         let s = &signature.s[s_start..];
         tx.append(&s);
         tx.finalize_unbounded_list();
-        tx.out()
+        tx.out().to_vec()
     }
 
     pub fn hash(&self) -> [u8; 32] {

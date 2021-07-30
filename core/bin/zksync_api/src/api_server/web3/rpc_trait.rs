@@ -5,8 +5,7 @@ use jsonrpc_derive::rpc;
 // Local uses
 use super::{
     types::{
-        BlockInfo, BlockNumber, Filter, Log, Transaction, TransactionReceipt, ValueOrArray, H160,
-        H256, U256, U64,
+        BlockInfo, BlockNumber, Filter, Log, Transaction, TransactionReceipt, H160, H256, U256, U64,
     },
     Web3RpcApp,
 };

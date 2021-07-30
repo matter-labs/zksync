@@ -227,6 +227,8 @@ API_JSON_RPC_HTTP_PORT="3030"
 API_JSON_RPC_HTTP_URL="http://127.0.0.1:3030"
 API_JSON_RPC_WS_PORT="3031"
 API_JSON_RPC_WS_URL="ws://127.0.0.1:3031"
+API_WEB3_PORT="3002"
+API_WEB3_URL="http://127.0.0.1:3002"
 API_PRIVATE_PORT="8090"
 API_PRIVATE_URL="http://127.0.0.1:8090"
 API_PROVER_PORT="8088"
@@ -265,6 +267,10 @@ API_PROMETHEUS_PORT="3312"
         assert_eq!(
             config.json_rpc.http_bind_addr(),
             SocketAddr::new(bind_broadcast_addr, config.json_rpc.http_port)
+        );
+        assert_eq!(
+            config.web3.bind_addr(),
+            SocketAddr::new(bind_broadcast_addr, config.web3.port)
         );
     }
 }

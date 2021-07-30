@@ -9,16 +9,20 @@ import {
   BigNumber,
   BigNumberish,
   PopulatedTransaction,
-} from "ethers";
-import {
   Contract,
   ContractTransaction,
   Overrides,
   CallOverrides,
-} from "@ethersproject/contracts";
-import { BytesLike } from "@ethersproject/bytes";
-import { Listener, Provider } from "@ethersproject/providers";
-import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
+  BytesLike,
+  utils,
+  providers
+} from "ethers";
+type FunctionFragment = utils.FunctionFragment;
+type EventFragment = utils.EventFragment;
+type Result = utils.Result;
+
+type Listener = providers.Listener;
+type Provider = providers.Provider;
 
 interface ZkSyncNFTFactoryInterface extends ethers.utils.Interface {
   functions: {

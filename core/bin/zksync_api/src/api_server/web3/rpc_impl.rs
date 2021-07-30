@@ -13,7 +13,7 @@ use super::{
     converter::{resolve_block_number, transaction_from_tx_data, u256_from_biguint},
     types::{
         BlockInfo, BlockNumber, CommonLogData, Event, Filter, Log, Transaction, TransactionReceipt,
-        TxData, ValueOrArray, H160, H2048, H256, U256, U64,
+        TxData, H160, H2048, H256, U256, U64,
     },
     Web3RpcApp,
 };
