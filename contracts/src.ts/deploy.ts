@@ -94,7 +94,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
         ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
         RegenesisMultisig: process.env.MISC_REGENESIS_MULTISIG_ADDRESS,
-        AdditionalZkSync: process.env.MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS,
+        AdditionalZkSync: process.env.CONTRACTS_ADDITIONAL_ZKSYNC_ADDR,
         TokenGovernance: process.env.CONTRACTS_LISTING_GOVERNANCE
     };
 }
@@ -340,14 +340,14 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         const gasPrice = additionalZkSyncContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS=${additionalZkSyncContract.address}`);
+            console.log(`CONTRACTS_ADDITIONAL_ZKSYNC_ADDR=${additionalZkSyncContract.address}`);
             console.log(
                 `Additiinal zkSync contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
                     zksGasUsed.mul(gasPrice)
                 )}`
             );
         }
-        this.addresses.RegenesisMultisig = additionalZkSyncContract.address;
+        this.addresses.AdditionalZkSync = additionalZkSyncContract.address;
     }
 
     public async deployRegenesisMultisig(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -442,6 +442,7 @@ export class Deployer {
     }
 
     public async deployAll(ethTxOptions?: ethers.providers.TransactionRequest) {
+        await this.deployAdditionalZkSync(ethTxOptions);
         await this.deployZkSyncTarget(ethTxOptions);
         await this.deployGovernanceTarget(ethTxOptions);
         await this.deployVerifierTarget(ethTxOptions);
