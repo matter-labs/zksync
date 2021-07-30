@@ -42,6 +42,10 @@ struct ExitProofData {
     account_id: AccountId,
     token_id: TokenId,
     amount: BigUintSerdeWrapper,
+    nft_creator_id: AccountId,
+    nft_creator_address: Address,
+    nft_serial_id: u32,
+    nft_content_hash: H256,
     proof: EncodedSingleProof,
     token_address: Address,
 }
@@ -148,11 +152,23 @@ async fn main() {
         .expect("Failed to generate exit proof")
     };
 
+    let account_zero_address = storage
+        .chain()
+        .account_schema()
+        .account_address_by_id(AccountId(0))
+        .await
+        .expect("Failed to get zero account address")
+        .expect("Account with id 0 does not exist");
+
     let proof_data = ExitProofData {
         stored_block_info,
         owner: address,
         token_id,
         account_id,
+        nft_creator_id: AccountId(0),
+        nft_creator_address: account_zero_address,
+        nft_serial_id: 0,
+        nft_content_hash: Default::default(),
         amount: amount.into(),
         proof,
         token_address,
