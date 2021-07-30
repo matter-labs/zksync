@@ -7,7 +7,7 @@ use zksync_storage::data_restore::records::{
 };
 use zksync_types::{
     block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
-    Token, TokenId, TokenInfo, NFT,
+    SerialId, Token, TokenId, TokenInfo, NFT,
 };
 
 use crate::{
@@ -119,6 +119,9 @@ pub trait StorageInteractor {
     /// * `tree_cache` - Merkle tree cache
     ///
     async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: serde_json::Value);
+
+    /// Retrieves the maximum serial id of a priority requests
+    async fn get_max_priority_op_serial_id(&mut self) -> SerialId;
 }
 
 /// Returns Rollup contract event from its stored representation
