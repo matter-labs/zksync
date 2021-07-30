@@ -7,7 +7,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    AccountId, BlockNumber, NewTokenEvent, Token, TokenId, TokenInfo,
+    AccountId, BlockNumber, NewTokenEvent, SerialId, Token, TokenId, TokenInfo,
     {block::Block, AccountUpdate, AccountUpdates},
 };
 
@@ -358,7 +358,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
         }
     }
 
-    async fn get_max_priority_op_serial_id(&mut self) -> i64 {
+    async fn get_max_priority_op_serial_id(&mut self) -> SerialId {
         self.storage
             .chain()
             .operations_schema()

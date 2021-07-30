@@ -10,7 +10,7 @@ use zksync_crypto::{
     params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
     Fr,
 };
-use zksync_types::{Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Token};
+use zksync_types::{Account, AccountId, AccountMap, AccountUpdate, BlockNumber, SerialId, Token};
 
 // Local deps
 use crate::{
@@ -77,7 +77,7 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
     /// The last serial id of the priority ops. Needed to make sure that
-    pub last_priority_op_serial_id: i64,
+    pub last_priority_op_serial_id: SerialId,
     phantom_data: PhantomData<I>,
 }
 
