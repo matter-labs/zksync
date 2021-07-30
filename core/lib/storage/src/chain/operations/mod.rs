@@ -6,7 +6,7 @@ use chrono::{Duration, Utc};
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     tx::TxHash,
-    BlockNumber, H256,
+    BlockNumber, SerialId, H256,
 };
 // Local imports
 use self::records::{
@@ -299,7 +299,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     /// Returns the highest serial id of the executed priority ops
     ///
     /// Note: used only by data restore
-    pub async fn get_max_priority_op_serial_id(&mut self) -> QueryResult<i64> {
+    pub async fn get_max_priority_op_serial_id(&mut self) -> QueryResult<SerialId> {
         let start = Instant::now();
 
         let max_serial_id = sqlx::query!(
@@ -307,7 +307,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .fetch_optional(self.0.conn())
         .await?;
-        let max_serial_id = max_serial_id.map(|record| record.max).unwrap_or(0);
+        let max_serial_id = max_serial_id.map(|record| record.max as u64).unwrap_or(0);
 
         metrics::histogram!(
             "sql.chain.operations.get_max_priority_op_serial_id",
