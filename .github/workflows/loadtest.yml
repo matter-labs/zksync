@@ -1,9 +1,7 @@
 name: Loadtest
-
 on:
-  push:
-  pull_request:
-    types: [opened]
+  schedule:
+    - cron: '17 23 * * *'
 
 env:
   ZKSYNC_ENV: loadtest
@@ -106,14 +104,18 @@ jobs:
         name: Update contracts in the ConfigMap
         run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
       -
+        id: config
+        run: |
+          echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
+      -
         name: Deploy apps
         working-directory: helm-infra
         run: |
           UPDATE_REPOS=y helmfile $HF_ARGS repos
+          export IMAGE_TAG=${{ steps.config.outputs.shortRev }}
           # Split apply into diff+sync (required for extra sync args), what for server to settle
-          IMAGE_TAG=868da34 helmfile $HF_ARGS $HF_DEPLOYS diff
-          IMAGE_TAG=868da34 helmfile $HF_ARGS $HF_DEPLOYS sync --args "--timeout 180s" && \
-            sleep 60
+          helmfile $HF_ARGS $HF_DEPLOYS diff
+          helmfile $HF_ARGS $HF_DEPLOYS sync --args "--timeout 180s" && sleep 60
 
   loadtest:
     name: Perform loadtest
