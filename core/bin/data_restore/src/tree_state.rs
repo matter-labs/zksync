@@ -136,11 +136,13 @@ impl TreeState {
         let last_unprocessed_prior_op = self.current_unprocessed_priority_op;
 
         for operation in operations {
+            if operation.is_priority_op() {
+                *last_priority_op_serial_id += 1;
+            }
             match operation {
                 ZkSyncOp::Deposit(op) => {
                     let priority_op = ZkSyncPriorityOp::Deposit(op.priority_op);
                     let op_result = self.state.execute_priority_op(priority_op.clone());
-                    *last_priority_op_serial_id += 1;
                     current_op_block_index = self.update_from_priority_operation(
                         priority_op,
                         op_result,
@@ -300,7 +302,6 @@ impl TreeState {
                 ZkSyncOp::FullExit(op) => {
                     let priority_op = ZkSyncPriorityOp::FullExit(op.priority_op);
                     let op_result = self.state.execute_priority_op(priority_op.clone());
-                    *last_priority_op_serial_id += 1;
                     current_op_block_index = self.update_from_priority_operation(
                         priority_op,
                         op_result,

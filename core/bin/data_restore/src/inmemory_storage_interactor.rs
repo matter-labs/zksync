@@ -164,7 +164,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
         let number_of_priority_ops = self
             .rollups
             .iter()
-            .flat_map(|rollup| rollup.clone().ops)
+            .flat_map(|rollup| &rollup.ops)
             .filter(|op| op.is_priority_op())
             .count();
         number_of_priority_ops as SerialId
