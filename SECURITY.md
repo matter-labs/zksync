@@ -38,7 +38,7 @@ Please email us at [security@zksync](mailto:security@zksync). We appreciate det
 
 ## **Bounty Payout**
 
-![bounty-table.png](https://s3.us-west-2.amazonaws.com/secure.notion-static.com/d4304877-232d-40ad-aeee-760f58f2a0cf/bounty-table.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAT73L2G45O3KS52Y5%2F20210731%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20210731T130950Z&X-Amz-Expires=86400&X-Amz-Signature=553d8144257a42b0bdd057edab4b44a2e9812abb2e9ab45aac155bf4797f10f0&X-Amz-SignedHeaders=host&response-content-disposition=filename%20%3D%22bounty-table.png%22)
+![bounty-table.png](https://zksync.io/bounty-table.png)
 
 ## **Contact**
 
