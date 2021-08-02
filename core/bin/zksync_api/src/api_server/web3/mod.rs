@@ -34,7 +34,6 @@ impl Web3RpcApp {
     pub fn new(connection_pool: ConnectionPool, chain_id: u8) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("Web3RpcApp must be created from the context of Tokio Runtime");
-        let calls_helper = dbg!(CallsHelper::new());
         Web3RpcApp {
             runtime_handle,
             connection_pool,

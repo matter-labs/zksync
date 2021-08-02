@@ -381,9 +381,16 @@ impl Web3RpcApp {
 
     pub async fn _impl_call(self, req: CallRequest, _block: Option<BlockNumber>) -> Result<Bytes> {
         let start = Instant::now();
+        let mut storage = self.access_storage().await?;
+
+        let result = self
+            .calls_helper
+            .execute(&mut storage, req.to, req.data.unwrap_or_default().0)
+            .await
+            .map_err(|_| Error::internal_error())?;
 
         metrics::histogram!("api.web3.call", start.elapsed());
-        Ok(Bytes(Vec::new()))
+        Ok(Bytes(result))
     }
 
     pub(crate) async fn append_logs(

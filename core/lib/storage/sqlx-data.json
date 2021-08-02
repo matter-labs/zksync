@@ -2120,6 +2120,26 @@
       ]
     }
   },
+  "4a5ad2a484f36cd0314d9036ee3cb30748480b5a4d211a32564065dbf96ee503": {
+    "query": "\n                SELECT account_id FROM balances\n                WHERE coin_id = $1 AND balance = 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "4a8d416bb6c7cf8c7d59ad07b181d24eebb8a39776395681ee7f99a4c9183cd8": {
     "query": "SELECT * FROM mempool_txs\n            ORDER BY created_at",
     "describe": {
@@ -6292,6 +6312,28 @@
         false,
         true,
         true
+      ]
+    }
+  },
+  "e6e6d1de5d9c4989fedeb5738fbf1a6658e7ffb30616b5b23189ae3f87b23836": {
+    "query": "\n                SELECT COUNT(*) FROM balances\n                WHERE account_id = $1 AND coin_id >= $2 AND coin_id < $3 AND balance = 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
