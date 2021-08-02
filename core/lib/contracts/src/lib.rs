@@ -12,7 +12,7 @@ const ZKSYNC_CONTRACT_FILE_V4: &str =
 const GOVERNANCE_CONTRACT_FILE: &str =
     "contracts/artifacts/cache/solpp-generated-contracts/Governance.sol/Governance.json";
 const IERC20_CONTRACT_FILE: &str =
-    "contracts/artifacts/cache/solpp-generated-contracts/IERC20.sol/ERC20.json";
+    "contracts/artifacts/cache/solpp-generated-contracts/IERC20.sol/IERC20.json";
 const IEIP1271_CONTRACT_FILE: &str =
     "contracts/artifacts/cache/solpp-generated-contracts/dev-contracts/IEIP1271.sol/IEIP1271.json";
 const UPGRADE_GATEKEEPER_CONTRACT_FILE: &str =

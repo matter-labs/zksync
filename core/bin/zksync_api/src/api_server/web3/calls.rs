@@ -1,23 +1,22 @@
 // Built-in uses
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::path::PathBuf;
 use std::str::FromStr;
 // External uses
-use ethabi::{encode, Contract, Function, Param, ParamType, Token as AbiToken};
+use ethabi::{encode, Contract, Function, Token as AbiToken};
 use jsonrpc_core::{Error, Result};
 use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_storage::StorageProcessor;
-use zksync_types::{Token, TokenId, NFT};
+use zksync_types::{TokenId, NFT};
 // Local uses
 use super::{
     converter::u256_from_biguint,
-    types::{Bytes, H160, H256, U256},
+    types::{H160, U256},
     ZKSYNC_PROXY_ADDRESS,
 };
-use crate::api_server::web3::types::CallRequest;
 use crate::utils::token_db_cache::TokenDBCache;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct CallsHelper {
