@@ -77,6 +77,7 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
     /// The last serial id of the priority ops. Needed to make sure that
+    /// the priority ops dont have same serial ids and incremented for each new priority op
     pub last_priority_op_serial_id: SerialId,
     phantom_data: PhantomData<I>,
 }
