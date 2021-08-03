@@ -1,0 +1,117 @@
+name: Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy Zksync to'
+        required: true
+      image_tag:
+        description: 'Tag of a built image to deploy (optional)'
+        required: false
+      config_tag:
+        description: 'Tag of a Zksync configuration to deploy (optional)'
+        required: false
+      deployment_id:
+        description: 'Deployment which triggers this pipeline (optional)'
+        required: false
+
+defaults:
+  run:
+    shell: bash -leo pipefail {0}
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: [k8s, stage]
+    outputs:
+      image_tag: ${{ github.event.inputs.image_tag || steps.set.outputs.short_rev }}
+      config_tag: ${{ steps.regex-match.outputs.group2 }}
+      deployment_id: ${{ github.event.inputs.deployment_id || steps.deployment.outputs.deployment_id }}
+      environment: ${{ github.event.inputs.environment }}
+      kubeConf: ${{ steps.envMap.outputs.kubeConf }}
+      hfEnv: ${{ steps.envMap.outputs.hfEnv }}
+      namespace: ${{ steps.envMap.outputs.namespace }}
+      runner: ${{ steps.envMap.outputs.runner }}
+
+    steps:
+      - uses: actions/checkout@v2
+      -
+        id: set
+        run: |
+          echo "::set-output name=short_rev::$(git rev-parse --short HEAD)"
+      -
+        name: Map runtime environment data
+        id: envMap
+        uses: kanga333/variable-mapper@v0.2.2
+        with:
+          key: ${{ github.event.inputs.environment }}
+          export_to: output
+          mode: overwrite
+          map: |
+            {
+              ".*": {
+                "hfEnv": "${{ github.event.inputs.environment }}",
+                "kubeConf": "KUBECONF_STAGE",
+                "runner": "stage",
+                "namespace": "${{ github.event.inputs.environment }}"
+              },
+              "^rinkeby$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
+              "^ropsten$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
+              "^mainnet$": { "kubeConf": "KUBECONF_MAINNET", "runner": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
+            }
+      -
+        ## Config tag selector
+        #  group1 - whole tag
+        #  group2 - vX.Y.Z part
+        uses: actions-ecosystem/action-regex-match@v2
+        id: configTag
+        if: github.event.inputs.config_tag == ''
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs\/tags\/((v[0-9]+\.[0-9]+\.[0-9])(-?.*)?)$'
+      -
+        ## For manually invoked workflow_dispatch we create a deployment event
+        uses: chrnorm/deployment-action@releases/v1
+        name: Create GitHub deployment
+        id: deployment
+        if: github.event.inputs.deployment_id == ''
+        with:
+          token: ${{ github.token }}
+          environment: ${{ steps.set.outputs.environment }}"
+
+  deploy:
+    name: Deploy
+    needs: [setup]
+    runs-on: [k8s, deployer, "${{ needs.setup.outputs.runner }}"]
+    container:
+      image: dysnix/kubectl:v1.19-gcloud
+
+    env:
+      IMAGE_TAG: ${{ needs.setup.outputs.image_tag }}
+
+    steps:
+      - name: Check 
+        if: needs.setup.outputs.config_tag == ''
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.error('Provide config_tag (input) or deploy from a tag!')
+            core.setFailed('config_tag is unknown')
+      -
+        name: Update deployment status (failure)
+        uses: chrnorm/deployment-status@releases/v1
+        if: failure()
+        with:
+          token: ${{ github.token }}
+          state: failure
+          deployment_id: ${{ needs.setup.outputs.deployment_id }}
+      # -
+      #   name: Notify to Mattermost (on failure)
+      #   uses: tferreira/matterfy@releases/v1
+      #   if: failure()
+      #   with:
+      #     type: ${{ job.status }}
+      #     job_name: '*Deployment to ${{ needs.setup.outputs.environment }} failed*'
+      #     icon_emoji: octocat
+      #     channel: 'matterlabs-alerts'
+      #     url: ${{ secrets.MATTERMOST_WEBHOOK }}
