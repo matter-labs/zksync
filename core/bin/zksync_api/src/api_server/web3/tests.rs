@@ -1,6 +1,7 @@
 // Built-in uses
 use std::str::FromStr;
 // External uses
+use ethabi::{ParamType, Token};
 use futures01::future::Future;
 use jsonrpc_core::{IoHandler, Params};
 use jsonrpc_core_client::{RawClient, RpcError};
@@ -16,9 +17,10 @@ use zksync_types::{
 };
 // Local uses
 use super::{
-    converter::transaction_from_tx_data,
+    calls::CallsHelper,
+    converter::{transaction_from_tx_data, u256_from_biguint},
     types::{BlockInfo, Event, Log, Transaction, TransactionReceipt, H160, H256, U256, U64},
-    Web3RpcApp,
+    Web3RpcApp, ZKSYNC_PROXY_ADDRESS,
 };
 use crate::api_server::rest::v02::test_utils::TestServerConfig;
 
@@ -879,6 +881,444 @@ async fn get_logs() -> anyhow::Result<()> {
     for log in logs {
         assert!(topics.contains(&log.topics[0]));
     }
+
+    Ok(())
+}
+
+/// Tests `eth_call` method for erc20 contracts
+#[tokio::test(threaded_scheduler)]
+#[cfg_attr(
+    not(feature = "api_test"),
+    ignore = "Use `zk test rust-api` command to perform this test"
+)]
+async fn erc20_calls() -> anyhow::Result<()> {
+    let cfg = TestServerConfig::default();
+    cfg.fill_database().await?;
+    let pool = ConnectionPool::new(Some(1));
+
+    let (token, address, balance) = {
+        let mut storage = pool.access_storage().await?;
+        let token = storage
+            .tokens_schema()
+            .get_token(TokenId(1).into())
+            .await?
+            .unwrap();
+        let address = storage
+            .chain()
+            .account_schema()
+            .account_address_by_id(AccountId(3))
+            .await?
+            .unwrap();
+        let last_block = storage
+            .chain()
+            .block_schema()
+            .get_last_saved_block()
+            .await?;
+        let balance = storage
+            .chain()
+            .account_schema()
+            .get_account_balance_for_block(address, last_block, token.id)
+            .await?;
+        (token, address, u256_from_biguint(balance).unwrap())
+    };
+
+    // Test `name` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", token.address)),
+        );
+        req.insert("data".to_string(), Value::String("0x06fdde03".to_string()));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::String],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(outputs[0].clone().into_string().unwrap(), token.symbol);
+
+    // Test `symbol` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", token.address)),
+        );
+        req.insert("data".to_string(), Value::String("0x95d89b41".to_string()));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::String],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(outputs[0].clone().into_string().unwrap(), token.symbol);
+
+    // Test `decimals` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", token.address)),
+        );
+        req.insert("data".to_string(), Value::String("0x313ce567".to_string()));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Uint(8)],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        outputs[0].clone().into_uint().unwrap(),
+        U256::from(token.decimals)
+    );
+
+    // Test `totalSupply` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", token.address)),
+        );
+        req.insert("data".to_string(), Value::String("0x18160ddd".to_string()));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Uint(256)],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(outputs[0].clone().into_uint().unwrap(), U256::max_value());
+
+    // Test `balanceOf` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", token.address)),
+        );
+        let address = ethabi::encode(&[Token::Address(address)]);
+        let mut data = "0x70a08231".to_string();
+        data.push_str(hex::encode(address).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Uint(256)],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(outputs[0].clone().into_uint().unwrap(), balance);
+
+    // Test `allowance` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", token.address)),
+        );
+        let mut data = "0xdd62ed3e".to_string();
+        let address1 = ethabi::encode(&[Token::Address(H160::random())]);
+        let address2 = ethabi::encode(&[Token::Address(H160::random())]);
+        data.push_str(hex::encode(address1).as_str());
+        data.push_str(hex::encode(address2).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Uint(256)],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(outputs[0].clone().into_uint().unwrap(), U256::max_value());
+
+    Ok(())
+}
+
+/// Tests `eth_call` method for erc721 contracts
+#[tokio::test(threaded_scheduler)]
+#[cfg_attr(
+    not(feature = "api_test"),
+    ignore = "Use `zk test rust-api` command to perform this test"
+)]
+async fn erc721_calls() -> anyhow::Result<()> {
+    let cfg = TestServerConfig::default();
+    cfg.fill_database().await?;
+    let pool = ConnectionPool::new(Some(1));
+    let nft = {
+        let mut storage = pool.access_storage().await?;
+        storage
+            .tokens_schema()
+            .get_nft(TokenId(65544))
+            .await?
+            .unwrap()
+    };
+    let zksync_proxy_address = H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap();
+    let token_id = ethabi::encode(&[Token::Uint(U256::from(nft.id.0))]);
+
+    // Test `creatorId` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", zksync_proxy_address)),
+        );
+        let mut data = "0x8d6a62b2".to_string();
+        data.push_str(hex::encode(token_id.clone()).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Uint(256)],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        outputs[0].clone().into_uint().unwrap(),
+        U256::from(nft.creator_id.0)
+    );
+
+    // Test `creatorAddress` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", zksync_proxy_address)),
+        );
+        let mut data = "0xb2a999c7".to_string();
+        data.push_str(hex::encode(token_id.clone()).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Address],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        outputs[0].clone().into_address().unwrap(),
+        nft.creator_address
+    );
+
+    // Test `serialId` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", zksync_proxy_address)),
+        );
+        let mut data = "0xe2d328df".to_string();
+        data.push_str(hex::encode(token_id.clone()).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Uint(256)],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        outputs[0].clone().into_uint().unwrap(),
+        U256::from(nft.serial_id)
+    );
+
+    // Test `contentHash` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", zksync_proxy_address)),
+        );
+        let mut data = "0xf3e0c290".to_string();
+        data.push_str(hex::encode(token_id.clone()).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::FixedBytes(32)],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        outputs[0].clone().into_fixed_bytes().unwrap(),
+        nft.content_hash.as_bytes().to_vec()
+    );
+
+    // Test `tokenURI` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", zksync_proxy_address)),
+        );
+        let mut data = "0xc87b56dd".to_string();
+        data.push_str(hex::encode(token_id.clone()).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::String],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    let expected_cid = CallsHelper::ipfs_cid(nft.content_hash.as_bytes());
+    assert_eq!(
+        outputs[0].clone().into_string().unwrap(),
+        format!("ipfs://{}", expected_cid)
+    );
+
+    // Test `getApproved` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", zksync_proxy_address)),
+        );
+        let mut data = "0x081812fc".to_string();
+        data.push_str(hex::encode(token_id.clone()).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Address],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        outputs[0].clone().into_address().unwrap(),
+        zksync_proxy_address
+    );
+
+    // Test `ownerOf` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", zksync_proxy_address)),
+        );
+        let mut data = "0x6352211e".to_string();
+        data.push_str(hex::encode(token_id.clone()).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Address],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    let expected_owner = {
+        let mut storage = pool.access_storage().await?;
+        storage
+            .chain()
+            .account_schema()
+            .get_nft_owner(nft.id)
+            .await?
+    };
+    assert_eq!(outputs[0].clone().into_address().unwrap(), expected_owner);
+
+    // Test `balanceOf` function.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert(
+            "to".to_string(),
+            Value::String(format!("{:#?}", zksync_proxy_address)),
+        );
+        let mut data = "0x70a08231".to_string();
+        let address = ethabi::encode(&[Token::Address(expected_owner)]);
+        data.push_str(hex::encode(address).as_str());
+        req.insert("data".to_string(), Value::String(data));
+        client
+            .call_method("eth_call", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let (resp_data, _) = fut.wait().unwrap();
+    let resp_data = serde_json::from_value::<String>(resp_data).unwrap();
+    let outputs = ethabi::decode(
+        &[ParamType::Uint(256)],
+        &hex::decode(resp_data.strip_prefix("0x").unwrap()).unwrap(),
+    )
+    .unwrap();
+    let expected_balance = {
+        let mut storage = pool.access_storage().await?;
+        storage
+            .chain()
+            .account_schema()
+            .get_account_nft_balance(expected_owner)
+            .await?
+    };
+    assert_eq!(
+        outputs[0].clone().into_uint().unwrap(),
+        U256::from(expected_balance)
+    );
 
     Ok(())
 }

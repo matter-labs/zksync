@@ -272,13 +272,13 @@ impl CallsHelper {
         Ok(nft)
     }
 
-    fn to_base58(source: &[u8]) -> String {
+    fn bytes_to_base58(source: &[u8]) -> String {
         let mut digits: [u8; 46] = [0; 46];
         let mut digit_length: usize = 1;
         for mut carry in source.iter().map(|a| *a as u32) {
-            for j in 0..digit_length {
-                carry += (digits[j] as u32) * 256;
-                digits[j] = (carry % 58) as u8;
+            for digit in digits.iter_mut().take(digit_length) {
+                carry += (*digit as u32) * 256;
+                *digit = (carry % 58) as u8;
                 carry /= 58;
             }
 
@@ -290,23 +290,23 @@ impl CallsHelper {
         }
 
         let result: Vec<u8> = digits.iter().rev().copied().collect();
-        Self::to_alphabet(&result)
+        Self::indices_to_alphabet(&result)
     }
 
-    fn ipfs_cid(source: &[u8]) -> String {
+    pub fn ipfs_cid(source: &[u8]) -> String {
         let concat: Vec<u8> = Self::SHA256_MULTI_HASH
             .iter()
             .chain(source.iter())
             .copied()
             .collect();
-        Self::to_base58(&concat)
+        Self::bytes_to_base58(&concat)
     }
 
-    fn to_alphabet(indices: &[u8]) -> String {
+    fn indices_to_alphabet(indices: &[u8]) -> String {
         let mut output = String::new();
         for i in indices {
             output.push(Self::ALPHABET.as_bytes()[*i as usize] as char)
         }
-        return output;
+        output
     }
 }
