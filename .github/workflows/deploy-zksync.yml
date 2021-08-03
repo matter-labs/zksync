@@ -8,8 +8,8 @@ on:
       image_tag:
         description: 'Tag of a built image to deploy (optional)'
         required: false
-      config_tag:
-        description: 'Tag of a Zksync configuration to deploy (optional)'
+      config_ref:
+        description: 'Branch/Tag of the Zksync configs to deploy (optional)'
         required: false
       deployment_id:
         description: 'Deployment which triggers this pipeline (optional)'
@@ -19,19 +19,23 @@ defaults:
   run:
     shell: bash -leo pipefail {0}
 
+env:
+  DEPLOY_APPS: -l name=server -l name=prover
+
 jobs:
   setup:
     name: Setup
     runs-on: [k8s, stage]
     outputs:
       image_tag: ${{ github.event.inputs.image_tag || steps.set.outputs.short_rev }}
-      config_tag: ${{ steps.regex-match.outputs.group2 }}
+      config_ref: ${{ github.event.inputs.config_ref || steps.regex-match.outputs.group2 }}
       deployment_id: ${{ github.event.inputs.deployment_id || steps.deployment.outputs.deployment_id }}
       environment: ${{ github.event.inputs.environment }}
       kubeConf: ${{ steps.envMap.outputs.kubeConf }}
       hfEnv: ${{ steps.envMap.outputs.hfEnv }}
       namespace: ${{ steps.envMap.outputs.namespace }}
       runner: ${{ steps.envMap.outputs.runner }}
+      jobOutcomes: ${{ steps.set.outputs.jobOutcomes }}
 
     steps:
       - uses: actions/checkout@v2
@@ -39,6 +43,7 @@ jobs:
         id: set
         run: |
           echo "::set-output name=short_rev::$(git rev-parse --short HEAD)"
+          echo "::set-output name=jobOutcomes::{\"cancelled\":\"failure\",\"failure\":\"failure\",\"success\":\"success\"}"
       -
         name: Map runtime environment data
         id: envMap
@@ -65,7 +70,7 @@ jobs:
         #  group2 - vX.Y.Z part
         uses: actions-ecosystem/action-regex-match@v2
         id: configTag
-        if: github.event.inputs.config_tag == ''
+        if: github.event.inputs.config_ref == ''
         with:
           text: ${{ github.ref }}
           regex: '^refs\/tags\/((v[0-9]+\.[0-9]+\.[0-9])(-?.*)?)$'
@@ -77,7 +82,7 @@ jobs:
         if: github.event.inputs.deployment_id == ''
         with:
           token: ${{ github.token }}
-          environment: ${{ steps.set.outputs.environment }}"
+          environment: ${{ github.event.inputs.environment }}
 
   deploy:
     name: Deploy
@@ -86,32 +91,70 @@ jobs:
     container:
       image: dysnix/kubectl:v1.19-gcloud
 
+    # Disable simultaneous deployments into a single environment
+    concurrency: ${{ needs.setup.outputs.environment }}
+
     env:
+      ENVFILE: ./compiled_envs/${{ needs.setup.outputs.environment }}.env
+      # Helmfile environment name
+      HFENV: ${{ needs.setup.outputs.hfEnv }}
       IMAGE_TAG: ${{ needs.setup.outputs.image_tag }}
+      OUTCOMES: ${{ needs.setup.outputs.jobOutcomes }}
 
     steps:
-      - name: Check 
-        if: needs.setup.outputs.config_tag == ''
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.error('Provide config_tag (input) or deploy from a tag!')
-            core.setFailed('config_tag is unknown')
+      - name: Create ~/.kube/config
+        run: mkdir -p ~/.kube && echo "$KUBECONF" | base64 -d > ~/.kube/config
+      ## ----- Update Configs -----
+      ## --------------------------
+      #  Enabled only if the config_ref can be determined!
       -
-        name: Update deployment status (failure)
+        if: needs.setup.outputs.config_ref != ''
+        name: Clone configs
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/configs
+          path: configs
+          ref: ${{ needs.setup.outputs.config_ref }}
+          token: ${{ secrets.GH_TOKEN }}
+      -
+        if: needs.setup.outputs.config_ref != ''
+        name: Update Server Config
+        working-directory: configs
+        run: |
+          sudo apk --no-cache add yarn
+          ./bin/config
+          ./bin/config compile ${{ needs.setup.outputs.environment }}
+          kubectl delete configmap -n ${{ needs.setup.outputs.namespace }} server-env-custom || /bin/true
+          kubectl create configmap -n ${{ needs.setup.outputs.namespace }} server-env-custom --from-env-file=${{ env.ENVFILE }}
+      ## --------------------------
+      -
+        name: Clone helm-infra
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/helm-infra
+          path: helm-infra
+          token: ${{ secrets.GH_TOKEN }}
+      -
+        name: Deploy Zksync
+        working-directory: helm-infra
+        run: |
+          UPDATE_REPOS=y helmfile -e $HFENV repos
+          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+      -
+        if: always()
+        name: Update deployment status
         uses: chrnorm/deployment-status@releases/v1
-        if: failure()
         with:
           token: ${{ github.token }}
-          state: failure
+          state: ${{ fromJSON(env.OUTCOMES)[job.status] }}
           deployment_id: ${{ needs.setup.outputs.deployment_id }}
-      # -
-      #   name: Notify to Mattermost (on failure)
-      #   uses: tferreira/matterfy@releases/v1
-      #   if: failure()
-      #   with:
-      #     type: ${{ job.status }}
-      #     job_name: '*Deployment to ${{ needs.setup.outputs.environment }} failed*'
-      #     icon_emoji: octocat
-      #     channel: 'matterlabs-alerts'
-      #     url: ${{ secrets.MATTERMOST_WEBHOOK }}
+      -
+        if: failure() || cancelled()
+        name: Notify to Mattermost (on unsuccessful deploys)
+        uses: tferreira/matterfy@releases/v1
+        with:
+          type: ${{ job.status }}
+          job_name: '*Deployment to "${{ needs.setup.outputs.environment }}" failed*'
+          icon_emoji: octocat
+          channel: 'matterlabs-alerts'
+          url: ${{ secrets.MATTERMOST_WEBHOOK }}
