@@ -1322,3 +1322,17 @@ async fn erc721_calls() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+#[cfg_attr(
+    not(feature = "api_test"),
+    ignore = "Use `zk test rust-api` command to perform this test"
+)]
+/// Tests that ipfs cid creation algorithm is the same as in smart contract.
+fn ipfs_cid() {
+    // Test data is the same as in `contracts/test/factory_test.ts`
+    let content_hash =
+        H256::from_str("218145f24cb870cc72ec7f0cc734b86f3e9a744666282f99023f022be77aaea6").unwrap();
+    let ipfs_cid = CallsHelper::ipfs_cid(content_hash.as_bytes());
+    assert_eq!(ipfs_cid, "QmQbSVaG7DUjQ9ktPtMnSXReJ29XHezBghcxJeZDsGG7wB")
+}
