@@ -297,8 +297,6 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     }
 
     /// Returns the highest serial id of the executed priority ops
-    ///
-    /// Note: used only by data restore
     pub async fn get_max_priority_op_serial_id(&mut self) -> QueryResult<SerialId> {
         let start = Instant::now();
 
