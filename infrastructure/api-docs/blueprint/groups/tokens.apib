@@ -3,9 +3,9 @@
 ## api/v0.2/tokens [/tokens{?from,limit,direction}]
 
 + Parameters
-    + from (required, "latest" | number, `latest`) ... From which token id to show
+    + from (required, "latest" | number, `latest`) ... Token id of transaction from which to show or `latest`
     + limit (required, number, `2`) ... The limit of tokens to be returned
-    + direction (required, "newer" | "older", `older`) ... newer or older than the id of the `from`
+    + direction (required, "newer" | "older", `older`) ... Newer or older than the id of the `from`
 
 ### Get list of supported tokens [GET]
 Returns the tokens that are currently supported by zkSync
@@ -22,7 +22,7 @@ Returns the tokens that are currently supported by zkSync
 ## api/v0.2/tokens/tokenIdOrAddress [/tokens/{tokenIdOrAddress}]
 
 + Parameters
-    + tokenIdOrAddress (required, string, `2`) ... the id or address of the token in the zkSync network
+    + tokenIdOrAddress (required, string, `2`) ... Id or address of the token in the zkSync network
 
 ### Get token info [GET]
 Get token into
@@ -37,8 +37,8 @@ Get token into
 ## api/v0.2/tokens/:tokenIdOrAddress/priceIn/:currency [/tokens/{tokenIdOrAddress}/priceIn/{currency}]
 
 + Parameters
-    + tokenIdOrAddress (required, string, `2`) ... the id or address of the token in the zkSync network
-    + currency (required, `usd` | number, `usd`) ... either usd or any of the supported tokens in the zkSync network
+    + tokenIdOrAddress (required, string, `2`) ... Id or address of the token in the zkSync network
+    + currency (required, `usd` | number, `usd`) ... Either `usd` or id of any of the supported tokens in the zkSync network
 
 ### Get token price [GET]
 Get token price relative to another token
@@ -53,7 +53,7 @@ Get token price relative to another token
 ## api/v0.2/tokens/nft/id [/tokens/nft/{id}]
 
 + Parameters
-    + id (required, number, `{{nftId}}`) ... the id of the nft in the zkSync network
+    + id (required, number, `{{nftId}}`) ... Id of the nft in the zkSync network
 
 ### Get nft info [GET]
 Get nft into
