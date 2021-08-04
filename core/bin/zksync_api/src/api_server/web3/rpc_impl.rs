@@ -264,100 +264,35 @@ impl Web3RpcApp {
         let mut logs = Vec::new();
         match (addresses.is_empty(), topics.is_empty()) {
             (false, false) => {
-                let (has_erc_topic, tx_types) = self.process_topics(topics);
-                let (has_zksync_proxy_address, token_addresses) = self.process_addresses(addresses);
-
-                if has_erc_topic {
-                    let receipts = transaction
-                        .chain()
-                        .operations_ext_schema()
-                        .web3_receipts_with_token_addresses(from_block, to_block, &token_addresses)
-                        .await
-                        .map_err(|_| Error::internal_error())?;
-                    let token_addresses: HashSet<H160> = token_addresses.into_iter().collect();
-                    for receipt in receipts {
-                        self.append_logs(
-                            &mut transaction,
-                            receipt,
-                            &mut logs,
-                            false,
-                            true,
-                            Some(&token_addresses),
-                        )
-                        .await?;
-                    }
-                }
-
-                if has_zksync_proxy_address {
-                    let receipts = transaction
-                        .chain()
-                        .operations_ext_schema()
-                        .web3_receipts_with_types(from_block, to_block, tx_types)
-                        .await
-                        .map_err(|_| Error::internal_error())?;
-                    for receipt in receipts {
-                        self.append_logs(&mut transaction, receipt, &mut logs, true, false, None)
-                            .await?;
-                    }
-                }
+                self.filter_logs_by_addresses_and_topics(
+                    &mut transaction,
+                    &mut logs,
+                    from_block,
+                    to_block,
+                    addresses,
+                    topics,
+                )
+                .await?;
             }
             (false, true) => {
-                let (has_zksync_proxy_address, token_addresses) = self.process_addresses(addresses);
-                if has_zksync_proxy_address {
-                    let receipts = transaction
-                        .chain()
-                        .operations_ext_schema()
-                        .web3_receipts(from_block, to_block)
-                        .await
-                        .map_err(|_| Error::internal_error())?;
-                    for receipt in receipts {
-                        self.append_logs(&mut transaction, receipt, &mut logs, true, false, None)
-                            .await?;
-                    }
-                }
-                let receipts = transaction
-                    .chain()
-                    .operations_ext_schema()
-                    .web3_receipts_with_token_addresses(from_block, to_block, &token_addresses)
-                    .await
-                    .map_err(|_| Error::internal_error())?;
-                let token_addresses: HashSet<H160> = token_addresses.into_iter().collect();
-                for receipt in receipts {
-                    self.append_logs(
-                        &mut transaction,
-                        receipt,
-                        &mut logs,
-                        false,
-                        true,
-                        Some(&token_addresses),
-                    )
-                    .await?;
-                }
+                self.filter_logs_by_addresses(
+                    &mut transaction,
+                    &mut logs,
+                    from_block,
+                    to_block,
+                    addresses,
+                )
+                .await?;
             }
             (true, false) => {
-                let (has_erc_topic, tx_types) = self.process_topics(topics);
-                if has_erc_topic {
-                    let receipts = transaction
-                        .chain()
-                        .operations_ext_schema()
-                        .web3_receipts(from_block, to_block)
-                        .await
-                        .map_err(|_| Error::internal_error())?;
-                    for receipt in receipts {
-                        self.append_logs(&mut transaction, receipt, &mut logs, false, true, None)
-                            .await?;
-                    }
-                }
-                let receipts = transaction
-                    .chain()
-                    .operations_ext_schema()
-                    .web3_receipts_with_types(from_block, to_block, tx_types)
-                    .await
-                    .map_err(|_| Error::internal_error())?;
-                for receipt in receipts {
-                    self.append_logs(&mut transaction, receipt, &mut logs, true, false, None)
-                        .await?;
-                }
+                self.filter_logs_by_topics(
+                    &mut transaction,
+                    &mut logs,
+                    from_block,
+                    to_block,
+                    topics,
+                )
+                .await?;
             }
             (true, true) => {
                 let receipts = transaction
@@ -380,6 +315,133 @@ impl Web3RpcApp {
 
         metrics::histogram!("api.web3.get_logs", start.elapsed());
         Ok(logs)
+    }
+
+    async fn filter_logs_by_addresses_and_topics(
+        &self,
+        transaction: &mut StorageProcessor<'_>,
+        logs: &mut Vec<Log>,
+        from_block: zksync_types::BlockNumber,
+        to_block: zksync_types::BlockNumber,
+        addresses: Vec<H160>,
+        topics: Vec<H256>,
+    ) -> Result<()> {
+        let (has_erc_topic, tx_types) = self.process_topics(topics);
+        let (has_zksync_proxy_address, token_addresses) = self.process_addresses(addresses);
+
+        if has_erc_topic {
+            let receipts = transaction
+                .chain()
+                .operations_ext_schema()
+                .web3_receipts_with_token_addresses(from_block, to_block, &token_addresses)
+                .await
+                .map_err(|_| Error::internal_error())?;
+            let token_addresses: HashSet<H160> = token_addresses.into_iter().collect();
+            for receipt in receipts {
+                self.append_logs(
+                    transaction,
+                    receipt,
+                    logs,
+                    false,
+                    true,
+                    Some(&token_addresses),
+                )
+                .await?;
+            }
+        }
+
+        if has_zksync_proxy_address {
+            let receipts = transaction
+                .chain()
+                .operations_ext_schema()
+                .web3_receipts_with_types(from_block, to_block, tx_types)
+                .await
+                .map_err(|_| Error::internal_error())?;
+            for receipt in receipts {
+                self.append_logs(transaction, receipt, logs, true, false, None)
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn filter_logs_by_addresses(
+        &self,
+        transaction: &mut StorageProcessor<'_>,
+        logs: &mut Vec<Log>,
+        from_block: zksync_types::BlockNumber,
+        to_block: zksync_types::BlockNumber,
+        addresses: Vec<H160>,
+    ) -> Result<()> {
+        let (has_zksync_proxy_address, token_addresses) = self.process_addresses(addresses);
+        if has_zksync_proxy_address {
+            let receipts = transaction
+                .chain()
+                .operations_ext_schema()
+                .web3_receipts(from_block, to_block)
+                .await
+                .map_err(|_| Error::internal_error())?;
+            for receipt in receipts {
+                self.append_logs(transaction, receipt, logs, true, false, None)
+                    .await?;
+            }
+        }
+        let receipts = transaction
+            .chain()
+            .operations_ext_schema()
+            .web3_receipts_with_token_addresses(from_block, to_block, &token_addresses)
+            .await
+            .map_err(|_| Error::internal_error())?;
+        let token_addresses: HashSet<H160> = token_addresses.into_iter().collect();
+        for receipt in receipts {
+            self.append_logs(
+                transaction,
+                receipt,
+                logs,
+                false,
+                true,
+                Some(&token_addresses),
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn filter_logs_by_topics(
+        &self,
+        transaction: &mut StorageProcessor<'_>,
+        logs: &mut Vec<Log>,
+        from_block: zksync_types::BlockNumber,
+        to_block: zksync_types::BlockNumber,
+        topics: Vec<H256>,
+    ) -> Result<()> {
+        let (has_erc_topic, tx_types) = self.process_topics(topics);
+        if has_erc_topic {
+            let receipts = transaction
+                .chain()
+                .operations_ext_schema()
+                .web3_receipts(from_block, to_block)
+                .await
+                .map_err(|_| Error::internal_error())?;
+            for receipt in receipts {
+                self.append_logs(transaction, receipt, logs, false, true, None)
+                    .await?;
+            }
+        }
+        let receipts = transaction
+            .chain()
+            .operations_ext_schema()
+            .web3_receipts_with_types(from_block, to_block, tx_types)
+            .await
+            .map_err(|_| Error::internal_error())?;
+        for receipt in receipts {
+            self.append_logs(transaction, receipt, logs, true, false, None)
+                .await?;
+        }
+
+        Ok(())
     }
 
     pub(crate) async fn append_logs(
