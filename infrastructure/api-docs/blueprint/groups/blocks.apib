@@ -3,7 +3,7 @@
 ## api/v0.2/blocks [/blocks{?from,limit,direction}]
 
 + Parameters
-    + from (required, "latest" | number, `latest`) ... A number of the block from which to show or `latest`
+    + from (required, "latest" | number, `latest`) ... The number of the block from which to show or `latest`
     + limit (required, number, `2`) ... The limit of transactions to be shown
     + direction (required, "newer" | "older", `older`) ... Newer or older than the id of the `from`
 
@@ -22,7 +22,7 @@ Get blocks range
 ## api/v0.2/blocks/:block_number [/blocks/{blockNumber}]
 
 + Parameters
-    + `blockNumber`: `lastCommitted` (required, BlockNumber) - A number of the block, `lastCommitted` or `lastFinalized`
+    + `blockNumber`: `lastCommitted` (required, BlockNumber) - An integer block number, `lastCommitted` or `lastFinalized`
 
 ### Get block details [GET]
 Get block details
@@ -37,8 +37,8 @@ Get block details
 ## api/v0.2/blocks/blockNumber/transactions [/blocks/{blockNumber}/transactions{?from,limit,direction}]
 
 + Parameters
-    + `blockNumber`: `lastCommitted` (required, BlockNumber) - A number of the block, `lastCommitted` or `lastFinalized`
-    + from (required, "latest" | string, `latest`) ... A hash of transaction from which to show or `latest`
+    + `blockNumber`: `lastCommitted` (required, BlockNumber) - An integer block number, `lastCommitted` or `lastFinalized`
+    + from (required, "latest" | string, `latest`) ... The hash of the transaction from which to show or `latest`
     + limit (required, number, `2`) ... The limit of transactions to be shown
     + direction (required, "newer" | "older", `older`) ... Newer or older than the id of the `from`
 
