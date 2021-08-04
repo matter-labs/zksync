@@ -6,8 +6,8 @@ on:
         description: 'Environment to deploy Zksync to'
         required: true
       image_tag:
-        description: 'Tag of a built image to deploy (optional)'
-        required: false
+        description: 'Tag of a built image to deploy'
+        required: true
       config_ref:
         description: 'Branch or tag to fetch configs from (optional)'
         required: false
@@ -27,7 +27,7 @@ jobs:
     name: Setup
     runs-on: [k8s, stage]
     outputs:
-      image_tag: ${{ github.event.inputs.image_tag || steps.set.outputs.short_rev }}
+      image_tag: ${{ github.event.inputs.image_tag }}
       config_ref: ${{ github.event.inputs.config_ref }}
       deployment_id: ${{ github.event.inputs.deployment_id || steps.deployment.outputs.deployment_id }}
       environment: ${{ github.event.inputs.environment }}
@@ -42,7 +42,6 @@ jobs:
       -
         id: set
         run: |
-          echo "::set-output name=short_rev::$(git rev-parse --short HEAD)"
           echo "::set-output name=jobOutcomes::{\"cancelled\":\"failure\",\"failure\":\"failure\",\"success\":\"success\"}"
       -
         name: Map runtime environment data
