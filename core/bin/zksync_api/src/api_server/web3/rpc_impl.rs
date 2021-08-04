@@ -5,7 +5,10 @@ use std::time::Instant;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
 use zksync_crypto::convert::FeConvert;
-use zksync_storage::{chain::operations_ext::records::Web3TxReceipt, StorageProcessor};
+use zksync_storage::{
+    chain::{block::records::StorageBlock, operations_ext::records::Web3TxReceipt},
+    StorageProcessor,
+};
 use zksync_types::{ExecutedOperations, ZkSyncOp};
 // Local uses
 use super::{
@@ -453,6 +456,19 @@ impl Web3RpcApp {
         })
     }
 
+    async fn storage_block(
+        storage: &mut StorageProcessor<'_>,
+        block_number: zksync_types::BlockNumber,
+    ) -> Result<Option<StorageBlock>> {
+        let block = storage
+            .chain()
+            .block_schema()
+            .get_storage_block(block_number)
+            .await
+            .map_err(|_| Error::internal_error())?;
+        Ok(block)
+    }
+
     pub(crate) async fn block_by_number(
         storage: &mut StorageProcessor<'_>,
         block_number: zksync_types::BlockNumber,
@@ -467,17 +483,13 @@ impl Web3RpcApp {
             H256::zero()
         } else {
             // It was already checked that the block is in storage, so the parent block has to be there too.
-            let parent_block = transaction
-                .chain()
-                .block_schema()
-                .get_storage_block(block_number - 1)
-                .await
-                .map_err(|_| Error::internal_error())?
-                .expect("Can't find parent block in storage");
-            H256::from_slice(&parent_block.root_hash)
+            let block = Self::storage_block(&mut transaction, block_number - 1)
+                .await?
+                .ok_or_else(Error::internal_error)?;
+            H256::from_slice(&block.root_hash)
         };
 
-        if include_txs {
+        let result = if include_txs {
             // It was already checked that the block is in storage.
             let block = transaction
                 .chain()
@@ -485,7 +497,7 @@ impl Web3RpcApp {
                 .get_block(block_number)
                 .await
                 .map_err(|_| Error::internal_error())?
-                .expect("Can't find block in storage");
+                .ok_or_else(Error::internal_error)?;
             let hash = H256::from_slice(&block.new_root_hash.to_bytes());
             let transactions = block
                 .block_transactions
@@ -515,24 +527,19 @@ impl Web3RpcApp {
                 })
                 .collect();
 
-            Ok(BlockInfo::new_with_txs(
+            BlockInfo::new_with_txs(
                 hash,
                 parent_hash,
                 block_number,
                 block.timestamp,
                 transactions,
-            ))
+            )
         } else {
             // It was already checked that the block is in storage.
-            let block = transaction
-                .chain()
-                .block_schema()
-                .get_storage_block(block_number)
-                .await
-                .map_err(|_| Error::internal_error())?
-                .expect("Can't find block in storage");
-            let hash = H256::from_slice(&block.root_hash);
-            let transactions = transaction
+            let block = Self::storage_block(&mut transaction, block_number)
+                .await?
+                .ok_or_else(Error::internal_error)?;
+            let hashes = transaction
                 .chain()
                 .block_schema()
                 .get_block_transactions_hashes(block_number)
@@ -542,19 +549,19 @@ impl Web3RpcApp {
                 .map(|hash| H256::from_slice(&hash))
                 .collect();
 
-            transaction
-                .commit()
-                .await
-                .map_err(|_| Error::internal_error())?;
-
-            Ok(BlockInfo::new_with_hashes(
-                hash,
+            BlockInfo::new_with_hashes(
+                H256::from_slice(&block.root_hash),
                 parent_hash,
                 block_number,
                 block.timestamp.unwrap_or_default() as u64,
-                transactions,
-            ))
-        }
+                hashes,
+            )
+        };
+        transaction
+            .commit()
+            .await
+            .map_err(|_| Error::internal_error())?;
+        Ok(result)
     }
 
     fn process_topics(&self, topics: Vec<H256>) -> (bool, Vec<String>) {
@@ -565,7 +572,13 @@ impl Web3RpcApp {
                 if matches!(event, Event::ERCTransfer) {
                     has_erc_topic = true;
                 } else {
-                    tx_types.push(format!("{:?}", event).replace("ZkSync", ""));
+                    // Event name is just "ZkSync" + tx_type, so to get tx_type we can just cut "ZkSync" prefix
+                    tx_types.push(
+                        format!("{:?}", event)
+                            .strip_prefix("ZkSync")
+                            .unwrap()
+                            .to_string(),
+                    );
                 }
             }
         }
