@@ -34,6 +34,7 @@ impl StoredBlockInfo {
     }
 }
 
+#[derive(Debug)]
 struct NFTInfo {
     creator_id: AccountId,
     creator_address: Address,
