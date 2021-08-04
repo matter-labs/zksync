@@ -15,6 +15,8 @@ type Pool = deadpool::managed::Pool<PgConnection, SqlxError>;
 
 pub type PooledConnection = deadpool::managed::Object<PgConnection, SqlxError>;
 
+pub const DB_CONNECTION_RETRIES: u32 = 3;
+
 #[derive(Clone)]
 struct DbPool {
     url: String,
@@ -79,9 +81,25 @@ impl ConnectionPool {
     /// database access is must-have (e.g. block committer).
     pub async fn access_storage(&self) -> Result<StorageProcessor<'_>, SqlxError> {
         let start = Instant::now();
-        let connection = self.pool.get().await.unwrap();
+        let connection = self.get_pooled_connection().await;
         metrics::histogram!("sql.connection_acquire", start.elapsed());
 
         Ok(StorageProcessor::from_pool(connection))
+    }
+
+    async fn get_pooled_connection(&self) -> PooledConnection {
+        let mut retry_count = 0;
+
+        while retry_count < DB_CONNECTION_RETRIES {
+            let connection = self.pool.get().await;
+
+            match connection {
+                Ok(connection) => return connection,
+                Err(_) => retry_count += 1,
+            }
+        }
+
+        // Attempting to get the pooled connection for the last time
+        self.pool.get().await.unwrap()
     }
 }
