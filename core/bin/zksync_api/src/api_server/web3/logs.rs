@@ -28,7 +28,7 @@ impl LogsHelper {
             (Event::ZkSyncTransfer, "ZkSyncTransfer(address,address,address,uint256,uint256)"),
             (Event::ZkSyncWithdraw, "ZkSyncWithdraw(address,address,address,uint256,uint256)"),
             (Event::ZkSyncForcedExit, "ZkSyncForcedExit(address,address,address,uint256)"),
-            (Event::ZkSyncChangePubKey, "ZkSyncChangePubKey(address,address,address,uint256)"),
+            (Event::ZkSyncChangePubKey, "ZkSyncChangePubKey(address,bytes20,address,uint256)"),
             (Event::ZkSyncDeposit, "ZkSyncDeposit(address,address,address,uint256)"),
             (Event::ZkSyncFullExit, "ZkSyncFullExit(address,address,uint256)"),
             (Event::ZkSyncMintNFT, "ZkSyncMintNFT(uint32,address,address,bytes32,address,uint256)"),
@@ -530,7 +530,7 @@ impl LogsHelper {
     ) -> Bytes {
         let bytes = encode(&[
             AbiToken::Address(account),
-            AbiToken::Address(H160::from(new_pub_key_hash)),
+            AbiToken::FixedBytes(new_pub_key_hash.to_vec()),
             AbiToken::Address(token),
             AbiToken::Uint(fee),
         ]);

@@ -6,7 +6,7 @@ use num::BigUint;
 // Workspace uses
 use zksync_storage::StorageProcessor;
 // Local uses
-use super::types::{Bytes, CommonLogData, Log, Transaction, TxData, H160, H256, U256};
+use super::types::{BlockNumber, Bytes, CommonLogData, Log, Transaction, TxData, H160, H256, U256};
 
 pub fn u256_from_biguint(number: BigUint) -> Result<U256> {
     U256::from_dec_str(&number.to_string()).map_err(|_| Error::internal_error())
@@ -14,7 +14,7 @@ pub fn u256_from_biguint(number: BigUint) -> Result<U256> {
 
 pub async fn resolve_block_number(
     storage: &mut StorageProcessor<'_>,
-    number: Option<super::types::BlockNumber>,
+    number: Option<BlockNumber>,
 ) -> Result<Option<zksync_types::BlockNumber>> {
     let last_saved_block = storage
         .chain()
@@ -31,21 +31,21 @@ pub async fn resolve_block_number(
     };
 
     let number = match number {
-        super::types::BlockNumber::Earliest => zksync_types::BlockNumber(0),
-        super::types::BlockNumber::Committed => storage
+        BlockNumber::Earliest => zksync_types::BlockNumber(0),
+        BlockNumber::Committed => storage
             .chain()
             .block_schema()
             .get_last_committed_confirmed_block()
             .await
             .map_err(|_| Error::internal_error())?,
-        super::types::BlockNumber::Finalized => storage
+        BlockNumber::Finalized => storage
             .chain()
             .block_schema()
             .get_last_verified_confirmed_block()
             .await
             .map_err(|_| Error::internal_error())?,
-        super::types::BlockNumber::Latest | super::types::BlockNumber::Pending => last_saved_block,
-        super::types::BlockNumber::Number(number) => {
+        BlockNumber::Latest | BlockNumber::Pending => last_saved_block,
+        BlockNumber::Number(number) => {
             if number.as_u64() > last_saved_block.0 as u64 {
                 return Ok(None);
             }

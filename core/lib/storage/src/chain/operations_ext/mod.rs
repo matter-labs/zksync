@@ -1518,7 +1518,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 FROM everything
                 LEFT JOIN blocks
                     ON everything.block_number = blocks.number
-                lEFT JOIN aggregate_operations
+                LEFT JOIN aggregate_operations
                     ON (blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block)
                     AND aggregate_operations.action_type = 'CommitBlocks'
                 WHERE confirmed = true
