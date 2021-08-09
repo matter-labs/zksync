@@ -6,8 +6,8 @@ use std::time::Instant;
 use structopt::StructOpt;
 use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_crypto::proof::EncodedSingleProof;
-use zksync_storage::ConnectionPool;
-use zksync_types::{block::Block, AccountId, Address, BlockNumber, TokenId, TokenLike, H256};
+use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::{block::Block, AccountId, Address, BlockNumber, TokenId, TokenLike, H256, NFT};
 use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Serialize, Debug)]
@@ -34,6 +34,14 @@ impl StoredBlockInfo {
     }
 }
 
+#[derive(Debug)]
+struct NFTInfo {
+    creator_id: AccountId,
+    creator_address: Address,
+    serial_id: u32,
+    content_hash: H256,
+}
+
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ExitProofData {
@@ -42,6 +50,10 @@ struct ExitProofData {
     account_id: AccountId,
     token_id: TokenId,
     amount: BigUintSerdeWrapper,
+    nft_creator_id: AccountId,
+    nft_creator_address: Address,
+    nft_serial_id: u32,
+    nft_content_hash: H256,
     proof: EncodedSingleProof,
     token_address: Address,
 }
@@ -60,6 +72,35 @@ struct Opt {
     /// Token to withdraw - "ETH" or address of the ERC20 token
     #[structopt(long)]
     token: String,
+}
+
+async fn get_nft_info(storage: &mut StorageProcessor<'_>, nft: Option<NFT>) -> NFTInfo {
+    match nft {
+        Some(nft) => NFTInfo {
+            creator_id: nft.creator_id,
+            creator_address: nft.creator_address,
+            serial_id: nft.serial_id,
+            content_hash: nft.content_hash,
+        },
+        None => {
+            // The placeholder creator address should be the address
+            // of the account with id 0
+            let creator_address = storage
+                .chain()
+                .account_schema()
+                .account_address_by_id(AccountId(0))
+                .await
+                .expect("Failed to get zero account address")
+                .expect("Account with id 0 does not exist");
+
+            NFTInfo {
+                creator_id: AccountId(0),
+                creator_address,
+                serial_id: 0,
+                content_hash: Default::default(),
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -124,11 +165,13 @@ async fn main() {
 
     vlog::info!("Restored state from db: {} s", timer.elapsed().as_secs());
 
-    let (proof, amount) = if token_id.0 < MIN_NFT_TOKEN_ID {
-        zksync_prover_utils::exit_proof::create_exit_proof_fungible(
+    let (proof, amount, nft) = if token_id.0 < MIN_NFT_TOKEN_ID {
+        let (proof, amount) = zksync_prover_utils::exit_proof::create_exit_proof_fungible(
             accounts, account_id, address, token_id,
         )
-        .expect("Failed to generate exit proof")
+        .expect("Failed to generate exit proof");
+
+        (proof, amount, None)
     } else {
         let nft = storage
             .tokens_schema()
@@ -136,7 +179,7 @@ async fn main() {
             .await
             .expect("Db access fail")
             .expect("NFT token should exist");
-        zksync_prover_utils::exit_proof::create_exit_proof_nft(
+        let (proof, amount) = zksync_prover_utils::exit_proof::create_exit_proof_nft(
             accounts,
             account_id,
             address,
@@ -145,14 +188,22 @@ async fn main() {
             nft.serial_id,
             nft.content_hash,
         )
-        .expect("Failed to generate exit proof")
+        .expect("Failed to generate exit proof");
+
+        (proof, amount, Some(nft))
     };
+
+    let nft_info = get_nft_info(&mut storage, nft).await;
 
     let proof_data = ExitProofData {
         stored_block_info,
         owner: address,
         token_id,
         account_id,
+        nft_creator_id: nft_info.creator_id,
+        nft_creator_address: nft_info.creator_address,
+        nft_serial_id: nft_info.serial_id,
+        nft_content_hash: nft_info.content_hash,
         amount: amount.into(),
         proof,
         token_address,

@@ -106,5 +106,18 @@
     "decimals": 0,
     "symbol": "NEM",
     "name": "Dec0"
+  },
+  {
+    "address": "0x2e055eee18284513b993db7568a592679ab13188",
+    "decimals": 0,
+    "symbol": "DAI",
+    "name": "Dec0"
+  },
+  {
+
+    "address": "0xfe1b6abc39e46cec54d275efb4b29b33be176c2a",
+    "decimals": 0,
+    "symbol": "PHNX",
+    "name": "PHNX"
   }
 ]

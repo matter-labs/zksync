@@ -991,7 +991,7 @@ export class Wallet {
             if (changePubKey.ethAuthType === 'ECDSALegacyMessage') {
                 const feeType = {
                     ChangePubKey: {
-                        onchainPubkeyAuth: true
+                        onchainPubkeyAuth: false
                     }
                 };
                 const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);

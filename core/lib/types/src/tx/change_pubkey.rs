@@ -459,7 +459,7 @@ impl ChangePubKey {
             ChangePubKeyFeeTypeArg::ContractsV4Version(auth_data.get_fee_type())
         } else {
             ChangePubKeyFeeTypeArg::PreContracts4Version {
-                onchain_pubkey_auth: self.eth_auth_data.is_none(),
+                onchain_pubkey_auth: self.eth_signature.is_none(),
             }
         }
     }

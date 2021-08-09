@@ -6,7 +6,7 @@ use web3::types::Address;
 use zksync_types::block::Block;
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
-    NewTokenEvent, Operation, Token, TokenId, TokenInfo,
+    NewTokenEvent, Operation, SerialId, Token, TokenId, TokenInfo,
 };
 
 use crate::{
@@ -158,6 +158,16 @@ impl StorageInteractor for InMemoryStorageInteractor {
         _tree_cache: serde_json::Value,
     ) {
         // Inmemory storage doesn't support caching.
+    }
+
+    async fn get_max_priority_op_serial_id(&mut self) -> SerialId {
+        let number_of_priority_ops = self
+            .rollups
+            .iter()
+            .flat_map(|rollup| &rollup.ops)
+            .filter(|op| op.is_priority_op())
+            .count();
+        number_of_priority_ops as SerialId
     }
 }
 
