@@ -38,9 +38,11 @@ pub enum AccountUpdate {
     },
     MintNFT {
         token: NFT,
+        nonce: Nonce,
     },
     RemoveNFT {
         token: NFT,
+        nonce: Nonce,
     },
 }
 
@@ -80,11 +82,13 @@ impl AccountUpdate {
                 old_nonce: *new_nonce,
                 new_nonce: *old_nonce,
             },
-            AccountUpdate::MintNFT { token } => AccountUpdate::RemoveNFT {
+            AccountUpdate::MintNFT { token, nonce } => AccountUpdate::RemoveNFT {
                 token: token.clone(),
+                nonce: *nonce,
             },
-            AccountUpdate::RemoveNFT { token } => AccountUpdate::MintNFT {
+            AccountUpdate::RemoveNFT { token, nonce } => AccountUpdate::MintNFT {
                 token: token.clone(),
+                nonce: *nonce,
             },
         }
     }

@@ -528,6 +528,27 @@
       ]
     }
   },
+  "0f00295e244d24dcc2be40ad74cb8232df1e7b96298ec99ff17e58aefe59c49a": {
+    "query": "\n                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, symbol, nonce )\n                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Bytea",
+          "Int4",
+          "Bytea",
+          "Bytea",
+          "Int8",
+          "Int4",
+          "Text",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0fb38a8f186b2b0a2b3d608bf43b111876e16bafe8e10ad9078b5066908ea0cf": {
     "query": "DELETE FROM proofs WHERE block_number > $1",
     "describe": {
@@ -614,12 +635,18 @@
           "ordinal": 8,
           "name": "symbol",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 9,
+          "name": "nonce",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
         "Left": []
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -818,6 +845,11 @@
           "ordinal": 8,
           "name": "symbol",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 9,
+          "name": "nonce",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -827,6 +859,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -2652,6 +2685,24 @@
       "nullable": []
     }
   },
+  "66dddd41e83db60b333ea6f5697d4507fb090021f4e4b22dbb4496d0999e17f1": {
+    "query": "\n                SELECT tx FROM executed_transactions WHERE tx->'type' = '\"MintNFT\"'\n                ORDER BY nonce\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
     "query": "SELECT * FROM aggregated_proofs WHERE first_block = $1 and last_block = $2",
     "describe": {
@@ -3500,6 +3551,11 @@
           "ordinal": 8,
           "name": "symbol",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 9,
+          "name": "nonce",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -3508,6 +3564,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -3637,26 +3694,6 @@
           "Int8",
           "Int8",
           "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "8fa8f2151ca29683db10c67186c397d6d86cd2322431a5915bc187114fa7bcd8": {
-    "query": "\n                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, symbol )\n                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9)\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4",
-          "Bytea",
-          "Int4",
-          "Bytea",
-          "Bytea",
-          "Int8",
-          "Int4",
-          "Text"
         ]
       },
       "nullable": []
@@ -4163,6 +4200,20 @@
         null,
         null
       ]
+    }
+  },
+  "a46775cb3cebe4a12937b3ec34ec0fc5917a69b0880006227e3b34481a26d92f": {
+    "query": "\n                        UPDATE mint_nft_updates\n                        SET nonce = $1\n                        WHERE creator_address = $2 AND serial_id = $3\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea",
+          "Int4"
+        ]
+      },
+      "nullable": []
     }
   },
   "a4969ac155106f1d8dd9b305e71ce36b3ee39adf75574d40e123a617a502ffe4": {
@@ -5541,6 +5592,11 @@
           "ordinal": 8,
           "name": "symbol",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 9,
+          "name": "nonce",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -5550,6 +5606,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -5820,6 +5877,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "e19061f374f28705d805f4f7eb05fe05f4adafeb80a9ac37a91cc6557f2b470a": {
+    "query": "\n                    SELECT serial_id FROM mint_nft_updates\n                    WHERE creator_address = $1\n                    ORDER BY serial_id\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "e295fe3cf4138c1dfd76fc7b4f5e72ab981229c036c46fb937cd6fc974af843d": {
@@ -6218,6 +6295,11 @@
           "ordinal": 8,
           "name": "symbol",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 9,
+          "name": "nonce",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -6226,6 +6308,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -6705,6 +6788,11 @@
           "ordinal": 8,
           "name": "symbol",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 9,
+          "name": "nonce",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -6713,6 +6801,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
