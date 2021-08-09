@@ -148,7 +148,7 @@ impl LogsHelper {
                 let data = Self::zksync_withdraw_nft_data(
                     op.tx.from,
                     op.tx.to,
-                    U256::from(nft.id),
+                    U256::from(nft.id.0),
                     nft.address,
                     fee_token.address,
                     u256_from_biguint(op.tx.fee)?,
@@ -468,6 +468,8 @@ impl LogsHelper {
         transaction_log_index: U256,
         storage: &mut StorageProcessor<'_>,
     ) -> jsonrpc_core::Result<Log> {
+        // According to specifications, amount is added to transfer log data for ERC20 tokens
+        // and token ID is added instead for ERC721 tokens.
         let (contract_address, amount_or_id) = if !token.is_nft {
             (token.address, u256_from_biguint(amount)?)
         } else {
