@@ -148,6 +148,7 @@ impl LogsHelper {
                 let data = Self::zksync_withdraw_nft_data(
                     op.tx.from,
                     op.tx.to,
+                    U256::from(nft.id),
                     nft.address,
                     fee_token.address,
                     u256_from_biguint(op.tx.fee)?,
@@ -560,7 +561,8 @@ impl LogsHelper {
     fn zksync_withdraw_nft_data(
         from: H160,
         to: H160,
-        token: H160,
+        token_id: U256,
+        token_address: H160,
         fee_token: H160,
         fee: U256,
         creator_id: U256,
@@ -571,7 +573,8 @@ impl LogsHelper {
         let bytes = encode(&[
             AbiToken::Address(from),
             AbiToken::Address(to),
-            AbiToken::Address(token),
+            AbiToken::Uint(token_id),
+            AbiToken::Address(token_address),
             AbiToken::Address(fee_token),
             AbiToken::Uint(fee),
             AbiToken::Uint(creator_id),
