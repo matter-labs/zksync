@@ -786,8 +786,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 .push(i64::from(mint_nft.nonce.0));
         }
 
-        println!("{:?}", nonces_by_address);
-
         for (address, nonces) in nonces_by_address {
             let records = sqlx::query!(
                 r#"
@@ -803,7 +801,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             assert_eq!(nonces.len(), serial_ids.len());
 
             for (nonce, serial_id) in nonces.into_iter().zip(serial_ids) {
-                println!("{:#?} {} {}", address, serial_id, nonce);
                 sqlx::query!(
                     r#"
                         UPDATE mint_nft_updates
