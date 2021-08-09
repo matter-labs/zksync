@@ -56,6 +56,7 @@ impl Default for MockProverConfigs {
                 heartbeat_interval: 1000,
                 cycle_wait: 500,
                 request_timeout: 1,
+                die_after_proof: false,
             },
             core: zksync_config::configs::prover::Core {
                 gone_timeout: 2,

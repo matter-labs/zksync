@@ -65,6 +65,7 @@ pub struct StorageNFT {
     pub creator_address: Vec<u8>,
     pub address: Vec<u8>,
     pub content_hash: Vec<u8>,
+    pub symbol: String,
 }
 
 #[derive(Debug, FromRow)]
@@ -97,7 +98,7 @@ impl From<StorageNFT> for NFT {
             creator_address: Address::from_slice(val.creator_address.as_slice()),
             creator_id: AccountId(val.creator_account_id as u32),
             address: Address::from_slice(val.address.as_slice()),
-            symbol: "".to_string(),
+            symbol: val.symbol,
             content_hash: H256::from_slice(val.content_hash.as_slice()),
         }
     }
