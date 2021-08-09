@@ -111,7 +111,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         {
             let (_, accounts) = self
                 .database
-                .load_committed_state(&mut storage, Some(block))
+                .load_committed_state(&mut storage, Some(cached_block))
                 .await?;
             for (id, account) in accounts {
                 circuit_account_tree.insert(*id, account.into());
