@@ -198,7 +198,7 @@ impl LogsHelper {
             ZkSyncOp::Deposit(op) => {
                 let token = self.get_token_by_id(storage, op.priority_op.token).await?;
                 let data = Self::zksync_deposit_data(
-                    op.priority_op.to,
+                    op.priority_op.from,
                     op.priority_op.to,
                     token.address,
                     u256_from_biguint(op.priority_op.amount)?,
@@ -523,13 +523,13 @@ impl LogsHelper {
     }
 
     fn zksync_change_pub_key_data(
-        account: H160,
+        account_address: H160,
         new_pub_key_hash: [u8; 20],
         token: H160,
         fee: U256,
     ) -> Bytes {
         let bytes = encode(&[
-            AbiToken::Address(account),
+            AbiToken::Address(account_address),
             AbiToken::FixedBytes(new_pub_key_hash.to_vec()),
             AbiToken::Address(token),
             AbiToken::Uint(fee),
@@ -585,8 +585,8 @@ impl LogsHelper {
     #[allow(clippy::too_many_arguments)]
     fn zksync_swap_data(
         initiator: H160,
-        account1: H160,
-        account2: H160,
+        account_address1: H160,
+        account_address2: H160,
         recipient1: H160,
         recipient2: H160,
         fee_token: H160,
@@ -598,8 +598,8 @@ impl LogsHelper {
     ) -> Bytes {
         let bytes = encode(&[
             AbiToken::Address(initiator),
-            AbiToken::Address(account1),
-            AbiToken::Address(account2),
+            AbiToken::Address(account_address1),
+            AbiToken::Address(account_address2),
             AbiToken::Address(recipient1),
             AbiToken::Address(recipient2),
             AbiToken::Address(fee_token),
@@ -612,19 +612,19 @@ impl LogsHelper {
         bytes.into()
     }
 
-    fn zksync_deposit_data(to: H160, from: H160, token: H160, amount: U256) -> Bytes {
+    fn zksync_deposit_data(from: H160, to: H160, token: H160, amount: U256) -> Bytes {
         let bytes = encode(&[
-            AbiToken::Address(to),
             AbiToken::Address(from),
+            AbiToken::Address(to),
             AbiToken::Address(token),
             AbiToken::Uint(amount),
         ]);
         bytes.into()
     }
 
-    fn zksync_full_exit_data(account: H160, token: H160, amount: U256) -> Bytes {
+    fn zksync_full_exit_data(account_address: H160, token: H160, amount: U256) -> Bytes {
         let bytes = encode(&[
-            AbiToken::Address(account),
+            AbiToken::Address(account_address),
             AbiToken::Address(token),
             AbiToken::Uint(amount),
         ]);

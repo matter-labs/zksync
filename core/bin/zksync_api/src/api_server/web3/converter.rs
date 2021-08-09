@@ -74,7 +74,6 @@ pub fn transaction_from_tx_data(tx: TxData) -> Transaction {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn log(
     address: H160,
     topic: H256,
