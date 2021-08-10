@@ -6,7 +6,7 @@ use sqlx::types::BigDecimal;
 // Workspace imports
 use zksync_types::{
     helpers::{apply_updates, reverse_updates},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, Address, BlockNumber, PubKeyHash,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, Address, BlockNumber, Nonce, PubKeyHash,
     TokenId, ZkSyncTx, NFT,
 };
 // Local imports
@@ -672,6 +672,32 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         metrics::histogram!("sql.token.get_mint_nft_update", start.elapsed());
         Ok(nft.map(|p| p.into()))
     }
+
+    pub async fn get_mint_nft_update_by_creator_and_nonce(
+        &mut self,
+        creator_address: Address,
+        nonce: Nonce,
+    ) -> QueryResult<Option<NFT>> {
+        let start = Instant::now();
+        let nft = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            r#"
+            SELECT * FROM mint_nft_updates
+            WHERE creator_address = $1 AND nonce = $2
+            "#,
+            creator_address.as_bytes(),
+            i64::from(nonce.0)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.token.get_mint_nft_update_by_creator_and_nonce",
+            start.elapsed()
+        );
+        Ok(nft.map(|p| p.into()))
+    }
+
     pub async fn load_committed_nft_tokens(
         &mut self,
         block_number: Option<BlockNumber>,
