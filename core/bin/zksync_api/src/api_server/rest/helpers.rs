@@ -155,7 +155,7 @@ pub async fn parse_tx_id(
         .collect::<Result<Vec<u64>, actix_web::error::Error>>()?;
     if parts.len() != 2 {
         return Err(actix_web::error::ErrorBadRequest(anyhow::anyhow!(
-            "Wrong number of params. You have to provide block id and tx id"
+            "Wrong amount of parameters. There must be two parameters: block and transaction ID"
         )));
     }
 
