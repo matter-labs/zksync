@@ -12,7 +12,7 @@
     "axios": "^0.21.1",
     "bootstrap-vue": "^2.0.4",
     "core-js": "^3.3.2",
-    "ethers": "^5.0.0",
+    "ethers": "^5.4.4",
     "lru-cache": "^6.0.0",
     "node-libs-browser": "^2.2.1",
     "node-sass": "^4.13.0",
