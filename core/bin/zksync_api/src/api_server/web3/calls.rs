@@ -50,7 +50,7 @@ impl CallsHelper {
     pub fn new() -> Self {
         let mut path = PathBuf::new();
         path.push(std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_string()));
-        path.push("core/bin/zksync_api/src/api_server/web3/abi");
+        path.push("etc/web3-abi");
         let erc20_abi = std::fs::File::open(path.join("ERC20.json")).unwrap();
         let erc20_functions = Contract::load(erc20_abi)
             .unwrap()
