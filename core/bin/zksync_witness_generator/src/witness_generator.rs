@@ -2,7 +2,7 @@
 use std::{thread, time};
 // External
 use futures::channel::mpsc;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 // Workspace deps
 use crate::database_interface::DatabaseInterface;
 use zksync_circuit::serialization::ProverData;
@@ -57,8 +57,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             .name("prover_server_pool".to_string())
             .spawn(move || {
                 let _panic_sentinel = ThreadPanicNotify(panic_notify);
-                let mut runtime = tokio::runtime::Builder::new()
-                    .basic_scheduler()
+                let runtime = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Unable to build runtime for a witness generator");
@@ -241,7 +240,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         );
         let mut current_block = self.start_block;
         loop {
-            delay_for(self.rounds_interval).await;
+            sleep(self.rounds_interval).await;
             let should_work = match self.should_work_on_block(current_block).await {
                 Ok(should_work) => should_work,
                 Err(err) => {

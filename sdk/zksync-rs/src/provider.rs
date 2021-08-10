@@ -269,7 +269,7 @@ impl RpcProvider {
 
             if should_retry && delay < MAX_DURATION {
                 delay *= 2;
-                tokio::time::delay_for(delay).await;
+                tokio::time::sleep(delay).await;
                 continue;
             }
 

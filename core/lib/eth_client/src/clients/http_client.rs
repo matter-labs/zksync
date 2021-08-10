@@ -250,12 +250,14 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                 let gas_used = receipt.gas_used;
 
                 let call_request = web3::types::CallRequest {
-                    from: Some(transaction.from),
+                    from: transaction.from,
                     to: transaction.to,
                     gas: Some(transaction.gas),
                     gas_price: Some(transaction.gas_price),
                     value: Some(transaction.value),
                     data: Some(transaction.input),
+                    transaction_type: None,
+                    access_list: None,
                 };
 
                 let encoded_revert_reason = self

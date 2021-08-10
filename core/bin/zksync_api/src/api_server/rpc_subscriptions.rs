@@ -210,18 +210,11 @@ pub fn start_ws_server(
 
         io.extend_with(rpc_sub_app.to_delegate());
 
-        let task_executor = tokio_old::runtime::Builder::new()
-            .name_prefix("ws-executor")
-            .core_threads(super::THREADS_PER_SERVER)
-            .build()
-            .expect("failed to build ws executor");
-
         let server = jsonrpc_ws_server::ServerBuilder::with_meta_extractor(
             io,
             |context: &RequestContext| Arc::new(Session::new(context.sender())),
         )
         .max_connections(1000)
-        .event_loop_executor(task_executor.executor())
         .start(&addr)
         .expect("Unable to start RPC ws server");
 

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::{task::JoinHandle, time};
+use tokio_stream::wrappers::IntervalStream;
 use web3::types::{Block, BlockId, BlockNumber, H256, U64};
 
 use zksync_config::ZkSyncConfig;
@@ -71,7 +72,7 @@ impl MultiplexedGatewayWatcher {
     pub async fn run(self) {
         vlog::info!("Ethereum Gateway Watcher started");
 
-        time::interval(self.interval)
+        IntervalStream::new(time::interval(self.interval))
             .for_each_concurrent(self.task_limit, |_| self.check_client_gateways())
             .await
     }

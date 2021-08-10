@@ -189,7 +189,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         let mut last_used_block = 0;
         loop {
             // We perform a loading routine every X seconds.
-            tokio::time::delay_for(self.options.sender.tx_poll_period()).await;
+            tokio::time::sleep(self.options.sender.tx_poll_period()).await;
             // If we received an error when loading a new operation, we can't do anything about it and should panic.
             if let Err(error) = self.load_new_operations().await {
                 vlog::error!("Unable to restore operations from the database: {}", error);
@@ -331,7 +331,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             // This metric is needed to track how much time is spent in backoff mode
             // and trigger grafana alerts
             metrics::histogram!("eth_sender.backoff_mode", RATE_LIMIT_BACKOFF_PERIOD);
-            time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
+            time::sleep(RATE_LIMIT_BACKOFF_PERIOD).await;
         }
     }
 
