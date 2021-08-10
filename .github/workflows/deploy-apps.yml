@@ -47,6 +47,9 @@ jobs:
               "^ropsten$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
               "^mainnet$": { "kubeConf": "KUBECONF_MAINNET", "runner": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
             }
+      - name: debug
+        run: |
+          echo "${{ toJSON(github.event) }}"
       -
         name: Cancel deployment (deployment tag missmatch)
         if: ${{ steps.regex-match.outputs.group1 == '' }}
