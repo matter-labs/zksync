@@ -309,7 +309,7 @@ export class Deployer {
             this.contracts.forcedExit,
             [this.deployWallet.address, receiver],
             {
-                gasLimit: 6000000,
+                gasLimit: 8000000,
                 ...ethTxOptions
             }
         );

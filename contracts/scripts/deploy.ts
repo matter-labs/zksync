@@ -78,16 +78,16 @@ async function main() {
         await deployer.deployProxiesAndGatekeeper({ gasPrice, nonce: args.nonce });
     }
 
+    if (args.contract === 'TokenGovernance' || args.contract == null) {
+        await deployer.deployTokenGovernance({ gasPrice, nonce: args.nonce });
+    }
+
     if (args.contract === 'ZkSyncNFTFactory' || args.contract == null) {
         await deployer.deployNFTFactory({ gasPrice, nonce: args.nonce });
     }
 
     if (args.contract === 'ForcedExit' || args.contract == null) {
         await deployer.deployForcedExit({ gasPrice, nonce: args.nonce });
-    }
-
-    if (args.contract === 'TokenGovernance' || args.contract == null) {
-        await deployer.deployTokenGovernance({ gasPrice, nonce: args.nonce });
     }
 }
 
