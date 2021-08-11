@@ -355,6 +355,7 @@ impl Web3RpcApp {
             status: Some((receipt.success as u8).into()),
             root: Some(root_hash),
             logs_bloom: H2048::zero(),
+            transaction_type: None,
         })
     }
 

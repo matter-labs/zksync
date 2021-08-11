@@ -2,7 +2,6 @@
 use std::time::Instant;
 // External imports
 use anyhow::format_err;
-use sqlx::Done;
 // Workspace imports
 use zksync_types::BlockNumber;
 // Local imports

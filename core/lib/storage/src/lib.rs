@@ -126,7 +126,7 @@ pub struct StorageProcessor<'a> {
 }
 
 #[derive(sqlx::Type, Debug, Clone, PartialEq, Eq)]
-#[sqlx(rename = "action_type")]
+#[sqlx(type_name = "action_type")]
 pub enum StorageActionType {
     COMMIT,
     VERIFY,

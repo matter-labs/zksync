@@ -12,7 +12,7 @@ use zksync_types::{
 // Local uses
 
 #[derive(sqlx::Type, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[sqlx(rename = "event_type")]
+#[sqlx(type_name = "event_type")]
 #[serde(rename_all = "snake_case")]
 pub enum EventType {
     Account,

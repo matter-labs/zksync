@@ -87,8 +87,3 @@ pub fn init() -> Option<ClientInitGuard> {
         ))
     })
 }
-
-#[cfg(feature = "actix")]
-pub fn actix_middleware() -> sentry_actix::Sentry {
-    sentry_actix::Sentry::new()
-}

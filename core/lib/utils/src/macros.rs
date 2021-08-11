@@ -9,7 +9,7 @@ macro_rules! retry_opt {
                     break val;
                 } else {
                     $err;
-                    tokio::time::delay_for($delay.into()).await;
+                    tokio::time::sleep($delay.into()).await;
                 }
             }
         }

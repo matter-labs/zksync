@@ -60,7 +60,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiFeeData::new(tx_sender);
 
     web::scope("fee")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route("", web::post().to(get_tx_fee))
         .route("/batch", web::post().to(get_batch_fee))
 }

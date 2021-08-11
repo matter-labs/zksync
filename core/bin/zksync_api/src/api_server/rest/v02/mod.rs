@@ -3,7 +3,6 @@ use actix_web::{
     web::{self},
     Scope,
 };
-
 // Workspace uses
 use zksync_api_types::v02::ApiVersion;
 use zksync_config::ZkSyncConfig;
@@ -33,11 +32,12 @@ pub struct SharedData {
 }
 
 pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope {
+    let data = SharedData {
+        net: zk_config.chain.eth.network,
+        api_version: ApiVersion::V02,
+    };
     web::scope("/api/v0.2")
-        .data(SharedData {
-            net: zk_config.chain.eth.network,
-            api_version: ApiVersion::V02,
-        })
+        .app_data(web::Data::new(data))
         .service(account::api_scope(
             tx_sender.pool.clone(),
             tx_sender.tokens.clone(),

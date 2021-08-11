@@ -87,17 +87,18 @@ impl TestServerConfig {
         scope: String,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,
     {
         let this = self.clone();
-        let server = actix_web::test::start(move || {
+
+        let server = actix_test::start(move || {
             let app = App::new();
             let shared_data = shared_data.clone();
             let app = if let Some(shared_data) = shared_data {
-                app.data(shared_data)
+                app.app_data(web::Data::new(shared_data))
             } else {
                 app
             };
@@ -114,7 +115,7 @@ impl TestServerConfig {
         &self,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,

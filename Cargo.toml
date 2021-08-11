@@ -41,13 +41,8 @@ members = [
     # Test infrastructure
     "core/tests/test_account",
     "core/tests/testkit",
-    "core/tests/loadtest",
     "core/tests/loadnext",
 
     # SDK section
     "sdk/zksync-rs"
 ]
-
-[patch.crates-io]
-web3 = { git = "https://github.com/Deniallugo/rust-web3", branch = "update_ethabi"}
-

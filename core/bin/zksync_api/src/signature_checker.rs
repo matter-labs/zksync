@@ -386,9 +386,8 @@ pub fn start_sign_checker_detached(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
-            let mut runtime = Builder::new()
+            let runtime = Builder::new_multi_thread()
                 .enable_all()
-                .threaded_scheduler()
                 .build()
                 .expect("failed to build runtime for signature processor");
             let handle = runtime.handle().clone();
