@@ -49,8 +49,9 @@ contract RegenesisMultisig is Ownable, Config {
         require(_oldRootHash == candidateOldRootHash, "2");
         require(_newRootHash == candidateNewRootHash, "3");
 
-        address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS =
-            [$(SECURITY_COUNCIL_MEMBERS)];
+        address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS = [
+            $(SECURITY_COUNCIL_MEMBERS)
+        ];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
             if (SECURITY_COUNCIL_MEMBERS[id] == msg.sender) {
                 require(securityCouncilApproves[id] == false);

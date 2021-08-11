@@ -981,14 +981,13 @@ contract Plonk4VerifierWithAccessToDNext {
         uint256[] memory individual_vks_inputs,
         uint256[16] memory subproofs_limbs
     ) internal view returns (bool) {
-        (uint256 recursive_input, PairingsBn254.G1Point[2] memory aggregated_g1s) =
-            reconstruct_recursive_public_input(
-                recursive_vks_root,
-                max_valid_index,
-                recursive_vks_indexes,
-                individual_vks_inputs,
-                subproofs_limbs
-            );
+        (uint256 recursive_input, PairingsBn254.G1Point[2] memory aggregated_g1s) = reconstruct_recursive_public_input(
+            recursive_vks_root,
+            max_valid_index,
+            recursive_vks_indexes,
+            individual_vks_inputs,
+            subproofs_limbs
+        );
 
         assert(recursive_input == proof.input_values[0]);
 
@@ -1188,16 +1187,15 @@ contract VerifierWithDeserialize is Plonk4VerifierWithAccessToDNext {
 
         Proof memory proof = deserialize_proof(public_inputs, serialized_proof);
 
-        bool valid =
-            verify_recursive(
-                proof,
-                vk,
-                recursive_vks_root,
-                max_valid_index,
-                recursive_vks_indexes,
-                individual_vks_inputs,
-                subproofs_limbs
-            );
+        bool valid = verify_recursive(
+            proof,
+            vk,
+            recursive_vks_root,
+            max_valid_index,
+            recursive_vks_indexes,
+            individual_vks_inputs,
+            subproofs_limbs
+        );
 
         return valid;
     }
