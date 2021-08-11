@@ -11,8 +11,8 @@
         "zksync-crypto": "^0.6.0"
     },
     "peerDependencies": {
-        "@ethersproject/logger": "^5.0.0",
-        "ethers": "^5.0.0"
+        "@ethersproject/logger": "^5.4.0",
+        "ethers": "^5.4.4"
     },
     "devDependencies": {
         "@rollup/plugin-commonjs": "^16.0.0",
@@ -22,7 +22,7 @@
         "@types/mocha": "^8.0.3",
         "@types/node": "^14.14.5",
         "chai": "^4.2.0",
-        "ethers": "^5.0.26",
+        "ethers": "^5.4.4",
         "mocha": "^8.2.0",
         "rollup": "^2.32.1",
         "rollup-plugin-copy": "^3.3.0",

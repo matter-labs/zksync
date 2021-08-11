@@ -13,7 +13,7 @@
         "commander": "^6.0.0",
         "deep-extend": "^0.6.0",
         "dotenv": "^8.2.0",
-        "ethers": "^5.0.18",
+        "ethers": "^5.4.4",
         "node-fetch": "^2.6.1",
         "tabtab": "^3.0.2",
         "@iarna/toml": "^2.2.5"
