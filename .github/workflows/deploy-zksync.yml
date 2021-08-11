@@ -84,7 +84,7 @@ jobs:
         with:
           workflow: Update Config
           token: ${{ secrets.GH_TOKEN }}
-          wait-for-completion-timeout: 100s
+          wait-for-completion-timeout: 5m
           wait-for-completion-interval: 20s
           inputs: |
             {
