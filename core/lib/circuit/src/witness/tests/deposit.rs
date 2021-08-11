@@ -40,6 +40,40 @@ fn test_deposit_in_empty_leaf() {
     );
 }
 
+/// Checks that deposit can be applied to a new account if deposit address is zero.
+/// Here we generate an empty ZkSyncState (with no accounts), and make a deposit to a new account.
+#[test]
+#[ignore]
+fn test_deposit_zero_address() {
+    // Input data.
+    let mut account = WitnessTestAccount::new(AccountId(1), 1); // Will not be included into ZkSyncState
+    account.set_empty_address();
+    account.set_empty_pubkey_hash();
+
+    let accounts = vec![account];
+
+    let deposit_op = DepositOp {
+        priority_op: Deposit {
+            from: accounts[0].account.address,
+            token: TokenId(0),
+            amount: BigUint::from(1u32),
+            to: accounts[0].account.address,
+        },
+        account_id: accounts[0].id,
+    };
+
+    generic_test_scenario::<DepositWitness<Bn256>, _>(
+        &accounts,
+        deposit_op,
+        (),
+        |plasma_state, op| {
+            <ZkSyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                .expect("Deposit failed");
+            vec![]
+        },
+    );
+}
+
 /// Checks that deposit can be applied to an existing account.
 /// Here we generate a ZkSyncState with one account, and make a deposit to this account.
 #[test]

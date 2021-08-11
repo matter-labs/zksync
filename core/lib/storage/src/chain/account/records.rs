@@ -83,7 +83,7 @@ pub struct StorageBalance {
 }
 
 #[derive(Debug, Clone, Copy, sqlx::Type)]
-#[sqlx(rename = "eth_account_type")]
+#[sqlx(type_name = "eth_account_type")]
 pub enum EthAccountType {
     Owned,
     CREATE2,

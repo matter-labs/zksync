@@ -166,7 +166,7 @@ pub async fn submit_request(
 
 pub async fn get_request_by_id(
     data: web::Data<ApiForcedExitRequestsData>,
-    web::Path(request_id): web::Path<ForcedExitRequestId>,
+    request_id: web::Path<ForcedExitRequestId>,
 ) -> JsonResult<ForcedExitRequest> {
     let start = Instant::now();
 
@@ -185,7 +185,7 @@ pub async fn get_request_by_id(
     );
 
     let fe_request_from_db = fe_requests_schema
-        .get_request_by_id(request_id)
+        .get_request_by_id(*request_id)
         .await
         .map_err(ApiError::internal)?;
 
@@ -199,7 +199,7 @@ pub async fn get_request_by_id(
 // existing enough time
 pub async fn check_account_eligibility(
     data: web::Data<ApiForcedExitRequestsData>,
-    web::Path(account): web::Path<Address>,
+    account: web::Path<Address>,
 ) -> JsonResult<ForcedExitEligibilityResponse> {
     let mut storage = data
         .connection_pool
@@ -210,7 +210,7 @@ pub async fn check_account_eligibility(
 
     let eligible = data
         .forced_exit_checker
-        .check_forced_exit(&mut storage, account)
+        .check_forced_exit(&mut storage, *account)
         .await
         .map_err(ApiError::from)?;
 
@@ -228,7 +228,7 @@ pub fn api_scope(
 
     // `enabled` endpoint should always be there
     let scope = web::scope("v0.1")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route("status", web::get().to(get_status));
 
     if config.forced_exit_requests.enabled {
@@ -263,7 +263,7 @@ mod tests {
     };
 
     struct TestServer {
-        api_server: actix_web::test::TestServer,
+        api_server: actix_test::TestServer,
         #[allow(dead_code)]
         pool: ConnectionPool,
     }
@@ -474,6 +474,6 @@ pub fn check_address_space_overflow(id: i64, digits_in_id: u8) {
 
     metrics::histogram!(
         "forced_exit_requests.address_space_overflow",
-        exceeding_rate
+        exceeding_rate as f64
     );
 }

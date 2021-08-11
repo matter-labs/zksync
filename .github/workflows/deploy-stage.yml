@@ -4,6 +4,12 @@ on:
     branches:
       - dev
       - breaking
+      - hotfix/*
+    tags:
+      - hotfix-*
+
+# Disable simultaneous deployments into stage
+concurrency: deploy-stage
 
 jobs:
   setup:

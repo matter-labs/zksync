@@ -316,7 +316,7 @@ impl ApiAccountData {
 
 async fn account_committed_info(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
 ) -> ApiResult<Option<Account>> {
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
@@ -329,7 +329,7 @@ async fn account_committed_info(
 
 async fn account_finalized_info(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
 ) -> ApiResult<Option<Account>> {
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
@@ -342,7 +342,7 @@ async fn account_finalized_info(
 
 async fn account_full_info(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
 ) -> ApiResult<AccountState> {
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
@@ -358,7 +358,7 @@ async fn account_full_info(
 
 async fn account_txs(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
     let query = api_try!(parse_query(query).map_err(Error::from));
@@ -369,7 +369,7 @@ async fn account_txs(
 
 async fn account_pending_txs(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, SerialId>> {
     let query = api_try!(parse_query(query).map_err(Error::from));
@@ -392,7 +392,7 @@ pub fn api_scope(
     let data = ApiAccountData::new(pool, tokens, core_api_client);
 
     web::scope("accounts")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route(
             "{account_id_or_address}/committed",
             web::get().to(account_committed_info),
@@ -459,7 +459,7 @@ mod tests {
 
     fn get_unconfirmed_ops_loopback(
         ops_handle: PendingOpsHandle,
-    ) -> (CoreApiClient, actix_web::test::TestServer) {
+    ) -> (CoreApiClient, actix_test::TestServer) {
         async fn get_ops(
             data: web::Data<PendingOpsHandle>,
             web::Query(_query): web::Query<PendingOpsFlattenRequest>,
@@ -467,10 +467,10 @@ mod tests {
             Json(data.lock().await.clone())
         }
 
-        let server = actix_web::test::start(move || {
+        let server = actix_test::start(move || {
             App::new().service(
                 web::scope("unconfirmed_ops")
-                    .data(ops_handle.clone())
+                    .app_data(web::Data::new(ops_handle.clone()))
                     .route("", web::get().to(get_ops)),
             )
         });
@@ -480,8 +480,8 @@ mod tests {
     }
 
     struct TestServer {
-        core_server: actix_web::test::TestServer,
-        api_server: actix_web::test::TestServer,
+        core_server: actix_test::TestServer,
+        api_server: actix_test::TestServer,
         pool: ConnectionPool,
         pending_ops: PendingOpsHandle,
     }

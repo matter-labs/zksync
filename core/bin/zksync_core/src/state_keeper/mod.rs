@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -591,7 +592,8 @@ impl ZkSyncStateKeeper {
             .await
             .expect("Unable to commit transaction in statekeeper");
         vlog::info!("Genesis block created, state: {}", state.root_hash());
-        println!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
+        let genesis_root = format!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
+        println!("{}", &genesis_root);
         metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
     }
 
