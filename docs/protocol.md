@@ -2176,6 +2176,71 @@ Get NFT factory which will be used for withdrawing NFT for corresponding creator
 - `_creatorAccountId`: Creator account id
 - `_creatorAddress`: Creator address
 
+### Token Governance contract
+
+#### Add token
+
+Collects fees for adding a token and passes the call to `addToken` in the governance contract.
+
+```solidity
+function addToken(address _token)
+```
+
+- `_token`: ERC20 token address
+
+#### Set listing fee token
+
+Set new listing token and fee, should be called only by zkSync governor.
+
+```solidity
+function setListingFeeToken(IERC20 _newListingFeeToken, uint256 _newListingFee)
+```
+
+- `_newListingFeeToken`: address of the token in which fees will be collected
+- `_newListingFee`: amount of tokens that will need to be paid for adding tokens
+
+#### Set listing fee
+
+Set new listing fee, should be called only by zkSync governor.
+
+```solidity
+function setListingFee(uint256 _newListingFee)
+```
+
+- `_newListingFee`: amount of tokens that will need to be paid for adding tokens
+
+#### Set lister
+
+Enable or disable token lister, if enabled new tokens can be added by that address without payment, should be called
+only by zkSync governor.
+
+```solidity
+function setLister(address _listerAddress, bool _active)
+```
+
+- `_listerAddress`: address that can list tokens without fee
+- `_active`: active flag
+
+#### Set listing cap
+
+Change maximum amount of tokens that can be listed using this method, should be called only by zkSync governor.
+
+```solidity
+function setListingCap(uint16 _newListingCap)
+```
+
+- `_newListingCap`: max number of tokens that can be listed using this contract
+
+#### Set treasury
+
+Change address that collects payments for listing tokens, should be called only by zkSync governor.
+
+```solidity
+function setTreasury(address _newTreasury)
+```
+
+- `_newTreasury`: address that collects listing payments
+
 ## Block state transition circuit
 
 Block circuit describes state transition function (STF) from previous state to the new one by applying a number of
