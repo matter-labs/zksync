@@ -97,11 +97,11 @@ pub trait Rpc {
 
 impl Rpc for RpcApp {
     fn account_info(&self, addr: Address) -> BoxFutureResult<AccountInfoResp> {
-        spawn! {self._impl_account_info(addr)}
+        spawn!(self._impl_account_info(addr))
     }
 
     fn ethop_info(&self, serial_id: u32) -> BoxFutureResult<ETHOpInfoResp> {
-        spawn! {self._impl_ethop_info(serial_id)}
+        spawn!(self._impl_ethop_info(serial_id))
     }
 
     fn tx_info(&self, hash: TxHash) -> BoxFutureResult<TransactionInfoResp> {

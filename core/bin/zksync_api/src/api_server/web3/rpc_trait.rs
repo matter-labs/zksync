@@ -1,6 +1,5 @@
 // External uses
-use futures::{FutureExt, TryFutureExt};
-use jsonrpc_core::Error;
+use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_derive::rpc;
 // Local uses
 use super::{
@@ -8,63 +7,56 @@ use super::{
     Web3RpcApp,
 };
 
-pub type FutureResp<T> = Box<dyn futures01::Future<Item = T, Error = Error> + Send>;
+pub type BoxFutureResult<T> = BoxFuture<Result<T>>;
 
 macro_rules! spawn {
-    ($self: ident$(.$method: ident($($args: expr),*))+) => {{
-        let handle = $self.runtime_handle.clone();
+    ($self: ident.$method: ident($($args: expr),*)) => {{
         let self_ = $self.clone();
-        let resp = async move {
-            handle
-                .spawn(self_$(.$method($($args),*))+)
-                .await
-                .unwrap()
-        };
-        Box::new(resp.boxed().compat())
+        Box::pin(self_.$method($($args),*))
     }}
 }
 
 #[rpc]
 pub trait Web3Rpc {
     #[rpc(name = "web3_clientVersion", returns = "String")]
-    fn web3_client_version(&self) -> Result<String, Error>;
+    fn web3_client_version(&self) -> Result<String>;
 
     #[rpc(name = "net_version", returns = "String")]
-    fn net_version(&self) -> Result<String, Error>;
+    fn net_version(&self) -> Result<String>;
 
     #[rpc(name = "eth_protocolVersion", returns = "String")]
-    fn protocol_version(&self) -> Result<String, Error>;
+    fn protocol_version(&self) -> Result<String>;
 
     #[rpc(name = "eth_mining", returns = "bool")]
-    fn mining(&self) -> Result<bool, Error>;
+    fn mining(&self) -> Result<bool>;
 
     #[rpc(name = "eth_hashrate", returns = "U256")]
-    fn hashrate(&self) -> Result<U256, Error>;
+    fn hashrate(&self) -> Result<U256>;
 
     #[rpc(name = "eth_gasPrice", returns = "U256")]
-    fn gas_price(&self) -> Result<U256, Error>;
+    fn gas_price(&self) -> Result<U256>;
 
     #[rpc(name = "eth_accounts", returns = "Vec<Address>")]
-    fn accounts(&self) -> Result<Vec<Address>, Error>;
+    fn accounts(&self) -> Result<Vec<Address>>;
 
     #[rpc(name = "eth_getUncleCountByBlockHash", returns = "U256")]
-    fn get_uncle_count_by_block_hash(&self, block_hash: H256) -> Result<U256, Error>;
+    fn get_uncle_count_by_block_hash(&self, block_hash: H256) -> Result<U256>;
 
     #[rpc(name = "eth_getUncleCountByBlockNumber", returns = "U256")]
-    fn get_uncle_count_by_block_number(&self, block_number: BlockNumber) -> Result<U256, Error>;
+    fn get_uncle_count_by_block_number(&self, block_number: BlockNumber) -> Result<U256>;
 
     #[rpc(name = "eth_blockNumber", returns = "U64")]
-    fn block_number(&self) -> FutureResp<U64>;
+    fn block_number(&self) -> BoxFutureResult<U64>;
 
     #[rpc(name = "eth_getBalance", returns = "U256")]
     fn get_balance(
         &self,
         address: zksync_types::Address,
         block: Option<BlockNumber>,
-    ) -> FutureResp<U256>;
+    ) -> BoxFutureResult<U256>;
 
     #[rpc(name = "eth_getBlockTransactionCountByHash", returns = "Option<U256>")]
-    fn get_block_transaction_count_by_hash(&self, hash: H256) -> FutureResp<Option<U256>>;
+    fn get_block_transaction_count_by_hash(&self, hash: H256) -> BoxFutureResult<Option<U256>>;
 
     #[rpc(
         name = "eth_getBlockTransactionCountByNumber",
@@ -73,95 +65,103 @@ pub trait Web3Rpc {
     fn get_block_transaction_count_by_number(
         &self,
         block: Option<BlockNumber>,
-    ) -> FutureResp<Option<U256>>;
+    ) -> BoxFutureResult<Option<U256>>;
 
     #[rpc(name = "eth_getTransactionByHash", returns = "Option<Transaction>")]
-    fn get_transaction_by_hash(&self, hash: H256) -> FutureResp<Option<Transaction>>;
+    fn get_transaction_by_hash(&self, hash: H256) -> BoxFutureResult<Option<Transaction>>;
 
     #[rpc(name = "eth_getBlockByNumber", returns = "Option<BlockInfo>")]
     fn get_block_by_number(
         &self,
         block_number: Option<BlockNumber>,
         include_txs: bool,
-    ) -> FutureResp<Option<BlockInfo>>;
+    ) -> BoxFutureResult<Option<BlockInfo>>;
 
     #[rpc(name = "eth_getBlockByHash", returns = "Option<BlockInfo>")]
-    fn get_block_by_hash(&self, hash: H256, include_txs: bool) -> FutureResp<Option<BlockInfo>>;
+    fn get_block_by_hash(
+        &self,
+        hash: H256,
+        include_txs: bool,
+    ) -> BoxFutureResult<Option<BlockInfo>>;
 }
 
 impl Web3Rpc for Web3RpcApp {
-    fn web3_client_version(&self) -> Result<String, Error> {
+    fn web3_client_version(&self) -> Result<String> {
         Ok(String::from("zkSync"))
     }
 
-    fn net_version(&self) -> Result<String, Error> {
+    fn net_version(&self) -> Result<String> {
         Ok(self.chain_id.to_string())
     }
 
-    fn protocol_version(&self) -> Result<String, Error> {
+    fn protocol_version(&self) -> Result<String> {
         Ok(String::from("0"))
     }
 
-    fn mining(&self) -> Result<bool, Error> {
+    fn mining(&self) -> Result<bool> {
         Ok(false)
     }
 
-    fn hashrate(&self) -> Result<U256, Error> {
+    fn hashrate(&self) -> Result<U256> {
         Ok(U256::zero())
     }
 
-    fn gas_price(&self) -> Result<U256, Error> {
+    fn gas_price(&self) -> Result<U256> {
         Ok(U256::zero())
     }
 
-    fn accounts(&self) -> Result<Vec<Address>, Error> {
+    fn accounts(&self) -> Result<Vec<Address>> {
         Ok(Vec::new())
     }
 
-    fn get_uncle_count_by_block_hash(&self, _block_hash: H256) -> Result<U256, Error> {
+    fn get_uncle_count_by_block_hash(&self, _block_hash: H256) -> Result<U256> {
         Ok(U256::zero())
     }
 
-    fn get_uncle_count_by_block_number(&self, _block_number: BlockNumber) -> Result<U256, Error> {
+    fn get_uncle_count_by_block_number(&self, _block_number: BlockNumber) -> Result<U256> {
         Ok(U256::zero())
     }
 
-    fn block_number(&self) -> FutureResp<U64> {
-        spawn! { self._impl_block_number() }
+    fn block_number(&self) -> BoxFutureResult<U64> {
+        spawn!(self._impl_block_number())
     }
 
     fn get_balance(
         &self,
         address: zksync_types::Address,
         block: Option<BlockNumber>,
-    ) -> FutureResp<U256> {
-        spawn! { self._impl_get_balance(address, block) }
+    ) -> BoxFutureResult<U256> {
+        spawn!(self._impl_get_balance(address, block))
     }
 
-    fn get_block_transaction_count_by_hash(&self, hash: H256) -> FutureResp<Option<U256>> {
-        spawn! { self._impl_get_block_transaction_count_by_hash(hash) }
+    fn get_block_transaction_count_by_hash(&self, hash: H256) -> BoxFutureResult<Option<U256>> {
+        spawn!(self._impl_get_block_transaction_count_by_hash(hash))
     }
 
     fn get_block_transaction_count_by_number(
         &self,
         block: Option<BlockNumber>,
-    ) -> FutureResp<Option<U256>> {
-        spawn! { self._impl_get_block_transaction_count_by_number(block) }
+    ) -> BoxFutureResult<Option<U256>> {
+        spawn!(self._impl_get_block_transaction_count_by_number(block))
     }
 
-    fn get_transaction_by_hash(&self, hash: H256) -> FutureResp<Option<Transaction>> {
-        spawn! { self._impl_get_transaction_by_hash(hash) }
+    fn get_transaction_by_hash(&self, hash: H256) -> BoxFutureResult<Option<Transaction>> {
+        spawn!(self._impl_get_transaction_by_hash(hash))
     }
 
     fn get_block_by_number(
         &self,
         block_number: Option<BlockNumber>,
         include_txs: bool,
-    ) -> FutureResp<Option<BlockInfo>> {
-        spawn! { self._impl_get_block_by_number(block_number, include_txs) }
+    ) -> BoxFutureResult<Option<BlockInfo>> {
+        spawn!(self._impl_get_block_by_number(block_number, include_txs))
     }
 
-    fn get_block_by_hash(&self, hash: H256, include_txs: bool) -> FutureResp<Option<BlockInfo>> {
-        spawn! { self._impl_get_block_by_hash(hash, include_txs) }
+    fn get_block_by_hash(
+        &self,
+        hash: H256,
+        include_txs: bool,
+    ) -> BoxFutureResult<Option<BlockInfo>> {
+        spawn!(self._impl_get_block_by_hash(hash, include_txs))
     }
 }

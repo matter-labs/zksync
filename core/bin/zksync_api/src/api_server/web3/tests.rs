@@ -1,9 +1,9 @@
 // Built-in uses
 use std::str::FromStr;
 // External uses
-use futures01::future::Future;
+use futures::future::{join, join5, Future};
 use jsonrpc_core::{IoHandler, Params};
-use jsonrpc_core_client::{RawClient, RpcError};
+use jsonrpc_core_client::{RawClient, RpcResult};
 use serde_json::Value;
 // Workspace uses
 use zksync_storage::ConnectionPool;
@@ -15,7 +15,7 @@ use super::{
 };
 use crate::api_server::rest::v02::test_utils::TestServerConfig;
 
-async fn local_client() -> anyhow::Result<(RawClient, impl Future<Item = (), Error = RpcError>)> {
+async fn local_client() -> anyhow::Result<(RawClient, impl Future<Output = RpcResult<()>>)> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
 
@@ -31,7 +31,7 @@ async fn local_client() -> anyhow::Result<(RawClient, impl Future<Item = (), Err
 }
 
 /// Checks that static methods return values they should return
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "api_test"),
     ignore = "Use `zk test rust-api` command to perform this test"
@@ -54,33 +54,47 @@ async fn static_methods() -> anyhow::Result<()> {
             "eth_getUncleCountByBlockNumber",
             Params::Array(vec![serde_json::to_value(U64::zero()).unwrap()]),
         );
-        let first_join = web3_client_version.join5(net_version, protocol_version, mining, hashrate);
-        let second_join = gas_price.join5(
+        let first_join = join5(
+            web3_client_version,
+            net_version,
+            protocol_version,
+            mining,
+            hashrate,
+        );
+        let second_join = join5(
+            gas_price,
             accounts,
             get_uncle_count_by_block_hash,
             get_uncle_count_by_block_number,
             server,
         );
-        first_join.join(second_join)
+
+        join(first_join, second_join)
     };
     let (
         (web3_client_version, net_version, protocol_version, mining, hashrate),
         (gas_price, accounts, get_uncle_count_by_block_hash, get_uncle_count_by_block_number, _),
-    ) = fut.wait().unwrap();
-    assert_eq!(web3_client_version.as_str().unwrap(), "zkSync");
-    assert_eq!(net_version.as_str().unwrap(), "9");
-    assert_eq!(protocol_version.as_str().unwrap(), "0");
-    assert_eq!(mining.as_bool().unwrap(), false);
-    assert_eq!(hashrate.as_str().unwrap(), "0x0");
-    assert_eq!(gas_price.as_str().unwrap(), "0x0");
-    assert!(accounts.as_array().unwrap().is_empty());
-    assert_eq!(get_uncle_count_by_block_hash.as_str().unwrap(), "0x0");
-    assert_eq!(get_uncle_count_by_block_number.as_str().unwrap(), "0x0");
+    ) = fut.await;
+    assert_eq!(web3_client_version.unwrap().as_str().unwrap(), "zkSync");
+    assert_eq!(net_version.unwrap().as_str().unwrap(), "9");
+    assert_eq!(protocol_version.unwrap().as_str().unwrap(), "0");
+    assert_eq!(mining.unwrap().as_bool().unwrap(), false);
+    assert_eq!(hashrate.unwrap().as_str().unwrap(), "0x0");
+    assert_eq!(gas_price.unwrap().as_str().unwrap(), "0x0");
+    assert!(accounts.unwrap().as_array().unwrap().is_empty());
+    assert_eq!(
+        get_uncle_count_by_block_hash.unwrap().as_str().unwrap(),
+        "0x0"
+    );
+    assert_eq!(
+        get_uncle_count_by_block_number.unwrap().as_str().unwrap(),
+        "0x0"
+    );
     Ok(())
 }
 
 /// Tests `eth_blockNumber` method
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "api_test"),
     ignore = "Use `zk test rust-api` command to perform this test"
@@ -90,11 +104,9 @@ async fn block_number() -> anyhow::Result<()> {
     // Checks that `eth_blockNumber` return last finalized confirmed block.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method("eth_blockNumber", Params::None)
-            .join(server)
+        join(client.call_method("eth_blockNumber", Params::None), server)
     };
-    let (block_number, _) = fut.wait().unwrap();
+    let block_number = fut.await.0.unwrap();
     let expected_block_number = {
         let mut storage = pool.access_storage().await?;
         let block_number = storage
@@ -112,7 +124,7 @@ async fn block_number() -> anyhow::Result<()> {
 }
 
 /// Tests `eth_getBalance` method
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "api_test"),
     ignore = "Use `zk test rust-api` command to perform this test"
@@ -123,33 +135,35 @@ async fn get_balance() -> anyhow::Result<()> {
     // Checks that balance of the account is zero after block with number 0.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getBalance",
                 Params::Array(vec![
                     Value::String(format!("{:#?}", address)),
                     Value::String("earliest".to_string()),
                 ]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (earliest_balance, _) = fut.wait().unwrap();
+    let earliest_balance = fut.await.0.unwrap();
     assert_eq!(earliest_balance.as_str().unwrap(), "0x0");
 
     // Checks that balance of the account equals expected balance after block with number 3.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getBalance",
                 Params::Array(vec![
                     Value::String("0x09d1ef5f45cfa30225edff40cebf657b4226b27b".to_string()),
                     Value::String("0x3".to_string()),
                 ]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (balance_by_number, _) = fut.wait().unwrap();
+    let balance_by_number = fut.await.0.unwrap();
     let expected_balance = {
         let mut storage = pool.access_storage().await?;
         let balance = storage
@@ -167,16 +181,17 @@ async fn get_balance() -> anyhow::Result<()> {
     // Checks that balance of the account equals expected balance after the last block.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getBalance",
                 Params::Array(vec![Value::String(
                     "0x09d1ef5f45cfa30225edff40cebf657b4226b27b".to_string(),
                 )]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (latest_balance, _) = fut.wait().unwrap();
+    let latest_balance = fut.await.0.unwrap();
     let expected_balance = {
         let mut storage = pool.access_storage().await?;
         let last_block = storage
@@ -200,7 +215,7 @@ async fn get_balance() -> anyhow::Result<()> {
 }
 
 /// Tests `eth_getBlockTransactionCountByHash` and `eth_getBlockTransactionCountByNumber` methods
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "api_test"),
     ignore = "Use `zk test rust-api` command to perform this test"
@@ -210,17 +225,18 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
     // Checks that `eth_getBlockTransactionCountByHash` works correctly.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getBlockTransactionCountByHash",
                 Params::Array(vec![Value::String(
                     "0x0000000000000000000000000000000000000000000000000000000000000001"
                         .to_string(),
                 )]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (count_by_hash, _) = fut.wait().unwrap();
+    let count_by_hash = fut.await.0.unwrap();
     let expected = {
         let mut storage = pool.access_storage().await?;
         U256::from(
@@ -239,14 +255,15 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
     // Checks that `eth_getBlockTransactionCountByNumber` works correctly for provided block.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getBlockTransactionCountByNumber",
                 Params::Array(vec![Value::String("0x1".to_string())]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (count_by_number, _) = fut.wait().unwrap();
+    let count_by_number = fut.await.0.unwrap();
     assert_eq!(
         serde_json::from_value::<U256>(count_by_number).unwrap(),
         expected
@@ -255,11 +272,12 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
     // Checks that `eth_getBlockTransactionCountByNumber` works correctly for the last block.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method("eth_getBlockTransactionCountByNumber", Params::None)
-            .join(server)
+        join(
+            client.call_method("eth_getBlockTransactionCountByNumber", Params::None),
+            server,
+        )
     };
-    let (count_in_last_block, _) = fut.wait().unwrap();
+    let count_in_last_block = fut.await.0.unwrap();
     let expected = {
         let mut storage = pool.access_storage().await?;
         let last_block = storage
@@ -284,7 +302,7 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
 }
 
 /// Tests `eth_getTransactionByHash` methods
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "api_test"),
     ignore = "Use `zk test rust-api` command to perform this test"
@@ -294,17 +312,18 @@ async fn get_transaction_by_hash() -> anyhow::Result<()> {
     // Checks that `eth_getTransactionByHash` returns `null` for non-existent transaction hash.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getTransactionByHash",
                 Params::Array(vec![Value::String(
                     "0x0000000000000000000000000000000000000000000000000000000000000000"
                         .to_string(),
                 )]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (transaction, _) = fut.wait().unwrap();
+    let transaction = fut.await.0.unwrap();
     assert!(transaction.is_null());
 
     // Checks that `eth_getTransactionByHash` works correctly for existent transaction.
@@ -320,14 +339,15 @@ async fn get_transaction_by_hash() -> anyhow::Result<()> {
     let tx_hash_str = format!("0x{}", hex::encode(&tx_hash));
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getTransactionByHash",
                 Params::Array(vec![Value::String(tx_hash_str)]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (transaction, _) = fut.wait().unwrap();
+    let transaction = fut.await.0.unwrap();
     let expected = {
         let mut storage = pool.access_storage().await?;
         let tx_data = storage
@@ -347,7 +367,7 @@ async fn get_transaction_by_hash() -> anyhow::Result<()> {
 }
 
 /// Tests `eth_getBlockByNumber` and `eth_getBlockByHash` methods
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "api_test"),
     ignore = "Use `zk test rust-api` command to perform this test"
@@ -357,8 +377,8 @@ async fn get_block() -> anyhow::Result<()> {
     // Checks that `eth_getBlockByHash` returns `null` for non-existent transaction hash.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getBlockByHash",
                 Params::Array(vec![
                     Value::String(
@@ -367,17 +387,18 @@ async fn get_block() -> anyhow::Result<()> {
                     ),
                     Value::Bool(false),
                 ]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (block, _) = fut.wait().unwrap();
+    let block = fut.await.0.unwrap();
     assert!(block.is_null());
 
     // Checks that `eth_getBlockByHash` returns correct block with tx hashes.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getBlockByHash",
                 Params::Array(vec![
                     Value::String(
@@ -386,10 +407,11 @@ async fn get_block() -> anyhow::Result<()> {
                     ),
                     Value::Bool(false),
                 ]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (block, _) = fut.wait().unwrap();
+    let block = fut.await.0.unwrap();
     let expected = {
         let mut storage = pool.access_storage().await?;
         Web3RpcApp::block_by_number(&mut storage, BlockNumber(2), false).await?
@@ -402,14 +424,15 @@ async fn get_block() -> anyhow::Result<()> {
     // Checks that `eth_getBlockByNumber` returns correct block with txs.
     let fut = {
         let (client, server) = local_client().await?;
-        client
-            .call_method(
+        join(
+            client.call_method(
                 "eth_getBlockByNumber",
                 Params::Array(vec![Value::String("0x2".to_string()), Value::Bool(true)]),
-            )
-            .join(server)
+            ),
+            server,
+        )
     };
-    let (block, _) = fut.wait().unwrap();
+    let block = fut.await.0.unwrap();
     let expected = {
         let mut storage = pool.access_storage().await?;
         Web3RpcApp::block_by_number(&mut storage, BlockNumber(2), true).await?

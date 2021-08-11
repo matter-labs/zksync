@@ -125,13 +125,18 @@ impl Web3RpcApp {
             block_hash: Some(tx.block_hash),
             block_number: Some(tx.block_number.into()),
             transaction_index: tx.block_index.map(Into::into),
-            from: tx.from,
+            from: Some(tx.from),
             to: tx.to,
             value: 0.into(),
             gas_price: 0.into(),
             gas: 0.into(),
             input: Vec::new().into(),
+            v: None,
+            r: None,
+            s: None,
             raw: None,
+            transaction_type: None,
+            access_list: None,
         }
     }
 
