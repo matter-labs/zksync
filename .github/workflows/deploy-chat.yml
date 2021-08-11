@@ -27,7 +27,7 @@ jobs:
           regex: '^(v\d+\.\d+\.\d+)(-r\d+)?$'
       -
         uses: dysnix/find-latest-tag@v1
-        if: steps.regex.outputs.match == ''
+        if: steps.regex.outputs.match != ''
         id: latest
         with:
           regex: ${{ steps.regex.outputs.group1 }}(-r\d+)?
