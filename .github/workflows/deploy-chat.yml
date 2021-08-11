@@ -8,7 +8,7 @@ defaults:
     shell: bash -leo pipefail {0}
 
 # Disable simultaneous deployments into a single environment
-concurrency: deploy-${{ github.event.inputs.environment }}
+concurrency: deploy-chat-${{ github.event.inputs.environment }}
 
 jobs:
   setup:
