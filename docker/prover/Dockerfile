@@ -6,7 +6,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release
 
 FROM debian:buster-slim
-RUN apt-get update && apt-get install -y axel ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y axel ca-certificates tini && rm -rf /var/lib/apt/lists/*
 # Docs of env variables used for this image
 # to test this locally just run
 # docker build -t tmp_prover -f =(f envsubst < ./docker/prover/Dockerfile) .; docker run --rm  tmp_prover:latest
@@ -33,4 +33,6 @@ COPY docker/prover/prover-entry.sh /bin/
 COPY keys/packed /keys/packed
 COPY contracts/artifacts/ /contracts/artifacts/
 
-CMD ["prover-entry.sh"]
+## Mitigate memory leaks when app exists it's restarted
+ENTRYPOINT [ "/usr/bin/tini", "-g", "--" ]
+CMD while :; do /bin/prover-entry.sh || exit $?; done
