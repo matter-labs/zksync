@@ -4,6 +4,9 @@ on:
     branches:
       - dev
       - breaking
+      - hotfix/*
+    tags:
+      - hotfix-*
 
 jobs:
   setup:
