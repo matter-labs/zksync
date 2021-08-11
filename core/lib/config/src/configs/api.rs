@@ -147,6 +147,8 @@ pub struct Web3 {
     pub port: u16,
     /// URL to access web3 JSON RPC server.
     pub url: String,
+    /// Max difference between blocks in `eth_getLogs` method.
+    pub max_block_range: u32,
 }
 
 impl Web3 {
@@ -195,6 +197,7 @@ mod tests {
             web3: Web3 {
                 port: 3002,
                 url: "http://127.0.0.1:3002".into(),
+                max_block_range: 10,
             },
             private: PrivateApi {
                 port: 8090,
@@ -229,6 +232,7 @@ API_JSON_RPC_WS_PORT="3031"
 API_JSON_RPC_WS_URL="ws://127.0.0.1:3031"
 API_WEB3_PORT="3002"
 API_WEB3_URL="http://127.0.0.1:3002"
+API_WEB3_MAX_BLOCK_RANGE="10"
 API_PRIVATE_PORT="8090"
 API_PRIVATE_URL="http://127.0.0.1:8090"
 API_PROVER_PORT="8088"

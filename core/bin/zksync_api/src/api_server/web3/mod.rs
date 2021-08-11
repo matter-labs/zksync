@@ -24,10 +24,11 @@ pub struct Web3RpcApp {
     connection_pool: ConnectionPool,
     logs_helper: LogsHelper,
     chain_id: u8,
+    max_block_range: u32,
 }
 
 impl Web3RpcApp {
-    pub fn new(connection_pool: ConnectionPool, chain_id: u8) -> Self {
+    pub fn new(connection_pool: ConnectionPool, config: &ZkSyncConfig) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("Web3RpcApp must be created from the context of Tokio Runtime");
 
@@ -35,7 +36,8 @@ impl Web3RpcApp {
             runtime_handle,
             connection_pool,
             logs_helper: LogsHelper::new(),
-            chain_id,
+            chain_id: config.eth_client.chain_id,
+            max_block_range: config.api.web3.max_block_range,
         }
     }
 
@@ -58,7 +60,7 @@ pub fn start_rpc_server(
 ) {
     let addr = config.api.web3.bind_addr();
 
-    let rpc_app = Web3RpcApp::new(connection_pool, config.eth_client.chain_id);
+    let rpc_app = Web3RpcApp::new(connection_pool, config);
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);
         let mut io = IoHandler::new();

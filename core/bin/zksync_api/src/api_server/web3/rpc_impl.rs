@@ -244,6 +244,18 @@ impl Web3RpcApp {
             }
         };
 
+        if from_block > to_block {
+            return Err(Error::invalid_params(
+                "`fromBlock` must not be greater than `toBlock`",
+            ));
+        }
+        if to_block.0 - from_block.0 > self.max_block_range {
+            return Err(Error::invalid_params(format!(
+                "The difference between `toBlock` and `fromBlock` must not be greater than {}",
+                self.max_block_range
+            )));
+        }
+
         let topics = if let Some(mut topics) = filter.topics {
             // If there is non-null topic at the non-first position then return empty vec,
             // since all our logs contain exactly one topic.
@@ -269,7 +281,7 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
         for receipt in receipts {
-            let logs = self.logs_by_receipt(&mut transaction, receipt).await?;
+            let logs = self.logs_from_receipt(&mut transaction, receipt).await?;
             let filtered = logs.into_iter().filter(|log| {
                 if !topics.is_empty() && !topics.contains(&log.topics[0]) {
                     return false;
@@ -291,7 +303,7 @@ impl Web3RpcApp {
         Ok(result)
     }
 
-    pub(crate) async fn logs_by_receipt(
+    pub(crate) async fn logs_from_receipt(
         &self,
         storage: &mut StorageProcessor<'_>,
         receipt: Web3TxReceipt,
@@ -328,7 +340,7 @@ impl Web3RpcApp {
         storage: &mut StorageProcessor<'_>,
         receipt: Web3TxReceipt,
     ) -> Result<TransactionReceipt> {
-        let logs = self.logs_by_receipt(storage, receipt.clone()).await?;
+        let logs = self.logs_from_receipt(storage, receipt.clone()).await?;
         let root_hash = H256::from_slice(&receipt.block_hash);
         Ok(TransactionReceipt {
             transaction_hash: H256::from_slice(&receipt.tx_hash),

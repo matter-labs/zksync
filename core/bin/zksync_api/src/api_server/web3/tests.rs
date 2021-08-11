@@ -2,11 +2,12 @@
 use std::str::FromStr;
 // External uses
 use futures01::future::Future;
-use jsonrpc_core::{IoHandler, Params};
+use jsonrpc_core::{Error, ErrorCode, IoHandler, Params};
 use jsonrpc_core_client::{RawClient, RpcError};
 use num::BigUint;
 use serde_json::{Map, Value};
 // Workspace uses
+use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::operations_ext::records::Web3TxReceipt, ConnectionPool};
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
@@ -26,7 +27,7 @@ async fn local_client() -> anyhow::Result<(RawClient, impl Future<Item = (), Err
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
 
-    let rpc_app = Web3RpcApp::new(cfg.pool, 9);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config);
     let mut io = IoHandler::new();
     rpc_app.extend(&mut io);
 
@@ -438,7 +439,7 @@ async fn get_block() -> anyhow::Result<()> {
 async fn create_logs() -> anyhow::Result<()> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
-    let rpc_app = Web3RpcApp::new(cfg.pool, 9);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config);
 
     let from_account_id = AccountId(3);
     let from_account = ZkSyncAccount::rand_with_seed([1, 2, 3, 4]);
@@ -725,7 +726,7 @@ async fn create_logs() -> anyhow::Result<()> {
             to_account: Some(H160::zero().as_bytes().to_vec()),
             success: true,
         };
-        let logs = rpc_app.logs_by_receipt(&mut storage, receipt).await?;
+        let logs = rpc_app.logs_from_receipt(&mut storage, receipt).await?;
         assert_eq!(logs.len(), events.len());
         for (idx, (log, (event, data, test_name))) in logs.into_iter().zip(events).enumerate() {
             assert_eq!(log.topics.len(), 1, "{}", test_name);
@@ -796,7 +797,7 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
             .web3_receipt_by_hash(&tx_hash)
             .await?
             .unwrap();
-        let rpc_app = Web3RpcApp::new(pool.clone(), 9);
+        let rpc_app = Web3RpcApp::new(pool.clone(), &ZkSyncConfig::from_env());
         rpc_app.tx_receipt(&mut storage, receipt).await?
     };
     assert_eq!(
@@ -815,7 +816,55 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
 )]
 async fn get_logs() -> anyhow::Result<()> {
     let pool = ConnectionPool::new(Some(1));
-    let rpc_app = Web3RpcApp::new(pool.clone(), 9);
+    let rpc_app = Web3RpcApp::new(pool.clone(), &ZkSyncConfig::from_env());
+
+    // Checks that it returns error if `fromBlock` is greater than `toBlock`.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let mut req = Map::new();
+        req.insert("fromBlock".to_string(), Value::String("0x2".to_string()));
+        req.insert("toBlock".to_string(), Value::String("0x1".to_string()));
+        client
+            .call_method("eth_getLogs", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let error = fut.wait().unwrap_err();
+    assert!(matches!(
+        error,
+        RpcError::JsonRpcError(Error {
+            code: ErrorCode::InvalidParams,
+            ..
+        })
+    ));
+
+    // Checks that it returns error if block range is too big.
+    let fut = {
+        let (client, server) = {
+            let mut config = ZkSyncConfig::from_env();
+            config.api.web3.max_block_range = 3;
+
+            let rpc_app = Web3RpcApp::new(pool.clone(), &config);
+            let mut io = IoHandler::new();
+            rpc_app.extend(&mut io);
+
+            jsonrpc_core_client::transports::local::connect::<RawClient, _, _>(io)
+        };
+        let mut req = Map::new();
+        req.insert("fromBlock".to_string(), Value::String("0x1".to_string()));
+        req.insert("toBlock".to_string(), Value::String("0x5".to_string()));
+        client
+            .call_method("eth_getLogs", Params::Array(vec![Value::Object(req)]))
+            .join(server)
+    };
+    let error = fut.wait().unwrap_err();
+    assert!(matches!(
+        error,
+        RpcError::JsonRpcError(Error {
+            code: ErrorCode::InvalidParams,
+            ..
+        })
+    ));
+
     // Checks that block filter works correctly.
     let fut = {
         let (client, server) = local_client().await?;

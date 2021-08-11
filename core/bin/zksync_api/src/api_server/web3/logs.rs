@@ -440,7 +440,6 @@ impl LogsHelper {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn erc_transfer(
         &self,
         token: Token,
