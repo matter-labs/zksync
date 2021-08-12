@@ -332,7 +332,7 @@ pub fn run_ticker_task(
                 config.ticker.number_of_ticker_actors,
                 TICKER_CHANNEL_SIZE,
             );
-            tokio::spawn(tickers[0].keep_price_updated(60));
+            tokio::spawn(tickers[0].keep_price_updated());
             // Run update prices only for the first ticker. At least one ticker should exist
             for ticker in tickers.into_iter() {
                 tokio::spawn(ticker.run());
