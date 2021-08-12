@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
-use tokio::time::Instant;
+use tokio::time::{Duration, Instant};
 // Workspace deps
 use zksync_balancer::{Balancer, BuildBalancedItem};
 use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
@@ -61,6 +61,7 @@ pub mod validator;
 mod tests;
 
 static TICKER_CHANNEL_SIZE: usize = 32000;
+const UPDATE_PRICE_INTERVAL_SECS: u64 = 10 * 60;
 
 /// Contains cost of zkSync operations in Wei.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -302,7 +303,8 @@ pub fn run_ticker_task(
                 validator,
             );
 
-            tokio::spawn(fee_ticker.run())
+            tokio::spawn(fee_ticker.run());
+            tokio::spawn(fee_ticker.keep_price_updated())
         }
 
         TokenPriceSource::CoinGecko => {
@@ -319,7 +321,7 @@ pub fn run_ticker_task(
                 .with_price_cache(price_cache)
                 .with_gas_price_cache(gas_price_cache);
 
-            let (ticker_balancer, tickers) = Balancer::new(
+            let (ticker_balancer, mut tickers) = Balancer::new(
                 FeeTickerBuilder {
                     api: ticker_api,
                     info: ticker_info,
@@ -330,9 +332,12 @@ pub fn run_ticker_task(
                 config.ticker.number_of_ticker_actors,
                 TICKER_CHANNEL_SIZE,
             );
+            tokio::spawn(tickers[0].keep_price_updated(60));
+            // Run update prices only for the first ticker. At least one ticker should exist
             for ticker in tickers.into_iter() {
                 tokio::spawn(ticker.run());
             }
+
             tokio::spawn(ticker_balancer.run())
         }
     }
@@ -427,6 +432,21 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .get_last_quote(token)
             .await
             .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
+    }
+
+    async fn keep_price_updated(&self) {
+        loop {
+            if let Ok(tokens) = self.api.get_all_tokens().await {
+                for token in &tokens {
+                    if let Err(e) = self.api.update_price(token).await {
+                        vlog::error!("Update price error {}", e);
+                    };
+                }
+            } else {
+                vlog::warn!("Error in database wait for the next step")
+            };
+            tokio::time::sleep(Duration::from_secs(UPDATE_PRICE_INTERVAL_SECS));
+        }
     }
 
     async fn get_fee_from_ticker_in_wei(
