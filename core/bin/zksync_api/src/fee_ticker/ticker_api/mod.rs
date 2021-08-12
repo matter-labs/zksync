@@ -1,6 +1,6 @@
 use super::PriceError;
 use crate::utils::token_db_cache::TokenDBCache;
-use anyhow::{format_err, Error};
+use anyhow::format_err;
 use async_trait::async_trait;
 use chrono::Utc;
 use num::rational::Ratio;
@@ -16,6 +16,7 @@ pub mod coingecko;
 pub mod coinmarkercap;
 
 const API_PRICE_EXPIRATION_TIME_SECS: i64 = 30 * 60;
+const UPDATE_PRICE_INTERVAL_SECS: u64 = 10 * 60;
 
 /// The limit of time we are willing to wait for response.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_millis(700);
@@ -33,14 +34,12 @@ pub trait FeeTickerAPI {
     /// Get last price from ticker
     async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError>;
 
-    /// Get last price from ticker
-    async fn update_price(&self, token: &Token) -> Result<(), PriceError>;
-
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error>;
 
     async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error>;
-    async fn get_all_tokens(&self) -> Result<Vec<Token>, anyhow::Error>;
+
+    async fn keep_price_updated(self);
 }
 
 #[derive(Debug, Clone)]
@@ -140,13 +139,10 @@ impl<T: TokenPriceAPI> TickerApi<T> {
             token_id,
             TokenCacheEntry::new(price.clone(), Instant::now()),
         );
-
-        if !is_price_historical {
-            self._update_stored_value(token_id, price)
-                .await
-                .map_err(|e| vlog::warn!("Failed to update historical ticker price: {}", e))
-                .unwrap_or_default();
-        }
+        self._update_stored_value(token_id, price)
+            .await
+            .map_err(|e| vlog::warn!("Failed to update historical ticker price: {}", e))
+            .unwrap_or_default();
     }
 
     async fn get_stored_value(&self, token_id: TokenId) -> Option<TokenPrice> {
@@ -180,6 +176,34 @@ impl<T: TokenPriceAPI> TickerApi<T> {
 
         metrics::histogram!("ticker.get_historical_ticker_price", start.elapsed());
         result
+    }
+
+    async fn update_price(&self, token: &Token) -> Result<(), PriceError> {
+        let start = Instant::now();
+        let api_price = match self.token_price_api.get_price(&token).await {
+            Ok(api_price) => api_price,
+
+            // Database contain this token, but is not listed in CoinGecko(CoinMarketCap)
+            Err(PriceError::TokenNotFound(_)) => TokenPrice {
+                usd_price: Ratio::from_integer(0u32.into()),
+                last_updated: Utc::now(),
+            },
+            Err(e) => return Err(e),
+        };
+
+        self.update_stored_value(token.id, api_price.clone()).await;
+        metrics::histogram!("ticker.update_price", start.elapsed());
+        Ok(())
+    }
+    async fn get_all_tokens(&self) -> Result<Vec<Token>, PriceError> {
+        let mut storage = self
+            .db_pool
+            .access_storage()
+            .await
+            .map_err(PriceError::db_error)?;
+        TokenDBCache::get_all_tokens(&mut storage)
+            .await
+            .map_err(PriceError::db_error)
     }
 }
 
@@ -231,24 +255,6 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         Err(PriceError::db_error("No price stored in database"))
     }
 
-    async fn update_price(&self, token: &Token) -> Result<(), PriceError> {
-        let start = Instant::now();
-        let api_price = match self.token_price_api.get_price(&token).await {
-            Ok(api_price) => api_price,
-
-            // Database contain this token, but is not listed in CoinGecko(CoinMarketCap)
-            Err(PriceError::TokenNotFound(_)) => TokenPrice {
-                usd_price: Ratio::from_integer(0u32.into()),
-                last_updated: Utc::now(),
-            },
-            Err(e) => return Err(e),
-        };
-
-        self.update_stored_value(token.id, api_price.clone()).await;
-        metrics::histogram!("ticker.update_price", start.elapsed());
-        Ok(())
-    }
-
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
         let start = Instant::now();
@@ -291,7 +297,18 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         result
     }
 
-    async fn get_all_tokens(&self) -> Result<Vec<Token>, Error> {
-        TokenDBCache::get_all_tokens(&mut cache.pool.access_storage().await?).await
+    async fn keep_price_updated(self) {
+        loop {
+            if let Ok(tokens) = self.get_all_tokens().await {
+                for token in &tokens {
+                    if let Err(e) = self.update_price(token).await {
+                        vlog::error!("Update price error {}", e);
+                    };
+                }
+            } else {
+                vlog::warn!("Error in database wait for the next step")
+            };
+            tokio::time::sleep(Duration::from_secs(UPDATE_PRICE_INTERVAL_SECS)).await;
+        }
     }
 }
