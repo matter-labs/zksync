@@ -265,6 +265,8 @@ impl Web3RpcApp {
                 .any(|(i, topic)| i > 0 && topic.is_some());
             if has_not_first {
                 return Ok(Vec::new());
+            } else if topics.is_empty() {
+                Vec::new()
             } else {
                 topics.remove(0).unwrap_or_default().0
             }

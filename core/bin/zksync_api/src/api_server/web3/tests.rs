@@ -19,7 +19,7 @@ use zksync_types::{
 use super::{
     converter::transaction_from_tx_data,
     types::{BlockInfo, Event, Log, Transaction, TransactionReceipt, H160, H256, U256, U64},
-    Web3RpcApp,
+    Web3RpcApp, ZKSYNC_PROXY_ADDRESS,
 };
 use crate::api_server::rest::v02::test_utils::TestServerConfig;
 
@@ -949,7 +949,7 @@ async fn get_logs() -> anyhow::Result<()> {
             .unwrap();
         addresses.push(token.address);
     }
-    addresses.push(rpc_app.logs_helper.zksync_proxy_address);
+    addresses.push(H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap());
 
     let fut = {
         let (client, server) = local_client().await?;

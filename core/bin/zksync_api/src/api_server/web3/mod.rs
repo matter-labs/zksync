@@ -18,6 +18,9 @@ mod rpc_trait;
 mod tests;
 mod types;
 
+pub const ZKSYNC_PROXY_ADDRESS: &str = "1000000000000000000000000000000000000000";
+pub const NFT_FACTORY_ADDRESS: &str = "2000000000000000000000000000000000000000";
+
 #[derive(Clone)]
 pub struct Web3RpcApp {
     runtime_handle: tokio::runtime::Handle,

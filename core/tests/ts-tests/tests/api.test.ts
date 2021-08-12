@@ -1,5 +1,7 @@
-import { Wallet, RestProvider, getDefaultRestProvider, types } from 'zksync';
+import { Wallet, RestProvider, getDefaultRestProvider, types, utils } from 'zksync';
 import { Tester } from './tester';
+import Web3 from 'web3';
+import { BigNumber } from 'ethers';
 import './priority-ops';
 import './change-pub-key';
 import './transfer';
@@ -200,5 +202,59 @@ describe('ZkSync REST API V0.2 tests', () => {
         await provider.notifyAnyTransaction(submitBatchResponse.transactionHashes[0], 'COMMIT');
         const batchInfo = await provider.getBatch(submitBatchResponse.batchHash);
         expect(batchInfo.batchHash).to.eql(submitBatchResponse.batchHash);
+    });
+});
+
+describe('ZkSync web3 API tests', () => {
+    let tester: Tester;
+    let alice: Wallet;
+    let token: string = 'ETH';
+    let amount: BigNumber;
+
+    before('create tester and test wallets', async () => {
+        tester = await Tester.init('localhost', 'HTTP', 'RPC');
+        alice = await tester.fundedWallet('1.0');
+        let bob = await tester.emptyWallet();
+        amount = tester.syncProvider.tokenSet.parseToken(token, '1000');
+        await tester.testDeposit(alice, token, amount, true);
+        await tester.testChangePubKey(alice, token, false);
+        await tester.testTransfer(alice, bob, token, amount.div(4));
+        await tester.testWithdraw(alice, token, amount.div(5));
+    });
+
+    it('should check getLogs', async () => {
+        let web3 = new Web3('http://localhost:3002');
+        let restProvider = await getDefaultRestProvider('localhost');
+        let txs = await restProvider.accountTxs(alice.address(), { from: 'latest', direction: 'older', limit: 4 });
+        let fromBlock = txs.list[3].blockNumber!;
+        let toBlock = txs.list[0].blockNumber!;
+        let blockInfo: types.ApiBlockInfo;
+        do {
+            await utils.sleep(1000);
+            blockInfo = await restProvider.blockByPosition(toBlock);
+        } while (!blockInfo);
+
+        let logs = await web3.eth.getPastLogs({ fromBlock, toBlock });
+        let address = alice.address().substr(2).toLowerCase();
+        let count: Map<string, number> = new Map();
+        for (let log of logs) {
+            if (log.data.includes(address)) {
+                let countBefore = count.get(log.topics[0]);
+                if (!countBefore) {
+                    countBefore = 0;
+                }
+                count.set(log.topics[0], countBefore + 1);
+            }
+        }
+        let zksyncDepositCount = count.get('0x2662d0a3ad9ff1caf7988e9ff1b359522c4c35d29e07035460b1e25c963ad3a0');
+        let zksyncChangePubKeyCount = count.get('0xe4ff40ee5f4c5ece5c0a6a50f5888e1a053fe2432370efd4f7d68a1629fe0a2c');
+        let zksyncTransferCount = count.get('0x5658042ff5bd6fc1d9418fb7a395205c554d2f0214fe1a13c193ee60fba3fbe2');
+        let zksyncWithdrawCount = count.get('0xc7937e7c6cc38e3d8cde2d3b9e942ae00eda070b394e346d232ed907c2d53a25');
+        let erc20TransferCount = count.get('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef');
+        expect(zksyncDepositCount).to.eql(1);
+        expect(zksyncChangePubKeyCount).to.eql(1);
+        expect(zksyncTransferCount).to.eql(1);
+        expect(zksyncWithdrawCount).to.eql(1);
+        expect(erc20TransferCount).to.eql(6); // 1 one Deposit, 1 one ChangePubKey, 2 for Transfer, 2 for Withdraw.
     });
 });

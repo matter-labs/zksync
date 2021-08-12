@@ -10,15 +10,18 @@ use tiny_keccak::keccak256;
 use zksync_storage::StorageProcessor;
 use zksync_types::{Nonce, Token, TokenId, ZkSyncOp, NFT};
 // Local uses
-use super::converter::{log, u256_from_biguint};
-use super::types::{Bytes, CommonLogData, Event, Log, H160, H256, U256};
+use super::{
+    converter::{log, u256_from_biguint},
+    types::{Bytes, CommonLogData, Event, Log, H160, H256, U256},
+    NFT_FACTORY_ADDRESS, ZKSYNC_PROXY_ADDRESS,
+};
 use crate::utils::token_db_cache::TokenDBCache;
 
 #[derive(Debug, Clone)]
 pub struct LogsHelper {
     topic_by_event: HashMap<Event, H256>,
     tokens: TokenDBCache,
-    pub zksync_proxy_address: H160,
+    zksync_proxy_address: H160,
     nft_factory_address: H160,
 }
 
@@ -46,10 +49,8 @@ impl LogsHelper {
         Self {
             topic_by_event,
             tokens: TokenDBCache::new(),
-            zksync_proxy_address: H160::from_str("1000000000000000000000000000000000000000")
-                .unwrap(),
-            nft_factory_address: H160::from_str("2000000000000000000000000000000000000000")
-                .unwrap(),
+            zksync_proxy_address: H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap(),
+            nft_factory_address: H160::from_str(NFT_FACTORY_ADDRESS).unwrap(),
         }
     }
 
