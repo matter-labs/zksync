@@ -4,7 +4,7 @@ Prover required circuit keys. You can generate them manually.
 
 ## 0. Requirements
 
-RAM: 128 GB 
+RAM: 128 GB
 
 CPU: 32 CPUs
 
@@ -14,7 +14,7 @@ Clone repository to your machine
 
 ## 2. Installing dependencies
 
-Key generation required the same [dependencies](../docs/setup-dev.md)  as our server.
+Key generation required the same [dependencies](../docs/setup-dev.md) as our server.
 
 ## 4. Generating keys
 
