@@ -2171,7 +2171,7 @@ function getNFTFactory(uint32 _creatorAccountId, address _creatorAddress)
 
 #### Add token
 
-Collects fees for adding a token and passes the call to `addToken` in the governance contract.
+Collects fees for adding a token and passes the call to the `addToken` function in the governance contract.
 
 ```solidity
 function addToken(address _token)
