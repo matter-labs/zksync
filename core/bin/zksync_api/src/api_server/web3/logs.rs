@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::str::FromStr;
 // External uses
 use ethabi::{encode, Token as AbiToken};
-use jsonrpc_core::Error;
-use num::BigUint;
+use jsonrpc_core::{Error, Result};
+use num::{BigUint, Zero};
 use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_storage::StorageProcessor;
@@ -62,8 +62,7 @@ impl LogsHelper {
         op: ZkSyncOp,
         common_data: CommonLogData,
         storage: &mut StorageProcessor<'_>,
-    ) -> jsonrpc_core::Result<Option<Log>> {
-        let transaction_log_index = Self::zksync_op_log_index(&op);
+    ) -> Result<Option<Log>> {
         let log_data = match op {
             ZkSyncOp::Transfer(op) => {
                 let token = self.get_token_by_id(storage, op.tx.token).await?;
@@ -71,8 +70,8 @@ impl LogsHelper {
                     op.tx.from,
                     op.tx.to,
                     token.address,
-                    u256_from_biguint(op.tx.amount)?,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.amount),
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncTransfer, data))
             }
@@ -82,8 +81,8 @@ impl LogsHelper {
                     op.tx.from,
                     op.tx.to,
                     token.address,
-                    u256_from_biguint(op.tx.amount)?,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.amount),
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncTransfer, data))
             }
@@ -93,8 +92,8 @@ impl LogsHelper {
                     op.tx.from,
                     op.tx.to,
                     token.address,
-                    u256_from_biguint(op.tx.amount)?,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.amount),
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncWithdraw, data))
             }
@@ -111,7 +110,7 @@ impl LogsHelper {
                     initiator,
                     op.tx.target,
                     token.address,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncForcedExit, data))
             }
@@ -121,7 +120,7 @@ impl LogsHelper {
                     op.tx.account,
                     op.tx.new_pk_hash.data,
                     fee_token.address,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncChangePubKey, data))
             }
@@ -136,7 +135,7 @@ impl LogsHelper {
                     op.tx.creator_address,
                     op.tx.content_hash,
                     op.tx.recipient,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.fee),
                     fee_token.address,
                 );
                 Some((Event::ZkSyncMintNFT, data))
@@ -150,7 +149,7 @@ impl LogsHelper {
                     U256::from(nft.id.0),
                     nft.address,
                     fee_token.address,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.fee),
                     U256::from(nft.creator_id.0),
                     nft.creator_address,
                     U256::from(nft.serial_id),
@@ -189,9 +188,9 @@ impl LogsHelper {
                     fee_token.address,
                     token1.address,
                     token2.address,
-                    u256_from_biguint(op.tx.fee)?,
-                    u256_from_biguint(op.tx.amounts.0)?,
-                    u256_from_biguint(op.tx.amounts.1)?,
+                    u256_from_biguint(op.tx.fee),
+                    u256_from_biguint(op.tx.amounts.0),
+                    u256_from_biguint(op.tx.amounts.1),
                 );
                 Some((Event::ZkSyncSwap, data))
             }
@@ -201,7 +200,7 @@ impl LogsHelper {
                     op.priority_op.from,
                     op.priority_op.to,
                     token.address,
-                    u256_from_biguint(op.priority_op.amount)?,
+                    u256_from_biguint(op.priority_op.amount),
                 );
                 Some((Event::ZkSyncDeposit, data))
             }
@@ -216,7 +215,7 @@ impl LogsHelper {
                     .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?;
                 let data =
-                    Self::zksync_full_exit_data(account, token.address, u256_from_biguint(amount)?);
+                    Self::zksync_full_exit_data(account, token.address, u256_from_biguint(amount));
                 Some((Event::ZkSyncFullExit, data))
             }
             _ => None,
@@ -227,95 +226,67 @@ impl LogsHelper {
                 self.topic_by_event(event).unwrap(),
                 data,
                 common_data,
-                transaction_log_index,
+                0u8.into(),
             )
         });
         Ok(log)
     }
 
-    pub async fn erc_logs(
+    /// Returns info for erc logs produced by operation
+    /// Info structure: (token, from, to, amount)
+    async fn erc_logs_info(
         &self,
         op: ZkSyncOp,
-        common_data: CommonLogData,
         storage: &mut StorageProcessor<'_>,
-    ) -> jsonrpc_core::Result<Vec<Log>> {
-        let mut logs = Vec::new();
+    ) -> Result<Vec<(Token, H160, H160, BigUint)>> {
+        let mut result = Vec::new();
         match op {
             ZkSyncOp::Transfer(op) => {
                 let token = self.get_token_by_id(storage, op.tx.token).await?;
-                logs.push(self.erc_transfer(
-                    token,
-                    op.tx.from,
-                    op.tx.to,
-                    op.tx.amount,
-                    common_data,
-                    0u8.into(),
-                )?);
+                result.push((token.clone(), op.tx.from, op.tx.to, op.tx.amount));
+                result.push((token, op.tx.from, H160::zero(), op.tx.fee));
             }
             ZkSyncOp::TransferToNew(op) => {
                 let token = self.get_token_by_id(storage, op.tx.token).await?;
-                logs.push(self.erc_transfer(
-                    token,
-                    op.tx.from,
-                    op.tx.to,
-                    op.tx.amount,
-                    common_data,
-                    0u8.into(),
-                )?);
+                result.push((token.clone(), op.tx.from, op.tx.to, op.tx.amount));
+                result.push((token, op.tx.from, H160::zero(), op.tx.fee));
             }
             ZkSyncOp::Withdraw(op) => {
                 let token = self.get_token_by_id(storage, op.tx.token).await?;
-                logs.push(self.erc_transfer(
-                    token,
-                    op.tx.from,
-                    H160::zero(),
-                    op.tx.amount,
-                    common_data,
-                    0u8.into(),
-                )?);
+                result.push((token.clone(), op.tx.from, H160::zero(), op.tx.amount));
+                result.push((token, op.tx.from, H160::zero(), op.tx.fee));
             }
             ZkSyncOp::ForcedExit(op) => {
                 let token = self.get_token_by_id(storage, op.tx.token).await?;
-                let from = storage
+                let initiator = storage
                     .chain()
                     .account_schema()
                     .account_address_by_id(op.tx.initiator_account_id)
                     .await
                     .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?;
-                logs.push(self.erc_transfer(
-                    token,
-                    from,
-                    H160::zero(),
-                    op.withdraw_amount.unwrap_or_default().0,
-                    common_data,
-                    0u8.into(),
-                )?);
+                let amount = op.withdraw_amount.unwrap_or_default().0;
+                result.push((token.clone(), op.tx.target, H160::zero(), amount));
+                result.push((token, initiator, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::ChangePubKeyOffchain(op) => {
+                let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                result.push((fee_token, op.tx.account, H160::zero(), op.tx.fee));
             }
             ZkSyncOp::MintNFTOp(op) => {
                 let nft = self
                     .get_nft_by_creator_and_nonce(storage, op.tx.creator_address, op.tx.nonce)
                     .await?;
                 let token = Token::new_nft(nft.id, "");
-                logs.push(self.erc_transfer(
-                    token,
-                    H160::zero(),
-                    op.tx.recipient,
-                    BigUint::default(),
-                    common_data,
-                    0u8.into(),
-                )?);
+                let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                result.push((token, H160::zero(), op.tx.recipient, BigUint::from(1u8)));
+                result.push((fee_token, op.tx.creator_address, H160::zero(), op.tx.fee));
             }
             ZkSyncOp::WithdrawNFT(op) => {
                 let token = self.get_token_by_id(storage, op.tx.token).await?;
-                logs.push(self.erc_transfer(
-                    token,
-                    op.tx.from,
-                    H160::zero(),
-                    BigUint::default(),
-                    common_data,
-                    0u8.into(),
-                )?);
+                let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                result.push((token, op.tx.from, H160::zero(), BigUint::from(1u8)));
+                result.push((fee_token, op.tx.from, H160::zero(), op.tx.fee));
             }
             ZkSyncOp::Swap(op) => {
                 let token1 = self
@@ -324,68 +295,84 @@ impl LogsHelper {
                 let token2 = self
                     .get_token_by_id(storage, op.tx.orders.0.token_sell)
                     .await?;
-                let address1 = storage
+                let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                let from1 = storage
                     .chain()
                     .account_schema()
                     .account_address_by_id(op.tx.orders.0.account_id)
                     .await
                     .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?;
-                let address2 = storage
+                let from2 = storage
                     .chain()
                     .account_schema()
                     .account_address_by_id(op.tx.orders.1.account_id)
                     .await
                     .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?;
-                logs.push(self.erc_transfer(
+                result.push((
                     token1,
-                    address1,
+                    from1,
                     op.tx.orders.1.recipient_address,
                     op.tx.amounts.0,
-                    common_data.clone(),
-                    0u8.into(),
-                )?);
-                logs.push(self.erc_transfer(
+                ));
+                result.push((
                     token2,
-                    address2,
+                    from2,
                     op.tx.orders.0.recipient_address,
                     op.tx.amounts.1,
-                    common_data.clone(),
-                    1u8.into(),
-                )?);
+                ));
+                result.push((fee_token, op.tx.submitter_address, H160::zero(), op.tx.fee));
             }
             ZkSyncOp::Deposit(op) => {
                 let token = self.get_token_by_id(storage, op.priority_op.token).await?;
-                logs.push(self.erc_transfer(
+                result.push((
                     token,
                     H160::zero(),
                     op.priority_op.to,
                     op.priority_op.amount,
-                    common_data,
-                    0u8.into(),
-                )?);
+                ));
             }
             ZkSyncOp::FullExit(op) => {
                 let token = self.get_token_by_id(storage, op.priority_op.token).await?;
-                let account = storage
+                let from = storage
                     .chain()
                     .account_schema()
                     .account_address_by_id(op.priority_op.account_id)
                     .await
                     .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?;
-                logs.push(self.erc_transfer(
+                result.push((
                     token,
-                    account,
+                    from,
                     H160::zero(),
                     op.withdraw_amount.unwrap_or_default().0,
-                    common_data,
-                    0u8.into(),
-                )?);
+                ));
             }
             _ => {}
-        };
+        }
+        Ok(result)
+    }
+
+    pub async fn erc_logs(
+        &self,
+        op: ZkSyncOp,
+        common_data: CommonLogData,
+        storage: &mut StorageProcessor<'_>,
+    ) -> Result<Vec<Log>> {
+        let mut logs = Vec::new();
+        // The index is equal to 1 because zksync log has index 0.
+        let mut index = 1u8.into();
+
+        let info = self.erc_logs_info(op, storage).await?;
+        logs.extend(info.into_iter().filter_map(|(token, from, to, amount)| {
+            if amount.is_zero() {
+                None
+            } else {
+                Some(self.erc_transfer(token, from, to, amount, common_data, &mut index))
+            }
+        }));
+
         Ok(logs)
     }
 
@@ -393,7 +380,7 @@ impl LogsHelper {
         &self,
         storage: &mut StorageProcessor<'_>,
         id: TokenId,
-    ) -> jsonrpc_core::Result<Token> {
+    ) -> Result<Token> {
         self.tokens
             .get_token(storage, id)
             .await
@@ -401,11 +388,7 @@ impl LogsHelper {
             .ok_or_else(Error::internal_error)
     }
 
-    async fn get_nft_by_id(
-        &self,
-        storage: &mut StorageProcessor<'_>,
-        id: TokenId,
-    ) -> jsonrpc_core::Result<NFT> {
+    async fn get_nft_by_id(&self, storage: &mut StorageProcessor<'_>, id: TokenId) -> Result<NFT> {
         self.tokens
             .get_nft_by_id(storage, id)
             .await
@@ -418,7 +401,7 @@ impl LogsHelper {
         storage: &mut StorageProcessor<'_>,
         creator_address: H160,
         nonce: Nonce,
-    ) -> jsonrpc_core::Result<NFT> {
+    ) -> Result<NFT> {
         storage
             .chain()
             .state_schema()
@@ -428,18 +411,6 @@ impl LogsHelper {
             .ok_or_else(Error::internal_error)
     }
 
-    fn zksync_op_log_index(tx: &ZkSyncOp) -> U256 {
-        // For `ChangePubKey` there is no erc transfer, so zksync log is the first one,
-        // for swaps there is two erc transfers, for other types there is only one.
-        if matches!(tx, ZkSyncOp::ChangePubKeyOffchain(_)) {
-            0u8.into()
-        } else if matches!(tx, ZkSyncOp::Swap(_)) {
-            2u8.into()
-        } else {
-            1u8.into()
-        }
-    }
-
     fn erc_transfer(
         &self,
         token: Token,
@@ -447,23 +418,25 @@ impl LogsHelper {
         to: H160,
         amount: BigUint,
         common_data: CommonLogData,
-        transaction_log_index: U256,
-    ) -> jsonrpc_core::Result<Log> {
+        transaction_log_index: &mut U256,
+    ) -> Log {
         // According to specifications, amount is added to transfer log data for ERC20 tokens
         // and token ID is added instead for ERC721 tokens.
         let (contract_address, amount_or_id) = if !token.is_nft {
-            (token.address, u256_from_biguint(amount)?)
+            (token.address, u256_from_biguint(amount))
         } else {
             (self.nft_factory_address, token.id.0.into())
         };
         let data = Self::erc_transfer_data(from, to, amount_or_id);
-        Ok(log(
+        let log = log(
             contract_address,
             self.topic_by_event(Event::ERCTransfer).unwrap(),
             data,
             common_data,
-            transaction_log_index,
-        ))
+            *transaction_log_index,
+        );
+        *transaction_log_index += 1u8.into();
+        log
     }
 
     fn erc_transfer_data(from: H160, to: H160, amount_or_id: U256) -> Bytes {

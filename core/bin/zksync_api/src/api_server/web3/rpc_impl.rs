@@ -53,7 +53,7 @@ impl Web3RpcApp {
             .get_account_eth_balance_for_block(address, block_number)
             .await
             .map_err(|_| Error::internal_error())?;
-        let result = u256_from_biguint(balance)?;
+        let result = u256_from_biguint(balance);
         metrics::histogram!("api.web3.get_balance", start.elapsed());
         Ok(result)
     }
@@ -318,19 +318,16 @@ impl Web3RpcApp {
         let op: Option<ZkSyncOp> = serde_json::from_value(receipt.operation).unwrap();
         let mut logs = Vec::new();
         if let Some(op) = op {
-            let erc_logs = self
-                .logs_helper
-                .erc_logs(op.clone(), common_data.clone(), storage)
-                .await?;
-            logs.extend(erc_logs);
-
             let zksync_log = self
                 .logs_helper
-                .zksync_log(op, common_data, storage)
+                .zksync_log(op.clone(), common_data, storage)
                 .await?;
             if let Some(zksync_log) = zksync_log {
                 logs.push(zksync_log);
             }
+
+            let erc_logs = self.logs_helper.erc_logs(op, common_data, storage).await?;
+            logs.extend(erc_logs);
         }
         Ok(logs)
     }

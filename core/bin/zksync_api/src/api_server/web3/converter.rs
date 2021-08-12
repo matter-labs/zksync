@@ -8,8 +8,8 @@ use zksync_storage::StorageProcessor;
 // Local uses
 use super::types::{BlockNumber, Bytes, CommonLogData, Log, Transaction, TxData, H160, H256, U256};
 
-pub fn u256_from_biguint(number: BigUint) -> Result<U256> {
-    U256::from_dec_str(&number.to_string()).map_err(|_| Error::internal_error())
+pub fn u256_from_biguint(number: BigUint) -> U256 {
+    U256::from_dec_str(&number.to_string()).unwrap()
 }
 
 pub async fn resolve_block_number(
