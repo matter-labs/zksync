@@ -1879,7 +1879,7 @@ function performExodus(
 - `_nftCreatorAccountId`: Creator id of NFT (optional, only for NFT)
 - `_nftCreatorAddress`: Creator Address of NFT (optional, only for NFT)
 - `_nftSerialId`: Serial ID of NFT (optional, only for NFT)
-- `_nftContentHash`: Unique identifier of the NFT represented as a 32-byte hex string
+- `_nftContentHash`: Identifier of the NFT represented as a 32-byte hex string
 - `_proof`: Proof that user funds are present in the account tree
 
 ##### Cancel outstanding deposits
@@ -1890,8 +1890,8 @@ Cancels open priority requests, accrues users balances from deposit priority req
 function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata)
 ```
 
-- `_n`: Supposed number of requests to cancel (if there are less request than provided number - will be canceled exact
-  number of requests)
+- `_n`: Supposed number of requests to cancel (if there are fewer requests than the provided number - all of the
+  requests will be canceled) number of requests)
 - `_depositsPubdata`: The array of the pubdata for the deposits to be cancelled. Please note, that it should not contain
   any (even empty) pubdata for `FullExit` priority operations.
 
@@ -2181,7 +2181,7 @@ function addToken(address _token)
 
 #### Set listing fee token
 
-Set new listing token and fee, should be called only by zkSync governor.
+Set new listing token and fee, can be called only by zkSync governor.
 
 ```solidity
 function setListingFeeToken(IERC20 _newListingFeeToken, uint256 _newListingFee)
@@ -2192,7 +2192,7 @@ function setListingFeeToken(IERC20 _newListingFeeToken, uint256 _newListingFee)
 
 #### Set listing fee
 
-Set new listing fee, should be called only by zkSync governor.
+Set new listing fee, can be called only by zkSync governor.
 
 ```solidity
 function setListingFee(uint256 _newListingFee)
@@ -2202,8 +2202,8 @@ function setListingFee(uint256 _newListingFee)
 
 #### Set lister
 
-Enable or disable token lister, if enabled new tokens can be added by that address without payment, should be called
-only by zkSync governor.
+Enable or disable token lister, if enabled new tokens can be added by that address without payment, can be called only
+by zkSync governor.
 
 ```solidity
 function setLister(address _listerAddress, bool _active)
@@ -2214,7 +2214,7 @@ function setLister(address _listerAddress, bool _active)
 
 #### Set listing cap
 
-Change maximum amount of tokens that can be listed using this method, should be called only by zkSync governor.
+Change maximum amount of tokens that can be listed using this method, can be called only by zkSync governor.
 
 ```solidity
 function setListingCap(uint16 _newListingCap)
@@ -2224,7 +2224,7 @@ function setListingCap(uint16 _newListingCap)
 
 #### Set treasury
 
-Change address that collects payments for listing tokens, should be called only by zkSync governor.
+Change address that collects payments for listing tokens, can be called only by zkSync governor.
 
 ```solidity
 function setTreasury(address _newTreasury)
