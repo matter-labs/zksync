@@ -127,6 +127,18 @@ async fn verify_eth_signature(
                 return Err(TxAddError::IncorrectEthSignature);
             }
         }
+        RequestData::Remove2FA(request) => {
+            let signature_correct = verify_ethereum_signature(
+                &request.sign_data.signature,
+                &request.sign_data.message,
+                request.sender,
+                eth_checker,
+            )
+            .await;
+            if !signature_correct {
+                return Err(TxAddError::IncorrectEthSignature);
+            }
+        }
     }
 
     Ok(())
@@ -327,6 +339,12 @@ pub struct OrderRequest {
     pub sender: Address,
 }
 
+#[derive(Debug)]
+pub struct Remove2FARequest {
+    pub sign_data: EthSignData,
+    pub sender: Address,
+}
+
 /// Request for the signature check.
 #[derive(Debug)]
 pub struct VerifySignatureRequest {
@@ -340,6 +358,7 @@ pub enum RequestData {
     Tx(TxRequest),
     Batch(BatchRequest),
     Order(OrderRequest),
+    Remove2FA(Remove2FARequest),
 }
 
 impl RequestData {
@@ -350,6 +369,7 @@ impl RequestData {
                 TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
             }
             RequestData::Order(request) => TxVariant::Order(request.order.clone()),
+            RequestData::Remove2FA(_) => unreachable!(),
         }
     }
 }

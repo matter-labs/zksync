@@ -10,9 +10,12 @@ use actix_web::{
 
 // Workspace uses
 use zksync_api_types::{
-    v02::transaction::{
-        ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
-        Transaction, TransactionData, TxData, TxHashSerializeWrapper, TxInBlockStatus,
+    v02::{
+        account::Remove2FA,
+        transaction::{
+            ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
+            Transaction, TransactionData, TxData, TxHashSerializeWrapper, TxInBlockStatus,
+        },
     },
     PriorityOpLookupQuery, TxWithSignature,
 };
@@ -169,6 +172,19 @@ async fn submit_batch(
     response.into()
 }
 
+async fn remove_fa(
+    data: web::Data<ApiTransactionData>,
+    Json(remove_2fa): Json<Remove2FA>,
+) -> ApiResult<()> {
+    let response = data
+        .tx_sender
+        .remove_2fa(remove_2fa)
+        .await
+        .map_err(Error::from);
+
+    response.into()
+}
+
 async fn get_batch(
     data: web::Data<ApiTransactionData>,
     batch_hash: web::Path<TxHash>,
@@ -186,6 +202,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("{tx_hash}/data", web::get().to(tx_data))
         .route("/batches", web::post().to(submit_batch))
         .route("/batches/{batch_hash}", web::get().to(get_batch))
+        .route("/remove2FA", web::post().to(remove_fa))
 }
 
 #[cfg(test)]
