@@ -48,9 +48,10 @@ sqlx = { version = "0.4.2", default-features = false, features = [
     "offline",
 ] }
 
+tokio = { version = "0.2", features = ["full"] }
+
 [dev-dependencies]
 zksync_test_account = { path = "../../tests/test_account" }
 db_test_macro = { path = "./db_test_macro" }
 zksync_config = { path = "../config", version = "1.0" }
 
-tokio = { version = "0.2", features = ["full"] }

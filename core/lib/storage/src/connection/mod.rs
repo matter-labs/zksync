@@ -1,7 +1,8 @@
 // Built-in deps
-use std::{fmt, time::Instant};
+use std::{fmt, time::Instant, time::Duration};
 // External imports
 use async_trait::async_trait;
+use tokio::time;
 use deadpool::managed::{Manager, PoolConfig, RecycleResult, Timeouts};
 use sqlx::{Connection, Error as SqlxError, PgConnection};
 // Local imports
@@ -90,6 +91,8 @@ impl ConnectionPool {
     async fn get_pooled_connection(&self) -> PooledConnection {
         let mut retry_count = 0;
 
+        let mut one_second = time::interval(Duration::from_secs(1));
+
         while retry_count < DB_CONNECTION_RETRIES {
             let connection = self.pool.get().await;
 
@@ -97,6 +100,10 @@ impl ConnectionPool {
                 Ok(connection) => return connection,
                 Err(_) => retry_count += 1,
             }
+
+            // Backing off for one second if facing an error
+            vlog::warn!("Failed to get connection to db. Backing off for 1 second");
+            one_second.tick().await;
         }
 
         // Attempting to get the pooled connection for the last time
