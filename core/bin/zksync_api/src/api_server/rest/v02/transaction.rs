@@ -132,16 +132,16 @@ impl ApiTransactionData {
 
 async fn tx_status(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<TxHash>,
+    tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<Receipt>> {
-    data.tx_status(tx_hash).await.into()
+    data.tx_status(*tx_hash).await.into()
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<TxHash>,
+    tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TxData>> {
-    data.tx_data(tx_hash).await.into()
+    data.tx_data(*tx_hash).await.into()
 }
 
 async fn submit_tx(
@@ -171,16 +171,16 @@ async fn submit_batch(
 
 async fn get_batch(
     data: web::Data<ApiTransactionData>,
-    web::Path(batch_hash): web::Path<TxHash>,
+    batch_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<ApiTxBatch>> {
-    data.get_batch(batch_hash).await.into()
+    data.get_batch(*batch_hash).await.into()
 }
 
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
     web::scope("transactions")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route("", web::post().to(submit_tx))
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))
@@ -216,7 +216,7 @@ mod tests {
         BlockNumber, SignedZkSyncTx, TokenId,
     };
 
-    fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
+    fn submit_txs_loopback() -> (CoreApiClient, actix_test::TestServer) {
         async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
             Json(Ok(()))
         }
@@ -231,7 +231,7 @@ mod tests {
             Json(None)
         }
 
-        let server = actix_web::test::start(move || {
+        let server = actix_test::start(move || {
             App::new()
                 .route("new_tx", web::post().to(send_tx))
                 .route("new_txs_batch", web::post().to(send_txs_batch))

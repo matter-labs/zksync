@@ -60,7 +60,7 @@ contract Config {
     /// @dev Expiration delta for priority request to be satisfied (in seconds)
     /// @dev NOTE: Priority expiration should be > (EXPECT_VERIFICATION_IN * BLOCK_PERIOD)
     /// @dev otherwise incorrect block with priority op could not be reverted.
-    uint256 internal constant PRIORITY_EXPIRATION_PERIOD = 3 days;
+    uint256 internal constant PRIORITY_EXPIRATION_PERIOD = 7 days;
 
     /// @dev Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 internal constant PRIORITY_EXPIRATION =

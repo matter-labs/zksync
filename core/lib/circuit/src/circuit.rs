@@ -1834,11 +1834,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         //keys are same or account is empty
 
-        let is_pubkey_correct = Boolean::xor(
-            cs.namespace(|| "keys are same xor account is empty"),
-            &is_pub_equal_to_previous,
-            &is_account_empty,
-        )?;
+        // or instead of xor
+        let is_pubkey_correct = Boolean::and(
+            cs.namespace(|| "keys are same or account is empty"),
+            &is_pub_equal_to_previous.not(),
+            &is_account_empty.not(),
+        )?
+        .not();
 
         is_valid_flags.push(is_pubkey_correct);
 

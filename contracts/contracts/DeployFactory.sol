@@ -59,11 +59,10 @@ contract DeployFactory is TokenDeployInit {
         // set this contract as governor
         Proxy verifier = new Proxy(address(_verifierTarget), abi.encode());
         AdditionalZkSync additionalZkSync = new AdditionalZkSync();
-        Proxy zkSync =
-            new Proxy(
-                address(_zksyncTarget),
-                abi.encode(address(governance), address(verifier), address(additionalZkSync), _genesisRoot)
-            );
+        Proxy zkSync = new Proxy(
+            address(_zksyncTarget),
+            abi.encode(address(governance), address(verifier), address(additionalZkSync), _genesisRoot)
+        );
 
         UpgradeGatekeeper upgradeGatekeeper = new UpgradeGatekeeper(zkSync);
 

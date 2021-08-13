@@ -6,7 +6,7 @@ use std::time::Duration;
 // External uses
 use chrono::Utc;
 use tokio::sync::RwLock;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 // Workspace uses
 use zksync_crypto::params::account_tree_depth;
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
@@ -68,7 +68,7 @@ impl MockDatabase {
     }
 
     pub async fn wait_for_stale_job_stale_idle() {
-        delay_for(Duration::from_secs(10)).await;
+        sleep(Duration::from_secs(10)).await;
     }
 
     pub async fn add_block(&self, block: Block) {

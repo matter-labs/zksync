@@ -17,12 +17,12 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
         ParamType::Uint(32), // uint32 _feeAccount,
     ]);
     let stored_block = ParamType::Tuple(vec![
-        (ParamType::Uint(32)),       // uint32 blockNumber
-        (ParamType::Uint(64)),       // uint32 priorityOperations
-        (ParamType::FixedBytes(32)), // bytes32  pendingOnchainOperationsHash
-        (ParamType::Uint(256)),      // uint256 timestamp
-        (ParamType::FixedBytes(32)), // bytes32 stateHash
-        (ParamType::FixedBytes(32)), // bytes32 commitment
+        ParamType::Uint(32),       // uint32 blockNumber
+        ParamType::Uint(64),       // uint32 priorityOperations
+        ParamType::FixedBytes(32), // bytes32  pendingOnchainOperationsHash
+        ParamType::Uint(256),      // uint256 timestamp
+        ParamType::FixedBytes(32), // bytes32 stateHash
+        ParamType::FixedBytes(32), // bytes32 commitment
     ]);
     ethabi::decode(
         vec![stored_block, ParamType::Array(Box::new(commit_operation))].as_slice(),

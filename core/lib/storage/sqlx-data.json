@@ -839,6 +839,78 @@
       ]
     }
   },
+  "1c02281a5f82e18874515bad5038402ae5718ec633b56463c99fee0beb0e8afd": {
+    "query": "\n                SELECT eth_operations.*,\n                    aggregate_operations.id as \"agg_op_id?\",\n                    aggregate_operations.arguments as \"arguments?\"\n                FROM eth_operations\n                LEFT JOIN eth_aggregated_ops_binding\n                    ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n                LEFT JOIN aggregate_operations\n                    ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                WHERE eth_operations.confirmed = false\n                ORDER BY eth_operations.id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "nonce",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "confirmed",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 3,
+          "name": "raw_tx",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "op_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "final_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "last_deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "last_used_gas_price",
+          "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "agg_op_id?",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "arguments?",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "1d4884ae73b5c60662e2d778b43230a9fa2c7b683402bb67966428f70db2d900": {
     "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        success,\n                        fail_reason,\n                        created_at\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        true as success,\n                        Null as fail_reason,\n                        created_at\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    success as \"success!\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\"\n                FROM everything\n                ORDER BY created_at DESC\n            ",
     "describe": {
@@ -1771,62 +1843,6 @@
       ]
     }
   },
-  "47e6a9e74f9281ef8f9373829fd8500920226c4a9ef3546b2d01fb0dfb20d686": {
-    "query": "\n                SELECT aggregate_operations.* FROM eth_aggregated_ops_binding\n                LEFT JOIN aggregate_operations ON aggregate_operations.id = op_id\n                WHERE eth_op_id = $1\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "arguments",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "from_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "to_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "49b2154dd103b5aee0ee03aa964e8e7eb6b1dff1abe69f63c06a8c06ea6d3ece": {
     "query": "\n                            WITH transactions AS (\n                                SELECT\n                                    tx_hash,\n                                    tx as op,\n                                    block_number,\n                                    created_at,\n                                    success,\n                                    fail_reason,\n                                    Null::bytea as eth_hash,\n                                    Null::bigint as priority_op_serialid,\n                                    block_index\n                                FROM executed_transactions\n                                WHERE (from_account = $1 OR to_account = $1 OR primary_account_address = $1)\n                                    AND created_at >= $2\n                                ), priority_ops AS (\n                                SELECT\n                                    tx_hash,\n                                    operation as op,\n                                    block_number,\n                                    created_at,\n                                    true as success,\n                                    Null as fail_reason,\n                                    eth_hash,\n                                    priority_op_serialid,\n                                    block_index\n                                FROM executed_priority_operations\n                                WHERE (from_account = $1 OR to_account = $1) AND created_at >= $2\n                            ), everything AS (\n                                SELECT * FROM transactions\n                                UNION ALL\n                                SELECT * FROM priority_ops\n                            )\n                            SELECT\n                                tx_hash as \"tx_hash!\",\n                                block_number as \"block_number!\",\n                                op as \"op!\",\n                                created_at as \"created_at!\",\n                                success as \"success!\",\n                                fail_reason as \"fail_reason?\",\n                                eth_hash as \"eth_hash?\",\n                                priority_op_serialid as \"priority_op_serialid?\"\n                            FROM everything\n                            ORDER BY created_at ASC, block_index ASC\n                            LIMIT $3\n                        ",
     "describe": {
@@ -1996,66 +2012,6 @@
         "Left": []
       },
       "nullable": [
-        false,
-        false
-      ]
-    }
-  },
-  "4c08da920ab0c43f5b5db98ba4ee44a20a1f365d9b118f3b61176a4b6ebd086b": {
-    "query": "SELECT * FROM eth_operations\n            WHERE confirmed = false\n            ORDER BY id ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "nonce",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "confirmed",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 3,
-          "name": "raw_tx",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "op_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "final_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 6,
-          "name": "last_deadline_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 7,
-          "name": "last_used_gas_price",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
         false,
         false
       ]
@@ -4361,57 +4317,57 @@
       "nullable": []
     }
   },
-  "aca411b7ebc9a4028b4c86b71d8cd9f205f464bf19fb23fceb81210357379160": {
-    "query": "\n            SELECT nft.*, tokens.symbol FROM nft\n            INNER JOIN tokens\n            ON tokens.id = nft.token_id\n            ",
+  "ae418808fd5a6b6662198ed63934415a46dfada56cbd72a869e81946b1ad2ea4": {
+    "query": "\n            SELECT\n                id as \"id!\", action_type as \"action_type!\",\n                arguments as \"arguments!\", from_block as \"from_block!\",\n                to_block as \"to_block!\", created_at as \"created_at!\",\n                confirmed as \"confirmed!\"\n            FROM aggregate_operations\n            WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)\n            ORDER BY id ASC\n            ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "token_id",
-          "type_info": "Int4"
+          "name": "id!",
+          "type_info": "Int8"
         },
         {
           "ordinal": 1,
-          "name": "creator_account_id",
-          "type_info": "Int4"
+          "name": "action_type!",
+          "type_info": "Text"
         },
         {
           "ordinal": 2,
-          "name": "creator_address",
-          "type_info": "Bytea"
+          "name": "arguments!",
+          "type_info": "Jsonb"
         },
         {
           "ordinal": 3,
-          "name": "serial_id",
-          "type_info": "Int4"
+          "name": "from_block!",
+          "type_info": "Int8"
         },
         {
           "ordinal": 4,
-          "name": "address",
-          "type_info": "Bytea"
+          "name": "to_block!",
+          "type_info": "Int8"
         },
         {
           "ordinal": 5,
-          "name": "content_hash",
-          "type_info": "Bytea"
+          "name": "created_at!",
+          "type_info": "Timestamptz"
         },
         {
           "ordinal": 6,
-          "name": "symbol",
-          "type_info": "Text"
+          "name": "confirmed!",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
         "Left": []
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
       ]
     }
   },
@@ -4481,60 +4437,6 @@
         ]
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "b6122cd06705d126020a1394f573c28cdae793acd95f4a054d75ae87767f52db": {
-    "query": "\n            SELECT * FROM aggregate_operations\n            WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)\n            ORDER BY id ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "arguments",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "from_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "to_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
         false,
         false,
         false,
@@ -5050,6 +4952,60 @@
       },
       "nullable": [
         false
+      ]
+    }
+  },
+  "c3632674ee6614b83e258c75447dc986507481a56fbdd5e05dedd0775f21fb79": {
+    "query": "\n            SELECT\n                token_id as \"token_id!\", creator_account_id as \"creator_account_id!\",\n                creator_address as \"creator_address!\", serial_id as \"serial_id!\",\n                nft.address as \"address!\", content_hash as \"content_hash!\",\n                tokens.symbol as \"symbol!\"\n            FROM nft\n            INNER JOIN tokens\n            ON tokens.id = nft.token_id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "creator_account_id!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_address!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "serial_id!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "address!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "content_hash!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "symbol!",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
       ]
     }
   },

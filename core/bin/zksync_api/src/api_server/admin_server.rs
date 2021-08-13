@@ -147,7 +147,6 @@ async fn run_server(app_state: AppState, bind_to: SocketAddr) {
 
         App::new()
             .wrap(auth)
-            .wrap(vlog::actix_middleware())
             .app_data(web::Data::new(app_state.clone()))
             .route("/tokens", web::post().to(add_token))
     })
@@ -169,7 +168,7 @@ pub fn start_admin_server(
         .name("admin_server".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            actix_rt::System::new("api-server").block_on(async move {
+            actix_rt::System::new().block_on(async move {
                 let app_state = AppState {
                     secret_auth,
                     connection_pool,

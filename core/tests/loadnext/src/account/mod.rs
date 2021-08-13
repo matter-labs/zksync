@@ -91,7 +91,7 @@ impl AccountLifespan {
                         return;
                     }
                     // We will wait and try again.
-                    tokio::time::delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
         }

@@ -125,6 +125,11 @@ impl WitnessTestAccount {
         self.account.pub_key_hash = Default::default();
     }
 
+    pub fn set_empty_address(&mut self) {
+        self.zksync_account.address = Default::default();
+        self.account.address = Default::default();
+    }
+
     pub fn new_empty(id: AccountId) -> Self {
         Self::new(id, 0)
     }

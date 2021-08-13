@@ -1,0 +1,159 @@
+name: Loadtest
+on:
+  schedule:
+    - cron: '17 23 * * *'
+
+
+env:
+  ZKSYNC_ENV: loadtest
+  HF_ARGS: -e loadtest
+
+jobs:
+  sqlproxy:
+    name: Provision SQLProxy
+    runs-on: [k8s, stage, deployer]
+    container:
+      image: dysnix/kubectl:v1.19-gcloud
+
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+      HF_DEPLOYS: -l name=sqlproxy
+
+    steps:
+      - uses: actions/checkout@v2
+      -
+        name: Clone helm-infra
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/helm-infra
+          path: helm-infra
+          ref: master
+          token: ${{ secrets.GH_TOKEN }}
+      -
+        name: Create ~/.kube/config
+        run: ./.github/scripts/write-kubeconf.sh
+      -
+        name: Setup helm and loadtest.env
+        run: |
+          .github/scripts/zksync-env.sh --kube loadtest > etc/env/loadtest.env
+          echo -n "ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY=" >> etc/env/loadtest.env
+          kubectl get secret -n loadtest server-env -o jsonpath='{.data.ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY}' | base64 -d >> etc/env/loadtest.env
+      -
+        name: Deploy SQLProxy
+        working-directory: helm-infra
+        run: |
+          UPDATE_REPOS=y helmfile $HF_ARGS repos
+          helmfile $HF_ARGS $HF_DEPLOYS sync
+
+  init:
+    name: Cleanup the database, compile and update contracts
+    runs-on: [k8s, stage, deployer]
+    needs: sqlproxy
+    env:
+      RUSTUP_HOME: /usr/share/rust/.rustup
+      CARGO_HOME: /usr/share/rust/.cargo
+
+    steps:
+      -
+        name: Preperare env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+          echo CI=1 >> $GITHUB_ENV
+          echo $CARGO_HOME/bin >> $GITHUB_PATH
+      -
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      -
+        name: Update cargo dependencies
+        run: |
+          cargo install --version=0.5.2 sqlx-cli
+          cargo install diesel_cli --no-default-features --features postgres
+      -
+        name: Setup loadtest database
+        run: |
+          zk
+          zk run yarn
+          zk run verify-keys unpack
+          zk db setup
+          zk server --genesis
+          zk contract build
+          zk contract deploy
+          cd contracts && zk f yarn governance-add-erc20 add-multi-current-network rinkeby
+          zk db insert contract
+
+  deploy:
+    name: Deploy the apps
+    runs-on: [k8s, stage, deployer]
+    needs: init
+    container:
+      image: dysnix/kubectl:v1.19-gcloud
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
+      HF_DEPLOYS: -l name=server -l name=prover
+    steps:
+      -
+        name: Create ~/.kube/config
+        run: .github/scripts/write-kubeconf.sh
+      -
+        name: Update contracts in the ConfigMap
+        run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
+      -
+        id: config
+        run: |
+          echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
+      -
+        name: Deploy apps
+        working-directory: helm-infra
+        run: |
+          UPDATE_REPOS=y helmfile $HF_ARGS repos
+          export IMAGE_TAG=${{ steps.config.outputs.shortRev }}
+          # Split apply into diff+sync (required for extra sync args), what for server to settle
+          helmfile $HF_ARGS $HF_DEPLOYS diff
+          helmfile $HF_ARGS $HF_DEPLOYS sync --args "--timeout 180s" && sleep 60
+
+  loadtest:
+    name: Perform loadtest
+    runs-on: [self-hosted, MAIN]
+    needs: deploy
+    container: rust:1.53
+    env:
+      WEB3_URL: ${{ secrets.CI_LOADTEST_WEB3_URL }}
+      MASTER_WALLET_PK: ${{ secrets.CI_LOADTEST_MAIN_PRIVKEY }}
+      ACCOUNTS_AMOUNT: 20
+      OPERATIONS_PER_ACCOUNT: 20
+      MAIN_TOKEN: "USDT"
+      ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
+      ETH_NETWORK: "rinkeby"
+      RUST_LOG: info
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run loadtest
+        run: cargo run --bin loadnext
+
+  cleanup:
+    name: Cleanup loadtest environment
+    runs-on: [k8s, stage, deployer]
+    needs: loadtest
+    if: always()
+    container:
+      image: dysnix/kubectl:v1.19-gcloud
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+
+    steps:
+      -
+        name: Create ~/.kube/config
+        run: .github/scripts/write-kubeconf.sh
+      -
+        name: Scale loadtest to 0 replicas
+        run: |
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 server
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 prover
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 sqlproxy-gcloud-sqlproxy

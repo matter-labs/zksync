@@ -76,7 +76,8 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// Expected root hash to be observed after restoring process. Only
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
-    /// The last serial id of the priority ops. Needed to make sure that
+    /// Serial id of the last priority operation processed by the driver. It's necessary to manually
+    /// keep track of it since it's impossible to restore it from the contract.
     pub last_priority_op_serial_id: SerialId,
     phantom_data: PhantomData<I>,
 }
