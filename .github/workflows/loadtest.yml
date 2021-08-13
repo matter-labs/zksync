@@ -3,6 +3,7 @@ on:
   schedule:
     - cron: '17 23 * * *'
 
+
 env:
   ZKSYNC_ENV: loadtest
   HF_ARGS: -e loadtest
