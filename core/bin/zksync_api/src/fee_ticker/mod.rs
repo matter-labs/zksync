@@ -446,9 +446,19 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let (fee_type, gas_tx_amount, op_chunks) = self.gas_tx_amount(tx_type, recipient).await;
 
         let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
-        let normal_gas_fee = (&wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone())
-            * self.config.scale_fee_coefficient.clone()
-            * &token_usd_risk;
+        let mut normal_gas_fee =
+            (&wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone()) * &token_usd_risk;
+
+        // Increase fee only for L2 operations
+        if matches!(
+            fee_type,
+            OutputFeeType::TransferToNew
+                | OutputFeeType::Transfer
+                | OutputFeeType::MintNFT
+                | OutputFeeType::Swap
+        ) {
+            normal_gas_fee *= self.config.scale_fee_coefficient.clone();
+        }
 
         let normal_fee = Fee::new(
             fee_type,
@@ -478,15 +488,25 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let mut total_op_chunks = BigUint::zero();
 
         for (tx_type, recipient) in txs {
-            let (_, gas_tx_amount, op_chunks) = self.gas_tx_amount(tx_type, recipient).await;
+            let (output_fee_type, mut gas_tx_amount, op_chunks) =
+                self.gas_tx_amount(tx_type, recipient).await;
+            // Increase fee only for L2 operations
+            if matches!(
+                output_fee_type,
+                OutputFeeType::Transfer
+                    | OutputFeeType::TransferToNew
+                    | OutputFeeType::Swap
+                    | OutputFeeType::MintNFT
+            ) {
+                gas_tx_amount *= self.config.scale_fee_coefficient.clone();
+            }
             total_normal_gas_tx_amount += gas_tx_amount;
             total_op_chunks += op_chunks;
         }
 
         let total_zkp_fee = (zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
-        let total_normal_gas_fee = (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price)
-            * &token_usd_risk
-            * self.config.scale_fee_coefficient.clone();
+        let total_normal_gas_fee =
+            (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price) * &token_usd_risk;
         let normal_fee = BatchFee::new(total_zkp_fee, total_normal_gas_fee);
 
         Ok(ResponseBatchFee { normal_fee })
