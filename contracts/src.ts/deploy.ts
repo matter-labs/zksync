@@ -129,7 +129,7 @@ export class Deployer {
         const govGasUsed = govRec.gasUsed;
         let gasPrice = govContract.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`CONTRACTS_GOVERNANCE_TARGET_ADDR=${govContract.address}`);
@@ -154,7 +154,7 @@ export class Deployer {
         const verGasUsed = verRec.gasUsed;
         let gasPrice = verifierContract.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`CONTRACTS_VERIFIER_TARGET_ADDR=${verifierContract.address}`);
@@ -179,7 +179,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         let gasPrice = zksContract.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`CONTRACTS_CONTRACT_TARGET_ADDR=${zksContract.address}`);
@@ -226,7 +226,7 @@ export class Deployer {
         const gasUsed = deployFactoryTx.gasUsed;
         let gasPrice = deployFactoryContract.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`CONTRACTS_DEPLOY_FACTORY_ADDR=${deployFactoryContract.address}`);
@@ -261,7 +261,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         let gasPrice = nftFactoryContarct.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`CONTRACTS_NFT_FACTORY_ADDR=${nftFactoryContarct.address}`);
@@ -299,7 +299,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         let gasPrice = tokenGovernanceContract.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`\nCONTRACTS_LISTING_GOVERNANCE=${tokenGovernanceContract.address}\n`);
@@ -335,7 +335,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         let gasPrice = forcedExitContract.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`CONTRACTS_FORCED_EXIT_ADDR=${forcedExitContract.address}`);
@@ -361,7 +361,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         let gasPrice = additionalZkSyncContract.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`CONTRACTS_ADDITIONAL_ZKSYNC_ADDR=${additionalZkSyncContract.address}`);
@@ -392,7 +392,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         let gasPrice = regenesisMultisigContract.deployTransaction.gasPrice;
         if (gasPrice == null) {
-            gasPrice =  await this.deployWallet.provider.getGasPrice();
+            gasPrice = await this.deployWallet.provider.getGasPrice();
         }
         if (this.verbose) {
             console.log(`MISC_REGENESIS_MULTISIG_ADDRESS=${regenesisMultisigContract.address}`);
