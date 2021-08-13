@@ -1,7 +1,9 @@
 name: Loadtest
 on:
+  pull_request:
   schedule:
     - cron: '17 23 * * *'
+
 
 env:
   ZKSYNC_ENV: loadtest
