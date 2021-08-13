@@ -4645,13 +4645,13 @@
         "Left": []
       },
       "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -4907,8 +4907,8 @@
       "nullable": []
     }
   },
-  "be08ea7e6c0e186a1ffb729742a06049b86be0b1cea7ac3522bfcd15f963ca74": {
-    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2 AND coin_id = $3\n                ORDER BY update_order_id DESC\n                LIMIT 1\n            ",
+  "bcf5bfff77df23fb5e8ff35e9ad37ee02e141dfc0bdbbdec8983b656c9569dea": {
+    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2 AND coin_id = $3\n                ORDER BY block_number DESC, update_order_id DESC\n                LIMIT 1\n            ",
     "describe": {
       "columns": [
         {

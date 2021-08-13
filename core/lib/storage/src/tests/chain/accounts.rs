@@ -224,6 +224,20 @@ async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
             },
         ),
         (
+            AccountId(2),
+            AccountUpdate::Create {
+                address: Address::random(),
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            AccountId(3),
+            AccountUpdate::Create {
+                address: Address::random(),
+                nonce: Nonce(0),
+            },
+        ),
+        (
             AccountId(1),
             AccountUpdate::UpdateBalance {
                 old_nonce: Nonce(0),
@@ -266,7 +280,7 @@ async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     storage
         .chain()
         .state_schema()
-        .commit_state_update(BlockNumber(3), &updates2, updates1.len())
+        .commit_state_update(BlockNumber(3), &updates2, 0)
         .await?;
 
     let balance01 = storage

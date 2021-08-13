@@ -237,7 +237,7 @@ impl CallsHelper {
                     let block = storage
                         .chain()
                         .block_schema()
-                        .get_last_saved_block()
+                        .get_last_verified_confirmed_block()
                         .await
                         .map_err(|_| Error::internal_error())?;
                     let address = params[0]

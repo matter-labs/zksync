@@ -211,10 +211,16 @@ describe('ZkSync web3 API tests', () => {
     let tester: Tester;
     let alice: Wallet;
     let bob: Wallet;
-    let token: string = 'ETH';
+    const token: string = 'ETH';
     let depositAmount: BigNumber;
     let web3: Web3;
     let restProvider: RestProvider;
+    let tokenAddress: string;
+    let erc20Contract: Contract;
+    const zksyncProxyAddress = '0x1000000000000000000000000000000000000000';
+    let zksyncProxyContract: Contract;
+    const nftFactoryAddress = '0x2000000000000000000000000000000000000000';
+    let nftFactoryContract: Contract;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', 'HTTP', 'RPC');
@@ -225,6 +231,29 @@ describe('ZkSync web3 API tests', () => {
         depositAmount = tester.syncProvider.tokenSet.parseToken(token, '1000');
         await tester.testDeposit(alice, token, depositAmount, true);
         await tester.testChangePubKey(alice, token, false);
+
+        tokenAddress = alice.provider.tokenSet.resolveTokenAddress(token);
+        const erc20InterfacePath = path.join(process.env['ZKSYNC_HOME'] as string, 'etc', 'web3-abi', 'ERC20.json');
+        const erc20Interface = new ethersUtils.Interface(require(erc20InterfacePath));
+        erc20Contract = new Contract(tokenAddress, erc20Interface, alice.ethSigner);
+
+        const zksyncProxyInterfacePath = path.join(
+            process.env['ZKSYNC_HOME'] as string,
+            'etc',
+            'web3-abi',
+            'ZkSyncProxy.json'
+        );
+        const zksyncProxyInterface = new ethersUtils.Interface(require(zksyncProxyInterfacePath));
+        zksyncProxyContract = new Contract(zksyncProxyAddress, zksyncProxyInterface, alice.ethSigner);
+
+        const nftFactoryInterfacePath = path.join(
+            process.env['ZKSYNC_HOME'] as string,
+            'etc',
+            'web3-abi',
+            'NFTFactory.json'
+        );
+        const nftFactoryInterface = new ethersUtils.Interface(require(nftFactoryInterfacePath));
+        nftFactoryContract = new Contract(nftFactoryAddress, nftFactoryInterface, alice.ethSigner);
     });
 
     it('should check logs', async () => {
@@ -249,21 +278,6 @@ describe('ZkSync web3 API tests', () => {
 
         const web3Receipt = await web3.eth.getTransactionReceipt(txHash);
         expect(web3Receipt.logs.length, 'Incorrect number of logs').to.eql(3);
-
-        const tokenAddress = alice.provider.tokenSet.resolveTokenAddress(token);
-        const erc20InterfacePath = path.join(process.env['ZKSYNC_HOME'] as string, 'etc', 'web3-abi', 'ERC20.json');
-        const erc20Interface = new ethersUtils.Interface(require(erc20InterfacePath));
-        const erc20Contract = new Contract(tokenAddress, erc20Interface, alice.ethSigner);
-
-        const zksyncProxyAddress = '0x1000000000000000000000000000000000000000';
-        const zksyncProxyInterfacePath = path.join(
-            process.env['ZKSYNC_HOME'] as string,
-            'etc',
-            'web3-abi',
-            'ZkSyncProxy.json'
-        );
-        const zksyncProxyInterface = new ethersUtils.Interface(require(zksyncProxyInterfacePath));
-        const zksyncProxyContract = new Contract(zksyncProxyAddress, zksyncProxyInterface, alice.ethSigner);
 
         const zksyncTransferSignature = 'ZkSyncTransfer(address,address,address,uint256,uint256)';
         const zksyncTransferTopic = ethersUtils.keccak256(ethersUtils.toUtf8Bytes(zksyncTransferSignature));
@@ -307,36 +321,58 @@ describe('ZkSync web3 API tests', () => {
         }
     });
 
-    it('should check calls', async () => {
+    it('should check erc721 calls', async () => {
+        const contentHash = '0x218145f24cb870cc72ec7f0cc734b86f3e9a744666282f99023f022be77aaea6';
         const mintNFTHandle = await alice.mintNFT({
             recipient: alice.address(),
-            contentHash: ethersUtils.randomBytes(32),
+            contentHash,
             feeToken: token
         });
         await mintNFTHandle.awaitVerifyReceipt();
         const state = await alice.getAccountState();
         const nft = Object.values(state.committed.nfts)[0];
 
-        const nftFactoryAddress = '0x2000000000000000000000000000000000000000';
-        const nftFactoryInterfacePath = path.join(
-            process.env['ZKSYNC_HOME'] as string,
-            'etc',
-            'web3-abi',
-            'NFTFactory.json'
-        );
-        const nftFactoryInterface = new ethersUtils.Interface(require(nftFactoryInterfacePath));
-        const ownerOfFunction = nftFactoryInterface.functions['ownerOf(uint256)'];
-        const callData = nftFactoryInterface.encodeFunctionData(ownerOfFunction, [nft.id]);
+        const ownerOfFunction = nftFactoryContract.interface.functions['ownerOf(uint256)'];
+        const ownerOfCallData = nftFactoryContract.interface.encodeFunctionData(ownerOfFunction, [nft.id]);
 
-        const callResult1 = await web3.eth.call({ to: nftFactoryAddress, data: callData });
-        const owner1 = nftFactoryInterface.decodeFunctionResult(ownerOfFunction, callResult1)[0];
+        let callResult = await web3.eth.call({ to: nftFactoryAddress, data: ownerOfCallData });
+        const owner1 = nftFactoryContract.interface.decodeFunctionResult(ownerOfFunction, callResult)[0];
         expect(owner1, 'Incorrect owner after mint').to.eql(alice.address());
 
         const transferHandle = (await alice.syncTransferNFT({ to: bob.address(), token: nft, feeToken: 'ETH' }))[0];
         await transferHandle.awaitVerifyReceipt();
 
-        const callResult2 = await web3.eth.call({ to: nftFactoryAddress, data: callData });
-        const owner2 = nftFactoryInterface.decodeFunctionResult(ownerOfFunction, callResult2)[0];
+        callResult = await web3.eth.call({ to: nftFactoryAddress, data: ownerOfCallData });
+        const owner2 = nftFactoryContract.interface.decodeFunctionResult(ownerOfFunction, callResult)[0];
         expect(owner2, 'Incorrect owner after transfer').to.eql(bob.address());
+
+        const tokenURIFunction = nftFactoryContract.interface.functions['tokenURI(uint256)'];
+        const tokenURICallData = nftFactoryContract.interface.encodeFunctionData(tokenURIFunction, [nft.id]);
+        callResult = await web3.eth.call({ to: nftFactoryAddress, data: tokenURICallData });
+        const tokenURI = nftFactoryContract.interface.decodeFunctionResult(tokenURIFunction, callResult)[0];
+        const expectedURI = 'ipfs://QmQbSVaG7DUjQ9ktPtMnSXReJ29XHezBghcxJeZDsGG7wB';
+        expect(tokenURI, 'Incorrect token URI').to.eql(expectedURI);
+    });
+
+    it('should check erc20 calls', async () => {
+        const balanceOfFunction = erc20Contract.interface.functions['balanceOf(address)'];
+        const balanceOfCallData = erc20Contract.interface.encodeFunctionData(balanceOfFunction, [alice.address()]);
+        let callResult = await web3.eth.call({ to: tokenAddress, data: balanceOfCallData });
+        let balance = nftFactoryContract.interface.decodeFunctionResult(balanceOfFunction, callResult)[0];
+        let expectedBalance = (await alice.getAccountState()).verified.balances[token] as string;
+        expect(balance.toString(), 'Incorrect balance before transfer').to.eql(expectedBalance);
+
+        const transferAmount = depositAmount.div(10);
+        const handle = await alice.syncTransfer({
+            to: bob.address(),
+            token,
+            amount: transferAmount
+        });
+        await handle.awaitVerifyReceipt();
+
+        callResult = await web3.eth.call({ to: tokenAddress, data: balanceOfCallData });
+        balance = nftFactoryContract.interface.decodeFunctionResult(balanceOfFunction, callResult)[0];
+        expectedBalance = (await alice.getAccountState()).verified.balances[token] as string;
+        expect(balance.toString(), 'Incorrect balance after transfer').to.eql(expectedBalance);
     });
 });
