@@ -1,13 +1,14 @@
 import { Wallet, RestProvider, getDefaultRestProvider, types, utils } from 'zksync';
 import { Tester } from './tester';
 import Web3 from 'web3';
-import { BigNumber, utils as ethersUtils } from 'ethers';
+import { BigNumber, utils as ethersUtils, Contract } from 'ethers';
 import './priority-ops';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
 import './forced-exit';
 import { expect } from 'chai';
+import path from 'path';
 
 import * as api from './api';
 
@@ -224,7 +225,7 @@ describe('ZkSync web3 API tests', () => {
     });
 
     it('should check logs', async () => {
-        let restProvider = await getDefaultRestProvider('localhost');
+        const restProvider = await getDefaultRestProvider('localhost');
         const fee = (await restProvider.getTransactionFee('Transfer', bob.address(), 'ETH')).totalFee;
         const handle = await alice.syncTransfer({
             to: bob.address(),
@@ -247,27 +248,59 @@ describe('ZkSync web3 API tests', () => {
         expect(web3Receipt.logs.length, 'Incorrect number of logs').to.eql(3);
 
         const tokenAddress = alice.provider.tokenSet.resolveTokenAddress(token);
-        const hexFrom = alice.address().toLowerCase().substr(2).padStart(64, '0');
-        const hexTo = bob.address().toLowerCase().substr(2).padStart(64, '0');
-        const hexToken = tokenAddress.toLowerCase().substr(2).padStart(64, '0');
-        const hexAmount = amount.div(10)._hex.substr(2).padStart(64, '0');
-        const hexFee = fee._hex.substr(2).padStart(64, '0');
-        const hexZero = ''.padStart(64, '0');
+        const erc20InterfacePath = path.join(process.env['ZKSYNC_HOME'] as string, 'etc', 'web3-abi', 'ERC20.json');
+        const erc20Interface = new ethersUtils.Interface(require(erc20InterfacePath));
+        const erc20Contract = new Contract(tokenAddress, erc20Interface, alice.ethSigner);
 
-        const zksyncTransferTopic = ethersUtils.keccak256(
-            ethersUtils.toUtf8Bytes('ZkSyncTransfer(address,address,address,uint256,uint256)')
+        const zksyncProxyAddress = '0x1000000000000000000000000000000000000000';
+        const zksyncProxyInterfacePath = path.join(
+            process.env['ZKSYNC_HOME'] as string,
+            'etc',
+            'web3-abi',
+            'ZkSyncProxy.json'
         );
-        const ercTransferTopic = ethersUtils.keccak256(ethersUtils.toUtf8Bytes('Transfer(address,address,uint256)'));
+        const zksyncProxyInterface = new ethersUtils.Interface(require(zksyncProxyInterfacePath));
+        const zksyncProxyContract = new Contract(zksyncProxyAddress, zksyncProxyInterface, alice.ethSigner);
 
-        let expectedTopicsAndData = [
-            [zksyncTransferTopic, `0x${hexFrom}${hexTo}${hexToken}${hexAmount}${hexFee}`],
-            [ercTransferTopic, `0x${hexFrom}${hexTo}${hexAmount}`],
-            [ercTransferTopic, `0x${hexFrom}${hexZero}${hexFee}`]
+        const zksyncTransferSignature = 'ZkSyncTransfer(address,address,address,uint256,uint256)';
+        const zksyncTransferTopic = ethersUtils.keccak256(ethersUtils.toUtf8Bytes(zksyncTransferSignature));
+        const erc20TransferSignature = 'Transfer(address,address,uint256)';
+        const erc20TransferTopic = ethersUtils.keccak256(ethersUtils.toUtf8Bytes(erc20TransferSignature));
+
+        const expectedTopicsAndEvents = [
+            [zksyncTransferTopic, zksyncProxyContract, zksyncTransferSignature],
+            [erc20TransferTopic, erc20Contract, erc20TransferSignature],
+            [erc20TransferTopic, erc20Contract, erc20TransferSignature]
+        ];
+        const expectedData = [
+            {
+                from: alice.address(),
+                to: bob.address(),
+                token: tokenAddress,
+                amount: amount.div(10),
+                fee
+            },
+            {
+                from: alice.address(),
+                to: bob.address(),
+                value: amount.div(10)
+            },
+            {
+                from: alice.address(),
+                to: '0x'.padEnd(42, '0'),
+                value: fee
+            }
         ];
         for (let i = 0; i < 3; ++i) {
             expect(web3Receipt.logs[i].topics.length, 'Incorrect number of topics').to.eql(1);
-            expect(web3Receipt.logs[i].topics[0], 'Incorrect topic').to.eql(expectedTopicsAndData[i][0]);
-            expect(web3Receipt.logs[i].data, 'Incorrect data').to.eql(expectedTopicsAndData[i][1]);
+            expect(web3Receipt.logs[i].topics[0], 'Incorrect topic').to.eql(expectedTopicsAndEvents[i][0]);
+            const contract = expectedTopicsAndEvents[i][1] as Contract;
+            const eventSignature = expectedTopicsAndEvents[i][2] as string;
+            const log = contract.interface.decodeEventLog(eventSignature, web3Receipt.logs[i].data);
+            for (const key in expectedData[i]) {
+                const expected = (expectedData[i] as any)[key];
+                expect(log[key], 'Incorrect data').to.eql(expected);
+            }
         }
     });
 });
