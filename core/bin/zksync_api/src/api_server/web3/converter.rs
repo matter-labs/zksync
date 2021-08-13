@@ -16,17 +16,17 @@ pub async fn resolve_block_number(
     storage: &mut StorageProcessor<'_>,
     number: Option<BlockNumber>,
 ) -> Result<Option<zksync_types::BlockNumber>> {
-    let last_saved_block = storage
-        .chain()
-        .block_schema()
-        .get_last_saved_block()
-        .await
-        .map_err(|_| Error::internal_error())?;
-
     let number = match number {
         Some(number) => number,
         None => {
-            return Ok(Some(last_saved_block));
+            return Ok(Some(
+                storage
+                    .chain()
+                    .block_schema()
+                    .get_last_verified_confirmed_block()
+                    .await
+                    .map_err(|_| Error::internal_error())?,
+            ));
         }
     };
 
@@ -38,14 +38,25 @@ pub async fn resolve_block_number(
             .get_last_committed_confirmed_block()
             .await
             .map_err(|_| Error::internal_error())?,
-        BlockNumber::Finalized => storage
+        BlockNumber::Finalized | BlockNumber::Latest => storage
             .chain()
             .block_schema()
             .get_last_verified_confirmed_block()
             .await
             .map_err(|_| Error::internal_error())?,
-        BlockNumber::Latest | BlockNumber::Pending => last_saved_block,
+        BlockNumber::Pending => storage
+            .chain()
+            .block_schema()
+            .get_last_saved_block()
+            .await
+            .map_err(|_| Error::internal_error())?,
         BlockNumber::Number(number) => {
+            let last_saved_block = storage
+                .chain()
+                .block_schema()
+                .get_last_saved_block()
+                .await
+                .map_err(|_| Error::internal_error())?;
             if number.as_u64() > last_saved_block.0 as u64 {
                 return Ok(None);
             }

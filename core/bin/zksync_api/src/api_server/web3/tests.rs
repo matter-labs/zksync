@@ -188,7 +188,7 @@ async fn get_balance() -> anyhow::Result<()> {
         expected_balance
     );
 
-    // Checks that balance of the account equals expected balance after the last block.
+    // Checks that balance of the account equals expected balance after the last verified block.
     let fut = {
         let (client, server) = local_client().await?;
         join(
@@ -201,13 +201,13 @@ async fn get_balance() -> anyhow::Result<()> {
             server,
         )
     };
-    let latest_balance = fut.await.0.unwrap();
+    let verified_balance = fut.await.0.unwrap();
     let expected_balance = {
         let mut storage = pool.access_storage().await?;
         let last_block = storage
             .chain()
             .block_schema()
-            .get_last_saved_block()
+            .get_last_verified_confirmed_block()
             .await?;
         let balance = storage
             .chain()
@@ -217,7 +217,7 @@ async fn get_balance() -> anyhow::Result<()> {
         U256::from_dec_str(&balance.to_string()).unwrap()
     };
     assert_eq!(
-        serde_json::from_value::<U256>(latest_balance).unwrap(),
+        serde_json::from_value::<U256>(verified_balance).unwrap(),
         expected_balance
     );
 
@@ -279,7 +279,7 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
         expected
     );
 
-    // Checks that `eth_getBlockTransactionCountByNumber` works correctly for the last block.
+    // Checks that `eth_getBlockTransactionCountByNumber` works correctly for the last verified block.
     let fut = {
         let (client, server) = local_client().await?;
         join(
@@ -287,13 +287,13 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
             server,
         )
     };
-    let count_in_last_block = fut.await.0.unwrap();
+    let count_in_last_verified_block = fut.await.0.unwrap();
     let expected = {
         let mut storage = pool.access_storage().await?;
         let last_block = storage
             .chain()
             .block_schema()
-            .get_last_saved_block()
+            .get_last_verified_confirmed_block()
             .await?;
         U256::from(
             storage
@@ -304,7 +304,7 @@ async fn get_block_transaction_count() -> anyhow::Result<()> {
         )
     };
     assert_eq!(
-        serde_json::from_value::<U256>(count_in_last_block).unwrap(),
+        serde_json::from_value::<U256>(count_in_last_verified_block).unwrap(),
         expected
     );
 
