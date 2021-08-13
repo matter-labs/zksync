@@ -825,6 +825,12 @@ async fn verify_tx_info_message_signature(
                     signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
                 Some(EthSignData { signature, message })
             }
+            EthAccountType::No2FA => {
+                // NOTE: CHANGE PLS
+                let signature =
+                    signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+                Some(EthSignData { signature, message })
+            }
         },
         None => None,
     };
@@ -890,6 +896,16 @@ async fn verify_txs_batch_signature(
                     None
                 }
                 EthAccountType::Owned => {
+                    if batch_sign_data.is_none() && !tx.signature.exists() {
+                        return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                    }
+                    tx.signature
+                        .tx_signature()
+                        .clone()
+                        .map(|signature| EthSignData { signature, message })
+                }
+                EthAccountType::No2FA => {
+                    // TOOD
                     if batch_sign_data.is_none() && !tx.signature.exists() {
                         return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
                     }
