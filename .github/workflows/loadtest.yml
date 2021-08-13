@@ -1,6 +1,5 @@
 name: Loadtest
 on:
-  pull_request:
   schedule:
     - cron: '17 23 * * *'
 
