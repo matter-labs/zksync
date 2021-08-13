@@ -7,6 +7,7 @@ import './change-pub-key';
 import './transfer';
 import './withdraw';
 import './forced-exit';
+import './mint-nft';
 import { expect } from 'chai';
 import path from 'path';
 
@@ -213,11 +214,13 @@ describe('ZkSync web3 API tests', () => {
     let token: string = 'ETH';
     let depositAmount: BigNumber;
     let web3: Web3;
+    let restProvider: RestProvider;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', 'HTTP', 'RPC');
         alice = await tester.fundedWallet('1.0');
         bob = await tester.emptyWallet();
+        restProvider = await getDefaultRestProvider('localhost');
         web3 = new Web3('http://localhost:3002');
         depositAmount = tester.syncProvider.tokenSet.parseToken(token, '1000');
         await tester.testDeposit(alice, token, depositAmount, true);
@@ -225,7 +228,6 @@ describe('ZkSync web3 API tests', () => {
     });
 
     it('should check logs', async () => {
-        const restProvider = await getDefaultRestProvider('localhost');
         const fee = (await restProvider.getTransactionFee('Transfer', bob.address(), 'ETH')).totalFee;
         const transferAmount = depositAmount.div(10);
         const handle = await alice.syncTransfer({
@@ -239,11 +241,11 @@ describe('ZkSync web3 API tests', () => {
         const blockNumber = receipt.block!.blockNumber;
 
         // Wait until the block is committed confirmed.
-        let blockInfo: types.ApiBlockInfo;
+        let committedConfirmed: number;
         do {
             await utils.sleep(1000);
-            blockInfo = await restProvider.blockByPosition(blockNumber);
-        } while (!blockInfo);
+            committedConfirmed = (await restProvider.networkStatus()).lastCommitted;
+        } while (committedConfirmed < blockNumber);
 
         const web3Receipt = await web3.eth.getTransactionReceipt(txHash);
         expect(web3Receipt.logs.length, 'Incorrect number of logs').to.eql(3);
@@ -303,5 +305,38 @@ describe('ZkSync web3 API tests', () => {
                 expect(log[key], 'Incorrect data').to.eql(expected);
             }
         }
+    });
+
+    it('should check calls', async () => {
+        const mintNFTHandle = await alice.mintNFT({
+            recipient: alice.address(),
+            contentHash: ethersUtils.randomBytes(32),
+            feeToken: token
+        });
+        await mintNFTHandle.awaitVerifyReceipt();
+        const state = await alice.getAccountState();
+        const nft = Object.values(state.committed.nfts)[0];
+
+        const nftFactoryAddress = '0x2000000000000000000000000000000000000000';
+        const nftFactoryInterfacePath = path.join(
+            process.env['ZKSYNC_HOME'] as string,
+            'etc',
+            'web3-abi',
+            'NFTFactory.json'
+        );
+        const nftFactoryInterface = new ethersUtils.Interface(require(nftFactoryInterfacePath));
+        const ownerOfFunction = nftFactoryInterface.functions['ownerOf(uint256)'];
+        const callData = nftFactoryInterface.encodeFunctionData(ownerOfFunction, [nft.id]);
+
+        const callResult1 = await web3.eth.call({ to: nftFactoryAddress, data: callData });
+        const owner1 = nftFactoryInterface.decodeFunctionResult(ownerOfFunction, callResult1)[0];
+        expect(owner1, 'Incorrect owner after mint').to.eql(alice.address());
+
+        const transferHandle = (await alice.syncTransferNFT({ to: bob.address(), token: nft, feeToken: 'ETH' }))[0];
+        await transferHandle.awaitVerifyReceipt();
+
+        const callResult2 = await web3.eth.call({ to: nftFactoryAddress, data: callData });
+        const owner2 = nftFactoryInterface.decodeFunctionResult(ownerOfFunction, callResult2)[0];
+        expect(owner2, 'Incorrect owner after transfer').to.eql(bob.address());
     });
 });
