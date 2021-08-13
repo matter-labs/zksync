@@ -1115,6 +1115,9 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         setup.get_tx_hash(0, 4),
         setup.get_tx_hash(0, 5),
         setup.get_tx_hash(0, 6),
+        setup.get_tx_hash(0, 7),
+        setup.get_tx_hash(0, 8),
+        setup.get_tx_hash(0, 9),
     ];
 
     for (tx_hash, limit, direction, expected, test_name) in vec![
@@ -1147,10 +1150,10 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
             "Big limit (newer)",
         ),
         (
-            tx_hashes[6],
+            tx_hashes[9],
             5,
             PaginationDirection::Older,
-            tx_hashes[2..=6].iter().rev().cloned().collect(),
+            tx_hashes[5..=9].iter().rev().cloned().collect(),
             "Last 5 txs",
         ),
         (

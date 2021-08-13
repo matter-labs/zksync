@@ -3,7 +3,9 @@ use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_derive::rpc;
 // Local uses
 use super::{
-    types::{Address, BlockInfo, BlockNumber, Transaction, H256, U256, U64},
+    types::{
+        BlockInfo, BlockNumber, Filter, Log, Transaction, TransactionReceipt, H160, H256, U256, U64,
+    },
     Web3RpcApp,
 };
 
@@ -36,8 +38,8 @@ pub trait Web3Rpc {
     #[rpc(name = "eth_gasPrice", returns = "U256")]
     fn gas_price(&self) -> Result<U256>;
 
-    #[rpc(name = "eth_accounts", returns = "Vec<Address>")]
-    fn accounts(&self) -> Result<Vec<Address>>;
+    #[rpc(name = "eth_accounts", returns = "Vec<H160>")]
+    fn accounts(&self) -> Result<Vec<H160>>;
 
     #[rpc(name = "eth_getUncleCountByBlockHash", returns = "U256")]
     fn get_uncle_count_by_block_hash(&self, block_hash: H256) -> Result<U256>;
@@ -49,11 +51,7 @@ pub trait Web3Rpc {
     fn block_number(&self) -> BoxFutureResult<U64>;
 
     #[rpc(name = "eth_getBalance", returns = "U256")]
-    fn get_balance(
-        &self,
-        address: zksync_types::Address,
-        block: Option<BlockNumber>,
-    ) -> BoxFutureResult<U256>;
+    fn get_balance(&self, address: H160, block: Option<BlockNumber>) -> BoxFutureResult<U256>;
 
     #[rpc(name = "eth_getBlockTransactionCountByHash", returns = "Option<U256>")]
     fn get_block_transaction_count_by_hash(&self, hash: H256) -> BoxFutureResult<Option<U256>>;
@@ -83,6 +81,15 @@ pub trait Web3Rpc {
         hash: H256,
         include_txs: bool,
     ) -> BoxFutureResult<Option<BlockInfo>>;
+
+    #[rpc(
+        name = "eth_getTransactionReceipt",
+        returns = "Option<TransactionReceipt>"
+    )]
+    fn get_transaction_receipt(&self, hash: H256) -> BoxFutureResult<Option<TransactionReceipt>>;
+
+    #[rpc(name = "eth_getLogs", returns = "Vec<Log>")]
+    fn get_logs(&self, filter: Filter) -> BoxFutureResult<Vec<Log>>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -110,7 +117,7 @@ impl Web3Rpc for Web3RpcApp {
         Ok(U256::zero())
     }
 
-    fn accounts(&self) -> Result<Vec<Address>> {
+    fn accounts(&self) -> Result<Vec<H160>> {
         Ok(Vec::new())
     }
 
@@ -126,11 +133,7 @@ impl Web3Rpc for Web3RpcApp {
         spawn!(self._impl_block_number())
     }
 
-    fn get_balance(
-        &self,
-        address: zksync_types::Address,
-        block: Option<BlockNumber>,
-    ) -> BoxFutureResult<U256> {
+    fn get_balance(&self, address: H160, block: Option<BlockNumber>) -> BoxFutureResult<U256> {
         spawn!(self._impl_get_balance(address, block))
     }
 
@@ -163,5 +166,13 @@ impl Web3Rpc for Web3RpcApp {
         include_txs: bool,
     ) -> BoxFutureResult<Option<BlockInfo>> {
         spawn!(self._impl_get_block_by_hash(hash, include_txs))
+    }
+
+    fn get_transaction_receipt(&self, hash: H256) -> BoxFutureResult<Option<TransactionReceipt>> {
+        spawn!(self._impl_get_transaction_receipt(hash))
+    }
+
+    fn get_logs(&self, filter: Filter) -> BoxFutureResult<Vec<Log>> {
+        spawn!(self._impl_get_logs(filter))
     }
 }

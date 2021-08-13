@@ -42,6 +42,7 @@ ws_url="ws://127.0.0.1:3031"
 [api.web3]
 port=3002
 url="http://127.0.0.1:3002"
+max_block_range=10
 
 # Configuration for the core private server.
 [api.private]

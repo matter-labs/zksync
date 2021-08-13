@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use zksync_api_client::rest::client::Client;
 use zksync_api_types::v02::Response;
 use zksync_config::ZkSyncConfig;
-use zksync_crypto::rand::{SeedableRng, XorShiftRng};
+use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
     chain::operations::OperationsSchema,
@@ -37,9 +37,10 @@ use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     prover::ProverJobType,
     tx::ChangePubKeyType,
-    AccountId, AccountMap, Address, BatchFee, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp, Nonce, OutputFeeType,
-    PriorityOp, Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
+    AccountId, AccountMap, AccountUpdate, Address, BatchFee, BlockNumber, Deposit, DepositOp,
+    ExecutedOperations, ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp,
+    Nonce, OutputFeeType, PriorityOp, Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp,
+    ZkSyncTx, H256, NFT,
 };
 
 // Local uses
@@ -395,6 +396,7 @@ impl TestServerConfig {
                         *account_id,
                         account,
                         block_number.0 * accounts.len() as u32 + id as u32,
+                        &mut rng,
                     ));
                 });
             apply_updates(&mut accounts, updates.clone());
@@ -411,6 +413,34 @@ impl TestServerConfig {
             } else {
                 vec![]
             };
+
+            let mut mint_nft_updates = Vec::new();
+            for (i, tx) in txs.iter().enumerate() {
+                if let Some(tx) = tx.get_executed_tx() {
+                    if let ZkSyncTx::MintNFT(tx) = &tx.signed_tx.tx {
+                        let nft_address: Address = rng.gen::<[u8; 20]>().into();
+                        let content_hash: H256 = rng.gen::<[u8; 32]>().into();
+                        let token = NFT::new(
+                            TokenId(80000 + block_number.0 * 100 + i as u32),
+                            0,
+                            tx.creator_id,
+                            tx.creator_address,
+                            nft_address,
+                            None,
+                            content_hash,
+                        );
+                        let update = (
+                            tx.creator_id,
+                            AccountUpdate::MintNFT {
+                                token,
+                                nonce: Nonce(0),
+                            },
+                        );
+                        mint_nft_updates.push(update);
+                    }
+                }
+            }
+            updates.extend(mint_nft_updates);
 
             storage
                 .chain()
@@ -608,7 +638,7 @@ impl TestServerConfig {
                 block_number: 2,
                 block_index: 2,
                 operation: serde_json::to_value(
-                    dummy_deposit_op(Address::default(), AccountId(1), VERIFIED_OP_SERIAL_ID, 2).op,
+                    dummy_deposit_op(Address::default(), AccountId(3), VERIFIED_OP_SERIAL_ID, 2).op,
                 )
                 .unwrap(),
                 from_account: Default::default(),
@@ -630,7 +660,7 @@ impl TestServerConfig {
                 block_number: EXECUTED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
                 operation: serde_json::to_value(
-                    dummy_full_exit_op(AccountId(1), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
+                    dummy_full_exit_op(AccountId(3), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
                         .op,
                 )
                 .unwrap(),

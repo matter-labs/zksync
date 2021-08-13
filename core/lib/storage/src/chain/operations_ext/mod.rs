@@ -23,7 +23,7 @@ use zksync_types::{
 // Local imports
 use self::records::{
     AccountCreatedAt, InBlockBatchTx, PriorityOpReceiptResponse, StorageTxData, StorageTxReceipt,
-    TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse, Web3TxData,
+    TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse, Web3TxData, Web3TxReceipt,
 };
 use crate::{
     chain::{
@@ -706,7 +706,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             "#,
             address.as_ref(), offset as i64, limit as i64
         ).fetch_all(self.0.conn())
-        .await?;
+            .await?;
 
         if !tx_history.is_empty() {
             let tokens = TokensSchema(self.0).load_tokens().await?;
@@ -889,7 +889,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             tx_number_start_idx, tx_number_end_idx,
             limit as i64
         ).fetch_all(self.0.conn())
-        .await?;
+            .await?;
 
         if !tx_history.is_empty() {
             let tokens = TokensSchema(self.0).load_tokens().await?;
@@ -1017,8 +1017,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         time_from,
                         i64::from(query.limit),
                     )
-                    .fetch_all(transaction.conn())
-                    .await?
+                        .fetch_all(transaction.conn())
+                        .await?
                 }
                 PaginationDirection::Older => {
                     sqlx::query_as!(
@@ -1073,8 +1073,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         time_from,
                         i64::from(query.limit),
                     )
-                    .fetch_all(transaction.conn())
-                    .await?
+                        .fetch_all(transaction.conn())
+                        .await?
                 }
             };
             let last_finalized = transaction
@@ -1197,9 +1197,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             i64::from(*last_committed),
             address.as_bytes()
         )
-        .fetch_one(transaction.conn())
-        .await?
-        .count;
+            .fetch_one(transaction.conn())
+            .await?
+            .count;
 
         let priority_op_count = sqlx::query!(
             r#"
@@ -1394,7 +1394,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     root_hash as "block_hash!"
                 FROM everything
                 LEFT JOIN blocks
-                ON everything.block_number = blocks.number
+                    ON everything.block_number = blocks.number
             "#,
             hash,
         )
@@ -1403,5 +1403,133 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.block.tx_data_for_web3", start.elapsed());
         Ok(result)
+    }
+
+    pub async fn web3_receipt_by_hash(
+        &mut self,
+        hash: &[u8],
+    ) -> QueryResult<Option<Web3TxReceipt>> {
+        let start = Instant::now();
+
+        let tx: Option<Web3TxReceipt> = sqlx::query_as!(
+            Web3TxReceipt,
+            r#"
+                WITH transaction AS (
+                    SELECT
+                        tx_hash,
+                        block_number,
+                        operation,
+                        block_index,
+                        from_account,
+                        to_account,
+                        success
+                    FROM executed_transactions
+                    WHERE tx_hash = $1
+                ), priority_op AS (
+                    SELECT
+                        tx_hash,
+                        block_number,
+                        operation,
+                        block_index,
+                        from_account,
+                        to_account,
+                        true as success
+                    FROM executed_priority_operations
+                    WHERE tx_hash = $1 OR eth_hash = $1
+                ),
+                everything AS (
+                    SELECT * FROM transaction
+                    UNION ALL
+                    SELECT * FROM priority_op
+                )
+                SELECT
+                    tx_hash as "tx_hash!",
+                    block_number as "block_number!",
+                    operation as "operation!",
+                    block_index as "block_index?",
+                    from_account as "from_account!",
+                    to_account as "to_account?",
+                    success as "success!",
+                    root_hash as "block_hash!"
+                FROM everything
+                LEFT JOIN blocks
+                    ON everything.block_number = blocks.number
+                LEFT JOIN aggregate_operations
+                    ON (blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block)
+                    AND aggregate_operations.action_type = 'CommitBlocks'
+                WHERE confirmed = true
+            "#,
+            hash
+        )
+            .fetch_optional(self.0.conn())
+            .await?;
+
+        metrics::histogram!("sql.chain.block.web3_receipt_by_hash", start.elapsed());
+        Ok(tx)
+    }
+
+    pub async fn web3_receipts(
+        &mut self,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+    ) -> QueryResult<Vec<Web3TxReceipt>> {
+        let start = Instant::now();
+
+        let receipts: Vec<Web3TxReceipt> = sqlx::query_as!(
+            Web3TxReceipt,
+            r#"
+                WITH transaction AS (
+                    SELECT
+                        tx_hash,
+                        block_number,
+                        operation,
+                        block_index,
+                        from_account,
+                        to_account,
+                        success
+                    FROM executed_transactions
+                    WHERE block_number BETWEEN $1 AND $2
+                ), priority_op AS (
+                    SELECT
+                        tx_hash,
+                        block_number,
+                        operation,
+                        block_index,
+                        from_account,
+                        to_account,
+                        true as success
+                    FROM executed_priority_operations
+                    WHERE block_number BETWEEN $1 AND $2
+                ),
+                everything AS (
+                    SELECT * FROM transaction
+                    UNION ALL
+                    SELECT * FROM priority_op
+                )
+                SELECT
+                    tx_hash as "tx_hash!",
+                    block_number as "block_number!",
+                    operation as "operation!",
+                    block_index as "block_index?",
+                    from_account as "from_account!",
+                    to_account as "to_account?",
+                    success as "success!",
+                    root_hash as "block_hash!"
+                FROM everything
+                LEFT JOIN blocks
+                    ON everything.block_number = blocks.number
+                LEFT JOIN aggregate_operations
+                    ON (blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block)
+                    AND aggregate_operations.action_type = 'CommitBlocks'
+                WHERE confirmed = true
+            "#,
+            i64::from(from_block.0),
+            i64::from(to_block.0)
+        )
+            .fetch_all(self.0.conn())
+            .await?;
+
+        metrics::histogram!("sql.chain.block.web3_receipts", start.elapsed());
+        Ok(receipts)
     }
 }
