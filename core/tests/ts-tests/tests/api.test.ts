@@ -211,7 +211,7 @@ describe('ZkSync web3 API tests', () => {
     let alice: Wallet;
     let bob: Wallet;
     let token: string = 'ETH';
-    let amount: BigNumber;
+    let depositAmount: BigNumber;
     let web3: Web3;
 
     before('create tester and test wallets', async () => {
@@ -219,18 +219,19 @@ describe('ZkSync web3 API tests', () => {
         alice = await tester.fundedWallet('1.0');
         bob = await tester.emptyWallet();
         web3 = new Web3('http://localhost:3002');
-        amount = tester.syncProvider.tokenSet.parseToken(token, '1000');
-        await tester.testDeposit(alice, token, amount, true);
+        depositAmount = tester.syncProvider.tokenSet.parseToken(token, '1000');
+        await tester.testDeposit(alice, token, depositAmount, true);
         await tester.testChangePubKey(alice, token, false);
     });
 
     it('should check logs', async () => {
         const restProvider = await getDefaultRestProvider('localhost');
         const fee = (await restProvider.getTransactionFee('Transfer', bob.address(), 'ETH')).totalFee;
+        const transferAmount = depositAmount.div(10);
         const handle = await alice.syncTransfer({
             to: bob.address(),
             token,
-            amount: amount.div(10),
+            amount: transferAmount,
             fee
         });
         const txHash = handle.txHash.replace('sync-tx:', '0x');
@@ -277,13 +278,13 @@ describe('ZkSync web3 API tests', () => {
                 from: alice.address(),
                 to: bob.address(),
                 token: tokenAddress,
-                amount: amount.div(10),
+                amount: transferAmount,
                 fee
             },
             {
                 from: alice.address(),
                 to: bob.address(),
-                value: amount.div(10)
+                value: transferAmount
             },
             {
                 from: alice.address(),
