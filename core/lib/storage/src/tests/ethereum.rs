@@ -198,7 +198,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 }
 
 /// Here we check `unprocessed` and `unconfirmed` operations getting.
-/// If there is no `ETHOperation` for `Operation`, it must be returend by `load_unprocessed_operations`.
+/// If there is no `ETHOperation` for `Operation`, it must be returned by `load_unprocessed_operations`.
 /// It must **not** be returned by `load_unconfirmed_operations`.
 ///
 /// If there is an `ETHOperation` and it's not confirmed, it must be returned by `load_unconfirmed_operations`

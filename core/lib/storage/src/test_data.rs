@@ -106,7 +106,13 @@ pub fn generate_nft<R: Rng>(
         H256::from(rng.gen::<[u8; 32]>()),
     );
     vec![
-        (account_id, AccountUpdate::MintNFT { token: nft }),
+        (
+            account_id,
+            AccountUpdate::MintNFT {
+                token: nft,
+                nonce: account.nonce,
+            },
+        ),
         (
             account_id,
             AccountUpdate::UpdateBalance {

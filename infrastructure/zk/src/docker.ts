@@ -45,9 +45,9 @@ async function _build(image: string) {
         await contract.build();
     }
     const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
-    const latestImage = `-t matterlabs/${image}:latest`;
+    // const latestImage = `-t matterlabs/${image}:latest`;
     const taggedImage = ['nginx', 'server', 'prover'].includes(image) ? `-t matterlabs/${image}:${imageTag}` : '';
-    await utils.spawn(`DOCKER_BUILDKIT=1 docker build ${latestImage} ${taggedImage} -f ./docker/${image}/Dockerfile .`);
+    await utils.spawn(`DOCKER_BUILDKIT=1 docker build ${taggedImage} -f ./docker/${image}/Dockerfile .`);
 }
 
 async function _push(image: string) {

@@ -91,8 +91,7 @@ mod test {
     #[test]
     // Should be run in the dev environment
     fn test_fetch_coinmarketcap_data() {
-        let mut runtime = tokio::runtime::Builder::new()
-            .basic_scheduler()
+        let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("tokio runtime");

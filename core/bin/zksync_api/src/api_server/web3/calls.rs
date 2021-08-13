@@ -14,23 +14,24 @@ use zksync_types::{TokenId, NFT};
 use super::{
     converter::u256_from_biguint,
     types::{H160, U256},
-    ZKSYNC_PROXY_ADDRESS,
+    NFT_FACTORY_ADDRESS, ZKSYNC_PROXY_ADDRESS,
 };
 use crate::utils::token_db_cache::TokenDBCache;
 
 #[derive(Debug, Clone)]
 pub struct CallsHelper {
     erc20: HashMap<[u8; 4], Function>,
-    zksync_proxy: HashMap<[u8; 4], Function>,
+    nft_factory: HashMap<[u8; 4], Function>,
     tokens: TokenDBCache,
     zksync_proxy_address: H160,
+    nft_factory_address: H160,
 }
 
 impl CallsHelper {
     const SHA256_MULTI_HASH: [u8; 2] = [18, 32]; // 0x1220
     const ALPHABET: &'static str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-    fn gen_hashmap(functions: Vec<Function>) -> HashMap<[u8; 4], Function> {
+    fn function_by_selector(functions: Vec<Function>) -> HashMap<[u8; 4], Function> {
         functions
             .into_iter()
             .map(|f| {
@@ -59,23 +60,24 @@ impl CallsHelper {
             .flatten()
             .cloned()
             .collect();
-        let erc20_function_by_selector = Self::gen_hashmap(erc20_functions);
+        let erc20_function_by_selector = Self::function_by_selector(erc20_functions);
 
-        let zksync_proxy_abi = std::fs::File::open(path.join("ZkSyncProxy.json")).unwrap();
-        let zksync_proxy_functions = Contract::load(zksync_proxy_abi)
+        let nft_factory_abi = std::fs::File::open(path.join("NFTFactory.json")).unwrap();
+        let nft_factory_functions = Contract::load(nft_factory_abi)
             .unwrap()
             .functions
             .values()
             .flatten()
             .cloned()
             .collect();
-        let zksync_proxy_function_by_selector = Self::gen_hashmap(zksync_proxy_functions);
+        let nft_factory_function_by_selector = Self::function_by_selector(nft_factory_functions);
 
         Self {
             erc20: erc20_function_by_selector,
-            zksync_proxy: zksync_proxy_function_by_selector,
+            nft_factory: nft_factory_function_by_selector,
             tokens: TokenDBCache::new(),
             zksync_proxy_address: H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap(),
+            nft_factory_address: H160::from_str(NFT_FACTORY_ADDRESS).unwrap(),
         }
     }
 
@@ -85,8 +87,8 @@ impl CallsHelper {
         to: H160,
         data: Vec<u8>,
     ) -> Result<Vec<u8>> {
-        let all_functions = if to == self.zksync_proxy_address {
-            &self.zksync_proxy
+        let all_functions = if to == self.nft_factory_address {
+            &self.nft_factory
         } else {
             let token = self
                 .tokens
@@ -119,7 +121,7 @@ impl CallsHelper {
             return Ok(Vec::new());
         };
 
-        let result = if to == self.zksync_proxy_address {
+        let result = if to == self.nft_factory_address {
             match function.name.as_str() {
                 "creatorId" => {
                     let token_id = params[0]
@@ -248,7 +250,7 @@ impl CallsHelper {
                         .get_account_balance_for_block(address, block, token.id)
                         .await
                         .map_err(|_| Error::internal_error())?;
-                    encode(&[AbiToken::Uint(u256_from_biguint(balance)?)])
+                    encode(&[AbiToken::Uint(u256_from_biguint(balance))])
                 }
                 _ => unreachable!(),
             }

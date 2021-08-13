@@ -20,6 +20,7 @@ mod tests;
 mod types;
 
 pub const ZKSYNC_PROXY_ADDRESS: &str = "1000000000000000000000000000000000000000";
+pub const NFT_FACTORY_ADDRESS: &str = "2000000000000000000000000000000000000000";
 
 #[derive(Clone)]
 pub struct Web3RpcApp {
@@ -28,10 +29,11 @@ pub struct Web3RpcApp {
     logs_helper: LogsHelper,
     calls_helper: CallsHelper,
     chain_id: u8,
+    max_block_range: u32,
 }
 
 impl Web3RpcApp {
-    pub fn new(connection_pool: ConnectionPool, chain_id: u8) -> Self {
+    pub fn new(connection_pool: ConnectionPool, config: &ZkSyncConfig) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("Web3RpcApp must be created from the context of Tokio Runtime");
         Web3RpcApp {
@@ -39,7 +41,8 @@ impl Web3RpcApp {
             connection_pool,
             logs_helper: LogsHelper::new(),
             calls_helper: CallsHelper::new(),
-            chain_id,
+            chain_id: config.eth_client.chain_id,
+            max_block_range: config.api.web3.max_block_range,
         }
     }
 
@@ -62,7 +65,7 @@ pub fn start_rpc_server(
 ) {
     let addr = config.api.web3.bind_addr();
 
-    let rpc_app = Web3RpcApp::new(connection_pool, config.eth_client.chain_id);
+    let rpc_app = Web3RpcApp::new(connection_pool, config);
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);
         let mut io = IoHandler::new();

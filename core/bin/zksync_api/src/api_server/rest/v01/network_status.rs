@@ -35,7 +35,7 @@ impl SharedNetworkStatus {
             .spawn(move || {
                 let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
-                let mut runtime = Runtime::new().expect("tokio runtime creation");
+                let runtime = Runtime::new().expect("tokio runtime creation");
 
                 let state_update_task = async move {
                     let mut timer = time::interval(Duration::from_millis(30000));

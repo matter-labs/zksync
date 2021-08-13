@@ -34,8 +34,6 @@ regenesis_multisig_address="0xAA7113B9de498556dC76eDFEFc57681083c861C1"
 # The number of parter signatures we need to get for the regenesis
 regenesis_threshold=2
 
-# The address of the new additional zkSync
-new_additional_zksync_address="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"
 
 # Token in which we want accept fees for permissionless token listing
 listing_fee_token="0x0000000000000000000000000000000000000000"

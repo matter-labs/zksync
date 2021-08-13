@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use zksync_api_client::rest::client::Client;
 use zksync_api_types::v02::Response;
 use zksync_config::ZkSyncConfig;
-use zksync_crypto::rand::{SeedableRng, XorShiftRng};
+use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
     chain::operations::OperationsSchema,
@@ -37,9 +37,10 @@ use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     prover::ProverJobType,
     tx::ChangePubKeyType,
-    AccountId, AccountMap, Address, BatchFee, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp, Nonce, OutputFeeType,
-    PriorityOp, Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
+    AccountId, AccountMap, AccountUpdate, Address, BatchFee, BlockNumber, Deposit, DepositOp,
+    ExecutedOperations, ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp,
+    Nonce, OutputFeeType, PriorityOp, Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp,
+    ZkSyncTx, H256, NFT,
 };
 
 // Local uses
@@ -86,17 +87,18 @@ impl TestServerConfig {
         scope: String,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,
     {
         let this = self.clone();
-        let server = actix_web::test::start(move || {
+
+        let server = actix_test::start(move || {
             let app = App::new();
             let shared_data = shared_data.clone();
             let app = if let Some(shared_data) = shared_data {
-                app.data(shared_data)
+                app.app_data(web::Data::new(shared_data))
             } else {
                 app
             };
@@ -113,7 +115,7 @@ impl TestServerConfig {
         &self,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,
@@ -411,6 +413,34 @@ impl TestServerConfig {
             } else {
                 vec![]
             };
+
+            let mut mint_nft_updates = Vec::new();
+            for (i, tx) in txs.iter().enumerate() {
+                if let Some(tx) = tx.get_executed_tx() {
+                    if let ZkSyncTx::MintNFT(tx) = &tx.signed_tx.tx {
+                        let nft_address: Address = rng.gen::<[u8; 20]>().into();
+                        let content_hash: H256 = rng.gen::<[u8; 32]>().into();
+                        let token = NFT::new(
+                            TokenId(80000 + block_number.0 * 100 + i as u32),
+                            0,
+                            tx.creator_id,
+                            tx.creator_address,
+                            nft_address,
+                            None,
+                            content_hash,
+                        );
+                        let update = (
+                            tx.creator_id,
+                            AccountUpdate::MintNFT {
+                                token,
+                                nonce: Nonce(0),
+                            },
+                        );
+                        mint_nft_updates.push(update);
+                    }
+                }
+            }
+            updates.extend(mint_nft_updates);
 
             storage
                 .chain()

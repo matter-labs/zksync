@@ -4,25 +4,25 @@ use std::str::FromStr;
 // External uses
 use ethabi::{encode, Token as AbiToken};
 use jsonrpc_core::{Error, Result};
-use num::BigUint;
+use num::{BigUint, Zero};
 use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_storage::StorageProcessor;
-use zksync_types::{Token, TokenId, ZkSyncOp, NFT};
+use zksync_types::{Nonce, Token, TokenId, ZkSyncOp, NFT};
 // Local uses
 use super::{
     converter::{log, u256_from_biguint},
     types::{Bytes, CommonLogData, Event, Log, H160, H256, U256},
-    ZKSYNC_PROXY_ADDRESS,
+    NFT_FACTORY_ADDRESS, ZKSYNC_PROXY_ADDRESS,
 };
 use crate::utils::token_db_cache::TokenDBCache;
 
 #[derive(Debug, Clone)]
 pub struct LogsHelper {
     topic_by_event: HashMap<Event, H256>,
-    event_by_topic: HashMap<H256, Event>,
     tokens: TokenDBCache,
-    pub zksync_proxy_address: H160,
+    zksync_proxy_address: H160,
+    nft_factory_address: H160,
 }
 
 impl LogsHelper {
@@ -31,33 +31,27 @@ impl LogsHelper {
             (Event::ZkSyncTransfer, "ZkSyncTransfer(address,address,address,uint256,uint256)"),
             (Event::ZkSyncWithdraw, "ZkSyncWithdraw(address,address,address,uint256,uint256)"),
             (Event::ZkSyncForcedExit, "ZkSyncForcedExit(address,address,address,uint256)"),
-            (Event::ZkSyncChangePubKey, "ZkSyncChangePubKey(address,address,address,uint256)"),
+            (Event::ZkSyncChangePubKey, "ZkSyncChangePubKey(address,bytes20,address,uint256)"),
             (Event::ZkSyncDeposit, "ZkSyncDeposit(address,address,address,uint256)"),
             (Event::ZkSyncFullExit, "ZkSyncFullExit(address,address,uint256)"),
-            (Event::ZkSyncMintNFT, "ZkSyncMintNFT(uint32,address,address,bytes32,address,uint256)"),
-            (Event::ZkSyncWithdrawNFT, "ZkSyncWithdrawNFT(address,address,address,address,uint256,uint32,address,uint32,bytes32)"),
+            (Event::ZkSyncMintNFT, "ZkSyncMintNFT(uint32,uint32,address,bytes32,address,uint256,address)"),
+            (Event::ZkSyncWithdrawNFT, "ZkSyncWithdrawNFT(address,address,uint32,address,address,uint256,uint32,address,uint32,bytes32)"),
             (Event::ZkSyncSwap, "ZkSyncSwap(address,address,address,address,address,address,address,address,uint256,uint256,uint256)"),
             (Event::ERCTransfer, "Transfer(address,address,uint256)"),
         ];
         let mut topic_by_event = HashMap::new();
-        let mut event_by_topic = HashMap::new();
 
         for (event_name, event_str) in data.into_iter() {
             let topic = H256::from(keccak256(event_str.as_bytes()));
             topic_by_event.insert(event_name, topic);
-            event_by_topic.insert(topic, event_name);
         }
 
         Self {
             topic_by_event,
-            event_by_topic,
             tokens: TokenDBCache::new(),
             zksync_proxy_address: H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap(),
+            nft_factory_address: H160::from_str(NFT_FACTORY_ADDRESS).unwrap(),
         }
-    }
-
-    pub fn event_by_topic(&self, topic: &H256) -> Option<Event> {
-        self.event_by_topic.get(topic).cloned()
     }
 
     pub fn topic_by_event(&self, event: Event) -> Option<H256> {
@@ -70,7 +64,6 @@ impl LogsHelper {
         common_data: CommonLogData,
         storage: &mut StorageProcessor<'_>,
     ) -> Result<Option<Log>> {
-        let transaction_log_index = Self::zksync_op_log_index(&op);
         let log_data = match op {
             ZkSyncOp::Transfer(op) => {
                 let token = self.get_token_by_id(storage, op.tx.token).await?;
@@ -78,8 +71,8 @@ impl LogsHelper {
                     op.tx.from,
                     op.tx.to,
                     token.address,
-                    u256_from_biguint(op.tx.amount)?,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.amount),
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncTransfer, data))
             }
@@ -89,8 +82,8 @@ impl LogsHelper {
                     op.tx.from,
                     op.tx.to,
                     token.address,
-                    u256_from_biguint(op.tx.amount)?,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.amount),
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncTransfer, data))
             }
@@ -100,8 +93,8 @@ impl LogsHelper {
                     op.tx.from,
                     op.tx.to,
                     token.address,
-                    u256_from_biguint(op.tx.amount)?,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.amount),
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncWithdraw, data))
             }
@@ -113,12 +106,12 @@ impl LogsHelper {
                     .account_address_by_id(op.tx.initiator_account_id)
                     .await
                     .map_err(|_| Error::internal_error())?
-                    .expect("Can`t find account in storage");
+                    .ok_or_else(Error::internal_error)?;
                 let data = Self::zksync_forced_exit_data(
                     initiator,
                     op.tx.target,
                     token.address,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncForcedExit, data))
             }
@@ -128,18 +121,22 @@ impl LogsHelper {
                     op.tx.account,
                     op.tx.new_pk_hash.data,
                     fee_token.address,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.fee),
                 );
                 Some((Event::ZkSyncChangePubKey, data))
             }
             ZkSyncOp::MintNFTOp(op) => {
                 let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                let nft = self
+                    .get_nft_by_creator_and_nonce(storage, op.tx.creator_address, op.tx.nonce)
+                    .await?;
                 let data = Self::zksync_mint_nft_data(
+                    nft.id.0.into(),
                     op.tx.creator_id.0.into(),
                     op.tx.creator_address,
                     op.tx.content_hash,
                     op.tx.recipient,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.fee),
                     fee_token.address,
                 );
                 Some((Event::ZkSyncMintNFT, data))
@@ -150,9 +147,10 @@ impl LogsHelper {
                 let data = Self::zksync_withdraw_nft_data(
                     op.tx.from,
                     op.tx.to,
+                    U256::from(nft.id.0),
                     nft.address,
                     fee_token.address,
-                    u256_from_biguint(op.tx.fee)?,
+                    u256_from_biguint(op.tx.fee),
                     U256::from(nft.creator_id.0),
                     nft.creator_address,
                     U256::from(nft.serial_id),
@@ -174,14 +172,14 @@ impl LogsHelper {
                     .account_address_by_id(op.accounts.0)
                     .await
                     .map_err(|_| Error::internal_error())?
-                    .expect("Can`t find account in storage");
+                    .ok_or_else(Error::internal_error)?;
                 let account2 = storage
                     .chain()
                     .account_schema()
                     .account_address_by_id(op.accounts.1)
                     .await
                     .map_err(|_| Error::internal_error())?
-                    .expect("Can`t find account in storage");
+                    .ok_or_else(Error::internal_error)?;
                 let data = Self::zksync_swap_data(
                     op.tx.submitter_address,
                     account1,
@@ -191,19 +189,19 @@ impl LogsHelper {
                     fee_token.address,
                     token1.address,
                     token2.address,
-                    u256_from_biguint(op.tx.fee)?,
-                    u256_from_biguint(op.tx.amounts.0)?,
-                    u256_from_biguint(op.tx.amounts.1)?,
+                    u256_from_biguint(op.tx.fee),
+                    u256_from_biguint(op.tx.amounts.0),
+                    u256_from_biguint(op.tx.amounts.1),
                 );
                 Some((Event::ZkSyncSwap, data))
             }
             ZkSyncOp::Deposit(op) => {
                 let token = self.get_token_by_id(storage, op.priority_op.token).await?;
                 let data = Self::zksync_deposit_data(
-                    op.priority_op.to,
+                    op.priority_op.from,
                     op.priority_op.to,
                     token.address,
-                    u256_from_biguint(op.priority_op.amount)?,
+                    u256_from_biguint(op.priority_op.amount),
                 );
                 Some((Event::ZkSyncDeposit, data))
             }
@@ -216,9 +214,9 @@ impl LogsHelper {
                     .account_address_by_id(op.priority_op.account_id)
                     .await
                     .map_err(|_| Error::internal_error())?
-                    .expect("Can`t find account in storage");
+                    .ok_or_else(Error::internal_error)?;
                 let data =
-                    Self::zksync_full_exit_data(account, token.address, u256_from_biguint(amount)?);
+                    Self::zksync_full_exit_data(account, token.address, u256_from_biguint(amount));
                 Some((Event::ZkSyncFullExit, data))
             }
             _ => None,
@@ -229,10 +227,132 @@ impl LogsHelper {
                 self.topic_by_event(event).unwrap(),
                 data,
                 common_data,
-                transaction_log_index,
+                0u8.into(),
             )
         });
         Ok(log)
+    }
+
+    /// Returns info for erc logs produced by operation
+    /// Info structure: (token, from, to, amount)
+    async fn erc_logs_info(
+        &self,
+        op: ZkSyncOp,
+        storage: &mut StorageProcessor<'_>,
+    ) -> Result<Vec<(Token, H160, H160, BigUint)>> {
+        let mut result = Vec::new();
+        match op {
+            ZkSyncOp::Transfer(op) => {
+                let token = self.get_token_by_id(storage, op.tx.token).await?;
+                result.push((token.clone(), op.tx.from, op.tx.to, op.tx.amount));
+                result.push((token, op.tx.from, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::TransferToNew(op) => {
+                let token = self.get_token_by_id(storage, op.tx.token).await?;
+                result.push((token.clone(), op.tx.from, op.tx.to, op.tx.amount));
+                result.push((token, op.tx.from, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::Withdraw(op) => {
+                let token = self.get_token_by_id(storage, op.tx.token).await?;
+                result.push((token.clone(), op.tx.from, H160::zero(), op.tx.amount));
+                result.push((token, op.tx.from, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::ForcedExit(op) => {
+                let token = self.get_token_by_id(storage, op.tx.token).await?;
+                let initiator = storage
+                    .chain()
+                    .account_schema()
+                    .account_address_by_id(op.tx.initiator_account_id)
+                    .await
+                    .map_err(|_| Error::internal_error())?
+                    .ok_or_else(Error::internal_error)?;
+                let amount = op.withdraw_amount.unwrap_or_default().0;
+                result.push((token.clone(), op.tx.target, H160::zero(), amount));
+                result.push((token, initiator, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::ChangePubKeyOffchain(op) => {
+                let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                result.push((fee_token, op.tx.account, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::MintNFTOp(op) => {
+                let nft = self
+                    .get_nft_by_creator_and_nonce(storage, op.tx.creator_address, op.tx.nonce)
+                    .await?;
+                let token = Token::new_nft(nft.id, "");
+                let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                result.push((token, H160::zero(), op.tx.recipient, BigUint::from(1u8)));
+                result.push((fee_token, op.tx.creator_address, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::WithdrawNFT(op) => {
+                let token = self.get_token_by_id(storage, op.tx.token).await?;
+                let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                result.push((token, op.tx.from, H160::zero(), BigUint::from(1u8)));
+                result.push((fee_token, op.tx.from, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::Swap(op) => {
+                let token1 = self
+                    .get_token_by_id(storage, op.tx.orders.0.token_buy)
+                    .await?;
+                let token2 = self
+                    .get_token_by_id(storage, op.tx.orders.0.token_sell)
+                    .await?;
+                let fee_token = self.get_token_by_id(storage, op.tx.fee_token).await?;
+                let from1 = storage
+                    .chain()
+                    .account_schema()
+                    .account_address_by_id(op.tx.orders.0.account_id)
+                    .await
+                    .map_err(|_| Error::internal_error())?
+                    .ok_or_else(Error::internal_error)?;
+                let from2 = storage
+                    .chain()
+                    .account_schema()
+                    .account_address_by_id(op.tx.orders.1.account_id)
+                    .await
+                    .map_err(|_| Error::internal_error())?
+                    .ok_or_else(Error::internal_error)?;
+                result.push((
+                    token1,
+                    from1,
+                    op.tx.orders.1.recipient_address,
+                    op.tx.amounts.0,
+                ));
+                result.push((
+                    token2,
+                    from2,
+                    op.tx.orders.0.recipient_address,
+                    op.tx.amounts.1,
+                ));
+                result.push((fee_token, op.tx.submitter_address, H160::zero(), op.tx.fee));
+            }
+            ZkSyncOp::Deposit(op) => {
+                let token = self.get_token_by_id(storage, op.priority_op.token).await?;
+                result.push((
+                    token,
+                    H160::zero(),
+                    op.priority_op.to,
+                    op.priority_op.amount,
+                ));
+            }
+            ZkSyncOp::FullExit(op) => {
+                let token = self.get_token_by_id(storage, op.priority_op.token).await?;
+                let from = storage
+                    .chain()
+                    .account_schema()
+                    .account_address_by_id(op.priority_op.account_id)
+                    .await
+                    .map_err(|_| Error::internal_error())?
+                    .ok_or_else(Error::internal_error)?;
+                result.push((
+                    token,
+                    from,
+                    H160::zero(),
+                    op.withdraw_amount.unwrap_or_default().0,
+                ));
+            }
+            _ => {}
+        }
+        Ok(result)
     }
 
     pub async fn erc_logs(
@@ -242,177 +362,18 @@ impl LogsHelper {
         storage: &mut StorageProcessor<'_>,
     ) -> Result<Vec<Log>> {
         let mut logs = Vec::new();
-        match op {
-            ZkSyncOp::Transfer(op) => {
-                let token = self.get_token_by_id(storage, op.tx.token).await?;
-                logs.push(
-                    self.erc_transfer(
-                        token,
-                        op.tx.from,
-                        op.tx.to,
-                        op.tx.amount,
-                        common_data,
-                        0u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
+        // The index is equal to 1 because zksync log has index 0.
+        let mut index = 1u8.into();
+
+        let info = self.erc_logs_info(op, storage).await?;
+        logs.extend(info.into_iter().filter_map(|(token, from, to, amount)| {
+            if amount.is_zero() {
+                None
+            } else {
+                Some(self.erc_transfer(token, from, to, amount, common_data, &mut index))
             }
-            ZkSyncOp::TransferToNew(op) => {
-                let token = self.get_token_by_id(storage, op.tx.token).await?;
-                logs.push(
-                    self.erc_transfer(
-                        token,
-                        op.tx.from,
-                        op.tx.to,
-                        op.tx.amount,
-                        common_data,
-                        0u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
-            }
-            ZkSyncOp::Withdraw(op) => {
-                let token = self.get_token_by_id(storage, op.tx.token).await?;
-                logs.push(
-                    self.erc_transfer(
-                        token,
-                        op.tx.from,
-                        H160::zero(),
-                        op.tx.amount,
-                        common_data,
-                        0u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
-            }
-            ZkSyncOp::ForcedExit(op) => {
-                let token = self.get_token_by_id(storage, op.tx.token).await?;
-                let from = storage
-                    .chain()
-                    .account_schema()
-                    .account_address_by_id(op.tx.initiator_account_id)
-                    .await
-                    .map_err(|_| Error::internal_error())?
-                    .expect("Can`t find account in storage");
-                logs.push(
-                    self.erc_transfer(
-                        token,
-                        from,
-                        H160::zero(),
-                        op.withdraw_amount.unwrap_or_default().0,
-                        common_data,
-                        0u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
-            }
-            ZkSyncOp::MintNFTOp(_op) => {
-                //TODO
-            }
-            ZkSyncOp::WithdrawNFT(op) => {
-                let token = self.get_token_by_id(storage, op.tx.token).await?;
-                logs.push(
-                    self.erc_transfer(
-                        token,
-                        op.tx.from,
-                        H160::zero(),
-                        BigUint::default(),
-                        common_data,
-                        0u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
-            }
-            ZkSyncOp::Swap(op) => {
-                let token1 = self
-                    .get_token_by_id(storage, op.tx.orders.0.token_buy)
-                    .await?;
-                let token2 = self
-                    .get_token_by_id(storage, op.tx.orders.0.token_sell)
-                    .await?;
-                let address1 = storage
-                    .chain()
-                    .account_schema()
-                    .account_address_by_id(op.tx.orders.0.account_id)
-                    .await
-                    .map_err(|_| Error::internal_error())?
-                    .expect("Can`t find account in storage");
-                let address2 = storage
-                    .chain()
-                    .account_schema()
-                    .account_address_by_id(op.tx.orders.1.account_id)
-                    .await
-                    .map_err(|_| Error::internal_error())?
-                    .expect("Can`t find account in storage");
-                logs.push(
-                    self.erc_transfer(
-                        token1,
-                        address1,
-                        op.tx.orders.1.recipient_address,
-                        op.tx.amounts.0,
-                        common_data.clone(),
-                        0u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
-                logs.push(
-                    self.erc_transfer(
-                        token2,
-                        address2,
-                        op.tx.orders.0.recipient_address,
-                        op.tx.amounts.1,
-                        common_data.clone(),
-                        1u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
-            }
-            ZkSyncOp::Deposit(op) => {
-                let token = self.get_token_by_id(storage, op.priority_op.token).await?;
-                logs.push(
-                    self.erc_transfer(
-                        token,
-                        H160::zero(),
-                        op.priority_op.to,
-                        op.priority_op.amount,
-                        common_data,
-                        0u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
-            }
-            ZkSyncOp::FullExit(op) => {
-                let token = self.get_token_by_id(storage, op.priority_op.token).await?;
-                let account = storage
-                    .chain()
-                    .account_schema()
-                    .account_address_by_id(op.priority_op.account_id)
-                    .await
-                    .map_err(|_| Error::internal_error())?
-                    .expect("Can`t find account in storage");
-                logs.push(
-                    self.erc_transfer(
-                        token,
-                        account,
-                        H160::zero(),
-                        op.withdraw_amount.unwrap_or_default().0,
-                        common_data,
-                        0u8.into(),
-                        storage,
-                    )
-                    .await?,
-                );
-            }
-            _ => {}
-        };
+        }));
+
         Ok(logs)
     }
 
@@ -421,69 +382,62 @@ impl LogsHelper {
         storage: &mut StorageProcessor<'_>,
         id: TokenId,
     ) -> Result<Token> {
-        Ok(self
-            .tokens
+        self.tokens
             .get_token(storage, id)
             .await
             .map_err(|_| Error::internal_error())?
-            .expect("Can't find token in storage"))
+            .ok_or_else(Error::internal_error)
     }
 
     async fn get_nft_by_id(&self, storage: &mut StorageProcessor<'_>, id: TokenId) -> Result<NFT> {
-        Ok(self
-            .tokens
+        self.tokens
             .get_nft_by_id(storage, id)
             .await
             .map_err(|_| Error::internal_error())?
-            .expect("Can't find token in storage"))
+            .ok_or_else(Error::internal_error)
     }
 
-    fn zksync_op_log_index(tx: &ZkSyncOp) -> U256 {
-        // For ChangePubKey there is no erc20/erc751 transfer, so zksync log is the first one,
-        // for swaps there is two erc20/erc751 transfer, for other types that produce zksync log
-        // there is only one. It doesn't matter what it returns for Noop and Close.
-        if matches!(
-            tx,
-            ZkSyncOp::ChangePubKeyOffchain(_) | ZkSyncOp::MintNFTOp(_)
-        ) {
-            0u8.into()
-        } else if matches!(tx, ZkSyncOp::Swap(_)) {
-            2u8.into()
-        } else {
-            1u8.into()
-        }
+    async fn get_nft_by_creator_and_nonce(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        creator_address: H160,
+        nonce: Nonce,
+    ) -> Result<NFT> {
+        storage
+            .chain()
+            .state_schema()
+            .get_mint_nft_update_by_creator_and_nonce(creator_address, nonce)
+            .await
+            .map_err(|_| Error::internal_error())?
+            .ok_or_else(Error::internal_error)
     }
 
-    #[allow(clippy::too_many_arguments)]
-    async fn erc_transfer(
+    fn erc_transfer(
         &self,
         token: Token,
         from: H160,
         to: H160,
         amount: BigUint,
         common_data: CommonLogData,
-        transaction_log_index: U256,
-        storage: &mut StorageProcessor<'_>,
-    ) -> Result<Log> {
+        transaction_log_index: &mut U256,
+    ) -> Log {
+        // According to specifications, amount is added to transfer log data for ERC20 tokens
+        // and token ID is added instead for ERC721 tokens.
         let (contract_address, amount_or_id) = if !token.is_nft {
-            (token.address, u256_from_biguint(amount)?)
+            (token.address, u256_from_biguint(amount))
         } else {
-            let nft = self
-                .tokens
-                .get_nft_by_id(storage, token.id)
-                .await
-                .map_err(|_| Error::internal_error())?
-                .expect("Can't find token in storage");
-            (nft.creator_address, nft.serial_id.into())
+            (self.nft_factory_address, token.id.0.into())
         };
         let data = Self::erc_transfer_data(from, to, amount_or_id);
-        Ok(log(
+        let log = log(
             contract_address,
             self.topic_by_event(Event::ERCTransfer).unwrap(),
             data,
             common_data,
-            transaction_log_index,
-        ))
+            *transaction_log_index,
+        );
+        *transaction_log_index += 1u8.into();
+        log
     }
 
     fn erc_transfer_data(from: H160, to: H160, amount_or_id: U256) -> Bytes {
@@ -521,14 +475,14 @@ impl LogsHelper {
     }
 
     fn zksync_change_pub_key_data(
-        account: H160,
+        account_address: H160,
         new_pub_key_hash: [u8; 20],
         token: H160,
         fee: U256,
     ) -> Bytes {
         let bytes = encode(&[
-            AbiToken::Address(account),
-            AbiToken::Address(H160::from(new_pub_key_hash)),
+            AbiToken::Address(account_address),
+            AbiToken::FixedBytes(new_pub_key_hash.to_vec()),
             AbiToken::Address(token),
             AbiToken::Uint(fee),
         ]);
@@ -536,6 +490,7 @@ impl LogsHelper {
     }
 
     fn zksync_mint_nft_data(
+        token_id: U256,
         creator_id: U256,
         creator_address: H160,
         content_hash: H256,
@@ -544,6 +499,7 @@ impl LogsHelper {
         fee_token: H160,
     ) -> Bytes {
         let bytes = encode(&[
+            AbiToken::Uint(token_id),
             AbiToken::Uint(creator_id),
             AbiToken::Address(creator_address),
             AbiToken::FixedBytes(content_hash.as_bytes().to_vec()),
@@ -558,7 +514,8 @@ impl LogsHelper {
     fn zksync_withdraw_nft_data(
         from: H160,
         to: H160,
-        token: H160,
+        token_id: U256,
+        token_address: H160,
         fee_token: H160,
         fee: U256,
         creator_id: U256,
@@ -569,7 +526,8 @@ impl LogsHelper {
         let bytes = encode(&[
             AbiToken::Address(from),
             AbiToken::Address(to),
-            AbiToken::Address(token),
+            AbiToken::Uint(token_id),
+            AbiToken::Address(token_address),
             AbiToken::Address(fee_token),
             AbiToken::Uint(fee),
             AbiToken::Uint(creator_id),
@@ -583,8 +541,8 @@ impl LogsHelper {
     #[allow(clippy::too_many_arguments)]
     fn zksync_swap_data(
         initiator: H160,
-        account1: H160,
-        account2: H160,
+        account_address1: H160,
+        account_address2: H160,
         recipient1: H160,
         recipient2: H160,
         fee_token: H160,
@@ -596,8 +554,8 @@ impl LogsHelper {
     ) -> Bytes {
         let bytes = encode(&[
             AbiToken::Address(initiator),
-            AbiToken::Address(account1),
-            AbiToken::Address(account2),
+            AbiToken::Address(account_address1),
+            AbiToken::Address(account_address2),
             AbiToken::Address(recipient1),
             AbiToken::Address(recipient2),
             AbiToken::Address(fee_token),
@@ -610,19 +568,19 @@ impl LogsHelper {
         bytes.into()
     }
 
-    fn zksync_deposit_data(to: H160, from: H160, token: H160, amount: U256) -> Bytes {
+    fn zksync_deposit_data(from: H160, to: H160, token: H160, amount: U256) -> Bytes {
         let bytes = encode(&[
-            AbiToken::Address(to),
             AbiToken::Address(from),
+            AbiToken::Address(to),
             AbiToken::Address(token),
             AbiToken::Uint(amount),
         ]);
         bytes.into()
     }
 
-    fn zksync_full_exit_data(account: H160, token: H160, amount: U256) -> Bytes {
+    fn zksync_full_exit_data(account_address: H160, token: H160, amount: U256) -> Bytes {
         let bytes = encode(&[
-            AbiToken::Address(account),
+            AbiToken::Address(account_address),
             AbiToken::Address(token),
             AbiToken::Uint(amount),
         ]);

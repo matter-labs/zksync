@@ -1,11 +1,14 @@
-import { Wallet, RestProvider, getDefaultRestProvider, types } from 'zksync';
+import { Wallet, RestProvider, getDefaultRestProvider, types, utils } from 'zksync';
 import { Tester } from './tester';
+import Web3 from 'web3';
+import { BigNumber, utils as ethersUtils, Contract } from 'ethers';
 import './priority-ops';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
 import './forced-exit';
 import { expect } from 'chai';
+import path from 'path';
 
 import * as api from './api';
 
@@ -200,5 +203,105 @@ describe('ZkSync REST API V0.2 tests', () => {
         await provider.notifyAnyTransaction(submitBatchResponse.transactionHashes[0], 'COMMIT');
         const batchInfo = await provider.getBatch(submitBatchResponse.batchHash);
         expect(batchInfo.batchHash).to.eql(submitBatchResponse.batchHash);
+    });
+});
+
+describe('ZkSync web3 API tests', () => {
+    let tester: Tester;
+    let alice: Wallet;
+    let bob: Wallet;
+    let token: string = 'ETH';
+    let depositAmount: BigNumber;
+    let web3: Web3;
+
+    before('create tester and test wallets', async () => {
+        tester = await Tester.init('localhost', 'HTTP', 'RPC');
+        alice = await tester.fundedWallet('1.0');
+        bob = await tester.emptyWallet();
+        web3 = new Web3('http://localhost:3002');
+        depositAmount = tester.syncProvider.tokenSet.parseToken(token, '1000');
+        await tester.testDeposit(alice, token, depositAmount, true);
+        await tester.testChangePubKey(alice, token, false);
+    });
+
+    it('should check logs', async () => {
+        const restProvider = await getDefaultRestProvider('localhost');
+        const fee = (await restProvider.getTransactionFee('Transfer', bob.address(), 'ETH')).totalFee;
+        const transferAmount = depositAmount.div(10);
+        const handle = await alice.syncTransfer({
+            to: bob.address(),
+            token,
+            amount: transferAmount,
+            fee
+        });
+        const txHash = handle.txHash.replace('sync-tx:', '0x');
+        const receipt = await handle.awaitReceipt();
+        const blockNumber = receipt.block!.blockNumber;
+
+        // Wait until the block is committed confirmed.
+        let blockInfo: types.ApiBlockInfo;
+        do {
+            await utils.sleep(1000);
+            blockInfo = await restProvider.blockByPosition(blockNumber);
+        } while (!blockInfo);
+
+        const web3Receipt = await web3.eth.getTransactionReceipt(txHash);
+        expect(web3Receipt.logs.length, 'Incorrect number of logs').to.eql(3);
+
+        const tokenAddress = alice.provider.tokenSet.resolveTokenAddress(token);
+        const erc20InterfacePath = path.join(process.env['ZKSYNC_HOME'] as string, 'etc', 'web3-abi', 'ERC20.json');
+        const erc20Interface = new ethersUtils.Interface(require(erc20InterfacePath));
+        const erc20Contract = new Contract(tokenAddress, erc20Interface, alice.ethSigner);
+
+        const zksyncProxyAddress = '0x1000000000000000000000000000000000000000';
+        const zksyncProxyInterfacePath = path.join(
+            process.env['ZKSYNC_HOME'] as string,
+            'etc',
+            'web3-abi',
+            'ZkSyncProxy.json'
+        );
+        const zksyncProxyInterface = new ethersUtils.Interface(require(zksyncProxyInterfacePath));
+        const zksyncProxyContract = new Contract(zksyncProxyAddress, zksyncProxyInterface, alice.ethSigner);
+
+        const zksyncTransferSignature = 'ZkSyncTransfer(address,address,address,uint256,uint256)';
+        const zksyncTransferTopic = ethersUtils.keccak256(ethersUtils.toUtf8Bytes(zksyncTransferSignature));
+        const erc20TransferSignature = 'Transfer(address,address,uint256)';
+        const erc20TransferTopic = ethersUtils.keccak256(ethersUtils.toUtf8Bytes(erc20TransferSignature));
+
+        const expectedTopicsAndEvents = [
+            [zksyncTransferTopic, zksyncProxyContract, zksyncTransferSignature],
+            [erc20TransferTopic, erc20Contract, erc20TransferSignature],
+            [erc20TransferTopic, erc20Contract, erc20TransferSignature]
+        ];
+        const expectedData = [
+            {
+                from: alice.address(),
+                to: bob.address(),
+                token: tokenAddress,
+                amount: transferAmount,
+                fee
+            },
+            {
+                from: alice.address(),
+                to: bob.address(),
+                value: transferAmount
+            },
+            {
+                from: alice.address(),
+                to: '0x'.padEnd(42, '0'),
+                value: fee
+            }
+        ];
+        for (let i = 0; i < 3; ++i) {
+            expect(web3Receipt.logs[i].topics.length, 'Incorrect number of topics').to.eql(1);
+            expect(web3Receipt.logs[i].topics[0], 'Incorrect topic').to.eql(expectedTopicsAndEvents[i][0]);
+            const contract = expectedTopicsAndEvents[i][1] as Contract;
+            const eventSignature = expectedTopicsAndEvents[i][2] as string;
+            const log = contract.interface.decodeEventLog(eventSignature, web3Receipt.logs[i].data);
+            for (const key in expectedData[i]) {
+                const expected = (expectedData[i] as any)[key];
+                expect(log[key], 'Incorrect data').to.eql(expected);
+            }
+        }
     });
 });

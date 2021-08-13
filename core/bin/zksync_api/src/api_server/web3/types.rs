@@ -261,7 +261,7 @@ pub enum Event {
     ERCTransfer, // erc20 and erc721 transfers have same topics
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CommonLogData {
     pub block_hash: Option<H256>,
     pub block_number: Option<U64>,

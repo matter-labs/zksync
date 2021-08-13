@@ -58,6 +58,10 @@ async function main() {
         await deployer.deployRegenesisMultisig({ gasPrice, nonce: args.nonce });
     }
 
+    if (args.contract === 'AdditionalZkSync' || args.contract == null) {
+        await deployer.deployAdditionalZkSync({ gasPrice, nonce: args.nonce });
+    }
+
     if (args.contract === 'ZkSync' || args.contract == null) {
         await deployer.deployZkSyncTarget({ gasPrice, nonce: args.nonce });
     }
@@ -74,23 +78,16 @@ async function main() {
         await deployer.deployProxiesAndGatekeeper({ gasPrice, nonce: args.nonce });
     }
 
+    if (args.contract === 'TokenGovernance' || args.contract == null) {
+        await deployer.deployTokenGovernance({ gasPrice, nonce: args.nonce });
+    }
+
     if (args.contract === 'ZkSyncNFTFactory' || args.contract == null) {
         await deployer.deployNFTFactory({ gasPrice, nonce: args.nonce });
     }
 
     if (args.contract === 'ForcedExit' || args.contract == null) {
         await deployer.deployForcedExit({ gasPrice, nonce: args.nonce });
-    }
-
-    // We don't deploy it by default, since
-    // the address of it wouldn't be able to be inserted into the solpp
-    // for ZkSync smart contract
-    if (args.contract === 'AdditionalZkSync') {
-        await deployer.deployAdditionalZkSync({ gasPrice, nonce: args.nonce });
-    }
-
-    if (args.contract === 'TokenGovernance' || args.contract == null) {
-        await deployer.deployTokenGovernance({ gasPrice, nonce: args.nonce });
     }
 }
 

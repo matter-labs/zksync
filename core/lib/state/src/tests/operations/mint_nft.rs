@@ -106,7 +106,10 @@ fn mint_success() {
             // Mint nft
             (
                 creator_account_id,
-                AccountUpdate::MintNFT { token: nft.clone() },
+                AccountUpdate::MintNFT {
+                    token: nft.clone(),
+                    nonce: creator_account.nonce,
+                },
             ),
             // Store part of nft token hash as balance to NFT storage account id
             (
@@ -195,7 +198,10 @@ fn mint_success() {
             // Mint nft
             (
                 creator_account_id,
-                AccountUpdate::MintNFT { token: nft.clone() },
+                AccountUpdate::MintNFT {
+                    token: nft.clone(),
+                    nonce: creator_account.nonce,
+                },
             ),
             // Store part of nft token hash as balance to NFT storage account id
             (
@@ -369,7 +375,10 @@ fn mint_token_to_new_account() {
             // Mint nft
             (
                 creator_account_id,
-                AccountUpdate::MintNFT { token: nft.clone() },
+                AccountUpdate::MintNFT {
+                    token: nft.clone(),
+                    nonce: creator_account.nonce + 1,
+                },
             ),
             // Store part of nft token hash as balance to NFT storage account id
             (

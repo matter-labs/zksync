@@ -56,6 +56,7 @@ impl Default for MockProverConfigs {
                 heartbeat_interval: 1000,
                 cycle_wait: 500,
                 request_timeout: 1,
+                die_after_proof: false,
             },
             core: zksync_config::configs::prover::Core {
                 gone_timeout: 2,
@@ -165,7 +166,7 @@ async fn test_shutdown_request() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(prover_options.prover.cycle_wait()).fuse();
+    let timeout = tokio::time::sleep(prover_options.prover.cycle_wait()).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 
@@ -203,7 +204,7 @@ async fn test_receiving_heartbeats() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(Duration::from_secs(10)).fuse();
+    let timeout = tokio::time::sleep(Duration::from_secs(10)).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 
@@ -240,7 +241,7 @@ async fn test_publishing_proof() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(Duration::from_secs(10)).fuse();
+    let timeout = tokio::time::sleep(Duration::from_secs(10)).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 

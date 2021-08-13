@@ -1055,38 +1055,5 @@ async fn web3_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .await?;
     assert_eq!(all_receipts.len(), 20);
 
-    // Test `web3_receipts_with_types` method
-    let types = vec!["Transfer".to_string(), "Deposit".to_string()];
-    let receipts = storage
-        .chain()
-        .operations_ext_schema()
-        .web3_receipts_with_types(BlockNumber(1), BlockNumber(1), types.clone())
-        .await?;
-    assert_eq!(receipts.len(), 3);
-    for receipt in receipts {
-        let mut tx_type = receipt.operation["type"].as_str().unwrap().to_string();
-        tx_type = tx_type.replace("TransferToNew", "Transfer");
-        assert!(types.contains(&tx_type))
-    }
-    // Test `web3_receipts_with_token_addresses` method
-    let addresses = vec![setup.tokens[0].address, setup.tokens[3].address];
-    // Transactions of these types use these tokens in setup
-    let expected_types = vec![
-        "Swap".to_string(),
-        "Deposit".to_string(),
-        "WithdrawNFT".to_string(),
-    ];
-    let receipts = storage
-        .chain()
-        .operations_ext_schema()
-        .web3_receipts_with_token_addresses(BlockNumber(1), BlockNumber(1), &addresses)
-        .await?;
-    assert_eq!(receipts.len(), 3);
-    for receipt in receipts {
-        let mut tx_type = receipt.operation["type"].as_str().unwrap().to_string();
-        tx_type = tx_type.replace("TransferToNew", "Transfer");
-        assert!(expected_types.contains(&tx_type))
-    }
-
     Ok(())
 }

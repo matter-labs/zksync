@@ -93,7 +93,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
                     );
                 }
             }
-            tokio::time::delay_for(Duration::from_secs(duration_secs)).await
+            tokio::time::sleep(Duration::from_secs(duration_secs)).await
         }
     }
 }

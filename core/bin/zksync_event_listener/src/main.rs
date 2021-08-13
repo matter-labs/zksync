@@ -5,9 +5,7 @@ fn main() {
     let _sentry_guard = vlog::init();
     let config = ZkSyncConfig::from_env();
 
-    let mut sys = actix_web::rt::System::builder()
-        .name("event-listener")
-        .build();
+    let sys = actix_web::rt::System::new();
 
     sys.block_on(run_event_server(config));
 }

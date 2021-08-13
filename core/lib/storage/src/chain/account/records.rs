@@ -47,6 +47,7 @@ pub struct StorageMintNFTUpdate {
     pub update_order_id: i32,
     pub block_number: i64,
     pub symbol: String,
+    pub nonce: i64,
 }
 
 impl From<StorageMintNFTUpdate> for NFT {
@@ -83,7 +84,7 @@ pub struct StorageBalance {
 }
 
 #[derive(Debug, Clone, Copy, sqlx::Type)]
-#[sqlx(rename = "eth_account_type")]
+#[sqlx(type_name = "eth_account_type")]
 pub enum EthAccountType {
     Owned,
     CREATE2,
