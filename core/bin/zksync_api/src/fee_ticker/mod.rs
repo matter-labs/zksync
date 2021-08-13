@@ -485,14 +485,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let wei_price_usd = self.wei_price_usd().await?;
         let token_usd_risk = self.token_usd_risk(&token).await?;
 
-        let mut total_normal_gas_tx_amount = BigUint::zero();
-        let mut total_op_chunks = BigUint::zero();
+        let mut total_normal_gas_tx_amount = Ratio::from(BigUint::zero());
+        let mut total_op_chunks = Ratio::from(BigUint::zero());
 
         for (tx_type, recipient) in txs {
-            let (output_fee_type, mut gas_tx_amount, op_chunks) =
+            let (output_fee_type, gas_tx_amount, op_chunks) =
                 self.gas_tx_amount(tx_type, recipient).await;
             // Increase fee only for L2 operations
-            if matches!(
+            let gas_tx_amount: Ratio<BigUint> = if matches!(
                 output_fee_type,
                 OutputFeeType::Transfer
                     | OutputFeeType::TransferToNew
@@ -500,8 +500,11 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     | OutputFeeType::MintNFT
                     | OutputFeeType::ChangePubKey(_)
             ) {
-                gas_tx_amount *= self.config.scale_fee_coefficient.clone();
-            }
+                self.config.scale_fee_coefficient.clone() * gas_tx_amount
+            } else {
+                gas_tx_amount.into()
+            };
+
             total_normal_gas_tx_amount += gas_tx_amount;
             total_op_chunks += op_chunks;
         }
