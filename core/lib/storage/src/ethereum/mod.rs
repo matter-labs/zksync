@@ -15,7 +15,7 @@ use zksync_types::{
     BlockNumber,
 };
 // Local imports
-use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
+use self::records::{ETHOperationData, ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
 
 pub mod records;
@@ -41,14 +41,20 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         let mut transaction = self.0.start_transaction().await?;
 
-        // TODO: Currently `sqlx` doesn't work well with joins, thus we will perform one additional query
-        // for each loaded operation. This is not crucial, as this operation is done once per node launch,
-        // but not effective and must be fixed as soon as `sqlx` 0.5 is released (ZKS-102).
-        let eth_ops = sqlx::query_as!(
-            StorageETHOperation,
-            "SELECT * FROM eth_operations
-            WHERE confirmed = false
-            ORDER BY id ASC"
+        let eth_ops: Vec<ETHOperationData> = sqlx::query_as!(
+            ETHOperationData,
+            r#"
+                SELECT eth_operations.*,
+                    aggregate_operations.id as "agg_op_id?",
+                    aggregate_operations.arguments as "arguments?"
+                FROM eth_operations
+                LEFT JOIN eth_aggregated_ops_binding
+                    ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id
+                LEFT JOIN aggregate_operations
+                    ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                WHERE eth_operations.confirmed = false
+                ORDER BY eth_operations.id ASC
+            "#,
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -58,18 +64,6 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         // Transform the `StoredOperation` to `Operation` and `StoredETHOperation` to `ETHOperation`.
         for eth_op in eth_ops {
-            let raw_op = sqlx::query_as!(
-                StoredAggregatedOperation,
-                r#"
-                SELECT aggregate_operations.* FROM eth_aggregated_ops_binding
-                LEFT JOIN aggregate_operations ON aggregate_operations.id = op_id
-                WHERE eth_op_id = $1
-                "#,
-                eth_op.id
-            )
-            .fetch_optional(transaction.conn())
-            .await?;
-
             // Load the stored txs hashes ordered by their ID,
             // so the latest added hash will be the last one in the list.
             let eth_tx_hashes: Vec<ETHTxHash> = sqlx::query_as!(
@@ -86,8 +80,13 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                 "No hashes stored for the Ethereum operation"
             );
 
-            // If there is an operation, convert it to the `Operation` type.
-            let op = raw_op.map(|raw| raw.into_aggregated_op());
+            // If there is an operation, convert it to the `AggregatedOperation` type.
+            let op = eth_op.agg_op_id.map(|id| {
+                let op: AggregatedOperation =
+                    serde_json::from_value(eth_op.arguments.clone().unwrap())
+                        .expect("Incorrect serialized aggregated operation in storage");
+                (id, op)
+            });
 
             // Convert the fields into expected format.
             let op_type = AggregatedActionType::from_str(eth_op.op_type.as_ref())
@@ -161,7 +160,12 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let raw_ops = sqlx::query_as!(
             StoredAggregatedOperation,
             r#"
-            SELECT * FROM aggregate_operations
+            SELECT
+                id as "id!", action_type as "action_type!",
+                arguments as "arguments!", from_block as "from_block!",
+                to_block as "to_block!", created_at as "created_at!",
+                confirmed as "confirmed!"
+            FROM aggregate_operations
             WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)
             ORDER BY id ASC
             "#,

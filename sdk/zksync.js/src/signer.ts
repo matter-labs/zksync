@@ -315,9 +315,7 @@ export class Signer {
         return new Signer(await privateKeyFromSeed(seed));
     }
 
-    static async fromETHSignature(
-        ethSigner: ethers.Signer
-    ): Promise<{
+    static async fromETHSignature(ethSigner: ethers.Signer): Promise<{
         signer: Signer;
         ethSignatureType: EthSignerType;
     }> {

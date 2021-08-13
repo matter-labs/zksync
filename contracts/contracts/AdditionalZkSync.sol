@@ -57,19 +57,18 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         require(!performedExodus[_accountId][_tokenId], "t"); // already exited
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect stored block info
 
-        bool proofCorrect =
-            verifier.verifyExitProof(
-                _storedBlockInfo.stateHash,
-                _accountId,
-                _owner,
-                _tokenId,
-                _amount,
-                _nftCreatorAccountId,
-                _nftCreatorAddress,
-                _nftSerialId,
-                _nftContentHash,
-                _proof
-            );
+        bool proofCorrect = verifier.verifyExitProof(
+            _storedBlockInfo.stateHash,
+            _accountId,
+            _owner,
+            _tokenId,
+            _amount,
+            _nftCreatorAccountId,
+            _nftCreatorAddress,
+            _nftSerialId,
+            _nftContentHash,
+            _proof
+        );
         require(proofCorrect, "x");
 
         if (_tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
@@ -78,15 +77,14 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             emit WithdrawalPending(uint16(_tokenId), _amount);
         } else {
             require(_amount != 0, "Z"); // Unsupported nft amount
-            Operations.WithdrawNFT memory withdrawNftOp =
-                Operations.WithdrawNFT(
-                    _nftCreatorAccountId,
-                    _nftCreatorAddress,
-                    _nftSerialId,
-                    _nftContentHash,
-                    _owner,
-                    _tokenId
-                );
+            Operations.WithdrawNFT memory withdrawNftOp = Operations.WithdrawNFT(
+                _nftCreatorAccountId,
+                _nftCreatorAddress,
+                _nftSerialId,
+                _nftContentHash,
+                _owner,
+                _tokenId
+            );
             pendingWithdrawnNFTs[_tokenId] = withdrawNftOp;
             emit WithdrawalNFTPending(_tokenId);
         }
@@ -121,8 +119,9 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     function cutUpgradeNoticePeriod() external {
         requireActive();
 
-        address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS =
-            [$(SECURITY_COUNCIL_MEMBERS)];
+        address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS = [
+            $(SECURITY_COUNCIL_MEMBERS)
+        ];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
             if (SECURITY_COUNCIL_MEMBERS[id] == msg.sender) {
                 require(upgradeStartTimestamp != 0);

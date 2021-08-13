@@ -6,10 +6,10 @@ on:
         description: 'Environment to deploy Zksync to'
         required: true
       image_tag:
-        description: 'Tag of a built image to deploy (optional)'
-        required: false
+        description: 'Tag of a built image to deploy'
+        required: true
       config_ref:
-        description: 'Branch/Tag of the Zksync configs to deploy (optional)'
+        description: 'Branch or tag to fetch configs from (optional)'
         required: false
       deployment_id:
         description: 'Deployment which triggers this pipeline (optional)'
@@ -19,16 +19,16 @@ defaults:
   run:
     shell: bash -leo pipefail {0}
 
-env:
-  DEPLOY_APPS: -l name=server -l name=prover
+# Disable simultaneous deployments into a single environment
+concurrency: deploy-zksync-${{ github.event.inputs.environment }}
 
 jobs:
   setup:
     name: Setup
     runs-on: [k8s, stage]
     outputs:
-      image_tag: ${{ github.event.inputs.image_tag || steps.set.outputs.short_rev }}
-      config_ref: ${{ github.event.inputs.config_ref || steps.regex-match.outputs.group2 }}
+      image_tag: ${{ github.event.inputs.image_tag }}
+      config_ref: ${{ github.event.inputs.config_ref }}
       deployment_id: ${{ github.event.inputs.deployment_id || steps.deployment.outputs.deployment_id }}
       environment: ${{ github.event.inputs.environment }}
       kubeConf: ${{ steps.envMap.outputs.kubeConf }}
@@ -42,7 +42,6 @@ jobs:
       -
         id: set
         run: |
-          echo "::set-output name=short_rev::$(git rev-parse --short HEAD)"
           echo "::set-output name=jobOutcomes::{\"cancelled\":\"failure\",\"failure\":\"failure\",\"success\":\"success\"}"
       -
         name: Map runtime environment data
@@ -65,16 +64,6 @@ jobs:
               "^mainnet$": { "kubeConf": "KUBECONF_MAINNET", "runner": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
             }
       -
-        ## Config tag selector
-        #  group1 - whole tag
-        #  group2 - vX.Y.Z part
-        uses: actions-ecosystem/action-regex-match@v2
-        id: configTag
-        if: github.event.inputs.config_ref == ''
-        with:
-          text: ${{ github.ref }}
-          regex: '^refs\/tags\/((v[0-9]+\.[0-9]+\.[0-9])(-?.*)?)$'
-      -
         ## For manually invoked workflow_dispatch we create a deployment event
         uses: chrnorm/deployment-action@releases/v1
         name: Create GitHub deployment
@@ -84,49 +73,44 @@ jobs:
           token: ${{ github.token }}
           environment: ${{ github.event.inputs.environment }}
 
-  deploy:
-    name: Deploy
+  update:
+    name: Update Config
     needs: [setup]
     runs-on: [k8s, deployer, "${{ needs.setup.outputs.runner }}"]
-    container:
-      image: dysnix/kubectl:v1.19-gcloud
+    steps:
+      - name: Update Config
+        uses: aurelien-baudet/workflow-dispatch@v2
+        if: needs.setup.outputs.config_ref != ''
+        with:
+          workflow: Update Config
+          token: ${{ secrets.GH_TOKEN }}
+          wait-for-completion-timeout: 5m
+          wait-for-completion-interval: 20s
+          inputs: |
+            {
+              "environment": "${{ needs.setup.outputs.environment }}",
+              "ref": "${{ needs.setup.outputs.config_ref }}"
+            }
 
-    # Disable simultaneous deployments into a single environment
-    concurrency: ${{ needs.setup.outputs.environment }}
+  deploy:
+    name: Deploy
+    needs: [setup, update]
+    runs-on: [k8s, deployer, "${{ needs.setup.outputs.runner }}"]
+    container:
+      image: dysnix/kubectl:v1.20-gcloud
 
     env:
-      ENVFILE: ./compiled_envs/${{ needs.setup.outputs.environment }}.env
+      DEPLOY_APPS: -l name=server -l name=prover
+      KUBECONF: ${{ secrets[needs.setup.outputs.kubeConf] }}
       # Helmfile environment name
       HFENV: ${{ needs.setup.outputs.hfEnv }}
       IMAGE_TAG: ${{ needs.setup.outputs.image_tag }}
       OUTCOMES: ${{ needs.setup.outputs.jobOutcomes }}
 
     steps:
-      - name: Create ~/.kube/config
+      -
+        name: Create ~/.kube/config
         run: mkdir -p ~/.kube && echo "$KUBECONF" | base64 -d > ~/.kube/config
-      ## ----- Update Configs -----
-      ## --------------------------
-      #  Enabled only if the config_ref can be determined!
-      -
-        if: needs.setup.outputs.config_ref != ''
-        name: Clone configs
-        uses: actions/checkout@v2
-        with:
-          repository: matter-labs/configs
-          path: configs
-          ref: ${{ needs.setup.outputs.config_ref }}
-          token: ${{ secrets.GH_TOKEN }}
-      -
-        if: needs.setup.outputs.config_ref != ''
-        name: Update Server Config
-        working-directory: configs
-        run: |
-          sudo apk --no-cache add yarn
-          ./bin/config
-          ./bin/config compile ${{ needs.setup.outputs.environment }}
-          kubectl delete configmap -n ${{ needs.setup.outputs.namespace }} server-env-custom || /bin/true
-          kubectl create configmap -n ${{ needs.setup.outputs.namespace }} server-env-custom --from-env-file=${{ env.ENVFILE }}
-      ## --------------------------
       -
         name: Clone helm-infra
         uses: actions/checkout@v2

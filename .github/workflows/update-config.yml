@@ -13,39 +13,29 @@ defaults:
   run:
     shell: bash -leo pipefail {0}
 
+# Disable simultaneous deployments into a single environment
+concurrency: update-config-${{ github.event.inputs.environment }}
+
 jobs:
   pre:
     runs-on: [k8s, stage]
     steps:
       - uses: actions/checkout@v2
       -
-        id: config
-        run: |
-          environment=${{ github.event.inputs.environment }}
-          ref=${{ github.event.inputs.ref }}
-          echo "::set-output name=environment::${environment}"
-          echo "::set-output name=ref::${ref}"
-      -
-        uses: actions-ecosystem/action-regex-match@v2
-        id: regex-match
-        with:
-          text: ${{ steps.config.outputs.ref }}
-          regex: '^((v[0-9]+\.[0-9]+\.[0-9])(-?.*)?)$'
-      -
         name: Map runtime environment data
         id: envMap
         uses: kanga333/variable-mapper@v0.2.2
         with:
-          key: ${{ steps.config.outputs.environment }}
+          key: ${{ github.event.inputs.environment }}
           export_to: output
           mode: overwrite
           map: |
             {
               ".*": {
-                "hfEnv": "${{ steps.config.outputs.environment }}",
+                "hfEnv": "${{ github.event.inputs.environment }}",
                 "kubeConf": "KUBECONF_STAGE",
                 "runner": "stage",
-                "namespace": "${{ steps.config.outputs.environment }}"
+                "namespace": "${{ github.event.inputs.environment }}"
               },
               "^rinkeby$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
               "^ropsten$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
@@ -53,21 +43,19 @@ jobs:
             }
 
     outputs:
-      environment: ${{ steps.config.outputs.environment }}
+      environment: ${{ github.event.inputs.environment }}
       kubeConf: ${{ steps.envMap.outputs.kubeConf }}
       hfEnv: ${{ steps.envMap.outputs.hfEnv }}
       namespace: ${{ steps.envMap.outputs.namespace }}
       runner: ${{ steps.envMap.outputs.runner }}
-      configTag: ${{ steps.config.outputs.ref }}
-      isTag: ${{ steps.regex-match.outputs.group1 != '' }}
+      configRef: ${{ github.event.inputs.ref }}
 
   updateConfig:
-    if: ${{ needs.pre.outputs.isTag == 'true' }}
-    name: update config
+    name: Update Config
     needs: [pre]
     runs-on: [k8s, deployer, "${{ needs.pre.outputs.runner }}"]
     container:
-      image: dysnix/kubectl:v1.19-gcloud
+      image: dysnix/kubectl:v1.20-gcloud
     env:
       KUBECONF: ${{ secrets[needs.pre.outputs.kubeConf] }}
       ENVFILE: ./compiled_envs/${{ needs.pre.outputs.environment }}.env
@@ -81,7 +69,7 @@ jobs:
         with:
           repository: matter-labs/configs
           path: configs
-          ref: ${{ needs.pre.outputs.configTag }}
+          ref: ${{ needs.pre.outputs.configRef }}
           token: ${{ secrets.GH_TOKEN }}
       -
         name: Update Server Config

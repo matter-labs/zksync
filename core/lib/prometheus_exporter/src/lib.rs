@@ -3,7 +3,7 @@
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::time::Duration;
 use tokio::task::JoinHandle;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use zksync_storage::ConnectionPool;
 use zksync_types::aggregated_operations::AggregatedActionType::*;
 
@@ -64,7 +64,7 @@ pub fn run_prometheus_exporter(
                     .await
                     .expect("unable to commit db transaction");
 
-                delay_for(QUERY_INTERVAL).await;
+                sleep(QUERY_INTERVAL).await;
             }
         }))
     } else {

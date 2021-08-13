@@ -341,8 +341,6 @@ pub mod operations_test {
 
     #[test]
     fn test_eth_witness() {
-        // TODO: Change pre-defined input / output after merging breaking to dev (ZKS-131).
-
         let mut change_pubkey =
             ChangePubKeyOp::from_public_data(&hex::decode(CHANGE_PUBKEY_PUBLIC_DATA).unwrap())
                 .unwrap();

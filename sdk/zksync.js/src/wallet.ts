@@ -225,9 +225,7 @@ export class Wallet {
         };
     }
 
-    async signRegisterFactory(
-        factoryAddress: Address
-    ): Promise<{
+    async signRegisterFactory(factoryAddress: Address): Promise<{
         signature: TxEthSignature;
         accountId: number;
         accountAddress: Address;
@@ -991,7 +989,7 @@ export class Wallet {
             if (changePubKey.ethAuthType === 'ECDSALegacyMessage') {
                 const feeType = {
                     ChangePubKey: {
-                        onchainPubkeyAuth: true
+                        onchainPubkeyAuth: false
                     }
                 };
                 const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);

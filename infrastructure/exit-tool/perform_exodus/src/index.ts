@@ -134,8 +134,23 @@ const abi = [
         outputs: [],
         stateMutability: 'nonpayable',
         type: 'function'
+    },
+    {
+        inputs: [
+            {
+                internalType: 'uint32',
+                name: '_tokenId',
+                type: 'uint32'
+            }
+        ],
+        name: 'withdrawPendingNFTBalance',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function'
     }
 ];
+
+const MIN_NFT_TOKEN_ID = 65536;
 
 async function main() {
     const { privateKey, target, path, network } = program;
@@ -186,9 +201,16 @@ async function main() {
     console.log('performExodus confirmed');
 
     console.log('Sending withdrawPendingBalance transaction');
-    const withdrawTx = await zkSyncContract.withdrawPendingBalance(owner, tokenAddress, amount, {
-        gasLimit: 500_000
-    });
+    let withdrawTx: ethers.ContractTransaction;
+    if (tokenId < MIN_NFT_TOKEN_ID) {
+        withdrawTx = await zkSyncContract.withdrawPendingBalance(owner, tokenAddress, amount, {
+            gasLimit: 500_000
+        });
+    } else {
+        withdrawTx = await zkSyncContract.withdrawPendingNFTBalance(tokenId, {
+            gasLimit: 500_000
+        });
+    }
     console.log('withdrawPendingBalance sent, waiting for confirmation...');
     await withdrawTx.wait();
     console.log('withdrawPendingBalance confirmed');

@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use std::convert::From;
 
 // External uses
-use actix_web::{web::Data, Error as ActixError, HttpRequest, HttpResponse, Responder};
+use actix_web::{web::Data, HttpRequest, HttpResponse, Responder};
 use chrono::Utc;
-use futures::future::{ready, Ready};
 use qstring::QString;
 use serde::{Deserialize, Serialize};
 
@@ -25,10 +24,7 @@ pub enum ApiResult<R: Serialize> {
 }
 
 impl<R: Serialize> Responder for ApiResult<R> {
-    type Error = ActixError;
-    type Future = Ready<Result<HttpResponse, ActixError>>;
-
-    fn respond_to(self, req: &HttpRequest) -> Self::Future {
+    fn respond_to(self, req: &HttpRequest) -> HttpResponse {
         let data = req
             .app_data::<Data<SharedData>>()
             .expect("Wrong app data type");
@@ -66,9 +62,9 @@ impl<R: Serialize> Responder for ApiResult<R> {
 
         let body = serde_json::to_string(&response).expect("Should be correct serializable");
 
-        ready(Ok(HttpResponse::Ok()
+        HttpResponse::Ok()
             .content_type("application/json")
-            .body(body)))
+            .body(body)
     }
 }
 
