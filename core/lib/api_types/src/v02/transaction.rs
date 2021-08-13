@@ -4,8 +4,8 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 use zksync_types::{
     tx::{
-        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer, TxHash,
-        Withdraw, WithdrawNFT,
+        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
+        TxEthSignature, TxHash, Withdraw, WithdrawNFT,
     },
     AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
     H256,
@@ -245,4 +245,23 @@ pub struct ApiTxBatch {
 pub struct BatchStatus {
     pub updated_at: DateTime<Utc>,
     pub last_state: TxInBlockStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Remove2FA {
+    pub account_id: AccountId,
+    pub signature: TxEthSignature,
+}
+
+impl Remove2FA {
+    // Even though the function returns constant value, it is made for consistency
+    // with Order and transactions
+    pub fn get_ethereum_sign_message() -> String {
+        "By signing this message you agree to not receive 2FA protection by zkSync server.\n MAKE SURE YOU TRUST YOUR CLIENT!".to_string()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Remove2FAResponse {
+    pub success: bool,
 }

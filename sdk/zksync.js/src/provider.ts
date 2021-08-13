@@ -14,7 +14,8 @@ import {
     TransactionReceipt,
     TxEthSignature,
     TxEthSignatureVariant,
-    NFTInfo
+    NFTInfo,
+    Remove2FARequest
 } from './types';
 import { isTokenETH, sleep, TokenSet } from './utils';
 import {
@@ -27,6 +28,7 @@ import {
 } from './typechain';
 
 import { SyncProvider } from './provider-interface';
+import { types } from '.';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
     if (transport === 'WS') {
@@ -265,6 +267,10 @@ export class Provider extends SyncProvider {
     async getTokenPrice(tokenLike: TokenLike): Promise<number> {
         const tokenPrice = await this.transport.request('get_token_price', [tokenLike]);
         return parseFloat(tokenPrice);
+    }
+
+    async remove2FA(data: Remove2FARequest): Promise<boolean> {
+        throw new Error('JSON-RPC does not support remove2FA');
     }
 
     async disconnect() {

@@ -20,8 +20,7 @@ use thiserror::Error;
 
 // Workspace uses
 use zksync_api_types::{
-    v02::account::Remove2FA,
-    v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper},
+    v02::transaction::{Remove2FA, SubmitBatchResponse, TxHashSerializeWrapper},
     TxWithSignature,
 };
 use zksync_config::ZkSyncConfig;

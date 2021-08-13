@@ -623,3 +623,12 @@ export interface ApiBatchData {
     createdAt: string;
     batchStatus: ApiBatchStatus;
 }
+
+export interface Remove2FARequest {
+    accountId: number;
+    signature: TxEthSignature;
+}
+
+export interface Remove2FAResponse {
+    success: boolean;
+}

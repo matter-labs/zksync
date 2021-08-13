@@ -446,6 +446,13 @@ export function getChangePubkeyLegacyMessage(pubKeyHash: PubKeyHash, nonce: numb
     return utils.toUtf8Bytes(message);
 }
 
+export function getRemove2FAMessage(): Uint8Array {
+    const message =
+        'By signing this message you agree to not receive 2FA protection by zkSync server.\n MAKE SURE YOU TRUST YOUR CLIENT!';
+
+    return utils.toUtf8Bytes(message);
+}
+
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {
     let messageBytes = typeof message === 'string' ? utils.toUtf8Bytes(message) : utils.arrayify(message);
     if (addPrefix) {

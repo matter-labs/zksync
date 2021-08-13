@@ -11,10 +11,11 @@ use actix_web::{
 // Workspace uses
 use zksync_api_types::{
     v02::{
-        account::Remove2FA,
+        transaction::Remove2FA,
         transaction::{
-            ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
-            Transaction, TransactionData, TxData, TxHashSerializeWrapper, TxInBlockStatus,
+            ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, Remove2FAResponse,
+            SubmitBatchResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
+            TxInBlockStatus,
         },
     },
     PriorityOpLookupQuery, TxWithSignature,
@@ -175,14 +176,17 @@ async fn submit_batch(
 async fn remove_fa(
     data: web::Data<ApiTransactionData>,
     Json(remove_2fa): Json<Remove2FA>,
-) -> ApiResult<()> {
-    let response = data
+) -> ApiResult<Remove2FAResponse> {
+    let result = data
         .tx_sender
         .remove_2fa(remove_2fa)
         .await
         .map_err(Error::from);
 
-    response.into()
+    match result {
+        Err(err) => ApiResult::Error(err),
+        Ok(_) => ApiResult::Ok(Remove2FAResponse { success: true }),
+    }
 }
 
 async fn get_batch(

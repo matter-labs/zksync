@@ -1,5 +1,6 @@
 import Axios from 'axios';
 import { BigNumber } from 'ethers';
+import { TransactionTypes } from 'ethers/lib/utils';
 import { SyncProvider } from './provider-interface';
 import * as types from './types';
 import { sleep, TokenSet } from './utils';
@@ -106,6 +107,15 @@ export class RestProvider extends SyncProvider {
         infoType: 'committed' | 'finalized'
     ): Promise<types.ApiAccountInfo> {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
+    }
+
+    async remove2FADetailed(data: types.Remove2FARequest): Promise<Response<types.Remove2FAResponse>> {
+        return await this.post(`${this.address}/transactions/remove2FA`, data);
+    }
+
+    async remove2FA(data: types.Remove2FARequest): Promise<boolean> {
+        const response = this.parseResponse(await this.remove2FADetailed(data));
+        return response.success;
     }
 
     async accountFullInfoDetailed(idOrAddress: number | types.Address): Promise<Response<types.ApiAccountFullInfo>> {
