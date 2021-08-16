@@ -4,7 +4,7 @@ use std::time::Instant;
 use num::{BigUint, Zero};
 use sqlx::{types::BigDecimal, Acquire};
 // Workspace imports
-use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID};
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
 use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
 // Local imports
 use self::records::*;
@@ -443,6 +443,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 return Ok(0);
             }
         };
+        if account_id == NFT_STORAGE_ACCOUNT_ID {
+            // It is special account ID, just return 0 for it.
+            return Ok(0);
+        }
 
         let balance = sqlx::query!(
             r#"
@@ -464,34 +468,22 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         Ok(balance)
     }
 
-    pub async fn get_nft_owner(&mut self, token_id: TokenId) -> QueryResult<Address> {
+    pub async fn get_nft_owner(&mut self, token_id: TokenId) -> QueryResult<Option<AccountId>> {
         let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
 
         let record = sqlx::query!(
             r#"
                 SELECT account_id FROM balances
-                WHERE coin_id = $1 AND balance = 1
+                WHERE coin_id = $1 AND balance = 1 AND account_id != $2
             "#,
             token_id.0 as i32,
+            i64::from(NFT_STORAGE_ACCOUNT_ID.0)
         )
-        .fetch_optional(transaction.conn())
+        .fetch_optional(self.0.conn())
         .await?;
-        let result = if let Some(record) = record {
-            let owner_id = AccountId(record.account_id as u32);
-            let owner_address = transaction
-                .chain()
-                .account_schema()
-                .account_address_by_id(owner_id)
-                .await?;
-            owner_address.unwrap_or_default()
-        } else {
-            Address::default()
-        };
+        let owner_id = record.map(|record| AccountId(record.account_id as u32));
 
-        transaction.commit().await?;
         metrics::histogram!("sql.chain.account.get_nft_owner", start.elapsed());
-
-        Ok(result)
+        Ok(owner_id)
     }
 }

@@ -419,28 +419,30 @@ async fn test_get_account_nft_balance(mut storage: StorageProcessor<'_>) -> Quer
 
 #[db_test]
 async fn test_get_nft_owner(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let account_id1 = AccountId(1);
+    let account_id2 = AccountId(2);
     let address1 = Address::random();
     let address2 = Address::random();
     let nft_id = TokenId(MIN_NFT_TOKEN_ID + 100);
 
-    // Checks that owner of nonexistent nft is zero address.
+    // Checks that there is no owner for nonexistent nft.
     let owner = storage
         .chain()
         .account_schema()
         .get_nft_owner(nft_id)
         .await?;
-    assert_eq!(owner, Address::zero());
+    assert!(owner.is_none());
 
     let updates1 = vec![
         (
-            AccountId(1),
+            account_id1,
             AccountUpdate::Create {
                 address: address1,
                 nonce: Nonce(0),
             },
         ),
         (
-            AccountId(1),
+            account_id1,
             AccountUpdate::UpdateBalance {
                 old_nonce: Nonce(0),
                 new_nonce: Nonce(1),
@@ -475,18 +477,18 @@ async fn test_get_nft_owner(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .account_schema()
         .get_nft_owner(nft_id)
         .await?;
-    assert_eq!(owner, address1);
+    assert_eq!(owner.unwrap(), account_id1);
 
     let updates2 = vec![
         (
-            AccountId(2),
+            account_id2,
             AccountUpdate::Create {
                 address: address2,
                 nonce: Nonce(0),
             },
         ),
         (
-            AccountId(1),
+            account_id1,
             AccountUpdate::UpdateBalance {
                 old_nonce: Nonce(1),
                 new_nonce: Nonce(2),
@@ -494,7 +496,7 @@ async fn test_get_nft_owner(mut storage: StorageProcessor<'_>) -> QueryResult<()
             },
         ),
         (
-            AccountId(2),
+            account_id2,
             AccountUpdate::UpdateBalance {
                 old_nonce: Nonce(0),
                 new_nonce: Nonce(1),
@@ -519,7 +521,7 @@ async fn test_get_nft_owner(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .account_schema()
         .get_nft_owner(nft_id)
         .await?;
-    assert_eq!(owner, address2);
+    assert_eq!(owner.unwrap(), account_id2);
 
     Ok(())
 }

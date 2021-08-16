@@ -89,12 +89,16 @@ impl CallsHelper {
         to: H160,
         data: Vec<u8>,
     ) -> Result<Vec<u8>> {
+        let mut transaction = storage
+            .start_transaction()
+            .await
+            .map_err(|_| Error::internal_error())?;
         let all_functions = if to == self.nft_factory_address {
             &self.nft_factory
         } else {
             let token = self
                 .tokens
-                .get_token(storage, to)
+                .get_token(&mut transaction, to)
                 .await
                 .map_err(|_| Error::internal_error())?;
             if let Some(token) = token {
@@ -130,7 +134,7 @@ impl CallsHelper {
                         .clone()
                         .into_uint()
                         .ok_or_else(Error::internal_error)?;
-                    if let Some(nft) = self.get_nft(storage, token_id).await? {
+                    if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         encode(&[AbiToken::Uint(U256::from(nft.creator_id.0))])
                     } else {
                         return Ok(Vec::new());
@@ -141,7 +145,7 @@ impl CallsHelper {
                         .clone()
                         .into_uint()
                         .ok_or_else(Error::internal_error)?;
-                    if let Some(nft) = self.get_nft(storage, token_id).await? {
+                    if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         encode(&[AbiToken::Address(nft.creator_address)])
                     } else {
                         return Ok(Vec::new());
@@ -152,7 +156,7 @@ impl CallsHelper {
                         .clone()
                         .into_uint()
                         .ok_or_else(Error::internal_error)?;
-                    if let Some(nft) = self.get_nft(storage, token_id).await? {
+                    if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         encode(&[AbiToken::Uint(U256::from(nft.serial_id))])
                     } else {
                         return Ok(Vec::new());
@@ -163,7 +167,7 @@ impl CallsHelper {
                         .clone()
                         .into_uint()
                         .ok_or_else(Error::internal_error)?;
-                    if let Some(nft) = self.get_nft(storage, token_id).await? {
+                    if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         encode(&[AbiToken::FixedBytes(nft.content_hash.as_bytes().to_vec())])
                     } else {
                         return Ok(Vec::new());
@@ -174,7 +178,7 @@ impl CallsHelper {
                         .clone()
                         .into_uint()
                         .ok_or_else(Error::internal_error)?;
-                    if let Some(nft) = self.get_nft(storage, token_id).await? {
+                    if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         let ipfs_cid = Self::ipfs_cid(nft.content_hash.as_bytes());
                         encode(&[AbiToken::String(format!("ipfs://{}", ipfs_cid))])
                     } else {
@@ -186,7 +190,7 @@ impl CallsHelper {
                         .clone()
                         .into_address()
                         .ok_or_else(Error::internal_error)?;
-                    let balance = storage
+                    let balance = transaction
                         .chain()
                         .account_schema()
                         .get_account_nft_balance(address)
@@ -199,14 +203,25 @@ impl CallsHelper {
                         .clone()
                         .into_uint()
                         .ok_or_else(Error::internal_error)?;
-                    if let Some(nft) = self.get_nft(storage, token_id).await? {
-                        let owner = storage
+                    if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
+                        let owner_id = transaction
                             .chain()
                             .account_schema()
                             .get_nft_owner(nft.id)
                             .await
                             .map_err(|_| Error::internal_error())?;
-                        encode(&[AbiToken::Address(owner)])
+                        let owner_address = if let Some(owner_id) = owner_id {
+                            let owner_address = transaction
+                                .chain()
+                                .account_schema()
+                                .account_address_by_id(owner_id)
+                                .await
+                                .map_err(|_| Error::internal_error())?;
+                            owner_address.unwrap_or_default()
+                        } else {
+                            H160::zero()
+                        };
+                        encode(&[AbiToken::Address(owner_address)])
                     } else {
                         return Ok(Vec::new());
                     }
@@ -216,7 +231,7 @@ impl CallsHelper {
                         .clone()
                         .into_uint()
                         .ok_or_else(Error::internal_error)?;
-                    if self.get_nft(storage, token_id).await?.is_some() {
+                    if self.get_nft(&mut transaction, token_id).await?.is_some() {
                         encode(&[AbiToken::Address(self.zksync_proxy_address)])
                     } else {
                         return Ok(Vec::new());
@@ -227,7 +242,7 @@ impl CallsHelper {
         } else {
             let token = self
                 .tokens
-                .get_token(storage, to)
+                .get_token(&mut transaction, to)
                 .await
                 .map_err(|_| Error::internal_error())?
                 .ok_or_else(Error::internal_error)?;
@@ -236,7 +251,7 @@ impl CallsHelper {
                 "decimals" => encode(&[AbiToken::Uint(U256::from(token.decimals))]),
                 "totalSupply" | "allowance" => encode(&[AbiToken::Uint(U256::max_value())]),
                 "balanceOf" => {
-                    let block = storage
+                    let block = transaction
                         .chain()
                         .block_schema()
                         .get_last_verified_confirmed_block()
@@ -246,7 +261,7 @@ impl CallsHelper {
                         .clone()
                         .into_address()
                         .ok_or_else(Error::internal_error)?;
-                    let balance = storage
+                    let balance = transaction
                         .chain()
                         .account_schema()
                         .get_account_balance_for_block(address, block, token.id)
@@ -257,6 +272,10 @@ impl CallsHelper {
                 _ => unreachable!(),
             }
         };
+        transaction
+            .commit()
+            .await
+            .map_err(|_| Error::internal_error())?;
         Ok(result)
     }
 

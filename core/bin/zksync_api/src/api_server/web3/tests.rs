@@ -1420,11 +1420,18 @@ async fn erc721_calls() -> anyhow::Result<()> {
     .unwrap();
     let expected_owner = {
         let mut storage = pool.access_storage().await?;
-        storage
+        let owner_id = storage
             .chain()
             .account_schema()
             .get_nft_owner(nft.id)
             .await?
+            .unwrap();
+        storage
+            .chain()
+            .account_schema()
+            .account_address_by_id(owner_id)
+            .await?
+            .unwrap()
     };
     assert_eq!(outputs[0].clone().into_address().unwrap(), expected_owner);
 
