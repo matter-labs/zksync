@@ -26,5 +26,5 @@ zk run verify-keys gen
 zk run verify-keys pack
 ```
 
-After that, generated packed key will be placed into `keys/packed` directory. You may either copy this file to your
+After that, generated packed key will be placed into the `keys/packed` directory. You may either copy this file to your
 local machine, or commit it directly to the repo.
