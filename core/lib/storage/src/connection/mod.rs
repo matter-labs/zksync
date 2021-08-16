@@ -1,10 +1,11 @@
 // Built-in deps
-use std::{fmt, time::Instant};
+use std::{fmt, time::Duration, time::Instant};
 // External imports
 use async_trait::async_trait;
 use deadpool::managed::{Manager, PoolConfig, RecycleResult, Timeouts};
 use deadpool::Runtime;
 use sqlx::{Connection, Error as SqlxError, PgConnection};
+use tokio::time;
 // Local imports
 // use self::recoverable_connection::RecoverableConnection;
 use crate::{get_database_url, StorageProcessor};
@@ -15,6 +16,8 @@ pub mod holder;
 type Pool = deadpool::managed::Pool<DbPool>;
 
 pub type PooledConnection = deadpool::managed::Object<DbPool>;
+
+pub const DB_CONNECTION_RETRIES: u32 = 3;
 
 #[derive(Clone)]
 pub struct DbPool {
@@ -83,9 +86,31 @@ impl ConnectionPool {
     /// database access is must-have (e.g. block committer).
     pub async fn access_storage(&self) -> Result<StorageProcessor<'_>, SqlxError> {
         let start = Instant::now();
-        let connection = self.pool.get().await.unwrap();
+        let connection = self.get_pooled_connection().await;
         metrics::histogram!("sql.connection_acquire", start.elapsed());
 
         Ok(StorageProcessor::from_pool(connection))
+    }
+
+    async fn get_pooled_connection(&self) -> PooledConnection {
+        let mut retry_count = 0;
+
+        let mut one_second = time::interval(Duration::from_secs(1));
+
+        while retry_count < DB_CONNECTION_RETRIES {
+            let connection = self.pool.get().await;
+
+            match connection {
+                Ok(connection) => return connection,
+                Err(_) => retry_count += 1,
+            }
+
+            // Backing off for one second if facing an error
+            vlog::warn!("Failed to get connection to db. Backing off for 1 second");
+            one_second.tick().await;
+        }
+
+        // Attempting to get the pooled connection for the last time
+        self.pool.get().await.unwrap()
     }
 }
