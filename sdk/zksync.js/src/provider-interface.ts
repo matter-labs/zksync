@@ -47,6 +47,7 @@ export abstract class SyncProvider {
     abstract getTokenPrice(tokenLike: TokenLike): Promise<number>;
     abstract getEthTxForWithdrawal(withdrawalHash: string): Promise<string>;
     abstract getNFT(id: number): Promise<NFTInfo>;
+    abstract getNFTOwner(id: number): Promise<number>;
 
     async updateTokenSet(): Promise<void> {
         const updatedTokenSet = new TokenSet(await this.getTokens());
