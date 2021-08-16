@@ -302,11 +302,15 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             if let Ok(tokens) = self.get_all_tokens().await {
                 for token in &tokens {
                     if let Err(e) = self.update_price(token).await {
-                        vlog::error!("Update price error {}", e);
+                        vlog::error!(
+                            "Can't update price for token {}. Error: {}",
+                            token.symbol,
+                            e
+                        );
                     };
                 }
             } else {
-                vlog::warn!("Error in database wait for the next step")
+                vlog::warn!("Can't get info from the database; waiting for the next iteration");
             };
             tokio::time::sleep(Duration::from_secs(UPDATE_PRICE_INTERVAL_SECS)).await;
         }
