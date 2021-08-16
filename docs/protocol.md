@@ -1872,7 +1872,7 @@ function performExodus(
 ```
 
 - `_storedBlockInfo`: Stored block data of the last verified block
-- `_owner`: owner address in L1 chain
+- `_owner`: owner address in L2 chain
 - `_accountId`: `AccountId` of the owner account
 - `_tokenId`: Verified token id
 - `_amount`: `StateAmount` Full amount of the given token that belong to `AccountId` in the last verified block
