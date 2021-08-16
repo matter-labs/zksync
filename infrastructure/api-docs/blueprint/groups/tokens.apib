@@ -50,17 +50,32 @@ Get token price relative to another token
         + result (Token.Price, required{{isResultNullable}})
         + error (Error, required, nullable)
 
-## api/v0.2/tokens/nft/id [/tokens/nft/{id}]
+## api/v0.2/tokens/nft/:id [/tokens/nft/{id}]
 
 + Parameters
-    + id (required, number, `{{nftId}}`) ... ID of the nft in the zkSync network
+    + id (required, number, `{{nftId}}`) ... ID of the NFT in the zkSync network
 
-### Get nft info [GET]
-Get nft into
+### Get NFT info [GET]
+Get NFT info
 
 + Response 200 (application/json)
     + Attributes
         + request (Request, required)
         + status: success (string, required)
         + result (Token.NFTInfo, required{{isResultNullable}})
+        + error (Error, required, nullable)
+
+## api/v0.2/tokens/nft/:id/owner [/tokens/nft/{id}/owner]
+
++ Parameters
+    + id (required, number, `{{nftId}}`) ... ID of the NFT in the zkSync network
+
+### Get NFT owner ID [GET]
+Get NFT owner ID
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (number, required{{isResultNullable}})
         + error (Error, required, nullable)
