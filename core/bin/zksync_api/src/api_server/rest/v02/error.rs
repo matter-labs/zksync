@@ -12,7 +12,7 @@ use zksync_api_types::v02::pagination::{UnknownFromParameter, MAX_LIMIT};
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
 
-#[derive(Serialize_repr, Debug, Deserialize)]
+#[derive(Serialize_repr, Debug, Deserialize, Clone)]
 #[repr(u16)]
 pub enum ErrorCode {
     UnreacheableError = 0,
@@ -41,7 +41,7 @@ pub enum ErrorCode {
 }
 
 /// Error object in a response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Error {
     pub error_type: String,

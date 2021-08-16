@@ -24,13 +24,66 @@ pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
     /// Stores account type in the databse
-    /// There are 2 types: Owned and CREATE2
     pub async fn set_account_type(
         &mut self,
         account_id: AccountId,
         account_type: EthAccountType,
     ) -> QueryResult<()> {
         let start = Instant::now();
+
+        let mut transaction = self.0.start_transaction().await?;
+
+        let current_type = AccountSchema(&mut transaction)
+            .account_type_by_id(account_id)
+            .await?;
+
+        // Making sure that No2FA can not be changed to Owned
+        let new_type = match (current_type, account_type) {
+            (Some(EthAccountType::No2FA), EthAccountType::Owned) => EthAccountType::No2FA,
+            _ => account_type,
+        };
+
+        sqlx::query!(
+            r#"
+            INSERT INTO eth_account_types VALUES ( $1, $2 )
+            ON CONFLICT (account_id) DO UPDATE SET account_type = $2
+            "#,
+            i64::from(*account_id),
+            new_type as EthAccountType
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        transaction.commit().await?;
+
+        metrics::histogram!("sql.chain.state.set_account_type", start.elapsed());
+        Ok(())
+    }
+
+    /// Changes 2FA mode for the account if possible
+    pub async fn update_account_2fa(
+        &mut self,
+        account_id: AccountId,
+        requires_2fa: bool,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let current_type = AccountSchema(&mut transaction)
+            .account_type_by_id(account_id)
+            .await?;
+
+        if let Some(EthAccountType::CREATE2) = current_type {
+            return Err(anyhow::Error::msg(
+                "Can not change 2FA for a CREATE2 account.",
+            ));
+        }
+
+        let account_type = if requires_2fa {
+            EthAccountType::Owned
+        } else {
+            EthAccountType::No2FA
+        };
 
         sqlx::query!(
             r#"
@@ -40,10 +93,12 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             i64::from(*account_id),
             account_type as EthAccountType
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
-        metrics::histogram!("sql.chain.state.set_account_type", start.elapsed());
+        transaction.commit().await?;
+
+        metrics::histogram!("sql.chain.state.update_account_2fa", start.elapsed());
         Ok(())
     }
 

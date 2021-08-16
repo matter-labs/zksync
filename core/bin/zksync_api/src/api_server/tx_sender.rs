@@ -219,7 +219,7 @@ impl TxSender {
             .map_err(|_| SubmitError::Remove2FA(TxAddError::DbError))?
             .chain()
             .account_schema()
-            .set_account_type(account_id, EthAccountType::No2FA)
+            .update_account_2fa(account_id, false)
             .await
             .map_err(|_| SubmitError::Remove2FA(TxAddError::DbError))
     }
@@ -272,6 +272,11 @@ impl TxSender {
                 Ok(())
             };
         }
+        if matches!(signer_type, EthAccountType::No2FA) {
+            // We don't verify signatures for accounts with no 2FA
+            return Ok(());
+        }
+
         let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
         let signer = self
             .get_address_by_id(order.account_id)
@@ -947,14 +952,9 @@ async fn verify_txs_batch_signature(
                         .map(|signature| EthSignData { signature, message })
                 }
                 EthAccountType::No2FA => {
-                    // TOOD
-                    if batch_sign_data.is_none() && !tx.signature.exists() {
-                        return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
-                    }
-                    tx.signature
-                        .tx_signature()
-                        .clone()
-                        .map(|signature| EthSignData { signature, message })
+                    // Even if the user supplies some eth signature we won't
+                    // check it
+                    None
                 }
             }
         } else {

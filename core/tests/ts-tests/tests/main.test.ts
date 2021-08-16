@@ -12,10 +12,8 @@ import './forced-exit';
 import './misc';
 import './batch-builder';
 import './create2';
-import './no2fa';
 import './swap';
 import './register-factory';
-import { TestnetERC20Token } from '../../../../contracts/typechain';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -294,6 +292,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             if (onlyBasic) {
                 return;
             }
+
             await tester.testTransfer(hilda, david, token, TX_AMOUNT);
             await tester.testBatch(hilda, david, token, TX_AMOUNT);
         });
@@ -340,14 +339,18 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             zkPrivateKey = await crypto.privateKeyFromSeed(utils.arrayify(ethers.constants.HashZero))
             // Even the wallets with no 2fa should sign message for CPK with their private key
             hilda = await tester.fundedWallet('1.0');
-            frida = await tester.emptyWallet();
+            frida = await tester.fundedWallet('1.0');
             hilda.signer = Signer.fromPrivateKey(zkPrivateKey);
             await tester.testDeposit(hilda, token, DEPOSIT_AMOUNT, true);
-            const cpk = await hilda.setSigningKey({
+            await tester.testDeposit(frida, token, DEPOSIT_AMOUNT, true);
+            await (await hilda.setSigningKey({
                 feeToken: token,
                 ethAuthType: 'ECDSA'
-            });
-            await cpk.awaitReceipt();
+            })).awaitReceipt();
+            await (await frida.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'ECDSA'
+            })).awaitReceipt();
             await hilda.remove2FA();
 
             const accountState = await hilda.getAccountState();
@@ -363,8 +366,31 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             );
         });
 
-        step('Test No2FA transfer', async () => {
-            await tester.testNo2FATransfer(hilda, frida, token, TX_AMOUNT);
+        step('Test No2FA transfers', async () => {
+            if (onlyBasic) {
+                return;
+            }
+
+           await tester.testTransfer(hilda, frida, token, TX_AMOUNT);
+           await tester.testBatch(hilda, frida, token, TX_AMOUNT);
+        })
+
+        step('Test No2FA Swaps', async () => {
+            if(onlyBasic) {
+                return;
+            }
+
+            const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
+            await tester.testDeposit(frida, secondToken, DEPOSIT_AMOUNT, true);
+            await tester.testSwap(hilda, frida, token, secondToken, TX_AMOUNT);
+        })
+
+        step('Test No2FA Withdrawals', async () => {
+            if(onlyBasic) {
+                return;
+            }
+
+            await tester.testWithdraw(hilda, token, TX_AMOUNT);
         })
 
     }); 
@@ -402,24 +428,24 @@ if (process.env.TEST_TRANSPORT) {
 } else {
     // Default case: run HTTP&ETH / HTTP&wBTC.
     tokenAndTransport = [
-        {
-            transport: 'HTTP',
-            token: 'ETH',
-            providerType: 'RPC',
-            onlyBasic: true
-        },
-        {
-            transport: 'HTTP',
-            token: defaultERC20,
-            providerType: 'RPC',
-            onlyBasic: false
-        },
-        {
-            transport: 'HTTP',
-            token: 'ETH',
-            providerType: 'REST',
-            onlyBasic: true
-        },
+        // {
+        //     transport: 'HTTP',
+        //     token: 'ETH',
+        //     providerType: 'RPC',
+        //     onlyBasic: true
+        // },
+        // {
+        //     transport: 'HTTP',
+        //     token: defaultERC20,
+        //     providerType: 'RPC',
+        //     onlyBasic: false
+        // },
+        // {
+        //     transport: 'HTTP',
+        //     token: 'ETH',
+        //     providerType: 'REST',
+        //     onlyBasic: true
+        // },
         {
             transport: 'HTTP',
             token: defaultERC20,
