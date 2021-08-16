@@ -247,7 +247,8 @@ pub struct BatchStatus {
     pub last_state: TxInBlockStatus,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Remove2FA {
     pub account_id: AccountId,
     pub signature: TxEthSignature,

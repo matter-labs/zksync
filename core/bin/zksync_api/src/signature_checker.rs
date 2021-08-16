@@ -31,6 +31,7 @@ pub enum TxVariant {
     Tx(SignedZkSyncTx),
     Batch(Vec<SignedZkSyncTx>, Option<EthBatchSignData>),
     Order(Box<Order>),
+    Remove2FA,
 }
 
 /// Wrapper on a `TxVariant` which guarantees that (a batch of)
@@ -68,6 +69,7 @@ impl VerifiedTx {
             TxVariant::Tx(tx) => tx,
             TxVariant::Batch(_, _) => panic!("called `unwrap_tx` on a `Batch` value"),
             TxVariant::Order(_) => panic!("called `unwrap_tx` on an `Order` value"),
+            TxVariant::Remove2FA => panic!("called `unwrap_tx` on an `Remove2FA` value"),
         }
     }
 
@@ -77,6 +79,7 @@ impl VerifiedTx {
             TxVariant::Batch(txs, batch_sign_data) => (txs, batch_sign_data),
             TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
             TxVariant::Order(_) => panic!("called `unwrap_batch` on an `Order` value"),
+            TxVariant::Remove2FA => panic!("called `unwrap_batch` on an `Remove2FA` value"),
         }
     }
 }
@@ -308,6 +311,7 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
                 return Err(TxAddError::IncorrectTx);
             }
         }
+        TxVariant::Remove2FA => {} // There is no data to check correctness of
     }
     Ok(())
 }
@@ -369,7 +373,7 @@ impl RequestData {
                 TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
             }
             RequestData::Order(request) => TxVariant::Order(request.order.clone()),
-            RequestData::Remove2FA(_) => unreachable!(),
+            RequestData::Remove2FA(_) => TxVariant::Remove2FA,
         }
     }
 }

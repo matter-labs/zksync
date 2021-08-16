@@ -46,7 +46,7 @@ export interface NFTInfo {
     withdrawnFactory?: Address;
 }
 
-export type EthAccountType = 'Owned' | 'CREATE2';
+export type EthAccountType = 'Owned' | 'CREATE2' | 'No2FA';
 
 export type AccountState = AccountStateRest | AccountStateRpc;
 

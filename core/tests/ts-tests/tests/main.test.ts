@@ -1,6 +1,6 @@
 import { expect } from 'chai';
-import { BigNumber, utils } from 'ethers';
-import { Wallet, types } from 'zksync';
+import { BigNumber, utils, ethers } from 'ethers';
+import { Wallet, types, crypto, Signer, No2FAWalletSigner } from 'zksync';
 
 import { Tester } from './tester';
 import './priority-ops';
@@ -12,8 +12,10 @@ import './forced-exit';
 import './misc';
 import './batch-builder';
 import './create2';
+import './no2fa';
 import './swap';
 import './register-factory';
+import { TestnetERC20Token } from '../../../../contracts/typechain';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -324,6 +326,48 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             }
         });
     });
+
+    describe.only('No2FA tests', () => {
+        let hilda: Wallet;
+        let zkPrivateKey: Uint8Array;
+        let frida: Wallet;
+        
+        step('should setup an account without 2fa', async () => {
+            if (onlyBasic) {
+                return;
+            }
+
+            zkPrivateKey = await crypto.privateKeyFromSeed(utils.arrayify(ethers.constants.HashZero))
+            // Even the wallets with no 2fa should sign message for CPK with their private key
+            hilda = await tester.fundedWallet('1.0');
+            frida = await tester.emptyWallet();
+            hilda.signer = Signer.fromPrivateKey(zkPrivateKey);
+            await tester.testDeposit(hilda, token, DEPOSIT_AMOUNT, true);
+            const cpk = await hilda.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'ECDSA'
+            });
+            await cpk.awaitReceipt();
+            await hilda.remove2FA();
+
+            const accountState = await hilda.getAccountState();
+            expect(accountState.accountType, 'Incorrect account type').to.be.eql('No2FA');
+
+            // Making sure that the wallet has no Ethereum private key
+            const ethSigner = new No2FAWalletSigner(hilda.address(), hilda.ethSigner.provider);
+            const syncSigner = Signer.fromPrivateKey(zkPrivateKey);
+            hilda = await Wallet.fromSyncSigner(
+                ethSigner,
+                syncSigner,
+                hilda.provider
+            );
+        });
+
+        step('Test No2FA transfer', async () => {
+            await tester.testNo2FATransfer(hilda, frida, token, TX_AMOUNT);
+        })
+
+    }); 
 });
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).
