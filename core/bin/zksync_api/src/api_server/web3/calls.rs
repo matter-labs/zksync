@@ -18,10 +18,12 @@ use super::{
 };
 use crate::utils::token_db_cache::TokenDBCache;
 
+type Selector = [u8; 4];
+
 #[derive(Debug, Clone)]
 pub struct CallsHelper {
-    erc20: HashMap<[u8; 4], Function>,
-    nft_factory: HashMap<[u8; 4], Function>,
+    erc20: HashMap<Selector, Function>,
+    nft_factory: HashMap<Selector, Function>,
     tokens: TokenDBCache,
     zksync_proxy_address: H160,
     nft_factory_address: H160,
@@ -31,7 +33,7 @@ impl CallsHelper {
     const SHA256_MULTI_HASH: [u8; 2] = [18, 32]; // 0x1220
     const ALPHABET: &'static str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-    fn function_by_selector(functions: Vec<Function>) -> HashMap<[u8; 4], Function> {
+    fn function_by_selector(functions: Vec<Function>) -> HashMap<Selector, Function> {
         functions
             .into_iter()
             .map(|f| {
@@ -42,7 +44,7 @@ impl CallsHelper {
                     .collect::<Vec<_>>()
                     .join(",");
                 let signature = format!("{}({})", f.name, inputs);
-                let selector: [u8; 4] = keccak256(signature.as_bytes())[0..4].try_into().unwrap();
+                let selector: Selector = keccak256(signature.as_bytes())[0..4].try_into().unwrap();
                 (selector, f)
             })
             .collect()
@@ -105,7 +107,7 @@ impl CallsHelper {
                 return Ok(Vec::new());
             }
         };
-        let selector: [u8; 4] = if data.len() >= 4 {
+        let selector: Selector = if data.len() >= 4 {
             data[0..4].try_into().unwrap()
         } else {
             return Ok(Vec::new());
