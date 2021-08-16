@@ -1,20 +1,20 @@
 # Generating new circuit keys
 
-Prover required circuit keys. You can generate them manually.
+Prover requires circuit keys. You can generate them manually.
 
 ## 0. Requirements
 
-RAM: 128 GB
+RAM: 196 GB
 
 CPU: 32 CPUs
 
 ## 1. Preparation
 
-Clone repository to your machine
+Clone the repository to your machine
 
 ## 2. Installing dependencies
 
-Key generation required the same [dependencies](../docs/setup-dev.md) as our server.
+Key generation requires the same [dependencies](../docs/setup-dev.md) as our server.
 
 ## 4. Generating keys
 
@@ -22,7 +22,7 @@ Key generation required the same [dependencies](../docs/setup-dev.md) as our ser
 zk
 zk run plonk-setup download
 zk run verify-keys gen
-# Note: etc/env/dev.env.example must have correct keys/DIR
+# Note: generated etc/env/dev.env must have the correct keys/DIR
 zk run verify-keys pack
 ```
 
