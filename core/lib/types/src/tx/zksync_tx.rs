@@ -422,4 +422,17 @@ impl ZkSyncTx {
             ZkSyncTx::WithdrawNFT(tx) => tx.time_range.valid_from,
         }
     }
+
+    pub fn variance_name(&self) -> String {
+        match self {
+            ZkSyncTx::Transfer(_) => "Transfer".to_string(),
+            ZkSyncTx::Withdraw(_) => "Withdraw".to_string(),
+            ZkSyncTx::Close(_) => "Close".to_string(),
+            ZkSyncTx::ChangePubKey(_) => "ChangePubKey".to_string(),
+            ZkSyncTx::ForcedExit(_) => "ForcedExit".to_string(),
+            ZkSyncTx::MintNFT(_) => "MintNFT".to_string(),
+            ZkSyncTx::Swap(_) => "Swap".to_string(),
+            ZkSyncTx::WithdrawNFT(_) => "WithdrawNFT".to_string(),
+        }
+    }
 }

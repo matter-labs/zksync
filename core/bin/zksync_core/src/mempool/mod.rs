@@ -355,6 +355,24 @@ impl MempoolBlocksHandler {
             vlog::debug!("Proposed txs for block: {:?}", txs);
         }
         metrics::histogram!("mempool.propose_new_block", start.elapsed());
+
+        for pr_op in &priority_ops {
+            let labels = vec![
+                ("name", pr_op.data.variance_name()),
+                ("token", pr_op.data.token_id().to_string()),
+            ];
+            metrics::increment_counter!("mempool.transactions_count", &labels)
+        }
+
+        for tx_variant in &txs {
+            for tx in tx_variant.get_transactions() {
+                let labels = vec![
+                    ("name", tx.tx.variance_name()),
+                    ("token", tx.tx.token_id().to_string()),
+                ];
+                metrics::increment_counter!("mempool.transactions_count", &labels)
+            }
+        }
         ProposedBlock { priority_ops, txs }
     }
 
