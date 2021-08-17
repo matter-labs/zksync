@@ -328,7 +328,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
 
     describe('No2FA tests', () => {
         let hilda: Wallet;
-        let zkPrivateKey: Uint8Array;
         let frida: Wallet;
         
         step('should setup an account without 2fa', async () => {
@@ -336,7 +335,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
                 return;
             }
 
-            zkPrivateKey = await crypto.privateKeyFromSeed(utils.arrayify(ethers.constants.HashZero))
+            const zkPrivateKey = await crypto.privateKeyFromSeed(utils.arrayify(ethers.constants.HashZero))
             // Even the wallets with no 2fa should sign message for CPK with their private key
             hilda = await tester.fundedWallet('1.0');
             frida = await tester.fundedWallet('1.0');

@@ -261,9 +261,9 @@ impl Toggle2FA {
     // with Order and transactions
     pub fn get_ethereum_sign_message(&self) -> String {
         if self.enable {
-            format!("By signing this message you agree to benefit from 2FA protection by zkSync server.\nMake sure that you hold the Ethereum private key!\nNonce: {}", self.nonce).to_string()
+            format!("By signing this message you agree to benefit from 2FA protection by zkSync server.\nMake sure that you hold the Ethereum private key!\nNonce: {}", self.nonce)
         } else {
-            format!("By signing this message you agree to not receive 2FA protection by zkSync server.\nMAKE SURE YOU TRUST YOUR CLIENT!\nNonce: {}", self.nonce).to_string()
+            format!("By signing this message you agree to not receive 2FA protection by zkSync server.\nMAKE SURE YOU TRUST YOUR CLIENT!\nNonce: {}", self.nonce)
         }
     }
 }

@@ -1,6 +1,5 @@
 import Axios from 'axios';
 import { BigNumber } from 'ethers';
-import { TransactionTypes } from 'ethers/lib/utils';
 import { SyncProvider } from './provider-interface';
 import * as types from './types';
 import { sleep, TokenSet } from './utils';
@@ -109,7 +108,7 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
-    async toggle2FADetailed(data: types.Toggle2FARequest): Promise<Response<types.Remove2FAResponse>> {
+    async toggle2FADetailed(data: types.Toggle2FARequest): Promise<Response<types.Toggle2FAResponse>> {
         return await this.post(`${this.address}/transactions/toggle2FA`, data);
     }
 

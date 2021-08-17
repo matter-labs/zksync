@@ -18,8 +18,7 @@ import {
     Swap,
     TokenRatio,
     WeiRatio,
-    WithdrawNFT,
-    Nonce
+    WithdrawNFT
 } from './types';
 import { rescueHashOrders } from './crypto';
 

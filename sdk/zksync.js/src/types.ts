@@ -631,6 +631,6 @@ export interface Toggle2FARequest {
     signature: TxEthSignature;
 }
 
-export interface Remove2FAResponse {
+export interface Toggle2FAResponse {
     success: boolean;
 }

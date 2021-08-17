@@ -16,9 +16,9 @@ use futures::{
 };
 use itertools::izip;
 use num::{bigint::ToBigInt, BigUint, Zero};
-use reqwest::header::REFRESH;
 use thiserror::Error;
 
+use zksync_api_types::v02::transaction::Toggle2FAResponse;
 // Workspace uses
 use zksync_api_types::{
     v02::transaction::{SubmitBatchResponse, Toggle2FA, TxHashSerializeWrapper},
@@ -83,7 +83,7 @@ pub enum SubmitError {
     InappropriateFeeToken,
     // Not all TxAddErrors would apply to Toggle2FA, but
     // it is helpful to re-use IncorrectEthSignature and DbError
-    #[error("Failed to remove 2FA: {0}.")]
+    #[error("Failed to toggle 2FA: {0}.")]
     Toggle2FA(TxAddError),
 
     #[error("Communication error with the core server: {0}.")]
@@ -229,7 +229,10 @@ impl TxSender {
         Ok(nonce)
     }
 
-    pub async fn toggle_2fa(&self, toggle_2fa: Toggle2FA) -> Result<(), SubmitError> {
+    pub async fn toggle_2fa(
+        &self,
+        toggle_2fa: Toggle2FA,
+    ) -> Result<Toggle2FAResponse, SubmitError> {
         let account_id = toggle_2fa.account_id;
         let require_2fa = toggle_2fa.enable;
         self.verify_toggle_2fa_request_eth_signature(toggle_2fa)
@@ -243,7 +246,9 @@ impl TxSender {
             .account_schema()
             .update_account_2fa(account_id, require_2fa)
             .await
-            .map_err(|_| SubmitError::Toggle2FA(TxAddError::DbError))
+            .map_err(|_| SubmitError::Toggle2FA(TxAddError::DbError))?;
+
+        Ok(Toggle2FAResponse { success: true })
     }
 
     async fn verify_toggle_2fa_request_eth_signature(
@@ -257,18 +262,13 @@ impl TxSender {
             ));
         }
 
-        dbg!("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC121212");
-
         let current_nonce = self
             .get_nonce_by_id(toggle_2fa.account_id)
             .await
             .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
         if current_nonce != toggle_2fa.nonce {
-            dbg!("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC");
             return Err(SubmitError::InvalidParams("Invalid nonce".to_string()));
         }
-
-        dbg!("CCCCCCCCCCCCAAAAAAAAAAAAAAAAAAAAACCCCCCCCCCCCCCCCCCCCCCCCC");
 
         let message = toggle_2fa.get_ethereum_sign_message().into_bytes();
 

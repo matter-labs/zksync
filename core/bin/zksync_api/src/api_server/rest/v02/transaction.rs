@@ -177,16 +177,13 @@ async fn toggle_2fa(
     data: web::Data<ApiTransactionData>,
     Json(toggle_2fa): Json<Toggle2FA>,
 ) -> ApiResult<Toggle2FAResponse> {
-    let result = data
+    let response = data
         .tx_sender
         .toggle_2fa(toggle_2fa)
         .await
         .map_err(Error::from);
 
-    match result {
-        Err(err) => ApiResult::Error(err),
-        Ok(_) => ApiResult::Ok(Toggle2FAResponse { success: true }),
-    }
+    response.into()
 }
 
 async fn get_batch(
