@@ -867,6 +867,15 @@ async fn verify_tx_info_message_signature(
     msg_to_sign: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
+    if matches!(
+        (account_type, signature.clone()),
+        (EthAccountType::CREATE2, Some(_))
+    ) {
+        return Err(SubmitError::IncorrectTx(
+            "Eth signature from CREATE2 account not expected".to_string(),
+        ));
+    }
+
     let should_check_eth_signature = match (account_type, tx) {
         (EthAccountType::CREATE2, _) => false,
         (EthAccountType::No2FA, ZkSyncTx::ChangePubKey(_)) => true,

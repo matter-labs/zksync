@@ -326,13 +326,13 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         });
     });
 
-    describe.only('No2FA tests', () => {
+    describe('No2FA tests', () => {
         let hilda: Wallet;
         let zkPrivateKey: Uint8Array;
         let frida: Wallet;
         
         step('should setup an account without 2fa', async () => {
-            if (onlyBasic) {
+            if (onlyBasic || providerType == 'RPC') {
                 return;
             }
 
@@ -367,16 +367,17 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         });
 
         step('Test No2FA transfers', async () => {
-            if (onlyBasic) {
+            if (onlyBasic || providerType == 'RPC') {
                 return;
             }
 
            await tester.testTransfer(hilda, frida, token, TX_AMOUNT);
            await tester.testBatch(hilda, frida, token, TX_AMOUNT);
+           await tester.testBatchBuilderTransfersWithoutSignatures(hilda, frida, token, TX_AMOUNT);
         })
 
         step('Test No2FA Swaps', async () => {
-            if(onlyBasic) {
+            if(onlyBasic || providerType == 'RPC') {
                 return;
             }
 
@@ -386,7 +387,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         })
 
         step('Test No2FA Withdrawals', async () => {
-            if(onlyBasic) {
+            if(onlyBasic || providerType == 'RPC') {
                 return;
             }
 
@@ -428,24 +429,24 @@ if (process.env.TEST_TRANSPORT) {
 } else {
     // Default case: run HTTP&ETH / HTTP&wBTC.
     tokenAndTransport = [
-        // {
-        //     transport: 'HTTP',
-        //     token: 'ETH',
-        //     providerType: 'RPC',
-        //     onlyBasic: true
-        // },
-        // {
-        //     transport: 'HTTP',
-        //     token: defaultERC20,
-        //     providerType: 'RPC',
-        //     onlyBasic: false
-        // },
-        // {
-        //     transport: 'HTTP',
-        //     token: 'ETH',
-        //     providerType: 'REST',
-        //     onlyBasic: true
-        // },
+        {
+            transport: 'HTTP',
+            token: 'ETH',
+            providerType: 'RPC',
+            onlyBasic: true
+        },
+        {
+            transport: 'HTTP',
+            token: defaultERC20,
+            providerType: 'RPC',
+            onlyBasic: false
+        },
+        {
+            transport: 'HTTP',
+            token: 'ETH',
+            providerType: 'REST',
+            onlyBasic: true
+        },
         {
             transport: 'HTTP',
             token: defaultERC20,
