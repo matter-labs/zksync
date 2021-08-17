@@ -31,7 +31,6 @@ use crate::{
         block::records::TransactionItem,
         operations::{records::StoredExecutedPriorityOperation, OperationsSchema},
     },
-    tokens::TokensSchema,
     QueryResult, StorageProcessor,
 };
 
@@ -622,6 +621,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let account_id = transaction
+            .chain()
+            .account_schema()
+            .account_id_by_address(*address)
+            .await?;
+        let account_id_value = serde_json::to_value(account_id).unwrap();
         // This query does the following:
         // - creates a union of `executed_transactions` and the `executed_priority_operations`
         // - unifies the information to match the `TransactionsHistoryItem`
@@ -666,6 +673,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         to_account = $1
                         or
                         primary_account_address = $1
+                        or (
+                            tx->'type' = '"Swap"'
+                            and (
+                                operation->'accounts'->0 = $2
+                                or
+                                operation->'accounts'->1 = $2
+                                or
+                                operation->'recipients'->0 = $2
+                                or
+                                operation->'recipients'->1 = $2
+                            )
+                        )
                     union all
                     select
                         concat_ws(',', block_number, block_index) as tx_id,
@@ -686,9 +705,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 order by
                     block_number desc, created_at desc
                 offset 
-                    $2
-                limit 
                     $3
+                limit 
+                    $4
             )
             select
                 tx_id as "tx_id!",
@@ -705,12 +724,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number
             order by transactions.block_number desc, created_at desc
             "#,
-            address.as_ref(), offset as i64, limit as i64
-        ).fetch_all(self.0.conn())
+            address.as_ref(), account_id_value, offset as i64, limit as i64
+        ).fetch_all(transaction.conn())
         .await?;
 
         if !tx_history.is_empty() {
-            let tokens = TokensSchema(self.0).load_tokens().await?;
+            let tokens = transaction.tokens_schema().load_tokens().await?;
             for tx_item in &mut tx_history {
                 let tx_info = match tx_item.tx["type"].as_str().unwrap_or("NONE") {
                     "NONE" => {
@@ -747,6 +766,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }
         }
 
+        transaction.commit().await?;
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_history",
             start.elapsed()
@@ -771,6 +791,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
         // Filter for txs that older/newer than provided tx ID.
         // For older blocks, block number should be between 0 and block number - 1,
         // or for the same block number, transaction in block should be between 0 and tx in block number - 1.
@@ -784,6 +805,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             SearchDirection::Older => (0i32, block_tx_id as i32 - 1),
             SearchDirection::Newer => (block_tx_id as i32 + 1, i32::MAX),
         };
+        let account_id = transaction
+            .chain()
+            .account_schema()
+            .account_id_by_address(*address)
+            .await?;
+        let account_id_value = serde_json::to_value(account_id).unwrap();
 
         // This query does the following:
         // - creates a union of `executed_transactions` and the `executed_priority_operations`
@@ -806,7 +833,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                FROM aggregate_operations
                    INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
                WHERE aggregate_operations.confirmed = true 
-           ), aggr_exec AS (
+            ), aggr_exec AS (
                 SELECT 
                    aggregate_operations.confirmed, 
                    execute_aggregated_blocks_binding.block_number 
@@ -836,9 +863,21 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                             to_account = $1
                             or
                             primary_account_address = $1
+                            or (
+                                tx->'type' = '"Swap"'
+                                and (
+                                    operation->'accounts'->0 = $2
+                                    or
+                                    operation->'accounts'->1 = $2
+                                    or
+                                    operation->'recipients'->0 = $2
+                                    or
+                                    operation->'recipients'->1 = $2
+                                )
+                            )
                         )
                         and
-                        (block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6))
+                        (block_number BETWEEN $4 AND $5 or (block_number = $3 and block_index BETWEEN $6 AND $7))
                     union all
                     select
                         concat_ws(',', block_number, block_index) as tx_id,
@@ -859,12 +898,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                             to_account = $1
                         )
                         and
-                        (block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6))
+                        (block_number BETWEEN $4 AND $5 or (block_number = $3 and block_index BETWEEN $6 AND $7))
                     ) t
                 order by
                     block_number desc, created_at desc
                 limit 
-                    $7
+                    $8
             )
             select
                 tx_id as "tx_id!",
@@ -884,16 +923,16 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 verified.block_number = transactions.block_number AND verified.confirmed = true
             order by transactions.block_number desc, created_at desc
             "#,
-            address.as_ref(),
+            address.as_ref(), account_id_value,
             block_id as i64,
             block_number_start_idx, block_number_end_idx,
             tx_number_start_idx, tx_number_end_idx,
             limit as i64
-        ).fetch_all(self.0.conn())
+        ).fetch_all(transaction.conn())
         .await?;
 
         if !tx_history.is_empty() {
-            let tokens = TokensSchema(self.0).load_tokens().await?;
+            let tokens = transaction.tokens_schema().load_tokens().await?;
             for tx_item in &mut tx_history {
                 let tx_info = match tx_item.tx["type"].as_str().unwrap_or("NONE") {
                     "NONE" => {
@@ -930,6 +969,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }
         }
 
+        transaction.commit().await?;
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_history_from",
             start.elapsed()
@@ -963,6 +1003,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .operations_ext_schema()
             .get_tx_created_at_and_block_number(tx_hash)
             .await?;
+        let account_id = transaction
+            .chain()
+            .account_schema()
+            .account_id_by_address(query.from.address)
+            .await?;
+        let account_id_value = serde_json::to_value(account_id).unwrap();
+
         let txs = if let Some((time_from, _)) = created_at_and_block {
             let raw_txs: Vec<TransactionItem> = match query.direction {
                 PaginationDirection::Newer => {
@@ -981,8 +1028,26 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     Null::bigint as priority_op_serialid,
                                     block_index
                                 FROM executed_transactions
-                                WHERE (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
-                                    AND created_at >= $2
+                                WHERE (
+                                    from_account = $1
+                                    OR
+                                    to_account = $1
+                                    OR
+                                    primary_account_address = $1
+                                    OR (
+                                        tx->'type' = '"Swap"'
+                                        AND (
+                                            operation->'accounts'->0 = $2
+                                            OR
+                                            operation->'accounts'->1 = $2
+                                            OR
+                                            operation->'recipients'->0 = $2
+                                            OR
+                                            operation->'recipients'->1 = $2
+                                        )
+                                    )
+                                )
+                                    AND created_at >= $3
                                 ), priority_ops AS (
                                 SELECT
                                     tx_hash,
@@ -995,7 +1060,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     priority_op_serialid,
                                     block_index
                                 FROM executed_priority_operations
-                                WHERE (from_account = $1 OR to_account = $1) AND created_at >= $2
+                                WHERE (from_account = $1 OR to_account = $1) AND created_at >= $3
                             ), everything AS (
                                 SELECT * FROM transactions
                                 UNION ALL
@@ -1012,9 +1077,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 priority_op_serialid as "priority_op_serialid?"
                             FROM everything
                             ORDER BY created_at ASC, block_index ASC
-                            LIMIT $3
+                            LIMIT $4
                         "#,
                         query.from.address.as_bytes(),
+                        account_id_value,
                         time_from,
                         i64::from(query.limit),
                     )
@@ -1037,8 +1103,26 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     Null::bigint as priority_op_serialid,
                                     block_index
                                 FROM executed_transactions
-                                WHERE (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
-                                    AND created_at <= $2
+                                WHERE (
+                                    from_account = $1
+                                    OR
+                                    to_account = $1
+                                    OR
+                                    primary_account_address = $1
+                                    OR (
+                                        tx->'type' = '"Swap"'
+                                        AND (
+                                            operation->'accounts'->0 = $2
+                                            OR
+                                            operation->'accounts'->1 = $2
+                                            OR
+                                            operation->'recipients'->0 = $2
+                                            OR
+                                            operation->'recipients'->1 = $2
+                                        )
+                                    )
+                                )
+                                    AND created_at <= $3
                             ), priority_ops AS (
                                 SELECT
                                     tx_hash,
@@ -1051,7 +1135,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     priority_op_serialid,
                                     block_index
                                 FROM executed_priority_operations
-                                WHERE (from_account = $1 OR to_account = $1) AND created_at <= $2
+                                WHERE (from_account = $1 OR to_account = $1) AND created_at <= $3
                             ), everything AS (
                                 SELECT * FROM transactions
                                 UNION ALL
@@ -1068,9 +1152,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 priority_op_serialid as "priority_op_serialid?"
                             FROM everything
                             ORDER BY created_at DESC, block_index DESC
-                            LIMIT $3
+                            LIMIT $4
                         "#,
                         query.from.address.as_bytes(),
+                        account_id_value,
                         time_from,
                         i64::from(query.limit),
                     )
@@ -1111,12 +1196,39 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         address: Address,
     ) -> QueryResult<Option<TxHash>> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let account_id = transaction
+            .chain()
+            .account_schema()
+            .account_id_by_address(address)
+            .await?;
+        let account_id_value = serde_json::to_value(account_id).unwrap();
+
         let record = sqlx::query!(
             r#"
                 WITH transactions AS (
                     SELECT tx_hash, created_at, block_index
                     FROM executed_transactions
-                    WHERE from_account = $1 OR to_account = $1 OR primary_account_address = $1
+                    WHERE (
+                        from_account = $1
+                        OR
+                        to_account = $1
+                        OR
+                        primary_account_address = $1
+                        OR (
+                            tx->'type' = '"Swap"'
+                            AND (
+                                operation->'accounts'->0 = $2
+                                OR
+                                operation->'accounts'->1 = $2
+                                OR
+                                operation->'recipients'->0 = $2
+                                OR
+                                operation->'recipients'->1 = $2
+                            )
+                        )
+                    )
                 ), priority_ops AS (
                     SELECT tx_hash, created_at, block_index
                     FROM executed_priority_operations
@@ -1133,10 +1245,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 LIMIT 1
             "#,
             address.as_bytes(),
+            account_id_value
         )
-        .fetch_optional(self.0.conn())
+        .fetch_optional(transaction.conn())
         .await?;
 
+        transaction.commit().await?;
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_last_tx_hash",
             start.elapsed()
@@ -1190,13 +1304,38 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .block_schema()
             .get_last_committed_confirmed_block()
             .await?;
+        let account_id = transaction
+            .chain()
+            .account_schema()
+            .account_id_by_address(address)
+            .await?;
+        let account_id_value = serde_json::to_value(account_id).unwrap();
         let tx_count = sqlx::query!(
             r#"
                 SELECT COUNT(*) as "count!" FROM executed_transactions
-                WHERE block_number <= $1 AND (from_account = $2 OR to_account = $2 OR primary_account_address = $2)
+                WHERE block_number <= $1 AND (
+                    from_account = $2
+                    OR
+                    to_account = $2
+                    OR
+                    primary_account_address = $2
+                    OR (
+                        tx->'type' = '"Swap"'
+                        AND (
+                            operation->'accounts'->0 = $3
+                            OR
+                            operation->'accounts'->1 = $3
+                            OR
+                            operation->'recipients'->0 = $3
+                            OR
+                            operation->'recipients'->1 = $3
+                        )
+                    )
+                )
             "#,
             i64::from(*last_committed),
-            address.as_bytes()
+            address.as_bytes(),
+            account_id_value
         )
         .fetch_one(transaction.conn())
         .await?
