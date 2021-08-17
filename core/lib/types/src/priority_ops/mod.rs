@@ -343,6 +343,13 @@ impl ZkSyncPriorityOp {
         deposits_data.resize(n as usize, Vec::new());
         (n, deposits_data)
     }
+
+    pub fn variance_name(&self) -> String {
+        match self {
+            ZkSyncPriorityOp::Deposit(_) => "Deposit".to_string(),
+            ZkSyncPriorityOp::FullExit(_) => "FullExit".to_string(),
+        }
+    }
 }
 
 /// Priority operation description with the metadata required for server to process it.
