@@ -104,7 +104,7 @@ impl SumbitErrorCode {
             SubmitError::CommunicationCoreServer(_) => Self::CommunicationCoreServer,
             SubmitError::Internal(_) => Self::Internal,
             SubmitError::Other(_) => Self::Other,
-            SubmitError::Remove2FA(_) => Self::Other,
+            SubmitError::Toggle2FA(_) => Self::Other,
         }
     }
 

@@ -36,7 +36,7 @@ pub enum ErrorCode {
     TxAddError = 605,
     InappropriateFeeToken = 606,
     CommunicationCoreServer = 607,
-    Remove2FAError = 608,
+    Toggle2FAError = 608,
     Other = 60_000,
 }
 
@@ -184,7 +184,7 @@ impl ApiError for SubmitError {
             Self::InappropriateFeeToken => ErrorCode::InappropriateFeeToken,
             Self::CommunicationCoreServer(_) => ErrorCode::CommunicationCoreServer,
             Self::Internal(_) => ErrorCode::InternalError,
-            Self::Remove2FA(_) => ErrorCode::Remove2FAError,
+            Self::Toggle2FA(_) => ErrorCode::Toggle2FAError,
             Self::Other(_) => ErrorCode::Other,
         }
     }

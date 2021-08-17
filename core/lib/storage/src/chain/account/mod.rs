@@ -64,7 +64,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     pub async fn update_account_2fa(
         &mut self,
         account_id: AccountId,
-        requires_2fa: bool,
+        require_2fa: bool,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -79,7 +79,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             ));
         }
 
-        let account_type = if requires_2fa {
+        let account_type = if require_2fa {
             EthAccountType::Owned
         } else {
             EthAccountType::No2FA

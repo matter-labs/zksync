@@ -31,7 +31,7 @@ pub enum TxVariant {
     Tx(SignedZkSyncTx),
     Batch(Vec<SignedZkSyncTx>, Option<EthBatchSignData>),
     Order(Box<Order>),
-    Remove2FA,
+    Toggle2FA,
 }
 
 /// Wrapper on a `TxVariant` which guarantees that (a batch of)
@@ -69,7 +69,7 @@ impl VerifiedTx {
             TxVariant::Tx(tx) => tx,
             TxVariant::Batch(_, _) => panic!("called `unwrap_tx` on a `Batch` value"),
             TxVariant::Order(_) => panic!("called `unwrap_tx` on an `Order` value"),
-            TxVariant::Remove2FA => panic!("called `unwrap_tx` on an `Remove2FA` value"),
+            TxVariant::Toggle2FA => panic!("called `unwrap_tx` on an `Toggle2FA` value"),
         }
     }
 
@@ -79,7 +79,7 @@ impl VerifiedTx {
             TxVariant::Batch(txs, batch_sign_data) => (txs, batch_sign_data),
             TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
             TxVariant::Order(_) => panic!("called `unwrap_batch` on an `Order` value"),
-            TxVariant::Remove2FA => panic!("called `unwrap_batch` on an `Remove2FA` value"),
+            TxVariant::Toggle2FA => panic!("called `unwrap_batch` on an `Toggle2FA` value"),
         }
     }
 }
@@ -130,7 +130,7 @@ async fn verify_eth_signature(
                 return Err(TxAddError::IncorrectEthSignature);
             }
         }
-        RequestData::Remove2FA(request) => {
+        RequestData::Toggle2FA(request) => {
             let signature_correct = verify_ethereum_signature(
                 &request.sign_data.signature,
                 &request.sign_data.message,
@@ -311,7 +311,7 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
                 return Err(TxAddError::IncorrectTx);
             }
         }
-        TxVariant::Remove2FA => {} // There is no data to check correctness of
+        TxVariant::Toggle2FA => {} // There is no data to check correctness of
     }
     Ok(())
 }
@@ -344,7 +344,7 @@ pub struct OrderRequest {
 }
 
 #[derive(Debug)]
-pub struct Remove2FARequest {
+pub struct Toggle2FARequest {
     pub sign_data: EthSignData,
     pub sender: Address,
 }
@@ -362,7 +362,7 @@ pub enum RequestData {
     Tx(TxRequest),
     Batch(BatchRequest),
     Order(OrderRequest),
-    Remove2FA(Remove2FARequest),
+    Toggle2FA(Toggle2FARequest),
 }
 
 impl RequestData {
@@ -373,7 +373,7 @@ impl RequestData {
                 TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
             }
             RequestData::Order(request) => TxVariant::Order(request.order.clone()),
-            RequestData::Remove2FA(_) => TxVariant::Remove2FA,
+            RequestData::Toggle2FA(_) => TxVariant::Toggle2FA,
         }
     }
 }

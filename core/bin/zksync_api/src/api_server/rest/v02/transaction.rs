@@ -11,10 +11,10 @@ use actix_web::{
 // Workspace uses
 use zksync_api_types::{
     v02::{
-        transaction::Remove2FA,
+        transaction::Toggle2FA,
         transaction::{
-            ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, Remove2FAResponse,
-            SubmitBatchResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
+            ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
+            Toggle2FAResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
             TxInBlockStatus,
         },
     },
@@ -173,19 +173,19 @@ async fn submit_batch(
     response.into()
 }
 
-async fn remove_fa(
+async fn toggle_2fa(
     data: web::Data<ApiTransactionData>,
-    Json(remove_2fa): Json<Remove2FA>,
-) -> ApiResult<Remove2FAResponse> {
+    Json(toggle_2fa): Json<Toggle2FA>,
+) -> ApiResult<Toggle2FAResponse> {
     let result = data
         .tx_sender
-        .remove_2fa(remove_2fa)
+        .toggle_2fa(toggle_2fa)
         .await
         .map_err(Error::from);
 
     match result {
         Err(err) => ApiResult::Error(err),
-        Ok(_) => ApiResult::Ok(Remove2FAResponse { success: true }),
+        Ok(_) => ApiResult::Ok(Toggle2FAResponse { success: true }),
     }
 }
 
@@ -206,7 +206,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("{tx_hash}/data", web::get().to(tx_data))
         .route("/batches", web::post().to(submit_batch))
         .route("/batches/{batch_hash}", web::get().to(get_batch))
-        .route("/remove2FA", web::post().to(remove_fa))
+        .route("/toggle2FA", web::post().to(toggle_2fa))
 }
 
 #[cfg(test)]

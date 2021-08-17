@@ -624,8 +624,10 @@ export interface ApiBatchData {
     batchStatus: ApiBatchStatus;
 }
 
-export interface Remove2FARequest {
+export interface Toggle2FARequest {
+    enable: boolean;
     accountId: number;
+    nonce: number;
     signature: TxEthSignature;
 }
 

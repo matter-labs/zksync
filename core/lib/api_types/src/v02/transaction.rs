@@ -7,8 +7,8 @@ use zksync_types::{
         ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
         TxEthSignature, TxHash, Withdraw, WithdrawNFT,
     },
-    AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
-    H256,
+    AccountId, Address, BlockNumber, EthBlockId, Nonce, SerialId, TokenId, ZkSyncOp,
+    ZkSyncPriorityOp, H256,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, ZeroPrefixHexSerde};
 
@@ -249,20 +249,26 @@ pub struct BatchStatus {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Remove2FA {
+pub struct Toggle2FA {
+    pub enable: bool,
+    pub nonce: Nonce,
     pub account_id: AccountId,
     pub signature: TxEthSignature,
 }
 
-impl Remove2FA {
+impl Toggle2FA {
     // Even though the function returns constant value, it is made for consistency
     // with Order and transactions
-    pub fn get_ethereum_sign_message() -> String {
-        "By signing this message you agree to not receive 2FA protection by zkSync server.\n MAKE SURE YOU TRUST YOUR CLIENT!".to_string()
+    pub fn get_ethereum_sign_message(&self) -> String {
+        if self.enable {
+            format!("By signing this message you agree to benefit from 2FA protection by zkSync server.\nMake sure that you hold the Ethereum private key!\nNonce: {}", self.nonce).to_string()
+        } else {
+            format!("By signing this message you agree to not receive 2FA protection by zkSync server.\nMAKE SURE YOU TRUST YOUR CLIENT!\nNonce: {}", self.nonce).to_string()
+        }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Remove2FAResponse {
+pub struct Toggle2FAResponse {
     pub success: bool,
 }

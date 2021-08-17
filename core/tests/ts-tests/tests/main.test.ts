@@ -351,7 +351,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
                 feeToken: token,
                 ethAuthType: 'ECDSA'
             })).awaitReceipt();
-            await hilda.remove2FA();
+            await hilda.toggle2FA(false);
 
             const accountState = await hilda.getAccountState();
             expect(accountState.accountType, 'Incorrect account type').to.be.eql('No2FA');

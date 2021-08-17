@@ -16,15 +16,17 @@ use futures::{
 };
 use itertools::izip;
 use num::{bigint::ToBigInt, BigUint, Zero};
+use reqwest::header::REFRESH;
 use thiserror::Error;
 
 // Workspace uses
 use zksync_api_types::{
-    v02::transaction::{Remove2FA, SubmitBatchResponse, TxHashSerializeWrapper},
+    v02::transaction::{SubmitBatchResponse, Toggle2FA, TxHashSerializeWrapper},
     TxWithSignature,
 };
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
+use zksync_types::Nonce;
 use zksync_types::{
     tx::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
@@ -33,7 +35,7 @@ use zksync_types::{
     AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
 
-use crate::signature_checker::Remove2FARequest;
+use crate::signature_checker::Toggle2FARequest;
 // Local uses
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
@@ -79,10 +81,10 @@ pub enum SubmitError {
     TxAdd(TxAddError),
     #[error("Chosen token is not suitable for paying fees.")]
     InappropriateFeeToken,
-    // Not all TxAddErrors would apply to Remove2FA, but
+    // Not all TxAddErrors would apply to Toggle2FA, but
     // it is helpful to re-use IncorrectEthSignature and DbError
     #[error("Failed to remove 2FA: {0}.")]
-    Remove2FA(TxAddError),
+    Toggle2FA(TxAddError),
 
     #[error("Communication error with the core server: {0}.")]
     CommunicationCoreServer(String),
@@ -208,45 +210,79 @@ impl TxSender {
             .unwrap_or(EthAccountType::Owned))
     }
 
-    pub async fn remove_2fa(&self, remove_2fa: Remove2FA) -> Result<(), SubmitError> {
-        let account_id = remove_2fa.account_id;
-        self.verify_remove_2fa_request_eth_signature(remove_2fa)
+    async fn get_nonce_by_id(&self, id: AccountId) -> Result<Nonce, anyhow::Error> {
+        let state = self
+            .pool
+            .access_storage()
+            .await?
+            .chain()
+            .account_schema()
+            .account_state_by_id(id)
+            .await
+            .map_err(|_| anyhow::anyhow!("Account id not found in db"))?;
+
+        let nonce = match state.committed {
+            Some((_, account)) => account.nonce,
+            None => Nonce(0u32),
+        };
+
+        Ok(nonce)
+    }
+
+    pub async fn toggle_2fa(&self, toggle_2fa: Toggle2FA) -> Result<(), SubmitError> {
+        let account_id = toggle_2fa.account_id;
+        let require_2fa = toggle_2fa.enable;
+        self.verify_toggle_2fa_request_eth_signature(toggle_2fa)
             .await?;
 
         self.pool
             .access_storage()
             .await
-            .map_err(|_| SubmitError::Remove2FA(TxAddError::DbError))?
+            .map_err(|_| SubmitError::Toggle2FA(TxAddError::DbError))?
             .chain()
             .account_schema()
-            .update_account_2fa(account_id, false)
+            .update_account_2fa(account_id, require_2fa)
             .await
-            .map_err(|_| SubmitError::Remove2FA(TxAddError::DbError))
+            .map_err(|_| SubmitError::Toggle2FA(TxAddError::DbError))
     }
 
-    async fn verify_remove_2fa_request_eth_signature(
+    async fn verify_toggle_2fa_request_eth_signature(
         &self,
-        remove_2fa: Remove2FA,
+        toggle_2fa: Toggle2FA,
     ) -> Result<(), SubmitError> {
-        let signer_type = self.get_sender_type(remove_2fa.account_id).await?;
+        let signer_type = self.get_sender_type(toggle_2fa.account_id).await?;
         if matches!(signer_type, EthAccountType::CREATE2 | EthAccountType::No2FA) {
             return Err(SubmitError::InvalidParams(
                 "The account already doesn't have 2FA".to_string(),
             ));
         }
 
-        let signature = remove_2fa.signature;
+        dbg!("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC121212");
+
+        let current_nonce = self
+            .get_nonce_by_id(toggle_2fa.account_id)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+        if current_nonce != toggle_2fa.nonce {
+            dbg!("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC");
+            return Err(SubmitError::InvalidParams("Invalid nonce".to_string()));
+        }
+
+        dbg!("CCCCCCCCCCCCAAAAAAAAAAAAAAAAAAAAACCCCCCCCCCCCCCCCCCCCCCCCC");
+
+        let message = toggle_2fa.get_ethereum_sign_message().into_bytes();
+
+        let signature = toggle_2fa.signature;
         let signer = self
-            .get_address_by_id(remove_2fa.account_id)
+            .get_address_by_id(toggle_2fa.account_id)
             .await
             .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
 
-        let message = Remove2FA::get_ethereum_sign_message().into_bytes();
         let eth_sign_data = EthSignData { signature, message };
         let (sender, receiever) = oneshot::channel();
 
         let request = VerifySignatureRequest {
-            data: RequestData::Remove2FA(Remove2FARequest {
+            data: RequestData::Toggle2FA(Toggle2FARequest {
                 sign_data: eth_sign_data,
                 sender: signer,
             }),

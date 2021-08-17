@@ -49,7 +49,7 @@ import {
     signMessagePersonalAPI,
     isNFT,
     SYNC_MAIN_CONTRACT_INTERFACE,
-    getRemove2FAMessage
+    getToggle2FAMessage
 } from './utils';
 
 const EthersErrorCode = ErrorCode;
@@ -916,15 +916,17 @@ export class Wallet {
         return changePubKeyTx;
     }
 
-    async remove2FA(): Promise<boolean> {
+    async toggle2FA(enable: boolean): Promise<boolean> {
         await this.setRequiredAccountIdFromServer('Remove 2FA');
         const accountId = await this.getAccountId();
+        const nonce = await this.getNonce();
+        const signature = await this.getEthMessageSignature(getToggle2FAMessage(enable, nonce));
 
-        const signature = await this.getEthMessageSignature(getRemove2FAMessage());
-
-        return await this.provider.remove2FA({
+        return await this.provider.toggle2FA({
             accountId,
-            signature
+            signature,
+            nonce,
+            enable
         });
     }
 

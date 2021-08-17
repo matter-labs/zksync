@@ -15,7 +15,7 @@ import {
     TxEthSignature,
     TxEthSignatureVariant,
     NFTInfo,
-    Remove2FARequest
+    Toggle2FARequest
 } from './types';
 import { isTokenETH, sleep, TokenSet } from './utils';
 import {
@@ -269,7 +269,7 @@ export class Provider extends SyncProvider {
         return parseFloat(tokenPrice);
     }
 
-    async remove2FA(data: Remove2FARequest): Promise<boolean> {
+    async toggle2FA(data: Toggle2FARequest): Promise<boolean> {
         throw new Error('JSON-RPC does not support remove2FA');
     }
 

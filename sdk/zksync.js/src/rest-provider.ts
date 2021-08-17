@@ -109,12 +109,12 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
-    async remove2FADetailed(data: types.Remove2FARequest): Promise<Response<types.Remove2FAResponse>> {
-        return await this.post(`${this.address}/transactions/remove2FA`, data);
+    async toggle2FADetailed(data: types.Toggle2FARequest): Promise<Response<types.Remove2FAResponse>> {
+        return await this.post(`${this.address}/transactions/toggle2FA`, data);
     }
 
-    async remove2FA(data: types.Remove2FARequest): Promise<boolean> {
-        const response = this.parseResponse(await this.remove2FADetailed(data));
+    async toggle2FA(data: types.Toggle2FARequest): Promise<boolean> {
+        const response = this.parseResponse(await this.toggle2FADetailed(data));
         return response.success;
     }
 
