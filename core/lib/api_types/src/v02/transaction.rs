@@ -1,4 +1,5 @@
 use crate::{v02::block::BlockStatus, TxWithSignature};
+use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
@@ -7,8 +8,8 @@ use zksync_types::{
         ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
         TxEthSignature, TxHash, Withdraw, WithdrawNFT,
     },
-    AccountId, Address, BlockNumber, EthBlockId, Nonce, SerialId, TokenId, ZkSyncOp,
-    ZkSyncPriorityOp, H256,
+    AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
+    H256,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, ZeroPrefixHexSerde};
 
@@ -251,7 +252,8 @@ pub struct BatchStatus {
 #[serde(rename_all = "camelCase")]
 pub struct Toggle2FA {
     pub enable: bool,
-    pub nonce: Nonce,
+    #[serde(with = "ts_milliseconds")]
+    pub timestamp: DateTime<Utc>,
     pub account_id: AccountId,
     pub signature: TxEthSignature,
 }
@@ -264,15 +266,15 @@ impl Toggle2FA {
             format!(
                 "By signing this message you agree to benefit from 2FA protection by zkSync server.\n\
                  Make sure that you hold the Ethereum private key!\n\
-                Nonce: {}", 
-                self.nonce
+                Timestamp: {}", 
+                self.timestamp.timestamp_millis()
             )
         } else {
             format!(
                 "By signing this message you agree to not receive 2FA protection by zkSync server.\n\
                 MAKE SURE YOU TRUST YOUR CLIENT!\n\
-                Nonce: {}", 
-                self.nonce
+                Timestamp: {}", 
+                self.timestamp.timestamp_millis()
             )
         }
     }

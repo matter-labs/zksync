@@ -627,7 +627,7 @@ export interface ApiBatchData {
 export interface Toggle2FARequest {
     enable: boolean;
     accountId: number;
-    nonce: number;
+    timestamp: number;
     signature: TxEthSignature;
 }
 

@@ -917,15 +917,15 @@ export class Wallet {
     }
 
     async toggle2FA(enable: boolean): Promise<boolean> {
-        await this.setRequiredAccountIdFromServer('Remove 2FA');
+        await this.setRequiredAccountIdFromServer('Toggle 2FA');
         const accountId = await this.getAccountId();
-        const nonce = await this.getNonce();
-        const signature = await this.getEthMessageSignature(getToggle2FAMessage(enable, nonce));
+        const timestamp = new Date().getTime();
+        const signature = await this.getEthMessageSignature(getToggle2FAMessage(enable, timestamp));
 
         return await this.provider.toggle2FA({
             accountId,
             signature,
-            nonce,
+            timestamp,
             enable
         });
     }

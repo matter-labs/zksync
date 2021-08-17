@@ -10,6 +10,7 @@ use std::{
 
 // External uses
 use bigdecimal::BigDecimal;
+use chrono::{Duration, Utc};
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
@@ -26,7 +27,6 @@ use zksync_api_types::{
 };
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
-use zksync_types::Nonce;
 use zksync_types::{
     tx::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
@@ -210,25 +210,6 @@ impl TxSender {
             .unwrap_or(EthAccountType::Owned))
     }
 
-    async fn get_nonce_by_id(&self, id: AccountId) -> Result<Nonce, anyhow::Error> {
-        let state = self
-            .pool
-            .access_storage()
-            .await?
-            .chain()
-            .account_schema()
-            .account_state_by_id(id)
-            .await
-            .map_err(|_| anyhow::anyhow!("Account id not found in db"))?;
-
-        let nonce = match state.committed {
-            Some((_, account)) => account.nonce,
-            None => Nonce(0u32),
-        };
-
-        Ok(nonce)
-    }
-
     pub async fn toggle_2fa(
         &self,
         toggle_2fa: Toggle2FA,
@@ -262,12 +243,18 @@ impl TxSender {
             ));
         }
 
-        let current_nonce = self
-            .get_nonce_by_id(toggle_2fa.account_id)
-            .await
-            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
-        if current_nonce != toggle_2fa.nonce {
-            return Err(SubmitError::InvalidParams("Invalid nonce".to_string()));
+        let current_time = Utc::now();
+        let request_time = toggle_2fa.timestamp;
+        let validness_interval_minutes = 10;
+        let validness_interval = Duration::minutes(validness_interval_minutes);
+
+        if current_time - validness_interval > request_time
+            || current_time + validness_interval < request_time
+        {
+            return Err(SubmitError::InvalidParams(format!(
+                "Timestamp differs by more than {} minutes",
+                validness_interval_minutes
+            )));
         }
 
         let message = toggle_2fa.get_ethereum_sign_message().into_bytes();

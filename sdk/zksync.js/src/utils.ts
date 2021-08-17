@@ -446,18 +446,18 @@ export function getChangePubkeyLegacyMessage(pubKeyHash: PubKeyHash, nonce: numb
     return utils.toUtf8Bytes(message);
 }
 
-export function getToggle2FAMessage(require2FA: boolean, nonce: number): Uint8Array {
+export function getToggle2FAMessage(require2FA: boolean, timestamp: number): Uint8Array {
     let message: string;
     if (require2FA) {
         message =
             `By signing this message you agree to benefit from 2FA protection by zkSync server.\n` +
             `Make sure that you hold the Ethereum private key!\n` +
-            `Nonce: ${nonce}`;
+            `Timestamp: ${timestamp}`;
     } else {
         message =
             `By signing this message you agree to not receive 2FA protection by zkSync server.\n` +
             `MAKE SURE YOU TRUST YOUR CLIENT!\n` +
-            `Nonce: ${nonce}`;
+            `Timestamp: ${timestamp}`;
     }
 
     return utils.toUtf8Bytes(message);
