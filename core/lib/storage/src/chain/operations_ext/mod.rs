@@ -1196,12 +1196,39 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         address: Address,
     ) -> QueryResult<Option<TxHash>> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let account_id = transaction
+            .chain()
+            .account_schema()
+            .account_id_by_address(address)
+            .await?;
+        let account_id_value = serde_json::to_value(account_id).unwrap();
+
         let record = sqlx::query!(
             r#"
                 WITH transactions AS (
                     SELECT tx_hash, created_at, block_index
                     FROM executed_transactions
-                    WHERE from_account = $1 OR to_account = $1 OR primary_account_address = $1
+                    WHERE (
+                        from_account = $1
+                        OR
+                        to_account = $1
+                        OR
+                        primary_account_address = $1
+                        OR (
+                            tx->'type' = '"Swap"'
+                            AND (
+                                operation->'accounts'->0 = $2
+                                OR
+                                operation->'accounts'->1 = $2
+                                OR
+                                operation->'recipients'->0 = $2
+                                OR
+                                operation->'recipients'->1 = $2
+                            )
+                        )
+                    )
                 ), priority_ops AS (
                     SELECT tx_hash, created_at, block_index
                     FROM executed_priority_operations
@@ -1218,10 +1245,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 LIMIT 1
             "#,
             address.as_bytes(),
+            account_id_value
         )
-        .fetch_optional(self.0.conn())
+        .fetch_optional(transaction.conn())
         .await?;
 
+        transaction.commit().await?;
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_last_tx_hash",
             start.elapsed()

@@ -268,6 +268,27 @@
       "nullable": []
     }
   },
+  "0b46f41dca792dfd45d87154c899204629567e20007f7c4c9f6b7602ad580a81": {
+    "query": "\n                WITH transactions AS (\n                    SELECT tx_hash, created_at, block_index\n                    FROM executed_transactions\n                    WHERE (\n                        from_account = $1\n                        OR\n                        to_account = $1\n                        OR\n                        primary_account_address = $1\n                        OR (\n                            tx->'type' = '\"Swap\"'\n                            AND (\n                                operation->'accounts'->0 = $2\n                                OR\n                                operation->'accounts'->1 = $2\n                                OR\n                                operation->'recipients'->0 = $2\n                                OR\n                                operation->'recipients'->1 = $2\n                            )\n                        )\n                    )\n                ), priority_ops AS (\n                    SELECT tx_hash, created_at, block_index\n                    FROM executed_priority_operations\n                    WHERE from_account = $1 OR to_account = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\"\n                FROM everything\n                ORDER BY created_at DESC, block_index DESC\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Jsonb"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "0bdd32081fc9c8fbfb63787696884617129c30915c400e5647d2a81f882c6d4d": {
     "query": "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
     "describe": {
@@ -4023,26 +4044,6 @@
       "parameters": {
         "Left": [
           "Int8",
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
-  "a9e416d1cf63d47318cf8da7904b62101a9fa413f5b646b832cd9114a6693158": {
-    "query": "\n                WITH transactions AS (\n                    SELECT tx_hash, created_at, block_index\n                    FROM executed_transactions\n                    WHERE from_account = $1 OR to_account = $1 OR primary_account_address = $1\n                ), priority_ops AS (\n                    SELECT tx_hash, created_at, block_index\n                    FROM executed_priority_operations\n                    WHERE from_account = $1 OR to_account = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\"\n                FROM everything\n                ORDER BY created_at DESC, block_index DESC\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
           "Bytea"
         ]
       },
