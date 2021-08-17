@@ -36,4 +36,10 @@ impl Client {
             .send()
             .await
     }
+
+    pub async fn nft_owner_by_id(&self, id: TokenId) -> Result<Response> {
+        self.get_with_scope(super::API_V02_SCOPE, &format!("tokens/nft/{}/owner", id))
+            .send()
+            .await
+    }
 }
