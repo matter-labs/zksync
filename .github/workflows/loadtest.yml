@@ -144,7 +144,8 @@ jobs:
           inputs: |
             {
               "environment": "${{ env.ZKSYNC_ENV }}",
-              "image_tag": "${{ needs.setup.outputs.image_tag }}"
+              "image_tag": "${{ needs.setup.outputs.image_tag }}",
+              "scaleup": "true"
             }
 
   loadtest:
