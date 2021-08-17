@@ -65,7 +65,7 @@ jobs:
         name: Create etc/env/loadtest.env
         run: |
           mkdir -p etc/env/
-          kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env         
+          kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env
           kubectl get secret -n ${ZKSYNC_ENV} secretenv-zksync -o go-template='{{range $k, $v := .data}}{{ printf "%s=%s\n" $k ($v | base64decode) }}{{end}}' \
             >> etc/env/${ZKSYNC_ENV}.env
 
@@ -112,10 +112,27 @@ jobs:
           cd contracts && zk f yarn governance-add-erc20 add-multi-current-network rinkeby
           zk db insert contract
 
+  update-configmap:
+    name: Deploy contracts
+    runs-on: [k8s, deployer, stage]
+    needs: [dbsetup]
+    container:
+      image: dysnix/kubectl:v1.20-gcloud
+    steps:
+      -
+        name: Update contracts in the ConfigMap
+        run: |
+          mkdir -p etc/env/
+          kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env
+          cat deployed_contracts.log >> etc/env/${ZKSYNC_ENV}.env
+
+          kubectl delete configmap -n ${ZKSYNC_ENV} server-env-custom || /bin/true
+          kubectl create configmap -n ${ZKSYNC_ENV} server-env-custom --from-env-file=etc/env/${ZKSYNC_ENV}.env
+
   deploy:
     name: Deploy apps
     runs-on: [k8s, deployer, stage]
-    needs: [setup, dbsetup]
+    needs: [update-configmap]
     steps:
       - name: Deploy
         uses: aurelien-baudet/workflow-dispatch@v2
@@ -127,7 +144,8 @@ jobs:
           inputs: |
             {
               "environment": "${{ env.ZKSYNC_ENV }}",
-              "image_tag": "${{ needs.setup.outputs.image_tag }}"
+              "image_tag": "${{ needs.setup.outputs.image_tag }}",
+              "scaleup": "true"
             }
 
   loadtest:
