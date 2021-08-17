@@ -8,18 +8,42 @@ env:
   HF_ARGS: -e loadtest
 
 jobs:
-  sqlproxy:
-    name: Provision SQLProxy
-    runs-on: [k8s, stage, deployer]
+  update:
+    name: Update Configs
+    runs-on: [k8s, deployer, stage]
+    steps:
+      - name: Update Config
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          workflow: Update Config
+          token: ${{ secrets.GH_TOKEN }}
+          wait-for-completion-timeout: 5m
+          wait-for-completion-interval: 20s
+          inputs: |
+            {
+              "environment": "${{ env.ZKSYNC_ENV }}",
+              "ref": "master"
+            }
+
+  setup:
+    name: Setup and Provision SQLProxy
+    ## stage selects the specific cluster
+    runs-on: [k8s, deployer, stage]
+    needs: [update]
     container:
-      image: dysnix/kubectl:v1.19-gcloud
+      image: dysnix/kubectl:v1.20-gcloud
 
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-      HF_DEPLOYS: -l name=sqlproxy
+      DEPLOY_APPS: -l name=sqlproxy
+
+    outputs:
+      image_tag: ${{ steps.set.outputs.shortRev }}
 
     steps:
       - uses: actions/checkout@v2
+      - id: set
+        run: echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
       -
         name: Clone helm-infra
         uses: actions/checkout@v2
@@ -32,22 +56,24 @@ jobs:
         name: Create ~/.kube/config
         run: ./.github/scripts/write-kubeconf.sh
       -
-        name: Setup helm and loadtest.env
-        run: |
-          .github/scripts/zksync-env.sh --kube loadtest > etc/env/loadtest.env
-          echo -n "ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY=" >> etc/env/loadtest.env
-          kubectl get secret -n loadtest server-env -o jsonpath='{.data.ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY}' | base64 -d >> etc/env/loadtest.env
-      -
-        name: Deploy SQLProxy
+        name: Provision SQLProxy
         working-directory: helm-infra
         run: |
           UPDATE_REPOS=y helmfile $HF_ARGS repos
-          helmfile $HF_ARGS $HF_DEPLOYS sync
+          helmfile $HF_ARGS $DEPLOY_APPS sync
+      -
+        name: Create etc/env/loadtest.env
+        run: |
+          mkdir -p etc/env/
+          kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env         
+          kubectl get secret -n ${ZKSYNC_ENV} secretenv-zksync -o go-template='{{range $k, $v := .data}}{{ printf "%s=%s\n" $k ($v | base64decode) }}{{end}}' \
+            >> etc/env/${ZKSYNC_ENV}.env
 
-  init:
+  dbsetup:
     name: Cleanup the database, compile and update contracts
-    runs-on: [k8s, stage, deployer]
-    needs: sqlproxy
+    ## stage selects the specific cluster
+    runs-on: [k8s, deployer, stage]
+    needs: [setup]
     env:
       RUSTUP_HOME: /usr/share/rust/.rustup
       CARGO_HOME: /usr/share/rust/.cargo
@@ -87,35 +113,22 @@ jobs:
           zk db insert contract
 
   deploy:
-    name: Deploy the apps
-    runs-on: [k8s, stage, deployer]
-    needs: init
-    container:
-      image: dysnix/kubectl:v1.19-gcloud
-    env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
-      HF_DEPLOYS: -l name=server -l name=prover
+    name: Deploy apps
+    runs-on: [k8s, deployer, stage]
+    needs: [setup, dbsetup]
     steps:
-      -
-        name: Create ~/.kube/config
-        run: .github/scripts/write-kubeconf.sh
-      -
-        name: Update contracts in the ConfigMap
-        run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
-      -
-        id: config
-        run: |
-          echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
-      -
-        name: Deploy apps
-        working-directory: helm-infra
-        run: |
-          UPDATE_REPOS=y helmfile $HF_ARGS repos
-          export IMAGE_TAG=${{ steps.config.outputs.shortRev }}
-          # Split apply into diff+sync (required for extra sync args), what for server to settle
-          helmfile $HF_ARGS $HF_DEPLOYS diff
-          helmfile $HF_ARGS $HF_DEPLOYS sync --args "--timeout 180s" && sleep 60
+      - name: Deploy
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          workflow: Deploy
+          token: ${{ secrets.GH_TOKEN }}
+          wait-for-completion-timeout: 10m
+          wait-for-completion-interval: 1m
+          inputs: |
+            {
+              "environment": "${{ env.ZKSYNC_ENV }}",
+              "image_tag": "${{ needs.setup.outputs.image_tag }}"
+            }
 
   loadtest:
     name: Perform loadtest
@@ -138,15 +151,17 @@ jobs:
 
   cleanup:
     name: Cleanup loadtest environment
-    runs-on: [k8s, stage, deployer]
-    needs: loadtest
-    if: always()
+    ## stage selects the specific cluster
+    runs-on: [k8s, deployer, stage]
+    needs: [dbsetup, loadtest]
     container:
-      image: dysnix/kubectl:v1.19-gcloud
+      image: dysnix/kubectl:v1.20-gcloud
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
 
+    if: always()
     steps:
+      - run: rm -f etc/env/${ZKSYNC_ENV}.env
       -
         name: Create ~/.kube/config
         run: .github/scripts/write-kubeconf.sh

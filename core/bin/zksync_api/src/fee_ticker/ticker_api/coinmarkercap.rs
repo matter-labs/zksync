@@ -12,7 +12,7 @@ use crate::fee_ticker::PriceError;
 use zksync_types::{Token, TokenLike, TokenPrice};
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CoinMarketCapAPI {
     client: reqwest::Client,
     base_url: Url,

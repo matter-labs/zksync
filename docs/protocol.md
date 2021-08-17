@@ -1772,10 +1772,10 @@ def pubdata_invariants():
 Deposit Ether to Rollup - transfer Ether from user L1 address into Rollup address
 
 ```solidity
-depositETH(address _rollupAddr)
+function depositETH(address _zkSyncAddress) payable
 ```
 
-- `_rollupAddr`: The receiver Layer 2 address
+- `_zkSyncAddress`: The receiver Layer 2 address
 
 msg.value equals amount to deposit.
 
@@ -1784,19 +1784,19 @@ msg.value equals amount to deposit.
 Deposit ERC-20 token to Rollup - transfer token from user L1 address into Rollup address
 
 ```solidity
-depositERC20(IERC20 _token, uint104 _amount, address _rollupAddr) payable
+function depositERC20(IERC20 _token, uint104 _amount, address _zkSyncAddress)
 ```
 
 - `_token`: Token address in L1 chain
 - `_amount`: Amount to deposit
-- `_rollupAddr`: The receiver Rollup address
+- `_zkSyncAddress`: The receiver Rollup address
 
 #### Withdraw Ether
 
 Withdraw NFT to L1
 
 ```solidity
-withdrawPendingNFTBalance(uint32 _tokenId)
+function withdrawPendingNFTBalance(uint32 _tokenId)
 ```
 
 - `_tokenId`: Token to withdraw
@@ -1806,23 +1806,23 @@ withdrawPendingNFTBalance(uint32 _tokenId)
 Withdraw ERC20 token to L1 - Transfer token from contract to owner
 
 ```solidity
-withdrawPendingBalance(
-address payable _owner,
-address _token,
-uint128 _amount
+function withdrawPendingBalance(
+  address payable _owner,
+  address _token,
+  uint128 _amount
 )
 ```
 
+- `_owner`: Recipient
 - `_token`: Token address in L1 chain
 - `_amount`: Amount to withdraw
-- `_owner`: Recipient
 
 #### Authenticate rollup public key change
 
 Authenticates pubkey hash change for new rollup public key.
 
 ```solidity
-setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
+function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce)
 ```
 
 - `_pubkey_hash`: `RollupPubkeyHash`
@@ -1834,10 +1834,7 @@ Register full exit request to withdraw all token balance from the account. The u
 that her transactions are censored by the validator.
 
 ```solidity
-requestFullExit (
-    uint24 _accountId,
-    address _token,
-)
+function requestFullExit(uint32 _accountId, address _token)
 ```
 
 - `_accountId`: `AccountId` of the Rollup account
@@ -1847,10 +1844,7 @@ Register full exit request to withdraw NFT tokens balance from the account. User
 their transactions are censored by the validator.
 
 ```solidity
-requestFullExitNFT (
-    uint24 _accountId,
-    uint32 _tokenId,
-)
+function requestFullExitNFT(uint32 _accountId, uint32 _tokenId)
 ```
 
 - `_accountId`: `AccountId` of the Rollup account
@@ -1863,26 +1857,29 @@ requestFullExitNFT (
 Withdraws token from Rollup to L1 in case of exodus mode. User must provide proof that she owns funds.
 
 ```solidity
-performExodus(
+function performExodus(
     StoredBlockInfo memory _storedBlockInfo,
-    uint24 _accountId,
+    address _owner,
+    uint32 _accountId,
     uint32 _tokenId,
     uint128 _amount,
     uint32 _nftCreatorAccountId,
     address _nftCreatorAddress,
     uint32 _nftSerialId,
     bytes32 _nftContentHash,
-    uint256[] calldata _proof
+    uint256[] memory _proof
 )
 ```
 
 - `_storedBlockInfo`: Stored block data of the last verified block
-- `_accountId`: `AccountId` of the owner account.
+- `_owner`: owner address in L2 chain
+- `_accountId`: `AccountId` of the owner account
 - `_tokenId`: Verified token id
-- `_amount`: `StateAmount` Full amount of the given token that belong to `AccountId` in the last verified block.
+- `_amount`: `StateAmount` Full amount of the given token that belong to `AccountId` in the last verified block
 - `_nftCreatorAccountId`: Creator id of NFT (optional, only for NFT)
 - `_nftCreatorAddress`: Creator Address of NFT (optional, only for NFT)
 - `_nftSerialId`: Serial ID of NFT (optional, only for NFT)
+- `_nftContentHash`: Identifier of the NFT represented as a 32-byte hex string
 - `_proof`: Proof that user funds are present in the account tree
 
 ##### Cancel outstanding deposits
@@ -1890,11 +1887,11 @@ performExodus(
 Cancels open priority requests, accrues users balances from deposit priority requests in Exodus mode.
 
 ```solidity
-cancelOutstandingDepositsForExodusMode(uint64 _number, bytes[] memory _depositsPubdata)
+function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata)
 ```
 
-- `_number`: Supposed number of requests to cancel (if there are less request than provided number - will be canceled
-  exact number of requests)
+- `_n`: Supposed number of requests to cancel (if there are fewer requests than the provided number - all of the
+  requests will be canceled) number of requests)
 - `_depositsPubdata`: The array of the pubdata for the deposits to be cancelled. Please note, that it should not contain
   any (even empty) pubdata for `FullExit` priority operations.
 
@@ -1916,29 +1913,27 @@ struct StoredBlockInfo {
 }
 
 struct OnchainOperationData {
-  uint32 publicDataOffset;
   bytes ethWitness;
+  uint32 publicDataOffset;
 }
 
 struct CommitBlockInfo {
-  uint32 blockNumber;
-  uint32 feeAccount;
   bytes32 newStateHash;
   bytes publicData;
   uint256 timestamp;
   OnchainOperationData[] onchainOperations;
+  uint32 blockNumber;
+  uint32 feeAccount;
 }
 
 function commitBlocks(StoredBlockInfo memory _lastCommittedBlockData, CommitBlockInfo[] memory _newBlocksData)
-  external
-  nonReentrant;
 
 ```
 
 - `_lastCommittedBlockData`: Stored info of the last committed block.
-- `_commitBlockInfo`: Data of the new committed blocks.
+- `_newBlocksData`: Data of the new committed blocks.
 
-`StoredBlockInfo` - block data that we store on Ethereum. We store hash of this struct in storage and pass it in tx
+`StoredBlockInfo` - block data that we store on Ethereum. We store hash of this structure in storage and pass it in tx
 arguments every time we need to access any of its field.
 
 - `blockNumber` - rollup block number
@@ -1951,38 +1946,38 @@ arguments every time we need to access any of its field.
 
 `OnchainOperationData` - data needed for the onchain operation processing.
 
-- `publicDataOffset`- offset in the public data bytes after which pubdata for the onchain operation begins
 - `ethWitness` - additional data that can be needed for the onchain operation processing (e.g. signature for change
   pubkey operation)
+- `publicDataOffset`- offset in the public data bytes after which pubdata for the onchain operation begins
 
 `CommitBlockInfo` - data needed for new block commit
 
-- `blockNumber` - rollup block number
-- `feeAccount` - id of the fee account for rollup block
 - `newStateHash` - new rollup state root hash
 - `publicData` - public data of the executed rollup operations
 - `timestamp` - rollup block timestamp
 - `onchainOperations` - list of onchain operations that needs to be processed
+- `blockNumber` - rollup block number
+- `feeAccount` - id of the fee account for rollup block
 
 ##### Verify block commitments
 
 Verify aggregated proof of multiple block commitments.
 
 ```solidity
-function verifyCommitments(
+function verifyAggregatedBlockProof(
     uint256[] memory _recursiveInput,
     uint256[] memory _proof,
     uint8[] memory _vkIndexes,
-    uint256[] memory _commitments,
-    uint256[16] memory _subproofsLibms
-) external {
+    uint256[] memory _individualVksInputs,
+    uint256[16] memory _subproofsLimbs
+)
 ```
 
 - `_recursiveInput` - input of the recursive aggregated circuit
 - `_proof` - recursive proof
 - `_vkIndexes` - index of the verification keys in the aggregated verification keys tree
-- `_commitments` - block commitments to be verified
-- `_subproofsLibms` - data needed for recursive proof verification
+- `_individualVksInputs` - block commitments to be verified
+- `_subproofsLimbs` - data needed for recursive proof verification
 
 ##### Execute blocks
 
@@ -1993,11 +1988,9 @@ onchain operations will be fulfilled.
 struct ExecuteBlockInfo {
   StoredBlockInfo storedBlock;
   bytes[] pendingOnchainOpsPubdata;
-  bytes32[] commitmentsInSlot;
-  uint256 commitmentIdx;
 }
 
-function executeBlocks(ExecuteBlockInfo[] memory _blocksData) external nonReentrant;
+function executeBlocks(ExecuteBlockInfo[] memory _blocksData)
 
 ```
 
@@ -2007,8 +2000,6 @@ function executeBlocks(ExecuteBlockInfo[] memory _blocksData) external nonReentr
 
 - `storedBlock` - stored block that was committed
 - `pendingOnchainOpsPubdata` - list of pubdata for onchain operations that needs to be processed
-- `commitmentsInSlot` - list of commitments that were verified with one recursive proof
-- `commitmentIdx` - index in `commitmentsInSlot` array where current block commitment is stored.
 
 #### Exodus mode trigger
 
@@ -2016,7 +2007,7 @@ Checks if Exodus mode must be entered. Exodus mode must be entered in case of cu
 than the oldest of existed priority requests expiration block number.
 
 ```solidity
-triggerExodusIfNeeded() returns (bool)
+function activateExodusMode() returns (bool)
 ```
 
 #### Revert blocks
@@ -2025,7 +2016,7 @@ Revert blocks that were not verified before deadline determined by `EXPECT_VERIF
 valid operator.
 
 ```solidity
-revertBlocks(StoredBlockInfo[] memory _blocksToRevert);
+function revertBlocks(StoredBlockInfo[] memory _blocksToRevert)
 ```
 
 - `_blocksToRevert`: committed blocks to revert in reverse order starting from last committed.
@@ -2037,7 +2028,7 @@ revertBlocks(StoredBlockInfo[] memory _blocksToRevert);
 Change current governor. The caller must be current governor.
 
 ```solidity
-changeGovernor(address _newGovernor)
+function changeGovernor(address _newGovernor)
 ```
 
 - `_newGovernor`: Address of the new governor
@@ -2047,7 +2038,7 @@ changeGovernor(address _newGovernor)
 Add token to the list of networks tokens. The caller must be current token governance.
 
 ```solidity
-addToken(address _token)
+function addToken(address _token)
 ```
 
 - `_token`: Token address
@@ -2070,7 +2061,7 @@ function setTokenPaused(address _tokenAddr, bool _tokenPaused);
 Change validator status (active or not active). The caller must be current governor.
 
 ```solidity
-setValidator(address _validator, bool _active)
+function setValidator(address _validator, bool _active)
 ```
 
 - `_validator`: Validator address
@@ -2079,7 +2070,7 @@ setValidator(address _validator, bool _active)
 ##### Change token governance
 
 ```solidity
-changeTokenGovernance(TokenGovernance _newTokenGovernance)
+function changeTokenGovernance(TokenGovernance _newTokenGovernance)
 ```
 
 - `_newTokenGovernance`: New token Governance
@@ -2089,7 +2080,7 @@ changeTokenGovernance(TokenGovernance _newTokenGovernance)
 Validate that specified address is the token governance address
 
 ```solidity
-requireGovernor(address _address)
+function requireGovernor(address _address)
 ```
 
 - `_address`: Address to check
@@ -2099,7 +2090,7 @@ requireGovernor(address _address)
 Validate that specified address is the active validator
 
 ```solidity
-requireActiveValidator(address _address)
+function requireActiveValidator(address _address)
 ```
 
 - `_address`: Address to check
@@ -2109,7 +2100,7 @@ requireActiveValidator(address _address)
 Validate token id (must be less than total tokens amount).
 
 ```solidity
-isValidTokenId(uint32 _tokenId) returns (bool)
+function isValidTokenId(uint32 _tokenId) returns (bool)
 ```
 
 - `_tokenId`: Token id
@@ -2121,7 +2112,7 @@ Returns: bool flag that indicates if token id is less than total tokens amount.
 Validate token address (it must be presented in tokens list).
 
 ```solidity
-validateTokenAddress(address _tokenAddr) returns (uint32)
+function validateTokenAddress(address _tokenAddr) returns (uint16)
 ```
 
 - `_tokenAddr`: Token address
@@ -2133,7 +2124,7 @@ Returns: token id.
 Register custom factory for withdrawing NFT
 
 ```solidity
-registerNFTFactoryCreator(uint32 _creatorAccountId, address _creatorAddress, bytes memory _signature)
+function registerNFTFactoryCreator(uint32 _creatorAccountId, address _creatorAddress, bytes memory _signature)
 ```
 
 - `_creatorAccountId`: Creator's zkSync account ID
@@ -2160,7 +2151,7 @@ contract.
 Register factory, which will be use for withdrawing NFT by default
 
 ```solidity
-setDefaultNFTFactory(address _factory)
+function setDefaultNFTFactory(address _factory)
 ```
 
 - `_factory`: NFT factory address
@@ -2170,11 +2161,76 @@ setDefaultNFTFactory(address _factory)
 Get NFT factory which will be used for withdrawing NFT for corresponding creator
 
 ```solidity
-    getNFTFactory(uint32 _creatorAccountId, address _creatorAddress)
+function getNFTFactory(uint32 _creatorAccountId, address _creatorAddress)
 ```
 
 - `_creatorAccountId`: Creator account id
 - `_creatorAddress`: Creator address
+
+### Token Governance contract
+
+#### Add token
+
+Collects fees for adding a token and passes the call to the `addToken` function in the governance contract.
+
+```solidity
+function addToken(address _token)
+```
+
+- `_token`: ERC20 token address
+
+#### Set listing fee token
+
+Set new listing token and fee, can be called only by zkSync governor.
+
+```solidity
+function setListingFeeToken(IERC20 _newListingFeeToken, uint256 _newListingFee)
+```
+
+- `_newListingFeeToken`: address of the token in which fees will be collected
+- `_newListingFee`: amount of tokens that will need to be paid for adding tokens
+
+#### Set listing fee
+
+Set new listing fee, can be called only by zkSync governor.
+
+```solidity
+function setListingFee(uint256 _newListingFee)
+```
+
+- `_newListingFee`: amount of tokens that will need to be paid for adding tokens
+
+#### Set lister
+
+Enable or disable token lister, if enabled new tokens can be added by that address without payment, can be called only
+by zkSync governor.
+
+```solidity
+function setLister(address _listerAddress, bool _active)
+```
+
+- `_listerAddress`: address that can list tokens without fee
+- `_active`: active flag
+
+#### Set listing cap
+
+Change maximum amount of tokens that can be listed using this method, can be called only by zkSync governor.
+
+```solidity
+function setListingCap(uint16 _newListingCap)
+```
+
+- `_newListingCap`: max number of tokens that can be listed using this contract
+
+#### Set treasury
+
+Change address that collects payments for listing tokens, can be called only by zkSync governor.
+
+```solidity
+function setTreasury(address _newTreasury)
+```
+
+- `_newTreasury`: address that collects listing payments
 
 ## Block state transition circuit
 

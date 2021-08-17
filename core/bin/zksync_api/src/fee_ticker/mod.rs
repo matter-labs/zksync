@@ -293,6 +293,8 @@ pub fn run_ticker_task(
                 CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
+            let token_price_updater = ticker_api.clone();
+            tokio::spawn(token_price_updater.keep_price_updated());
             let ticker_info = TickerInfo::new(db_pool);
             let fee_ticker = FeeTicker::new(
                 ticker_api,
@@ -319,6 +321,9 @@ pub fn run_ticker_task(
                 .with_price_cache(price_cache)
                 .with_gas_price_cache(gas_price_cache);
 
+            let token_price_updater = ticker_api.clone();
+            tokio::spawn(token_price_updater.keep_price_updated());
+
             let (ticker_balancer, tickers) = Balancer::new(
                 FeeTickerBuilder {
                     api: ticker_api,
@@ -330,9 +335,11 @@ pub fn run_ticker_task(
                 config.ticker.number_of_ticker_actors,
                 TICKER_CHANNEL_SIZE,
             );
+
             for ticker in tickers.into_iter() {
                 tokio::spawn(ticker.run());
             }
+
             tokio::spawn(ticker_balancer.run())
         }
     }
