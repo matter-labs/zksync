@@ -97,7 +97,7 @@ jobs:
       -
         name: Update cargo dependencies
         run: |
-          cargo install --version=0.5.2 sqlx-cli
+          cargo install  --git https://github.com/launchbadge/sqlx.git --tag v0.5.6 sqlx-cli
           cargo install diesel_cli --no-default-features --features postgres
       -
         name: Setup loadtest database
