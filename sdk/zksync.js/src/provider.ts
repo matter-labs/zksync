@@ -184,6 +184,10 @@ export class Provider extends SyncProvider {
         return nft;
     }
 
+    async getNFTOwner(id: number): Promise<number> {
+        return await this.transport.request('get_nft_owner', [id]);
+    }
+
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise((resolve) => {
