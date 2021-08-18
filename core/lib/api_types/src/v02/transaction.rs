@@ -264,15 +264,15 @@ impl Toggle2FA {
     pub fn get_ethereum_sign_message(&self) -> String {
         if self.enable {
             format!(
-                "By signing this message you agree to benefit from 2FA protection by zkSync server.\n\
-                 Make sure that you hold the Ethereum private key!\n\
-                Timestamp: {}", 
+                "By signing this message, you are opting into Two-factor Authentication protection by the zkSync Server.\n\
+                Transactions now require signatures by both your L1 and L2 private key.\n\
+                Timestamp: {}",
                 self.timestamp.timestamp_millis()
             )
         } else {
             format!(
-                "By signing this message you agree to not receive 2FA protection by zkSync server.\n\
-                MAKE SURE YOU TRUST YOUR CLIENT!\n\
+                "You are opting out of Two-factor Authentication protection by the zkSync Server. Transactions now only require signatures by your L2 private key.\n\
+                BY SIGNING THIS MESSAGE, YOU ARE TRUSTING YOUR WALLET CLIENT TO KEEP YOUR L2 PRIVATE KEY SAFE!\n\
                 Timestamp: {}", 
                 self.timestamp.timestamp_millis()
             )
