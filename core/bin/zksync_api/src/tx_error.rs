@@ -45,3 +45,15 @@ pub enum TxAddError {
     #[error("Too many Ethereum signatures provided")]
     EthSignaturesLimitExceeded,
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
+pub enum Toggle2FAError {
+    #[error("Internal error")]
+    Other,
+
+    #[error("Database unavailable")]
+    DbError,
+
+    #[error("Can not change 2FA for a CREATE2 account.")]
+    CREATE2,
+}

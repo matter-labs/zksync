@@ -43,7 +43,7 @@ use crate::{
     signature_checker::{
         BatchRequest, OrderRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest,
     },
-    tx_error::TxAddError,
+    tx_error::{Toggle2FAError, TxAddError},
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
 
@@ -85,7 +85,7 @@ pub enum SubmitError {
     // Not all TxAddErrors would apply to Toggle2FA, but
     // it is helpful to re-use IncorrectEthSignature and DbError
     #[error("Failed to toggle 2FA: {0}.")]
-    Toggle2FA(TxAddError),
+    Toggle2FA(Toggle2FAError),
 
     #[error("Communication error with the core server: {0}.")]
     CommunicationCoreServer(String),
@@ -93,6 +93,14 @@ pub enum SubmitError {
     Internal(anyhow::Error),
     #[error("{0}")]
     Other(String),
+}
+
+fn tx_db_error_map() -> SubmitError {
+    SubmitError::TxAdd(TxAddError::DbError)
+}
+
+fn toggle_db_error_map() -> SubmitError {
+    SubmitError::Toggle2FA(Toggle2FAError::DbError)
 }
 
 impl SubmitError {
@@ -193,21 +201,28 @@ impl TxSender {
     }
 
     async fn get_tx_sender_type(&self, tx: &ZkSyncTx) -> Result<EthAccountType, SubmitError> {
-        self.get_sender_type(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
-            .await
+        self.get_sender_type(
+            tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?,
+            tx_db_error_map,
+        )
+        .await
     }
 
-    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, SubmitError> {
+    async fn get_sender_type(
+        &self,
+        id: AccountId,
+        db_error_map: fn() -> SubmitError,
+    ) -> Result<EthAccountType, SubmitError> {
         Ok(self
             .pool
             .access_storage()
             .await
-            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+            .map_err(|_| db_error_map())?
             .chain()
             .account_schema()
             .account_type_by_id(id)
             .await
-            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+            .map_err(|_| db_error_map())?
             .unwrap_or(EthAccountType::Owned))
     }
 
@@ -216,12 +231,12 @@ impl TxSender {
         toggle_2fa: Toggle2FA,
     ) -> Result<Toggle2FAResponse, SubmitError> {
         let account_id = toggle_2fa.account_id;
-        let current_type = self.get_sender_type(toggle_2fa.account_id).await?;
+        let current_type = self
+            .get_sender_type(toggle_2fa.account_id, toggle_db_error_map)
+            .await?;
 
         if matches!(current_type, EthAccountType::CREATE2) {
-            return Err(SubmitError::Other(
-                "Can not change 2FA for a CREATE2 account.".to_string(),
-            ));
+            return Err(SubmitError::Toggle2FA(Toggle2FAError::CREATE2));
         }
 
         let new_type = if toggle_2fa.enable {
@@ -236,12 +251,12 @@ impl TxSender {
         self.pool
             .access_storage()
             .await
-            .map_err(|_| SubmitError::Toggle2FA(TxAddError::DbError))?
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?
             .chain()
             .account_schema()
             .set_account_type(account_id, new_type)
             .await
-            .map_err(|_| SubmitError::Toggle2FA(TxAddError::DbError))?;
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?;
 
         Ok(Toggle2FAResponse { success: true })
     }
@@ -291,7 +306,9 @@ impl TxSender {
         order: &Order,
         signature: Option<TxEthSignature>,
     ) -> Result<(), SubmitError> {
-        let signer_type = self.get_sender_type(order.account_id).await?;
+        let signer_type = self
+            .get_sender_type(order.account_id, tx_db_error_map)
+            .await?;
         if matches!(signer_type, EthAccountType::CREATE2) {
             return if signature.is_some() {
                 Err(SubmitError::IncorrectTx(
