@@ -10,13 +10,10 @@ use actix_web::{
 
 // Workspace uses
 use zksync_api_types::{
-    v02::{
-        transaction::Toggle2FA,
-        transaction::{
-            ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
-            Toggle2FAResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
-            TxInBlockStatus,
-        },
+    v02::transaction::{
+        ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
+        Toggle2FA, Toggle2FAResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
+        TxInBlockStatus,
     },
     PriorityOpLookupQuery, TxWithSignature,
 };

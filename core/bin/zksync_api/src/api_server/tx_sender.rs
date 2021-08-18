@@ -34,14 +34,14 @@ use zksync_types::{
     AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
 
-use crate::signature_checker::Toggle2FARequest;
 // Local uses
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
     core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
     signature_checker::{
-        BatchRequest, OrderRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest,
+        BatchRequest, OrderRequest, RequestData, Toggle2FARequest, TxRequest, VerifiedTx,
+        VerifySignatureRequest,
     },
     tx_error::{Toggle2FAError, TxAddError},
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
@@ -93,14 +93,6 @@ pub enum SubmitError {
     Internal(anyhow::Error),
     #[error("{0}")]
     Other(String),
-}
-
-fn tx_db_error_map() -> SubmitError {
-    SubmitError::TxAdd(TxAddError::DbError)
-}
-
-fn toggle_db_error_map() -> SubmitError {
-    SubmitError::Toggle2FA(Toggle2FAError::DbError)
 }
 
 impl SubmitError {
@@ -201,28 +193,20 @@ impl TxSender {
     }
 
     async fn get_tx_sender_type(&self, tx: &ZkSyncTx) -> Result<EthAccountType, SubmitError> {
-        self.get_sender_type(
-            tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?,
-            tx_db_error_map,
-        )
-        .await
+        self.get_sender_type(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
+            .await
+            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))
     }
 
-    async fn get_sender_type(
-        &self,
-        id: AccountId,
-        db_error_map: fn() -> SubmitError,
-    ) -> Result<EthAccountType, SubmitError> {
+    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, anyhow::Error> {
         Ok(self
             .pool
             .access_storage()
-            .await
-            .map_err(|_| db_error_map())?
+            .await?
             .chain()
             .account_schema()
             .account_type_by_id(id)
-            .await
-            .map_err(|_| db_error_map())?
+            .await?
             .unwrap_or(EthAccountType::Owned))
     }
 
@@ -232,8 +216,9 @@ impl TxSender {
     ) -> Result<Toggle2FAResponse, SubmitError> {
         let account_id = toggle_2fa.account_id;
         let current_type = self
-            .get_sender_type(toggle_2fa.account_id, toggle_db_error_map)
-            .await?;
+            .get_sender_type(toggle_2fa.account_id)
+            .await
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?;
 
         if matches!(current_type, EthAccountType::CREATE2) {
             return Err(SubmitError::Toggle2FA(Toggle2FAError::CREATE2));
@@ -307,8 +292,9 @@ impl TxSender {
         signature: Option<TxEthSignature>,
     ) -> Result<(), SubmitError> {
         let signer_type = self
-            .get_sender_type(order.account_id, tx_db_error_map)
-            .await?;
+            .get_sender_type(order.account_id)
+            .await
+            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?;
         if matches!(signer_type, EthAccountType::CREATE2) {
             return if signature.is_some() {
                 Err(SubmitError::IncorrectTx(
@@ -914,8 +900,8 @@ async fn verify_tx_info_message_signature(
     req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
     if matches!(
-        (account_type, signature.clone()),
-        (EthAccountType::CREATE2, Some(_))
+        (account_type, signature.clone(), msg_to_sign.clone()),
+        (EthAccountType::CREATE2, Some(_), Some(_))
     ) {
         return Err(SubmitError::IncorrectTx(
             "Eth signature from CREATE2 account not expected".to_string(),
