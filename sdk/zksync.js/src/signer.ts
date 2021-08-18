@@ -377,3 +377,37 @@ export class Create2WalletSigner extends ethers.Signer {
         return new Create2WalletSigner(this.zkSyncPubkeyHash, this.create2WalletData, provider);
     }
 }
+
+export class No2FAWalletSigner extends ethers.Signer {
+    constructor(public readonly address: string, provider?: ethers.providers.Provider) {
+        super();
+        Object.defineProperty(this, 'provider', {
+            enumerable: true,
+            value: provider,
+            writable: false
+        });
+    }
+
+    async getAddress() {
+        return this.address;
+    }
+
+    /**
+     * This signer can't sign messages but we return zeroed signature bytes to comply with ethers API.
+     */
+    async signMessage(_message) {
+        return ethers.utils.hexlify(new Uint8Array(65));
+    }
+
+    async signTransaction(_message): Promise<string> {
+        throw new Error("No2FAWallet signer can't sign transactions");
+    }
+
+    connect(provider: ethers.providers.Provider): ethers.Signer {
+        return new No2FAWalletSigner(this.address, provider);
+    }
+}
+
+export function unableToSign(signer: ethers.Signer) {
+    return signer instanceof Create2WalletSigner || signer instanceof No2FAWalletSigner;
+}

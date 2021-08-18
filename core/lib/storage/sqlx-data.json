@@ -1646,7 +1646,8 @@
               "kind": {
                 "Enum": [
                   "Owned",
-                  "CREATE2"
+                  "CREATE2",
+                  "No2FA"
                 ]
               }
             }
@@ -5728,7 +5729,8 @@
               "kind": {
                 "Enum": [
                   "Owned",
-                  "CREATE2"
+                  "CREATE2",
+                  "No2FA"
                 ]
               }
             }

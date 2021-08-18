@@ -2,7 +2,7 @@ export { Wallet, Transaction, ETHOperation, submitSignedTransaction, submitSigne
 export { Provider, ETHProxy, getDefaultProvider } from './provider';
 export { RestProvider, getDefaultRestProvider } from './rest-provider';
 export { SyncProvider } from './provider-interface';
-export { Signer, Create2WalletSigner } from './signer';
+export { Signer, Create2WalletSigner, No2FAWalletSigner } from './signer';
 export { closestPackableTransactionAmount, closestPackableTransactionFee } from './utils';
 export { EthMessageSigner } from './eth-message-signer';
 
