@@ -12,7 +12,6 @@ const IMAGES = [
     'ci',
     'exit-tool',
     'dev-liquidity-token-watcher',
-    'ci-integration-test',
     'zk-environment',
     'event-listener',
     'data-restore'
