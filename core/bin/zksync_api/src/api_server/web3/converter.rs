@@ -105,7 +105,7 @@ pub fn log(
         block_number: common_data.block_number,
         transaction_hash: Some(common_data.transaction_hash),
         transaction_index: common_data.transaction_index,
-        log_index: None,
+        log_index: Some(0.into()),
         transaction_log_index: Some(transaction_log_index),
         log_type: None,
         removed: Some(false),
