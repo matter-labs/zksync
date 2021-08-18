@@ -2,8 +2,8 @@
 
 All notable changes to the contracts will be documented in this file.
 
-
 ## 2021-07-27
+
 **Version 5.2** is scheduled for upgrade.
 
 ### Changed
@@ -12,6 +12,7 @@ All notable changes to the contracts will be documented in this file.
 - Minor issues from audit fixed.
 
 ## 2021-05-31
+
 **Version 5.1** is scheduled for upgrade.
 
 ### Added
