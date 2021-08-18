@@ -271,7 +271,8 @@ impl Toggle2FA {
             )
         } else {
             format!(
-                "You are opting out of Two-factor Authentication protection by the zkSync Server. Transactions now only require signatures by your L2 private key.\n\
+                "You are opting out of Two-factor Authentication protection by the zkSync Server.\n\
+                Transactions now only require signatures by your L2 private key.\n\
                 BY SIGNING THIS MESSAGE, YOU ARE TRUSTING YOUR WALLET CLIENT TO KEEP YOUR L2 PRIVATE KEY SAFE!\n\
                 Timestamp: {}", 
                 self.timestamp.timestamp_millis()

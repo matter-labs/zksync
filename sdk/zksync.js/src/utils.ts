@@ -450,13 +450,14 @@ export function getToggle2FAMessage(require2FA: boolean, timestamp: number): Uin
     let message: string;
     if (require2FA) {
         message =
-            `By signing this message you agree to benefit from 2FA protection by zkSync server.\n` +
-            `Make sure that you hold the Ethereum private key!\n` +
+            `By signing this message, you are opting into Two-factor Authentication protection by the zkSync Server.\n` +
+            `Transactions now require signatures by both your L1 and L2 private key.\n` +
             `Timestamp: ${timestamp}`;
     } else {
         message =
-            `By signing this message you agree to not receive 2FA protection by zkSync server.\n` +
-            `MAKE SURE YOU TRUST YOUR CLIENT!\n` +
+            `You are opting out of Two-factor Authentication protection by the zkSync Server.\n` +
+            `Transactions now only require signatures by your L2 private key.\n` +
+            `BY SIGNING THIS MESSAGE, YOU ARE TRUSTING YOUR WALLET CLIENT TO KEEP YOUR L2 PRIVATE KEY SAFE!\n` +
             `Timestamp: ${timestamp}`;
     }
 
