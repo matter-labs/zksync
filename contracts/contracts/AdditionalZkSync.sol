@@ -131,14 +131,12 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
                         approvedUpgradeNoticePeriod = 2 weeks;
                         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
                     }
-                }
-                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_1_WEEK_THRESHOLD) {
+                } else if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_1_WEEK_THRESHOLD) {
                     if (approvedUpgradeNoticePeriod > 1 weeks) {
                         approvedUpgradeNoticePeriod = 1 weeks;
                         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
                     }
-                }
-                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_3_DAYS_THRESHOLD) {
+                } else if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_3_DAYS_THRESHOLD) {
                     if (approvedUpgradeNoticePeriod > 3 days) {
                         approvedUpgradeNoticePeriod = 3 days;
                         emit NoticePeriodChange(approvedUpgradeNoticePeriod);

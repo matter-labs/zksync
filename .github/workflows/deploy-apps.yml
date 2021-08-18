@@ -4,7 +4,7 @@ on:
   deployment:
 
 env:
-  DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
+  DEPLOY_APPS: -l name=server -l name=prover
 
 jobs:
   pre:

@@ -228,11 +228,11 @@ impl GasCounter {
     }
 
     pub fn commit_gas_limit(&self) -> U256 {
-        self.commit_cost * U256::from(130) / U256::from(100)
+        Self::scale_up(self.commit_cost)
     }
 
     pub fn verify_gas_limit(&self) -> U256 {
-        self.verify_cost * U256::from(130) / U256::from(100)
+        Self::scale_up(self.verify_cost)
     }
 
     pub fn complete_withdrawals_gas_limit() -> U256 {

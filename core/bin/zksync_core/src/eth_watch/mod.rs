@@ -216,7 +216,6 @@ impl<W: EthClient> EthWatch<W> {
             new_tokens,
             register_nft_factory_events,
         );
-
         self.set_new_state(new_state);
         Ok(())
     }

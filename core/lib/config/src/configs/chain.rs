@@ -3,7 +3,6 @@ use serde::Deserialize;
 /// Built-in uses
 use std::time::Duration;
 // Local uses
-use zksync_crypto::{convert::FeConvert, priv_key_from_fs, Fs, PrivateKey};
 use zksync_types::network::Network;
 use zksync_types::Address;
 
@@ -89,9 +88,6 @@ pub struct StateKeeper {
     pub block_prove_deadline: u64,
     pub block_execute_deadline: u64,
     pub max_aggregated_tx_gas: usize,
-    pub last_tx_signer_used: bool,
-    pub last_tx_signer_address: Address,
-    pub last_tx_signer_private_key: String,
 }
 
 impl StateKeeper {
@@ -110,17 +106,6 @@ impl StateKeeper {
 
     pub fn block_execute_deadline(&self) -> Duration {
         Duration::from_secs(self.block_execute_deadline)
-    }
-
-    pub fn last_tx_signer_data(&self) -> Option<(Address, PrivateKey)> {
-        if self.last_tx_signer_used {
-            let fs = Fs::from_hex(&self.last_tx_signer_private_key)
-                .expect("failed to parse private key");
-            let pk = priv_key_from_fs(fs);
-            Some((self.last_tx_signer_address, pk))
-        } else {
-            None
-        }
     }
 }
 
@@ -156,9 +141,6 @@ mod tests {
                 block_prove_deadline: 3_000,
                 block_execute_deadline: 4_000,
                 max_aggregated_tx_gas: 4_000_000,
-                last_tx_signer_used: false,
-                last_tx_signer_private_key: "0xaabbeecc".into(),
-                last_tx_signer_address: addr("da03a0b5963f75f1c8485b355ff6d30f3093bde7"),
             },
         }
     }
@@ -187,9 +169,6 @@ CHAIN_STATE_KEEPER_BLOCK_COMMIT_DEADLINE="300"
 CHAIN_STATE_KEEPER_BLOCK_PROVE_DEADLINE="3000"
 CHAIN_STATE_KEEPER_BLOCK_EXECUTE_DEADLINE="4000"
 CHAIN_STATE_KEEPER_MAX_AGGREGATED_TX_GAS="4000000"
-CHAIN_STATE_KEEPER_LAST_TX_SIGNER_USED="false"
-CHAIN_STATE_KEEPER_LAST_TX_SIGNER_ADDRESS="0xda03a0b5963f75f1c8485b355ff6d30f3093bde7"
-CHAIN_STATE_KEEPER_LAST_TX_SIGNER_PRIVATE_KEY="0xaabbeecc"
         "#;
         set_env(config);
 
