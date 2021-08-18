@@ -326,7 +326,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         });
     });
 
-    describe.only('No2FA tests', () => {
+    describe('No2FA tests', () => {
         let hilda: Wallet;
         let hildaWithEthSigner: Wallet;
         let frida: Wallet;
@@ -439,24 +439,24 @@ if (process.env.TEST_TRANSPORT) {
 } else {
     // Default case: run HTTP&ETH / HTTP&wBTC.
     tokenAndTransport = [
-        // {
-        //     transport: 'HTTP',
-        //     token: 'ETH',
-        //     providerType: 'RPC',
-        //     onlyBasic: true
-        // },
-        // {
-        //     transport: 'HTTP',
-        //     token: defaultERC20,
-        //     providerType: 'RPC',
-        //     onlyBasic: false
-        // },
-        // {
-        //     transport: 'HTTP',
-        //     token: 'ETH',
-        //     providerType: 'REST',
-        //     onlyBasic: true
-        // },
+        {
+            transport: 'HTTP',
+            token: 'ETH',
+            providerType: 'RPC',
+            onlyBasic: true
+        },
+        {
+            transport: 'HTTP',
+            token: defaultERC20,
+            providerType: 'RPC',
+            onlyBasic: false
+        },
+        {
+            transport: 'HTTP',
+            token: 'ETH',
+            providerType: 'REST',
+            onlyBasic: true
+        },
         {
             transport: 'HTTP',
             token: defaultERC20,
