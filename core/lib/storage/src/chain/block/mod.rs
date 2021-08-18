@@ -68,10 +68,25 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         } else {
                             EthAccountType::Owned
                         };
+
+                        let current_type = transaction
+                            .chain()
+                            .account_schema()
+                            .account_type_by_id(tx.account_id)
+                            .await?;
+
+                        let new_account_type = match (current_type, account_type) {
+                            // You can not change No2FA to Owned here
+                            (Some(EthAccountType::No2FA), EthAccountType::Owned) => {
+                                EthAccountType::No2FA
+                            }
+                            _ => account_type,
+                        };
+
                         transaction
                             .chain()
                             .account_schema()
-                            .set_account_type(tx.account_id, account_type)
+                            .set_account_type(tx.account_id, new_account_type)
                             .await?;
                     }
                     // Store the executed operation in the corresponding schema.

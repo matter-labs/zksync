@@ -19,10 +19,9 @@ use itertools::izip;
 use num::{bigint::ToBigInt, BigUint, Zero};
 use thiserror::Error;
 
-use zksync_api_types::v02::transaction::Toggle2FAResponse;
 // Workspace uses
 use zksync_api_types::{
-    v02::transaction::{SubmitBatchResponse, Toggle2FA, TxHashSerializeWrapper},
+    v02::transaction::{SubmitBatchResponse, Toggle2FA, Toggle2FAResponse, TxHashSerializeWrapper},
     TxWithSignature,
 };
 use zksync_config::ZkSyncConfig;
@@ -47,6 +46,8 @@ use crate::{
     tx_error::TxAddError,
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
+
+const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
 #[derive(Clone)]
 pub struct TxSender {
@@ -215,7 +216,20 @@ impl TxSender {
         toggle_2fa: Toggle2FA,
     ) -> Result<Toggle2FAResponse, SubmitError> {
         let account_id = toggle_2fa.account_id;
-        let require_2fa = toggle_2fa.enable;
+        let current_type = self.get_sender_type(toggle_2fa.account_id).await?;
+
+        if matches!(current_type, EthAccountType::CREATE2) {
+            return Err(SubmitError::Other(
+                "Can not change 2FA for a CREATE2 account.".to_string(),
+            ));
+        }
+
+        let new_type = if toggle_2fa.enable {
+            EthAccountType::Owned
+        } else {
+            EthAccountType::No2FA
+        };
+
         self.verify_toggle_2fa_request_eth_signature(toggle_2fa)
             .await?;
 
@@ -225,7 +239,7 @@ impl TxSender {
             .map_err(|_| SubmitError::Toggle2FA(TxAddError::DbError))?
             .chain()
             .account_schema()
-            .update_account_2fa(account_id, require_2fa)
+            .set_account_type(account_id, new_type)
             .await
             .map_err(|_| SubmitError::Toggle2FA(TxAddError::DbError))?;
 
@@ -236,24 +250,16 @@ impl TxSender {
         &self,
         toggle_2fa: Toggle2FA,
     ) -> Result<(), SubmitError> {
-        let signer_type = self.get_sender_type(toggle_2fa.account_id).await?;
-        if matches!(signer_type, EthAccountType::CREATE2 | EthAccountType::No2FA) {
-            return Err(SubmitError::InvalidParams(
-                "The account already doesn't have 2FA".to_string(),
-            ));
-        }
-
         let current_time = Utc::now();
         let request_time = toggle_2fa.timestamp;
-        let validness_interval_minutes = 10;
-        let validness_interval = Duration::minutes(validness_interval_minutes);
+        let validness_interval = Duration::minutes(VALIDNESS_INTERVAL_MINUTES);
 
         if current_time - validness_interval > request_time
             || current_time + validness_interval < request_time
         {
             return Err(SubmitError::InvalidParams(format!(
                 "Timestamp differs by more than {} minutes",
-                validness_interval_minutes
+                VALIDNESS_INTERVAL_MINUTES
             )));
         }
 
