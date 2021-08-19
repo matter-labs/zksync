@@ -103,7 +103,14 @@ pub struct Token {
     pub symbol: String,
     /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
     pub decimals: u8,
-    pub is_nft: bool,
+    pub kind: TokenKind,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub enum TokenKind {
+    ERC20,
+    NFT,
+    None,
 }
 
 impl Token {
@@ -113,7 +120,7 @@ impl Token {
             address,
             symbol: symbol.to_string(),
             decimals,
-            is_nft: false,
+            kind: TokenKind::ERC20,
         }
     }
 
@@ -123,7 +130,7 @@ impl Token {
             address: Default::default(),
             symbol: symbol.to_string(),
             decimals: 0,
-            is_nft: true,
+            kind: TokenKind::NFT,
         }
     }
 }

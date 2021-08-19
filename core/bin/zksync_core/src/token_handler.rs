@@ -73,6 +73,20 @@ impl TokenHandler {
         receiver.await.expect("Err response from eth watch")
     }
 
+    async fn is_contract_erc20(&self, address: Address) -> bool {
+        let (sender, receiver) = oneshot::channel();
+        self.eth_watch_req
+            .clone()
+            .send(EthWatchRequest::IsContractERC20 {
+                address,
+                resp: sender,
+            })
+            .await
+            .expect("ETH watch req receiver dropped");
+
+        receiver.await.expect("Err response from eth watch")
+    }
+
     async fn save_new_tokens(
         &self,
         storage: &mut StorageProcessor<'_>,
@@ -93,6 +107,8 @@ impl TokenHandler {
             // or use default values (name = "ERC20-{id}", decimals = 18).
             let default_symbol = format!("ERC20-{}", token_event.id);
             let default_decimals = 18;
+
+            let is_erc20 = self.is_contract_erc20(token_event.address).await;
 
             let token_from_list = {
                 let token_info = self.token_list.get(&token_event.address).cloned();

@@ -20,7 +20,35 @@ pub struct DbToken {
     pub address: String,
     pub symbol: String,
     pub decimals: i16,
-    pub is_nft: bool,
+    pub kind: TokenKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "token_kind")]
+pub enum TokenKind {
+    ERC20,
+    NFT,
+    None,
+}
+
+impl From<TokenKind> for zksync_types::tokens::TokenKind {
+    fn from(kind: TokenKind) -> zksync_types::tokens::TokenKind {
+        match kind {
+            TokenKind::ERC20 => zksync_types::tokens::TokenKind::ERC20,
+            TokenKind::NFT => zksync_types::tokens::TokenKind::NFT,
+            TokenKind::None => zksync_types::tokens::TokenKind::None,
+        }
+    }
+}
+
+impl From<zksync_types::tokens::TokenKind> for TokenKind {
+    fn from(kind: zksync_types::tokens::TokenKind) -> TokenKind {
+        match kind {
+            zksync_types::tokens::TokenKind::ERC20 => TokenKind::ERC20,
+            zksync_types::tokens::TokenKind::NFT => TokenKind::NFT,
+            zksync_types::tokens::TokenKind::None => TokenKind::None,
+        }
+    }
 }
 
 impl From<Token> for DbToken {
@@ -30,7 +58,7 @@ impl From<Token> for DbToken {
             address: address_to_stored_string(&token.address),
             symbol: token.symbol,
             decimals: token.decimals as i16,
-            is_nft: token.is_nft,
+            kind: token.kind.into(),
         }
     }
 }
@@ -42,7 +70,7 @@ impl From<DbToken> for Token {
             address: stored_str_address_to_address(&val.address),
             symbol: val.symbol,
             decimals: val.decimals as u8,
-            is_nft: val.is_nft,
+            kind: val.kind.into(),
         }
     }
 }

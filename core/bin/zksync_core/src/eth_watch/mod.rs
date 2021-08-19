@@ -111,6 +111,10 @@ pub enum EthWatchRequest {
         pubkey_hash: PubKeyHash,
         resp: oneshot::Sender<bool>,
     },
+    IsContractERC20 {
+        address: Address,
+        resp: oneshot::Sender<bool>,
+    },
 }
 
 pub struct EthWatch<W: EthClient> {
@@ -634,6 +638,9 @@ impl<W: EthClient> EthWatch<W> {
                     )
                     .unwrap_or_default();
                 }
+                EthWatchRequest::IsContractERC20 { address, resp } => resp
+                    .send(self.client.is_contract_erc20(adddress))
+                    .unwrap_or_default(),
             }
         }
     }

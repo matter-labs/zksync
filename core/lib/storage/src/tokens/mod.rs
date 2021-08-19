@@ -13,7 +13,7 @@ use zksync_api_types::v02::{
 use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
-use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageApiNFT, StorageNFT};
+use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageApiNFT, StorageNFT, TokenKind};
 
 use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
@@ -45,7 +45,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let token_from_db: Option<Token> = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT * FROM tokens
+            SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
             WHERE id = $1 OR address = $2 OR symbol = $3
             LIMIT 1
             "#,
@@ -81,14 +81,14 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
 
         sqlx::query!(
             r#"
-            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
+            INSERT INTO tokens ( id, address, symbol, decimals, kind )
             VALUES ( $1, $2, $3, $4, $5 )
             "#,
             token.id.0 as i32,
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
-            token.is_nft
+            token.kind.into::<TokenKind>() as TokenKind
         )
         .execute(self.0.conn())
         .await
@@ -104,17 +104,17 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let start = Instant::now();
         sqlx::query!(
             r#"
-            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
+            INSERT INTO tokens ( id, address, symbol, decimals, kind )
             VALUES ( $1, $2, $3, $4, $5 )
             ON CONFLICT (id)
             DO
-              UPDATE SET address = $2, symbol = $3, decimals = $4
+              UPDATE SET address = $2, symbol = $3, decimals = $4, kind = $5
             "#,
             *token.id as i32,
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
-            token.is_nft
+            token.kind.into::<TokenKind>() as TokenKind
         )
         .execute(self.0.conn())
         .await?;
@@ -128,18 +128,24 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         from: TokenId,
         limit: Option<u32>,
+        include_none_kind: bool,
     ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
         let limit = limit.map(i64::from);
+        let mut kinds = vec![TokenKind::ERC20];
+        if include_none_kind {
+            kinds.push(TokenKind::None);
+        }
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT * FROM tokens
-            WHERE id >= $1 AND is_nft = false
+            SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
+            WHERE id >= $1 AND kind = ANY($2)
             ORDER BY id ASC
-            LIMIT $2
+            LIMIT $3
             "#,
             *from as i32,
+            kinds.as_slice() as _,
             limit
         )
         .fetch_all(self.0.conn())
@@ -155,18 +161,24 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         from: TokenId,
         limit: Option<u32>,
+        include_none_kind: bool,
     ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
         let limit = limit.map(i64::from);
+        let mut kinds = vec![TokenKind::ERC20];
+        if include_none_kind {
+            kinds.push(TokenKind::None);
+        }
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT * FROM tokens
-            WHERE id <= $1 AND is_nft = false
+            SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
+            WHERE id <= $1 AND kind = ANY($2)
             ORDER BY id DESC
-            LIMIT $2
+            LIMIT $3
             "#,
-            from.0 as u32,
+            *from as i32,
+            &kinds.as_slice() as _,
             limit
         )
         .fetch_all(self.0.conn())
@@ -180,8 +192,13 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Loads all the stored tokens from the database.
     /// Alongside with the tokens added via `store_token` method, the default `ETH` token
     /// is returned.
-    pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
-        let tokens = self.load_tokens_asc(TokenId(0), None).await?;
+    pub async fn load_tokens(
+        &mut self,
+        include_none_kind: bool,
+    ) -> QueryResult<HashMap<TokenId, Token>> {
+        let tokens = self
+            .load_tokens_asc(TokenId(0), None, include_none_kind)
+            .await?;
         Ok(tokens.into_iter().map(|token| (token.id, token)).collect())
     }
 
@@ -192,10 +209,12 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     ) -> QueryResult<Vec<Token>> {
         let tokens = match query.direction {
             PaginationDirection::Newer => {
-                self.load_tokens_asc(query.from, Some(query.limit)).await?
+                self.load_tokens_asc(query.from, Some(query.limit), false)
+                    .await?
             }
             PaginationDirection::Older => {
-                self.load_tokens_desc(query.from, Some(query.limit)).await?
+                self.load_tokens_desc(query.from, Some(query.limit), false)
+                    .await?
             }
         };
         Ok(tokens)
@@ -238,12 +257,12 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT id, address, symbol, decimals, is_nft
+            SELECT id, address, decimals, kind as "kind: _", symbol
             FROM tokens
             INNER JOIN ticker_market_volume
             ON tokens.id = ticker_market_volume.token_id
             WHERE ticker_market_volume.market_volume >= $1
-            AND is_nft = false
+            AND kind = 'ERC20'::token_kind
             ORDER BY id ASC
             "#,
             ratio_to_big_decimal(&min_market_volume, STORED_USD_PRICE_PRECISION)
@@ -296,12 +315,17 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     }
 
     /// Get the number of tokens from Database
-    pub async fn get_count(&mut self) -> QueryResult<u32> {
+    pub async fn get_count(&mut self, include_none_kind: bool) -> QueryResult<u32> {
         let start = Instant::now();
+        let mut kinds = vec![TokenKind::ERC20];
+        if include_none_kind {
+            kinds.push(TokenKind::None);
+        }
         let last_token_id = sqlx::query!(
             r#"
-            SELECT max(id) as "id!" FROM tokens WHERE is_nft = false
+            SELECT max(id) as "id!" FROM tokens WHERE kind = ANY($1)
             "#,
+            &kinds.as_slice() as _
         )
         .fetch_optional(self.0.conn())
         .await?
@@ -369,7 +393,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                 sqlx::query_as!(
                     DbToken,
                     r#"
-                    SELECT * FROM tokens
+                    SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
                     WHERE id = $1
                     LIMIT 1
                     "#,
@@ -382,7 +406,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                 sqlx::query_as!(
                     DbToken,
                     r#"
-                    SELECT * FROM tokens
+                    SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
                     WHERE address = $1
                     LIMIT 1
                     "#,
@@ -395,7 +419,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                 sqlx::query_as!(
                     DbToken,
                     r#"
-                    SELECT * FROM tokens
+                    SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
                     WHERE symbol = $1
                     LIMIT 1
                     "#,
