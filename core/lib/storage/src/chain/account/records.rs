@@ -88,6 +88,7 @@ pub struct StorageBalance {
 pub enum EthAccountType {
     Owned,
     CREATE2,
+    No2FA,
 }
 
 impl From<EthAccountType> for ApiEthAccountType {
@@ -95,6 +96,7 @@ impl From<EthAccountType> for ApiEthAccountType {
         match account_type {
             EthAccountType::Owned => ApiEthAccountType::Owned,
             EthAccountType::CREATE2 => ApiEthAccountType::CREATE2,
+            EthAccountType::No2FA => ApiEthAccountType::No2FA,
         }
     }
 }

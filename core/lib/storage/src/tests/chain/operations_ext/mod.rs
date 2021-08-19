@@ -6,10 +6,12 @@ use zksync_api_types::v02::{
     pagination::{AccountTxsRequest, ApiEither, PaginationDirection, PaginationQuery},
     transaction::{Receipt, TxInBlockStatus},
 };
+use zksync_crypto::{franklin_crypto::bellman::pairing::ff::Field, Fr};
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    block::Block,
     tx::TxHash,
-    BlockNumber, ExecutedOperations,
+    AccountId, AccountUpdate, BlockNumber, ExecutedOperations, Nonce, ZkSyncOp, H256,
 };
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
@@ -21,7 +23,7 @@ use crate::{
         dummy_ethereum_tx_hash, gen_sample_block, gen_unique_aggregated_operation,
         BLOCK_SIZE_CHUNKS,
     },
-    tests::db_test,
+    tests::{db_test, ACCOUNT_MUTEX},
     tokens::StoreTokenError,
     QueryResult, StorageProcessor,
 };
@@ -1054,6 +1056,133 @@ async fn web3_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .web3_receipts(BlockNumber(1), BlockNumber(2))
         .await?;
     assert_eq!(all_receipts.len(), 20);
+
+    Ok(())
+}
+
+/// Test getting swap for account using different storage methods
+#[db_test]
+async fn test_getting_swap_for_acc(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let _lock = ACCOUNT_MUTEX.lock().await;
+    // Commit block with a swap.
+    let mut setup = TransactionsHistoryTestSetup::new();
+    let swap_op = setup.create_swap_tx_with_random_recipients(Some(0));
+    let block = Block::new(
+        BlockNumber(1),
+        Fr::zero(),
+        AccountId(0),
+        vec![swap_op.clone()],
+        (0, 0), // Not important
+        100,
+        1_000_000.into(),
+        1_500_000.into(),
+        H256::default(),
+        0,
+    );
+    setup.blocks.push(block);
+    let op = match swap_op.get_executed_tx().unwrap().op.clone().unwrap() {
+        ZkSyncOp::Swap(op) => op,
+        _ => unreachable!(),
+    };
+    let ((recipient1_address, recipient1_id), (recipient2_address, recipient2_id)) = (
+        (op.tx.orders.0.recipient_address, op.recipients.0),
+        (op.tx.orders.1.recipient_address, op.recipients.1),
+    );
+
+    let updates = vec![
+        (
+            recipient1_id,
+            AccountUpdate::Create {
+                address: recipient1_address,
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            recipient2_id,
+            AccountUpdate::Create {
+                address: recipient2_address,
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            setup.from_zksync_account.get_account_id().unwrap(),
+            AccountUpdate::Create {
+                address: setup.from_zksync_account.address,
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            setup.to_zksync_account.get_account_id().unwrap(),
+            AccountUpdate::Create {
+                address: setup.to_zksync_account.address,
+                nonce: Nonce(0),
+            },
+        ),
+    ];
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(1), &updates, 0)
+        .await?;
+    commit_schema_data(&mut storage, &setup).await?;
+
+    let addresses_to_check = vec![
+        op.tx.submitter_address,
+        setup.from_zksync_account.address,
+        setup.to_zksync_account.address,
+        recipient1_address,
+        recipient2_address,
+    ];
+    let tx_hash = swap_op.get_executed_tx().unwrap().signed_tx.tx.hash();
+
+    // Check that the swap is returned by any function that returns account transactions.
+    for address in addresses_to_check.iter() {
+        let txs = storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions_history(address, 0, 1)
+            .await?;
+        assert_eq!(txs.len(), 1);
+        assert_eq!(txs[0].hash.clone().unwrap(), tx_hash.to_string());
+    }
+
+    for address in addresses_to_check.iter() {
+        let txs = storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions_history_from(address, (2, 1), SearchDirection::Older, 1)
+            .await?;
+        assert_eq!(txs.len(), 1);
+        assert_eq!(txs[0].hash.clone().unwrap(), tx_hash.to_string());
+    }
+
+    for address in addresses_to_check.iter() {
+        let txs = storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions(&PaginationQuery {
+                from: AccountTxsRequest {
+                    address: *address,
+                    tx_hash: ApiEither::from(tx_hash),
+                },
+                limit: 1,
+                direction: PaginationDirection::Older,
+            })
+            .await?
+            .unwrap();
+        assert_eq!(txs.len(), 1);
+        assert_eq!(txs[0].tx_hash, tx_hash);
+    }
+
+    for address in addresses_to_check.iter() {
+        let last_tx_hash = storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_last_tx_hash(*address)
+            .await?
+            .unwrap();
+        assert_eq!(last_tx_hash, tx_hash);
+    }
 
     Ok(())
 }

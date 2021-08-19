@@ -152,6 +152,10 @@ impl FeeTickerAPI for MockApiProvider {
         }
         unreachable!("incorrect token input")
     }
+
+    async fn keep_price_updated(self) {
+        // Just do nothing
+    }
 }
 
 struct MockTickerInfo {

@@ -18,7 +18,11 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     Upgradeable[] public managedContracts;
 
     /// @notice Upgrade mode statuses
-    enum UpgradeStatus {Idle, NoticePeriod, Preparation}
+    enum UpgradeStatus {
+        Idle,
+        NoticePeriod,
+        Preparation
+    }
 
     UpgradeStatus public upgradeStatus;
 

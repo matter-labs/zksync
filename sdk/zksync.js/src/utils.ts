@@ -446,6 +446,24 @@ export function getChangePubkeyLegacyMessage(pubKeyHash: PubKeyHash, nonce: numb
     return utils.toUtf8Bytes(message);
 }
 
+export function getToggle2FAMessage(require2FA: boolean, timestamp: number): Uint8Array {
+    let message: string;
+    if (require2FA) {
+        message =
+            `By signing this message, you are opting into Two-factor Authentication protection by the zkSync Server.\n` +
+            `Transactions now require signatures by both your L1 and L2 private key.\n` +
+            `Timestamp: ${timestamp}`;
+    } else {
+        message =
+            `You are opting out of Two-factor Authentication protection by the zkSync Server.\n` +
+            `Transactions now only require signatures by your L2 private key.\n` +
+            `BY SIGNING THIS MESSAGE, YOU ARE TRUSTING YOUR WALLET CLIENT TO KEEP YOUR L2 PRIVATE KEY SAFE!\n` +
+            `Timestamp: ${timestamp}`;
+    }
+
+    return utils.toUtf8Bytes(message);
+}
+
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {
     let messageBytes = typeof message === 'string' ? utils.toUtf8Bytes(message) : utils.arrayify(message);
     if (addPrefix) {

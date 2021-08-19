@@ -271,6 +271,10 @@ export class Provider extends SyncProvider {
         return parseFloat(tokenPrice);
     }
 
+    async toggle2FA(): Promise<boolean> {
+        throw new Error('JSON-RPC does not support toggle2FA');
+    }
+
     async disconnect() {
         return await this.transport.disconnect();
     }

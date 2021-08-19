@@ -10,6 +10,7 @@ use std::{
 
 // External uses
 use bigdecimal::BigDecimal;
+use chrono::{Duration, Utc};
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
@@ -20,7 +21,7 @@ use thiserror::Error;
 
 // Workspace uses
 use zksync_api_types::{
-    v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper},
+    v02::transaction::{SubmitBatchResponse, Toggle2FA, Toggle2FAResponse, TxHashSerializeWrapper},
     TxWithSignature,
 };
 use zksync_config::ZkSyncConfig;
@@ -39,11 +40,14 @@ use crate::{
     core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
     signature_checker::{
-        BatchRequest, OrderRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest,
+        BatchRequest, OrderRequest, RequestData, Toggle2FARequest, TxRequest, VerifiedTx,
+        VerifySignatureRequest,
     },
-    tx_error::TxAddError,
+    tx_error::{Toggle2FAError, TxAddError},
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
+
+const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
 #[derive(Clone)]
 pub struct TxSender {
@@ -78,6 +82,10 @@ pub enum SubmitError {
     TxAdd(TxAddError),
     #[error("Chosen token is not suitable for paying fees.")]
     InappropriateFeeToken,
+    // Not all TxAddErrors would apply to Toggle2FA, but
+    // it is helpful to re-use IncorrectEthSignature and DbError
+    #[error("Failed to toggle 2FA: {0}.")]
+    Toggle2FA(Toggle2FAError),
 
     #[error("Communication error with the core server: {0}.")]
     CommunicationCoreServer(String),
@@ -187,20 +195,95 @@ impl TxSender {
     async fn get_tx_sender_type(&self, tx: &ZkSyncTx) -> Result<EthAccountType, SubmitError> {
         self.get_sender_type(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
             .await
+            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))
     }
 
-    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, SubmitError> {
+    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, anyhow::Error> {
         Ok(self
             .pool
             .access_storage()
-            .await
-            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+            .await?
             .chain()
             .account_schema()
             .account_type_by_id(id)
-            .await
-            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+            .await?
             .unwrap_or(EthAccountType::Owned))
+    }
+
+    pub async fn toggle_2fa(
+        &self,
+        toggle_2fa: Toggle2FA,
+    ) -> Result<Toggle2FAResponse, SubmitError> {
+        let account_id = toggle_2fa.account_id;
+        let current_type = self
+            .get_sender_type(toggle_2fa.account_id)
+            .await
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?;
+
+        if matches!(current_type, EthAccountType::CREATE2) {
+            return Err(SubmitError::Toggle2FA(Toggle2FAError::CREATE2));
+        }
+
+        let new_type = if toggle_2fa.enable {
+            EthAccountType::Owned
+        } else {
+            EthAccountType::No2FA
+        };
+
+        self.verify_toggle_2fa_request_eth_signature(toggle_2fa)
+            .await?;
+
+        self.pool
+            .access_storage()
+            .await
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?
+            .chain()
+            .account_schema()
+            .set_account_type(account_id, new_type)
+            .await
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?;
+
+        Ok(Toggle2FAResponse { success: true })
+    }
+
+    async fn verify_toggle_2fa_request_eth_signature(
+        &self,
+        toggle_2fa: Toggle2FA,
+    ) -> Result<(), SubmitError> {
+        let current_time = Utc::now();
+        let request_time = toggle_2fa.timestamp;
+        let validness_interval = Duration::minutes(VALIDNESS_INTERVAL_MINUTES);
+
+        if current_time - validness_interval > request_time
+            || current_time + validness_interval < request_time
+        {
+            return Err(SubmitError::InvalidParams(format!(
+                "Timestamp differs by more than {} minutes",
+                VALIDNESS_INTERVAL_MINUTES
+            )));
+        }
+
+        let message = toggle_2fa.get_ethereum_sign_message().into_bytes();
+
+        let signature = toggle_2fa.signature;
+        let signer = self
+            .get_address_by_id(toggle_2fa.account_id)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+
+        let eth_sign_data = EthSignData { signature, message };
+        let (sender, receiever) = oneshot::channel();
+
+        let request = VerifySignatureRequest {
+            data: RequestData::Toggle2FA(Toggle2FARequest {
+                sign_data: eth_sign_data,
+                sender: signer,
+            }),
+            response: sender,
+        };
+
+        send_verify_request_and_recv(request, self.sign_verify_requests.clone(), receiever).await?;
+        Ok(())
     }
 
     async fn verify_order_eth_signature(
@@ -208,7 +291,10 @@ impl TxSender {
         order: &Order,
         signature: Option<TxEthSignature>,
     ) -> Result<(), SubmitError> {
-        let signer_type = self.get_sender_type(order.account_id).await?;
+        let signer_type = self
+            .get_sender_type(order.account_id)
+            .await
+            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?;
         if matches!(signer_type, EthAccountType::CREATE2) {
             return if signature.is_some() {
                 Err(SubmitError::IncorrectTx(
@@ -218,6 +304,11 @@ impl TxSender {
                 Ok(())
             };
         }
+        if matches!(signer_type, EthAccountType::No2FA) {
+            // We don't verify signatures for accounts with no 2FA
+            return Ok(());
+        }
+
         let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
         let signer = self
             .get_address_by_id(order.account_id)
@@ -808,25 +899,28 @@ async fn verify_tx_info_message_signature(
     msg_to_sign: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
-    let eth_sign_data = match msg_to_sign {
-        Some(message) => match account_type {
-            // Check if account is a CREATE2 account
-            // These accounts do not have to pass 2FA
-            EthAccountType::CREATE2 => {
-                if signature.is_some() {
-                    return Err(SubmitError::IncorrectTx(
-                        "Eth signature from CREATE2 account not expected".to_string(),
-                    ));
-                }
-                None
-            }
-            EthAccountType::Owned => {
-                let signature =
-                    signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
-                Some(EthSignData { signature, message })
-            }
-        },
-        None => None,
+    if matches!(
+        (account_type, signature.clone(), msg_to_sign.clone()),
+        (EthAccountType::CREATE2, Some(_), Some(_))
+    ) {
+        return Err(SubmitError::IncorrectTx(
+            "Eth signature from CREATE2 account not expected".to_string(),
+        ));
+    }
+
+    let should_check_eth_signature = match (account_type, tx) {
+        (EthAccountType::CREATE2, _) => false,
+        (EthAccountType::No2FA, ZkSyncTx::ChangePubKey(_)) => true,
+        (EthAccountType::No2FA, _) => false,
+        _ => true,
+    };
+
+    let eth_sign_data = match (msg_to_sign, should_check_eth_signature) {
+        (Some(message), true) => {
+            let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+            Some(EthSignData { signature, message })
+        }
+        _ => None,
     };
 
     let (sender, receiever) = oneshot::channel();
@@ -897,6 +991,11 @@ async fn verify_txs_batch_signature(
                         .tx_signature()
                         .clone()
                         .map(|signature| EthSignData { signature, message })
+                }
+                EthAccountType::No2FA => {
+                    // Even if the user supplies some eth signature we won't
+                    // check it
+                    None
                 }
             }
         } else {

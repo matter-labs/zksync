@@ -2,7 +2,7 @@ import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from '
 import { ErrorCode } from '@ethersproject/logger';
 import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
-import { Create2WalletSigner, Signer } from './signer';
+import { Create2WalletSigner, Signer, unableToSign } from './signer';
 import { BatchBuilder } from './batch-builder';
 import {
     AccountState,
@@ -48,7 +48,8 @@ import {
     MAX_TIMESTAMP,
     signMessagePersonalAPI,
     isNFT,
-    SYNC_MAIN_CONTRACT_INTERFACE
+    SYNC_MAIN_CONTRACT_INTERFACE,
+    getToggle2FAMessage
 } from './utils';
 
 const EthersErrorCode = ErrorCode;
@@ -137,6 +138,18 @@ export class Wallet {
         return wallet;
     }
 
+    static async fromSyncSigner(
+        ethWallet: ethers.Signer,
+        syncSigner: Signer,
+        provider: SyncProvider,
+        accountId?: number
+    ) {
+        return await Wallet.fromEthSigner(ethWallet, provider, syncSigner, accountId, {
+            verificationMethod: 'ERC-1271',
+            isSignedMsgPrefixed: true
+        });
+    }
+
     async getEthMessageSignature(message: ethers.utils.BytesLike): Promise<TxEthSignature> {
         if (this.ethSignerType == null) {
             throw new Error('ethSignerType is unknown');
@@ -208,26 +221,23 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
-        const ethereumSignature =
-            this.ethSigner instanceof Create2WalletSigner
-                ? null
-                : await this.ethMessageSigner.ethSignTransfer({
-                      stringAmount,
-                      stringFee,
-                      stringToken,
-                      to: transfer.to,
-                      nonce: transfer.nonce,
-                      accountId: this.accountId
-                  });
+        const ethereumSignature = unableToSign(this.ethSigner)
+            ? null
+            : await this.ethMessageSigner.ethSignTransfer({
+                  stringAmount,
+                  stringFee,
+                  stringToken,
+                  to: transfer.to,
+                  nonce: transfer.nonce,
+                  accountId: this.accountId
+              });
         return {
             tx: signedTransferTransaction,
             ethereumSignature
         };
     }
 
-    async signRegisterFactory(
-        factoryAddress: Address
-    ): Promise<{
+    async signRegisterFactory(factoryAddress: Address): Promise<{
         signature: TxEthSignature;
         accountId: number;
         accountAddress: Address;
@@ -287,15 +297,14 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
-        const ethereumSignature =
-            this.ethSigner instanceof Create2WalletSigner
-                ? null
-                : await this.ethMessageSigner.ethSignForcedExit({
-                      stringToken,
-                      stringFee,
-                      target: forcedExit.target,
-                      nonce: forcedExit.nonce
-                  });
+        const ethereumSignature = unableToSign(this.ethSigner)
+            ? null
+            : await this.ethMessageSigner.ethSignForcedExit({
+                  stringToken,
+                  stringFee,
+                  target: forcedExit.target,
+                  nonce: forcedExit.nonce
+              });
 
         return {
             tx: signedForcedExitTransaction,
@@ -380,10 +389,9 @@ export class Wallet {
 
         messages.push(`Nonce: ${batchNonce}`);
         const message = messages.filter((part) => part.length != 0).join('\n');
-        const ethSignatures =
-            this.ethSigner instanceof Create2WalletSigner
-                ? []
-                : [await this.ethMessageSigner.getEthMessageSignature(message)];
+        const ethSignatures = unableToSign(this.ethSigner)
+            ? []
+            : [await this.ethMessageSigner.getEthMessageSignature(message)];
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignatures);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
@@ -497,17 +505,16 @@ export class Wallet {
             : this.provider.tokenSet.formatToken(order.tokenSell, order.amount);
         const stringTokenSell = await this.provider.getTokenSymbol(order.tokenSell);
         const stringTokenBuy = await this.provider.getTokenSymbol(order.tokenBuy);
-        const ethereumSignature =
-            this.ethSigner instanceof Create2WalletSigner
-                ? null
-                : await this.ethMessageSigner.ethSignOrder({
-                      amount: stringAmount,
-                      tokenSell: stringTokenSell,
-                      tokenBuy: stringTokenBuy,
-                      nonce: order.nonce,
-                      recipient: order.recipient,
-                      ratio: order.ratio
-                  });
+        const ethereumSignature = unableToSign(this.ethSigner)
+            ? null
+            : await this.ethMessageSigner.ethSignOrder({
+                  amount: stringAmount,
+                  tokenSell: stringTokenSell,
+                  tokenBuy: stringTokenBuy,
+                  nonce: order.nonce,
+                  recipient: order.recipient,
+                  ratio: order.ratio
+              });
         order.ethSignature = ethereumSignature;
         return order;
     }
@@ -545,14 +552,13 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
-        const ethereumSignature =
-            this.ethSigner instanceof Create2WalletSigner
-                ? null
-                : await this.ethMessageSigner.ethSignSwap({
-                      fee: stringFee,
-                      feeToken: stringToken,
-                      nonce: swap.nonce
-                  });
+        const ethereumSignature = unableToSign(this.ethSigner)
+            ? null
+            : await this.ethMessageSigner.ethSignSwap({
+                  fee: stringFee,
+                  feeToken: stringToken,
+                  nonce: swap.nonce
+              });
 
         return {
             tx: signedSwapTransaction,
@@ -710,16 +716,15 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
         const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
-        const ethereumSignature =
-            this.ethSigner instanceof Create2WalletSigner
-                ? null
-                : await this.ethMessageSigner.ethSignMintNFT({
-                      stringFeeToken,
-                      stringFee,
-                      recipient: mintNFT.recipient,
-                      contentHash: mintNFT.contentHash,
-                      nonce: mintNFT.nonce
-                  });
+        const ethereumSignature = unableToSign(this.ethSigner)
+            ? null
+            : await this.ethMessageSigner.ethSignMintNFT({
+                  stringFeeToken,
+                  stringFee,
+                  recipient: mintNFT.recipient,
+                  contentHash: mintNFT.contentHash,
+                  nonce: mintNFT.nonce
+              });
 
         return {
             tx: signedMintNFTTransaction,
@@ -744,16 +749,15 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
         const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
-        const ethereumSignature =
-            this.ethSigner instanceof Create2WalletSigner
-                ? null
-                : await this.ethMessageSigner.ethSignWithdrawNFT({
-                      token: withdrawNFT.token,
-                      to: withdrawNFT.to,
-                      stringFee,
-                      stringFeeToken,
-                      nonce: withdrawNFT.nonce
-                  });
+        const ethereumSignature = unableToSign(this.ethSigner)
+            ? null
+            : await this.ethMessageSigner.ethSignWithdrawNFT({
+                  token: withdrawNFT.token,
+                  to: withdrawNFT.to,
+                  stringFee,
+                  stringFeeToken,
+                  nonce: withdrawNFT.nonce
+              });
 
         return {
             tx: signedWithdrawNFTTransaction,
@@ -781,17 +785,16 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
-        const ethereumSignature =
-            this.ethSigner instanceof Create2WalletSigner
-                ? null
-                : await this.ethMessageSigner.ethSignWithdraw({
-                      stringAmount,
-                      stringFee,
-                      stringToken,
-                      ethAddress: withdraw.ethAddress,
-                      nonce: withdraw.nonce,
-                      accountId: this.accountId
-                  });
+        const ethereumSignature = unableToSign(this.ethSigner)
+            ? null
+            : await this.ethMessageSigner.ethSignWithdraw({
+                  stringAmount,
+                  stringFee,
+                  stringToken,
+                  ethAddress: withdraw.ethAddress,
+                  nonce: withdraw.nonce,
+                  accountId: this.accountId
+              });
 
         return {
             tx: signedWithdrawTransaction,
@@ -911,6 +914,20 @@ export class Wallet {
         });
 
         return changePubKeyTx;
+    }
+
+    async toggle2FA(enable: boolean): Promise<boolean> {
+        await this.setRequiredAccountIdFromServer('Toggle 2FA');
+        const accountId = await this.getAccountId();
+        const timestamp = new Date().getTime();
+        const signature = await this.getEthMessageSignature(getToggle2FAMessage(enable, timestamp));
+
+        return await this.provider.toggle2FA({
+            accountId,
+            signature,
+            timestamp,
+            enable
+        });
     }
 
     async signSetSigningKey(changePubKey: {

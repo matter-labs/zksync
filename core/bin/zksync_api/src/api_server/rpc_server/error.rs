@@ -20,6 +20,7 @@ pub enum RpcErrorCodes {
     AccountCloseDisabled = 301,
     OperationsLimitReached = 302,
     UnsupportedFastProcessing = 303,
+    Toggle2FA = 304,
 }
 
 impl From<TxAddError> for RpcErrorCodes {
@@ -72,6 +73,11 @@ impl From<SubmitError> for jsonrpc_core::Error {
             },
             SubmitError::TxAdd(inner) => Self {
                 code: RpcErrorCodes::from(inner).into(),
+                message: inner.to_string(),
+                data: None,
+            },
+            SubmitError::Toggle2FA(inner) => Self {
+                code: RpcErrorCodes::Toggle2FA.into(),
                 message: inner.to_string(),
                 data: None,
             },

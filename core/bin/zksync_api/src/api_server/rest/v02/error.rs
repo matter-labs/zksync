@@ -13,7 +13,7 @@ use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
 
-#[derive(Serialize_repr, Debug, Deserialize)]
+#[derive(Serialize_repr, Debug, Deserialize, Clone)]
 #[repr(u16)]
 pub enum ErrorCode {
     UnreacheableError = 0,
@@ -38,11 +38,12 @@ pub enum ErrorCode {
     TxAddError = 605,
     InappropriateFeeToken = 606,
     CommunicationCoreServer = 607,
+    Toggle2FAError = 608,
     Other = 60_000,
 }
 
 /// Error object in a response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Error {
     pub error_type: String,
@@ -188,6 +189,7 @@ impl ApiError for SubmitError {
             Self::InappropriateFeeToken => ErrorCode::InappropriateFeeToken,
             Self::CommunicationCoreServer(_) => ErrorCode::CommunicationCoreServer,
             Self::Internal(_) => ErrorCode::InternalError,
+            Self::Toggle2FA(_) => ErrorCode::Toggle2FAError,
             Self::Other(_) => ErrorCode::Other,
         }
     }

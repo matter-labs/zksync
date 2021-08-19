@@ -27,7 +27,6 @@ pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
     /// Stores account type in the databse
-    /// There are 2 types: Owned and CREATE2
     pub async fn set_account_type(
         &mut self,
         account_id: AccountId,

@@ -39,4 +39,5 @@ pub enum AccountAddressOrId {
 pub enum EthAccountType {
     Owned,
     CREATE2,
+    No2FA,
 }

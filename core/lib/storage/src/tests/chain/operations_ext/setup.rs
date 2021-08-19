@@ -518,6 +518,74 @@ impl TransactionsHistoryTestSetup {
         ExecutedOperations::Tx(Box::new(executed_change_pubkey_op))
     }
 
+    pub fn create_swap_tx_with_random_recipients(
+        &mut self,
+        block_index: Option<u32>,
+    ) -> ExecutedOperations {
+        let from_id = self.from_zksync_account.get_account_id().unwrap();
+        let to_id = self.to_zksync_account.get_account_id().unwrap();
+
+        let recipient1_id = AccountId(0xbcde);
+        let recipient1_account = ZkSyncAccount::rand();
+        recipient1_account.set_account_id(Some(recipient1_id));
+
+        let recipient2_id = AccountId(0xedcb);
+        let recipient2_account = ZkSyncAccount::rand();
+        recipient2_account.set_account_id(Some(recipient2_id));
+
+        let order1 = self.from_zksync_account.sign_order(
+            self.tokens[0].id,
+            self.tokens[1].id,
+            1u32.into(),
+            1u32.into(),
+            1u32.into(),
+            &recipient1_account.address,
+            None,
+            true,
+            Default::default(),
+        );
+        let order2 = self.to_zksync_account.sign_order(
+            self.tokens[1].id,
+            self.tokens[0].id,
+            1u32.into(),
+            1u32.into(),
+            1u32.into(),
+            &recipient2_account.address,
+            None,
+            true,
+            Default::default(),
+        );
+        let swap_op = ZkSyncOp::Swap(Box::new(SwapOp {
+            tx: self
+                .from_zksync_account
+                .sign_swap(
+                    (order1, order2),
+                    (1u32.into(), 1u32.into()),
+                    None,
+                    true,
+                    self.tokens[0].id,
+                    &self.tokens[0].symbol,
+                    0u32.into(),
+                )
+                .0,
+            submitter: from_id,
+            accounts: (from_id, to_id),
+            recipients: (recipient1_id, recipient2_id),
+        }));
+
+        let executed_swap_op = ExecutedTx {
+            signed_tx: swap_op.try_get_tx().unwrap().into(),
+            success: true,
+            op: Some(swap_op),
+            fail_reason: None,
+            block_index,
+            created_at: self.get_tx_time(),
+            batch_id: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_swap_op))
+    }
+
     /// This method is important, since it seems that during database roundtrip timestamp
     /// can be rounded and loose several microseconds in precision, which have lead to the
     /// test failures (txs were using `chrono::Utc::now()` and had difference of 1-2 microsecond

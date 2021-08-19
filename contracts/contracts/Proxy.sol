@@ -19,8 +19,9 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @param targetInitializationParameters Target initialization parameters
     constructor(address target, bytes memory targetInitializationParameters) Ownable(msg.sender) {
         setTarget(target);
-        (bool initializationSuccess, ) =
-            getTarget().delegatecall(abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters));
+        (bool initializationSuccess, ) = getTarget().delegatecall(
+            abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters)
+        );
         require(initializationSuccess, "uin11"); // uin11 - target initialization failed
     }
 
@@ -59,8 +60,9 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
         requireMaster(msg.sender);
 
         setTarget(newTarget);
-        (bool upgradeSuccess, ) =
-            getTarget().delegatecall(abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters));
+        (bool upgradeSuccess, ) = getTarget().delegatecall(
+            abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters)
+        );
         require(upgradeSuccess, "ufu11"); // ufu11 - target upgrade failed
     }
 
@@ -82,14 +84,14 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
             returndatacopy(ptr, 0x0, size)
             // Depending on result value
             switch result
-                case 0 {
-                    // End execution and revert state changes
-                    revert(ptr, size)
-                }
-                default {
-                    // Return data with length of size at pointers position
-                    return(ptr, size)
-                }
+            case 0 {
+                // End execution and revert state changes
+                revert(ptr, size)
+            }
+            default {
+                // Return data with length of size at pointers position
+                return(ptr, size)
+            }
         }
     }
 

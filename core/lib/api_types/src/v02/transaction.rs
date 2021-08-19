@@ -1,11 +1,12 @@
 use crate::{v02::block::BlockStatus, TxWithSignature};
+use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use zksync_types::{
     tx::{
-        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer, TxHash,
-        Withdraw, WithdrawNFT,
+        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
+        TxEthSignature, TxHash, Withdraw, WithdrawNFT,
     },
     AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
     H256,
@@ -245,4 +246,42 @@ pub struct ApiTxBatch {
 pub struct BatchStatus {
     pub updated_at: DateTime<Utc>,
     pub last_state: TxInBlockStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Toggle2FA {
+    pub enable: bool,
+    #[serde(with = "ts_milliseconds")]
+    pub timestamp: DateTime<Utc>,
+    pub account_id: AccountId,
+    pub signature: TxEthSignature,
+}
+
+impl Toggle2FA {
+    // Even though the function returns constant value, it is made for consistency
+    // with Order and transactions
+    pub fn get_ethereum_sign_message(&self) -> String {
+        if self.enable {
+            format!(
+                "By signing this message, you are opting into Two-factor Authentication protection by the zkSync Server.\n\
+                Transactions now require signatures by both your L1 and L2 private key.\n\
+                Timestamp: {}",
+                self.timestamp.timestamp_millis()
+            )
+        } else {
+            format!(
+                "You are opting out of Two-factor Authentication protection by the zkSync Server.\n\
+                Transactions now only require signatures by your L2 private key.\n\
+                BY SIGNING THIS MESSAGE, YOU ARE TRUSTING YOUR WALLET CLIENT TO KEEP YOUR L2 PRIVATE KEY SAFE!\n\
+                Timestamp: {}", 
+                self.timestamp.timestamp_millis()
+            )
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Toggle2FAResponse {
+    pub success: bool,
 }

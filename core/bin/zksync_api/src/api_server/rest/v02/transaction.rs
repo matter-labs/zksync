@@ -12,7 +12,8 @@ use actix_web::{
 use zksync_api_types::{
     v02::transaction::{
         ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
-        Transaction, TransactionData, TxData, TxHashSerializeWrapper, TxInBlockStatus,
+        Toggle2FA, Toggle2FAResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
+        TxInBlockStatus,
     },
     PriorityOpLookupQuery, TxWithSignature,
 };
@@ -169,6 +170,19 @@ async fn submit_batch(
     response.into()
 }
 
+async fn toggle_2fa(
+    data: web::Data<ApiTransactionData>,
+    Json(toggle_2fa): Json<Toggle2FA>,
+) -> ApiResult<Toggle2FAResponse> {
+    let response = data
+        .tx_sender
+        .toggle_2fa(toggle_2fa)
+        .await
+        .map_err(Error::from);
+
+    response.into()
+}
+
 async fn get_batch(
     data: web::Data<ApiTransactionData>,
     batch_hash: web::Path<TxHash>,
@@ -186,6 +200,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("{tx_hash}/data", web::get().to(tx_data))
         .route("/batches", web::post().to(submit_batch))
         .route("/batches/{batch_hash}", web::get().to(get_batch))
+        .route("/toggle2FA", web::post().to(toggle_2fa))
 }
 
 #[cfg(test)]
