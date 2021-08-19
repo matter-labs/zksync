@@ -101,14 +101,9 @@ impl CallsHelper {
                 .get_token(&mut transaction, to)
                 .await
                 .map_err(|_| Error::internal_error())?;
-            if let Some(token) = token {
-                if !token.is_nft {
-                    &self.erc20
-                } else {
-                    return Ok(Vec::new());
-                }
-            } else {
-                return Ok(Vec::new());
+            match token {
+                Some(token) if !token.is_nft => &self.erc20,
+                _ => return Ok(Vec::new()),
             }
         };
         let selector: Selector = if data.len() >= 4 {
