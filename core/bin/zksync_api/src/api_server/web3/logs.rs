@@ -1,11 +1,11 @@
 // Built-in uses
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::str::FromStr;
 // External uses
-use ethabi::{encode, Token as AbiToken};
+use ethabi::{encode, Contract, Token as AbiToken};
 use jsonrpc_core::{Error, Result};
 use num::{BigUint, Zero};
-use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_storage::StorageProcessor;
 use zksync_types::{Nonce, Token, TokenId, ZkSyncOp, NFT};
@@ -27,24 +27,69 @@ pub struct LogsHelper {
 
 impl LogsHelper {
     pub fn new() -> Self {
-        let data = vec![
-            (Event::ZkSyncTransfer, "ZkSyncTransfer(address,address,address,uint256,uint256)"),
-            (Event::ZkSyncWithdraw, "ZkSyncWithdraw(address,address,address,uint256,uint256)"),
-            (Event::ZkSyncForcedExit, "ZkSyncForcedExit(address,address,address,uint256)"),
-            (Event::ZkSyncChangePubKey, "ZkSyncChangePubKey(address,bytes20,address,uint256)"),
-            (Event::ZkSyncDeposit, "ZkSyncDeposit(address,address,address,uint256)"),
-            (Event::ZkSyncFullExit, "ZkSyncFullExit(address,address,uint256)"),
-            (Event::ZkSyncMintNFT, "ZkSyncMintNFT(uint32,uint32,address,bytes32,address,uint256,address)"),
-            (Event::ZkSyncWithdrawNFT, "ZkSyncWithdrawNFT(address,address,uint32,address,address,uint256,uint32,address,uint32,bytes32)"),
-            (Event::ZkSyncSwap, "ZkSyncSwap(address,address,address,address,address,address,address,address,uint256,uint256,uint256)"),
-            (Event::ERCTransfer, "Transfer(address,address,uint256)"),
-        ];
-        let mut topic_by_event = HashMap::new();
+        let mut path = PathBuf::new();
+        path.push(std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_string()));
+        path.push("etc/web3-abi");
 
-        for (event_name, event_str) in data.into_iter() {
-            let topic = H256::from(keccak256(event_str.as_bytes()));
-            topic_by_event.insert(event_name, topic);
-        }
+        let proxy_abi = std::fs::File::open(path.join("ZkSyncProxy.json")).unwrap();
+        let proxy_contract = Contract::load(proxy_abi).unwrap();
+
+        let erc20_abi = std::fs::File::open(path.join("ERC20.json")).unwrap();
+        let erc20_contract = Contract::load(erc20_abi).unwrap();
+
+        let topic_by_event: HashMap<_, _> = vec![
+            (
+                Event::ZkSyncTransfer,
+                proxy_contract.event("ZkSyncTransfer").unwrap().signature(),
+            ),
+            (
+                Event::ZkSyncWithdraw,
+                proxy_contract.event("ZkSyncWithdraw").unwrap().signature(),
+            ),
+            (
+                Event::ZkSyncForcedExit,
+                proxy_contract
+                    .event("ZkSyncForcedExit")
+                    .unwrap()
+                    .signature(),
+            ),
+            (
+                Event::ZkSyncChangePubKey,
+                proxy_contract
+                    .event("ZkSyncChangePubKey")
+                    .unwrap()
+                    .signature(),
+            ),
+            (
+                Event::ZkSyncDeposit,
+                proxy_contract.event("ZkSyncDeposit").unwrap().signature(),
+            ),
+            (
+                Event::ZkSyncFullExit,
+                proxy_contract.event("ZkSyncFullExit").unwrap().signature(),
+            ),
+            (
+                Event::ZkSyncMintNFT,
+                proxy_contract.event("ZkSyncMintNFT").unwrap().signature(),
+            ),
+            (
+                Event::ZkSyncWithdrawNFT,
+                proxy_contract
+                    .event("ZkSyncWithdrawNFT")
+                    .unwrap()
+                    .signature(),
+            ),
+            (
+                Event::ZkSyncSwap,
+                proxy_contract.event("ZkSyncSwap").unwrap().signature(),
+            ),
+            (
+                Event::ERCTransfer,
+                erc20_contract.event("Transfer").unwrap().signature(),
+            ),
+        ]
+        .into_iter()
+        .collect();
 
         Self {
             topic_by_event,

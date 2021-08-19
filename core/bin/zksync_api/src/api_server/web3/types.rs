@@ -258,7 +258,7 @@ pub enum Event {
     ZkSyncMintNFT,
     ZkSyncWithdrawNFT,
     ZkSyncSwap,
-    ERCTransfer, // erc20 and erc721 transfers have same topics
+    ERCTransfer, // ERC20 and ERC721 transfers have same topics
 }
 
 #[derive(Debug, Clone, Copy)]
