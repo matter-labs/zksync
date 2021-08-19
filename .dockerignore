@@ -10,6 +10,7 @@
 !etc/env/docker.env
 !etc/env/base
 !etc/tokens
+!etc/web3-abi
 !keys/packed
 !docker/nginx/nginx.conf
 !bin/

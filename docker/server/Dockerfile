@@ -13,5 +13,5 @@ EXPOSE 3030
 EXPOSE 3002
 COPY --from=builder /usr/src/zksync/target/release/zksync_server /usr/bin
 COPY contracts/artifacts/ /contracts/artifacts/
-COPY etc/web3-api/ /etc/web3-api/
+COPY etc/web3-abi/ /etc/web3-abi/
 ENTRYPOINT ["zksync_server"]
