@@ -26,13 +26,6 @@ jobs:
     name: Build and Push Docker Images
     runs-on: [self-hosted, MAIN]
 
-    ## Required services
-    services:
-      postgres:
-        image: postgres:10.4
-        ports:
-          - 5432:5432
-
     steps:
     - uses: actions/checkout@v2
     - name: setup-env
@@ -47,6 +40,7 @@ jobs:
         zk run yarn
         cp etc/tokens/{test,localhost}.json
         zk run verify-keys unpack
+        zk up
         zk db basic-setup
     - name: update-images
       run: |
