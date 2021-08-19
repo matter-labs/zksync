@@ -113,12 +113,17 @@ jobs:
           zk db insert contract
 
   update-configmap:
-    name: Deploy contracts
+    name: Update ConfigMap
     runs-on: [k8s, deployer, stage]
     needs: [dbsetup]
     container:
       image: dysnix/kubectl:v1.20-gcloud
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
     steps:
+      -
+        name: Create ~/.kube/config
+        run: .github/scripts/write-kubeconf.sh
       -
         name: Update contracts in the ConfigMap
         run: |
