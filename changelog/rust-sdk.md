@@ -20,7 +20,7 @@ All notable changes to `zksync_rs` will be documented in this file.
 
 ### Fixed
 
-## Version 0.3.0 (15.02.2021)
+## Version 0.3.0 (2021-02-15)
 
 ### Added
 

@@ -28,20 +28,20 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Fixed
 
-## Version 0.10.9 (13.04.2021)
+## Version 0.10.9 (2021-04-13)
 
 ### Changed
 
 - Exported classes: `ETHOperation`, `Transaction`, `ZKSyncTxError`
 - Exported types: `TotalFee`
 
-## Version 0.10.6 (16.03.2021)
+## Version 0.10.6 (2021-03-16)
 
 ### Added
 
 - (`BatchBuilder`) Make it possible to add signed `ChangePubKey` transaction to the batch.
 
-## Version 0.10.4 (08.03.2021)
+## Version 0.10.4 (2021-03-08)
 
 ### Added
 
@@ -61,7 +61,7 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Fixed
 
-## Version 0.9.0 (15.02.2021)
+## Version 0.9.0 (2021-02-15)
 
 ### Added
 
