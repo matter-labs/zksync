@@ -5,6 +5,7 @@ on:
       - dev
       - breaking
       - hotfix/*
+      - deniallugo-fix-ci
     tags:
       - hotfix-*
 
@@ -33,6 +34,7 @@ jobs:
         echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
+
     - name: init
       run: |
         cargo sqlx --version || cargo install sqlx-cli
@@ -42,10 +44,15 @@ jobs:
         zk run verify-keys unpack
         zk up
         zk db basic-setup
+
     - name: update-images
       run: |
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zk docker push rust
+
+    - name: docker-down
+      run: |
+        docker-compose down
 
   # Reminder: when disabling the deploy stage - comment the whole job out!
   deploy:
