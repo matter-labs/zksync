@@ -118,7 +118,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     // Helper method for retrieving blocks from the database.
-    async fn get_storage_block(&mut self, block: BlockNumber) -> QueryResult<Option<StorageBlock>> {
+    pub async fn get_storage_block(
+        &mut self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<StorageBlock>> {
         let start = Instant::now();
         let block = sqlx::query_as!(
             StorageBlock,
@@ -1325,5 +1328,56 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             start.elapsed()
         );
         Ok(())
+    }
+
+    pub async fn get_block_number_by_hash(
+        &mut self,
+        hash: &[u8],
+    ) -> QueryResult<Option<BlockNumber>> {
+        let start = Instant::now();
+        let record = sqlx::query!("SELECT number FROM blocks where root_hash = $1", hash)
+            .fetch_optional(self.0.conn())
+            .await?;
+        let block_number = record.map(|r| BlockNumber(r.number as u32));
+
+        metrics::histogram!("sql.chain.block.get_block_number_by_hash", start.elapsed());
+        Ok(block_number)
+    }
+
+    pub async fn get_block_transactions_hashes(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<Vec<Vec<u8>>> {
+        let start = Instant::now();
+        let records = sqlx::query!(
+            r#"
+                WITH transactions AS (
+                    SELECT tx_hash, created_at, block_index
+                    FROM executed_transactions
+                    WHERE block_number = $1
+                ), priority_ops AS (
+                    SELECT tx_hash, created_at, block_index
+                    FROM executed_priority_operations
+                    WHERE block_number = $1
+                ), everything AS (
+                    SELECT * FROM transactions
+                    UNION ALL
+                    SELECT * FROM priority_ops
+                )
+                SELECT tx_hash as "tx_hash!"
+                FROM everything
+                ORDER BY created_at, block_index
+            "#,
+            i64::from(*block_number)
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+        let hashes = records.into_iter().map(|record| record.tx_hash).collect();
+
+        metrics::histogram!(
+            "sql.chain.block.get_block_transactions_hashes",
+            start.elapsed()
+        );
+        Ok(hashes)
     }
 }

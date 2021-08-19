@@ -38,6 +38,12 @@ http_url="http://127.0.0.1:3030"
 ws_port=3031
 ws_url="ws://127.0.0.1:3031"
 
+# Configuration for the web3 JSON RPC server
+[api.web3]
+port=3002
+url="http://127.0.0.1:3002"
+max_block_range=10
+
 # Configuration for the core private server.
 [api.private]
 port=8090

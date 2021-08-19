@@ -47,6 +47,7 @@ pub struct StorageMintNFTUpdate {
     pub update_order_id: i32,
     pub block_number: i64,
     pub symbol: String,
+    pub nonce: i64,
 }
 
 impl From<StorageMintNFTUpdate> for NFT {

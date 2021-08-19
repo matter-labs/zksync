@@ -268,7 +268,7 @@ impl InMemoryStorageInteractor {
                     account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = *new_pub_key_hash;
                 }
-                AccountUpdate::MintNFT { ref token } => {
+                AccountUpdate::MintNFT { ref token, .. } => {
                     self.tokens.insert(
                         token.id,
                         Token {
@@ -280,7 +280,7 @@ impl InMemoryStorageInteractor {
                         },
                     );
                 }
-                AccountUpdate::RemoveNFT { ref token } => {
+                AccountUpdate::RemoveNFT { ref token, .. } => {
                     self.tokens.remove(&token.id);
                 }
             }

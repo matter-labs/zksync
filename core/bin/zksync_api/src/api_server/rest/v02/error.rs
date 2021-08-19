@@ -8,6 +8,7 @@ use thiserror::Error;
 
 // Workspace uses
 use zksync_api_types::v02::pagination::{UnknownFromParameter, MAX_LIMIT};
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
@@ -25,6 +26,7 @@ pub enum ErrorCode {
     TransactionNotFound = 205,
     PaginationLimitTooBig = 206,
     QueryDeserializationError = 207,
+    InvalidNFTTokenId = 208,
     StorageError = 300,
     TokenNotFound = 500,
     ExternalApiError = 501,
@@ -99,6 +101,8 @@ pub enum InvalidDataError {
     TransactionNotFound,
     #[error("Limit for pagination should be less than or equal to {}", MAX_LIMIT)]
     PaginationLimitTooBig,
+    #[error("NFT token ID should be greater than or equal to {}", MIN_NFT_TOKEN_ID)]
+    InvalidNFTTokenId,
 }
 
 impl ApiError for InvalidDataError {
@@ -115,6 +119,7 @@ impl ApiError for InvalidDataError {
             Self::InvalidCurrency => ErrorCode::InvalidCurrency,
             Self::TransactionNotFound => ErrorCode::TransactionNotFound,
             Self::PaginationLimitTooBig => ErrorCode::PaginationLimitTooBig,
+            Self::InvalidNFTTokenId => ErrorCode::InvalidNFTTokenId,
         }
     }
 }

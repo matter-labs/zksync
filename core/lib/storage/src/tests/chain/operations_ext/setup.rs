@@ -11,8 +11,8 @@ use zksync_types::{
     operations::{ChangePubKeyOp, ZkSyncOp},
     priority_ops::PriorityOp,
     tx::{ChangePubKeyType, TxHash},
-    AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, SwapOp,
-    Token, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, MintNFTOp,
+    SwapOp, Token, TokenId, TransferOp, TransferToNewOp, WithdrawNFTOp, WithdrawOp,
 };
 // Local imports
 
@@ -30,10 +30,13 @@ pub struct TransactionsHistoryTestSetup {
 
 impl TransactionsHistoryTestSetup {
     pub fn new() -> Self {
+        let mut nft_token = Token::new_nft(TokenId(100000), "NFT-100000");
+        nft_token.address = Address::random();
         let tokens = vec![
-            Token::new(TokenId(0), Address::zero(), "ETH", 18), // used for deposits
-            Token::new(TokenId(1), Address::random(), "DAI", 18), // used for transfers
+            Token::new(TokenId(0), Address::zero(), "ETH", 18), // used for deposits, swaps
+            Token::new(TokenId(1), Address::random(), "DAI", 18), // used for transfers, swaps
             Token::new(TokenId(2), Address::random(), "FAU", 6), // used for withdraws
+            nft_token,                                          // used for nft withdrawals
         ];
 
         let from_account_id = AccountId(0xbabe);
@@ -74,8 +77,11 @@ impl TransactionsHistoryTestSetup {
         let executed_close_op = self.create_close_tx(Some(3));
         let executed_change_pubkey_op = self.create_change_pubkey_tx(Some(4));
         let executed_withdraw_op = self.create_withdraw_tx(Some(5));
+        let executed_mint_nft_op = self.create_mint_nft_tx(Some(6));
+        let executed_withdraw_nft_op = self.create_withdraw_nft_tx(Some(7));
+        let executed_swap_op = self.create_swap_tx(Some(8));
         let executed_full_exit_op =
-            self.create_full_exit_op(prior_op_unique_serial_id + 1, block_id, 6);
+            self.create_full_exit_op(prior_op_unique_serial_id + 1, block_id, 9);
 
         let operations = vec![
             executed_deposit_op,
@@ -84,6 +90,9 @@ impl TransactionsHistoryTestSetup {
             executed_close_op,
             executed_change_pubkey_op,
             executed_withdraw_op,
+            executed_mint_nft_op,
+            executed_withdraw_nft_op,
+            executed_swap_op,
             executed_full_exit_op,
         ];
 
@@ -111,8 +120,11 @@ impl TransactionsHistoryTestSetup {
         let executed_close_op = self.create_close_tx(Some(2));
         let executed_change_pubkey_op = self.create_change_pubkey_tx(Some(3));
         let executed_withdraw_op = self.create_withdraw_tx(Some(4));
+        let executed_mint_nft_op = self.create_mint_nft_tx(Some(5));
+        let executed_withdraw_nft_op = self.create_withdraw_nft_tx(Some(6));
+        let executed_swap_op = self.create_swap_tx(Some(7));
         let executed_full_exit_op =
-            self.create_full_exit_op(prior_op_unique_serial_id + 1, block_id, 6);
+            self.create_full_exit_op(prior_op_unique_serial_id + 1, block_id, 8);
 
         let operations = vec![
             executed_deposit_op,
@@ -121,6 +133,9 @@ impl TransactionsHistoryTestSetup {
             executed_close_op,
             executed_change_pubkey_op,
             executed_withdraw_op,
+            executed_mint_nft_op,
+            executed_withdraw_nft_op,
+            executed_swap_op,
             executed_full_exit_op,
         ];
 
@@ -335,6 +350,127 @@ impl TransactionsHistoryTestSetup {
         };
 
         ExecutedOperations::Tx(Box::new(executed_withdraw_op))
+    }
+
+    fn create_mint_nft_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
+        let mint_nft_op = ZkSyncOp::MintNFTOp(Box::new(MintNFTOp {
+            tx: self
+                .from_zksync_account
+                .sign_mint_nft(
+                    self.tokens[0].id,
+                    &self.tokens[0].symbol,
+                    Default::default(),
+                    0u32.into(),
+                    &self.to_zksync_account.address,
+                    None,
+                    true,
+                )
+                .0,
+            creator_account_id: self.from_zksync_account.get_account_id().unwrap(),
+            recipient_account_id: self.to_zksync_account.get_account_id().unwrap(),
+        }));
+
+        let executed_mint_nft_op = ExecutedTx {
+            signed_tx: mint_nft_op.try_get_tx().unwrap().into(),
+            success: true,
+            op: Some(mint_nft_op),
+            fail_reason: None,
+            block_index,
+            created_at: self.get_tx_time(),
+            batch_id: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_mint_nft_op))
+    }
+
+    fn create_withdraw_nft_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
+        let withdraw_nft_op = ZkSyncOp::WithdrawNFT(Box::new(WithdrawNFTOp {
+            tx: self
+                .from_zksync_account
+                .sign_withdraw_nft(
+                    self.tokens[3].id,
+                    self.tokens[0].id,
+                    &self.tokens[0].symbol,
+                    0u32.into(),
+                    &self.to_zksync_account.address,
+                    None,
+                    true,
+                    Default::default(),
+                )
+                .0,
+            creator_id: self.from_zksync_account.get_account_id().unwrap(),
+            creator_address: self.from_zksync_account.address,
+            serial_id: 0,
+            content_hash: Default::default(),
+        }));
+
+        let executed_withdraw_nft_op = ExecutedTx {
+            signed_tx: withdraw_nft_op.try_get_tx().unwrap().into(),
+            success: true,
+            op: Some(withdraw_nft_op),
+            fail_reason: None,
+            block_index,
+            created_at: self.get_tx_time(),
+            batch_id: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_withdraw_nft_op))
+    }
+
+    fn create_swap_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
+        let from_id = self.from_zksync_account.get_account_id().unwrap();
+        let to_id = self.to_zksync_account.get_account_id().unwrap();
+        let order1 = self.from_zksync_account.sign_order(
+            self.tokens[0].id,
+            self.tokens[1].id,
+            1u32.into(),
+            1u32.into(),
+            1u32.into(),
+            &self.from_zksync_account.address,
+            None,
+            true,
+            Default::default(),
+        );
+        let order2 = self.to_zksync_account.sign_order(
+            self.tokens[1].id,
+            self.tokens[0].id,
+            1u32.into(),
+            1u32.into(),
+            1u32.into(),
+            &self.to_zksync_account.address,
+            None,
+            true,
+            Default::default(),
+        );
+        let swap_op = ZkSyncOp::Swap(Box::new(SwapOp {
+            tx: self
+                .from_zksync_account
+                .sign_swap(
+                    (order1, order2),
+                    (1u32.into(), 1u32.into()),
+                    None,
+                    true,
+                    self.tokens[0].id,
+                    &self.tokens[0].symbol,
+                    0u32.into(),
+                )
+                .0,
+            submitter: from_id,
+            accounts: (from_id, to_id),
+            recipients: (from_id, to_id),
+        }));
+
+        let executed_swap_op = ExecutedTx {
+            signed_tx: swap_op.try_get_tx().unwrap().into(),
+            success: true,
+            op: Some(swap_op),
+            fail_reason: None,
+            block_index,
+            created_at: self.get_tx_time(),
+            batch_id: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_swap_op))
     }
 
     fn create_close_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {

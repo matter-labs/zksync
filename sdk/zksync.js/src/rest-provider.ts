@@ -419,6 +419,14 @@ export class RestProvider extends SyncProvider {
         return nft;
     }
 
+    async getNFTOwnerDetailed(id: number): Promise<Response<number>> {
+        return await this.get(`${this.address}/tokens/nft/${id}/owner`);
+    }
+
+    async getNFTOwner(id: number): Promise<number> {
+        return this.parseResponse(await this.getNFTOwnerDetailed(id));
+    }
+
     async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.ApiTxReceipt> {
         while (true) {
             let transactionStatus = await this.txStatus(hash);

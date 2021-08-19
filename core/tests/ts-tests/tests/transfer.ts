@@ -76,6 +76,7 @@ Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wal
     expect(nft !== undefined);
     const senderBefore = await sender.getNFT(nft.id);
     const receiverBefore = await receiver.getNFT(nft.id);
+    const ownerBefore = await this.syncProvider.getNFTOwner(nft.id);
     const handles = await sender.syncTransferNFT({
         to: receiver.address(),
         feeToken,
@@ -83,13 +84,16 @@ Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wal
         fee
     });
 
-    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
     const senderAfter = await sender.getNFT(nft.id);
     const receiverAfter = await receiver.getNFT(nft.id);
+    const ownerAfter = await this.syncProvider.getNFTOwner(nft.id);
     expect(senderBefore, 'NFT transfer failed').to.exist;
     expect(receiverAfter, 'NFT transfer failed').to.exist;
     expect(senderAfter, 'NFT transfer failed').to.not.exist;
     expect(receiverBefore, 'NFT transfer failed').to.not.exist;
+    expect(ownerBefore, 'NFT transfer failed').to.eql(sender.accountId);
+    expect(ownerAfter, 'NFT transfer failed').to.eql(receiver.accountId);
     this.runningFee = this.runningFee.add(fee);
 };
 
