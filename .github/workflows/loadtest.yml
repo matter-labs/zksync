@@ -3,6 +3,10 @@ on:
   schedule:
     - cron: '17 23 * * *'
 
+  push:
+    branches:
+      - devops/refactor-pipeline*
+
 env:
   ZKSYNC_ENV: loadtest
   HF_ARGS: -e loadtest
@@ -43,7 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - id: set
-        run: echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
+        run: |
+          rev=HEAD
+          [[ "${{ startsWith(github.ref, 'refs/heads/devops/refactor-pipeline') }}" == 'false' ]] || rev=origin/dev
+          echo "::set-output name=shortRev::$(git rev-parse --short ${rev})"
       -
         name: Clone helm-infra
         uses: actions/checkout@v2
