@@ -4,7 +4,7 @@ use std::{fmt, sync::Mutex};
 use num::BigUint;
 // Workspace uses
 use zksync_basic_types::H256;
-use zksync_crypto::rand::{thread_rng, Rng};
+use zksync_crypto::rand::{thread_rng, Rng, SeedableRng, XorShiftRng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
 use zksync_types::{
     tx::{
@@ -85,7 +85,15 @@ impl ZkSyncAccount {
     /// Note: probably not secure, use for testing.
     pub fn rand() -> Self {
         let rng = &mut thread_rng();
+        Self::rand_with_rng(rng)
+    }
 
+    pub fn rand_with_seed(seed: [u32; 4]) -> Self {
+        let mut rng = XorShiftRng::from_seed(seed);
+        Self::rand_with_rng(&mut rng)
+    }
+
+    fn rand_with_rng<T: Rng>(rng: &mut T) -> Self {
         let pk = priv_key_from_fs(rng.gen());
         let (eth_private_key, eth_address) = {
             let eth_pk = rng.gen::<[u8; 32]>().into();

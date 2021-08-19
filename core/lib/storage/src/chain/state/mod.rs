@@ -6,8 +6,8 @@ use sqlx::types::BigDecimal;
 // Workspace imports
 use zksync_types::{
     helpers::{apply_updates, reverse_updates},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, Address, BlockNumber, PubKeyHash,
-    TokenId, NFT,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, Address, BlockNumber, Nonce, PubKeyHash,
+    TokenId, ZkSyncTx, NFT,
 };
 // Local imports
 use crate::chain::{
@@ -153,7 +153,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .execute(transaction.conn())
                     .await?;
                 }
-                AccountUpdate::MintNFT { ref token } => {
+                AccountUpdate::MintNFT { ref token, nonce } => {
                     let update_order_id = update_order_id as i32;
                     let token_id = token.id.0 as i32;
                     let creator_account_id = token.creator_id.0 as i32;
@@ -162,17 +162,18 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     let address = token.address.as_bytes().to_vec();
                     let content_hash = token.content_hash.as_bytes().to_vec();
                     let block_number = i64::from(*block_number);
+                    let nonce = i64::from(*nonce);
                     sqlx::query!(
                         r#"
-                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, symbol )
-                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9)
+                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, symbol, nonce )
+                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                         "#,
-                        token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, token.symbol
+                        token_id, creator_account_id, creator_address, serial_id, address, content_hash, block_number, update_order_id, token.symbol, nonce
                     )
                         .execute(transaction.conn())
                         .await?;
                 }
-                AccountUpdate::RemoveNFT { ref token } => {
+                AccountUpdate::RemoveNFT { ref token, .. } => {
                     let token_id = token.id.0 as i32;
                     let block_number = i64::from(*block_number);
                     sqlx::query!(
@@ -671,6 +672,32 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         metrics::histogram!("sql.token.get_mint_nft_update", start.elapsed());
         Ok(nft.map(|p| p.into()))
     }
+
+    pub async fn get_mint_nft_update_by_creator_and_nonce(
+        &mut self,
+        creator_address: Address,
+        nonce: Nonce,
+    ) -> QueryResult<Option<NFT>> {
+        let start = Instant::now();
+        let nft = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            r#"
+            SELECT * FROM mint_nft_updates
+            WHERE creator_address = $1 AND nonce = $2
+            "#,
+            creator_address.as_bytes(),
+            i64::from(nonce.0)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.token.get_mint_nft_update_by_creator_and_nonce",
+            start.elapsed()
+        );
+        Ok(nft.map(|p| p.into()))
+    }
+
     pub async fn load_committed_nft_tokens(
         &mut self,
         block_number: Option<BlockNumber>,
@@ -756,6 +783,65 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             "sql.chain.state.remove_account_pubkey_updates",
             start.elapsed()
         );
+        Ok(())
+    }
+
+    pub async fn mint_nft_updates_set_nonces(&mut self) -> QueryResult<()> {
+        let records = sqlx::query!(
+            r#"
+                SELECT tx FROM executed_transactions WHERE tx->'type' = '"MintNFT"'
+                ORDER BY nonce
+            "#
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let mint_nft_txs: Vec<serde_json::Value> =
+            records.into_iter().map(|record| record.tx).collect();
+        let mut nonces_by_address: HashMap<Address, Vec<i64>> = HashMap::new();
+
+        for raw_tx in mint_nft_txs {
+            let tx: ZkSyncTx = serde_json::from_value(raw_tx).unwrap();
+            let mint_nft = match tx {
+                ZkSyncTx::MintNFT(tx) => *tx,
+                _ => unreachable!(),
+            };
+            nonces_by_address
+                .entry(mint_nft.creator_address)
+                .or_default()
+                .push(i64::from(mint_nft.nonce.0));
+        }
+
+        for (address, nonces) in nonces_by_address {
+            let records = sqlx::query!(
+                r#"
+                    SELECT serial_id FROM mint_nft_updates
+                    WHERE creator_address = $1
+                    ORDER BY serial_id
+                "#,
+                address.as_bytes()
+            )
+            .fetch_all(self.0.conn())
+            .await?;
+            let serial_ids: Vec<i32> = records.into_iter().map(|record| record.serial_id).collect();
+            assert_eq!(nonces.len(), serial_ids.len());
+
+            for (nonce, serial_id) in nonces.into_iter().zip(serial_ids) {
+                sqlx::query!(
+                    r#"
+                        UPDATE mint_nft_updates
+                        SET nonce = $1
+                        WHERE creator_address = $2 AND serial_id = $3
+                    "#,
+                    nonce,
+                    address.as_bytes(),
+                    serial_id
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+        }
+
         Ok(())
     }
 }

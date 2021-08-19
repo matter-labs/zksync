@@ -216,8 +216,8 @@ async fn get_account_transactions_history(mut storage: StorageProcessor<'_>) -> 
         .get_account_transactions_history(&setup.to_zksync_account.address, 0, 10)
         .await?;
 
-    assert_eq!(from_history.len(), 7);
-    assert_eq!(to_history.len(), 4);
+    assert_eq!(from_history.len(), 10);
+    assert_eq!(to_history.len(), 5);
 
     Ok(())
 }
@@ -235,8 +235,8 @@ async fn get_account_transactions_history_from(
 
     let block_size = setup.blocks[0].block_transactions.len() as u64;
 
-    let txs_from = 7; // Amount of transactions related to "from" account.
-    let txs_to = 4;
+    let txs_from = 10; // Amount of transactions related to "from" account.
+    let txs_to = 5;
 
     // execute_operation
     commit_schema_data(&mut storage, &setup).await?;
@@ -380,14 +380,14 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         (
             "Get five transactions from some index.",
             ReceiptRequest {
-                tx_hash: setup.get_tx_hash(0, 4),
+                tx_hash: setup.get_tx_hash(0, 7),
                 direction: PaginationDirection::Newer,
                 limit: 5,
             },
             vec![
-                setup.get_tx_hash(0, 4),
-                setup.get_tx_hash(0, 5),
-                setup.get_tx_hash(0, 6),
+                setup.get_tx_hash(0, 7),
+                setup.get_tx_hash(0, 8),
+                setup.get_tx_hash(0, 9),
                 setup.get_tx_hash(1, 0),
                 setup.get_tx_hash(1, 1),
             ],
@@ -395,11 +395,11 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         (
             "Limit is more than number of txs. (Newer)",
             ReceiptRequest {
-                tx_hash: setup.get_tx_hash(1, 5),
+                tx_hash: setup.get_tx_hash(1, 8),
                 direction: PaginationDirection::Newer,
                 limit: 5,
             },
-            vec![setup.get_tx_hash(1, 5), setup.get_tx_hash(1, 6)],
+            vec![setup.get_tx_hash(1, 8), setup.get_tx_hash(1, 9)],
         ),
         // Older search direction
         (
@@ -437,8 +437,8 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
                 setup.get_tx_hash(1, 2),
                 setup.get_tx_hash(1, 1),
                 setup.get_tx_hash(1, 0),
-                setup.get_tx_hash(0, 6),
-                setup.get_tx_hash(0, 5),
+                setup.get_tx_hash(0, 9),
+                setup.get_tx_hash(0, 8),
             ],
         ),
         (
@@ -496,7 +496,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
         .get_account_transactions(&PaginationQuery {
             from: AccountTxsRequest {
                 address: from,
-                tx_hash: ApiEither::from(setup.get_tx_hash(0, 6)),
+                tx_hash: ApiEither::from(setup.get_tx_hash(0, 9)),
             },
             limit: 2,
             direction: PaginationDirection::Newer,
@@ -726,7 +726,7 @@ async fn account_transactions_count(mut storage: StorageProcessor<'_>) -> QueryR
         .operations_ext_schema()
         .get_account_transactions_count(setup.from_zksync_account.address)
         .await?;
-    assert_eq!(count_after_commit, 7);
+    assert_eq!(count_after_commit, 10);
 
     Ok(())
 }
@@ -752,7 +752,7 @@ async fn account_last_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<
         .operations_ext_schema()
         .get_account_last_tx_hash(setup.from_zksync_account.address)
         .await?;
-    assert_eq!(last_tx_hash, Some(setup.get_tx_hash(0, 6)));
+    assert_eq!(last_tx_hash, Some(setup.get_tx_hash(0, 9)));
 
     Ok(())
 }
@@ -778,7 +778,7 @@ async fn block_last_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .operations_ext_schema()
         .get_block_last_tx_hash(BlockNumber(1))
         .await?;
-    assert_eq!(last_tx_hash, Some(setup.get_tx_hash(0, 6)));
+    assert_eq!(last_tx_hash, Some(setup.get_tx_hash(0, 9)));
     Ok(())
 }
 
@@ -942,6 +942,120 @@ async fn tx_data(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .tx_data_api_v02(tx.hash().as_ref())
         .await?;
     assert_eq!(l2_data.unwrap().tx.tx_hash, tx.hash());
+
+    Ok(())
+}
+
+/// Test `tx_data_for_web3` method
+#[db_test]
+async fn tx_data_for_web3(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+
+    // Checks that it returns None for unexisting tx
+    let data = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(&[0xDE, 0xAD, 0xBE, 0xEF])
+        .await?;
+    assert!(data.is_none());
+
+    setup.add_block(1);
+    commit_schema_data(&mut storage, &setup).await?;
+    storage
+        .chain()
+        .block_schema()
+        .save_block(gen_sample_block(
+            BlockNumber(1),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
+        .await?;
+
+    // Test data for L1 op.
+    let eth_hash = match setup.blocks[0].block_transactions[0].clone() {
+        ExecutedOperations::PriorityOp(op) => op.priority_op.eth_hash,
+        ExecutedOperations::Tx(_) => {
+            panic!("Should be L1 op")
+        }
+    };
+    let tx_hash = setup.get_tx_hash(0, 0).as_ref().to_vec();
+
+    let l1_data_by_tx_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(&tx_hash)
+        .await?;
+    assert_eq!(l1_data_by_tx_hash.unwrap().tx_hash, tx_hash);
+
+    let l1_data_by_eth_hash = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(eth_hash.as_ref())
+        .await?;
+    assert_eq!(l1_data_by_eth_hash.unwrap().tx_hash, tx_hash);
+
+    // Test data for executed L2 tx.
+    let tx_hash = setup.get_tx_hash(0, 2).as_ref().to_vec();
+    let l2_data = storage
+        .chain()
+        .operations_ext_schema()
+        .tx_data_for_web3(&tx_hash)
+        .await?;
+    assert_eq!(l2_data.unwrap().tx_hash, tx_hash);
+
+    Ok(())
+}
+
+/// Test web3 receipts methods
+#[db_test]
+async fn web3_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+
+    // Checks that it returns None for unexisting tx
+    let receipt = storage
+        .chain()
+        .operations_ext_schema()
+        .web3_receipt_by_hash(&[0xDE, 0xAD, 0xBE, 0xEF])
+        .await?;
+    assert!(receipt.is_none());
+
+    setup.add_block(1);
+    setup.add_block(2);
+    commit_schema_data(&mut storage, &setup).await?;
+    let tx_hash = setup.get_tx_hash(0, 0).as_ref().to_vec();
+
+    // Check that it returns None for tx from block that is not committed confirmed
+    let receipt = storage
+        .chain()
+        .operations_ext_schema()
+        .web3_receipt_by_hash(&tx_hash)
+        .await?;
+    assert!(receipt.is_none());
+
+    commit_block(&mut storage, BlockNumber(1)).await?;
+    commit_block(&mut storage, BlockNumber(2)).await?;
+
+    // Check that it returns receipt for tx from committed confirmed block
+    let receipt = storage
+        .chain()
+        .operations_ext_schema()
+        .web3_receipt_by_hash(&tx_hash)
+        .await?;
+    assert_eq!(receipt.unwrap().tx_hash, tx_hash);
+
+    // Test `web3_receipts` method
+    let first_block_receipts = storage
+        .chain()
+        .operations_ext_schema()
+        .web3_receipts(BlockNumber(1), BlockNumber(1))
+        .await?;
+    assert_eq!(first_block_receipts.len(), 10);
+    let all_receipts = storage
+        .chain()
+        .operations_ext_schema()
+        .web3_receipts(BlockNumber(1), BlockNumber(2))
+        .await?;
+    assert_eq!(all_receipts.len(), 20);
 
     Ok(())
 }

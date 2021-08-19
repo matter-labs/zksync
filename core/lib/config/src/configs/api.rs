@@ -18,6 +18,8 @@ pub struct ApiConfig {
     pub rest: RestApi,
     /// Configuration options for the JSON RPC servers.
     pub json_rpc: JsonRpc,
+    /// Configuration options for the web3 JSON RPC server.
+    pub web3: Web3,
     /// Configuration options for the private core API.
     pub private: PrivateApi,
     /// Configuration options for the prover server.
@@ -33,6 +35,7 @@ impl ApiConfig {
             admin: envy_load!("admin", "API_ADMIN_"),
             rest: envy_load!("rest", "API_REST_"),
             json_rpc: envy_load!("json_rpc", "API_JSON_RPC_"),
+            web3: envy_load!("web3", "API_WEB3_"),
             private: envy_load!("private", "API_PRIVATE_"),
             prover: envy_load!("prover", "API_PROVER_"),
             prometheus: envy_load!("prometheus", "API_PROMETHEUS_"),
@@ -139,6 +142,22 @@ impl JsonRpc {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
+pub struct Web3 {
+    /// Port to which the web3 JSON RPC server is listening.
+    pub port: u16,
+    /// URL to access web3 JSON RPC server.
+    pub url: String,
+    /// Max difference between blocks in `eth_getLogs` method.
+    pub max_block_range: u32,
+}
+
+impl Web3 {
+    pub fn bind_addr(&self) -> SocketAddr {
+        SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Prometheus {
     /// Port to which the Prometheus exporter server is listening.
     pub port: u16,
@@ -175,6 +194,11 @@ mod tests {
                 ws_port: 3031,
                 ws_url: "ws://127.0.0.1:3031".into(),
             },
+            web3: Web3 {
+                port: 3002,
+                url: "http://127.0.0.1:3002".into(),
+                max_block_range: 10,
+            },
             private: PrivateApi {
                 port: 8090,
                 url: "http://127.0.0.1:8090".into(),
@@ -206,6 +230,9 @@ API_JSON_RPC_HTTP_PORT="3030"
 API_JSON_RPC_HTTP_URL="http://127.0.0.1:3030"
 API_JSON_RPC_WS_PORT="3031"
 API_JSON_RPC_WS_URL="ws://127.0.0.1:3031"
+API_WEB3_PORT="3002"
+API_WEB3_URL="http://127.0.0.1:3002"
+API_WEB3_MAX_BLOCK_RANGE="10"
 API_PRIVATE_PORT="8090"
 API_PRIVATE_URL="http://127.0.0.1:8090"
 API_PROVER_PORT="8088"
@@ -244,6 +271,10 @@ API_PROMETHEUS_PORT="3312"
         assert_eq!(
             config.json_rpc.http_bind_addr(),
             SocketAddr::new(bind_broadcast_addr, config.json_rpc.http_port)
+        );
+        assert_eq!(
+            config.web3.bind_addr(),
+            SocketAddr::new(bind_broadcast_addr, config.web3.port)
         );
     }
 }

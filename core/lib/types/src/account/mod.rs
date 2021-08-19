@@ -172,11 +172,11 @@ impl Account {
                     account.nonce = new_nonce;
                     Some(account)
                 }
-                AccountUpdate::MintNFT { token } => {
+                AccountUpdate::MintNFT { token, .. } => {
                     account.minted_nfts.insert(token.id, token);
                     Some(account)
                 }
-                AccountUpdate::RemoveNFT { token } => {
+                AccountUpdate::RemoveNFT { token, .. } => {
                     account.minted_nfts.remove(&token.id);
                     Some(account)
                 }

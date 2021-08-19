@@ -225,6 +225,7 @@ async fn test_nfts_with_factories(mut storage: StorageProcessor<'_>) -> QueryRes
         update_order_id: 0,
         block_number: 0,
         symbol: symbol.clone(),
+        nonce: 0,
     });
     storage
         .chain()

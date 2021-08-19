@@ -21,8 +21,9 @@ use zksync_api_types::v02::{
     token::{ApiNFT, ApiToken, TokenPrice},
 };
 use zksync_config::ZkSyncConfig;
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{Token, TokenId, TokenLike};
+use zksync_types::{AccountId, Token, TokenId, TokenLike};
 
 // Local uses
 use super::{
@@ -249,6 +250,9 @@ async fn get_nft(
     data: web::Data<ApiTokenData>,
     id: web::Path<TokenId>,
 ) -> ApiResult<Option<ApiNFT>> {
+    if id.0 < MIN_NFT_TOKEN_ID {
+        return Error::from(InvalidDataError::InvalidNFTTokenId).into();
+    }
     let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
     let nft = api_try!(storage
         .tokens_schema()
@@ -256,6 +260,23 @@ async fn get_nft(
         .await
         .map_err(Error::storage));
     ApiResult::Ok(nft)
+}
+
+async fn get_nft_owner(
+    data: web::Data<ApiTokenData>,
+    id: web::Path<TokenId>,
+) -> ApiResult<Option<AccountId>> {
+    if id.0 < MIN_NFT_TOKEN_ID {
+        return Error::from(InvalidDataError::InvalidNFTTokenId).into();
+    }
+    let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
+    let owner_id = api_try!(storage
+        .chain()
+        .account_schema()
+        .get_nft_owner(*id)
+        .await
+        .map_err(Error::storage));
+    ApiResult::Ok(owner_id)
 }
 
 pub fn api_scope(
@@ -278,6 +299,7 @@ pub fn api_scope(
             web::get().to(token_price),
         )
         .route("nft/{id}", web::get().to(get_nft))
+        .route("nft/{id}/owner", web::get().to(get_nft_owner))
 }
 
 #[cfg(test)]
@@ -421,10 +443,23 @@ mod tests {
         let response = client.token_price(&token_like, "333").await?;
         assert!(response.error.is_some());
 
-        let id = TokenId(65542);
-        let response = client.nft_by_id(id).await?;
+        let nft_id = TokenId(65542);
+        let response = client.nft_by_id(nft_id).await?;
         let nft: ApiNFT = deserialize_response_result(response)?;
-        assert_eq!(nft.id, id);
+        assert_eq!(nft.id, nft_id);
+
+        let response = client.nft_owner_by_id(nft_id).await?;
+        let owner_id: AccountId = deserialize_response_result(response)?;
+        let expected_owner_id = {
+            let mut storage = cfg.pool.access_storage().await?;
+            storage
+                .chain()
+                .account_schema()
+                .get_nft_owner(nft_id)
+                .await?
+                .unwrap()
+        };
+        assert_eq!(owner_id, expected_owner_id);
 
         server.stop().await;
         Ok(())

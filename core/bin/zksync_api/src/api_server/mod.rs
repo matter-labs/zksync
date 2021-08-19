@@ -22,6 +22,7 @@ mod rest;
 pub mod rpc_server;
 mod rpc_subscriptions;
 mod tx_sender;
+mod web3;
 
 /// Amount of threads used by each server to serve requests.
 const THREADS_PER_SERVER: usize = 128;
@@ -68,10 +69,12 @@ pub fn start_api_server(
     );
 
     rpc_server::start_rpc_server(
-        connection_pool,
+        connection_pool.clone(),
         sign_check_sender,
         ticker_request_sender,
-        panic_notify,
+        panic_notify.clone(),
         config,
     );
+
+    web3::start_rpc_server(connection_pool, panic_notify, config);
 }

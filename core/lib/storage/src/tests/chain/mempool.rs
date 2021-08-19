@@ -313,9 +313,14 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
     // Make sure that the mempool responds that these transactions are missing.
     for tx in &txs {
         let tx_hash = tx.hash();
-
-        assert!(!MempoolSchema(&mut storage).contains_tx(tx_hash).await?);
-        assert!(MempoolSchema(&mut storage).get_tx(tx_hash).await?.is_none());
+        assert_eq!(
+            MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
+            false
+        );
+        assert!(MempoolSchema(&mut storage)
+            .get_tx(tx_hash.as_ref())
+            .await?
+            .is_none());
     }
 
     // Submit transactions.
@@ -338,7 +343,7 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
         assert!(MempoolSchema(&mut storage).contains_tx(tx_hash).await?);
         assert_eq!(
             MempoolSchema(&mut storage)
-                .get_tx(tx_hash)
+                .get_tx(tx_hash.as_ref())
                 .await?
                 .as_ref()
                 .unwrap()

@@ -154,6 +154,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
             op.creator_account_id,
             AccountUpdate::MintNFT {
                 token: token.clone(),
+                nonce,
             },
         ));
         self.nfts.insert(token_id, token);
