@@ -8,9 +8,10 @@ use zksync_api_types::{
     v02::{fee::ApiTxFeeTypes, token::ApiNFT},
     TxWithSignature,
 };
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
-    Address, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
+    AccountId, Address, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::TokenPriceRequestType};
@@ -290,5 +291,26 @@ impl RpcApp {
         let result = self.eth_tx_for_withdrawal(withdrawal_hash).await;
         metrics::histogram!("api.rpc.get_eth_tx_for_withdrawal", start.elapsed());
         result
+    }
+
+    pub async fn _impl_get_nft_owner(self, id: TokenId) -> Result<Option<AccountId>> {
+        let start = Instant::now();
+        let owner_id = if id.0 < MIN_NFT_TOKEN_ID {
+            None
+        } else {
+            let mut storage = self.access_storage().await?;
+            storage
+                .chain()
+                .account_schema()
+                .get_nft_owner(id)
+                .await
+                .map_err(|err| {
+                    vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
+                    Error::internal_error()
+                })?
+        };
+
+        metrics::histogram!("api.rpc.get_nft_owner", start.elapsed());
+        Ok(owner_id)
     }
 }

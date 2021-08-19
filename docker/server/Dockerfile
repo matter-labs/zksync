@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y libpq5 ca-certificates && rm -rf /var/l
 EXPOSE 3000
 EXPOSE 3031
 EXPOSE 3030
+EXPOSE 3002
 COPY --from=builder /usr/src/zksync/target/release/zksync_server /usr/bin
 COPY contracts/artifacts/ /contracts/artifacts/
+COPY etc/web3-api/ /etc/web3-api/
 ENTRYPOINT ["zksync_server"]

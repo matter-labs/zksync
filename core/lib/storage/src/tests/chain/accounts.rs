@@ -1,9 +1,10 @@
 // External imports
 use num::{BigUint, Zero};
 // Workspace imports
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID};
 use zksync_types::{
     aggregated_operations::AggregatedActionType, helpers::apply_updates, AccountId, AccountMap,
-    AccountUpdate, Address, BlockNumber, Nonce, TokenId,
+    AccountUpdate, Address, BlockNumber, Nonce, Token, TokenId,
 };
 // Local imports
 use super::block::apply_random_updates;
@@ -223,6 +224,20 @@ async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
             },
         ),
         (
+            AccountId(2),
+            AccountUpdate::Create {
+                address: Address::random(),
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            AccountId(3),
+            AccountUpdate::Create {
+                address: Address::random(),
+                nonce: Nonce(0),
+            },
+        ),
+        (
             AccountId(1),
             AccountUpdate::UpdateBalance {
                 old_nonce: Nonce(0),
@@ -248,7 +263,6 @@ async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
                 balance_update: (TokenId(0), BigUint::from(200u32), BigUint::from(300u32)),
             },
         ),
-        // Balance updates of non-eth tokens should be ignored.
         (
             AccountId(1),
             AccountUpdate::UpdateBalance {
@@ -266,33 +280,248 @@ async fn test_get_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     storage
         .chain()
         .state_schema()
-        .commit_state_update(BlockNumber(3), &updates2, updates1.len())
+        .commit_state_update(BlockNumber(3), &updates2, 0)
         .await?;
 
-    let balance1 = storage
+    let balance01 = storage
         .chain()
         .account_schema()
-        .get_account_eth_balance_for_block(address, BlockNumber(1))
+        .get_account_balance_for_block(address, BlockNumber(1), TokenId(0))
         .await?;
-    let balance2 = storage
+    let balance02 = storage
         .chain()
         .account_schema()
-        .get_account_eth_balance_for_block(address, BlockNumber(2))
+        .get_account_balance_for_block(address, BlockNumber(2), TokenId(0))
         .await?;
-    let balance3 = storage
+    let balance03 = storage
         .chain()
         .account_schema()
-        .get_account_eth_balance_for_block(address, BlockNumber(3))
+        .get_account_balance_for_block(address, BlockNumber(3), TokenId(0))
         .await?;
-    let balance4 = storage
+    let balance04 = storage
         .chain()
         .account_schema()
-        .get_account_eth_balance_for_block(address, BlockNumber(4))
+        .get_account_balance_for_block(address, BlockNumber(4), TokenId(0))
         .await?;
-    assert_eq!(balance1, BigUint::zero());
-    assert_eq!(balance2, BigUint::from(100u32));
-    assert_eq!(balance3, BigUint::from(300u32));
-    assert_eq!(balance4, BigUint::from(300u32));
+    let balance14 = storage
+        .chain()
+        .account_schema()
+        .get_account_balance_for_block(address, BlockNumber(4), TokenId(1))
+        .await?;
+    assert_eq!(balance01, BigUint::zero());
+    assert_eq!(balance02, BigUint::from(100u32));
+    assert_eq!(balance03, BigUint::from(300u32));
+    assert_eq!(balance04, BigUint::from(300u32));
+    assert_eq!(balance14, BigUint::from(10000u32));
+
+    Ok(())
+}
+
+#[db_test]
+async fn test_get_account_nft_balance(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let address = Address::random();
+    let nft_id = TokenId(MIN_NFT_TOKEN_ID + 100);
+
+    storage
+        .tokens_schema()
+        .store_or_update_token(Token {
+            id: nft_id,
+            address: Address::random(),
+            symbol: "NFT".to_string(),
+            decimals: 0,
+            is_nft: true,
+        })
+        .await?;
+    storage
+        .tokens_schema()
+        .store_or_update_token(Token {
+            id: NFT_TOKEN_ID,
+            address: Address::random(),
+            symbol: "SPECIAL".to_string(),
+            decimals: 0,
+            is_nft: true,
+        })
+        .await?;
+
+    // Checks that nonexistent account has zero nft balance.
+    let nft_balance0 = storage
+        .chain()
+        .account_schema()
+        .get_account_nft_balance(address)
+        .await?;
+    assert_eq!(nft_balance0, 0u32);
+
+    let updates1 = vec![
+        (
+            AccountId(1),
+            AccountUpdate::Create {
+                address,
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            AccountId(1),
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(0),
+                new_nonce: Nonce(1),
+                balance_update: (nft_id, BigUint::zero(), BigUint::from(1u32)),
+            },
+        ),
+    ];
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(1), &updates1, 0)
+        .await?;
+    storage
+        .chain()
+        .state_schema()
+        .apply_state_update(BlockNumber(1))
+        .await?;
+
+    // Checks that nft balance has changed after applying state update.
+    let nft_balance1 = storage
+        .chain()
+        .account_schema()
+        .get_account_nft_balance(address)
+        .await?;
+    assert_eq!(nft_balance1, 1u32);
+
+    let updates2 = vec![(
+        AccountId(1),
+        AccountUpdate::UpdateBalance {
+            old_nonce: Nonce(0),
+            new_nonce: Nonce(1),
+            balance_update: (NFT_TOKEN_ID, BigUint::zero(), BigUint::from(1u32)),
+        },
+    )];
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(2), &updates2, updates1.len())
+        .await?;
+    storage
+        .chain()
+        .state_schema()
+        .apply_state_update(BlockNumber(2))
+        .await?;
+
+    // Checks that nft balance hasn't changed after updating balance of special token.
+    let nft_balance2 = storage
+        .chain()
+        .account_schema()
+        .get_account_nft_balance(address)
+        .await?;
+    assert_eq!(nft_balance2, 1u32);
+
+    Ok(())
+}
+
+#[db_test]
+async fn test_get_nft_owner(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let account_id1 = AccountId(1);
+    let account_id2 = AccountId(2);
+    let address1 = Address::random();
+    let address2 = Address::random();
+    let nft_id = TokenId(MIN_NFT_TOKEN_ID + 100);
+
+    // Checks that there is no owner for nonexistent nft.
+    let owner = storage
+        .chain()
+        .account_schema()
+        .get_nft_owner(nft_id)
+        .await?;
+    assert!(owner.is_none());
+
+    let updates1 = vec![
+        (
+            account_id1,
+            AccountUpdate::Create {
+                address: address1,
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            account_id1,
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(0),
+                new_nonce: Nonce(1),
+                balance_update: (nft_id, BigUint::zero(), BigUint::from(1u32)),
+            },
+        ),
+    ];
+    storage
+        .tokens_schema()
+        .store_or_update_token(Token {
+            id: nft_id,
+            address: Address::random(),
+            symbol: "NFT".to_string(),
+            decimals: 0,
+            is_nft: true,
+        })
+        .await?;
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(1), &updates1, 0)
+        .await?;
+    storage
+        .chain()
+        .state_schema()
+        .apply_state_update(BlockNumber(1))
+        .await?;
+
+    // Checks that owner is correct after first block.
+    let owner = storage
+        .chain()
+        .account_schema()
+        .get_nft_owner(nft_id)
+        .await?;
+    assert_eq!(owner.unwrap(), account_id1);
+
+    let updates2 = vec![
+        (
+            account_id2,
+            AccountUpdate::Create {
+                address: address2,
+                nonce: Nonce(0),
+            },
+        ),
+        (
+            account_id1,
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(1),
+                new_nonce: Nonce(2),
+                balance_update: (nft_id, BigUint::from(1u32), BigUint::zero()),
+            },
+        ),
+        (
+            account_id2,
+            AccountUpdate::UpdateBalance {
+                old_nonce: Nonce(0),
+                new_nonce: Nonce(1),
+                balance_update: (nft_id, BigUint::zero(), BigUint::from(1u32)),
+            },
+        ),
+    ];
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(2), &updates2, updates1.len())
+        .await?;
+    storage
+        .chain()
+        .state_schema()
+        .apply_state_update(BlockNumber(2))
+        .await?;
+
+    // Checks that owner is correct after second block.
+    let owner = storage
+        .chain()
+        .account_schema()
+        .get_nft_owner(nft_id)
+        .await?;
+    assert_eq!(owner.unwrap(), account_id2);
 
     Ok(())
 }

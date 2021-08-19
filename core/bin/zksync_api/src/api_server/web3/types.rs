@@ -268,3 +268,14 @@ pub struct CommonLogData {
     pub transaction_hash: H256,
     pub transaction_index: Option<U64>,
 }
+
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallRequest {
+    pub from: Option<H160>,
+    pub to: H160,
+    pub gas: Option<U256>,
+    pub gas_price: Option<U256>,
+    pub value: Option<U256>,
+    pub data: Option<Bytes>,
+}

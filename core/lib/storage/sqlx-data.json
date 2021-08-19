@@ -2601,27 +2601,6 @@
       "nullable": []
     }
   },
-  "608b872d00f343f4409accbc9f4eda94918de5596ae55c062fed6d8c894e7b29": {
-    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0\n                ORDER BY update_order_id DESC\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "new_balance",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {
     "query": "SELECT * FROM executed_priority_operations WHERE eth_hash = $1",
     "describe": {
@@ -2805,6 +2784,27 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "7102023319626d8894376477c6681184464f79c2b588bdb227d22cf032f3e8b7": {
+    "query": "\n                SELECT account_id FROM balances\n                WHERE coin_id = $1 AND balance = 1 AND account_id != $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {
@@ -4908,6 +4908,28 @@
       "nullable": []
     }
   },
+  "bcf5bfff77df23fb5e8ff35e9ad37ee02e141dfc0bdbbdec8983b656c9569dea": {
+    "query": "\n                SELECT new_balance FROM account_balance_updates\n                WHERE account_id = $1 AND block_number <= $2 AND coin_id = $3\n                ORDER BY block_number DESC, update_order_id DESC\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "new_balance",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "bec05747dcfbf729bfd6e5d6aedf8da39f6d0d4ab5f0eae8dfed6c07adac1ba8": {
     "query": "SELECT eth_operations.* FROM aggregate_operations\n                LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                ($1 BETWEEN from_block AND to_block) AND action_type = $2 AND eth_operations.confirmed = true \n            LIMIT 1",
     "describe": {
@@ -6288,6 +6310,28 @@
         false,
         true,
         true
+      ]
+    }
+  },
+  "e6e6d1de5d9c4989fedeb5738fbf1a6658e7ffb30616b5b23189ae3f87b23836": {
+    "query": "\n                SELECT COUNT(*) FROM balances\n                WHERE account_id = $1 AND coin_id >= $2 AND coin_id < $3 AND balance = 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },

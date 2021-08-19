@@ -8,13 +8,13 @@ use zksync_storage::{
     chain::{block::records::StorageBlock, operations_ext::records::Web3TxReceipt},
     StorageProcessor,
 };
-use zksync_types::{ExecutedOperations, ZkSyncOp};
+use zksync_types::{ExecutedOperations, TokenId, ZkSyncOp};
 // Local uses
 use super::{
     converter::{resolve_block_number, transaction_from_tx_data, u256_from_biguint},
     types::{
-        BlockInfo, BlockNumber, CommonLogData, Filter, Log, Transaction, TransactionReceipt,
-        TxData, H160, H2048, H256, U256, U64,
+        BlockInfo, BlockNumber, Bytes, CallRequest, CommonLogData, Filter, Log, Transaction,
+        TransactionReceipt, TxData, H160, H2048, H256, U256, U64,
     },
     Web3RpcApp,
 };
@@ -50,7 +50,7 @@ impl Web3RpcApp {
         let balance = transaction
             .chain()
             .account_schema()
-            .get_account_eth_balance_for_block(address, block_number)
+            .get_account_balance_for_block(address, block_number, TokenId(0))
             .await
             .map_err(|_| Error::internal_error())?;
         let result = u256_from_biguint(balance);
@@ -303,6 +303,20 @@ impl Web3RpcApp {
 
         metrics::histogram!("api.web3.get_logs", start.elapsed());
         Ok(result)
+    }
+
+    pub async fn _impl_call(self, req: CallRequest, _block: Option<BlockNumber>) -> Result<Bytes> {
+        let start = Instant::now();
+        let mut storage = self.access_storage().await?;
+
+        let result = self
+            .calls_helper
+            .execute(&mut storage, req.to, req.data.unwrap_or_default().0)
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        metrics::histogram!("api.web3.call", start.elapsed());
+        Ok(Bytes(result))
     }
 
     pub(crate) async fn logs_from_receipt(

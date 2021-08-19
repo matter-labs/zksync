@@ -4,6 +4,7 @@ use std::time::Instant;
 use num::{BigUint, Zero};
 use sqlx::{types::BigDecimal, Acquire};
 // Workspace imports
+use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
 use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
 // Local imports
 use self::records::*;
@@ -378,10 +379,11 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         Ok(BlockNumber(block_number as u32))
     }
 
-    pub async fn get_account_eth_balance_for_block(
+    pub async fn get_account_balance_for_block(
         &mut self,
         address: Address,
         block_number: BlockNumber,
+        token_id: TokenId,
     ) -> QueryResult<BigUint> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -401,12 +403,13 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let record = sqlx::query!(
             r#"
                 SELECT new_balance FROM account_balance_updates
-                WHERE account_id = $1 AND block_number <= $2 AND coin_id = 0
-                ORDER BY update_order_id DESC
+                WHERE account_id = $1 AND block_number <= $2 AND coin_id = $3
+                ORDER BY block_number DESC, update_order_id DESC
                 LIMIT 1
             "#,
             i64::from(account_id.0),
-            i64::from(block_number.0)
+            i64::from(block_number.0),
+            token_id.0 as i32
         )
         .fetch_optional(transaction.conn())
         .await?;
@@ -423,5 +426,64 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         );
 
         Ok(result)
+    }
+
+    pub async fn get_account_nft_balance(&mut self, address: Address) -> QueryResult<u32> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let account_id = transaction
+            .chain()
+            .account_schema()
+            .account_id_by_address(address)
+            .await?;
+        let account_id = match account_id {
+            Some(id) => id,
+            None => {
+                return Ok(0);
+            }
+        };
+        if account_id == NFT_STORAGE_ACCOUNT_ID {
+            // It is special account ID, just return 0 for it.
+            return Ok(0);
+        }
+
+        let balance = sqlx::query!(
+            r#"
+                SELECT COUNT(*) FROM balances
+                WHERE account_id = $1 AND coin_id >= $2 AND coin_id < $3 AND balance = 1
+            "#,
+            i64::from(account_id.0),
+            MIN_NFT_TOKEN_ID as i32,
+            NFT_TOKEN_ID.0 as i32
+        )
+        .fetch_one(transaction.conn())
+        .await?
+        .count
+        .unwrap_or(0) as u32;
+
+        transaction.commit().await?;
+        metrics::histogram!("sql.chain.account.get_account_nft_balance", start.elapsed());
+
+        Ok(balance)
+    }
+
+    pub async fn get_nft_owner(&mut self, token_id: TokenId) -> QueryResult<Option<AccountId>> {
+        let start = Instant::now();
+
+        let record = sqlx::query!(
+            r#"
+                SELECT account_id FROM balances
+                WHERE coin_id = $1 AND balance = 1 AND account_id != $2
+            "#,
+            token_id.0 as i32,
+            i64::from(NFT_STORAGE_ACCOUNT_ID.0)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        let owner_id = record.map(|record| AccountId(record.account_id as u32));
+
+        metrics::histogram!("sql.chain.account.get_nft_owner", start.elapsed());
+        Ok(owner_id)
     }
 }

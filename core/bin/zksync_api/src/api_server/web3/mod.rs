@@ -8,8 +8,9 @@ use zksync_config::ZkSyncConfig;
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
-use self::{logs::LogsHelper, rpc_trait::Web3Rpc};
+use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
 
+mod calls;
 mod converter;
 mod logs;
 mod rpc_impl;
@@ -26,6 +27,7 @@ pub struct Web3RpcApp {
     runtime_handle: tokio::runtime::Handle,
     connection_pool: ConnectionPool,
     logs_helper: LogsHelper,
+    calls_helper: CallsHelper,
     chain_id: u8,
     max_block_range: u32,
 }
@@ -34,11 +36,11 @@ impl Web3RpcApp {
     pub fn new(connection_pool: ConnectionPool, config: &ZkSyncConfig) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("Web3RpcApp must be created from the context of Tokio Runtime");
-
         Web3RpcApp {
             runtime_handle,
             connection_pool,
             logs_helper: LogsHelper::new(),
+            calls_helper: CallsHelper::new(),
             chain_id: config.eth_client.chain_id,
             max_block_range: config.api.web3.max_block_range,
         }

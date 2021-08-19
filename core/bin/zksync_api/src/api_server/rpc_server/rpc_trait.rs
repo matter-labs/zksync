@@ -12,7 +12,7 @@ use zksync_api_types::{
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignatureVariant, TxHash},
-    Address, Fee, Token, TokenId, TokenLike, TotalFee, ZkSyncTx,
+    AccountId, Address, Fee, Token, TokenId, TokenLike, TotalFee, ZkSyncTx,
 };
 
 // Local uses
@@ -93,6 +93,9 @@ pub trait Rpc {
 
     #[rpc(name = "get_nft", returns = "Option<ApiNFT>")]
     fn get_nft(&self, id: TokenId) -> BoxFutureResult<Option<ApiNFT>>;
+
+    #[rpc(name = "get_nft_owner", returns = "Option<AccountId>")]
+    fn get_nft_owner(&self, id: TokenId) -> BoxFutureResult<Option<AccountId>>;
 }
 
 impl Rpc for RpcApp {
@@ -172,5 +175,9 @@ impl Rpc for RpcApp {
 
     fn get_nft(&self, id: TokenId) -> BoxFutureResult<Option<ApiNFT>> {
         spawn!(self._impl_get_nft(id))
+    }
+
+    fn get_nft_owner(&self, id: TokenId) -> BoxFutureResult<Option<AccountId>> {
+        spawn!(self._impl_get_nft_owner(id))
     }
 }
