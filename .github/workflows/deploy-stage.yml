@@ -5,6 +5,7 @@ on:
       - dev
       - breaking
       - hotfix/*
+      - deniallugo-fix-ci
     tags:
       - hotfix-*
 
@@ -47,6 +48,7 @@ jobs:
         zk run yarn
         cp etc/tokens/{test,localhost}.json
         zk run verify-keys unpack
+        zk up
         zk db basic-setup
     - name: update-images
       run: |
