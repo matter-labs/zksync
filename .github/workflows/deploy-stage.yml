@@ -27,13 +27,6 @@ jobs:
     name: Build and Push Docker Images
     runs-on: [self-hosted, MAIN]
 
-    ## Required services
-    services:
-      postgres:
-        image: postgres:10.4
-        ports:
-          - 5432:5432
-
     steps:
     - uses: actions/checkout@v2
     - name: setup-env
