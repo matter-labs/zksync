@@ -6,7 +6,7 @@ use web3::types::Address;
 use zksync_types::block::Block;
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
-    NewTokenEvent, Operation, SerialId, Token, TokenId, TokenInfo,
+    NewTokenEvent, Operation, SerialId, Token, TokenId, TokenInfo, TokenKind,
 };
 
 use crate::{
@@ -71,7 +71,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
             symbol: token.symbol,
             address: token.address,
             decimals: token.decimals,
-            is_nft: false,
+            kind: TokenKind::ERC20,
         };
         self.tokens.insert(token_id, token);
     }
@@ -97,7 +97,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
                     address,
                     symbol: format!("ERC20-{}", *id),
                     decimals: 18,
-                    is_nft: false,
+                    kind: TokenKind::ERC20,
                 },
             );
         }
@@ -276,7 +276,7 @@ impl InMemoryStorageInteractor {
                             address: token.address,
                             symbol: token.symbol.clone(),
                             decimals: 0,
-                            is_nft: true,
+                            kind: TokenKind::NFT,
                         },
                     );
                 }

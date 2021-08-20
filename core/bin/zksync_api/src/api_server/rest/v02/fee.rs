@@ -13,7 +13,10 @@ use zksync_api_types::v02::fee::{ApiFee, BatchFeeRequest, TxFeeRequest};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
-use crate::api_server::tx_sender::TxSender;
+use crate::{
+    api_server::tx_sender::{SubmitError, TxSender},
+    api_try,
+};
 
 /// Shared data between `api/v0.2/fee` endpoints.
 #[derive(Clone)]
@@ -31,6 +34,15 @@ async fn get_tx_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<TxFeeRequest>,
 ) -> ApiResult<ApiFee> {
+    let token_allowed = api_try!(TxSender::token_allowed_for_fees(
+        data.tx_sender.ticker_requests.clone(),
+        body.token_like.clone()
+    )
+    .await
+    .map_err(Error::from));
+    if !token_allowed {
+        return Error::from(SubmitError::InappropriateFeeToken).into();
+    }
     data.tx_sender
         .get_txs_fee_in_wei(body.tx_type.into(), body.address, body.token_like)
         .await
@@ -43,6 +55,15 @@ async fn get_batch_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<BatchFeeRequest>,
 ) -> ApiResult<ApiFee> {
+    let token_allowed = api_try!(TxSender::token_allowed_for_fees(
+        data.tx_sender.ticker_requests.clone(),
+        body.token_like.clone()
+    )
+    .await
+    .map_err(Error::from));
+    if !token_allowed {
+        return Error::from(SubmitError::InappropriateFeeToken).into();
+    }
     let txs = body
         .transactions
         .into_iter()

@@ -98,7 +98,7 @@ mod test {
         let ticker_url = parse_env("FEE_TICKER_COINMARKETCAP_BASE_URL");
         let client = reqwest::Client::new();
         let api = CoinMarketCapAPI::new(client, ticker_url);
-        let token = Token::new(TokenId(0), Default::default(), "ETH", 18);
+        let token = Token::new(TokenId(0), Default::default(), "ETH", 18, true);
         runtime
             .block_on(api.get_price(&token))
             .expect("Failed to get data from ticker");

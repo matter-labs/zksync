@@ -7,7 +7,7 @@ use num::{rational::Ratio, BigUint};
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
     tokens::TokenMarketVolume, AccountId, Address, BlockNumber, ExecutedOperations, ExecutedTx,
-    Token, TokenId, TokenLike, TokenPrice, WithdrawNFTOp, ZkSyncOp, H256,
+    Token, TokenId, TokenKind, TokenLike, TokenPrice, WithdrawNFTOp, ZkSyncOp, H256,
 };
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 // Local imports
@@ -35,7 +35,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000000".parse().unwrap(),
         symbol: "ETH".into(),
         decimals: 18,
-        is_nft: false,
+        kind: TokenKind::ERC20,
     };
     assert_eq!(tokens[&TokenId(0)], eth_token);
 
@@ -45,21 +45,21 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000001".parse().unwrap(),
         symbol: "ABC".into(),
         decimals: 9,
-        is_nft: false,
+        kind: TokenKind::ERC20,
     };
     let token_b = Token {
         id: TokenId(2),
         address: "0000000000000000000000000000000000000002".parse().unwrap(),
         symbol: "DEF".into(),
         decimals: 6,
-        is_nft: false,
+        kind: TokenKind::ERC20,
     };
     let nft = Token {
         id: TokenId(MIN_NFT_TOKEN_ID),
         address: "0000000000000000000000000000000000000005".parse().unwrap(),
         symbol: "NFT".into(),
         decimals: 0,
-        is_nft: true,
+        kind: TokenKind::NFT,
     };
 
     TokensSchema(&mut storage)

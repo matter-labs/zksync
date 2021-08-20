@@ -119,6 +119,7 @@ impl TokenHandler {
                         token_info.address,
                         &token_info.symbol,
                         token_info.decimals,
+                        is_erc20,
                     ))
                 } else {
                     None
@@ -139,6 +140,7 @@ impl TokenHandler {
                                 token_from_list.address,
                                 &default_symbol,
                                 token_from_list.decimals,
+                                is_erc20,
                             );
                             let try_insert_token = token_schema.store_token(token.clone()).await;
                             match try_insert_token {
@@ -161,6 +163,7 @@ impl TokenHandler {
                         token_event.address,
                         &default_symbol,
                         default_decimals,
+                        is_erc20,
                     );
                     let try_insert_token = token_schema.store_token(token.clone()).await;
                     match try_insert_token {

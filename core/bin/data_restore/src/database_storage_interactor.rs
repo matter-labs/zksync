@@ -7,7 +7,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    AccountId, BlockNumber, NewTokenEvent, SerialId, Token, TokenId, TokenInfo,
+    AccountId, BlockNumber, NewTokenEvent, SerialId, Token, TokenId, TokenInfo, TokenKind,
     {block::Block, AccountUpdate, AccountUpdates},
 };
 
@@ -124,7 +124,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
                 symbol: token.symbol,
                 address: token.address,
                 decimals: token.decimals,
-                is_nft: false,
+                kind: TokenKind::ERC20,
             })
             .await
             .expect("failed to store token");

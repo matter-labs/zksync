@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 // Local uses
 use zksync_storage::ConnectionPool;
-use zksync_types::{tokens, Address, TokenId};
+use zksync_types::{tokens, Address, TokenId, TokenKind};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -117,7 +117,7 @@ async fn add_token(
         address: token_request.address,
         symbol: token_request.symbol.clone(),
         decimals: token_request.decimals,
-        is_nft: false,
+        kind: TokenKind::ERC20,
     };
 
     storage

@@ -79,6 +79,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             return Err(StoreTokenError::TokenAlreadyExistsError(error_message));
         }
 
+        let kind: TokenKind = token.kind.into();
         sqlx::query!(
             r#"
             INSERT INTO tokens ( id, address, symbol, decimals, kind )
@@ -88,7 +89,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
-            token.kind.into::<TokenKind>() as TokenKind
+            kind as TokenKind
         )
         .execute(self.0.conn())
         .await
@@ -102,6 +103,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// token with a new one, otherwise, saves the token.
     pub async fn store_or_update_token(&mut self, token: Token) -> QueryResult<()> {
         let start = Instant::now();
+        let kind: TokenKind = token.kind.into();
         sqlx::query!(
             r#"
             INSERT INTO tokens ( id, address, symbol, decimals, kind )
@@ -114,7 +116,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
-            token.kind.into::<TokenKind>() as TokenKind
+            kind as TokenKind
         )
         .execute(self.0.conn())
         .await?;
@@ -128,24 +130,18 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         from: TokenId,
         limit: Option<u32>,
-        include_none_kind: bool,
     ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
         let limit = limit.map(i64::from);
-        let mut kinds = vec![TokenKind::ERC20];
-        if include_none_kind {
-            kinds.push(TokenKind::None);
-        }
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
             SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
-            WHERE id >= $1 AND kind = ANY($2)
+            WHERE id >= $1 AND kind = 'ERC20'::token_kind
             ORDER BY id ASC
-            LIMIT $3
+            LIMIT $2
             "#,
             *from as i32,
-            kinds.as_slice() as _,
             limit
         )
         .fetch_all(self.0.conn())
@@ -161,24 +157,18 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         from: TokenId,
         limit: Option<u32>,
-        include_none_kind: bool,
     ) -> QueryResult<Vec<Token>> {
         let start = Instant::now();
         let limit = limit.map(i64::from);
-        let mut kinds = vec![TokenKind::ERC20];
-        if include_none_kind {
-            kinds.push(TokenKind::None);
-        }
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
             SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
-            WHERE id <= $1 AND kind = ANY($2)
+            WHERE id <= $1 AND kind = 'ERC20'::token_kind
             ORDER BY id DESC
-            LIMIT $3
+            LIMIT $2
             "#,
             *from as i32,
-            &kinds.as_slice() as _,
             limit
         )
         .fetch_all(self.0.conn())
@@ -192,13 +182,8 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Loads all the stored tokens from the database.
     /// Alongside with the tokens added via `store_token` method, the default `ETH` token
     /// is returned.
-    pub async fn load_tokens(
-        &mut self,
-        include_none_kind: bool,
-    ) -> QueryResult<HashMap<TokenId, Token>> {
-        let tokens = self
-            .load_tokens_asc(TokenId(0), None, include_none_kind)
-            .await?;
+    pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
+        let tokens = self.load_tokens_asc(TokenId(0), None).await?;
         Ok(tokens.into_iter().map(|token| (token.id, token)).collect())
     }
 
@@ -209,12 +194,10 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     ) -> QueryResult<Vec<Token>> {
         let tokens = match query.direction {
             PaginationDirection::Newer => {
-                self.load_tokens_asc(query.from, Some(query.limit), false)
-                    .await?
+                self.load_tokens_asc(query.from, Some(query.limit)).await?
             }
             PaginationDirection::Older => {
-                self.load_tokens_desc(query.from, Some(query.limit), false)
-                    .await?
+                self.load_tokens_desc(query.from, Some(query.limit)).await?
             }
         };
         Ok(tokens)
@@ -315,17 +298,12 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     }
 
     /// Get the number of tokens from Database
-    pub async fn get_count(&mut self, include_none_kind: bool) -> QueryResult<u32> {
+    pub async fn get_count(&mut self) -> QueryResult<u32> {
         let start = Instant::now();
-        let mut kinds = vec![TokenKind::ERC20];
-        if include_none_kind {
-            kinds.push(TokenKind::None);
-        }
         let last_token_id = sqlx::query!(
             r#"
-            SELECT max(id) as "id!" FROM tokens WHERE kind = ANY($1)
+            SELECT max(id) as "id!" FROM tokens WHERE kind != 'NFT'::token_kind
             "#,
-            &kinds.as_slice() as _
         )
         .fetch_optional(self.0.conn())
         .await?

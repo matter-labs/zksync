@@ -276,8 +276,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 let address = address_to_stored_string(&Address::from_slice(&upd.address));
                 sqlx::query!(
                     r#"
-                    INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
-                    VALUES ( $1, $2, $3, $4, true )
+                    INSERT INTO tokens ( id, address, symbol, decimals, kind )
+                    VALUES ( $1, $2, $3, $4, 'NFT'::token_kind )
                     "#,
                     upd.token_id,
                     address,

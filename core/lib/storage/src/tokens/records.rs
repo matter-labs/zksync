@@ -31,22 +31,22 @@ pub enum TokenKind {
     None,
 }
 
-impl From<TokenKind> for zksync_types::tokens::TokenKind {
-    fn from(kind: TokenKind) -> zksync_types::tokens::TokenKind {
+impl From<TokenKind> for zksync_types::TokenKind {
+    fn from(kind: TokenKind) -> zksync_types::TokenKind {
         match kind {
-            TokenKind::ERC20 => zksync_types::tokens::TokenKind::ERC20,
-            TokenKind::NFT => zksync_types::tokens::TokenKind::NFT,
-            TokenKind::None => zksync_types::tokens::TokenKind::None,
+            TokenKind::ERC20 => zksync_types::TokenKind::ERC20,
+            TokenKind::NFT => zksync_types::TokenKind::NFT,
+            TokenKind::None => zksync_types::TokenKind::None,
         }
     }
 }
 
-impl From<zksync_types::tokens::TokenKind> for TokenKind {
-    fn from(kind: zksync_types::tokens::TokenKind) -> TokenKind {
+impl From<zksync_types::TokenKind> for TokenKind {
+    fn from(kind: zksync_types::TokenKind) -> TokenKind {
         match kind {
-            zksync_types::tokens::TokenKind::ERC20 => TokenKind::ERC20,
-            zksync_types::tokens::TokenKind::NFT => TokenKind::NFT,
-            zksync_types::tokens::TokenKind::None => TokenKind::None,
+            zksync_types::TokenKind::ERC20 => TokenKind::ERC20,
+            zksync_types::TokenKind::NFT => TokenKind::NFT,
+            zksync_types::TokenKind::None => TokenKind::None,
         }
     }
 }

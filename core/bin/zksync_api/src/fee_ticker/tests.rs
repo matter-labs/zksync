@@ -8,7 +8,7 @@ use futures::{channel::mpsc, executor::block_on};
 use std::str::FromStr;
 use std::thread::sleep;
 use tokio::time::Duration;
-use zksync_types::{Address, Token, TokenId, TokenPrice};
+use zksync_types::{Address, Token, TokenId, TokenKind, TokenPrice};
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 
 use crate::fee_ticker::{
@@ -147,6 +147,7 @@ impl FeeTickerAPI for MockApiProvider {
                     test_token.address,
                     "",
                     test_token.precision,
+                    true,
                 ));
             }
         }
@@ -563,7 +564,7 @@ async fn test_error_coingecko_api() {
         address: Address::random(),
         symbol: String::from("DAI"),
         decimals: 18,
-        is_nft: false,
+        kind: TokenKind::ERC20,
     };
     let (address, handler) = run_server(token.address);
     let client = reqwest::ClientBuilder::new()

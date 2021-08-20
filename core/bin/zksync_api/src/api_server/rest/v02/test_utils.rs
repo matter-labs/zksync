@@ -366,6 +366,7 @@ impl TestServerConfig {
                 Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
                 "PHNX",
                 18,
+                true,
             ))
             .await?;
         // Insert Golem token with old symbol (from rinkeby).
@@ -376,6 +377,7 @@ impl TestServerConfig {
                 Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
                 "GNT",
                 18,
+                true,
             ))
             .await?;
 

@@ -25,7 +25,7 @@ use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
-    PriorityOp, SignedZkSyncTx, Token, TokenId, H256, NFT,
+    PriorityOp, SignedZkSyncTx, Token, TokenId, TokenKind, H256, NFT,
 };
 // Local uses
 use crate::{
@@ -530,7 +530,7 @@ impl ZkSyncStateKeeper {
                 symbol: "SPECIAL".to_string(),
                 address: *NFT_STORAGE_ACCOUNT_ADDRESS,
                 decimals: 18,
-                is_nft: true, // TODO: ZKS-635
+                kind: TokenKind::NFT,
             })
             .await
             .expect("failed to store special token");

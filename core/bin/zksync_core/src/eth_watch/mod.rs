@@ -639,7 +639,7 @@ impl<W: EthClient> EthWatch<W> {
                     .unwrap_or_default();
                 }
                 EthWatchRequest::IsContractERC20 { address, resp } => resp
-                    .send(self.client.is_contract_erc20(adddress))
+                    .send(self.client.is_contract_erc20(address).await)
                     .unwrap_or_default(),
             }
         }
