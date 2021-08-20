@@ -39,7 +39,7 @@ jobs:
       namespace: ${{ steps.envMap.outputs.namespace }}
       runner: ${{ steps.envMap.outputs.runner }}
       jobOutcomes: ${{ steps.set.outputs.jobOutcomes }}
-      scalup: ${{ github.event.inputs.scaleup == 'true' }}
+      scaleup: ${{ github.event.inputs.scaleup == 'true' }}
 
     steps:
       - uses: actions/checkout@v2

@@ -3,6 +3,13 @@ on:
   schedule:
     - cron: '17 23 * * *'
 
+  push:
+    branches:
+      - devops/refactor-pipeline*
+
+# Disable simultaneous deployments into a single environment
+concurrency: deploy-${{ github.event.inputs.environment }}
+
 env:
   ZKSYNC_ENV: loadtest
   HF_ARGS: -e loadtest
@@ -43,7 +50,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - id: set
-        run: echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
+        run: |
+          rev=HEAD
+          [[ "${{ startsWith(github.ref, 'refs/heads/devops/refactor-pipeline') }}" == 'false' ]] || rev=origin/dev
+          git rev-parse --short ${rev}
+          echo "::set-output name=shortRev::$(git rev-parse --short ${rev})"
       -
         name: Clone helm-infra
         uses: actions/checkout@v2
@@ -68,6 +79,12 @@ jobs:
           kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env
           kubectl get secret -n ${ZKSYNC_ENV} secretenv-zksync -o go-template='{{range $k, $v := .data}}{{ printf "%s=%s\n" $k ($v | base64decode) }}{{end}}' \
             >> etc/env/${ZKSYNC_ENV}.env
+      -
+        uses: actions/upload-artifact@v2
+        with:
+          name: loadtest_env
+          path: etc/env/${{ env.ZKSYNC_ENV }}.env
+          if-no-files-found: error
 
   dbsetup:
     name: Cleanup the database, compile and update contracts
@@ -79,6 +96,11 @@ jobs:
       CARGO_HOME: /usr/share/rust/.cargo
 
     steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: loadtest_env
+          path: etc/env
       -
         name: Preperare env
         run: |
@@ -111,28 +133,37 @@ jobs:
           zk contract deploy
           cd contracts && zk f yarn governance-add-erc20 add-multi-current-network rinkeby
           zk db insert contract
+      -
+        uses: actions/upload-artifact@v2
+        with:
+          name: deployed_contracts
+          path: deployed_contracts.log
+          if-no-files-found: error
 
   update-configmap:
-    name: Deploy contracts
+    name: Update ConfigMap
     runs-on: [k8s, deployer, stage]
     needs: [dbsetup]
     container:
       image: dysnix/kubectl:v1.20-gcloud
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
     steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: deployed_contracts
+      -
+        name: Create ~/.kube/config
+        run: .github/scripts/write-kubeconf.sh
       -
         name: Update contracts in the ConfigMap
-        run: |
-          mkdir -p etc/env/
-          kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env
-          cat deployed_contracts.log >> etc/env/${ZKSYNC_ENV}.env
-
-          kubectl delete configmap -n ${ZKSYNC_ENV} server-env-custom || /bin/true
-          kubectl create configmap -n ${ZKSYNC_ENV} server-env-custom --from-env-file=etc/env/${ZKSYNC_ENV}.env
+        run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
 
   deploy:
     name: Deploy apps
     runs-on: [k8s, deployer, stage]
-    needs: [update-configmap]
+    needs: [setup, update-configmap]
     steps:
       - name: Deploy
         uses: aurelien-baudet/workflow-dispatch@v2
@@ -179,6 +210,7 @@ jobs:
 
     if: always()
     steps:
+      - uses: actions/checkout@v2
       - run: rm -f etc/env/${ZKSYNC_ENV}.env
       -
         name: Create ~/.kube/config
