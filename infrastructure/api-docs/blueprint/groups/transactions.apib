@@ -47,3 +47,19 @@ Get transaction data
         + status: success (string, required)
         + result (Transaction.Signed, required{{isResultNullable}})
         + error (Error, required, nullable)
+
+## api/v0.2/transactions/toggle2FA [/transactions]
+
+### Toggle 2-factor authentication [POST]
+Enable or disable requirement for L1 signature for L2 transactions.
+
++ Request (application/json)
+    + Attributes
+        + enable: false (boolean, required)
+        + accountId: 122 (number, required)
+        + timestamp: 1629451646472 (number, required)
+        + signature: TxEthSignature
+
++ Response 200 (application/json)
+    + Attributes
+        + success: true (boolean, required)
