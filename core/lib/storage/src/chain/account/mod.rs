@@ -8,6 +8,7 @@ use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_
 use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
 // Local imports
 use self::records::*;
+use crate::chain::block::BlockSchema;
 use crate::diff::StorageAccountDiff;
 use crate::{QueryResult, StorageProcessor};
 
@@ -133,9 +134,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .account_and_last_block(account_id)
             .await?;
 
-        if account.is_none() {
-            return Ok(((0, None), None));
-        }
+        let last_verified_block = BlockSchema(&mut transaction)
+            .get_last_verified_block()
+            .await?
+            .0 as i64;
 
         let account_balance_diff = sqlx::query_as!(
             StorageAccountUpdate,
@@ -144,7 +146,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 WHERE account_id = $1 AND block_number > $2
             ",
             i64::from(*account_id),
-            last_block
+            last_verified_block
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -156,7 +158,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 WHERE account_id = $1 AND block_number > $2
             ",
             i64::from(*account_id),
-            last_block
+            last_verified_block
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -168,7 +170,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 WHERE account_id = $1 AND block_number > $2
             ",
             i64::from(*account_id),
-            last_block
+            last_verified_block
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -179,7 +181,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 WHERE creator_account_id = $1 AND block_number > $2
             ",
             *account_id as i32,
-            last_block
+            last_verified_block
         )
         .fetch_all(transaction.conn())
         .await?;
