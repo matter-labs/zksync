@@ -57,12 +57,12 @@ Enable or disable requirement for L1 signature for L2 transactions.
     + Attributes
         + enable: false (boolean, required)
         + accountId: {{accountId}} (number, required)
-        + timestamp: 1629451646472 (number, required)
-        + signature: TxEthSignature
+        + timestamp: {{toggle2FATimestamp}} (number, required)
+        + signature (Toggle2FAEthSignature, required)
 
 + Response 200 (application/json)
     + Attributes
         + request (Request, required)
         + status: success (string, required)
-        + result (2FAResult, required{{isResultNullable}})
+        + result (Toggle2FAResult, required{{isResultNullable}})
         + error (Error, required, nullable)

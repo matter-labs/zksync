@@ -253,5 +253,13 @@
 - tx (Transaction.Incoming, required)
 - signature (TxEthSignatureVariant, required)
 
-## 2FAResult (object)
-- success true (boolean, required)
+## Toggle2FAEthereumSignature
+- type: `EthereumSignature` (string, fixed)
+- signature: `{{toggle2FASignature}}` (string, required)
+
+## Toggle2FAEthSignature (enum)
+- (Toggle2FAEthereumSignature)
+- (EIP1271Signature)
+
+## Toggle2FAResult (object)
+- success: true (boolean, required)
