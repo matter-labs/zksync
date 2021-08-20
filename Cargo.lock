@@ -4906,6 +4906,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
+name = "token_kind_migration"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "tokio 1.9.0",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_eth_client",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "tokio"
 version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
