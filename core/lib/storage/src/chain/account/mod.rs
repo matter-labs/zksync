@@ -133,6 +133,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .account_and_last_block(account_id)
             .await?;
 
+        if account.is_none() {
+            return Ok(((0, None), None));
+        }
+
         let account_balance_diff = sqlx::query_as!(
             StorageAccountUpdate,
             "
