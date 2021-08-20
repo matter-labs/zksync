@@ -135,7 +135,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .await?;
 
         let last_verified_block = BlockSchema(&mut transaction)
-            .get_last_verified_block()
+            .get_last_verified_confirmed_block()
             .await?
             .0 as i64;
 
