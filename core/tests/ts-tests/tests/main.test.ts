@@ -14,6 +14,7 @@ import './batch-builder';
 import './create2';
 import './swap';
 import './register-factory';
+import './token-listing';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -330,7 +331,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         let hilda: Wallet;
         let hildaWithEthSigner: Wallet;
         let frida: Wallet;
-        
+
         step('should setup an account without 2fa', async () => {
             if (onlyBasic || providerType == 'RPC') {
                 return;
@@ -404,7 +405,22 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             const accountState = await hilda.getAccountState();
             expect(accountState.accountType, 'Incorrect account type').to.be.eql('Owned');
         })
-    }); 
+    });
+
+    describe('Permissionless token listing tests', () => {
+        step('Test ERC20 token listing', async () => {
+            if(onlyBasic || providerType == 'RPC') {
+                return;
+            }
+            await tester.testERC20Listing();
+        })
+        step('Test non-ERC20 token listing', async () => {
+            if(onlyBasic || providerType == 'RPC') {
+                return;
+            }
+            await tester.testNonERC20Listing();
+        })
+    })
 });
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).

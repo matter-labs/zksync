@@ -101,4 +101,15 @@ export class Tester {
         };
         return await zksync.Wallet.fromCreate2Data(signer, this.syncProvider, create2Data);
     }
+
+    async submitToken(tokenAddress: string) {
+        const govAbi = ['function tokenGovernance() public view returns (address)'];
+        const gov = new ethers.Contract(this.syncProvider.contractAddress.govContract, govAbi, this.ethWallet);
+
+        const tokenGovAddress = await gov.tokenGovernance();
+        const tokenGovAbi = ['function addToken(address) external'];
+        const tokenGov = new ethers.Contract(tokenGovAddress, tokenGovAbi, this.ethWallet);
+        const tx = await tokenGov.addToken(tokenAddress);
+        await tx.wait();
+    }
 }
