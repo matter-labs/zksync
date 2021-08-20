@@ -65,26 +65,26 @@ impl<W: TokenWatcher> MarketUpdater<W> {
         Ok(market)
     }
 
-    pub async fn update_all_tokens(&mut self, tokens: &[Token]) -> anyhow::Result<()> {
+    pub async fn update_all_tokens(&mut self, tokens: Vec<Token>) -> anyhow::Result<()> {
         let start = Instant::now();
         for token in tokens {
-            self.update_token(token).await?;
+            self.update_token(&token).await?;
         }
         metrics::histogram!("ticker.validator.update_all_tokens", start.elapsed());
         Ok(())
     }
 
     pub async fn keep_updated(mut self, duration_secs: u64) {
-        let tokens = self
-            .tokens_cache
-            .get_all_tokens()
-            .await
-            .expect("Error to connect in db");
-
         let mut error_counter = 0;
 
         loop {
-            if let Err(e) = self.update_all_tokens(&tokens).await {
+            let tokens = self.tokens_cache.get_all_tokens().await;
+            let result = match tokens {
+                Ok(tokens) => self.update_all_tokens(tokens).await,
+                Err(e) => Err(e),
+            };
+
+            if let Err(e) = result {
                 error_counter += 1;
                 vlog::warn!("Error when updating token market volume {:?}", e);
                 if error_counter >= CRITICAL_NUMBER_OF_ERRORS {
@@ -300,7 +300,7 @@ mod tests {
         );
 
         let mut updater = MarketUpdater::new(cache, watcher);
-        updater.update_all_tokens(&all_tokens).await.unwrap();
+        updater.update_all_tokens(all_tokens).await.unwrap();
 
         let new_dai_token_market = validator
             .tokens_cache
