@@ -4164,6 +4164,24 @@
       ]
     }
   },
+  "a0f1e59021d8b8d2c57dad3796db0979e7dbef1d0ab009026c0a45b40eef3dec": {
+    "query": "\n            SELECT COUNT(*) as \"count!\" FROM tokens WHERE kind = 'ERC20'::token_kind\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "a154c713c54d22beec24fd99856956ab851fc6daf5692ffc6e0255c7dc6f16c1": {
     "query": "\n                SELECT * FROM account_pubkey_updates\n                WHERE account_id = $1 AND block_number > $2\n            ",
     "describe": {
@@ -6568,6 +6586,24 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "eaba990c2cc8e68e9f9f6ae673d63c4ff30475d2e74bb9c8bee1b4341aacaf7c": {
+    "query": "\n            SELECT max(id) as \"id!\" FROM tokens WHERE kind = 'ERC20'::token_kind\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "eac9603e24c96b9675d13f7b2d8b2f9509a0f72a4b058919343d9e49ece8657c": {

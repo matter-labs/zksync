@@ -297,8 +297,41 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
-    /// Get the number of tokens from Database
+    /// Get the number of ERC20 tokens from Database
     pub async fn get_count(&mut self) -> QueryResult<u32> {
+        let start = Instant::now();
+        let count = sqlx::query!(
+            r#"
+            SELECT COUNT(*) as "count!" FROM tokens WHERE kind = 'ERC20'::token_kind
+            "#,
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .count;
+
+        metrics::histogram!("sql.token.get_count", start.elapsed());
+        Ok(count as u32)
+    }
+
+    /// Get the max token ID of ERC20 tokens from Database
+    pub async fn get_max_erc20_token_id(&mut self) -> QueryResult<u32> {
+        let start = Instant::now();
+        let last_token_id = sqlx::query!(
+            r#"
+            SELECT max(id) as "id!" FROM tokens WHERE kind = 'ERC20'::token_kind
+            "#,
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|token| token.id)
+        .unwrap_or(0);
+
+        metrics::histogram!("sql.token.get_count", start.elapsed());
+        Ok(last_token_id as u32)
+    }
+
+    /// Get the max token ID of non-NFT tokens from Database
+    pub async fn get_max_token_id(&mut self) -> QueryResult<u32> {
         let start = Instant::now();
         let last_token_id = sqlx::query!(
             r#"

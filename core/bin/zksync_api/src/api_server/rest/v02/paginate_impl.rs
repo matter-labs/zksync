@@ -41,7 +41,7 @@ impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
             Either::Right(_) => TokenId(
                 transaction
                     .tokens_schema()
-                    .get_count()
+                    .get_max_erc20_token_id()
                     .await
                     .map_err(Error::storage)?,
             ),
