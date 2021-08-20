@@ -62,4 +62,7 @@ Enable or disable requirement for L1 signature for L2 transactions.
 
 + Response 200 (application/json)
     + Attributes
-        + success: true (boolean, required)
+        + request (Request, required)
+        + status: success (string, required)
+        + result (2FAResult, required{{isResultNullable}})
+        + error (Error, required, nullable)
