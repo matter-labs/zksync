@@ -128,10 +128,19 @@ mod tests {
 
         let tx_type = ApiTxFeeTypes::Withdraw;
         let address = Address::default();
-        let token_like = TokenLike::Id(TokenId(1));
+        let not_allowed_token = TokenLike::Id(TokenId(1));
 
         let response = client
-            .get_txs_fee(tx_type, address, token_like.clone())
+            .get_txs_fee(tx_type.clone(), address, not_allowed_token)
+            .await?;
+        let expected_error = Error::from(SubmitError::InappropriateFeeToken);
+        let error = serde_json::from_value::<Error>(response.error.unwrap()).unwrap();
+        assert_eq!(error, expected_error);
+
+        let allowed_token = TokenLike::Id(TokenId(2));
+
+        let response = client
+            .get_txs_fee(tx_type, address, allowed_token.clone())
             .await?;
         let api_fee: ApiFee = deserialize_response_result(response)?;
         assert_eq!(api_fee.gas_fee, BigUint::from(1u32));
@@ -144,7 +153,7 @@ mod tests {
         };
         let txs = vec![tx.clone(), tx.clone(), tx];
 
-        let response = client.get_batch_fee(txs, token_like).await?;
+        let response = client.get_batch_fee(txs, allowed_token).await?;
         let api_batch_fee: ApiFee = deserialize_response_result(response)?;
         assert_eq!(api_batch_fee.gas_fee, BigUint::from(3u32));
         assert_eq!(api_batch_fee.zkp_fee, BigUint::from(3u32));
