@@ -12,7 +12,7 @@ use zksync_types::{
     priority_ops::PriorityOp,
     tx::{ChangePubKeyType, TxHash},
     AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, MintNFTOp,
-    SwapOp, Token, TokenId, TransferOp, TransferToNewOp, WithdrawNFTOp, WithdrawOp,
+    SwapOp, Token, TokenId, TokenKind, TransferOp, TransferToNewOp, WithdrawNFTOp, WithdrawOp,
 };
 // Local imports
 
@@ -33,10 +33,10 @@ impl TransactionsHistoryTestSetup {
         let mut nft_token = Token::new_nft(TokenId(100000), "NFT-100000");
         nft_token.address = Address::random();
         let tokens = vec![
-            Token::new(TokenId(0), Address::zero(), "ETH", 18, true), // used for deposits, swaps
-            Token::new(TokenId(1), Address::random(), "DAI", 18, true), // used for transfers, swaps
-            Token::new(TokenId(2), Address::random(), "FAU", 6, true), // used for withdraws
-            nft_token,                                                // used for nft withdrawals
+            Token::new(TokenId(0), Address::zero(), "ETH", 18, TokenKind::ERC20), // used for deposits, swaps
+            Token::new(TokenId(1), Address::random(), "DAI", 18, TokenKind::ERC20), // used for transfers, swaps
+            Token::new(TokenId(2), Address::random(), "FAU", 6, TokenKind::ERC20), // used for withdraws
+            nft_token, // used for nft withdrawals
         ];
 
         let from_account_id = AccountId(0xbabe);

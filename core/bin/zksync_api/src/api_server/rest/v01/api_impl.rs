@@ -17,7 +17,7 @@ use chrono::Duration;
 use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
-use zksync_types::{Address, BlockNumber, Token, TokenId};
+use zksync_types::{Address, BlockNumber, Token, TokenId, TokenKind};
 
 /// Helper macro which wraps the serializable object into `Ok(HttpResponse::Ok().json(...))`.
 macro_rules! ok_json {
@@ -77,7 +77,7 @@ impl ApiV01 {
         // But ETH is always allowed to pay fee, and in all cases it should be on the list.
 
         if tokens.get(&TokenId(0)).is_none() {
-            let eth = Token::new(TokenId(0), Default::default(), "ETH", 18, true);
+            let eth = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
             tokens.insert(eth.id, eth);
         }
 

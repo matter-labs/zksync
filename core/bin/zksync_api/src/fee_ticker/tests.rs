@@ -147,7 +147,7 @@ impl FeeTickerAPI for MockApiProvider {
                     test_token.address,
                     "",
                     test_token.precision,
-                    true,
+                    TokenKind::ERC20,
                 ));
             }
         }

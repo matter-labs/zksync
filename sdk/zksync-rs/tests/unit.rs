@@ -8,12 +8,12 @@ use zksync_types::{tx::TxSignature, AccountId, Nonce, Token, TokenId, TokenKind}
 fn test_tokens_cache() {
     let mut tokens: HashMap<String, Token> = HashMap::default();
 
-    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18, true);
+    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18, TokenKind::ERC20);
     tokens.insert("ETH".to_string(), token_eth.clone());
-    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18, true);
+    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18, TokenKind::ERC20);
     tokens.insert("DAI".to_string(), token_dai.clone());
 
-    let unknown_token = Token::new(TokenId(2), H160::random(), "UNC", 5, false);
+    let unknown_token = Token::new(TokenId(2), H160::random(), "UNC", 5, TokenKind::None);
 
     let tokens_cache = TokensCache::new(tokens);
 

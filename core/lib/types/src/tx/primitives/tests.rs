@@ -4,7 +4,7 @@ use std::str::FromStr;
 use zksync_basic_types::Address;
 use zksync_utils::format_units;
 // Local uses
-use crate::{tx::*, AccountId, Nonce, Token, TokenId, Transfer, Withdraw, ZkSyncTx};
+use crate::{tx::*, AccountId, Nonce, Token, TokenId, TokenKind, Transfer, Withdraw, ZkSyncTx};
 
 fn get_transfer() -> Transfer {
     Transfer::new(
@@ -57,7 +57,7 @@ fn test_empty_batch() {
 /// Checks the correctness of the message `EthBatchSignData::new()` returns.
 #[test]
 fn test_batch_message() {
-    let token = Token::new(TokenId(0), Default::default(), "ETH", 18, true);
+    let token = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
     let transfer = get_transfer();
     let withdraw = get_withdraw();
     let change_pub_key = get_change_pub_key();

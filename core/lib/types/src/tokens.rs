@@ -114,12 +114,7 @@ pub enum TokenKind {
 }
 
 impl Token {
-    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8, is_erc20: bool) -> Self {
-        let kind = if is_erc20 {
-            TokenKind::ERC20
-        } else {
-            TokenKind::None
-        };
+    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8, kind: TokenKind) -> Self {
         Self {
             id,
             address,

@@ -19,7 +19,7 @@ use zksync_notifier::Notifier;
 use zksync_storage::{tokens::StoreTokenError, ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{NewTokenEvent, Token, TokenInfo},
-    Address, TokenId,
+    Address, TokenId, TokenKind,
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;
@@ -109,6 +109,11 @@ impl TokenHandler {
             let default_decimals = 18;
 
             let is_erc20 = self.is_contract_erc20(token_event.address).await;
+            let token_kind = if is_erc20 {
+                TokenKind::ERC20
+            } else {
+                TokenKind::None
+            };
 
             let token_from_list = {
                 let token_info = self.token_list.get(&token_event.address).cloned();
@@ -119,7 +124,7 @@ impl TokenHandler {
                         token_info.address,
                         &token_info.symbol,
                         token_info.decimals,
-                        is_erc20,
+                        token_kind,
                     ))
                 } else {
                     None
@@ -140,7 +145,7 @@ impl TokenHandler {
                                 token_from_list.address,
                                 &default_symbol,
                                 token_from_list.decimals,
-                                is_erc20,
+                                token_kind,
                             );
                             let try_insert_token = token_schema.store_token(token.clone()).await;
                             match try_insert_token {
@@ -163,7 +168,7 @@ impl TokenHandler {
                         token_event.address,
                         &default_symbol,
                         default_decimals,
-                        is_erc20,
+                        token_kind,
                     );
                     let try_insert_token = token_schema.store_token(token.clone()).await;
                     match try_insert_token {
