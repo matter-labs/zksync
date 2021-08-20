@@ -15,5 +15,5 @@ publish = false # We don't want to publish our binaries.
 [dependencies]
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1.0", features = ["full"] }
 anyhow = "1.0"
