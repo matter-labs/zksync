@@ -6,7 +6,11 @@ use jsonrpc_derive::rpc;
 
 // Workspace uses
 use zksync_api_types::{
-    v02::{fee::ApiTxFeeTypes, token::ApiNFT},
+    v02::{
+        fee::ApiTxFeeTypes,
+        token::ApiNFT,
+        transaction::{Toggle2FA, Toggle2FAResponse},
+    },
     TxWithSignature,
 };
 use zksync_crypto::params::ZKSYNC_VERSION;
@@ -96,6 +100,9 @@ pub trait Rpc {
 
     #[rpc(name = "get_nft_owner", returns = "Option<AccountId>")]
     fn get_nft_owner(&self, id: TokenId) -> BoxFutureResult<Option<AccountId>>;
+
+    #[rpc(name = "toggle_2fa", returns = "Toggle2FAResponse")]
+    fn toggle_2fa(&self, toggle_2fa: Toggle2FA) -> BoxFutureResult<Toggle2FAResponse>;
 }
 
 impl Rpc for RpcApp {
@@ -179,5 +186,9 @@ impl Rpc for RpcApp {
 
     fn get_nft_owner(&self, id: TokenId) -> BoxFutureResult<Option<AccountId>> {
         spawn!(self._impl_get_nft_owner(id))
+    }
+
+    fn toggle_2fa(&self, toggle_2fa: Toggle2FA) -> BoxFutureResult<Toggle2FAResponse> {
+        spawn!(self._impl_toggle_2fa(toggle_2fa))
     }
 }
