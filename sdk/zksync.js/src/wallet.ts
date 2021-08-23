@@ -31,7 +31,8 @@ import {
     Withdraw,
     WithdrawNFT,
     TokenRatio,
-    WeiRatio
+    WeiRatio,
+    Toggle2FARequest
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -916,18 +917,23 @@ export class Wallet {
         return changePubKeyTx;
     }
 
-    async toggle2FA(enable: boolean): Promise<boolean> {
-        await this.setRequiredAccountIdFromServer('Toggle 2FA');
+    async getToggle2FA(enable: boolean): Promise<Toggle2FARequest> {
         const accountId = await this.getAccountId();
         const timestamp = new Date().getTime();
         const signature = await this.getEthMessageSignature(getToggle2FAMessage(enable, timestamp));
 
-        return await this.provider.toggle2FA({
+        return {
             accountId,
             signature,
             timestamp,
             enable
-        });
+        };
+    }
+
+    async toggle2FA(enable: boolean): Promise<boolean> {
+        await this.setRequiredAccountIdFromServer('Toggle 2FA');
+
+        return await this.provider.toggle2FA(await this.getToggle2FA(enable));
     }
 
     async signSetSigningKey(changePubKey: {

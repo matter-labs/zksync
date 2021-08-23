@@ -83,6 +83,8 @@ interface Parameters {
     l2Signature: string;
     ethereumSignature: string;
     nftId: number;
+    toggle2FASignature: string;
+    toggle2FATimestamp: number;
 }
 
 async function getHashesAndSignatures() {
@@ -128,6 +130,10 @@ async function getHashesAndSignatures() {
     const state = await syncWallet.getAccountState();
     const nftId = Object.values(state.verified.nfts)[0].id;
 
+    const toggle2FAObject = await syncWallet.getToggle2FA(false);
+    const toggle2FASignature = (toggle2FAObject.signature as zksync.types.TxEthSignature).signature;
+    const toggle2FATimestamp = toggle2FAObject.timestamp;
+
     let result: Parameters = {
         txHash,
         txBatchHash,
@@ -136,7 +142,9 @@ async function getHashesAndSignatures() {
         pubKey,
         l2Signature,
         ethereumSignature,
-        nftId
+        nftId,
+        toggle2FASignature,
+        toggle2FATimestamp
     };
     return result;
 }
