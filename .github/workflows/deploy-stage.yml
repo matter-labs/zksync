@@ -70,5 +70,6 @@ jobs:
           inputs: |
             {
               "environment": "stage",
-              "image_tag": "${{ needs.setup.outputs.image_tag }}"
+              "image_tag": "${{ needs.setup.outputs.image_tag }}",
+              "config_ref": "master"
             }

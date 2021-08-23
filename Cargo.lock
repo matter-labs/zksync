@@ -20,9 +20,9 @@ dependencies = [
  "log 0.4.14",
  "once_cell",
  "parking_lot 0.11.1",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "smallvec 1.6.1",
- "tokio 1.9.0",
+ "tokio",
  "tokio-util",
 ]
 
@@ -37,8 +37,8 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log 0.4.14",
- "pin-project-lite 0.2.7",
- "tokio 1.9.0",
+ "pin-project-lite",
+ "tokio",
  "tokio-util",
 ]
 
@@ -90,14 +90,14 @@ dependencies = [
  "once_cell",
  "percent-encoding 2.1.0",
  "pin-project",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "rand 0.8.4",
  "regex",
  "serde",
  "sha-1 0.9.7",
  "smallvec 1.6.1",
  "time 0.2.27",
- "tokio 1.9.0",
+ "tokio",
  "zstd",
 ]
 
@@ -158,7 +158,7 @@ checksum = "bc7d7cd957c9ed92288a7c3c96af81fa5291f65247a76a34dac7b6af74e52ba0"
 dependencies = [
  "actix-macros",
  "futures-core",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -175,7 +175,7 @@ dependencies = [
  "mio 0.7.13",
  "num_cpus",
  "slab",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -186,7 +186,7 @@ checksum = "77f5f9d66a8730d0fae62c26f3424f5751e5518086628a40b7ab6fca4a705034"
 dependencies = [
  "futures-core",
  "paste",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
 ]
 
 [[package]]
@@ -235,7 +235,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e491cbaac2e7fc788dfff99ff48ef317e23b3cf63dbaf7aaab6418f40f92aa94"
 dependencies = [
  "local-waker",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
 ]
 
 [[package]]
@@ -293,7 +293,7 @@ dependencies = [
  "bytestring",
  "futures-core",
  "pin-project",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -551,7 +551,7 @@ dependencies = [
  "log 0.4.14",
  "mime 0.3.16",
  "percent-encoding 2.1.0",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "rand 0.8.4",
  "serde",
  "serde_json",
@@ -579,7 +579,7 @@ dependencies = [
  "instant",
  "pin-project",
  "rand 0.8.4",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -799,7 +799,7 @@ dependencies = [
  "anyhow",
  "ethabi",
  "structopt",
- "tokio 1.9.0",
+ "tokio",
  "web3",
  "zksync_config",
  "zksync_eth_client",
@@ -1070,7 +1070,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tinytemplate",
- "tokio 1.9.0",
+ "tokio",
  "walkdir",
 ]
 
@@ -1361,7 +1361,7 @@ dependencies = [
  "config",
  "num_cpus",
  "serde",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -1765,7 +1765,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1861,7 +1861,7 @@ dependencies = [
  "http",
  "indexmap",
  "slab",
- "tokio 1.9.0",
+ "tokio",
  "tokio-util",
  "tracing",
 ]
@@ -2003,7 +2003,7 @@ checksum = "60daa14be0e0786db0f03a9e57cb404c9d756eed2b6c62b9ea98ec5743ec75a9"
 dependencies = [
  "bytes 1.0.1",
  "http",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
 ]
 
 [[package]]
@@ -2053,9 +2053,9 @@ dependencies = [
  "httparse",
  "httpdate",
  "itoa",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "socket2",
- "tokio 1.9.0",
+ "tokio",
  "tower-service",
  "tracing",
  "want",
@@ -2070,7 +2070,7 @@ dependencies = [
  "bytes 1.0.1",
  "hyper 0.14.11",
  "native-tls",
- "tokio 1.9.0",
+ "tokio",
  "tokio-native-tls",
 ]
 
@@ -2239,7 +2239,7 @@ dependencies = [
  "log 0.4.14",
  "serde",
  "serde_json",
- "tokio 1.9.0",
+ "tokio",
  "url 1.7.2",
  "websocket",
 ]
@@ -2339,7 +2339,7 @@ dependencies = [
  "jsonrpc-core 18.0.0",
  "lazy_static",
  "log 0.4.14",
- "tokio 1.9.0",
+ "tokio",
  "tokio-stream",
  "tokio-util",
  "unicase 2.6.0",
@@ -2477,7 +2477,7 @@ dependencies = [
  "rand 0.8.4",
  "serde",
  "static_assertions",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "zksync",
  "zksync_eth_signer",
@@ -2659,7 +2659,7 @@ dependencies = [
  "parking_lot 0.11.1",
  "quanta",
  "thiserror",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -2729,7 +2729,7 @@ name = "mint_nft_nonce_migration"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "tokio 0.2.25",
+ "tokio",
  "zksync_config",
  "zksync_storage",
 ]
@@ -2776,29 +2776,6 @@ dependencies = [
  "log 0.4.14",
  "mio 0.6.23",
  "slab",
-]
-
-[[package]]
-name = "mio-named-pipes"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0840c1c50fd55e521b247f949c241c9997709f23bd7f023b9762cd561e935656"
-dependencies = [
- "log 0.4.14",
- "mio 0.6.23",
- "miow 0.3.7",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "mio-uds"
-version = "0.6.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afcb699eb26d4332647cc848492bbc15eafb26f08d0304550d5aa1f612e066f0"
-dependencies = [
- "iovec",
- "libc",
- "mio 0.6.23",
 ]
 
 [[package]]
@@ -3356,12 +3333,6 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "257b64915a082f7811703966789728173279bdebb956b143dbcd23f6f970a777"
-
-[[package]]
-name = "pin-project-lite"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d31d11c69a6b52a174b42bdc0c30e5e11670f90788b2c471c31c1d17d449443"
@@ -3915,11 +3886,11 @@ dependencies = [
  "mime 0.3.16",
  "native-tls",
  "percent-encoding 2.1.0",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "serde",
  "serde_json",
  "serde_urlencoded",
- "tokio 1.9.0",
+ "tokio",
  "tokio-native-tls",
  "url 2.2.2",
  "wasm-bindgen",
@@ -4198,7 +4169,7 @@ dependencies = [
  "sentry-contexts",
  "sentry-core",
  "sentry-panic",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -4619,7 +4590,7 @@ checksum = "8199b421ecf3493ee9ef3e7bc90c904844cfb2ea7ea2f57347a93f52bfd3e057"
 dependencies = [
  "native-tls",
  "once_cell",
- "tokio 1.9.0",
+ "tokio",
  "tokio-native-tls",
 ]
 
@@ -4907,30 +4878,6 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "0.2.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6703a273949a90131b290be1fe7b039d0fc884aa1935860dfcbe056f28cd8092"
-dependencies = [
- "bytes 0.5.6",
- "fnv",
- "futures-core",
- "iovec",
- "lazy_static",
- "libc",
- "memchr",
- "mio 0.6.23",
- "mio-named-pipes",
- "mio-uds",
- "num_cpus",
- "pin-project-lite 0.1.12",
- "signal-hook-registry",
- "slab",
- "tokio-macros 0.2.6",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "tokio"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b7b349f11a7047e6d1276853e612d152f5e8a352c61917887cc2169e2366b4c"
@@ -4943,9 +4890,9 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "parking_lot 0.11.1",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "signal-hook-registry",
- "tokio-macros 1.3.0",
+ "tokio-macros",
  "winapi 0.3.9",
 ]
 
@@ -4983,17 +4930,6 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e44da00bfc73a25f814cd8d7e57a68a5c31b74b3152a0a1d1f590c97ed06265a"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "tokio-macros"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54473be61f4ebe4efd09cec9bd5d16fa51d70ea0192213d754d2d500457db110"
@@ -5010,7 +4946,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7d995660bd2b7f8c1568414c1126076c13fbb725c40112dc0120b78eb9b717b"
 dependencies = [
  "native-tls",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -5039,8 +4975,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b2f3f698253f03119ac0102beaa64f67a67e08074d03a22d18784104543727f"
 dependencies = [
  "futures-core",
- "pin-project-lite 0.2.7",
- "tokio 1.9.0",
+ "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]
@@ -5089,8 +5025,8 @@ dependencies = [
  "futures-io",
  "futures-sink",
  "log 0.4.14",
- "pin-project-lite 0.2.7",
- "tokio 1.9.0",
+ "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]
@@ -5116,7 +5052,7 @@ checksum = "09adeb8c97449311ccd28a427f96fb563e7fd31aabf994189879d9da2394b89d"
 dependencies = [
  "cfg-if 1.0.0",
  "log 0.4.14",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
 ]
@@ -5506,7 +5442,7 @@ dependencies = [
  "serde_json",
  "soketto",
  "tiny-keccak 2.0.2",
- "tokio 1.9.0",
+ "tokio",
  "tokio-stream",
  "tokio-util",
  "url 2.2.2",
@@ -5521,7 +5457,7 @@ checksum = "1f6d8d1636b2627fe63518d5a9b38a569405d9c9bc665c43c9c341de57227ebb"
 dependencies = [
  "native-tls",
  "thiserror",
- "tokio 1.9.0",
+ "tokio",
  "url 2.2.2",
 ]
 
@@ -5665,7 +5601,7 @@ dependencies = [
  "serde_json",
  "sha2 0.8.2",
  "thiserror",
- "tokio 1.9.0",
+ "tokio",
  "web3",
  "zksync_config",
  "zksync_crypto",
@@ -5714,7 +5650,7 @@ dependencies = [
  "structopt",
  "thiserror",
  "tiny-keccak 1.5.0",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "web3",
  "zksync_api_client",
@@ -5776,7 +5712,7 @@ version = "1.0.0"
 dependencies = [
  "futures 0.3.16",
  "metrics",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -5852,7 +5788,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tiny-keccak 1.5.0",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "web3",
  "zksync_api_types",
@@ -5909,7 +5845,7 @@ dependencies = [
  "serde_json",
  "structopt",
  "tiny-keccak 1.5.0",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "web3",
  "zksync_config",
@@ -5931,7 +5867,7 @@ dependencies = [
  "metrics",
  "parity-crypto",
  "serde",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "web3",
  "zksync_config",
@@ -5956,7 +5892,7 @@ dependencies = [
  "num",
  "serde",
  "serde_json",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "web3",
  "zksync_basic_types",
@@ -5987,7 +5923,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "thiserror",
- "tokio 1.9.0",
+ "tokio",
  "zksync_types",
 ]
 
@@ -6021,7 +5957,7 @@ dependencies = [
  "log 0.4.14",
  "metrics",
  "num",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "web3",
  "zksync_api",
@@ -6042,7 +5978,7 @@ dependencies = [
  "futures 0.3.16",
  "metrics",
  "thiserror",
- "tokio 1.9.0",
+ "tokio",
  "tokio-stream",
  "vlog",
  "web3",
@@ -6077,7 +6013,7 @@ dependencies = [
  "metrics-exporter-prometheus",
  "metrics-macros",
  "metrics-util",
- "tokio 1.9.0",
+ "tokio",
  "tracing",
  "vlog",
  "zksync_config",
@@ -6103,7 +6039,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "web3",
  "zksync_circuit",
@@ -6127,7 +6063,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "zksync_basic_types",
  "zksync_circuit",
@@ -6149,7 +6085,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "zksync_api",
  "zksync_config",
@@ -6203,7 +6139,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "thiserror",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "zksync_api_types",
  "zksync_basic_types",
@@ -6237,7 +6173,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
- "tokio 1.9.0",
+ "tokio",
  "vlog",
  "web3",
  "zksync_circuit",
@@ -6291,7 +6227,7 @@ dependencies = [
  "num",
  "serde",
  "serde_json",
- "tokio 1.9.0",
+ "tokio",
 ]
 
 [[package]]
@@ -6312,7 +6248,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "tokio 1.9.0",
+ "tokio",
  "tracing",
  "vlog",
  "zksync_circuit",
