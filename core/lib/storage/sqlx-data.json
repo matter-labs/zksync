@@ -119,50 +119,6 @@
       ]
     }
   },
-  "04069d09246f16a6d03be04decaa05456556dc05b964adea34742af0eaef91aa": {
-    "query": "\n                    SELECT * FROM tokens\n                    WHERE symbol = $1\n                    LIMIT 1\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "06eb41e0b8385c6875b0355660a43e633172e01a20dcb3d81b4f47e4b70705c4": {
     "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n            VALUES ($1, $2, $3, $4, $5)",
     "describe": {
@@ -1093,6 +1049,61 @@
       "nullable": []
     }
   },
+  "21d959769e02bf5c52b68e69732363716534dbbbf0638a500ef46152136d2cab": {
+    "query": "\n                    SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n                    WHERE address = $1\n                    LIMIT 1\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "kind: _",
+          "type_info": {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {
@@ -1229,52 +1240,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "263931af0450d194a1369bb58e1f8584bf7706f5fba29bd58a8d9b31e2cb675e": {
-    "query": "\n            SELECT * FROM tokens\n            WHERE id = $1 OR address = $2 OR symbol = $3\n            LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "273c7371b1a13bbb03490e874b7f2eab969defa6aa9f2b416e4f9e8a135aa97c": {
@@ -1608,6 +1573,33 @@
         false,
         false
       ]
+    }
+  },
+  "3186e2d96b7f1e1339ac9f09221ae15aba8dff112083079fc6ef5f3acbfc1553": {
+    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, kind )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4, kind = $5\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2",
+          {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "nullable": []
     }
   },
   "3538961dd16f0eb374b50b33cae9a656426720c7fdf5d26ac406f44f47692e01": {
@@ -2408,20 +2400,59 @@
       ]
     }
   },
-  "578f732b2a605d3af17189dc0c1c72d3f6f1921672098c2a81bccb695843f745": {
-    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4\n            ",
+  "55f394e48eca655ba989d46093cbb36c40398446fa6d7aa776a4f57a3ecac300": {
+    "query": "\n            SELECT id, address, decimals, kind as \"kind: _\", symbol\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            AND kind = 'ERC20'::token_kind\n            ORDER BY id ASC\n            ",
     "describe": {
-      "columns": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "kind: _",
+          "type_info": {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
       "parameters": {
         "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2",
-          "Bool"
+          "Numeric"
         ]
       },
-      "nullable": []
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "58b251c3fbdf9be9b62f669f8cdc2d98940026c831e02a53337474d36a5224f0": {
@@ -2543,6 +2574,62 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "5fac3f8e9ad91897751e7f14c56723f24d1c85ed146679296525e667b55b3947": {
+    "query": "\n            SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n            WHERE id >= $1 AND kind = 'ERC20'::token_kind\n            ORDER BY id ASC\n            LIMIT $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "kind: _",
+          "type_info": {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {
@@ -3704,6 +3791,33 @@
       "nullable": []
     }
   },
+  "8ead89cb48612f9415b7904aa1579be0eed225f14ee2628d55f56602cf3e4acc": {
+    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, kind )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2",
+          {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8eb8865ba9f727bf86cbb3713903241b60e61b02b200fcf60483c99ff7cdc57c": {
     "query": "INSERT INTO data_restore_rollup_block_ops (block_num, operation)\n                SELECT $1, u.operation\n                    FROM UNNEST ($2::jsonb[])\n                    AS u(operation)",
     "describe": {
@@ -3841,22 +3955,6 @@
       "nullable": [
         null
       ]
-    }
-  },
-  "961bbd13b54a7d53a58dfef2e60ce77752ff30807226edc69a47487b994b1468": {
-    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2",
-          "Bool"
-        ]
-      },
-      "nullable": []
     }
   },
   "963cad1979935b50bc5c2bbe174f5d94fbd5c38ea752d304f987229c89e6070a": {
@@ -4063,6 +4161,24 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "a0f1e59021d8b8d2c57dad3796db0979e7dbef1d0ab009026c0a45b40eef3dec": {
+    "query": "\n            SELECT COUNT(*) as \"count!\" FROM tokens WHERE kind = 'ERC20'::token_kind\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -4525,48 +4641,19 @@
       "nullable": []
     }
   },
-  "b5e0f843d267576d57f41e2c4a63335749cb40e79bdb2b2cccbbaed5200abe96": {
-    "query": "\n                    SELECT * FROM tokens\n                    WHERE address = $1\n                    LIMIT 1\n                    ",
+  "b2236625d3128295e0e712c0d66eb6655fcd528897d7154a891946b14b15de46": {
+    "query": "\n                    INSERT INTO tokens ( id, address, symbol, decimals, kind )\n                    VALUES ( $1, $2, $3, $4, 'NFT'::token_kind )\n                    ",
     "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
+      "columns": [],
       "parameters": {
         "Left": [
-          "Text"
+          "Int4",
+          "Text",
+          "Text",
+          "Int2"
         ]
       },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
+      "nullable": []
     }
   },
   "b63daeea7fab180b5eba3721d26ad0a8f89193b9e459339e76e1a1bd87d9f37b": {
@@ -4751,50 +4838,6 @@
         "Left": []
       },
       "nullable": [
-        false,
-        false
-      ]
-    }
-  },
-  "bc246679e533069cc7fbdf248e62c3e649f32b8019b48a94d074a95a09777069": {
-    "query": "\n            SELECT id, address, symbol, decimals, is_nft\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            AND is_nft = false\n            ORDER BY id ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Numeric"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
         false,
         false
       ]
@@ -4988,6 +5031,61 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "c08f5c773d9475d06ae0a0e0771de9b004e1a3c9811a8a165acf079c198a9cb5": {
+    "query": "\n                    SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n                    WHERE id = $1\n                    LIMIT 1\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "kind: _",
+          "type_info": {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -5304,21 +5402,58 @@
       ]
     }
   },
-  "c7045d75468ecf0b89dadcb4edeb0a55eb65a175fa101c42011ca24c89036803": {
-    "query": "\n            SELECT max(id) as \"id!\" FROM tokens WHERE is_nft = false\n            ",
+  "c55673eb654deef9816a03d81ac34767003f366ef28a6be49ad3a9509f21aa1a": {
+    "query": "\n                    SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n                    WHERE symbol = $1\n                    LIMIT 1\n                    ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "id!",
+          "name": "id",
           "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "kind: _",
+          "type_info": {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "symbol",
+          "type_info": "Text"
         }
       ],
       "parameters": {
-        "Left": []
+        "Left": [
+          "Text"
+        ]
       },
       "nullable": [
-        null
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -5483,6 +5618,24 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "cd0e1f11fb56662010b4ec2e0eb9a0e877f1eab4157f8ac57db9b18cca666cbe": {
+    "query": "\n            SELECT max(id) as \"id!\" FROM tokens WHERE kind != 'NFT'::token_kind\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -5904,51 +6057,6 @@
       "nullable": []
     }
   },
-  "dd6a01d31268f3f9b922fdf75f8e9e265fc295562865e23dea4dd3293aa05d78": {
-    "query": "\n            SELECT * FROM tokens\n            WHERE id <= $1 AND is_nft = false\n            ORDER BY id DESC\n            LIMIT $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
     "query": "SELECT * from mempool_txs\n            WHERE tx_hash = $1",
     "describe": {
@@ -6037,6 +6145,63 @@
       ]
     }
   },
+  "e1a36acacae100eaa3b2e08fee32fd4040d47816e9ef9e9bc16f158aaa907c5a": {
+    "query": "\n            SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n            WHERE id = $1 OR address = $2 OR symbol = $3\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "kind: _",
+          "type_info": {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "e295fe3cf4138c1dfd76fc7b4f5e72ab981229c036c46fb937cd6fc974af843d": {
     "query": "DELETE FROM blocks WHERE number > $1",
     "describe": {
@@ -6083,50 +6248,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "e4897d5770da960d06e093558bcbcc924dfe62dd594ff2f464f42dd15a60975e": {
-    "query": "\n                    SELECT * FROM tokens\n                    WHERE id = $1\n                    LIMIT 1\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "e515899938d5ced7b83234fcea6ad024184702eca40b1fae1a16467649722a10": {
@@ -6237,6 +6358,62 @@
         false,
         true,
         true
+      ]
+    }
+  },
+  "e6cd1212f6a5feaa8b51fdd1982086e28d0a4bc5b1d487b9c83658bda1e5c758": {
+    "query": "\n            SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n            WHERE id <= $1 AND kind = 'ERC20'::token_kind\n            ORDER BY id DESC\n            LIMIT $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "kind: _",
+          "type_info": {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -6411,6 +6588,24 @@
       "nullable": []
     }
   },
+  "eaba990c2cc8e68e9f9f6ae673d63c4ff30475d2e74bb9c8bee1b4341aacaf7c": {
+    "query": "\n            SELECT max(id) as \"id!\" FROM tokens WHERE kind = 'ERC20'::token_kind\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "eac9603e24c96b9675d13f7b2d8b2f9509a0f72a4b058919343d9e49ece8657c": {
     "query": "SELECT number FROM blocks where root_hash = $1",
     "describe": {
@@ -6427,66 +6622,6 @@
         ]
       },
       "nullable": [
-        false
-      ]
-    }
-  },
-  "eb9480426aebcc7679526858296f555bb4d3e1ccf488a942de6d0b2dd1ed4720": {
-    "query": "\n                    INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n                    VALUES ( $1, $2, $3, $4, true )\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "ec1b0d11c29e691e78145bf04665fd1967b329722cf0d54a0611eedc4caff866": {
-    "query": "\n            SELECT * FROM tokens\n            WHERE id >= $1 AND is_nft = false\n            ORDER BY id ASC\n            LIMIT $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
         false
       ]
     }

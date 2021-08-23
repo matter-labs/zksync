@@ -19,7 +19,7 @@ use zksync_notifier::Notifier;
 use zksync_storage::{tokens::StoreTokenError, ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{NewTokenEvent, Token, TokenInfo},
-    Address, TokenId,
+    Address, TokenId, TokenKind,
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;
@@ -73,6 +73,20 @@ impl TokenHandler {
         receiver.await.expect("Err response from eth watch")
     }
 
+    async fn is_contract_erc20(&self, address: Address) -> bool {
+        let (sender, receiver) = oneshot::channel();
+        self.eth_watch_req
+            .clone()
+            .send(EthWatchRequest::IsContractERC20 {
+                address,
+                resp: sender,
+            })
+            .await
+            .expect("ETH watch req receiver dropped");
+
+        receiver.await.expect("Err response from eth watch")
+    }
+
     async fn save_new_tokens(
         &self,
         storage: &mut StorageProcessor<'_>,
@@ -81,7 +95,7 @@ impl TokenHandler {
         let mut transaction = storage.start_transaction().await?;
         let mut token_schema = transaction.tokens_schema();
 
-        let last_token_id = TokenId(token_schema.get_count().await?);
+        let last_token_id = TokenId(token_schema.get_max_token_id().await?);
         let mut new_tokens = Vec::new();
 
         for token_event in tokens {
@@ -94,6 +108,13 @@ impl TokenHandler {
             let default_symbol = format!("ERC20-{}", token_event.id);
             let default_decimals = 18;
 
+            let is_erc20 = self.is_contract_erc20(token_event.address).await;
+            let token_kind = if is_erc20 {
+                TokenKind::ERC20
+            } else {
+                TokenKind::None
+            };
+
             let token_from_list = {
                 let token_info = self.token_list.get(&token_event.address).cloned();
 
@@ -103,6 +124,7 @@ impl TokenHandler {
                         token_info.address,
                         &token_info.symbol,
                         token_info.decimals,
+                        token_kind,
                     ))
                 } else {
                     None
@@ -123,6 +145,7 @@ impl TokenHandler {
                                 token_from_list.address,
                                 &default_symbol,
                                 token_from_list.decimals,
+                                token_kind,
                             );
                             let try_insert_token = token_schema.store_token(token.clone()).await;
                             match try_insert_token {
@@ -145,6 +168,7 @@ impl TokenHandler {
                         token_event.address,
                         &default_symbol,
                         default_decimals,
+                        token_kind,
                     );
                     let try_insert_token = token_schema.store_token(token.clone()).await;
                     match try_insert_token {

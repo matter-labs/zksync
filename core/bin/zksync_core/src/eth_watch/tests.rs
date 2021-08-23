@@ -119,6 +119,10 @@ impl EthClient for FakeEthClient {
     ) -> Result<u64, anyhow::Error> {
         unreachable!()
     }
+
+    async fn is_contract_erc20(&self, _address: Address) -> bool {
+        true
+    }
 }
 
 fn create_watcher<T: EthClient>(client: T) -> EthWatch<T> {

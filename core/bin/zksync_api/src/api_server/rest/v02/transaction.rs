@@ -228,7 +228,7 @@ mod tests {
             EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature,
             TxEthSignatureVariant,
         },
-        BlockNumber, SignedZkSyncTx, TokenId,
+        BlockNumber, SignedZkSyncTx, TokenId, TokenKind,
     };
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_test::TestServer) {
@@ -294,7 +294,7 @@ mod tests {
         assert_eq!(tx.hash(), tx_hash);
 
         let TestTransactions { acc, txs } = TestServerConfig::gen_zk_txs(1_00);
-        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
+        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
         let (good_batch, expected_tx_hashes): (Vec<_>, Vec<_>) = txs
             .into_iter()
             .map(|(tx, _op)| {

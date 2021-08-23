@@ -1,62 +1,62 @@
 use std::collections::HashMap;
-use zksync::{tokens_cache::TokensCache, utils::*, web3::types::H160, zksync_types::Token};
+use zksync::{tokens_cache::TokensCache, utils::*, web3::types::H160};
 use zksync_config::test_config::unit_vectors::{Config as TestVectorsConfig, TestEntry};
 use zksync_crypto::PrivateKey;
-use zksync_types::{tx::TxSignature, AccountId, Nonce, TokenId};
+use zksync_types::{tx::TxSignature, AccountId, Nonce, Token, TokenId, TokenKind};
 
 #[test]
 fn test_tokens_cache() {
     let mut tokens: HashMap<String, Token> = HashMap::default();
 
-    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18);
+    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18, TokenKind::ERC20);
     tokens.insert("ETH".to_string(), token_eth.clone());
-    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18);
+    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18, TokenKind::ERC20);
     tokens.insert("DAI".to_string(), token_dai.clone());
 
-    let uncahed_token = Token::new(TokenId(2), H160::random(), "UNC", 5);
+    let unknown_token = Token::new(TokenId(2), H160::random(), "UNC", 5, TokenKind::None);
 
-    let tokens_hash = TokensCache::new(tokens);
+    let tokens_cache = TokensCache::new(tokens);
 
     assert_eq!(
-        tokens_hash.resolve(token_eth.address.into()),
+        tokens_cache.resolve(token_eth.address.into()),
         Some(token_eth.clone())
     );
     assert_eq!(
-        tokens_hash.resolve(token_eth.id.into()),
+        tokens_cache.resolve(token_eth.id.into()),
         Some(token_eth.clone())
     );
     assert_eq!(
-        tokens_hash.resolve((&token_eth.symbol as &str).into()),
+        tokens_cache.resolve((&token_eth.symbol as &str).into()),
         Some(token_eth.clone())
     );
 
     assert_eq!(
-        tokens_hash.resolve(token_dai.address.into()),
+        tokens_cache.resolve(token_dai.address.into()),
         Some(token_dai.clone())
     );
     assert_eq!(
-        tokens_hash.resolve(token_dai.id.into()),
+        tokens_cache.resolve(token_dai.id.into()),
         Some(token_dai.clone())
     );
     assert_eq!(
-        tokens_hash.resolve((&token_dai.symbol as &str).into()),
+        tokens_cache.resolve((&token_dai.symbol as &str).into()),
         Some(token_dai.clone())
     );
 
-    assert_eq!(tokens_hash.resolve(uncahed_token.address.into()), None);
-    assert_eq!(tokens_hash.resolve(uncahed_token.id.into()), None);
+    assert_eq!(tokens_cache.resolve(unknown_token.address.into()), None);
+    assert_eq!(tokens_cache.resolve(unknown_token.id.into()), None);
     assert_eq!(
-        tokens_hash.resolve((&uncahed_token.symbol as &str).into()),
+        tokens_cache.resolve((&unknown_token.symbol as &str).into()),
         None
     );
 
-    assert!(tokens_hash.is_eth(token_eth.address.into()));
-    assert!(tokens_hash.is_eth(token_eth.id.into()));
-    assert!(tokens_hash.is_eth((&token_eth.symbol as &str).into()));
+    assert!(tokens_cache.is_eth(token_eth.address.into()));
+    assert!(tokens_cache.is_eth(token_eth.id.into()));
+    assert!(tokens_cache.is_eth((&token_eth.symbol as &str).into()));
 
-    assert!(!tokens_hash.is_eth(token_dai.address.into()));
-    assert!(!tokens_hash.is_eth(token_dai.id.into()));
-    assert!(!tokens_hash.is_eth((&token_dai.symbol as &str).into()));
+    assert!(!tokens_cache.is_eth(token_dai.address.into()));
+    assert!(!tokens_cache.is_eth(token_dai.id.into()));
+    assert!(!tokens_cache.is_eth((&token_dai.symbol as &str).into()));
 }
 
 fn priv_key_from_raw(raw: &[u8]) -> Option<PrivateKey> {
@@ -195,7 +195,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: sign_data.string_token.clone(),
                     decimals: 0,
-                    is_nft: false,
+                    kind: TokenKind::ERC20,
                 };
                 let (transfer, eth_signature) = signer
                     .sign_transfer(
@@ -252,7 +252,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: sign_data.string_token.clone(),
                     decimals: 0,
-                    is_nft: false,
+                    kind: TokenKind::ERC20,
                 };
                 let (withdraw, eth_signature) = signer
                     .sign_withdraw(
@@ -309,7 +309,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: sign_data.string_fee_token.clone(),
                     decimals: 0,
-                    is_nft: false,
+                    kind: TokenKind::ERC20,
                 };
 
                 let (withdraw_nft, eth_signature) = signer
@@ -367,7 +367,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: sign_data.string_fee_token.clone(),
                     decimals: 0,
-                    is_nft: false,
+                    kind: TokenKind::ERC20,
                 };
 
                 let (mint_nft, eth_signature) = signer
@@ -425,7 +425,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: String::new(),
                     decimals: 0,
-                    is_nft: false,
+                    kind: TokenKind::ERC20,
                 };
                 let change_pub_key = signer
                     .sign_change_pubkey_tx(
@@ -481,7 +481,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: String::new(),
                     decimals: 0,
-                    is_nft: false,
+                    kind: TokenKind::ERC20,
                 };
                 let (forced_exit, _) = signer
                     .sign_forced_exit(
@@ -591,7 +591,7 @@ mod wallet_tests {
                     symbol: token.symbol.clone(),
                     address: token.address,
                     decimals: token.decimals,
-                    is_nft: false,
+                    kind: TokenKind::ERC20,
                 })
                 .map(|token| (token.symbol.clone(), token))
                 .collect();

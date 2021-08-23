@@ -10,7 +10,9 @@ use zksync_crypto::{
     params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
     Fr,
 };
-use zksync_types::{Account, AccountId, AccountMap, AccountUpdate, BlockNumber, SerialId, Token};
+use zksync_types::{
+    Account, AccountId, AccountMap, AccountUpdate, BlockNumber, SerialId, Token, TokenKind,
+};
 
 // Local deps
 use crate::{
@@ -179,7 +181,7 @@ where
                 symbol: "SPECIAL".to_string(),
                 address: *NFT_STORAGE_ACCOUNT_ADDRESS,
                 decimals: 18,
-                is_nft: true,
+                kind: TokenKind::NFT,
             })
             .await;
         vlog::info!("Special token added");

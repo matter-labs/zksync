@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 // Local uses
 use zksync_storage::ConnectionPool;
-use zksync_types::{tokens, Address, TokenId};
+use zksync_types::{tokens, Address, TokenId, TokenKind};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -99,13 +99,17 @@ async fn add_token(
     let id = match token_request.id {
         Some(id) => id,
         None => {
-            let last_token_id = storage.tokens_schema().get_count().await.map_err(|e| {
-                vlog::warn!(
-                    "failed get number of token from database in progress request: {}",
-                    e
-                );
-                actix_web::error::ErrorInternalServerError("storage layer error")
-            })?;
+            let last_token_id = storage
+                .tokens_schema()
+                .get_max_token_id()
+                .await
+                .map_err(|e| {
+                    vlog::warn!(
+                        "failed get number of token from database in progress request: {}",
+                        e
+                    );
+                    actix_web::error::ErrorInternalServerError("storage layer error")
+                })?;
             let next_available_id = last_token_id + 1;
 
             TokenId(next_available_id)
@@ -117,7 +121,7 @@ async fn add_token(
         address: token_request.address,
         symbol: token_request.symbol.clone(),
         decimals: token_request.decimals,
-        is_nft: false,
+        kind: TokenKind::ERC20,
     };
 
     storage

@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 // External uses
 use serde::{Deserialize, Serialize};
-use serde_repr::Serialize_repr;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use thiserror::Error;
 
 // Workspace uses
@@ -13,7 +13,7 @@ use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
 
-#[derive(Serialize_repr, Debug, Deserialize, Clone)]
+#[derive(Serialize_repr, Debug, Deserialize_repr, Clone, PartialEq)]
 #[repr(u16)]
 pub enum ErrorCode {
     UnreacheableError = 0,
@@ -43,7 +43,7 @@ pub enum ErrorCode {
 }
 
 /// Error object in a response
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Error {
     pub error_type: String,

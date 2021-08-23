@@ -8,7 +8,7 @@ use jsonrpc_core::{Error, Result};
 use num::{BigUint, Zero};
 // Workspace uses
 use zksync_storage::StorageProcessor;
-use zksync_types::{Nonce, Token, TokenId, ZkSyncOp, NFT};
+use zksync_types::{Nonce, Token, TokenId, TokenKind, ZkSyncOp, NFT};
 // Local uses
 use super::{
     converter::{log, u256_from_biguint},
@@ -468,10 +468,9 @@ impl LogsHelper {
     ) -> Log {
         // According to specifications, amount is added to transfer log data for ERC20 tokens
         // and token ID is added instead for ERC721 tokens.
-        let (contract_address, amount_or_id) = if !token.is_nft {
-            (token.address, u256_from_biguint(amount))
-        } else {
-            (self.nft_factory_address, token.id.0.into())
+        let (contract_address, amount_or_id) = match token.kind {
+            TokenKind::NFT => (self.nft_factory_address, token.id.0.into()),
+            _ => (token.address, u256_from_biguint(amount)),
         };
         let data = Self::erc_transfer_data(from, to, amount_or_id);
         let log = log(

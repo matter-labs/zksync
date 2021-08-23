@@ -9,7 +9,7 @@ use jsonrpc_core::{Error, Result};
 use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_storage::StorageProcessor;
-use zksync_types::{TokenId, NFT};
+use zksync_types::{TokenId, TokenKind, NFT};
 // Local uses
 use super::{
     converter::u256_from_biguint,
@@ -102,7 +102,7 @@ impl CallsHelper {
                 .await
                 .map_err(|_| Error::internal_error())?;
             match token {
-                Some(token) if !token.is_nft => &self.erc20,
+                Some(token) if matches!(token.kind, TokenKind::ERC20) => &self.erc20,
                 _ => return Ok(Vec::new()),
             }
         };

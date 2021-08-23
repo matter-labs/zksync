@@ -4,7 +4,7 @@ use num::{BigUint, Zero};
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID};
 use zksync_types::{
     aggregated_operations::AggregatedActionType, helpers::apply_updates, AccountId, AccountMap,
-    AccountUpdate, Address, BlockNumber, Nonce, Token, TokenId,
+    AccountUpdate, Address, BlockNumber, Nonce, Token, TokenId, TokenKind,
 };
 // Local imports
 use super::block::apply_random_updates;
@@ -329,7 +329,7 @@ async fn test_get_account_nft_balance(mut storage: StorageProcessor<'_>) -> Quer
             address: Address::random(),
             symbol: "NFT".to_string(),
             decimals: 0,
-            is_nft: true,
+            kind: TokenKind::NFT,
         })
         .await?;
     storage
@@ -339,7 +339,7 @@ async fn test_get_account_nft_balance(mut storage: StorageProcessor<'_>) -> Quer
             address: Address::random(),
             symbol: "SPECIAL".to_string(),
             decimals: 0,
-            is_nft: true,
+            kind: TokenKind::NFT,
         })
         .await?;
 
@@ -457,7 +457,7 @@ async fn test_get_nft_owner(mut storage: StorageProcessor<'_>) -> QueryResult<()
             address: Address::random(),
             symbol: "NFT".to_string(),
             decimals: 0,
-            is_nft: true,
+            kind: TokenKind::NFT,
         })
         .await?;
     storage
