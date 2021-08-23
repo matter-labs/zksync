@@ -5,7 +5,11 @@ use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
 use zksync_api_types::{
-    v02::{fee::ApiTxFeeTypes, token::ApiNFT},
+    v02::{
+        fee::ApiTxFeeTypes,
+        token::ApiNFT,
+        transaction::{Toggle2FA, Toggle2FAResponse},
+    },
     TxWithSignature,
 };
 use zksync_crypto::params::MIN_NFT_TOKEN_ID;
@@ -312,5 +316,15 @@ impl RpcApp {
 
         metrics::histogram!("api.rpc.get_nft_owner", start.elapsed());
         Ok(owner_id)
+    }
+
+    pub async fn _impl_toggle_2fa(self, toggle_2fa: Toggle2FA) -> Result<Toggle2FAResponse> {
+        let response = self
+            .tx_sender
+            .toggle_2fa(toggle_2fa)
+            .await
+            .map_err(Error::from);
+
+        response
     }
 }

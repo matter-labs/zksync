@@ -333,7 +333,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         let frida: Wallet;
 
         step('should setup an account without 2fa', async () => {
-            if (onlyBasic || providerType == 'RPC') {
+            if (onlyBasic) {
                 return;
             }
 
@@ -369,7 +369,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         });
 
         step('Test No2FA transfers', async () => {
-            if (onlyBasic || providerType == 'RPC') {
+            if (onlyBasic) {
                 return;
             }
 
@@ -379,7 +379,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         })
 
         step('Test No2FA Swaps', async () => {
-            if(onlyBasic || providerType == 'RPC') {
+            if(onlyBasic) {
                 return;
             }
 
@@ -389,7 +389,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         })
 
         step('Test No2FA Withdrawals', async () => {
-            if(onlyBasic || providerType == 'RPC') {
+            if(onlyBasic) {
                 return;
             }
 
@@ -397,7 +397,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         })
 
         step('Test switching 2FA on', async () => {
-            if(onlyBasic || providerType == 'RPC') {
+            if(onlyBasic) {
                 return;
             }
 

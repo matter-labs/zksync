@@ -14,7 +14,9 @@ import {
     TransactionReceipt,
     TxEthSignature,
     TxEthSignatureVariant,
-    NFTInfo
+    NFTInfo,
+    Toggle2FARequest,
+    Toggle2FAResponse
 } from './types';
 import { isTokenETH, sleep, TokenSet } from './utils';
 import {
@@ -271,8 +273,9 @@ export class Provider extends SyncProvider {
         return parseFloat(tokenPrice);
     }
 
-    async toggle2FA(): Promise<boolean> {
-        throw new Error('JSON-RPC does not support toggle2FA');
+    async toggle2FA(toggle2FA: Toggle2FARequest): Promise<boolean> {
+        const result: Toggle2FAResponse = await this.transport.request('toggle_2fa', [toggle2FA]);
+        return result.success;
     }
 
     async disconnect() {
