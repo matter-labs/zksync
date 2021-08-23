@@ -325,6 +325,6 @@ impl RpcApp {
             .await
             .map_err(Error::from);
 
-        response.into()
+        response
     }
 }
