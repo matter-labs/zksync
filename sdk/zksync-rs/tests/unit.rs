@@ -364,8 +364,8 @@ mod signatures_with_vectors {
 
                 let fee_token = Token::new(
                     mint_nft_tx.fee_token_id,
-                    sign_data.string_fee_token.clone().parse().unwrap(),
                     Default::default(),
+                    &sign_data.string_fee_token,
                     0,
                     TokenKind::ERC20,
                 );
