@@ -306,8 +306,8 @@ mod signatures_with_vectors {
 
                 let fee_token = Token::new(
                     withdraw_nft_tx.fee_token_id,
-                    sign_data.string_fee_token.clone(),
                     Default::default(),
+                    &sign_data.string_fee_token,
                     0,
                     TokenKind::ERC20,
                 );
@@ -479,7 +479,7 @@ mod signatures_with_vectors {
                 let token = Token::new(
                     forced_exit.token_id,
                     Default::default(),
-                    String::new(),
+                    "",
                     0,
                     TokenKind::ERC20,
                 );
