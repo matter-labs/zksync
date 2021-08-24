@@ -525,13 +525,13 @@ impl ZkSyncStateKeeper {
         vlog::info!("Adding special token");
         transaction
             .tokens_schema()
-            .store_token(Token {
-                id: NFT_TOKEN_ID,
-                symbol: "SPECIAL".to_string(),
-                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
-                decimals: 18,
-                kind: TokenKind::NFT,
-            })
+            .store_token(Token::new(
+                NFT_TOKEN_ID,
+                *NFT_STORAGE_ACCOUNT_ADDRESS,
+                "SPECIAL",
+                18,
+                TokenKind::NFT,
+            ))
             .await
             .expect("failed to store special token");
         vlog::info!("Special token added");

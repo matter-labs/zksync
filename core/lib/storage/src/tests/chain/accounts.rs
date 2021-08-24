@@ -330,6 +330,7 @@ async fn test_get_account_nft_balance(mut storage: StorageProcessor<'_>) -> Quer
             symbol: "NFT".to_string(),
             decimals: 0,
             kind: TokenKind::NFT,
+            is_nft: true,
         })
         .await?;
     storage
@@ -340,6 +341,7 @@ async fn test_get_account_nft_balance(mut storage: StorageProcessor<'_>) -> Quer
             symbol: "SPECIAL".to_string(),
             decimals: 0,
             kind: TokenKind::NFT,
+            is_nft: true,
         })
         .await?;
 
@@ -458,6 +460,7 @@ async fn test_get_nft_owner(mut storage: StorageProcessor<'_>) -> QueryResult<()
             symbol: "NFT".to_string(),
             decimals: 0,
             kind: TokenKind::NFT,
+            is_nft: true,
         })
         .await?;
     storage

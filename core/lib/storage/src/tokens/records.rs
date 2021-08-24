@@ -65,13 +65,13 @@ impl From<Token> for DbToken {
 
 impl From<DbToken> for Token {
     fn from(val: DbToken) -> Token {
-        Token {
-            id: TokenId(val.id as u32),
-            address: stored_str_address_to_address(&val.address),
-            symbol: val.symbol,
-            decimals: val.decimals as u8,
-            kind: val.kind.into(),
-        }
+        Token::new(
+            TokenId(val.id as u32),
+            stored_str_address_to_address(&val.address),
+            &val.symbol,
+            val.decimals as u8,
+            val.kind.into(),
+        )
     }
 }
 

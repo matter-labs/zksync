@@ -104,6 +104,7 @@ pub struct Token {
     /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
     pub decimals: u8,
     pub kind: TokenKind,
+    pub is_nft: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
@@ -121,6 +122,7 @@ impl Token {
             symbol: symbol.to_string(),
             decimals,
             kind,
+            is_nft: matches!(kind, TokenKind::NFT),
         }
     }
 
@@ -131,6 +133,7 @@ impl Token {
             symbol: symbol.to_string(),
             decimals: 0,
             kind: TokenKind::NFT,
+            is_nft: true,
         }
     }
 }

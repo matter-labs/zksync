@@ -74,13 +74,13 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
             .await
             .expect("failed to access db")
             .tokens_schema()
-            .store_token(Token {
-                id: TokenId(id as u32),
-                symbol: token.symbol,
-                address: token.address,
-                decimals: token.decimals,
-                kind: TokenKind::ERC20,
-            })
+            .store_token(Token::new(
+                TokenId(id as u32),
+                token.address,
+                &token.symbol,
+                token.decimals,
+                TokenKind::ERC20,
+            ))
             .await
             .expect("failed to store token");
     }
