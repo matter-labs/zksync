@@ -38,6 +38,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         symbol: "ETH".into(),
         decimals: 18,
         kind: TokenKind::ERC20,
+        is_nft: false,
     };
     assert_eq!(tokens[&TokenId(0)], eth_token);
 
@@ -48,6 +49,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         symbol: "ABC".into(),
         decimals: 9,
         kind: TokenKind::ERC20,
+        is_nft: false,
     };
     let token_b = Token {
         id: TokenId(2),
@@ -55,6 +57,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         symbol: "DEF".into(),
         decimals: 6,
         kind: TokenKind::None,
+        is_nft: false,
     };
     let nft = Token {
         id: TokenId(MIN_NFT_TOKEN_ID),
@@ -62,6 +65,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         symbol: "NFT".into(),
         decimals: 0,
         kind: TokenKind::NFT,
+        is_nft: true,
     };
 
     TokensSchema(&mut storage)

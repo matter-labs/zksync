@@ -119,13 +119,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
     async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         self.storage
             .tokens_schema()
-            .store_token(Token {
-                id: token_id,
-                symbol: token.symbol,
-                address: token.address,
-                decimals: token.decimals,
-                kind: TokenKind::ERC20,
-            })
+            .store_token(Token::new(
+                token_id,
+                token.address,
+                &token.symbol,
+                token.decimals,
+                TokenKind::ERC20,
+            ))
             .await
             .expect("failed to store token");
     }

@@ -190,13 +190,13 @@ mod signatures_with_vectors {
                 )
                 .await;
 
-                let token = Token {
-                    id: transfer_tx.token_id,
-                    address: Default::default(),
-                    symbol: sign_data.string_token.clone(),
-                    decimals: 0,
-                    kind: TokenKind::ERC20,
-                };
+                let token = Token::new(
+                    transfer_tx.token_id,
+                    Default::default(),
+                    &sign_data.string_token,
+                    0,
+                    TokenKind::ERC20,
+                );
                 let (transfer, eth_signature) = signer
                     .sign_transfer(
                         token,
@@ -247,13 +247,13 @@ mod signatures_with_vectors {
                 )
                 .await;
 
-                let token = Token {
-                    id: withdraw_tx.token_id,
-                    address: Default::default(),
-                    symbol: sign_data.string_token.clone(),
-                    decimals: 0,
-                    kind: TokenKind::ERC20,
-                };
+                let token = Token::new(
+                    withdraw_tx.token_id,
+                    Default::default(),
+                    &sign_data.string_token,
+                    0,
+                    TokenKind::ERC20,
+                );
                 let (withdraw, eth_signature) = signer
                     .sign_withdraw(
                         token,
@@ -304,13 +304,13 @@ mod signatures_with_vectors {
                 )
                 .await;
 
-                let fee_token = Token {
-                    id: withdraw_nft_tx.fee_token_id,
-                    address: Default::default(),
-                    symbol: sign_data.string_fee_token.clone(),
-                    decimals: 0,
-                    kind: TokenKind::ERC20,
-                };
+                let fee_token = Token::new(
+                    withdraw_nft_tx.fee_token_id,
+                    Default::default(),
+                    &sign_data.string_fee_token,
+                    0,
+                    TokenKind::ERC20,
+                );
 
                 let (withdraw_nft, eth_signature) = signer
                     .sign_withdraw_nft(
@@ -362,13 +362,13 @@ mod signatures_with_vectors {
                 )
                 .await;
 
-                let fee_token = Token {
-                    id: mint_nft_tx.fee_token_id,
-                    address: Default::default(),
-                    symbol: sign_data.string_fee_token.clone(),
-                    decimals: 0,
-                    kind: TokenKind::ERC20,
-                };
+                let fee_token = Token::new(
+                    mint_nft_tx.fee_token_id,
+                    Default::default(),
+                    &sign_data.string_fee_token,
+                    0,
+                    TokenKind::ERC20,
+                );
 
                 let (mint_nft, eth_signature) = signer
                     .sign_mint_nft(
@@ -420,13 +420,13 @@ mod signatures_with_vectors {
                 .await;
                 signer.pubkey_hash = change_pubkey_tx.new_pk_hash;
 
-                let token = Token {
-                    id: change_pubkey_tx.fee_token_id,
-                    address: Default::default(),
-                    symbol: String::new(),
-                    decimals: 0,
-                    kind: TokenKind::ERC20,
-                };
+                let token = Token::new(
+                    change_pubkey_tx.fee_token_id,
+                    Default::default(),
+                    "",
+                    0,
+                    TokenKind::ERC20,
+                );
                 let change_pub_key = signer
                     .sign_change_pubkey_tx(
                         sign_data.nonce,
@@ -476,13 +476,13 @@ mod signatures_with_vectors {
                 )
                 .await;
 
-                let token = Token {
-                    id: forced_exit.token_id,
-                    address: Default::default(),
-                    symbol: String::new(),
-                    decimals: 0,
-                    kind: TokenKind::ERC20,
-                };
+                let token = Token::new(
+                    forced_exit.token_id,
+                    Default::default(),
+                    "",
+                    0,
+                    TokenKind::ERC20,
+                );
                 let (forced_exit, _) = signer
                     .sign_forced_exit(
                         forced_exit.target,
@@ -586,12 +586,14 @@ mod wallet_tests {
 
             let tokens = (1..)
                 .zip(&genesis_tokens[..3])
-                .map(|(id, token)| Token {
-                    id: TokenId(id),
-                    symbol: token.symbol.clone(),
-                    address: token.address,
-                    decimals: token.decimals,
-                    kind: TokenKind::ERC20,
+                .map(|(id, token)| {
+                    Token::new(
+                        TokenId(id),
+                        token.address,
+                        &token.symbol,
+                        token.decimals,
+                        TokenKind::ERC20,
+                    )
                 })
                 .map(|token| (token.symbol.clone(), token))
                 .collect();

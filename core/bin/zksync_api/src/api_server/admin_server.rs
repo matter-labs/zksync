@@ -116,13 +116,13 @@ async fn add_token(
         }
     };
 
-    let token = tokens::Token {
+    let token = tokens::Token::new(
         id,
-        address: token_request.address,
-        symbol: token_request.symbol.clone(),
-        decimals: token_request.decimals,
-        kind: TokenKind::ERC20,
-    };
+        token_request.address,
+        &token_request.symbol,
+        token_request.decimals,
+        TokenKind::ERC20,
+    );
 
     storage
         .tokens_schema()

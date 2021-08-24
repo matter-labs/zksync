@@ -176,13 +176,13 @@ where
         );
 
         interactor
-            .save_special_token(Token {
-                id: NFT_TOKEN_ID,
-                symbol: "SPECIAL".to_string(),
-                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
-                decimals: 18,
-                kind: TokenKind::NFT,
-            })
+            .save_special_token(Token::new(
+                NFT_TOKEN_ID,
+                *NFT_STORAGE_ACCOUNT_ADDRESS,
+                "SPECIAL",
+                18,
+                TokenKind::NFT,
+            ))
             .await;
         vlog::info!("Special token added");
 

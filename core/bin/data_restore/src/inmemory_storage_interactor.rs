@@ -66,13 +66,13 @@ impl StorageInteractor for InMemoryStorageInteractor {
     }
 
     async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
-        let token = Token {
-            id: token_id,
-            symbol: token.symbol,
-            address: token.address,
-            decimals: token.decimals,
-            kind: TokenKind::ERC20,
-        };
+        let token = Token::new(
+            token_id,
+            token.address,
+            &token.symbol,
+            token.decimals,
+            TokenKind::ERC20,
+        );
         self.tokens.insert(token_id, token);
     }
 
@@ -98,6 +98,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
                     symbol: format!("ERC20-{}", *id),
                     decimals: 18,
                     kind: TokenKind::ERC20,
+                    is_nft: false,
                 },
             );
         }
@@ -277,6 +278,7 @@ impl InMemoryStorageInteractor {
                             symbol: token.symbol.clone(),
                             decimals: 0,
                             kind: TokenKind::NFT,
+                            is_nft: true,
                         },
                     );
                 }

@@ -565,6 +565,7 @@ async fn test_error_coingecko_api() {
         symbol: String::from("DAI"),
         decimals: 18,
         kind: TokenKind::ERC20,
+        is_nft: false,
     };
     let (address, handler) = run_server(token.address);
     let client = reqwest::ClientBuilder::new()

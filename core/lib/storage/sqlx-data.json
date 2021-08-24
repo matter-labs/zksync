@@ -2728,24 +2728,6 @@
       "nullable": []
     }
   },
-  "66dddd41e83db60b333ea6f5697d4507fb090021f4e4b22dbb4496d0999e17f1": {
-    "query": "\n                SELECT tx FROM executed_transactions WHERE tx->'type' = '\"MintNFT\"'\n                ORDER BY nonce\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx",
-          "type_info": "Jsonb"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
     "query": "SELECT * FROM aggregated_proofs WHERE first_block = $1 and last_block = $2",
     "describe": {
@@ -7171,6 +7153,24 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "f7a49b80724c8deb1f8af7016e92937fd04f9c5df474986ab61ad201ec41bdb4": {
+    "query": "\n                SELECT tx FROM executed_transactions WHERE tx->'type' = '\"MintNFT\"' AND success = true\n                ORDER BY nonce\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
       ]
     }
   },
