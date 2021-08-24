@@ -4881,7 +4881,7 @@ name = "token_kind_migration"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "tokio 1.9.0",
+ "tokio",
  "zksync_config",
  "zksync_contracts",
  "zksync_eth_client",

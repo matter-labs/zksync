@@ -789,7 +789,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     pub async fn mint_nft_updates_set_nonces(&mut self) -> QueryResult<()> {
         let records = sqlx::query!(
             r#"
-                SELECT tx FROM executed_transactions WHERE tx->'type' = '"MintNFT"'
+                SELECT tx FROM executed_transactions WHERE tx->'type' = '"MintNFT"' AND success = true
                 ORDER BY nonce
             "#
         )
