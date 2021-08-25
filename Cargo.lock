@@ -640,7 +640,7 @@ version = "0.3.2"
 source = "git+https://github.com/matter-labs/bellman?branch=beta#48441155ec7006bf7bfac553b5fb7d466d7fcd00"
 dependencies = [
  "bit-vec",
- "blake2s_const 0.6.0 (git+https://github.com/matter-labs/bellman?branch=beta)",
+ "blake2s_const",
  "blake2s_simd",
  "byteorder",
  "cfg-if 1.0.0",
@@ -649,27 +649,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "num_cpus",
- "pairing_ce 0.24.2",
- "rand 0.4.6",
- "tiny-keccak 1.5.0",
-]
-
-[[package]]
-name = "bellman_ce"
-version = "0.3.2"
-source = "git+https://github.com/matter-labs/bellman?branch=dev#5efac401299be53c465b87cbd61403a0cedd54a5"
-dependencies = [
- "bit-vec",
- "blake2s_const 0.6.0 (git+https://github.com/matter-labs/bellman?branch=dev)",
- "blake2s_simd",
- "byteorder",
- "cfg-if 1.0.0",
- "crossbeam",
- "futures 0.3.16",
- "hex",
- "lazy_static",
- "num_cpus",
- "pairing_ce 0.26.0",
+ "pairing_ce",
  "rand 0.4.6",
  "tiny-keccak 1.5.0",
 ]
@@ -748,16 +728,6 @@ dependencies = [
 name = "blake2s_const"
 version = "0.6.0"
 source = "git+https://github.com/matter-labs/bellman?branch=beta#48441155ec7006bf7bfac553b5fb7d466d7fcd00"
-dependencies = [
- "arrayref",
- "arrayvec 0.5.2",
- "constant_time_eq",
-]
-
-[[package]]
-name = "blake2s_const"
-version = "0.6.0"
-source = "git+https://github.com/matter-labs/bellman?branch=dev#5efac401299be53c465b87cbd61403a0cedd54a5"
 dependencies = [
  "arrayref",
  "arrayvec 0.5.2",
@@ -1258,6 +1228,15 @@ dependencies = [
 
 [[package]]
 name = "crypto-mac"
+version = "0.7.0"
+source = "git+https://github.com/RustCrypto/traits?tag=crypto-mac-v0.7.0#eefd93f7f041b6a42d265a0eb2d6d87460dbe13e"
+dependencies = [
+ "generic-array 0.12.4",
+ "subtle 1.0.0",
+]
+
+[[package]]
+name = "crypto-mac"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
@@ -1565,19 +1544,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38107cbd8bac0d907d7e7513c9f68c95adbda9e6f6f6bdf3f5111c6ecac4fe47"
 dependencies = [
  "byteorder",
- "ff_derive_ce 0.9.3",
- "hex",
- "rand 0.4.6",
-]
-
-[[package]]
-name = "ff_ce"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce9180c0561effb4f0bd2b9ed62d856b039e860d695d51fe690902f7b8157fe5"
-dependencies = [
- "byteorder",
- "ff_derive_ce 0.10.0",
+ "ff_derive_ce",
  "hex",
  "rand 0.4.6",
 ]
@@ -1587,20 +1554,6 @@ name = "ff_derive_ce"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dde5a00073374b4d7aa2d3a8359a5709f9c0bfac8393f254655d16b4acdfe823"
-dependencies = [
- "num-bigint 0.4.0",
- "num-integer",
- "num-traits",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "ff_derive_ce"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2c85c41b0578de2b2c68bd3513c2a402cc92ea11961295c55987fc1f8e8310c"
 dependencies = [
  "num-bigint 0.4.0",
  "num-integer",
@@ -1670,7 +1623,7 @@ name = "franklin-crypto"
 version = "0.0.5"
 source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#4a706d93628980e036249e3b182b91af8797ce8c"
 dependencies = [
- "bellman_ce 0.3.2 (git+https://github.com/matter-labs/bellman?branch=beta)",
+ "bellman_ce",
  "bit-vec",
  "blake2",
  "blake2-rfc_bellman_edition",
@@ -1678,7 +1631,7 @@ dependencies = [
  "byteorder",
  "digest 0.7.6",
  "hex",
- "hmac 0.7.1",
+ "hmac 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.9.0",
  "num-bigint 0.3.2",
  "num-integer",
@@ -1695,9 +1648,9 @@ dependencies = [
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=dev-dep#d4beddf19be3e9a69b803cd3859185745ed388b0"
+source = "git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac#d9bf61a014a5fae1d43bd12f72abe1c4a32ef870"
 dependencies = [
- "bellman_ce 0.3.2 (git+https://github.com/matter-labs/bellman?branch=dev)",
+ "bellman_ce",
  "bit-vec",
  "blake2",
  "blake2-rfc_bellman_edition",
@@ -1705,10 +1658,12 @@ dependencies = [
  "byteorder",
  "digest 0.7.6",
  "hex",
- "itertools 0.10.1",
- "num-bigint 0.4.0",
+ "hmac 0.7.1 (git+https://github.com/StanislavBreadless/MACs?branch=hmac-v0.7.1-with-new-deps)",
+ "itertools 0.9.0",
+ "num-bigint 0.3.2",
  "num-integer",
  "num-traits",
+ "poseidon_hash",
  "rand 0.4.6",
  "serde",
  "serde_derive",
@@ -2040,7 +1995,16 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dcb5e64cda4c23119ab41ba960d1e170a774c8e4b9d9e6a9bc18aabf5e59695"
 dependencies = [
- "crypto-mac 0.7.0",
+ "crypto-mac 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "digest 0.8.1",
+]
+
+[[package]]
+name = "hmac"
+version = "0.7.1"
+source = "git+https://github.com/StanislavBreadless/MACs?branch=hmac-v0.7.1-with-new-deps#e2e56e83b37f10a166c32004327a4145d72aa03e"
+dependencies = [
+ "crypto-mac 0.7.0 (git+https://github.com/RustCrypto/traits?tag=crypto-mac-v0.7.0)",
  "digest 0.8.1",
 ]
 
@@ -3174,19 +3138,7 @@ checksum = "1e753515675eaaa98071d814bea0148ae8c9d7995fa0531bf222e7857e3f1759"
 dependencies = [
  "byteorder",
  "cfg-if 1.0.0",
- "ff_ce 0.12.0",
- "rand 0.4.6",
-]
-
-[[package]]
-name = "pairing_ce"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40466bd63c23208e7907a80ab824dc1096f5bb5e0ddafbc6abf44cca0bdd4637"
-dependencies = [
- "byteorder",
- "cfg-if 1.0.0",
- "ff_ce 0.13.1",
+ "ff_ce",
  "rand 0.4.6",
 ]
 
@@ -3483,7 +3435,7 @@ dependencies = [
  "num-bigint 0.2.6",
  "num-integer",
  "num-traits",
- "pairing_ce 0.24.2",
+ "pairing_ce",
  "rand 0.4.6",
  "sha2 0.8.2",
  "tiny-keccak 1.5.0",
@@ -5920,7 +5872,7 @@ dependencies = [
  "base64 0.13.0",
  "ethabi",
  "fnv",
- "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=dev-dep)",
+ "franklin-crypto 0.0.5 (git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac)",
  "hex",
  "lazy_static",
  "num",
