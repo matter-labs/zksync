@@ -326,7 +326,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .map(|token| token.id)
         .unwrap_or(0);
 
-        metrics::histogram!("sql.token.get_count", start.elapsed());
+        metrics::histogram!("sql.token.get_max_erc20_token_id", start.elapsed());
         Ok(last_token_id as u32)
     }
 
@@ -343,7 +343,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .map(|token| token.id)
         .unwrap_or(0);
 
-        metrics::histogram!("sql.token.get_count", start.elapsed());
+        metrics::histogram!("sql.token.get_max_token_id", start.elapsed());
         Ok(last_token_id as u32)
     }
 

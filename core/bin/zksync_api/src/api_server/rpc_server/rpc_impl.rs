@@ -325,12 +325,14 @@ impl RpcApp {
     }
 
     pub async fn _impl_toggle_2fa(self, toggle_2fa: Toggle2FA) -> Result<Toggle2FAResponse> {
+        let start = Instant::now();
         let response = self
             .tx_sender
             .toggle_2fa(toggle_2fa)
             .await
             .map_err(Error::from);
 
+        metrics::histogram!("api.rpc.toggle_2fa", start.elapsed());
         response
     }
 }
