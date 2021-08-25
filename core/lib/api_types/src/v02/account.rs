@@ -55,21 +55,9 @@ pub enum EthAccountType {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OngoingDepositsResp {
-    /// Address for which response is served.
-    pub address: Address,
     /// List of tuples (Eth block number, Deposit operation) of ongoing
     /// deposit operations.
     pub deposits: Vec<OngoingDeposit>,
-
-    /// Amount of confirmations required for every deposit to be processed.
-    pub confirmations_for_eth_event: u64,
-
-    /// Estimated block number for deposits completions:
-    /// all the deposit operations for provided address are expected to be
-    /// accepted in the zkSync network upon reaching this blocks.
-    ///
-    /// Can be `None` if there are no ongoing deposits.
-    pub estimated_deposits_approval_block: Option<u64>,
 }
 
 /// Flattened `PriorityOp` object representing a deposit operation.

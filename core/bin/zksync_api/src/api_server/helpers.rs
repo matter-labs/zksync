@@ -36,6 +36,7 @@ async fn depositing_from_pending_ops(
     storage: &mut StorageProcessor<'_>,
     tokens: &TokenDBCache,
     pending_ops: OngoingDepositsResp,
+    confirmations_for_eth_event: u64,
 ) -> Result<DepositingAccountBalances, Error> {
     let mut balances = HashMap::new();
 
@@ -53,7 +54,7 @@ async fn depositing_from_pending_ops(
                 .symbol
         };
 
-        let expected_accept_block = op.received_on_block + pending_ops.confirmations_for_eth_event;
+        let expected_accept_block = op.received_on_block + confirmations_for_eth_event;
 
         let balance = balances
             .entry(token_symbol)
@@ -74,7 +75,6 @@ async fn depositing_from_pending_ops(
 async fn get_pending_ops(
     core_api_client: &CoreApiClient,
     address: Address,
-    confirmations_for_eth_event: u64,
 ) -> Result<OngoingDepositsResp, Error> {
     let start = Instant::now();
 
@@ -83,37 +83,11 @@ async fn get_pending_ops(
         .await
         .map_err(Error::core_api)?;
 
-    let mut max_block_number = 0;
+    // Transform operations into `OngoingDeposit`.
+    let deposits: Vec<_> = ongoing_ops.into_iter().map(OngoingDeposit::new).collect();
 
-    // Transform operations into `OngoingDeposit` and find the maximum block number in a
-    // single pass.
-    let deposits: Vec<_> = ongoing_ops
-        .into_iter()
-        .map(|op| {
-            if op.eth_block > max_block_number {
-                max_block_number = op.eth_block;
-            }
-
-            OngoingDeposit::new(op)
-        })
-        .collect();
-
-    let estimated_deposits_approval_block = if !deposits.is_empty() {
-        // We have to wait `confirmations_for_eth_event` blocks after the most
-        // recent deposit operation.
-        Some(max_block_number + confirmations_for_eth_event)
-    } else {
-        // No ongoing deposits => no estimated block.
-        None
-    };
-
-    metrics::histogram!("api.get_ongoing_deposits", start.elapsed());
-    Ok(OngoingDepositsResp {
-        address,
-        deposits,
-        confirmations_for_eth_event,
-        estimated_deposits_approval_block,
-    })
+    metrics::histogram!("api.rpc.get_ongoing_deposits", start.elapsed());
+    Ok(OngoingDepositsResp { deposits })
 }
 
 pub async fn get_depositing(
@@ -123,7 +97,6 @@ pub async fn get_depositing(
     address: Address,
     confirmations_for_eth_event: u64,
 ) -> Result<DepositingAccountBalances, Error> {
-    let pending_ops =
-        get_pending_ops(core_api_client, address, confirmations_for_eth_event).await?;
-    depositing_from_pending_ops(storage, tokens, pending_ops).await
+    let pending_ops = get_pending_ops(core_api_client, address).await?;
+    depositing_from_pending_ops(storage, tokens, pending_ops, confirmations_for_eth_event).await
 }

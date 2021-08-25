@@ -14,8 +14,16 @@
 - CREATE2
 
 ## Account.FullInfo
++ depositing (Depositing, required)
 + committed (Account, required, nullable)
 + finalized (Account, required, nullable)
+
+## Depositing (object)
++ *ETH* (DepositingFunds, required)
+
+## DepositingFunds (object)
++ amount: `1000000000000000000` (string, required)
++ expectedAcceptBlock: 25136211 (number, required)
 
 ## Account.Balances (object)
 + *ETH*: `1000000000000000000` (string, required)
