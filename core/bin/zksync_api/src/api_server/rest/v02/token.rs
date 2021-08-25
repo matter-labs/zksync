@@ -198,7 +198,7 @@ async fn token_pagination(
     data.token_page(query).await.into()
 }
 
-async fn token_by_id_or_address(
+async fn token_info(
     data: web::Data<ApiTokenData>,
     token_like_string: web::Path<String>,
 ) -> ApiResult<ApiToken> {
@@ -271,7 +271,7 @@ pub fn api_scope(
     web::scope("tokens")
         .app_data(web::Data::new(data))
         .route("", web::get().to(token_pagination))
-        .route("{token_like}", web::get().to(token_by_id_or_address))
+        .route("{token_like}", web::get().to(token_info))
         .route(
             "{token_like}/priceIn/{currency}",
             web::get().to(token_price),

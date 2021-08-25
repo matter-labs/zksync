@@ -48,62 +48,24 @@ export interface NFTInfo {
 
 export type EthAccountType = 'Owned' | 'CREATE2' | 'No2FA';
 
-export type AccountState = AccountStateRest | AccountStateRpc;
-
-export interface AccountStateRest {
-    address: Address;
-    id?: number;
-    accountType?: EthAccountType;
-    committed: {
-        balances: {
-            // Token are indexed by their symbol (e.g. "ETH")
-            [token: string]: BigNumberish;
+export interface Depositing {
+    balances: {
+        // Token are indexed by their symbol (e.g. "ETH")
+        [token: string]: {
+            // Sum of pending deposits for the token.
+            amount: BigNumberish;
+            // Value denoting the block number when the funds are expected
+            // to be received by zkSync network.
+            expectedAcceptBlock: number;
         };
-        nfts: {
-            // NFT are indexed by their id
-            [tokenId: number]: NFT;
-        };
-        mintedNfts: {
-            // NFT are indexed by their id
-            [tokenId: number]: NFT;
-        };
-        nonce: number;
-        pubKeyHash: PubKeyHash;
-    };
-    verified: {
-        balances: {
-            // Token are indexed by their symbol (e.g. "ETH")
-            [token: string]: BigNumberish;
-        };
-        nfts: {
-            // NFT are indexed by their id
-            [tokenId: number]: NFT;
-        };
-        mintedNfts: {
-            // NFT are indexed by their id
-            [tokenId: number]: NFT;
-        };
-        nonce: number;
-        pubKeyHash: PubKeyHash;
     };
 }
 
-export interface AccountStateRpc {
+export interface AccountState {
     address: Address;
     id?: number;
     accountType?: EthAccountType;
-    depositing: {
-        balances: {
-            // Token are indexed by their symbol (e.g. "ETH")
-            [token: string]: {
-                // Sum of pending deposits for the token.
-                amount: BigNumberish;
-                // Value denoting the block number when the funds are expected
-                // to be received by zkSync network.
-                expectedAcceptBlock: number;
-            };
-        };
-    };
+    depositing: Depositing;
     committed: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
@@ -455,6 +417,7 @@ export interface ApiAccountInfo {
 }
 
 export interface ApiAccountFullInfo {
+    depositing: Depositing;
     committed: ApiAccountInfo;
     finalized: ApiAccountInfo;
 }
@@ -494,7 +457,7 @@ export interface TokenPriceInfo {
     tokenSymbol: string;
     priceIn: string;
     decimals: number;
-    price: BigNumber;
+    price: string;
 }
 
 export interface SubmitBatchResponse {
