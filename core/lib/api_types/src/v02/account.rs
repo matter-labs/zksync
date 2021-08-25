@@ -51,12 +51,10 @@ pub enum EthAccountType {
 /// Please note that since this response is based on the events that are
 /// currently awaiting confirmations, this information is approximate:
 /// blocks on Ethereum can be reverted, and final list of executed deposits
-/// can differ from the this estimation.
+/// can differ from this estimation.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OngoingDepositsResp {
-    /// List of tuples (Eth block number, Deposit operation) of ongoing
-    /// deposit operations.
     pub deposits: Vec<OngoingDeposit>,
 }
 
@@ -68,7 +66,6 @@ pub struct OngoingDeposit {
     pub received_on_block: u64,
     pub token_id: TokenId,
     pub amount: u128,
-    pub eth_tx_hash: String,
 }
 
 impl OngoingDeposit {
@@ -86,13 +83,10 @@ impl OngoingDeposit {
             }
         };
 
-        let eth_tx_hash = hex::encode(&priority_op.eth_hash);
-
         Self {
             received_on_block: priority_op.eth_block,
             token_id,
             amount,
-            eth_tx_hash,
         }
     }
 }
