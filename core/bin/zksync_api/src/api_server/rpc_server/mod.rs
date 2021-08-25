@@ -98,51 +98,6 @@ impl RpcApp {
             .map_err(|_| Error::internal_error())
     }
 
-    /// Async version of `get_ongoing_deposits` which does not use old futures as a return type.
-    async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
-        let start = Instant::now();
-        let confirmations_for_eth_event = self.confirmations_for_eth_event;
-
-        let ongoing_ops = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_deposits(address)
-            .await
-            .map_err(|_| Error::internal_error())?;
-
-        let mut max_block_number = 0;
-
-        // Transform operations into `OngoingDeposit` and find the maximum block number in a
-        // single pass.
-        let deposits: Vec<_> = ongoing_ops
-            .into_iter()
-            .map(|op| {
-                if op.eth_block > max_block_number {
-                    max_block_number = op.eth_block;
-                }
-
-                OngoingDeposit::new(op)
-            })
-            .collect();
-
-        let estimated_deposits_approval_block = if !deposits.is_empty() {
-            // We have to wait `confirmations_for_eth_event` blocks after the most
-            // recent deposit operation.
-            Some(max_block_number + confirmations_for_eth_event)
-        } else {
-            // No ongoing deposits => no estimated block.
-            None
-        };
-
-        metrics::histogram!("api.rpc.get_ongoing_deposits", start.elapsed());
-        Ok(OngoingDepositsResp {
-            address,
-            deposits,
-            confirmations_for_eth_event,
-            estimated_deposits_approval_block,
-        })
-    }
-
     // cache access functions
     async fn get_executed_priority_operation(
         &self,

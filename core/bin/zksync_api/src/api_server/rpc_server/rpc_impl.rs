@@ -18,10 +18,14 @@ use zksync_types::{
     AccountId, Address, Fee, Token, TokenId, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
-use crate::{api_server::tx_sender::SubmitError, fee_ticker::TokenPriceRequestType};
+use crate::{
+    api_server::{
+        helpers::get_depositing, rpc_server::error::RpcErrorCodes, tx_sender::SubmitError,
+    },
+    fee_ticker::TokenPriceRequestType,
+};
 
 use super::{types::*, RpcApp};
-use crate::api_server::rpc_server::error::RpcErrorCodes;
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
@@ -29,14 +33,16 @@ impl RpcApp {
 
         let account_state = self.get_account_state(address).await?;
 
-        let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
         let mut storage = self.access_storage().await?;
-        let depositing = DepositingAccountBalances::from_pending_ops(
+        let depositing = get_depositing(
             &mut storage,
+            &self.tx_sender.core_api_client,
             &self.tx_sender.tokens,
-            depositing_ops,
+            address,
+            self.confirmations_for_eth_event,
         )
-        .await?;
+        .await
+        .map_err(|_| Error::internal_error())?;
         let account_type = if let Some(account_id) = account_state.account_id {
             storage
                 .chain()

@@ -14,7 +14,7 @@ use crate::api_server::tx_sender::TxSender;
 mod account;
 mod block;
 mod config;
-mod error;
+pub mod error;
 mod fee;
 mod paginate_impl;
 mod paginate_trait;
@@ -42,6 +42,7 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
             tx_sender.pool.clone(),
             tx_sender.tokens.clone(),
             tx_sender.core_api_client.clone(),
+            zk_config.eth_watch.confirmations_for_eth_event,
         ))
         .service(block::api_scope(
             tx_sender.pool.clone(),

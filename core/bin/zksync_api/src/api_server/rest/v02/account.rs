@@ -26,8 +26,8 @@ use super::{
     response::ApiResult,
 };
 use crate::{
-    api_try, core_api_client::CoreApiClient, fee_ticker::PriceError,
-    utils::token_db_cache::TokenDBCache,
+    api_server::helpers::get_depositing, api_try, core_api_client::CoreApiClient,
+    fee_ticker::PriceError, utils::token_db_cache::TokenDBCache,
 };
 
 /// Shared data between `api/v02/accounts` endpoints.
@@ -36,14 +36,21 @@ struct ApiAccountData {
     pool: ConnectionPool,
     tokens: TokenDBCache,
     core_api_client: CoreApiClient,
+    confirmations_for_eth_event: u64,
 }
 
 impl ApiAccountData {
-    fn new(pool: ConnectionPool, tokens: TokenDBCache, core_api_client: CoreApiClient) -> Self {
+    fn new(
+        pool: ConnectionPool,
+        tokens: TokenDBCache,
+        core_api_client: CoreApiClient,
+        confirmations_for_eth_event: u64,
+    ) -> Self {
         Self {
             pool,
             tokens,
             core_api_client,
+            confirmations_for_eth_event,
         }
     }
 
@@ -230,44 +237,63 @@ impl ApiAccountData {
         result
     }
 
-    async fn account_full_info(&self, account_id: AccountId) -> Result<AccountState, Error> {
+    async fn account_full_info(
+        &self,
+        address: Address,
+        account_id: Option<AccountId>,
+    ) -> Result<AccountState, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
-        let (finalized_state, committed_state) = transaction
-            .chain()
-            .account_schema()
-            .last_committed_state_for_account(account_id)
-            .await
-            .map_err(Error::storage)?;
-        let finalized = if let Some(account) = finalized_state.1 {
-            Some(
-                self.api_account(
-                    account,
-                    account_id,
-                    BlockNumber(finalized_state.0 as u32),
-                    &mut transaction,
-                )
-                .await?,
-            )
-        } else {
-            None
-        };
-        let committed = if let Some(account) = committed_state {
-            let last_block = transaction
+
+        let depositing = get_depositing(
+            &mut transaction,
+            &self.core_api_client,
+            &self.tokens,
+            address,
+            self.confirmations_for_eth_event,
+        )
+        .await?;
+        let (committed, finalized) = if let Some(account_id) = account_id {
+            let (finalized_state, committed_state) = transaction
                 .chain()
                 .account_schema()
-                .last_committed_block_with_update_for_acc(account_id)
+                .last_committed_state_for_account(account_id)
                 .await
                 .map_err(Error::storage)?;
-            Some(
-                self.api_account(account, account_id, last_block, &mut transaction)
+            let finalized = if let Some(account) = finalized_state.1 {
+                Some(
+                    self.api_account(
+                        account,
+                        account_id,
+                        BlockNumber(finalized_state.0 as u32),
+                        &mut transaction,
+                    )
                     .await?,
-            )
+                )
+            } else {
+                None
+            };
+            let committed = if let Some(account) = committed_state {
+                let last_block = transaction
+                    .chain()
+                    .account_schema()
+                    .last_committed_block_with_update_for_acc(account_id)
+                    .await
+                    .map_err(Error::storage)?;
+                Some(
+                    self.api_account(account, account_id, last_block, &mut transaction)
+                        .await?,
+                )
+            } else {
+                None
+            };
+            (committed, finalized)
         } else {
-            None
+            (None, None)
         };
         transaction.commit().await.map_err(Error::storage)?;
         Ok(AccountState {
+            depositing,
             committed,
             finalized,
         })
@@ -345,15 +371,12 @@ async fn account_full_info(
     account_id_or_address: web::Path<String>,
 ) -> ApiResult<AccountState> {
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
+    let address = api_try!(
+        data.get_address_by_address_or_id(address_or_id.clone())
+            .await
+    );
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    if let Some(account_id) = account_id {
-        data.account_full_info(account_id).await.into()
-    } else {
-        ApiResult::Ok(AccountState {
-            committed: None,
-            finalized: None,
-        })
-    }
+    data.account_full_info(address, account_id).await.into()
 }
 
 async fn account_txs(
@@ -388,8 +411,9 @@ pub fn api_scope(
     pool: ConnectionPool,
     tokens: TokenDBCache,
     core_api_client: CoreApiClient,
+    confirmations_for_eth_event: u64,
 ) -> Scope {
-    let data = ApiAccountData::new(pool, tokens, core_api_client);
+    let data = ApiAccountData::new(pool, tokens, core_api_client, confirmations_for_eth_event);
 
     web::scope("accounts")
         .app_data(web::Data::new(data))
@@ -502,7 +526,12 @@ mod tests {
             };
             let (api_client, api_server) = cfg.start_server(
                 move |cfg: &TestServerConfig| {
-                    api_scope(cfg.pool.clone(), TokenDBCache::new(), core_client.clone())
+                    api_scope(
+                        cfg.pool.clone(),
+                        TokenDBCache::new(),
+                        core_client.clone(),
+                        cfg.config.eth_watch.confirmations_for_eth_event,
+                    )
                 },
                 Some(shared_data),
             );
