@@ -203,16 +203,6 @@ async fn token_by_id_or_address(
     token_like_string: web::Path<String>,
 ) -> ApiResult<ApiToken> {
     let token_like = TokenLike::parse(&token_like_string);
-    let token_like = match token_like {
-        TokenLike::Symbol(_) => {
-            return Error::from(PriceError::token_not_found(
-                "Could not parse token as id or address",
-            ))
-            .into();
-        }
-        _ => token_like,
-    };
-
     data.api_token(token_like).await.into()
 }
 
@@ -224,15 +214,6 @@ async fn token_price(
 ) -> ApiResult<TokenPrice> {
     let (token_like_string, currency) = path.into_inner();
     let first_token = TokenLike::parse(&token_like_string);
-    let first_token = match first_token {
-        TokenLike::Symbol(_) => {
-            return Error::from(PriceError::token_not_found(
-                "Could not parse token as id or address",
-            ))
-            .into();
-        }
-        _ => first_token,
-    };
 
     let price = api_try!(data.token_price_in(first_token.clone(), &currency).await);
     let token = api_try!(data.token(first_token).await);
@@ -290,12 +271,9 @@ pub fn api_scope(
     web::scope("tokens")
         .app_data(web::Data::new(data))
         .route("", web::get().to(token_pagination))
+        .route("{token_like}", web::get().to(token_by_id_or_address))
         .route(
-            "{token_id_or_address}",
-            web::get().to(token_by_id_or_address),
-        )
-        .route(
-            "{token_id_or_address}/priceIn/{currency}",
+            "{token_like}/priceIn/{currency}",
             web::get().to(token_price),
         )
         .route("nft/{id}", web::get().to(get_nft))
@@ -338,6 +316,7 @@ mod tests {
 
         let prices = [
             (TokenLike::Id(TokenId(1)), 10_u64.into()),
+            (TokenLike::Symbol(String::from("PHNX")), 10_u64.into()),
             (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
             (Address::default().into(), 1_u64.into()),
         ];
@@ -412,7 +391,7 @@ mod tests {
         };
         assert_eq!(pagination, expected_pagination);
 
-        let token_like = TokenLike::Id(TokenId(1));
+        let token_like = TokenLike::Symbol(String::from("PHNX"));
         let token = {
             let mut storage = cfg.pool.access_storage().await?;
             storage

@@ -445,12 +445,14 @@ mod tests {
     };
     use actix_web::{web::Json, App};
     use chrono::Utc;
+    use num::BigUint;
     use serde::Deserialize;
     use serde_json::json;
     use std::sync::Arc;
     use tokio::sync::Mutex;
     use zksync_api_client::rest::client::Client;
     use zksync_api_types::v02::{
+        account::{DepositingAccountBalances, DepositingFunds},
         pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest},
         transaction::{L1Transaction, TransactionData},
         ApiVersion,
@@ -458,9 +460,13 @@ mod tests {
     use zksync_storage::StorageProcessor;
     use zksync_types::{AccountId, Address, H256};
 
-    type PendingOpsHandle = Arc<Mutex<serde_json::Value>>;
+    type ArcValue = Arc<Mutex<serde_json::Value>>;
 
-    fn create_pending_ops_handle() -> PendingOpsHandle {
+    fn create_pending_deposits_handle() -> ArcValue {
+        Arc::new(Mutex::new(json!([])))
+    }
+
+    fn create_pending_ops_handle() -> ArcValue {
         Arc::new(Mutex::new(json!({
             "list": [],
             "pagination": {
@@ -481,21 +487,36 @@ mod tests {
         pub direction: PaginationDirection,
     }
 
-    fn get_unconfirmed_ops_loopback(
-        ops_handle: PendingOpsHandle,
+    fn get_unconfirmed_ops_and_deposits_loopback(
+        ops_handle: ArcValue,
+        deposits_handle: ArcValue,
     ) -> (CoreApiClient, actix_test::TestServer) {
         async fn get_ops(
-            data: web::Data<PendingOpsHandle>,
+            data: web::Data<(ArcValue, ArcValue)>,
             web::Query(_query): web::Query<PendingOpsFlattenRequest>,
         ) -> Json<serde_json::Value> {
-            Json(data.lock().await.clone())
+            Json(data.into_inner().0.lock().await.clone())
+        }
+
+        async fn get_deposits(
+            data: web::Data<(ArcValue, ArcValue)>,
+            _address: web::Path<String>,
+        ) -> Json<serde_json::Value> {
+            Json(data.into_inner().1.lock().await.clone())
         }
 
         let server = actix_test::start(move || {
             App::new().service(
-                web::scope("unconfirmed_ops")
-                    .app_data(web::Data::new(ops_handle.clone()))
-                    .route("", web::get().to(get_ops)),
+                web::scope("")
+                    .app_data(web::Data::new((
+                        ops_handle.clone(),
+                        deposits_handle.clone(),
+                    )))
+                    .route("unconfirmed_ops", web::get().to(get_ops))
+                    .route(
+                        "unconfirmed_deposits/{address}",
+                        web::get().to(get_deposits),
+                    ),
             )
         });
 
@@ -507,7 +528,9 @@ mod tests {
         core_server: actix_test::TestServer,
         api_server: actix_test::TestServer,
         pool: ConnectionPool,
-        pending_ops: PendingOpsHandle,
+        pending_ops: ArcValue,
+        pending_deposits: ArcValue,
+        confirmations_for_eth_event: u64,
     }
 
     impl TestServer {
@@ -516,7 +539,11 @@ mod tests {
             cfg.fill_database().await?;
 
             let pending_ops = create_pending_ops_handle();
-            let (core_client, core_server) = get_unconfirmed_ops_loopback(pending_ops.clone());
+            let pending_deposits = create_pending_deposits_handle();
+            let (core_client, core_server) = get_unconfirmed_ops_and_deposits_loopback(
+                pending_ops.clone(),
+                pending_deposits.clone(),
+            );
 
             let pool = cfg.pool.clone();
 
@@ -543,6 +570,8 @@ mod tests {
                     api_server,
                     pool,
                     pending_ops,
+                    pending_deposits,
+                    confirmations_for_eth_event: cfg.config.eth_watch.confirmations_for_eth_event,
                 },
             ))
         }
@@ -579,8 +608,11 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
-        let (client, server) = get_unconfirmed_ops_loopback(create_pending_ops_handle());
+    async fn unconfirmed_ops_and_deposits_loopback() -> anyhow::Result<()> {
+        let (client, server) = get_unconfirmed_ops_and_deposits_loopback(
+            create_pending_ops_handle(),
+            create_pending_deposits_handle(),
+        );
         client
             .get_unconfirmed_ops(&PaginationQuery {
                 from: PendingOpsRequest {
@@ -592,6 +624,7 @@ mod tests {
                 direction: PaginationDirection::Newer,
             })
             .await?;
+        client.get_unconfirmed_deposits(Address::default()).await?;
 
         server.stop().await;
         Ok(())
@@ -632,22 +665,6 @@ mod tests {
             .await?;
         let account_finalized_info: Option<Account> = deserialize_response_result(response)?;
 
-        let response = client.account_full_info(&format!("{:?}", address)).await?;
-        let account_full_info: AccountState = deserialize_response_result(response)?;
-        assert_eq!(
-            account_full_info.committed,
-            Some(account_committed_info_by_id)
-        );
-        assert_eq!(account_full_info.finalized, account_finalized_info);
-
-        let query = PaginationQuery {
-            from: ApiEither::from(tx_hash),
-            limit: 1,
-            direction: PaginationDirection::Newer,
-        };
-        let response = client.account_txs(&query, &account_id.to_string()).await?;
-        let txs: Paginated<Transaction, TxHash> = deserialize_response_result(response)?;
-        assert_eq!(txs.list[0].tx_hash, tx_hash);
         // Provide unconfirmed pending ops.
         *server.pending_ops.lock().await = json!({
             "list": [
@@ -677,6 +694,48 @@ mod tests {
                 "direction": "newer"
             }
         });
+        *server.pending_deposits.lock().await = json!([{
+            "serial_id": 10,
+            "data": {
+                "type": "Deposit",
+                "from": Address::default(),
+                "token": 0,
+                "amount": "100500",
+                "to": address
+            },
+            "deadline_block": 100,
+            "eth_hash": H256::from_slice(&[0u8; 32]).as_bytes().to_vec(),
+            "eth_block": 25,
+            "eth_block_index": Some(3)
+        }]);
+        let balances = vec![(
+            String::from("ETH"),
+            DepositingFunds {
+                amount: BigUint::from(100500u32),
+                expected_accept_block: 25 + server.confirmations_for_eth_event,
+            },
+        )]
+        .into_iter()
+        .collect();
+        let expected_depositing = DepositingAccountBalances { balances };
+
+        let response = client.account_full_info(&format!("{:?}", address)).await?;
+        let account_full_info: AccountState = deserialize_response_result(response)?;
+        assert_eq!(
+            account_full_info.committed,
+            Some(account_committed_info_by_id)
+        );
+        assert_eq!(account_full_info.finalized, account_finalized_info);
+        assert_eq!(account_full_info.depositing, expected_depositing);
+
+        let query = PaginationQuery {
+            from: ApiEither::from(tx_hash),
+            limit: 1,
+            direction: PaginationDirection::Newer,
+        };
+        let response = client.account_txs(&query, &account_id.to_string()).await?;
+        let txs: Paginated<Transaction, TxHash> = deserialize_response_result(response)?;
+        assert_eq!(txs.list[0].tx_hash, tx_hash);
 
         let query = PaginationQuery {
             from: ApiEither::from(1),
