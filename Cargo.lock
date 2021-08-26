@@ -3841,9 +3841,9 @@ dependencies = [
 [[package]]
 name = "recursive_aggregation_circuit"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git?branch=master#30bbf42c81c08ba8a15dcad3eaca9e771c4d8c89"
+source = "git+https://github.com/StanislavBreadless/recursive_aggregation_circuit.git?branch=recursive-aggregation-circuit-with-new-hmac#5d3d87508718423f8b6b5ae9eef79b731ed11775"
 dependencies = [
- "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=beta)",
+ "franklin-crypto 0.0.5 (git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac)",
  "hex",
  "once_cell",
  "sha2 0.9.5",
