@@ -55,7 +55,7 @@ actix-web = "4.0.0-beta.8"
 actix-web-httpauth = "0.6.0-beta.2"
 
 num = { version = "0.3.1", features = ["serde"] }
-bigdecimal = { version = "0.2.0", features = ["serde"]}
+bigdecimal = { version = "=0.2.0", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"
