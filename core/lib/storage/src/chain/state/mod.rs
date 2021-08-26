@@ -692,7 +692,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!(
-            "sql.token.get_mint_nft_update_by_creator_and_nonce",
+            "sql.chain.state.get_mint_nft_update_by_creator_and_nonce",
             start.elapsed()
         );
         Ok(nft.map(|p| p.into()))

@@ -102,43 +102,6 @@ pub struct ContractAddress {
     pub gov_contract: String,
 }
 
-/// Flattened `PriorityOp` object representing a deposit operation.
-/// Used in the `OngoingDepositsResp`.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OngoingDeposit {
-    pub received_on_block: u64,
-    pub token_id: u16,
-    pub amount: u128,
-    pub eth_tx_hash: String,
-}
-
-/// Information about ongoing deposits for certain recipient address.
-///
-/// Please note that since this response is based on the events that are
-/// currently awaiting confirmations, this information is approximate:
-/// blocks on Ethereum can be reverted, and final list of executed deposits
-/// can differ from the this estimation.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OngoingDeposits {
-    /// Address for which response is served.
-    pub address: Address,
-    /// List of tuples (Eth block number, Deposit operation) of ongoing
-    /// deposit operations.
-    pub deposits: Vec<OngoingDeposit>,
-
-    /// Amount of confirmations required for every deposit to be processed.
-    pub confirmations_for_eth_event: u64,
-
-    /// Estimated block number for deposits completions:
-    /// all the deposit operations for provided address are expected to be
-    /// accepted in the zkSync network upon reaching this blocks.
-    ///
-    /// Can be `None` if there are no ongoing deposits.
-    pub estimated_deposits_approval_block: Option<u64>,
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ChangePubKeyFeeType {
     Onchain,

@@ -1540,7 +1540,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain.block.tx_data_for_web3", start.elapsed());
+        metrics::histogram!("sql.chain.operations_ext.tx_data_for_web3", start.elapsed());
         Ok(result)
     }
 
@@ -1603,7 +1603,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .fetch_optional(self.0.conn())
             .await?;
 
-        metrics::histogram!("sql.chain.block.web3_receipt_by_hash", start.elapsed());
+        metrics::histogram!(
+            "sql.chain.operations_ext.web3_receipt_by_hash",
+            start.elapsed()
+        );
         Ok(tx)
     }
 
@@ -1668,7 +1671,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .fetch_all(self.0.conn())
             .await?;
 
-        metrics::histogram!("sql.chain.block.web3_receipts", start.elapsed());
+        metrics::histogram!("sql.chain.operations_ext.web3_receipts", start.elapsed());
         Ok(receipts)
     }
 }

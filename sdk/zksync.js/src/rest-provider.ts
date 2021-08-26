@@ -315,26 +315,23 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.tokenPaginationDetailed(paginationQuery));
     }
 
-    async tokenByIdOrAddressDetailed(idOrAddress: number | types.TokenAddress): Promise<Response<types.TokenInfo>> {
-        return await this.get(`${this.address}/tokens/${idOrAddress}`);
+    async tokenInfoDetailed(tokenLike: types.TokenLike): Promise<Response<types.TokenInfo>> {
+        return await this.get(`${this.address}/tokens/${tokenLike}`);
     }
 
-    async tokenByIdOrAddress(idOrAddress: number | types.TokenAddress): Promise<types.TokenInfo> {
-        return this.parseResponse(await this.tokenByIdOrAddressDetailed(idOrAddress));
+    async tokenInfo(tokenLike: types.TokenLike): Promise<types.TokenInfo> {
+        return this.parseResponse(await this.tokenInfoDetailed(tokenLike));
     }
 
     async tokenPriceInfoDetailed(
-        idOrAddress: number | types.TokenAddress,
+        tokenLike: types.TokenLike,
         tokenIdOrUsd: number | 'usd'
     ): Promise<Response<types.TokenPriceInfo>> {
-        return await this.get(`${this.address}/tokens/${idOrAddress}/priceIn/${tokenIdOrUsd}`);
+        return await this.get(`${this.address}/tokens/${tokenLike}/priceIn/${tokenIdOrUsd}`);
     }
 
-    async tokenPriceInfo(
-        idOrAddress: number | types.TokenAddress,
-        tokenIdOrUsd: number | 'usd'
-    ): Promise<types.TokenPriceInfo> {
-        return this.parseResponse(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
+    async tokenPriceInfo(tokenLike: types.TokenLike, tokenIdOrUsd: number | 'usd'): Promise<types.TokenPriceInfo> {
+        return this.parseResponse(await this.tokenPriceInfoDetailed(tokenLike, tokenIdOrUsd));
     }
 
     async submitTxNewDetailed(tx: types.L2Tx, signature?: types.TxEthSignatureVariant): Promise<Response<string>> {
@@ -499,7 +496,7 @@ export class RestProvider extends SyncProvider {
         return tokens;
     }
 
-    async getState(address: types.Address): Promise<types.AccountStateRest> {
+    async getState(address: types.Address): Promise<types.AccountState> {
         const fullInfo = await this.accountFullInfo(address);
         const defaultInfo = {
             balances: {},
@@ -514,6 +511,7 @@ export class RestProvider extends SyncProvider {
                 address,
                 id: fullInfo.committed.accountId,
                 accountType: fullInfo.committed.accountType,
+                depositing: fullInfo.depositing,
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
@@ -534,6 +532,7 @@ export class RestProvider extends SyncProvider {
                 address,
                 id: fullInfo.committed.accountId,
                 accountType: fullInfo.committed.accountType,
+                depositing: fullInfo.depositing,
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
@@ -546,6 +545,7 @@ export class RestProvider extends SyncProvider {
         } else {
             return {
                 address,
+                depositing: fullInfo.depositing,
                 committed: defaultInfo,
                 verified: defaultInfo
             };
@@ -572,7 +572,7 @@ export class RestProvider extends SyncProvider {
 
     async getTokenPrice(tokenLike: types.TokenLike): Promise<number> {
         const price = await this.tokenPriceInfo(tokenLike, 'usd');
-        return price.price.toNumber();
+        return parseFloat(price.price);
     }
 
     async getTxReceipt(txHash: string): Promise<types.TransactionReceipt> {

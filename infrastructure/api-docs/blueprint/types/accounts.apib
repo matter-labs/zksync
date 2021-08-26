@@ -13,9 +13,20 @@
 - Owned
 - CREATE2
 
-## Account.FullInfo
+## Account.FullInfo (object)
++ depositing (Depositing, required)
 + committed (Account, required, nullable)
 + finalized (Account, required, nullable)
+
+## Depositing (object)
++ balances (DepositingBalances, required)
+
+## DepositingBalances (object)
++ *ETH* (DepositingFunds, required)
+
+## DepositingFunds (object)
++ amount: `1000000000000000000` (string, required)
++ expectedAcceptBlock: 25136211 (number, required)
 
 ## Account.Balances (object)
 + *ETH*: `1000000000000000000` (string, required)
