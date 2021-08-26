@@ -181,10 +181,16 @@ describe('ZkSync REST API V0.2 tests', () => {
             direction: 'newer'
         });
         expect(tokens.list.length).to.be.eql(2);
-        const firstToken = await provider.tokenByIdOrAddress('0x'.padEnd(42, '0'));
-        const secondToken = await provider.tokenByIdOrAddress(1);
+        const firstToken = await provider.tokenInfo('0x'.padEnd(42, '0'));
+        const secondToken = await provider.tokenInfo(1);
         expect(tokens.list[0]).to.be.eql(firstToken);
         expect(tokens.list[1]).to.be.eql(secondToken);
+        const firstTokenUSDPrice = await provider.getTokenPrice(0);
+        const secondTokenUSDPrice = await provider.getTokenPrice(1);
+        const expectedPrice = firstTokenUSDPrice / secondTokenUSDPrice;
+        const actualPrice = parseFloat((await provider.tokenPriceInfo(0, 1)).price);
+        expect(expectedPrice).to.be.lessThan(1.05 * actualPrice);
+        expect(expectedPrice).to.be.greaterThan(0.95 * actualPrice);
     });
 
     it('should check api v0.2 transaction scope', async () => {
