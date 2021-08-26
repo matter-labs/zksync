@@ -1611,6 +1611,33 @@ dependencies = [
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta-with-new-hmac#d9bf61a014a5fae1d43bd12f72abe1c4a32ef870"
+dependencies = [
+ "bellman_ce",
+ "bit-vec",
+ "blake2",
+ "blake2-rfc_bellman_edition",
+ "blake2s_simd",
+ "byteorder",
+ "digest 0.7.6",
+ "hex",
+ "hmac 0.7.1",
+ "itertools 0.9.0",
+ "num-bigint 0.3.2",
+ "num-integer",
+ "num-traits",
+ "poseidon_hash",
+ "rand 0.4.6",
+ "serde",
+ "serde_derive",
+ "sha2 0.8.2",
+ "splitmut",
+ "tiny-keccak 1.5.0",
+]
+
+[[package]]
+name = "franklin-crypto"
+version = "0.0.5"
 source = "git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac#d9bf61a014a5fae1d43bd12f72abe1c4a32ef870"
 dependencies = [
  "bellman_ce",
@@ -3794,9 +3821,9 @@ dependencies = [
 [[package]]
 name = "recursive_aggregation_circuit"
 version = "1.0.0"
-source = "git+https://github.com/StanislavBreadless/recursive_aggregation_circuit.git?branch=recursive-aggregation-circuit-with-new-hmac#5d3d87508718423f8b6b5ae9eef79b731ed11775"
+source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git?branch=recursive-aggregation-circuit-with-new-hmac#5d3d87508718423f8b6b5ae9eef79b731ed11775"
 dependencies = [
- "franklin-crypto",
+ "franklin-crypto 0.0.5 (git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac)",
  "hex",
  "once_cell",
  "sha2 0.9.5",
@@ -3903,7 +3930,7 @@ version = "0.3.0"
 source = "git+https://github.com/StanislavBreadless/rescue-poseidon.git?branch=stable-with-new-hmac#8d72a8f30061c7357cc6a104555d72f871314ff3"
 dependencies = [
  "byteorder",
- "franklin-crypto",
+ "franklin-crypto 0.0.5 (git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac)",
  "num-bigint 0.3.2",
  "num-integer",
  "num-iter",
@@ -5825,7 +5852,7 @@ dependencies = [
  "base64 0.13.0",
  "ethabi",
  "fnv",
- "franklin-crypto",
+ "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=beta-with-new-hmac)",
  "hex",
  "lazy_static",
  "num",
