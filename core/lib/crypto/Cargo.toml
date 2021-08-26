@@ -14,7 +14,7 @@ readme = "README.md"
 franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/StanislavBreadless/franklin-crypto.git", branch="beta-with-new-hmac", features = ["multicore", "plonk"]}
 recursive_aggregation_circuit = { package = "recursive_aggregation_circuit", version = "1.0.0", git = "https://github.com/StanislavBreadless/recursive_aggregation_circuit.git", branch="recursive-aggregation-circuit-with-new-hmac"}
 rand = "0.4"
-rescue_poseidon = { package = "rescue_poseidon", version = "0.3.0", git = "https://github.com/matter-labs/rescue-poseidon.git", branch="stable"}
+rescue_poseidon = { package = "rescue_poseidon", version = "0.3.0", git = "https://github.com/StanislavBreadless/rescue-poseidon.git", branch="stable-with-new-hmac"}
 
 num = { version = "0.3.1", features = ["serde"] }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
