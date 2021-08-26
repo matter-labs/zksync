@@ -1219,8 +1219,7 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 [[package]]
 name = "crypto-mac"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4434400df11d95d556bac068ddfedd482915eb18fe8bea89bc80b6e4b1c179e5"
+source = "git+https://github.com/RustCrypto/traits?tag=crypto-mac-v0.7.0#eefd93f7f041b6a42d265a0eb2d6d87460dbe13e"
 dependencies = [
  "generic-array 0.12.4",
  "subtle 1.0.0",
@@ -1612,7 +1611,34 @@ dependencies = [
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#4a706d93628980e036249e3b182b91af8797ce8c"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta-with-new-hmac#d9bf61a014a5fae1d43bd12f72abe1c4a32ef870"
+dependencies = [
+ "bellman_ce",
+ "bit-vec",
+ "blake2",
+ "blake2-rfc_bellman_edition",
+ "blake2s_simd",
+ "byteorder",
+ "digest 0.7.6",
+ "hex",
+ "hmac 0.7.1",
+ "itertools 0.9.0",
+ "num-bigint 0.3.2",
+ "num-integer",
+ "num-traits",
+ "poseidon_hash",
+ "rand 0.4.6",
+ "serde",
+ "serde_derive",
+ "sha2 0.8.2",
+ "splitmut",
+ "tiny-keccak 1.5.0",
+]
+
+[[package]]
+name = "franklin-crypto"
+version = "0.0.5"
+source = "git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac#d9bf61a014a5fae1d43bd12f72abe1c4a32ef870"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -1956,8 +1982,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 [[package]]
 name = "hmac"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dcb5e64cda4c23119ab41ba960d1e170a774c8e4b9d9e6a9bc18aabf5e59695"
+source = "git+https://github.com/StanislavBreadless/MACs?branch=hmac-v0.7.1-with-new-deps#e2e56e83b37f10a166c32004327a4145d72aa03e"
 dependencies = [
  "crypto-mac 0.7.0",
  "digest 0.8.1",
@@ -3796,9 +3821,9 @@ dependencies = [
 [[package]]
 name = "recursive_aggregation_circuit"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git?branch=master#30bbf42c81c08ba8a15dcad3eaca9e771c4d8c89"
+source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git?branch=recursive-aggregation-circuit-with-new-hmac#5d3d87508718423f8b6b5ae9eef79b731ed11775"
 dependencies = [
- "franklin-crypto",
+ "franklin-crypto 0.0.5 (git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac)",
  "hex",
  "once_cell",
  "sha2 0.9.5",
@@ -3902,10 +3927,10 @@ dependencies = [
 [[package]]
 name = "rescue_poseidon"
 version = "0.3.0"
-source = "git+https://github.com/matter-labs/rescue-poseidon.git?branch=stable#3415de1faa2cfa836f1ac059bf91b19af7c4c620"
+source = "git+https://github.com/StanislavBreadless/rescue-poseidon.git?branch=stable-with-new-hmac#8d72a8f30061c7357cc6a104555d72f871314ff3"
 dependencies = [
  "byteorder",
- "franklin-crypto",
+ "franklin-crypto 0.0.5 (git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac)",
  "num-bigint 0.3.2",
  "num-integer",
  "num-iter",
@@ -5827,7 +5852,7 @@ dependencies = [
  "base64 0.13.0",
  "ethabi",
  "fnv",
- "franklin-crypto",
+ "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=beta-with-new-hmac)",
  "hex",
  "lazy_static",
  "num",
