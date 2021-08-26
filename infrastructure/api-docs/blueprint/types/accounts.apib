@@ -13,12 +13,15 @@
 - Owned
 - CREATE2
 
-## Account.FullInfo
+## Account.FullInfo (object)
 + depositing (Depositing, required)
 + committed (Account, required, nullable)
 + finalized (Account, required, nullable)
 
 ## Depositing (object)
++ balances (DepositingBalances, required)
+
+## DepositingBalances (object)
 + *ETH* (DepositingFunds, required)
 
 ## DepositingFunds (object)
