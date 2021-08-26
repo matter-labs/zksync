@@ -16,7 +16,7 @@ zksync_utils = { path = "../utils", version = "1.0" }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
 
 num = { version = "0.3.1", features = ["serde"] }
-bigdecimal = { version = "0.2.0", features = ["serde"] }
+bigdecimal = { version = "=0.2.0", features = ["serde"] }
 hex = "0.4"
 tiny-keccak = "1.4.2"
 thiserror = "1.0"
