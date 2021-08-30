@@ -16,6 +16,12 @@ declare module './tester' {
         ): Promise<void>;
         testBatchBuilderSignedChangePubKey(sender: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testBatchBuilderTransfers(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testBatchBuilderTransfersWithoutSignatures(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber
+        ): Promise<void>;
         testBatchBuilderPayInDifferentToken(
             from: Wallet,
             to: Wallet,
@@ -152,6 +158,32 @@ Tester.prototype.testBatchBuilderTransfers = async function (
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
     const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    const senderAfter = await sender.getBalance(token);
+    const receiverAfter = await receiver.getBalance(token);
+    expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(totalFee)), 'Batched transfer failed').to.be.true;
+    expect(receiverAfter.sub(receiverBefore).eq(amount.mul(2)), 'Batched transfer failed').to.be.true;
+    this.runningFee = this.runningFee.add(totalFee);
+};
+
+// Copy-paste of multiTransfer test, batchBuilder must work the same way.
+// This test is meant for accounts which do not require ETH signature
+Tester.prototype.testBatchBuilderTransfersWithoutSignatures = async function (
+    sender: Wallet,
+    receiver: Wallet,
+    token: TokenLike,
+    amount: BigNumber
+) {
+    const batch = await sender
+        .batchBuilder()
+        .addTransfer({ to: receiver.address(), token, amount })
+        .addTransfer({ to: receiver.address(), token, amount })
+        .build(token);
+    const totalFee = batch.totalFee.get(token)!;
+
+    const senderBefore = await sender.getBalance(token);
+    const receiverBefore = await receiver.getBalance(token);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);

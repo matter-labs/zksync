@@ -364,7 +364,7 @@ where
                         RATE_LIMIT_DELAY.as_secs()
                     );
 
-                    time::delay_for(RATE_LIMIT_DELAY).await;
+                    time::sleep(RATE_LIMIT_DELAY).await;
                 }
             }
         };

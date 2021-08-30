@@ -94,7 +94,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
         ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
         RegenesisMultisig: process.env.MISC_REGENESIS_MULTISIG_ADDRESS,
-        AdditionalZkSync: process.env.MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS,
+        AdditionalZkSync: process.env.CONTRACTS_ADDITIONAL_ZKSYNC_ADDR,
         TokenGovernance: process.env.CONTRACTS_LISTING_GOVERNANCE
     };
 }
@@ -127,7 +127,10 @@ export class Deployer {
         });
         const govRec = await govContract.deployTransaction.wait();
         const govGasUsed = govRec.gasUsed;
-        const gasPrice = govContract.deployTransaction.gasPrice;
+        let gasPrice = govContract.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
             console.log(`CONTRACTS_GOVERNANCE_TARGET_ADDR=${govContract.address}`);
             console.log(
@@ -149,7 +152,10 @@ export class Deployer {
         });
         const verRec = await verifierContract.deployTransaction.wait();
         const verGasUsed = verRec.gasUsed;
-        const gasPrice = verifierContract.deployTransaction.gasPrice;
+        let gasPrice = verifierContract.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
             console.log(`CONTRACTS_VERIFIER_TARGET_ADDR=${verifierContract.address}`);
             console.log(
@@ -171,7 +177,10 @@ export class Deployer {
         });
         const zksRec = await zksContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
-        const gasPrice = zksContract.deployTransaction.gasPrice;
+        let gasPrice = zksContract.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
             console.log(`CONTRACTS_CONTRACT_TARGET_ADDR=${zksContract.address}`);
             console.log(
@@ -215,7 +224,10 @@ export class Deployer {
         }
         const txHash = deployFactoryTx.transactionHash;
         const gasUsed = deployFactoryTx.gasUsed;
-        const gasPrice = deployFactoryContract.deployTransaction.gasPrice;
+        let gasPrice = deployFactoryContract.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
             console.log(`CONTRACTS_DEPLOY_FACTORY_ADDR=${deployFactoryContract.address}`);
             console.log(`CONTRACTS_GOVERNANCE_ADDR=${this.addresses.Governance}`);
@@ -247,7 +259,10 @@ export class Deployer {
         );
         const zksRec = await nftFactoryContarct.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
-        const gasPrice = nftFactoryContarct.deployTransaction.gasPrice;
+        let gasPrice = nftFactoryContarct.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
             console.log(`CONTRACTS_NFT_FACTORY_ADDR=${nftFactoryContarct.address}`);
             console.log(
@@ -282,7 +297,10 @@ export class Deployer {
         );
         const zksRec = await tokenGovernanceContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
-        const gasPrice = tokenGovernanceContract.deployTransaction.gasPrice;
+        let gasPrice = tokenGovernanceContract.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
             console.log(`\nCONTRACTS_LISTING_GOVERNANCE=${tokenGovernanceContract.address}\n`);
             console.log(
@@ -315,7 +333,10 @@ export class Deployer {
         );
         const zksRec = await forcedExitContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
-        const gasPrice = forcedExitContract.deployTransaction.gasPrice;
+        let gasPrice = forcedExitContract.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
             console.log(`CONTRACTS_FORCED_EXIT_ADDR=${forcedExitContract.address}`);
             console.log(
@@ -338,9 +359,12 @@ export class Deployer {
         });
         const zksRec = await additionalZkSyncContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
-        const gasPrice = additionalZkSyncContract.deployTransaction.gasPrice;
+        let gasPrice = additionalZkSyncContract.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
-            console.log(`MISC_NEW_ADDITIONAL_ZKSYNC_ADDRESS=${additionalZkSyncContract.address}`);
+            console.log(`CONTRACTS_ADDITIONAL_ZKSYNC_ADDR=${additionalZkSyncContract.address}`);
             console.log(
                 `Additiinal zkSync contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
                     zksGasUsed.mul(gasPrice)
@@ -366,7 +390,10 @@ export class Deployer {
         );
         const zksRec = await regenesisMultisigContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
-        const gasPrice = regenesisMultisigContract.deployTransaction.gasPrice;
+        let gasPrice = regenesisMultisigContract.deployTransaction.gasPrice;
+        if (gasPrice == null) {
+            gasPrice = await this.deployWallet.provider.getGasPrice();
+        }
         if (this.verbose) {
             console.log(`MISC_REGENESIS_MULTISIG_ADDRESS=${regenesisMultisigContract.address}`);
             console.log(
@@ -442,6 +469,7 @@ export class Deployer {
     }
 
     public async deployAll(ethTxOptions?: ethers.providers.TransactionRequest) {
+        await this.deployAdditionalZkSync(ethTxOptions);
         await this.deployZkSyncTarget(ethTxOptions);
         await this.deployGovernanceTarget(ethTxOptions);
         await this.deployVerifierTarget(ethTxOptions);

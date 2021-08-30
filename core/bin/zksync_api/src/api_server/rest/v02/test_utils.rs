@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use zksync_api_client::rest::client::Client;
 use zksync_api_types::v02::Response;
 use zksync_config::ZkSyncConfig;
-use zksync_crypto::rand::{SeedableRng, XorShiftRng};
+use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
     chain::operations::OperationsSchema,
@@ -37,9 +37,10 @@ use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     prover::ProverJobType,
     tx::ChangePubKeyType,
-    AccountId, AccountMap, Address, BatchFee, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp, Nonce, OutputFeeType,
-    PriorityOp, Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
+    AccountId, AccountMap, AccountUpdate, Address, BatchFee, BlockNumber, Deposit, DepositOp,
+    ExecutedOperations, ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp,
+    Nonce, OutputFeeType, PriorityOp, Token, TokenId, TokenKind, TokenLike, Transfer, TransferOp,
+    ZkSyncOp, ZkSyncTx, H256, NFT,
 };
 
 // Local uses
@@ -86,17 +87,18 @@ impl TestServerConfig {
         scope: String,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,
     {
         let this = self.clone();
-        let server = actix_web::test::start(move || {
+
+        let server = actix_test::start(move || {
             let app = App::new();
             let shared_data = shared_data.clone();
             let app = if let Some(shared_data) = shared_data {
-                app.data(shared_data)
+                app.app_data(web::Data::new(shared_data))
             } else {
                 app
             };
@@ -113,7 +115,7 @@ impl TestServerConfig {
         &self,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,
@@ -364,6 +366,7 @@ impl TestServerConfig {
                 Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
                 "PHNX",
                 18,
+                TokenKind::ERC20,
             ))
             .await?;
         // Insert Golem token with old symbol (from rinkeby).
@@ -374,6 +377,7 @@ impl TestServerConfig {
                 Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
                 "GNT",
                 18,
+                TokenKind::ERC20,
             ))
             .await?;
 
@@ -394,6 +398,7 @@ impl TestServerConfig {
                         *account_id,
                         account,
                         block_number.0 * accounts.len() as u32 + id as u32,
+                        &mut rng,
                     ));
                 });
             apply_updates(&mut accounts, updates.clone());
@@ -410,6 +415,34 @@ impl TestServerConfig {
             } else {
                 vec![]
             };
+
+            let mut mint_nft_updates = Vec::new();
+            for (i, tx) in txs.iter().enumerate() {
+                if let Some(tx) = tx.get_executed_tx() {
+                    if let ZkSyncTx::MintNFT(tx) = &tx.signed_tx.tx {
+                        let nft_address: Address = rng.gen::<[u8; 20]>().into();
+                        let content_hash: H256 = rng.gen::<[u8; 32]>().into();
+                        let token = NFT::new(
+                            TokenId(80000 + block_number.0 * 100 + i as u32),
+                            0,
+                            tx.creator_id,
+                            tx.creator_address,
+                            nft_address,
+                            None,
+                            content_hash,
+                        );
+                        let update = (
+                            tx.creator_id,
+                            AccountUpdate::MintNFT {
+                                token,
+                                nonce: Nonce(0),
+                            },
+                        );
+                        mint_nft_updates.push(update);
+                    }
+                }
+            }
+            updates.extend(mint_nft_updates);
 
             storage
                 .chain()
@@ -607,7 +640,7 @@ impl TestServerConfig {
                 block_number: 2,
                 block_index: 2,
                 operation: serde_json::to_value(
-                    dummy_deposit_op(Address::default(), AccountId(1), VERIFIED_OP_SERIAL_ID, 2).op,
+                    dummy_deposit_op(Address::default(), AccountId(3), VERIFIED_OP_SERIAL_ID, 2).op,
                 )
                 .unwrap(),
                 from_account: Default::default(),
@@ -620,14 +653,16 @@ impl TestServerConfig {
                 eth_block: 10,
                 created_at: chrono::Utc::now(),
                 eth_block_index: Some(1),
-                tx_hash: Default::default(),
+                tx_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
             },
             // Committed priority operation.
             NewExecutedPriorityOperation {
                 block_number: EXECUTED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
                 operation: serde_json::to_value(
-                    dummy_full_exit_op(AccountId(1), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
+                    dummy_full_exit_op(AccountId(3), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
                         .op,
                 )
                 .unwrap(),
@@ -641,7 +676,9 @@ impl TestServerConfig {
                 eth_block: 14,
                 created_at: chrono::Utc::now(),
                 eth_block_index: Some(1),
-                tx_hash: Default::default(),
+                tx_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
             },
         ];
 

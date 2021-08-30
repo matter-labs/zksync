@@ -126,7 +126,7 @@ async fn heartbeat_future_handle<CLIENT>(
             let random_multiplier = between.ind_sample(&mut rng);
             Duration::from_secs((heartbeat_interval.as_secs_f64() * random_multiplier) as u64)
         };
-        tokio::time::delay_for(timeout_value).await;
+        tokio::time::sleep(timeout_value).await;
 
         vlog::debug!("Starting sending heartbeats for job with ID: {}", job_id);
 
@@ -232,5 +232,8 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
             first_block,
             last_block
         );
+        if prover_options.prover.die_after_proof {
+            return;
+        }
     }
 }

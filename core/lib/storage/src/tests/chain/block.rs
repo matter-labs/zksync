@@ -1115,6 +1115,9 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         setup.get_tx_hash(0, 4),
         setup.get_tx_hash(0, 5),
         setup.get_tx_hash(0, 6),
+        setup.get_tx_hash(0, 7),
+        setup.get_tx_hash(0, 8),
+        setup.get_tx_hash(0, 9),
     ];
 
     for (tx_hash, limit, direction, expected, test_name) in vec![
@@ -1147,10 +1150,10 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
             "Big limit (newer)",
         ),
         (
-            tx_hashes[6],
+            tx_hashes[9],
             5,
             PaginationDirection::Older,
-            tx_hashes[2..=6].iter().rev().cloned().collect(),
+            tx_hashes[5..=9].iter().rev().cloned().collect(),
             "Last 5 txs",
         ),
         (
@@ -1259,6 +1262,57 @@ async fn test_remove_new_account_tree_cache(mut storage: StorageProcessor<'_>) -
         .get_account_tree_cache_block(BlockNumber(3))
         .await?
         .is_none());
+
+    Ok(())
+}
+
+/// Check that `get_block_number_by_hash` works correctly
+#[db_test]
+async fn test_get_block_number_by_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let expected_number = BlockNumber(1);
+    let block = gen_sample_block(expected_number, BLOCK_SIZE_CHUNKS, Default::default());
+    storage
+        .chain()
+        .block_schema()
+        .save_block(block.clone())
+        .await?;
+
+    let actual_number = storage
+        .chain()
+        .block_schema()
+        .get_block_number_by_hash(&block.new_root_hash.to_bytes())
+        .await?;
+    assert_eq!(actual_number, Some(expected_number));
+
+    Ok(())
+}
+
+/// Check that `get_block_transactions_hashes` works correctly
+#[db_test]
+async fn test_get_block_transactions_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+    setup.add_block(1);
+
+    let before_commit = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions_hashes(BlockNumber(1))
+        .await?;
+    assert!(before_commit.is_empty());
+
+    commit_schema_data(&mut storage, &setup).await?;
+
+    let after_commit = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions_hashes(BlockNumber(1))
+        .await?;
+    let len = setup.blocks[0].block_transactions.len();
+    let expected: Vec<Vec<u8>> = (0..len)
+        .into_iter()
+        .map(|index| setup.get_tx_hash(0, index).as_ref().to_vec())
+        .collect();
+    assert_eq!(after_commit, expected);
 
     Ok(())
 }

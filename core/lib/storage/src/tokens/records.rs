@@ -20,7 +20,35 @@ pub struct DbToken {
     pub address: String,
     pub symbol: String,
     pub decimals: i16,
-    pub is_nft: bool,
+    pub kind: TokenKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "token_kind")]
+pub enum TokenKind {
+    ERC20,
+    NFT,
+    None,
+}
+
+impl From<TokenKind> for zksync_types::TokenKind {
+    fn from(kind: TokenKind) -> zksync_types::TokenKind {
+        match kind {
+            TokenKind::ERC20 => zksync_types::TokenKind::ERC20,
+            TokenKind::NFT => zksync_types::TokenKind::NFT,
+            TokenKind::None => zksync_types::TokenKind::None,
+        }
+    }
+}
+
+impl From<zksync_types::TokenKind> for TokenKind {
+    fn from(kind: zksync_types::TokenKind) -> TokenKind {
+        match kind {
+            zksync_types::TokenKind::ERC20 => TokenKind::ERC20,
+            zksync_types::TokenKind::NFT => TokenKind::NFT,
+            zksync_types::TokenKind::None => TokenKind::None,
+        }
+    }
 }
 
 impl From<Token> for DbToken {
@@ -30,20 +58,20 @@ impl From<Token> for DbToken {
             address: address_to_stored_string(&token.address),
             symbol: token.symbol,
             decimals: token.decimals as i16,
-            is_nft: token.is_nft,
+            kind: token.kind.into(),
         }
     }
 }
 
 impl From<DbToken> for Token {
     fn from(val: DbToken) -> Token {
-        Token {
-            id: TokenId(val.id as u32),
-            address: stored_str_address_to_address(&val.address),
-            symbol: val.symbol,
-            decimals: val.decimals as u8,
-            is_nft: val.is_nft,
-        }
+        Token::new(
+            TokenId(val.id as u32),
+            stored_str_address_to_address(&val.address),
+            &val.symbol,
+            val.decimals as u8,
+            val.kind.into(),
+        )
     }
 }
 
@@ -65,6 +93,7 @@ pub struct StorageNFT {
     pub creator_address: Vec<u8>,
     pub address: Vec<u8>,
     pub content_hash: Vec<u8>,
+    pub symbol: String,
 }
 
 #[derive(Debug, FromRow)]
@@ -97,7 +126,7 @@ impl From<StorageNFT> for NFT {
             creator_address: Address::from_slice(val.creator_address.as_slice()),
             creator_id: AccountId(val.creator_account_id as u32),
             address: Address::from_slice(val.address.as_slice()),
-            symbol: "".to_string(),
+            symbol: val.symbol,
             content_hash: H256::from_slice(val.content_hash.as_slice()),
         }
     }

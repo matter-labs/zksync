@@ -12,7 +12,8 @@ use actix_web::{
 use zksync_api_types::{
     v02::transaction::{
         ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
-        Transaction, TransactionData, TxData, TxHashSerializeWrapper, TxInBlockStatus,
+        Toggle2FA, Toggle2FAResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
+        TxInBlockStatus,
     },
     PriorityOpLookupQuery, TxWithSignature,
 };
@@ -132,16 +133,16 @@ impl ApiTransactionData {
 
 async fn tx_status(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<TxHash>,
+    tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<Receipt>> {
-    data.tx_status(tx_hash).await.into()
+    data.tx_status(*tx_hash).await.into()
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<TxHash>,
+    tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TxData>> {
-    data.tx_data(tx_hash).await.into()
+    data.tx_data(*tx_hash).await.into()
 }
 
 async fn submit_tx(
@@ -169,23 +170,37 @@ async fn submit_batch(
     response.into()
 }
 
+async fn toggle_2fa(
+    data: web::Data<ApiTransactionData>,
+    Json(toggle_2fa): Json<Toggle2FA>,
+) -> ApiResult<Toggle2FAResponse> {
+    let response = data
+        .tx_sender
+        .toggle_2fa(toggle_2fa)
+        .await
+        .map_err(Error::from);
+
+    response.into()
+}
+
 async fn get_batch(
     data: web::Data<ApiTransactionData>,
-    web::Path(batch_hash): web::Path<TxHash>,
+    batch_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<ApiTxBatch>> {
-    data.get_batch(batch_hash).await.into()
+    data.get_batch(*batch_hash).await.into()
 }
 
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
     web::scope("transactions")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route("", web::post().to(submit_tx))
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))
         .route("/batches", web::post().to(submit_batch))
         .route("/batches/{batch_hash}", web::get().to(get_batch))
+        .route("/toggle2FA", web::post().to(toggle_2fa))
 }
 
 #[cfg(test)]
@@ -213,10 +228,10 @@ mod tests {
             EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature,
             TxEthSignatureVariant,
         },
-        BlockNumber, SignedZkSyncTx, TokenId,
+        BlockNumber, SignedZkSyncTx, TokenId, TokenKind,
     };
 
-    fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
+    fn submit_txs_loopback() -> (CoreApiClient, actix_test::TestServer) {
         async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
             Json(Ok(()))
         }
@@ -231,7 +246,7 @@ mod tests {
             Json(None)
         }
 
-        let server = actix_web::test::start(move || {
+        let server = actix_test::start(move || {
             App::new()
                 .route("new_tx", web::post().to(send_tx))
                 .route("new_txs_batch", web::post().to(send_txs_batch))
@@ -279,7 +294,7 @@ mod tests {
         assert_eq!(tx.hash(), tx_hash);
 
         let TestTransactions { acc, txs } = TestServerConfig::gen_zk_txs(1_00);
-        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
+        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
         let (good_batch, expected_tx_hashes): (Vec<_>, Vec<_>) = txs
             .into_iter()
             .map(|(tx, _op)| {

@@ -21,8 +21,9 @@ use zksync_api_types::v02::{
     token::{ApiNFT, ApiToken, TokenPrice},
 };
 use zksync_config::ZkSyncConfig;
+use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{Token, TokenId, TokenLike};
+use zksync_types::{AccountId, Token, TokenId, TokenLike};
 
 // Local uses
 use super::{
@@ -199,7 +200,7 @@ async fn token_pagination(
 
 async fn token_by_id_or_address(
     data: web::Data<ApiTokenData>,
-    web::Path(token_like_string): web::Path<String>,
+    token_like_string: web::Path<String>,
 ) -> ApiResult<ApiToken> {
     let token_like = TokenLike::parse(&token_like_string);
     let token_like = match token_like {
@@ -219,8 +220,9 @@ async fn token_by_id_or_address(
 // Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318 (ZKS-628)
 async fn token_price(
     data: web::Data<ApiTokenData>,
-    web::Path((token_like_string, currency)): web::Path<(String, String)>,
+    path: web::Path<(String, String)>,
 ) -> ApiResult<TokenPrice> {
+    let (token_like_string, currency) = path.into_inner();
     let first_token = TokenLike::parse(&token_like_string);
     let first_token = match first_token {
         TokenLike::Symbol(_) => {
@@ -238,7 +240,7 @@ async fn token_price(
     ApiResult::Ok(TokenPrice {
         token_id: token.id,
         token_symbol: token.symbol,
-        price_in: currency,
+        price_in: currency.to_string(),
         decimals: token.decimals,
         price,
     })
@@ -246,15 +248,35 @@ async fn token_price(
 
 async fn get_nft(
     data: web::Data<ApiTokenData>,
-    web::Path(id): web::Path<TokenId>,
+    id: web::Path<TokenId>,
 ) -> ApiResult<Option<ApiNFT>> {
+    if id.0 < MIN_NFT_TOKEN_ID {
+        return Error::from(InvalidDataError::InvalidNFTTokenId).into();
+    }
     let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
     let nft = api_try!(storage
         .tokens_schema()
-        .get_nft_with_factories(id)
+        .get_nft_with_factories(*id)
         .await
         .map_err(Error::storage));
     ApiResult::Ok(nft)
+}
+
+async fn get_nft_owner(
+    data: web::Data<ApiTokenData>,
+    id: web::Path<TokenId>,
+) -> ApiResult<Option<AccountId>> {
+    if id.0 < MIN_NFT_TOKEN_ID {
+        return Error::from(InvalidDataError::InvalidNFTTokenId).into();
+    }
+    let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
+    let owner_id = api_try!(storage
+        .chain()
+        .account_schema()
+        .get_nft_owner(*id)
+        .await
+        .map_err(Error::storage));
+    ApiResult::Ok(owner_id)
 }
 
 pub fn api_scope(
@@ -266,7 +288,7 @@ pub fn api_scope(
     let data = ApiTokenData::new(config, pool, tokens_db, fee_ticker);
 
     web::scope("tokens")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route("", web::get().to(token_pagination))
         .route(
             "{token_id_or_address}",
@@ -277,6 +299,7 @@ pub fn api_scope(
             web::get().to(token_price),
         )
         .route("nft/{id}", web::get().to(get_nft))
+        .route("nft/{id}/owner", web::get().to(get_nft_owner))
 }
 
 #[cfg(test)]
@@ -420,10 +443,23 @@ mod tests {
         let response = client.token_price(&token_like, "333").await?;
         assert!(response.error.is_some());
 
-        let id = TokenId(65542);
-        let response = client.nft_by_id(id).await?;
+        let nft_id = TokenId(65542);
+        let response = client.nft_by_id(nft_id).await?;
         let nft: ApiNFT = deserialize_response_result(response)?;
-        assert_eq!(nft.id, id);
+        assert_eq!(nft.id, nft_id);
+
+        let response = client.nft_owner_by_id(nft_id).await?;
+        let owner_id: AccountId = deserialize_response_result(response)?;
+        let expected_owner_id = {
+            let mut storage = cfg.pool.access_storage().await?;
+            storage
+                .chain()
+                .account_schema()
+                .get_nft_owner(nft_id)
+                .await?
+                .unwrap()
+        };
+        assert_eq!(owner_id, expected_owner_id);
 
         server.stop().await;
         Ok(())

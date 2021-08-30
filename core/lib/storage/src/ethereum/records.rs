@@ -16,6 +16,20 @@ pub struct StorageETHOperation {
 }
 
 #[derive(Debug, Clone, FromRow, PartialEq)]
+pub struct ETHOperationData {
+    pub id: i64,
+    pub nonce: i64,
+    pub confirmed: bool,
+    pub raw_tx: Vec<u8>,
+    pub op_type: String,
+    pub final_hash: Option<Vec<u8>>,
+    pub last_deadline_block: i64,
+    pub last_used_gas_price: BigDecimal,
+    pub agg_op_id: Option<i64>,
+    pub arguments: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct ETHTxHash {
     pub id: i64,
     pub eth_op_id: i64,

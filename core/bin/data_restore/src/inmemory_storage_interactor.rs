@@ -6,7 +6,7 @@ use web3::types::Address;
 use zksync_types::block::Block;
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
-    NewTokenEvent, Operation, Token, TokenId, TokenInfo,
+    NewTokenEvent, Operation, SerialId, Token, TokenId, TokenInfo, TokenKind,
 };
 
 use crate::{
@@ -66,13 +66,13 @@ impl StorageInteractor for InMemoryStorageInteractor {
     }
 
     async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
-        let token = Token {
-            id: token_id,
-            symbol: token.symbol,
-            address: token.address,
-            decimals: token.decimals,
-            is_nft: false,
-        };
+        let token = Token::new(
+            token_id,
+            token.address,
+            &token.symbol,
+            token.decimals,
+            TokenKind::ERC20,
+        );
         self.tokens.insert(token_id, token);
     }
 
@@ -97,6 +97,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
                     address,
                     symbol: format!("ERC20-{}", *id),
                     decimals: 18,
+                    kind: TokenKind::ERC20,
                     is_nft: false,
                 },
             );
@@ -158,6 +159,16 @@ impl StorageInteractor for InMemoryStorageInteractor {
         _tree_cache: serde_json::Value,
     ) {
         // Inmemory storage doesn't support caching.
+    }
+
+    async fn get_max_priority_op_serial_id(&mut self) -> SerialId {
+        let number_of_priority_ops = self
+            .rollups
+            .iter()
+            .flat_map(|rollup| &rollup.ops)
+            .filter(|op| op.is_priority_op())
+            .count();
+        number_of_priority_ops as SerialId
     }
 }
 
@@ -258,7 +269,7 @@ impl InMemoryStorageInteractor {
                     account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = *new_pub_key_hash;
                 }
-                AccountUpdate::MintNFT { ref token } => {
+                AccountUpdate::MintNFT { ref token, .. } => {
                     self.tokens.insert(
                         token.id,
                         Token {
@@ -266,11 +277,12 @@ impl InMemoryStorageInteractor {
                             address: token.address,
                             symbol: token.symbol.clone(),
                             decimals: 0,
+                            kind: TokenKind::NFT,
                             is_nft: true,
                         },
                     );
                 }
-                AccountUpdate::RemoveNFT { ref token } => {
+                AccountUpdate::RemoveNFT { ref token, .. } => {
                     self.tokens.remove(&token.id);
                 }
             }

@@ -1,0 +1,223 @@
+name: Loadtest
+on:
+  schedule:
+    - cron: '17 23 * * *'
+
+  push:
+    branches:
+      - devops/refactor-pipeline*
+
+# Disable simultaneous deployments into a single environment
+concurrency: deploy-${{ github.event.inputs.environment }}
+
+env:
+  ZKSYNC_ENV: loadtest
+  HF_ARGS: -e loadtest
+
+jobs:
+  update:
+    name: Update Configs
+    runs-on: [k8s, deployer, stage]
+    steps:
+      - name: Update Config
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          workflow: Update Config
+          token: ${{ secrets.GH_TOKEN }}
+          wait-for-completion-timeout: 5m
+          wait-for-completion-interval: 20s
+          inputs: |
+            {
+              "environment": "${{ env.ZKSYNC_ENV }}",
+              "ref": "master"
+            }
+
+  setup:
+    name: Setup and Provision SQLProxy
+    ## stage selects the specific cluster
+    runs-on: [k8s, deployer, stage]
+    needs: [update]
+    container:
+      image: dysnix/kubectl:v1.20-gcloud
+
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+      DEPLOY_APPS: -l name=sqlproxy
+
+    outputs:
+      image_tag: ${{ steps.set.outputs.shortRev }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - id: set
+        run: |
+          rev=HEAD
+          [[ "${{ startsWith(github.ref, 'refs/heads/devops/refactor-pipeline') }}" == 'false' ]] || rev=origin/dev
+          git rev-parse --short ${rev}
+          echo "::set-output name=shortRev::$(git rev-parse --short ${rev})"
+      -
+        name: Clone helm-infra
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/helm-infra
+          path: helm-infra
+          ref: master
+          token: ${{ secrets.GH_TOKEN }}
+      -
+        name: Create ~/.kube/config
+        run: ./.github/scripts/write-kubeconf.sh
+      -
+        name: Provision SQLProxy
+        working-directory: helm-infra
+        run: |
+          UPDATE_REPOS=y helmfile $HF_ARGS repos
+          helmfile $HF_ARGS $DEPLOY_APPS sync
+      -
+        name: Create etc/env/loadtest.env
+        run: |
+          mkdir -p etc/env/
+          kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env
+          kubectl get secret -n ${ZKSYNC_ENV} secretenv-zksync -o go-template='{{range $k, $v := .data}}{{ printf "%s=%s\n" $k ($v | base64decode) }}{{end}}' \
+            >> etc/env/${ZKSYNC_ENV}.env
+      -
+        uses: actions/upload-artifact@v2
+        with:
+          name: loadtest_env
+          path: etc/env/${{ env.ZKSYNC_ENV }}.env
+          if-no-files-found: error
+
+  dbsetup:
+    name: Cleanup the database, compile and update contracts
+    ## stage selects the specific cluster
+    runs-on: [k8s, deployer, stage]
+    needs: [setup]
+    env:
+      RUSTUP_HOME: /usr/share/rust/.rustup
+      CARGO_HOME: /usr/share/rust/.cargo
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: loadtest_env
+          path: etc/env
+      -
+        name: Preperare env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+          echo CI=1 >> $GITHUB_ENV
+          echo $CARGO_HOME/bin >> $GITHUB_PATH
+      -
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      -
+        name: Update cargo dependencies
+        run: |
+          cargo install --version=0.5.6 sqlx-cli
+          cargo install diesel_cli --no-default-features --features postgres
+      -
+        name: Setup loadtest database
+        run: |
+          zk
+          zk run yarn
+          zk run verify-keys unpack
+          zk db setup
+          zk server --genesis
+          zk contract build
+          zk contract deploy
+          cd contracts && zk f yarn governance-add-erc20 add-multi-current-network rinkeby
+          zk db insert contract
+      -
+        uses: actions/upload-artifact@v2
+        with:
+          name: deployed_contracts
+          path: deployed_contracts.log
+          if-no-files-found: error
+
+  update-configmap:
+    name: Update ConfigMap
+    runs-on: [k8s, deployer, stage]
+    needs: [dbsetup]
+    container:
+      image: dysnix/kubectl:v1.20-gcloud
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: deployed_contracts
+      -
+        name: Create ~/.kube/config
+        run: .github/scripts/write-kubeconf.sh
+      -
+        name: Update contracts in the ConfigMap
+        run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
+
+  deploy:
+    name: Deploy apps
+    runs-on: [k8s, deployer, stage]
+    needs: [setup, update-configmap]
+    steps:
+      - name: Deploy
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          workflow: Deploy
+          token: ${{ secrets.GH_TOKEN }}
+          wait-for-completion-timeout: 10m
+          wait-for-completion-interval: 1m
+          inputs: |
+            {
+              "environment": "${{ env.ZKSYNC_ENV }}",
+              "image_tag": "${{ needs.setup.outputs.image_tag }}",
+              "scaleup": "true"
+            }
+
+  loadtest:
+    name: Perform loadtest
+    runs-on: [self-hosted, MAIN]
+    needs: deploy
+    container: rust:1.53
+    env:
+      WEB3_URL: ${{ secrets.CI_LOADTEST_WEB3_URL }}
+      MASTER_WALLET_PK: ${{ secrets.CI_LOADTEST_MAIN_PRIVKEY }}
+      ACCOUNTS_AMOUNT: 20
+      OPERATIONS_PER_ACCOUNT: 20
+      MAIN_TOKEN: "USDT"
+      ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
+      ETH_NETWORK: "rinkeby"
+      RUST_LOG: info
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run loadtest
+        run: cargo run --bin loadnext
+
+  cleanup:
+    name: Cleanup loadtest environment
+    ## stage selects the specific cluster
+    runs-on: [k8s, deployer, stage]
+    needs: [dbsetup, loadtest]
+    container:
+      image: dysnix/kubectl:v1.20-gcloud
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+
+    if: always()
+    steps:
+      - uses: actions/checkout@v2
+      - run: rm -f etc/env/${ZKSYNC_ENV}.env
+      -
+        name: Create ~/.kube/config
+        run: .github/scripts/write-kubeconf.sh
+      -
+        name: Scale loadtest to 0 replicas
+        run: |
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 server
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 prover
+          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 sqlproxy-gcloud-sqlproxy

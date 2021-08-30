@@ -18,8 +18,8 @@ zksync_storage = { path = "../../lib/storage", version = "1.0" }
 zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 ethabi = "14.0.0"
 anyhow = "1.0"
-web3 = "0.15.0"
+web3 = "0.16.0"
 structopt = "0.3.20"

@@ -109,6 +109,7 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
                         Some(upd.symbol),
                         H256::from_slice(&upd.content_hash.as_slice()),
                     ),
+                    nonce: Nonce(upd.nonce as u32),
                 },
             ),
         }

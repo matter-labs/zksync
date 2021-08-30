@@ -1,0 +1,19 @@
+[package]
+name = "mint_nft_nonce_migration"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+tokio = { version = "1.0", features = ["full"] }
+anyhow = "1.0"

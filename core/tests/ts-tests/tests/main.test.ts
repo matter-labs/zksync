@@ -1,6 +1,6 @@
 import { expect } from 'chai';
-import { BigNumber, utils } from 'ethers';
-import { Wallet, types } from 'zksync';
+import { BigNumber, utils, ethers } from 'ethers';
+import { Wallet, types, crypto, Signer, No2FAWalletSigner } from 'zksync';
 
 import { Tester } from './tester';
 import './priority-ops';
@@ -14,6 +14,7 @@ import './batch-builder';
 import './create2';
 import './swap';
 import './register-factory';
+import './token-listing';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -300,6 +301,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             if (onlyBasic) {
                 return;
             }
+
             await tester.testTransfer(hilda, david, token, TX_AMOUNT);
             await tester.testBatch(hilda, david, token, TX_AMOUNT);
         });
@@ -332,6 +334,101 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             }
         });
     });
+
+    describe('No2FA tests', () => {
+        let hilda: Wallet;
+        let hildaWithEthSigner: Wallet;
+        let frida: Wallet;
+
+        step('should setup an account without 2fa', async () => {
+            if (onlyBasic) {
+                return;
+            }
+
+            const zkPrivateKey = await crypto.privateKeyFromSeed(utils.arrayify(ethers.constants.HashZero))
+            // Even the wallets with no 2fa should sign message for CPK with their private key
+            hilda = await tester.fundedWallet('1.0');
+            frida = await tester.fundedWallet('1.0');
+            hilda.signer = Signer.fromPrivateKey(zkPrivateKey);
+            await tester.testDeposit(hilda, token, DEPOSIT_AMOUNT, true);
+            await tester.testDeposit(frida, token, DEPOSIT_AMOUNT, true);
+            await (await hilda.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'ECDSA'
+            })).awaitReceipt();
+            await (await frida.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'ECDSA'
+            })).awaitReceipt();
+            await hilda.toggle2FA(false);
+
+            const accountState = await hilda.getAccountState();
+            expect(accountState.accountType, 'Incorrect account type').to.be.eql('No2FA');
+
+            hildaWithEthSigner = hilda;
+            // Making sure that the wallet has no Ethereum private key
+            const ethSigner = new No2FAWalletSigner(hilda.address(), hilda.ethSigner.provider);
+            const syncSigner = Signer.fromPrivateKey(zkPrivateKey);
+            hilda = await Wallet.fromSyncSigner(
+                ethSigner,
+                syncSigner,
+                hilda.provider
+            );
+        });
+
+        step('Test No2FA transfers', async () => {
+            if (onlyBasic) {
+                return;
+            }
+
+           await tester.testTransfer(hilda, frida, token, TX_AMOUNT);
+           await tester.testBatch(hilda, frida, token, TX_AMOUNT);
+           await tester.testBatchBuilderTransfersWithoutSignatures(hilda, frida, token, TX_AMOUNT);
+        })
+
+        step('Test No2FA Swaps', async () => {
+            if(onlyBasic) {
+                return;
+            }
+
+            const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
+            await tester.testDeposit(frida, secondToken, DEPOSIT_AMOUNT, true);
+            await tester.testSwap(hilda, frida, token, secondToken, TX_AMOUNT);
+        })
+
+        step('Test No2FA Withdrawals', async () => {
+            if(onlyBasic) {
+                return;
+            }
+
+            await tester.testWithdraw(hilda, token, TX_AMOUNT);
+        })
+
+        step('Test switching 2FA on', async () => {
+            if(onlyBasic) {
+                return;
+            }
+
+            await hildaWithEthSigner.toggle2FA(true);
+            const accountState = await hilda.getAccountState();
+            expect(accountState.accountType, 'Incorrect account type').to.be.eql('Owned');
+        })
+    });
+
+    describe('Permissionless token listing tests', () => {
+        step('Test ERC20 token listing', async () => {
+            if(onlyBasic || providerType == 'RPC') {
+                return;
+            }
+            await tester.testERC20Listing();
+        })
+        step('Test non-ERC20 token listing', async () => {
+            if(onlyBasic || providerType == 'RPC') {
+                return;
+            }
+            await tester.testNonERC20Listing();
+        })
+    })
 });
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).

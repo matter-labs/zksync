@@ -31,6 +31,7 @@ pub enum TxVariant {
     Tx(SignedZkSyncTx),
     Batch(Vec<SignedZkSyncTx>, Option<EthBatchSignData>),
     Order(Box<Order>),
+    Toggle2FA,
 }
 
 /// Wrapper on a `TxVariant` which guarantees that (a batch of)
@@ -68,6 +69,7 @@ impl VerifiedTx {
             TxVariant::Tx(tx) => tx,
             TxVariant::Batch(_, _) => panic!("called `unwrap_tx` on a `Batch` value"),
             TxVariant::Order(_) => panic!("called `unwrap_tx` on an `Order` value"),
+            TxVariant::Toggle2FA => panic!("called `unwrap_tx` on an `Toggle2FA` value"),
         }
     }
 
@@ -77,6 +79,7 @@ impl VerifiedTx {
             TxVariant::Batch(txs, batch_sign_data) => (txs, batch_sign_data),
             TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
             TxVariant::Order(_) => panic!("called `unwrap_batch` on an `Order` value"),
+            TxVariant::Toggle2FA => panic!("called `unwrap_batch` on an `Toggle2FA` value"),
         }
     }
 }
@@ -116,6 +119,18 @@ async fn verify_eth_signature(
             }
         }
         RequestData::Order(request) => {
+            let signature_correct = verify_ethereum_signature(
+                &request.sign_data.signature,
+                &request.sign_data.message,
+                request.sender,
+                eth_checker,
+            )
+            .await;
+            if !signature_correct {
+                return Err(TxAddError::IncorrectEthSignature);
+            }
+        }
+        RequestData::Toggle2FA(request) => {
             let signature_correct = verify_ethereum_signature(
                 &request.sign_data.signature,
                 &request.sign_data.message,
@@ -296,6 +311,7 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
                 return Err(TxAddError::IncorrectTx);
             }
         }
+        TxVariant::Toggle2FA => {} // There is no data to check correctness of
     }
     Ok(())
 }
@@ -327,6 +343,12 @@ pub struct OrderRequest {
     pub sender: Address,
 }
 
+#[derive(Debug)]
+pub struct Toggle2FARequest {
+    pub sign_data: EthSignData,
+    pub sender: Address,
+}
+
 /// Request for the signature check.
 #[derive(Debug)]
 pub struct VerifySignatureRequest {
@@ -340,6 +362,7 @@ pub enum RequestData {
     Tx(TxRequest),
     Batch(BatchRequest),
     Order(OrderRequest),
+    Toggle2FA(Toggle2FARequest),
 }
 
 impl RequestData {
@@ -350,6 +373,7 @@ impl RequestData {
                 TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
             }
             RequestData::Order(request) => TxVariant::Order(request.order.clone()),
+            RequestData::Toggle2FA(_) => TxVariant::Toggle2FA,
         }
     }
 }
@@ -386,9 +410,8 @@ pub fn start_sign_checker_detached(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
-            let mut runtime = Builder::new()
+            let runtime = Builder::new_multi_thread()
                 .enable_all()
-                .threaded_scheduler()
                 .build()
                 .expect("failed to build runtime for signature processor");
             let handle = runtime.handle().clone();

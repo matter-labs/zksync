@@ -8,7 +8,7 @@ use futures::{channel::mpsc, executor::block_on};
 use std::str::FromStr;
 use std::thread::sleep;
 use tokio::time::Duration;
-use zksync_types::{Address, Token, TokenId, TokenPrice};
+use zksync_types::{Address, Token, TokenId, TokenKind, TokenPrice};
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 
 use crate::fee_ticker::{
@@ -147,10 +147,15 @@ impl FeeTickerAPI for MockApiProvider {
                     test_token.address,
                     "",
                     test_token.precision,
+                    TokenKind::ERC20,
                 ));
             }
         }
         unreachable!("incorrect token input")
+    }
+
+    async fn keep_price_updated(self) {
+        // Just do nothing
     }
 }
 
@@ -559,6 +564,7 @@ async fn test_error_coingecko_api() {
         address: Address::random(),
         symbol: String::from("DAI"),
         decimals: 18,
+        kind: TokenKind::ERC20,
         is_nft: false,
     };
     let (address, handler) = run_server(token.address);

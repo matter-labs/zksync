@@ -7,7 +7,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    AccountId, BlockNumber, NewTokenEvent, Token, TokenId, TokenInfo,
+    AccountId, BlockNumber, NewTokenEvent, SerialId, Token, TokenId, TokenInfo, TokenKind,
     {block::Block, AccountUpdate, AccountUpdates},
 };
 
@@ -119,13 +119,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
     async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         self.storage
             .tokens_schema()
-            .store_token(Token {
-                id: token_id,
-                symbol: token.symbol,
-                address: token.address,
-                decimals: token.decimals,
-                is_nft: false,
-            })
+            .store_token(Token::new(
+                token_id,
+                token.address,
+                &token.symbol,
+                token.decimals,
+                TokenKind::ERC20,
+            ))
             .await
             .expect("failed to store token");
     }
@@ -356,5 +356,14 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             "None" => StorageUpdateState::None,
             _ => panic!("Unknown storage state"),
         }
+    }
+
+    async fn get_max_priority_op_serial_id(&mut self) -> SerialId {
+        self.storage
+            .chain()
+            .operations_schema()
+            .get_max_priority_op_serial_id()
+            .await
+            .expect("Failed to retrieve maximum priority op serial id")
     }
 }

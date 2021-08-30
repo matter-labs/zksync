@@ -20,7 +20,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     PATH=/usr/local/cargo/bin:$PATH
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN cargo install diesel_cli --no-default-features --features postgres
-RUN cargo install --version=0.5.2 sqlx-cli
+RUN cargo install --version=0.5.6 sqlx-cli
 
 # Install `solc`
 RUN curl -LO https://github.com/ethereum/solidity/releases/download/v0.5.16/solc-static-linux

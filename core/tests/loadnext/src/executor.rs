@@ -90,6 +90,15 @@ impl Executor {
         ethereum.set_confirmation_timeout(ETH_CONFIRMATION_TIMEOUT);
 
         let token = self.config.main_token.as_str();
+
+        let balance = ethereum
+            .erc20_balance(master_wallet.address(), token)
+            .await?;
+        if balance.as_u128() > deposit_amount {
+            vlog::info!("There is already enough money on the master balance");
+            return Ok(());
+        }
+
         let mint_tx_hash = ethereum
             .mint_erc20(token, U256::from(deposit_amount), master_wallet.address())
             .await?;

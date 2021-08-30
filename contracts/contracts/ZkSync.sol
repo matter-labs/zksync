@@ -127,21 +127,25 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         initializeReentrancyGuard();
 
         (
-            Governance _governanceAddress,
-            Verifier _verifierAddress,
-            AdditionalZkSync _additionalZkSync,
+            address _governanceAddress,
+            address _verifierAddress,
+            address _additionalZkSync,
             bytes32 _genesisStateHash
-        ) = abi.decode(initializationParameters, (Governance, Verifier, AdditionalZkSync, bytes32));
+        ) = abi.decode(initializationParameters, (address, address, address, bytes32));
 
-        verifier = _verifierAddress;
-        governance = _governanceAddress;
-        additionalZkSync = _additionalZkSync;
+        verifier = Verifier(_verifierAddress);
+        governance = Governance(_governanceAddress);
+        additionalZkSync = AdditionalZkSync(_additionalZkSync);
 
-        StoredBlockInfo memory storedBlockZero =
-            StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, 0, _genesisStateHash, bytes32(0));
-
+        StoredBlockInfo memory storedBlockZero = StoredBlockInfo(
+            0,
+            0,
+            EMPTY_STRING_KECCAK,
+            0,
+            _genesisStateHash,
+            bytes32(0)
+        );
         storedBlockHashes[0] = hashStoredBlockInfo(storedBlockZero);
-
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
     }
@@ -296,17 +300,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
 
         // Priority Queue request
-        Operations.FullExit memory op =
-            Operations.FullExit({
-                accountId: _accountId,
-                owner: msg.sender,
-                tokenId: tokenId,
-                amount: 0, // unknown at this point
-                nftCreatorAccountId: uint32(0), // unknown at this point
-                nftCreatorAddress: address(0), // unknown at this point
-                nftSerialId: uint32(0), // unknown at this point
-                nftContentHash: bytes32(0) // unknown at this point
-            });
+        Operations.FullExit memory op = Operations.FullExit({
+            accountId: _accountId,
+            owner: msg.sender,
+            tokenId: tokenId,
+            amount: 0, // unknown at this point
+            nftCreatorAccountId: uint32(0), // unknown at this point
+            nftCreatorAddress: address(0), // unknown at this point
+            nftSerialId: uint32(0), // unknown at this point
+            nftContentHash: bytes32(0) // unknown at this point
+        });
         bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.FullExit, pubData);
 
@@ -326,17 +329,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(MAX_FUNGIBLE_TOKEN_ID < _tokenId && _tokenId < SPECIAL_NFT_TOKEN_ID, "T"); // request full exit nft for invalid token id
 
         // Priority Queue request
-        Operations.FullExit memory op =
-            Operations.FullExit({
-                accountId: _accountId,
-                owner: msg.sender,
-                tokenId: _tokenId,
-                amount: 0, // unknown at this point
-                nftCreatorAccountId: uint32(0), // unknown at this point
-                nftCreatorAddress: address(0), // unknown at this point
-                nftSerialId: uint32(0), // unknown at this point
-                nftContentHash: bytes32(0) // unknown at this point
-            });
+        Operations.FullExit memory op = Operations.FullExit({
+            accountId: _accountId,
+            owner: msg.sender,
+            tokenId: _tokenId,
+            amount: 0, // unknown at this point
+            nftCreatorAccountId: uint32(0), // unknown at this point
+            nftCreatorAddress: address(0), // unknown at this point
+            nftSerialId: uint32(0), // unknown at this point
+            nftContentHash: bytes32(0) // unknown at this point
+        });
         bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.FullExit, pubData);
     }
@@ -360,8 +362,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
 
         // Check onchain operations
-        (bytes32 pendingOnchainOpsHash, uint64 priorityReqCommitted, bytes memory onchainOpsOffsetCommitment) =
-            collectOnchainOps(_newBlock);
+        (
+            bytes32 pendingOnchainOpsHash,
+            uint64 priorityReqCommitted,
+            bytes memory onchainOpsOffsetCommitment
+        ) = collectOnchainOps(_newBlock);
 
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(_previousBlock, _newBlock, onchainOpsOffsetCommitment);
@@ -422,6 +427,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             emit WithdrawalNFT(op.tokenId);
         } catch {
             pendingWithdrawnNFTs[op.tokenId] = op;
+            emit WithdrawalNFTPending(op.tokenId);
         }
     }
 
@@ -453,6 +459,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             emit Withdrawal(_tokenId, _amount);
         } else {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
+            emit WithdrawalPending(_tokenId, _amount);
         }
     }
 
@@ -491,15 +498,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
                     if (op.amount == 1) {
-                        Operations.WithdrawNFT memory withdrawNftOp =
-                            Operations.WithdrawNFT(
-                                op.nftCreatorAccountId,
-                                op.nftCreatorAddress,
-                                op.nftSerialId,
-                                op.nftContentHash,
-                                op.owner,
-                                op.tokenId
-                            );
+                        Operations.WithdrawNFT memory withdrawNftOp = Operations.WithdrawNFT(
+                            op.nftCreatorAccountId,
+                            op.nftCreatorAddress,
+                            op.nftSerialId,
+                            op.nftContentHash,
+                            op.owner,
+                            op.tokenId
+                        );
                         withdrawOrStoreNFT(withdrawNftOp);
                     }
                 }
@@ -541,6 +547,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Blocks commitment verification.
     /// @notice Only verifies block commitments without any other processing
     function proveBlocks(StoredBlockInfo[] memory _committedBlocks, ProofInput memory _proof) external nonReentrant {
+        requireActive();
+
         uint32 currentTotalBlocksProven = totalBlocksProven;
         for (uint256 i = 0; i < _committedBlocks.length; ++i) {
             require(hashStoredBlockInfo(_committedBlocks[i]) == storedBlockHashes[currentTotalBlocksProven + 1], "o1");
@@ -549,14 +557,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             require(_proof.commitments[i] & INPUT_MASK == uint256(_committedBlocks[i].commitment) & INPUT_MASK, "o"); // incorrect block commitment in proof
         }
 
-        bool success =
-            verifier.verifyAggregatedBlockProof(
-                _proof.recursiveInput,
-                _proof.proof,
-                _proof.vkIndexes,
-                _proof.commitments,
-                _proof.subproofsLimbs
-            );
+        bool success = verifier.verifyAggregatedBlockProof(
+            _proof.recursiveInput,
+            _proof.proof,
+            _proof.vkIndexes,
+            _proof.commitments,
+            _proof.subproofsLimbs
+        );
         require(success, "p"); // Aggregated proof verification fail
 
         require(currentTotalBlocksProven <= totalBlocksCommitted, "q");
@@ -577,9 +584,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // #if EASY_EXODUS
         bool trigger = true;
         // #else
-        bool trigger =
-            block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
-                priorityRequests[firstPriorityRequestId].expirationBlock != 0;
+        bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
+            priorityRequests[firstPriorityRequestId].expirationBlock != 0;
         // #endif
         if (trigger) {
             if (!exodusMode) {
@@ -637,13 +643,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         address _owner
     ) internal {
         // Priority Queue request
-        Operations.Deposit memory op =
-            Operations.Deposit({
-                accountId: 0, // unknown at this point
-                owner: _owner,
-                tokenId: _tokenId,
-                amount: _amount
-            });
+        Operations.Deposit memory op = Operations.Deposit({
+            accountId: 0, // unknown at this point
+            owner: _owner,
+            tokenId: _tokenId,
+            amount: _amount
+        });
         bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.Deposit, pubData);
         emit Deposit(_tokenId, _amount);
@@ -759,13 +764,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             return verifyChangePubkeyCREATE2(_ethWitness, _changePk);
         } else if (changePkType == Operations.ChangePubkeyType.OldECRECOVER) {
             return verifyChangePubkeyOldECRECOVER(_ethWitness, _changePk);
+        } else if (changePkType == Operations.ChangePubkeyType.ECRECOVERV2) {
+            return verifyChangePubkeyECRECOVERV2(_ethWitness, _changePk);
         } else {
             revert("G"); // Incorrect ChangePubKey type
         }
     }
 
     /// @notice Checks that signature is valid for pubkey change message
-    /// @param _ethWitness Signature (65 bytes) + 32 bytes of the arbitrary signed data
+    /// @param _ethWitness Signature (65 bytes)
     /// @param _changePk Parsed change pubkey operation
     function verifyChangePubkeyECRECOVER(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk)
         internal
@@ -773,17 +780,39 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         returns (bool)
     {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
-        //        (, bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
-        bytes32 messageHash =
-            keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n60",
-                    _changePk.pubKeyHash,
-                    _changePk.nonce,
-                    _changePk.accountId,
-                    bytes32(0)
-                )
-            );
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n60",
+                _changePk.pubKeyHash,
+                _changePk.nonce,
+                _changePk.accountId,
+                bytes32(0)
+            )
+        );
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
+        return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
+    }
+
+    /// @notice Checks that signature is valid for pubkey change message
+    /// @param _ethWitness Signature (65 bytes) + 32 bytes of the arbitrary signed data
+    /// @notice additional 32 bytes can be used to sign batches and ChangePubKey with one signature
+    /// @param _changePk Parsed change pubkey operation
+    function verifyChangePubkeyECRECOVERV2(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk)
+        internal
+        pure
+        returns (bool)
+    {
+        (uint256 offset, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
+        (, bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n60",
+                _changePk.pubKeyHash,
+                _changePk.nonce,
+                _changePk.accountId,
+                additionalData
+            )
+        );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
         return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
     }
@@ -797,22 +826,21 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         returns (bool)
     {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
-        bytes32 messageHash =
-            keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n152",
-                    "Register zkSync pubkey:\n\n",
-                    Bytes.bytesToHexASCIIBytes(abi.encodePacked(_changePk.pubKeyHash)),
-                    "\n",
-                    "nonce: 0x",
-                    Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_changePk.nonce)),
-                    "\n",
-                    "account id: 0x",
-                    Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_changePk.accountId)),
-                    "\n\n",
-                    "Only sign this message for a trusted client!"
-                )
-            );
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n152",
+                "Register zkSync pubkey:\n\n",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked(_changePk.pubKeyHash)),
+                "\n",
+                "nonce: 0x",
+                Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_changePk.nonce)),
+                "\n",
+                "account id: 0x",
+                Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_changePk.accountId)),
+                "\n\n",
+                "Only sign this message for a trusted client!"
+            )
+        );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
         return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
     }
@@ -835,8 +863,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // salt from CREATE2 specification
         bytes32 salt = keccak256(abi.encodePacked(saltArg, _changePk.pubKeyHash));
         // Address computation according to CREATE2 definition: https://eips.ethereum.org/EIPS/eip-1014
-        address recoveredAddress =
-            address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), creatorAddress, salt, codeHash)))));
+        address recoveredAddress = address(
+            uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), creatorAddress, salt, codeHash))))
+        );
         // This type of change pubkey can be done only once
         return recoveredAddress == _changePk.owner && _changePk.nonce == 0;
     }
@@ -873,9 +902,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             // Use "invalid" to make gas estimation work
             switch success
-                case 0 {
-                    invalid()
-                }
+            case 0 {
+                invalid()
+            }
 
             commitment := mload(hashResult)
         }
@@ -901,11 +930,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         bytes20 hashedPubdata = priorityRequests[_priorityRequestId].hashedPubData;
         require(Operations.checkFullExitInPriorityQueue(_fullExit, hashedPubdata), "K");
-    }
-
-    /// @notice Checks that current state not is exodus mode
-    function requireActive() internal view {
-        require(!exodusMode, "L"); // exodus mode activated
     }
 
     // Priority queue
@@ -951,7 +975,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Should be only use to delegate the external calls as it passes the calldata
     /// @notice All functions delegated to additional contract should NOT be nonReentrant
     function delegateAdditional() internal {
-        AdditionalZkSync _target = additionalZkSync;
+        address _target = address(additionalZkSync);
         assembly {
             // The pointer to the free memory slot
             let ptr := mload(0x40)
@@ -966,14 +990,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             // Depending on result value
             switch result
-                case 0 {
-                    // End execution and revert state changes
-                    revert(ptr, size)
-                }
-                default {
-                    // Return data with length of size at pointers position
-                    return(ptr, size)
-                }
+            case 0 {
+                // End execution and revert state changes
+                revert(ptr, size)
+            }
+            default {
+                // Return data with length of size at pointers position
+                return(ptr, size)
+            }
         }
     }
 }

@@ -36,6 +36,7 @@ export async function deploy() {
     await utils.spawn('yarn contracts deploy-no-build | tee deploy.log');
     const deployLog = fs.readFileSync('deploy.log').toString();
     const envVars = [
+        'CONTRACTS_GENESIS_ROOT',
         'CONTRACTS_GOVERNANCE_TARGET_ADDR',
         'CONTRACTS_VERIFIER_TARGET_ADDR',
         'CONTRACTS_CONTRACT_TARGET_ADDR',
@@ -47,7 +48,8 @@ export async function deploy() {
         'CONTRACTS_FORCED_EXIT_ADDR',
         'CONTRACTS_NFT_FACTORY_ADDR',
         'CONTRACTS_GENESIS_TX_HASH',
-        'CONTRACTS_LISTING_GOVERNANCE'
+        'CONTRACTS_LISTING_GOVERNANCE',
+        'CONTRACTS_ADDITIONAL_ZKSYNC_ADDR'
     ];
     let updatedContracts = '';
     for (const envVar of envVars) {
@@ -61,6 +63,10 @@ export async function deploy() {
             updatedContracts += `${varContents}\n`;
         }
     }
+
+    // Update genesis root from env
+    let genesisRoot = process.env.CONTRACTS_GENESIS_ROOT;
+    updatedContracts += `CONTRACTS_GENESIS_ROOT=${genesisRoot}\n`;
 
     // Write updated contract addresses and tx hashes to the separate file
     // Currently it's used by loadtest github action to update deployment configmap.

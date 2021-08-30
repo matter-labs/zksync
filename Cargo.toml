@@ -7,6 +7,8 @@ members = [
     "core/bin/prover",
     "core/bin/parse_pub_data",
     "core/bin/block_revert",
+    "core/bin/mint_nft_nonce_migration",
+    "core/bin/token_kind_migration",
 
     # Server micro-services
     "core/bin/zksync_api",
@@ -40,13 +42,8 @@ members = [
     # Test infrastructure
     "core/tests/test_account",
     "core/tests/testkit",
-    "core/tests/loadtest",
     "core/tests/loadnext",
 
     # SDK section
     "sdk/zksync-rs"
 ]
-
-[patch.crates-io]
-web3 = { git = "https://github.com/Deniallugo/rust-web3", branch = "update_ethabi"}
-

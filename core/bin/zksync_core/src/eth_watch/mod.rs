@@ -111,6 +111,10 @@ pub enum EthWatchRequest {
         pubkey_hash: PubKeyHash,
         resp: oneshot::Sender<bool>,
     },
+    IsContractERC20 {
+        address: Address,
+        resp: oneshot::Sender<bool>,
+    },
 }
 
 pub struct EthWatch<W: EthClient> {
@@ -535,7 +539,7 @@ impl<W: EthClient> EthWatch<W> {
                         RATE_LIMIT_DELAY.as_secs()
                     );
 
-                    time::delay_for(RATE_LIMIT_DELAY).await;
+                    time::sleep(RATE_LIMIT_DELAY).await;
                 }
             }
         };
@@ -634,6 +638,9 @@ impl<W: EthClient> EthWatch<W> {
                     )
                     .unwrap_or_default();
                 }
+                EthWatchRequest::IsContractERC20 { address, resp } => resp
+                    .send(self.client.is_contract_erc20(address).await)
+                    .unwrap_or_default(),
             }
         }
     }

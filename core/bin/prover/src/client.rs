@@ -2,7 +2,7 @@
 use std::time::Duration;
 // External deps
 use anyhow::format_err;
-use backoff::future::FutureOperation;
+use backoff::future::retry_notify;
 use backoff::Error::{Permanent, Transient};
 use futures::Future;
 use reqwest::Url;
@@ -62,9 +62,7 @@ impl ApiClient {
                 duration_secs,
             )
         };
-
-        operation
-            .retry_notify(Self::get_backoff(), notify)
+        retry_notify(Self::get_backoff(), operation, notify)
             .await
             .map_err(|e| {
                 format_err!(

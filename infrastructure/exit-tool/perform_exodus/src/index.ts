@@ -72,14 +72,34 @@ const abi = [
                 type: 'uint32'
             },
             {
-                internalType: 'uint16',
+                internalType: 'uint32',
                 name: '_tokenId',
-                type: 'uint16'
+                type: 'uint32'
             },
             {
                 internalType: 'uint128',
                 name: '_amount',
                 type: 'uint128'
+            },
+            {
+                internalType: 'uint32',
+                name: '_nftCreatorAccountId',
+                type: 'uint32'
+            },
+            {
+                internalType: 'address',
+                name: '_nftCreatorAddress',
+                type: 'address'
+            },
+            {
+                internalType: 'uint32',
+                name: '_nftSerialId',
+                type: 'uint32'
+            },
+            {
+                internalType: 'bytes32',
+                name: '_nftContentHash',
+                type: 'bytes32'
             },
             {
                 internalType: 'uint256[]',
@@ -114,8 +134,23 @@ const abi = [
         outputs: [],
         stateMutability: 'nonpayable',
         type: 'function'
+    },
+    {
+        inputs: [
+            {
+                internalType: 'uint32',
+                name: '_tokenId',
+                type: 'uint32'
+            }
+        ],
+        name: 'withdrawPendingNFTBalance',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function'
     }
 ];
+
+const MIN_NFT_TOKEN_ID = 65536;
 
 async function main() {
     const { privateKey, target, path, network } = program;
@@ -138,21 +173,44 @@ async function main() {
     const tokenId = data['tokenId'];
     const tokenAddress = data['tokenAddress'];
     const amount = ethers.BigNumber.from(data['amount']);
+    const nftCreatorAccountId = data['nftCreatorId'];
+    const nftCreatorAddress = data['nftCreatorAddress'];
+    const nftSerialId = data['nftSerialId'];
+    const nftContentHash = data['nftContentHash'];
     const proof = data['proof']['proof'].map((el: string) => ethers.BigNumber.from(el));
 
     console.log('Sending performExodus transaction');
-    const exodusTx = await zkSyncContract.performExodus(storedBlockInfo, owner, accountId, tokenId, amount, proof, {
-        gasLimit: 1_000_000
-    });
+    const exodusTx = await zkSyncContract.performExodus(
+        storedBlockInfo,
+        owner,
+        accountId,
+        tokenId,
+        amount,
+        nftCreatorAccountId,
+        nftCreatorAddress,
+        nftSerialId,
+        nftContentHash,
+        proof,
+        {
+            gasLimit: 1_000_000
+        }
+    );
     console.log('performExodus sent, waiting for confirmation...');
 
     await exodusTx.wait();
     console.log('performExodus confirmed');
 
     console.log('Sending withdrawPendingBalance transaction');
-    const withdrawTx = await zkSyncContract.withdrawPendingBalance(owner, tokenAddress, amount, {
-        gasLimit: 500_000
-    });
+    let withdrawTx: ethers.ContractTransaction;
+    if (tokenId < MIN_NFT_TOKEN_ID) {
+        withdrawTx = await zkSyncContract.withdrawPendingBalance(owner, tokenAddress, amount, {
+            gasLimit: 500_000
+        });
+    } else {
+        withdrawTx = await zkSyncContract.withdrawPendingNFTBalance(tokenId, {
+            gasLimit: 500_000
+        });
+    }
     console.log('withdrawPendingBalance sent, waiting for confirmation...');
     await withdrawTx.wait();
     console.log('withdrawPendingBalance confirmed');

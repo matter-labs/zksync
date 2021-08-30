@@ -42,7 +42,7 @@ macro_rules! make_sloppy {
                 stringify!($f),
                 duration.as_millis()
             );
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
 
             let resp = $f(query, data).await;
             resp
@@ -172,7 +172,7 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
         .collect();
     if sloppy_mode {
         web::scope("/")
-            .data(data)
+            .app_data(web::Data::new(data))
             .route(
                 "/cryptocurrency/quotes/latest",
                 web::get().to(make_sloppy!(handle_coinmarketcap_token_price_query)),
@@ -187,7 +187,7 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
             )
     } else {
         web::scope("/")
-            .data(data)
+            .app_data(web::Data::new(data))
             .route(
                 "/cryptocurrency/quotes/latest",
                 web::get().to(handle_coinmarketcap_token_price_query),
@@ -226,12 +226,12 @@ fn main() {
         vlog::info!("Fee ticker server will run in a sloppy mode.");
     }
 
-    let mut runtime = actix_rt::System::new("dev-ticker");
+    let runtime = actix_rt::System::new();
     runtime.block_on(async move {
         HttpServer::new(move || {
             App::new()
+                .wrap(Cors::default().allow_any_origin().max_age(3600))
                 .wrap(middleware::Logger::default())
-                .wrap(Cors::new().send_wildcard().max_age(3600).finish())
                 .service(main_scope(opts.sloppy))
         })
         .bind("0.0.0.0:9876")

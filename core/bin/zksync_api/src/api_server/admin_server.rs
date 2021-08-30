@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 // Local uses
 use zksync_storage::ConnectionPool;
-use zksync_types::{tokens, Address, TokenId};
+use zksync_types::{tokens, Address, TokenId, TokenKind};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -99,26 +99,30 @@ async fn add_token(
     let id = match token_request.id {
         Some(id) => id,
         None => {
-            let last_token_id = storage.tokens_schema().get_count().await.map_err(|e| {
-                vlog::warn!(
-                    "failed get number of token from database in progress request: {}",
-                    e
-                );
-                actix_web::error::ErrorInternalServerError("storage layer error")
-            })?;
+            let last_token_id = storage
+                .tokens_schema()
+                .get_max_token_id()
+                .await
+                .map_err(|e| {
+                    vlog::warn!(
+                        "failed get number of token from database in progress request: {}",
+                        e
+                    );
+                    actix_web::error::ErrorInternalServerError("storage layer error")
+                })?;
             let next_available_id = last_token_id + 1;
 
             TokenId(next_available_id)
         }
     };
 
-    let token = tokens::Token {
+    let token = tokens::Token::new(
         id,
-        address: token_request.address,
-        symbol: token_request.symbol.clone(),
-        decimals: token_request.decimals,
-        is_nft: false,
-    };
+        token_request.address,
+        &token_request.symbol,
+        token_request.decimals,
+        TokenKind::ERC20,
+    );
 
     storage
         .tokens_schema()
@@ -147,7 +151,6 @@ async fn run_server(app_state: AppState, bind_to: SocketAddr) {
 
         App::new()
             .wrap(auth)
-            .wrap(vlog::actix_middleware())
             .app_data(web::Data::new(app_state.clone()))
             .route("/tokens", web::post().to(add_token))
     })
@@ -169,7 +172,7 @@ pub fn start_admin_server(
         .name("admin_server".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            actix_rt::System::new("api-server").block_on(async move {
+            actix_rt::System::new().block_on(async move {
                 let app_state = AppState {
                     secret_auth,
                     connection_pool,

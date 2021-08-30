@@ -160,7 +160,7 @@ async fn revert_blocks_on_contract(
 ) -> anyhow::Result<()> {
     let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
     let data = client.encode_tx_data("revertBlocks", tx_arg);
-    let gas_limit = 80000 + 5000 * blocks.len();
+    let gas_limit = 200000 + 5000 * blocks.len();
     let signed_tx = client
         .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(gas_limit))))
         .await

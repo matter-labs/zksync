@@ -1,0 +1,1 @@
+ALTER TABLE mint_nft_updates ADD COLUMN nonce BIGINT NOT NULL DEFAULT 0;

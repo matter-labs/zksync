@@ -16,7 +16,7 @@ use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
 use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_storage::ConnectionPool;
-use zksync_types::{tokens::get_genesis_token_list, Token, TokenId};
+use zksync_types::{tokens::get_genesis_token_list, Token, TokenId, TokenKind};
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
@@ -74,13 +74,13 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
             .await
             .expect("failed to access db")
             .tokens_schema()
-            .store_token(Token {
-                id: TokenId(id as u32),
-                symbol: token.symbol,
-                address: token.address,
-                decimals: token.decimals,
-                is_nft: false,
-            })
+            .store_token(Token::new(
+                TokenId(id as u32),
+                token.address,
+                &token.symbol,
+                token.decimals,
+                TokenKind::ERC20,
+            ))
             .await
             .expect("failed to store token");
     }

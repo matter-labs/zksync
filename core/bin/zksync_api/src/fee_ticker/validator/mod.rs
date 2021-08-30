@@ -65,26 +65,26 @@ impl<W: TokenWatcher> MarketUpdater<W> {
         Ok(market)
     }
 
-    pub async fn update_all_tokens(&mut self, tokens: &[Token]) -> anyhow::Result<()> {
+    pub async fn update_all_tokens(&mut self, tokens: Vec<Token>) -> anyhow::Result<()> {
         let start = Instant::now();
         for token in tokens {
-            self.update_token(token).await?;
+            self.update_token(&token).await?;
         }
         metrics::histogram!("ticker.validator.update_all_tokens", start.elapsed());
         Ok(())
     }
 
     pub async fn keep_updated(mut self, duration_secs: u64) {
-        let tokens = self
-            .tokens_cache
-            .get_all_tokens()
-            .await
-            .expect("Error to connect in db");
-
         let mut error_counter = 0;
 
         loop {
-            if let Err(e) = self.update_all_tokens(&tokens).await {
+            let tokens = self.tokens_cache.get_all_tokens().await;
+            let result = match tokens {
+                Ok(tokens) => self.update_all_tokens(tokens).await,
+                Err(e) => Err(e),
+            };
+
+            if let Err(e) = result {
                 error_counter += 1;
                 vlog::warn!("Error when updating token market volume {:?}", e);
                 if error_counter >= CRITICAL_NUMBER_OF_ERRORS {
@@ -93,7 +93,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
                     );
                 }
             }
-            tokio::time::delay_for(Duration::from_secs(duration_secs)).await
+            tokio::time::sleep(Duration::from_secs(duration_secs)).await
         }
     }
 }
@@ -209,7 +209,7 @@ mod tests {
     use std::str::FromStr;
     use std::sync::Arc;
     use tokio::sync::Mutex;
-    use zksync_types::TokenId;
+    use zksync_types::{TokenId, TokenKind};
 
     #[derive(Clone)]
     struct InMemoryTokenWatcher {
@@ -238,7 +238,7 @@ mod tests {
         );
         let dai_token_address =
             Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
-        let dai_token = Token::new(TokenId(1), dai_token_address, "DAI", 18);
+        let dai_token = Token::new(TokenId(1), dai_token_address, "DAI", 18, TokenKind::ERC20);
 
         let amount = watcher.get_token_market_volume(&dai_token).await.unwrap();
         assert!(amount > BigDecimal::zero());
@@ -248,13 +248,13 @@ mod tests {
     async fn check_tokens() {
         let dai_token_address =
             Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
-        let dai_token = Token::new(TokenId(1), dai_token_address, "DAI", 18);
+        let dai_token = Token::new(TokenId(1), dai_token_address, "DAI", 18, TokenKind::ERC20);
         let phnx_token_address =
             Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap();
-        let phnx_token = Token::new(TokenId(2), phnx_token_address, "PHNX", 18);
+        let phnx_token = Token::new(TokenId(2), phnx_token_address, "PHNX", 18, TokenKind::ERC20);
 
         let eth_address = Address::from_str("0000000000000000000000000000000000000000").unwrap();
-        let eth_token = Token::new(TokenId(2), eth_address, "ETH", 18);
+        let eth_token = Token::new(TokenId(2), eth_address, "ETH", 18, TokenKind::ERC20);
         let all_tokens = vec![dai_token.clone(), phnx_token.clone()];
 
         let mut market = HashMap::new();
@@ -300,7 +300,7 @@ mod tests {
         );
 
         let mut updater = MarketUpdater::new(cache, watcher);
-        updater.update_all_tokens(&all_tokens).await.unwrap();
+        updater.update_all_tokens(all_tokens).await.unwrap();
 
         let new_dai_token_market = validator
             .tokens_cache

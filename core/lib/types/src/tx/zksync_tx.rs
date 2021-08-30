@@ -138,6 +138,23 @@ impl ZkSyncTx {
         }
     }
 
+    pub fn from_account(&self) -> Address {
+        self.account()
+    }
+
+    pub fn to_account(&self) -> Option<Address> {
+        match self {
+            ZkSyncTx::Transfer(tx) => Some(tx.to),
+            ZkSyncTx::Withdraw(tx) => Some(tx.to),
+            ZkSyncTx::Close(tx) => Some(tx.account),
+            ZkSyncTx::ChangePubKey(tx) => Some(Address::from(tx.new_pk_hash.data)),
+            ZkSyncTx::ForcedExit(tx) => Some(tx.target),
+            ZkSyncTx::Swap(tx) => Some(tx.submitter_address),
+            ZkSyncTx::MintNFT(tx) => Some(tx.recipient),
+            ZkSyncTx::WithdrawNFT(tx) => Some(tx.to),
+        }
+    }
+
     pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ZkSyncTx::Transfer(tx) => Ok(tx.account_id),
@@ -420,6 +437,19 @@ impl ZkSyncTx {
             ZkSyncTx::Swap(tx) => tx.valid_from(),
             ZkSyncTx::MintNFT(_) => 0,
             ZkSyncTx::WithdrawNFT(tx) => tx.time_range.valid_from,
+        }
+    }
+
+    pub fn variance_name(&self) -> String {
+        match self {
+            ZkSyncTx::Transfer(_) => "Transfer".to_string(),
+            ZkSyncTx::Withdraw(_) => "Withdraw".to_string(),
+            ZkSyncTx::Close(_) => "Close".to_string(),
+            ZkSyncTx::ChangePubKey(_) => "ChangePubKey".to_string(),
+            ZkSyncTx::ForcedExit(_) => "ForcedExit".to_string(),
+            ZkSyncTx::MintNFT(_) => "MintNFT".to_string(),
+            ZkSyncTx::Swap(_) => "Swap".to_string(),
+            ZkSyncTx::WithdrawNFT(_) => "WithdrawNFT".to_string(),
         }
     }
 }

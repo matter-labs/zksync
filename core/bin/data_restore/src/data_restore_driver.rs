@@ -10,7 +10,9 @@ use zksync_crypto::{
     params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
     Fr,
 };
-use zksync_types::{Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Token};
+use zksync_types::{
+    Account, AccountId, AccountMap, AccountUpdate, BlockNumber, SerialId, Token, TokenKind,
+};
 
 // Local deps
 use crate::{
@@ -76,6 +78,9 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// Expected root hash to be observed after restoring process. Only
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
+    /// Serial id of the last priority operation processed by the driver. It's necessary to manually
+    /// keep track of it since it's impossible to restore it from the contract.
+    pub last_priority_op_serial_id: SerialId,
     phantom_data: PhantomData<I>,
 }
 
@@ -134,6 +139,7 @@ where
             finite_mode,
             final_hash,
             phantom_data: Default::default(),
+            last_priority_op_serial_id: 0,
         }
     }
 
@@ -170,13 +176,13 @@ where
         );
 
         interactor
-            .save_special_token(Token {
-                id: NFT_TOKEN_ID,
-                symbol: "SPECIAL".to_string(),
-                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
-                decimals: 18,
-                is_nft: true,
-            })
+            .save_special_token(Token::new(
+                NFT_TOKEN_ID,
+                *NFT_STORAGE_ACCOUNT_ADDRESS,
+                "SPECIAL",
+                18,
+                TokenKind::NFT,
+            ))
             .await;
         vlog::info!("Special token added");
 
@@ -288,6 +294,8 @@ where
             }
             StorageUpdateState::None => {}
         }
+
+        self.last_priority_op_serial_id = interactor.get_max_priority_op_serial_id().await;
         let total_verified_blocks = self.zksync_contract.get_total_verified_blocks().await;
 
         let last_verified_block = self.tree_state.state.block_number;
@@ -427,7 +435,11 @@ where
                 .available_block_chunk_sizes();
             let (block, acc_updates) = self
                 .tree_state
-                .update_tree_states_from_ops_block(&op_block, available_block_chunk_sizes)
+                .update_tree_states_from_ops_block(
+                    &op_block,
+                    available_block_chunk_sizes,
+                    &mut self.last_priority_op_serial_id,
+                )
                 .expect("Updating tree state: cant update tree from operations");
             blocks.push(block);
             updates.push(acc_updates);

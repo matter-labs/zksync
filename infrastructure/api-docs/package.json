@@ -7,8 +7,8 @@
     "dependencies": {
       "ts-node": "^9.0.0",
       "typescript": "^4.0.5",
-      "handlebars": "4.7.6",
-      "ethers": "^5.0.19",
+      "handlebars": "4.7.7",
+      "ethers": "^5.4.4",
       "commander": "^6.0.0"
     },
     "scripts": {

@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -24,7 +25,7 @@ use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
-    PriorityOp, SignedZkSyncTx, Token, TokenId, H256, NFT,
+    PriorityOp, SignedZkSyncTx, Token, TokenId, TokenKind, H256, NFT,
 };
 // Local uses
 use crate::{
@@ -524,13 +525,13 @@ impl ZkSyncStateKeeper {
         vlog::info!("Adding special token");
         transaction
             .tokens_schema()
-            .store_token(Token {
-                id: NFT_TOKEN_ID,
-                symbol: "SPECIAL".to_string(),
-                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
-                decimals: 18,
-                is_nft: true, // TODO: ZKS-635
-            })
+            .store_token(Token::new(
+                NFT_TOKEN_ID,
+                *NFT_STORAGE_ACCOUNT_ADDRESS,
+                "SPECIAL",
+                18,
+                TokenKind::NFT,
+            ))
             .await
             .expect("failed to store special token");
         vlog::info!("Special token added");
@@ -591,7 +592,8 @@ impl ZkSyncStateKeeper {
             .await
             .expect("Unable to commit transaction in statekeeper");
         vlog::info!("Genesis block created, state: {}", state.root_hash());
-        println!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
+        let genesis_root = format!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
+        println!("{}", &genesis_root);
         metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
     }
 

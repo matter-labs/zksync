@@ -7,7 +7,7 @@ use num::{rational::Ratio, BigUint};
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
     tokens::TokenMarketVolume, AccountId, Address, BlockNumber, ExecutedOperations, ExecutedTx,
-    Token, TokenId, TokenLike, TokenPrice, WithdrawNFTOp, ZkSyncOp, H256,
+    Token, TokenId, TokenKind, TokenLike, TokenPrice, WithdrawNFTOp, ZkSyncOp, H256,
 };
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 // Local imports
@@ -24,7 +24,9 @@ use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 #[db_test]
 async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // There should be only Ethereum main token by default.
-    assert_eq!(storage.tokens_schema().get_count().await?, 0);
+    assert_eq!(storage.tokens_schema().get_count().await?, 1);
+    assert_eq!(storage.tokens_schema().get_max_token_id().await?, 0);
+    assert_eq!(storage.tokens_schema().get_max_erc20_token_id().await?, 0);
     let tokens = TokensSchema(&mut storage)
         .load_tokens()
         .await
@@ -35,16 +37,18 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000000".parse().unwrap(),
         symbol: "ETH".into(),
         decimals: 18,
+        kind: TokenKind::ERC20,
         is_nft: false,
     };
     assert_eq!(tokens[&TokenId(0)], eth_token);
 
-    // Add two tokens.
+    // Add ERC20, None and NFT tokens.
     let token_a = Token {
         id: TokenId(1),
         address: "0000000000000000000000000000000000000001".parse().unwrap(),
         symbol: "ABC".into(),
         decimals: 9,
+        kind: TokenKind::ERC20,
         is_nft: false,
     };
     let token_b = Token {
@@ -52,6 +56,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000002".parse().unwrap(),
         symbol: "DEF".into(),
         decimals: 6,
+        kind: TokenKind::None,
         is_nft: false,
     };
     let nft = Token {
@@ -59,6 +64,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000005".parse().unwrap(),
         symbol: "NFT".into(),
         decimals: 0,
+        kind: TokenKind::NFT,
         is_nft: true,
     };
 
@@ -77,6 +83,8 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .expect("Store tokens query failed");
     // The count is updated.
     assert_eq!(storage.tokens_schema().get_count().await?, 2);
+    assert_eq!(storage.tokens_schema().get_max_token_id().await?, 2);
+    assert_eq!(storage.tokens_schema().get_max_erc20_token_id().await?, 1);
 
     // Load tokens again.
     let tokens = TokensSchema(&mut storage)
@@ -84,10 +92,10 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .await
         .expect("Load tokens query failed");
 
-    assert_eq!(tokens.len(), 3);
+    // There should not be `token_b` since it has `None` kind.
+    assert_eq!(tokens.len(), 2);
     assert_eq!(tokens[&eth_token.id], eth_token);
     assert_eq!(tokens[&token_a.id], token_a);
-    assert_eq!(tokens[&token_b.id], token_b);
 
     let token_b_by_id = TokensSchema(&mut storage)
         .get_token(TokenLike::Id(token_b.id))
@@ -225,6 +233,7 @@ async fn test_nfts_with_factories(mut storage: StorageProcessor<'_>) -> QueryRes
         update_order_id: 0,
         block_number: 0,
         symbol: symbol.clone(),
+        nonce: 0,
     });
     storage
         .chain()

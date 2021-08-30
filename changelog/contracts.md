@@ -2,16 +2,21 @@
 
 All notable changes to the contracts will be documented in this file.
 
-## 2021-27-07
+## 2021-07-27
 
 **Version 5.2** is scheduled for upgrade.
+
+### Added
+
+- Additional method for CREATE2 `ChangePubKey` authorization.
+- Events for pending withdrawals.
 
 ### Changed
 
 - Cleanup after previous upgrade with regenesis.
 - Minor issues from audit fixed.
 
-## 2021-31-05
+## 2021-05-31
 
 **Version 5.1** is scheduled for upgrade.
 
@@ -32,7 +37,7 @@ All notable changes to the contracts will be documented in this file.
   `AdditionalZkSync.sol`, to which some functionality is delegated.
 - `ZkSyncNFTFactory.sol` which serves as a default NFT factory, where all the NFTs are withdrawn by default.
 
-## 2021-25-02
+## 2021-02-25
 
 **Version 5** is scheduled for upgrade.
 
@@ -46,11 +51,11 @@ All notable changes to the contracts will be documented in this file.
 - Maximum amount of tokens that can be used to pay tx fee is increased to 512.
 - Circuit now enforces that `ForcedExit` target account pubkey hash is empty.
 
-## 2021-09-02
+## 2021-02-09
 
 **Version 4** is released.
 
-## 2021-14-01
+## 2021-01-14
 
 **Version 4** is scheduled for upgrade.
 

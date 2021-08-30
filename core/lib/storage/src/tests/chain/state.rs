@@ -1,7 +1,10 @@
 // External imports
 // Workspace imports
 use zksync_types::aggregated_operations::AggregatedActionType;
-use zksync_types::{helpers::apply_updates, AccountMap, BlockNumber};
+use zksync_types::{
+    helpers::apply_updates, AccountId, AccountMap, AccountUpdate, Address, BlockNumber, Nonce,
+    TokenId, H256, NFT,
+};
 // Local imports
 use super::block::apply_random_updates;
 use crate::{
@@ -263,5 +266,65 @@ async fn test_remove_account_updates(mut storage: StorageProcessor<'_>) -> Query
     // Check that there are updates for the 2nd block and there are not for the 3rd by comparing diffs.
     assert_ne!(diff1, diff2);
     assert_eq!(diff2, diff3);
+    Ok(())
+}
+
+/// Tests `get_mint_nft_update` and `get_mint_nft_update_by_creator_and_nonce` methods
+#[db_test]
+async fn test_get_mint_nft_update(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Check that it returns `None` for non-existent update.
+    let nft = storage
+        .chain()
+        .state_schema()
+        .get_mint_nft_update(TokenId(0))
+        .await?;
+    assert!(nft.is_none());
+    let nft = storage
+        .chain()
+        .state_schema()
+        .get_mint_nft_update_by_creator_and_nonce(Address::default(), Nonce(0))
+        .await?;
+    assert!(nft.is_none());
+
+    // Save mint nft update
+    let creator_address = Address::random();
+    let nonce = Nonce(10);
+    let token_id = TokenId(71234);
+    let created_nft = NFT::new(
+        token_id,
+        1,
+        AccountId(1),
+        creator_address,
+        Address::random(),
+        None,
+        H256::zero(),
+    );
+    let update = (
+        AccountId(1),
+        AccountUpdate::MintNFT {
+            token: created_nft,
+            nonce,
+        },
+    );
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(1), &[update], 0)
+        .await?;
+
+    // Checks that both methods can load update
+    let nft = storage
+        .chain()
+        .state_schema()
+        .get_mint_nft_update(token_id)
+        .await?;
+    assert_eq!(nft.unwrap().id, token_id);
+    let nft = storage
+        .chain()
+        .state_schema()
+        .get_mint_nft_update_by_creator_and_nonce(creator_address, nonce)
+        .await?;
+    assert_eq!(nft.unwrap().id, token_id);
+
     Ok(())
 }

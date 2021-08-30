@@ -108,6 +108,15 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
+    async toggle2FADetailed(data: types.Toggle2FARequest): Promise<Response<types.Toggle2FAResponse>> {
+        return await this.post(`${this.address}/transactions/toggle2FA`, data);
+    }
+
+    async toggle2FA(data: types.Toggle2FARequest): Promise<boolean> {
+        const response = this.parseResponse(await this.toggle2FADetailed(data));
+        return response.success;
+    }
+
     async accountFullInfoDetailed(idOrAddress: number | types.Address): Promise<Response<types.ApiAccountFullInfo>> {
         return await this.get(`${this.address}/accounts/${idOrAddress}`);
     }
@@ -408,6 +417,14 @@ export class RestProvider extends SyncProvider {
             throw new Error(`Requested NFT doesn't exist or the corresponding mintNFT operation is not verified yet`);
         }
         return nft;
+    }
+
+    async getNFTOwnerDetailed(id: number): Promise<Response<number>> {
+        return await this.get(`${this.address}/tokens/nft/${id}/owner`);
+    }
+
+    async getNFTOwner(id: number): Promise<number> {
+        return this.parseResponse(await this.getNFTOwnerDetailed(id));
     }
 
     async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.ApiTxReceipt> {

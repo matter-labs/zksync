@@ -82,6 +82,20 @@ impl ZkSyncPriorityOp {
         }
     }
 
+    pub fn from_account(&self) -> Address {
+        match self {
+            ZkSyncPriorityOp::Deposit(deposit) => deposit.from,
+            ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address,
+        }
+    }
+
+    pub fn to_account(&self) -> Option<Address> {
+        match self {
+            ZkSyncPriorityOp::Deposit(deposit) => Some(deposit.to),
+            ZkSyncPriorityOp::FullExit(full_exit) => Some(full_exit.eth_address),
+        }
+    }
+
     /// Parses legacy priority operation from the Ethereum logs.
     pub fn legacy_parse_from_priority_queue_logs(
         pub_data: &[u8],
@@ -342,6 +356,13 @@ impl ZkSyncPriorityOp {
         }
         deposits_data.resize(n as usize, Vec::new());
         (n, deposits_data)
+    }
+
+    pub fn variance_name(&self) -> String {
+        match self {
+            ZkSyncPriorityOp::Deposit(_) => "Deposit".to_string(),
+            ZkSyncPriorityOp::FullExit(_) => "FullExit".to_string(),
+        }
     }
 }
 
