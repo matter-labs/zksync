@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 // External uses
 use ethabi::{encode, Contract, Function, Token as AbiToken};
-use jsonrpc_core::{Error, Result};
+use jsonrpc_core::{Error, ErrorCode, Result};
 use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_storage::StorageProcessor;
@@ -32,6 +32,14 @@ pub struct CallsHelper {
 impl CallsHelper {
     const SHA256_MULTI_HASH: [u8; 2] = [18, 32]; // 0x1220
     const ALPHABET: &'static str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+    fn revert_error(message: &str) -> Error {
+        Error {
+            code: ErrorCode::ServerError(3),
+            message: message.to_string(),
+            data: None,
+        }
+    }
 
     fn function_by_selector(functions: Vec<Function>) -> HashMap<Selector, Function> {
         functions
@@ -132,7 +140,9 @@ impl CallsHelper {
                     if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         encode(&[AbiToken::Uint(U256::from(nft.creator_id.0))])
                     } else {
-                        return Ok(Vec::new());
+                        return Err(Self::revert_error(
+                            "execution reverted: creator ID query for nonexistent token",
+                        ));
                     }
                 }
                 "creatorAddress" => {
@@ -143,7 +153,9 @@ impl CallsHelper {
                     if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         encode(&[AbiToken::Address(nft.creator_address)])
                     } else {
-                        return Ok(Vec::new());
+                        return Err(Self::revert_error(
+                            "execution reverted: creator address query for nonexistent token",
+                        ));
                     }
                 }
                 "serialId" => {
@@ -154,7 +166,9 @@ impl CallsHelper {
                     if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         encode(&[AbiToken::Uint(U256::from(nft.serial_id))])
                     } else {
-                        return Ok(Vec::new());
+                        return Err(Self::revert_error(
+                            "execution reverted: serial ID query for nonexistent token",
+                        ));
                     }
                 }
                 "contentHash" => {
@@ -165,7 +179,9 @@ impl CallsHelper {
                     if let Some(nft) = self.get_nft(&mut transaction, token_id).await? {
                         encode(&[AbiToken::FixedBytes(nft.content_hash.as_bytes().to_vec())])
                     } else {
-                        return Ok(Vec::new());
+                        return Err(Self::revert_error(
+                            "execution reverted: content hash query for nonexistent token",
+                        ));
                     }
                 }
                 "tokenURI" => {
@@ -177,7 +193,9 @@ impl CallsHelper {
                         let ipfs_cid = Self::ipfs_cid(nft.content_hash.as_bytes());
                         encode(&[AbiToken::String(format!("ipfs://{}", ipfs_cid))])
                     } else {
-                        return Ok(Vec::new());
+                        return Err(Self::revert_error(
+                            "execution reverted: ERC721Metadata: URI query for nonexistent token",
+                        ));
                     }
                 }
                 "balanceOf" => {
@@ -185,6 +203,11 @@ impl CallsHelper {
                         .clone()
                         .into_address()
                         .ok_or_else(Error::internal_error)?;
+                    if address.is_zero() {
+                        return Err(Self::revert_error(
+                            "execution reverted: ERC721: balance query for the zero address",
+                        ));
+                    }
                     let balance = transaction
                         .chain()
                         .account_schema()
@@ -218,7 +241,9 @@ impl CallsHelper {
                         };
                         encode(&[AbiToken::Address(owner_address)])
                     } else {
-                        return Ok(Vec::new());
+                        return Err(Self::revert_error(
+                            "execution reverted: ERC721: owner query for nonexistent token",
+                        ));
                     }
                 }
                 "getApproved" => {
@@ -229,7 +254,9 @@ impl CallsHelper {
                     if self.get_nft(&mut transaction, token_id).await?.is_some() {
                         encode(&[AbiToken::Address(self.zksync_proxy_address)])
                     } else {
-                        return Ok(Vec::new());
+                        return Err(Self::revert_error(
+                            "execution reverted: ERC721: approved query for nonexistent token",
+                        ));
                     }
                 }
                 _ => unreachable!(),

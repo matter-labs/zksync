@@ -3927,10 +3927,10 @@ dependencies = [
 [[package]]
 name = "rescue_poseidon"
 version = "0.3.0"
-source = "git+https://github.com/StanislavBreadless/rescue-poseidon.git?branch=stable-with-new-hmac#8d72a8f30061c7357cc6a104555d72f871314ff3"
+source = "git+https://github.com/matter-labs/rescue-poseidon.git?branch=stable-with-new-hmac#0e6aff96567a6dd3425ffb860cbe47abb4a30ce6"
 dependencies = [
  "byteorder",
- "franklin-crypto 0.0.5 (git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac)",
+ "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=beta-with-new-hmac)",
  "num-bigint 0.3.2",
  "num-integer",
  "num-iter",
