@@ -380,4 +380,17 @@ describe('ZkSync web3 API tests', () => {
         expectedBalance = (await alice.getAccountState()).verified.balances[token] as string;
         expect(balance.toString(), 'Incorrect balance after transfer').to.eql(expectedBalance);
     });
+
+    it('should check eth_call error', async () => {
+        const ownerOfFunction = nftFactoryContract.interface.functions['ownerOf(uint256)'];
+        const ownerOfCallData = nftFactoryContract.interface.encodeFunctionData(ownerOfFunction, [99999]);
+        let failed = false;
+        try {
+            await web3Provider.call({ to: nftFactoryAddress, data: ownerOfCallData });
+        } catch (e) {
+            expect(e.toString().includes('execution reverted: ERC721: owner query for nonexistent token')).to.be.true;
+            failed = true;
+        }
+        expect(failed).to.be.true;
+    });
 });
