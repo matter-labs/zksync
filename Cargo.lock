@@ -637,7 +637,7 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 [[package]]
 name = "bellman_ce"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/bellman?branch=beta#48441155ec7006bf7bfac553b5fb7d466d7fcd00"
+source = "git+https://github.com/matter-labs/bellman?branch=beta#5809cc165db0a2e15be34c844fec568d8d6005bc"
 dependencies = [
  "bit-vec",
  "blake2s_const",
@@ -727,7 +727,7 @@ dependencies = [
 [[package]]
 name = "blake2s_const"
 version = "0.6.0"
-source = "git+https://github.com/matter-labs/bellman?branch=beta#48441155ec7006bf7bfac553b5fb7d466d7fcd00"
+source = "git+https://github.com/matter-labs/bellman?branch=beta#5809cc165db0a2e15be34c844fec568d8d6005bc"
 dependencies = [
  "arrayref",
  "arrayvec 0.5.2",
@@ -1611,34 +1611,7 @@ dependencies = [
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta-with-new-hmac#d9bf61a014a5fae1d43bd12f72abe1c4a32ef870"
-dependencies = [
- "bellman_ce",
- "bit-vec",
- "blake2",
- "blake2-rfc_bellman_edition",
- "blake2s_simd",
- "byteorder",
- "digest 0.7.6",
- "hex",
- "hmac 0.7.1",
- "itertools 0.9.0",
- "num-bigint 0.3.2",
- "num-integer",
- "num-traits",
- "poseidon_hash",
- "rand 0.4.6",
- "serde",
- "serde_derive",
- "sha2 0.8.2",
- "splitmut",
- "tiny-keccak 1.5.0",
-]
-
-[[package]]
-name = "franklin-crypto"
-version = "0.0.5"
-source = "git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac#d9bf61a014a5fae1d43bd12f72abe1c4a32ef870"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta-with-new-hmac#43471653d9b4088b43209626cbf474458c0dda6a"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -3821,9 +3794,9 @@ dependencies = [
 [[package]]
 name = "recursive_aggregation_circuit"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git?branch=recursive-aggregation-circuit-with-new-hmac#5d3d87508718423f8b6b5ae9eef79b731ed11775"
+source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git?branch=recursive-aggregation-circuit-with-new-hmac#faca8aa4d8ae736c38b766042a212024d8a1cc63"
 dependencies = [
- "franklin-crypto 0.0.5 (git+https://github.com/StanislavBreadless/franklin-crypto.git?branch=beta-with-new-hmac)",
+ "franklin-crypto",
  "hex",
  "once_cell",
  "sha2 0.9.5",
@@ -5852,7 +5825,7 @@ dependencies = [
  "base64 0.13.0",
  "ethabi",
  "fnv",
- "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=beta-with-new-hmac)",
+ "franklin-crypto",
  "hex",
  "lazy_static",
  "num",
