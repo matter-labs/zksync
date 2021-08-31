@@ -312,11 +312,10 @@ impl Web3RpcApp {
         let result = self
             .calls_helper
             .execute(&mut storage, req.to, req.data.unwrap_or_default().0)
-            .await
-            .map_err(|_| Error::internal_error())?;
+            .await;
 
         metrics::histogram!("api.web3.call", start.elapsed());
-        Ok(Bytes(result))
+        result.map(Bytes)
     }
 
     pub(crate) async fn logs_from_receipt(
