@@ -371,10 +371,7 @@ impl EthereumAccount {
         );
         let signed_tx = self
             .main_contract_eth_client
-            .sign_prepared_tx(
-                data,
-                Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
-            )
+            .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(6_800_000))))
             .await
             .map_err(|e| format_err!("Commit block send err: {}", e))?;
 
@@ -394,10 +391,7 @@ impl EthereumAccount {
             .encode_tx_data("proveBlocks", proof_operation.get_eth_tx_args().as_slice());
         let signed_tx = self
             .main_contract_eth_client
-            .sign_prepared_tx(
-                data,
-                Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
-            )
+            .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(6_800_000))))
             .await
             .map_err(|e| format_err!("Verify block send err: {}", e))?;
         let receipt =
@@ -417,10 +411,7 @@ impl EthereumAccount {
 
         let signed_tx = self
             .main_contract_eth_client
-            .sign_prepared_tx(
-                data,
-                Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
-            )
+            .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(6_800_000))))
             .await
             .map_err(|e| format_err!("Complete withdrawals send err: {}", e))?;
         let receipt =
@@ -438,10 +429,7 @@ impl EthereumAccount {
 
         let signed_tx = self
             .main_contract_eth_client
-            .sign_prepared_tx(
-                data,
-                Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
-            )
+            .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(6_800_000))))
             .await
             .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
         let receipt =

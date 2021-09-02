@@ -66,7 +66,7 @@ fn run_external_command(command: &str, args: &[&str]) -> String {
 
     if !result.status.success() {
         panic!(
-            "failed to run exetrnal command {}:\nstdout: {}\nstderr: {}",
+            "failed to run external command {}:\nstdout: {}\nstderr: {}",
             command, stdout, stderr
         );
     }
