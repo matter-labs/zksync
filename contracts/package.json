@@ -58,6 +58,6 @@
     "read-variable": "ts-node scripts/read-variable.ts"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "3.4.0-solc-0.7"
+    "@openzeppelin/contracts": "3.4.2"
   }
 }
