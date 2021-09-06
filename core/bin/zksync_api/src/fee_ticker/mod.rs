@@ -463,7 +463,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                 | OutputFeeType::Transfer
                 | OutputFeeType::MintNFT
                 | OutputFeeType::Swap
-                | OutputFeeType::ChangePubKey(_)
         ) {
             normal_gas_fee *= self.config.scale_fee_coefficient.clone();
         }
@@ -505,7 +504,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     | OutputFeeType::TransferToNew
                     | OutputFeeType::Swap
                     | OutputFeeType::MintNFT
-                    | OutputFeeType::ChangePubKey(_)
             ) {
                 self.config.scale_fee_coefficient.clone() * gas_tx_amount
             } else {
