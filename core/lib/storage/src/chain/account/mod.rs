@@ -45,7 +45,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             ON CONFLICT (account_id) DO UPDATE SET account_type = $2
             "#,
             i64::from(*account_id),
-            db_account_type
+            db_account_type as DbAccountType
         )
         .execute(transaction.conn())
         .await?;
@@ -99,7 +99,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         .await?
         .map(|record| record.account_type);
 
-        let pub_key_hash = if matches!(Some(DbAccountType::No2FA), db_account_type) {
+        let pub_key_hash = if let Some(DbAccountType::No2FA) = db_account_type {
             let result = sqlx::query!(
                 r#"
                 SELECT pub_key_hash 
