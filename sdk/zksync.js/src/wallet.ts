@@ -917,23 +917,24 @@ export class Wallet {
         return changePubKeyTx;
     }
 
-    async getToggle2FA(enable: boolean): Promise<Toggle2FARequest> {
+    async getToggle2FA(enable: boolean, pubKeyHash?: PubKeyHash): Promise<Toggle2FARequest> {
         const accountId = await this.getAccountId();
         const timestamp = new Date().getTime();
-        const signature = await this.getEthMessageSignature(getToggle2FAMessage(enable, timestamp));
+        const signature = await this.getEthMessageSignature(getToggle2FAMessage(enable, timestamp, pubKeyHash));
 
         return {
             accountId,
             signature,
             timestamp,
-            enable
+            enable,
+            pubKeyHash
         };
     }
 
-    async toggle2FA(enable: boolean): Promise<boolean> {
+    async toggle2FA(enable: boolean, pubKeyHash?: PubKeyHash): Promise<boolean> {
         await this.setRequiredAccountIdFromServer('Toggle 2FA');
 
-        return await this.provider.toggle2FA(await this.getToggle2FA(enable));
+        return await this.provider.toggle2FA(await this.getToggle2FA(enable, pubKeyHash));
     }
 
     async signSetSigningKey(changePubKey: {
