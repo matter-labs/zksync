@@ -228,7 +228,7 @@ impl TxSender {
         let new_type = if toggle_2fa.enable {
             EthAccountType::Owned
         } else {
-            EthAccountType::No2FA(toggle_2fa.pub_key_hash.clone())
+            EthAccountType::No2FA(toggle_2fa.pub_key_hash)
         };
 
         self.verify_toggle_2fa_request_eth_signature(toggle_2fa)

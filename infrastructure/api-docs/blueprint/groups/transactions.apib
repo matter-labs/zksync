@@ -51,7 +51,8 @@ Get transaction data
 ## api/v0.2/transactions/toggle2FA [/transactions/toggle2FA]
 
 ### Toggle 2-factor authentication [POST]
-Enable or disable requirement for L1 signature for L2 transactions.
+Enable or disable requirement for L1 signature for L2 transactions. It takes an optional `pubKeyHash` parameter, which, if specified,
+ensures that only transactions signed with a specific L2 private key won't have their Ethereum signature checked.
 
 + Request (application/json)
     + Attributes
@@ -59,6 +60,7 @@ Enable or disable requirement for L1 signature for L2 transactions.
         + accountId: {{accountId}} (number, required)
         + timestamp: {{toggle2FATimestamp}} (number, required)
         + signature (Toggle2FAEthSignature, required)
+        + pubKeyHash {{toggle2FAPubKeyHash}} (PubKeyHash, optional)
 
 + Response 200 (application/json)
     + Attributes

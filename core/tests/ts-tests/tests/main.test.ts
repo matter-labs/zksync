@@ -1,5 +1,5 @@
-import { expect } from 'chai';
-import { BigNumber, utils, ethers } from 'ethers';
+import { expect, use } from 'chai';
+import { BigNumber, utils } from 'ethers';
 import { Wallet, types, crypto, Signer, No2FAWalletSigner } from 'zksync';
 import chaiAsPromised from 'chai-as-promised';
 import { Tester } from './tester';
@@ -16,7 +16,7 @@ import './swap';
 import './register-factory';
 import './token-listing';
 
-chai.use(chaiAsPromised);
+use(chaiAsPromised);
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -329,7 +329,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         });
     });
 
-    describe.only('No2FA tests', () => {
+    describe('No2FA tests', () => {
         let hilda: Wallet;
         let hildaWithEthSigner: Wallet;
         let frida: Wallet;
@@ -366,7 +366,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             await hilda.toggle2FA(false, pubKeyHash);
 
             const accountState = await hilda.getAccountState();
-            console.log(accountState);
             expect(accountState.accountType, 'Incorrect account type').to.be.eql({
                 No2FA: pubKeyHash
             });
