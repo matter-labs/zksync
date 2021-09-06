@@ -911,7 +911,16 @@ async fn verify_tx_info_message_signature(
     let should_check_eth_signature = match (account_type, tx) {
         (EthAccountType::CREATE2, _) => false,
         (EthAccountType::No2FA, ZkSyncTx::ChangePubKey(_)) => true,
-        (EthAccountType::No2FA, _) => false,
+        (EthAccountType::No2FA(hash), _) => {
+            if let Some(not_checked_hash) = hash {
+                let tx_pub_key = tx.siganture();
+                let tx_pub_key_hash = PubKeyHash::from_pubkey(&tx_pub_key);
+
+                tx_pub_key_hash != not_checked_hash
+            } else {
+                false
+            }
+        }
         _ => true,
     };
 

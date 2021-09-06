@@ -43,7 +43,7 @@ pub enum AccountAddressOrId {
 pub enum EthAccountType {
     Owned,
     CREATE2,
-    No2FA,
+    No2FA(Option<PubKeyHash>),
 }
 
 /// Information about ongoing deposits for certain recipient address.

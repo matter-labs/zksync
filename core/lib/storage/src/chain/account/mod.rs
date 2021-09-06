@@ -5,7 +5,7 @@ use num::{BigUint, Zero};
 use sqlx::{types::BigDecimal, Acquire};
 // Workspace imports
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
-use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, TokenId};
+use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, PubKeyHash, TokenId};
 // Local imports
 use self::records::*;
 use crate::chain::block::BlockSchema;
@@ -35,16 +35,44 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     ) -> QueryResult<()> {
         let start = Instant::now();
 
+        let mut transaction = self.0.start_transaction().await?;
+
+        let (db_account_type, pub_key_hash) = account_type.into_db_types();
+
         sqlx::query!(
             r#"
             INSERT INTO eth_account_types VALUES ( $1, $2 )
             ON CONFLICT (account_id) DO UPDATE SET account_type = $2
             "#,
             i64::from(*account_id),
-            account_type as EthAccountType
+            db_account_type
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
+
+        if let Some(hash) = pub_key_hash {
+            sqlx::query!(
+                r#"
+                INSERT INTO no_2fa_pub_key_hash VALUES ( $1, $2 )
+                ON CONFLICT (account_id) DO UPDATE SET pub_key_hash = $2
+                "#,
+                i64::from(*account_id),
+                hash.as_hex()
+            )
+            .execute(transaction.conn())
+            .await?;
+        } else {
+            sqlx::query!(
+                r#"
+                DELETE FROM no_2fa_pub_key_hash WHERE account_id = $1
+                "#,
+                i64::from(*account_id)
+            )
+            .execute(transaction.conn())
+            .await?;
+        }
+
+        transaction.commit().await?;
 
         metrics::histogram!("sql.chain.state.set_account_type", start.elapsed());
         Ok(())
@@ -57,18 +85,38 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     ) -> QueryResult<Option<EthAccountType>> {
         let start = Instant::now();
 
-        let result = sqlx::query_as!(
+        let mut transaction = self.0.start_transaction().await?;
+
+        let db_account_type = sqlx::query_as!(
             StorageAccountType,
             r#"
-            SELECT account_id, account_type as "account_type!: EthAccountType" 
+            SELECT account_id, account_type as "account_type!: DbAccountType" 
             FROM eth_account_types WHERE account_id = $1
             "#,
             i64::from(*account_id)
         )
-        .fetch_optional(self.0.conn())
-        .await?;
+        .fetch_optional(transaction.conn())
+        .await?
+        .map(|record| record.account_type);
 
-        let account_type = result.map(|record| record.account_type as EthAccountType);
+        let pub_key_hash = if matches!(Some(DbAccountType::No2FA), db_account_type) {
+            let result = sqlx::query!(
+                r#"
+                SELECT pub_key_hash 
+                FROM no_2fa_pub_key_hash WHERE account_id = $1
+                "#,
+                i64::from(*account_id)
+            )
+            .fetch_optional(transaction.conn())
+            .await?;
+
+            result.map(|record| PubKeyHash::from_hex(&record.pub_key_hash).unwrap())
+        } else {
+            None
+        };
+
+        let account_type =
+            db_account_type.map(|db_type| EthAccountType::from_db(db_type, pub_key_hash));
         metrics::histogram!("sql.chain.account.account_type_by_id", start.elapsed());
         Ok(account_type)
     }

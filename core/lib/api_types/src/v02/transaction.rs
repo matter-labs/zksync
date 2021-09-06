@@ -283,7 +283,7 @@ impl Toggle2FA {
         };
 
         if let Some(hash) = self.pub_key_hash {
-            format!("{}\nPubKeyHash: {}", message, hash)
+            format!("{}\nPubKeyHash: {}", message, hash.as_hex())
         } else {
             message
         }
