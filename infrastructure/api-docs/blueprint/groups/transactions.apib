@@ -60,7 +60,7 @@ ensures that only transactions signed with a specific L2 private key won't have 
         + accountId: {{accountId}} (number, required)
         + timestamp: {{toggle2FATimestamp}} (number, required)
         + signature (Toggle2FAEthSignature, required)
-        + pubKeyHash {{toggle2FAPubKeyHash}} (PubKeyHash, optional)
+        + pubKeyHash {{toggle2FAPubKeyHash}} (string, optional)
 
 + Response 200 (application/json)
     + Attributes
