@@ -47,8 +47,9 @@ pub struct ForcedExit {
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
     /// Time range when the transaction is valid
-    #[serde(flatten, default)]
-    pub time_range: TimeRange,
+    /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
+    #[serde(flatten)]
+    pub time_range: Option<TimeRange>,
 }
 
 impl ForcedExit {
@@ -74,7 +75,7 @@ impl ForcedExit {
             token,
             fee,
             nonce,
-            time_range,
+            time_range: Some(time_range),
             signature: signature.clone().unwrap_or_default(),
             cached_signer: VerifiedSignatureCache::NotCached,
         };
@@ -120,7 +121,7 @@ impl ForcedExit {
         out.extend_from_slice(&(self.token.0 as u16).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.time_range.as_be_bytes());
+        out.extend_from_slice(&self.time_range.unwrap_or_default().as_be_bytes());
         out
     }
 
@@ -138,7 +139,7 @@ impl ForcedExit {
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.time_range.as_be_bytes());
+        out.extend_from_slice(&self.time_range.unwrap_or_default().as_be_bytes());
         out
     }
 
@@ -152,7 +153,10 @@ impl ForcedExit {
         let mut valid = is_fee_amount_packable(&self.fee)
             && self.initiator_account_id <= max_account_id()
             && self.token <= max_fungible_token_id()
-            && self.time_range.check_correctness();
+            && self
+                .time_range
+                .map(|r| r.check_correctness())
+                .unwrap_or(true);
 
         if valid {
             if self.fee != BigUint::zero() {
