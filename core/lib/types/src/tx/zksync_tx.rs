@@ -432,7 +432,7 @@ impl ZkSyncTx {
             ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default().valid_from,
-            ZkSyncTx::ForcedExit(tx) => tx.time_range.valid_from,
+            ZkSyncTx::ForcedExit(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::Close(tx) => tx.time_range.valid_from,
             ZkSyncTx::Swap(tx) => tx.valid_from(),
             ZkSyncTx::MintNFT(_) => 0,
