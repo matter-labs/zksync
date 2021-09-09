@@ -785,7 +785,7 @@ impl ZkSyncStateKeeper {
         let time_range = match tx {
             ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
             ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::ForcedExit(tx) => tx.time_range,
+            ZkSyncTx::ForcedExit(tx) => tx.time_range.unwrap_or_default(),
             ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
             ZkSyncTx::Close(tx) => tx.time_range,
             ZkSyncTx::MintNFT(_) => Default::default(),
