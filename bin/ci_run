@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Runs the command from within CI docker-compose environment.
 cd $ZKSYNC_HOME
