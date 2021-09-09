@@ -77,8 +77,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
                         let new_account_type = match (current_type, account_type) {
                             // You can not change No2FA to Owned here
-                            (Some(EthAccountType::No2FA), EthAccountType::Owned) => {
-                                EthAccountType::No2FA
+                            (Some(EthAccountType::No2FA(hash)), EthAccountType::Owned) => {
+                                EthAccountType::No2FA(hash)
                             }
                             _ => account_type,
                         };

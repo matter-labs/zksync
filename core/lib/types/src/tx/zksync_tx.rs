@@ -8,7 +8,7 @@ use crate::{
     operations::{ChangePubKeyOp, MintNFTOp},
     tx::{
         error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, MintNFT, Swap, Transfer,
-        TxEthSignature, TxHash, Withdraw, WithdrawNFT,
+        TxEthSignature, TxHash, TxSignature, Withdraw, WithdrawNFT,
     },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
@@ -179,6 +179,19 @@ impl ZkSyncTx {
             ZkSyncTx::MintNFT(tx) => tx.nonce,
             ZkSyncTx::Swap(tx) => tx.nonce,
             ZkSyncTx::WithdrawNFT(tx) => tx.nonce,
+        }
+    }
+
+    pub fn signature(&self) -> TxSignature {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.signature.clone(),
+            ZkSyncTx::Withdraw(tx) => tx.signature.clone(),
+            ZkSyncTx::Close(tx) => tx.signature.clone(),
+            ZkSyncTx::ChangePubKey(tx) => tx.signature.clone(),
+            ZkSyncTx::ForcedExit(tx) => tx.signature.clone(),
+            ZkSyncTx::MintNFT(tx) => tx.signature.clone(),
+            ZkSyncTx::Swap(tx) => tx.signature.clone(),
+            ZkSyncTx::WithdrawNFT(tx) => tx.signature.clone(),
         }
     }
 

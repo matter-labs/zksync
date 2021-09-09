@@ -1709,43 +1709,6 @@
       "nullable": []
     }
   },
-  "3c734a6a585db3da17b515c061bf7b1b50e466c79e6a38814f95f4ada2639b00": {
-    "query": "\n            SELECT account_id, account_type as \"account_type!: EthAccountType\" \n            FROM eth_account_types WHERE account_id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "account_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "account_type!: EthAccountType",
-          "type_info": {
-            "Custom": {
-              "name": "eth_account_type",
-              "kind": {
-                "Enum": [
-                  "Owned",
-                  "CREATE2",
-                  "No2FA"
-                ]
-              }
-            }
-          }
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
-    }
-  },
   "3ed6f62aea4b0901e56abf35be76cf1f4f64d14dc0ef63de8b205fc472c4de97": {
     "query": "INSERT INTO data_restore_last_watched_eth_block (block_number) VALUES ($1)",
     "describe": {
@@ -1831,6 +1794,43 @@
         "Left": []
       },
       "nullable": []
+    }
+  },
+  "4140bf1837df20c2d8ea67b0316ac4ef30ff7da2a24ccdb522a5ab08a54f91d2": {
+    "query": "\n            SELECT account_id, account_type as \"account_type!: DbAccountType\" \n            FROM eth_account_types WHERE account_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "account_type!: DbAccountType",
+          "type_info": {
+            "Custom": {
+              "name": "eth_account_type",
+              "kind": {
+                "Enum": [
+                  "Owned",
+                  "CREATE2",
+                  "No2FA"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "41a4d1c9fa9953cd94714a408afd892962f9eea9a9f1674b8dddfa72e2eb9ec2": {
@@ -2491,6 +2491,26 @@
       ]
     }
   },
+  "592cd3fa2a50f8f889323fd5b9e1962b009c1abfe2c2b8f504cdf27a3c06a5d4": {
+    "query": "\n                SELECT pub_key_hash \n                FROM no_2fa_pub_key_hash WHERE account_id = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "pub_key_hash",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "59c4e0d8255c2e4dd6eece1b24245daf3414d4f15b6cba7b369dc1ac32bed018": {
     "query": "\n                SELECT * FROM accounts\n                WHERE id = $1\n            ",
     "describe": {
@@ -2783,6 +2803,19 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "6dfbe5878cdb5d4d7050ee282a3552e20af4f9d676feb2256f351d59f39bbf63": {
+    "query": "\n                INSERT INTO no_2fa_pub_key_hash VALUES ( $1, $2 )\n                ON CONFLICT (account_id) DO UPDATE SET pub_key_hash = $2\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "6e99e599875e2567cc2f280fda3dbb0ae6a13fcc065dca1f6e96204bd14c27d1": {
@@ -6694,6 +6727,18 @@
           "Int4",
           "Bytea",
           "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "ee649d6b4702d3430ece17cfcfeb8a7e1c7bb0e557cd6bc99878083d483680d0": {
+    "query": "\n                DELETE FROM no_2fa_pub_key_hash WHERE account_id = $1\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
         ]
       },
       "nullable": []

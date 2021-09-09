@@ -446,7 +446,7 @@ export function getChangePubkeyLegacyMessage(pubKeyHash: PubKeyHash, nonce: numb
     return utils.toUtf8Bytes(message);
 }
 
-export function getToggle2FAMessage(require2FA: boolean, timestamp: number): Uint8Array {
+export function getToggle2FAMessage(require2FA: boolean, timestamp: number, pubKeyHash?: PubKeyHash): Uint8Array {
     let message: string;
     if (require2FA) {
         message =
@@ -459,6 +459,10 @@ export function getToggle2FAMessage(require2FA: boolean, timestamp: number): Uin
             `Transactions now only require signatures by your L2 private key.\n` +
             `BY SIGNING THIS MESSAGE, YOU ARE TRUSTING YOUR WALLET CLIENT TO KEEP YOUR L2 PRIVATE KEY SAFE!\n` +
             `Timestamp: ${timestamp}`;
+    }
+
+    if (pubKeyHash) {
+        message += `\nPubKeyHash: ${pubKeyHash}`;
     }
 
     return utils.toUtf8Bytes(message);

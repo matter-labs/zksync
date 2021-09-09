@@ -2,7 +2,7 @@
 use zksync_api_types::v02::account::EthAccountType as ApiEthAccountType;
 // External imports
 use sqlx::{types::BigDecimal, FromRow};
-use zksync_types::{AccountId, Address, TokenId, H256, NFT};
+use zksync_types::{AccountId, Address, PubKeyHash, TokenId, H256, NFT};
 
 #[derive(Debug, FromRow)]
 pub struct StorageAccount {
@@ -85,10 +85,22 @@ pub struct StorageBalance {
 
 #[derive(Debug, Clone, Copy, sqlx::Type)]
 #[sqlx(type_name = "eth_account_type")]
-pub enum EthAccountType {
+pub enum DbAccountType {
     Owned,
     CREATE2,
     No2FA,
+}
+
+pub struct StorageAccountType {
+    pub account_id: i64,
+    pub account_type: DbAccountType,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EthAccountType {
+    Owned,
+    CREATE2,
+    No2FA(Option<PubKeyHash>),
 }
 
 impl From<EthAccountType> for ApiEthAccountType {
@@ -96,13 +108,25 @@ impl From<EthAccountType> for ApiEthAccountType {
         match account_type {
             EthAccountType::Owned => ApiEthAccountType::Owned,
             EthAccountType::CREATE2 => ApiEthAccountType::CREATE2,
-            EthAccountType::No2FA => ApiEthAccountType::No2FA,
+            EthAccountType::No2FA(hash) => ApiEthAccountType::No2FA(hash),
         }
     }
 }
 
-#[derive(Debug, Clone, FromRow)]
-pub struct StorageAccountType {
-    pub account_id: i64,
-    pub account_type: EthAccountType,
+impl EthAccountType {
+    pub fn from_db(account_type: DbAccountType, pub_key_hash: Option<PubKeyHash>) -> Self {
+        match account_type {
+            DbAccountType::Owned => EthAccountType::Owned,
+            DbAccountType::CREATE2 => EthAccountType::CREATE2,
+            DbAccountType::No2FA => EthAccountType::No2FA(pub_key_hash),
+        }
+    }
+
+    pub fn into_db_types(self) -> (DbAccountType, Option<PubKeyHash>) {
+        match self {
+            EthAccountType::Owned => (DbAccountType::Owned, None),
+            EthAccountType::CREATE2 => (DbAccountType::CREATE2, None),
+            EthAccountType::No2FA(hash) => (DbAccountType::No2FA, hash),
+        }
+    }
 }

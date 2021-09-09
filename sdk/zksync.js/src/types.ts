@@ -592,6 +592,7 @@ export interface Toggle2FARequest {
     accountId: number;
     timestamp: number;
     signature: TxEthSignature;
+    pubKeyHash?: string;
 }
 
 export interface Toggle2FAResponse {
