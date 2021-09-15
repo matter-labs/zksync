@@ -109,6 +109,8 @@ impl PrivateApi {
 pub struct RestApi {
     /// Port to which the API server is listening.
     pub port: u16,
+    /// Indicates whether the service is HTTPS or HTTP
+    pub use_https: bool,
     /// URL to access API server.
     pub url: String,
 }

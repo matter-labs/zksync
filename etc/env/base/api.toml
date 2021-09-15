@@ -27,7 +27,8 @@ url="http://127.0.0.1:8080"
 # Configuration for the REST API server
 [api.rest]
 port=3001
-url="http://127.0.0.1:3001"
+use_https=true
+url="https://127.0.0.1:3001"
 
 # Configuration for the JSON RPC server
 [api.json_rpc]

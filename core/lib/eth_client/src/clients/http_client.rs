@@ -20,8 +20,7 @@ use web3::{
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
 
 use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
-use sha3::{Digest, Keccak256};
-use std::hash::Hash;
+use sha3::Digest;
 /// Gas limit value to be used in transaction if for some reason
 /// gas limit was not set for it.
 ///
