@@ -164,7 +164,7 @@ impl EthClient for EthHttpClient {
                 };
 
                 // Now we have to divide the range into two halfs and recursively try to get it.
-                if from_number <= to_number || to_number - from_number == 1.into() {
+                if to_number <= from_number || to_number - from_number == 1.into() {
                     // We can't divide ranges anymore.
                     anyhow::bail!("Got too much events in one block");
                 }
