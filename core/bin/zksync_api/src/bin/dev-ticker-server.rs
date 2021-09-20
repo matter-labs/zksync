@@ -62,7 +62,7 @@ async fn handle_coinmarketcap_token_price_query(
         "DAI" => BigDecimal::from(1),
         "tGLM" => BigDecimal::from(1),
         "GLM" => BigDecimal::from(1),
-        _ => BigDecimal::from(0),
+        _ => BigDecimal::from(1),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
 
