@@ -1051,7 +1051,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         fail_reason,
                                         Null::bytea as eth_hash,
                                         Null::bigint as priority_op_serialid,
-                                        block_index
+                                        block_index,
+                                        batch_id
                                     FROM executed_transactions
                                     WHERE block_number = $1 AND created_at >= $2
                                 ), priority_ops AS (
@@ -1064,7 +1065,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         Null as fail_reason,
                                         eth_hash,
                                         priority_op_serialid,
-                                        block_index
+                                        block_index,
+                                        Null::bigint as batch_id
                                     FROM executed_priority_operations
                                     WHERE block_number = $1 AND created_at >= $2
                                 ), everything AS (
@@ -1080,7 +1082,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                     success as "success!",
                                     fail_reason as "fail_reason?",
                                     eth_hash as "eth_hash?",
-                                    priority_op_serialid as "priority_op_serialid?"
+                                    priority_op_serialid as "priority_op_serialid?",
+                                    batch_id as "batch_id?"
                                 FROM everything
                                 ORDER BY created_at ASC, block_index ASC
                                 LIMIT $3
@@ -1106,7 +1109,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         fail_reason,
                                         Null::bytea as eth_hash,
                                         Null::bigint as priority_op_serialid,
-                                        block_index
+                                        block_index,
+                                        batch_id
                                     FROM executed_transactions
                                     WHERE block_number = $1 AND created_at <= $2
                                 ), priority_ops AS (
@@ -1119,7 +1123,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         Null as fail_reason,
                                         eth_hash,
                                         priority_op_serialid,
-                                        block_index
+                                        block_index,
+                                        Null::bigint as batch_id
                                     FROM executed_priority_operations
                                     WHERE block_number = $1 AND created_at <= $2
                                 ), everything AS (
@@ -1135,7 +1140,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                     success as "success!",
                                     fail_reason as "fail_reason?",
                                     eth_hash as "eth_hash?",
-                                    priority_op_serialid as "priority_op_serialid?"
+                                    priority_op_serialid as "priority_op_serialid?",
+                                    batch_id as "batch_id?"
                                 FROM everything
                                 ORDER BY created_at DESC, block_index DESC
                                 LIMIT $3

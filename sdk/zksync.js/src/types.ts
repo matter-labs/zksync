@@ -568,6 +568,7 @@ export interface ApiTransaction {
     status: L2TxStatus;
     failReason?: string;
     createdAt?: string;
+    batchId?: number;
 }
 
 export interface ApiSignedTx {

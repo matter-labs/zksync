@@ -77,6 +77,7 @@ pub struct TransactionItem {
     pub fail_reason: Option<String>,
     pub eth_hash: Option<Vec<u8>>,
     pub priority_op_serialid: Option<i64>,
+    pub batch_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

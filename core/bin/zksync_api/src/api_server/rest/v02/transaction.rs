@@ -102,6 +102,7 @@ impl ApiTransactionData {
                 status: TxInBlockStatus::Queued,
                 fail_reason: None,
                 created_at: None,
+                batch_id: None,
             };
 
             Ok(Some(TxData {

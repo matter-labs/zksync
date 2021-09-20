@@ -90,6 +90,7 @@ impl StorageTxData {
         complete_withdrawals_tx_hash: Option<H256>,
     ) -> TxData {
         let tx_hash = TxHash::from_slice(&data.tx_hash).unwrap();
+        let batch_id = data.batch_id.map(|id| id as u32);
         let tx = if data.block_number.is_some() {
             let block_number = data.block_number.map(|number| BlockNumber(number as u32));
             let status = if data.success.unwrap() {
@@ -122,6 +123,7 @@ impl StorageTxData {
                 status,
                 fail_reason: data.fail_reason,
                 created_at: Some(data.created_at),
+                batch_id,
             }
         } else {
             let tx_data = Self::tx_data_from_zksync_tx(
@@ -135,6 +137,7 @@ impl StorageTxData {
                 status: TxInBlockStatus::Queued,
                 fail_reason: None,
                 created_at: Some(data.created_at),
+                batch_id,
             }
         };
         let eth_signature = data.eth_sign_data.map(|eth_sign_data| {
