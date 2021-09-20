@@ -249,6 +249,7 @@ impl TransactionItem {
             status,
             fail_reason: item.fail_reason,
             created_at: Some(item.created_at),
+            batch_id: item.batch_id.map(|id| id as u32),
         }
     }
 }

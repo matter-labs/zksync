@@ -81,6 +81,7 @@ pub struct Transaction {
     pub status: TxInBlockStatus,
     pub fail_reason: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
+    pub batch_id: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

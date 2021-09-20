@@ -199,6 +199,7 @@ describe('ZkSync REST API V0.2 tests', () => {
 
         const txData = await provider.txData(lastTxHash);
         expect(txData!.tx.op.type).to.eql('Transfer');
+        expect(txData!.tx.batchId).to.not.exist;
 
         const batch = await alice
             .batchBuilder()
@@ -209,6 +210,11 @@ describe('ZkSync REST API V0.2 tests', () => {
         await provider.notifyAnyTransaction(submitBatchResponse.transactionHashes[0], 'COMMIT');
         const batchInfo = await provider.getBatch(submitBatchResponse.batchHash);
         expect(batchInfo.batchHash).to.eql(submitBatchResponse.batchHash);
+
+        const txInBatchData1 = await provider.txData(batchInfo.transactionHashes[0]);
+        const txInBatchData2 = await provider.txData(batchInfo.transactionHashes[1]);
+        expect(txInBatchData1.tx.batchId).to.exist;
+        expect(txInBatchData1.tx.batchId).to.eql(txInBatchData2.tx.batchId);
     });
 });
 

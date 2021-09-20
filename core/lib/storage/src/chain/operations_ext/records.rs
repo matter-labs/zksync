@@ -169,6 +169,7 @@ pub struct StorageTxData {
     pub created_at: DateTime<Utc>,
     pub eth_hash: Option<Vec<u8>>,
     pub priority_op_serialid: Option<i64>,
+    pub batch_id: Option<i64>,
     pub eth_sign_data: Option<serde_json::Value>,
 }
 

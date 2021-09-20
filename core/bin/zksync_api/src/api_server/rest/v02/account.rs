@@ -684,7 +684,8 @@ mod tests {
                     },
                     "status": "queued",
                     "failReason": Option::<String>::None,
-                    "createdAt": Utc::now()
+                    "createdAt": Utc::now(),
+                    "batch_id": Option::<u32>::None
                 }
             ],
             "pagination": {
