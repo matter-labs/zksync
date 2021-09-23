@@ -926,6 +926,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             "
             INSERT INTO account_tree_cache (block, tree_cache)
             VALUES ($1, $2)
+            ON CONFLICT (block)
+            DO NOTHING
             ",
             *block as i64,
             tree_cache_str,
