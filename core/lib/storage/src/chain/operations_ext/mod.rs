@@ -191,6 +191,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         fail_reason,
                         Null::bytea as eth_hash,
                         Null::bigint as priority_op_serialid,
+                        batch_id,
                         eth_sign_data
                     FROM executed_transactions
                     WHERE tx_hash = $1
@@ -204,6 +205,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         Null as fail_reason,
                         eth_hash,
                         priority_op_serialid,
+                        Null::bigint as batch_id,
                         Null::jsonb as eth_sign_data
                     FROM executed_priority_operations
                     WHERE tx_hash = $1 OR eth_hash = $1
@@ -217,6 +219,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         Null as fail_reason,
                         Null::bytea as eth_hash,
                         Null::bigint as priority_op_serialid,
+                        batch_id,
                         eth_sign_data
                     FROM mempool_txs
                     WHERE tx_hash = $2
@@ -237,6 +240,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     fail_reason as "fail_reason?",
                     eth_hash as "eth_hash?",
                     priority_op_serialid as "priority_op_serialid?",
+                    batch_id as "batch_id?",
                     eth_sign_data as "eth_sign_data?"
                 FROM everything
             "#,
@@ -1025,7 +1029,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     fail_reason,
                                     Null::bytea as eth_hash,
                                     Null::bigint as priority_op_serialid,
-                                    block_index
+                                    block_index,
+                                    batch_id
                                 FROM executed_transactions
                                 WHERE (
                                     from_account = $1
@@ -1057,7 +1062,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     Null as fail_reason,
                                     eth_hash,
                                     priority_op_serialid,
-                                    block_index
+                                    block_index,
+                                    Null::bigint as batch_id
                                 FROM executed_priority_operations
                                 WHERE (from_account = $1 OR to_account = $1) AND created_at >= $3
                             ), everything AS (
@@ -1073,7 +1079,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 success as "success!",
                                 fail_reason as "fail_reason?",
                                 eth_hash as "eth_hash?",
-                                priority_op_serialid as "priority_op_serialid?"
+                                priority_op_serialid as "priority_op_serialid?",
+                                batch_id as "batch_id?"
                             FROM everything
                             ORDER BY created_at ASC, block_index ASC
                             LIMIT $4
@@ -1100,7 +1107,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     fail_reason,
                                     Null::bytea as eth_hash,
                                     Null::bigint as priority_op_serialid,
-                                    block_index
+                                    block_index,
+                                    batch_id
                                 FROM executed_transactions
                                 WHERE (
                                     from_account = $1
@@ -1132,7 +1140,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     Null as fail_reason,
                                     eth_hash,
                                     priority_op_serialid,
-                                    block_index
+                                    block_index,
+                                    Null::bigint as batch_id
                                 FROM executed_priority_operations
                                 WHERE (from_account = $1 OR to_account = $1) AND created_at <= $3
                             ), everything AS (
@@ -1148,7 +1157,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 success as "success!",
                                 fail_reason as "fail_reason?",
                                 eth_hash as "eth_hash?",
-                                priority_op_serialid as "priority_op_serialid?"
+                                priority_op_serialid as "priority_op_serialid?",
+                                batch_id as "batch_id"
                             FROM everything
                             ORDER BY created_at DESC, block_index DESC
                             LIMIT $4

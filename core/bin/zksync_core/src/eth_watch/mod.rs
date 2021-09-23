@@ -468,6 +468,7 @@ impl<W: EthClient> EthWatch<W> {
                     status: TxInBlockStatus::Queued,
                     fail_reason: None,
                     created_at: None,
+                    batch_id: None,
                 }
             })
             .collect();
