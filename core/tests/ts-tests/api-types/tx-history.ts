@@ -1,40 +1,27 @@
-type ChangePubKeyOnchain = {
-    type: 'Onchain';
-};
-
-type ChangePubKeyECDSA = {
-    type: 'ECDSA';
-    ethSignature: string;
-    batchHash?: string;
-};
-
-type ChangePubKeyCREATE2 = {
-    type: 'CREATE2';
-    creatorAddress: string;
-    saltArg: string;
-    codeHash: string;
-};
+import {
+    TransferOp,
+    WithdrawOp,
+    WithdrawNFTOp,
+    ChangePubKeyOp,
+    FullExitOp,
+    ForcedExitOp,
+    MintNFTOp,
+    SwapOp,
+    DepositOp
+} from './transaction';
 
 type Deposit = {
     tx_id: string;
     hash: string;
     eth_block: number;
     pq_id: number;
-    tx: {
-        account_id: number;
-        priority_op: {
-            amount: string;
-            from: string;
-            to: string;
-            token: string;
-        };
-        type: 'Deposit';
-    };
+    tx: DepositOp;
     success: boolean;
-    fail_reason: string | null;
+    fail_reason: null;
     commited: boolean;
     verified: boolean;
     created_at: string;
+    batch_id: null;
 };
 
 type FullExit = {
@@ -42,24 +29,13 @@ type FullExit = {
     hash: string;
     eth_block: number;
     pq_id: number;
-    tx: {
-        type: 'FullExit';
-        serial_id: number | null;
-        priority_op: {
-            token: string;
-            account_id: number;
-            eth_address: string;
-        };
-        content_hash: string | null;
-        creator_address: string | null;
-        withdraw_amount: string;
-        creator_account_id: number | null;
-    };
+    tx: FullExitOp;
     success: boolean;
-    fail_reason: string | null;
+    fail_reason: null;
     commited: boolean;
     verified: boolean;
     created_at: string;
+    batch_id: null;
 };
 
 type Transfer = {
@@ -67,27 +43,13 @@ type Transfer = {
     hash: string;
     eth_block: null;
     pq_id: null;
-    tx: {
-        accountId: number;
-        amount: string;
-        fee: string;
-        from: string;
-        nonce: number;
-        signature: {
-            pubKey: string;
-            signature: string;
-        };
-        to: string;
-        token: string;
-        type: 'Transfer';
-        validFrom: number;
-        validUntil: number;
-    };
+    tx: TransferOp;
     success: boolean;
     fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
+    batch_id: number | null;
 };
 
 type ChangePubKey = {
@@ -95,28 +57,13 @@ type ChangePubKey = {
     hash: string;
     eth_block: null;
     pq_id: null;
-    tx: {
-        account: string;
-        accountId: number;
-        newPkHash: string;
-        nonce: number;
-        type: string;
-        feeToken: number;
-        fee: string;
-        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2 | null;
-        ethSignature: string | null;
-        signature: {
-            pubKey: string;
-            signature: string;
-        };
-        validFrom: number;
-        validUntil: number;
-    };
+    tx: ChangePubKeyOp;
     success: boolean;
     fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
+    batch_id: number | null;
 };
 
 type Withdraw = {
@@ -124,28 +71,13 @@ type Withdraw = {
     hash: string;
     eth_block: null;
     pq_id: null;
-    tx: {
-        amount: string;
-        accountId: number;
-        fee: string;
-        from: string;
-        nonce: number;
-        signature: {
-            pubKey: string;
-            signature: string;
-        };
-        to: string;
-        token: string;
-        type: 'Withdraw';
-        fast: boolean;
-        validFrom: number;
-        validUntil: number;
-    };
+    tx: WithdrawOp;
     success: boolean;
     fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
+    batch_id: number | null;
 };
 
 type ForcedExit = {
@@ -153,25 +85,65 @@ type ForcedExit = {
     hash: string;
     eth_block: null;
     pq_id: null;
-    tx: {
-        initiatorAccountId: number;
-        target: string;
-        token: string;
-        fee: string;
-        nonce: number;
-        signature: {
-            pubKey: string;
-            signature: string;
-        };
-        type: 'ForcedExit';
-        validFrom: number;
-        validUntil: number;
-    };
+    tx: ForcedExitOp;
     success: boolean;
     fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
+    batch_id: number | null;
 };
 
-export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit | ForcedExit)[];
+type MintNFT = {
+    tx_id: string;
+    hash: string;
+    eth_block: null;
+    pq_id: null;
+    tx: MintNFTOp;
+    success: boolean;
+    fail_reason: string | null;
+    commited: boolean;
+    verified: boolean;
+    created_at: string;
+    batch_id: number | null;
+};
+
+type WithdrawNFT = {
+    tx_id: string;
+    hash: string;
+    eth_block: null;
+    pq_id: null;
+    tx: WithdrawNFTOp;
+    success: boolean;
+    fail_reason: string | null;
+    commited: boolean;
+    verified: boolean;
+    created_at: string;
+    batch_id: number | null;
+};
+
+type Swap = {
+    tx_id: string;
+    hash: string;
+    eth_block: null;
+    pq_id: null;
+    tx: SwapOp;
+    success: boolean;
+    fail_reason: string | null;
+    commited: boolean;
+    verified: boolean;
+    created_at: string;
+    batch_id: number | null;
+};
+
+export type Interface = (
+    | Deposit
+    | Transfer
+    | Withdraw
+    | ChangePubKey
+    | FullExit
+    | ForcedExit
+    | MintNFT
+    | WithdrawNFT
+    | Swap
+)[];

@@ -33,6 +33,7 @@ pub struct TransactionsHistoryItem {
     pub commited: bool,
     pub verified: bool,
     pub created_at: DateTime<Utc>,
+    pub batch_id: Option<i64>,
 }
 
 /// Stored information resulted from executing the transaction.
