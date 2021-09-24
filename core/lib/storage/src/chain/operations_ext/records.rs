@@ -89,6 +89,7 @@ pub struct TxByHashResponse {
     pub created_at: String,
     pub fail_reason: Option<String>,
     pub tx: Value,
+    pub batch_id: Option<i64>,
 }
 
 /// Raw response of the [`get_account_transactions_receipts`] query.

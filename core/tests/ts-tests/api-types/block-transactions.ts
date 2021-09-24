@@ -54,9 +54,9 @@ type Deposit = {
         type: 'Deposit';
     };
     success: boolean;
-    fail_reason: string | null;
+    fail_reason: null;
     created_at: string;
-    batch_id: number | null;
+    batch_id: null;
 };
 
 type ChangePubKey = {
@@ -128,9 +128,9 @@ type FullExit = {
         creator_account_id: number | null;
     };
     success: boolean;
-    fail_reason: string | null;
+    fail_reason: null;
     created_at: string;
-    batch_id: number | null;
+    batch_id: null;
 };
 
 type ForcedExit = {
@@ -205,6 +205,45 @@ type MintNFT = {
     batch_id: number | null;
 };
 
+type Order = {
+    accountId: number;
+    recipient: string;
+    nonce: number;
+    tokenBuy: number;
+    tokenSell: number;
+    ratio: string[];
+    amount: string;
+    validFrom: number;
+    validUntil: number;
+    signature: {
+        pubKey: string;
+        signature: string;
+    };
+};
+
+type Swap = {
+    tx_hash: string;
+    block_number: number;
+    op: {
+        submitterId: number;
+        submitterAddress: string;
+        nonce: number;
+        orders: Order[];
+        amounts: string[];
+        fee: string;
+        feeToken: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        type: 'Swap';
+    };
+    success: boolean;
+    fail_reason: string | null;
+    created_at: string;
+    batch_id: number | null;
+};
+
 export type Interface = (
     | Deposit
     | Transfer
@@ -214,4 +253,5 @@ export type Interface = (
     | ForcedExit
     | WithdrawNFT
     | MintNFT
+    | Swap
 )[];

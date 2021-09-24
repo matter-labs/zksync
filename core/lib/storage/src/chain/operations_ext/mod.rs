@@ -471,6 +471,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 created_at,
                 fail_reason,
                 tx: tx.tx,
+                batch_id: tx.batch_id,
             })
         } else {
             None
@@ -551,6 +552,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 created_at,
                 fail_reason: None,
                 tx: operation,
+                batch_id: None,
             })
         } else {
             None
