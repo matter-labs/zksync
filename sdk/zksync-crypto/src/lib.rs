@@ -9,6 +9,7 @@ const PACKED_POINT_SIZE: usize = 32;
 const PACKED_SIGNATURE_SIZE: usize = 64;
 
 pub use franklin_crypto::bellman::pairing::bn256::{Bn256 as Engine, Fr};
+use zksync_types::tx::TxSignature;
 use franklin_crypto::rescue::bn256::Bn256RescueParams;
 
 pub type Fs = <Engine as JubjubEngine>::Fs;
@@ -176,4 +177,23 @@ pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Result<Vec<u8>, JsValue> {
     );
 
     Ok(packed_full_signature)
+}
+
+#[wasm_bindgen]
+pub fn verify_musig(pubkey: &[u8], msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
+    let wasm_unpacked_signature = TxSignature::deserialize_from_packed_bytes(&signature)
+        .expect("failed to unpack signature");
+    let pubkey = JUBJUB_PARAMS
+        .with(|params| PublicKey::read(pubkey, params))
+        .map_err(|_| JsValue::from_str("couldn't read public key"))?;
+
+    let signer_pubkey = wasm_unpacked_signature.verify_musig(&msg);
+
+    let result = if let Some(signer_pubkey) = signer_pubkey {
+        signer_pubkey == pubkey
+    } else {
+        false
+    };
+
+    Ok(result)
 }

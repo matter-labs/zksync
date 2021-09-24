@@ -21,6 +21,7 @@ default = ["console_error_panic_hook"]
 [dependencies]
 franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta-with-new-hmac"}
 rand = "0.4"
+zksync_types = { path = "../../core/lib/types" }
 
 wasm-bindgen = "=0.2.74"
 hex = "0.4"
@@ -41,7 +42,6 @@ wee_alloc = { version = "0.4.2", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
-zksync_types = { path = "../../core/lib/types" }
 crypto_lib = { package = "zksync_crypto", path = "../../core/lib/crypto" }
 
 [profile.release]
