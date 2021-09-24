@@ -918,56 +918,6 @@
       ]
     }
   },
-  "1d4884ae73b5c60662e2d778b43230a9fa2c7b683402bb67966428f70db2d900": {
-    "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        success,\n                        fail_reason,\n                        created_at\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        true as success,\n                        Null as fail_reason,\n                        created_at\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    success as \"success!\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\"\n                FROM everything\n                ORDER BY created_at DESC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "op!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
-    }
-  },
   "1e491f4afb54c10a9e4f2ea467bd7f219e7a32bdf741691cb6f350d50caae417": {
     "query": "\n            UPDATE forced_exit_requests\n                SET fulfilled_at = $1\n                WHERE id = $2\n            ",
     "describe": {
@@ -5306,6 +5256,62 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "c28c3bba6a78ed3bbf24289d7e0f7ccf53c60bc8dc5ed38e85d02f016ef03b43": {
+    "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        success,\n                        fail_reason,\n                        created_at,\n                        batch_id\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        true as success,\n                        Null as fail_reason,\n                        created_at,\n                        Null::bigint as batch_id\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    success as \"success!\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\",\n                    batch_id as \"batch_id?\"\n                FROM everything\n                ORDER BY created_at DESC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "op!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "fail_reason?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "batch_id?",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
     }
   },
   "c2b72cb3aeb4b448b240edef3988a1026577a82fb4ae1c416fcaf4622afa4ac0": {

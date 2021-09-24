@@ -37,6 +37,7 @@ type Transfer = {
     success: boolean;
     fail_reason: string | null;
     created_at: string;
+    batch_id: number | null;
 };
 
 type Deposit = {
@@ -55,6 +56,7 @@ type Deposit = {
     success: boolean;
     fail_reason: string | null;
     created_at: string;
+    batch_id: number | null;
 };
 
 type ChangePubKey = {
@@ -80,6 +82,7 @@ type ChangePubKey = {
     success: boolean;
     fail_reason: string | null;
     created_at: string;
+    batch_id: number | null;
 };
 
 type Withdraw = {
@@ -105,6 +108,7 @@ type Withdraw = {
     success: boolean;
     fail_reason: string | null;
     created_at: string;
+    batch_id: number | null;
 };
 
 type FullExit = {
@@ -126,6 +130,7 @@ type FullExit = {
     success: boolean;
     fail_reason: string | null;
     created_at: string;
+    batch_id: number | null;
 };
 
 type ForcedExit = {
@@ -148,6 +153,7 @@ type ForcedExit = {
     success: boolean;
     fail_reason: string | null;
     created_at: string;
+    batch_id: number | null;
 };
 
 type WithdrawNFT = {
@@ -173,6 +179,7 @@ type WithdrawNFT = {
     success: boolean;
     fail_reason: string | null;
     created_at: string;
+    batch_id: number | null;
 };
 
 type MintNFT = {
@@ -195,6 +202,7 @@ type MintNFT = {
     success: boolean;
     fail_reason: string | null;
     created_at: string;
+    batch_id: number | null;
 };
 
 export type Interface = (
