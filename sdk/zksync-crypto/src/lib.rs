@@ -9,7 +9,6 @@ const PACKED_POINT_SIZE: usize = 32;
 const PACKED_SIGNATURE_SIZE: usize = 64;
 
 pub use franklin_crypto::bellman::pairing::bn256::{Bn256 as Engine, Fr};
-use zksync_types::tx::TxSignature;
 use franklin_crypto::rescue::bn256::Bn256RescueParams;
 
 pub type Fs = <Engine as JubjubEngine>::Fs;
@@ -22,11 +21,13 @@ thread_local! {
 use wasm_bindgen::prelude::*;
 
 use franklin_crypto::{
-    alt_babyjubjub::{fs::FsRepr, AltJubjubBn256, FixedGenerators},
+    alt_babyjubjub::{fs::FsRepr, AltJubjubBn256, FixedGenerators, edwards},
     bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
-    eddsa::{PrivateKey, PublicKey, Seed},
+    eddsa::{PrivateKey, PublicKey, Seed, Signature as EddsaSignature},
     jubjub::JubjubEngine,
 };
+
+pub type Signature = EddsaSignature<Engine>;
 
 use crate::utils::set_panic_hook;
 use sha2::{Digest, Sha256};
@@ -180,20 +181,61 @@ pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Result<Vec<u8>, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn verify_musig(pubkey: &[u8], msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
-    let wasm_unpacked_signature = TxSignature::deserialize_from_packed_bytes(&signature)
-        .expect("failed to unpack signature");
+pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
+    let pubkey = &signature[..32];
+    let signature = &signature[32..];
+
     let pubkey = JUBJUB_PARAMS
         .with(|params| PublicKey::read(pubkey, params))
         .map_err(|_| JsValue::from_str("couldn't read public key"))?;
+    let sig = deserialize_sig(signature)?;
 
-    let signer_pubkey = wasm_unpacked_signature.verify_musig(&msg);
+    let value = JUBJUB_PARAMS.with(|jubjub_params| {
+        RESCUE_PARAMS.with(|rescue_params| {
+            pubkey.verify_musig_rescue(
+                msg,
+                &sig,
+                FixedGenerators::SpendingKeyGenerator,
+                &rescue_params,
+                &jubjub_params,
+            )
+        })
+    });
+    
 
-    let result = if let Some(signer_pubkey) = signer_pubkey {
-        signer_pubkey == pubkey
-    } else {
-        false
-    };
+    Ok(value)
+}
 
-    Ok(result)
+// pub fn verify_musig_rescue(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+//     let hashed_msg = rescue_hash_tx_msg(msg);
+//     let valid = self.pub_key.0.verify_musig_rescue(
+//         &hashed_msg,
+//         &self.signature.0,
+//         FixedGenerators::SpendingKeyGenerator,
+//         &RESCUE_PARAMS,
+//         &JUBJUB_PARAMS,
+//     );
+//     if valid {
+//         Some(self.pub_key.0.clone())
+//     } else {
+//         None
+//     }
+// }
+
+pub fn deserialize_sig(bytes: &[u8]) -> Result<Signature, JsValue> {
+    if bytes.len() != 64 {
+        return Err(JsValue::from_str("Signature length is not 64 bytes"));
+    }
+    let (r_bar, s_bar) = bytes.split_at(32);
+
+    let r = JUBJUB_PARAMS.with(|params| edwards::Point::read(r_bar, params))
+        .map_err(|_| JsValue::from_str("Failed to parse signature"))?;
+
+    let mut s_repr = FsRepr::default();
+    s_repr.read_le(s_bar).map_err(|_| JsValue::from_str("Failed to parse signature"))?;
+
+    let s =
+        <Engine as JubjubEngine>::Fs::from_repr(s_repr).map_err(|_| JsValue::from_str("Failed to parse signature"))?;
+
+    Ok(Signature { r, s })
 }

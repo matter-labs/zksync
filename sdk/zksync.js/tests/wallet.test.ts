@@ -1,9 +1,13 @@
 import { expect } from 'chai';
 import { BigNumber, ethers } from 'ethers';
 import { Wallet } from '../src/wallet';
+import { Signer } from '../src/signer';
 import { getTokens } from 'reading-tool';
 
 import { Provider } from '../src/provider';
+import { weiRatio, serializeOrder, MAX_TIMESTAMP } from '../src/utils';
+import { Ratio } from '../src/types';
+import { verifySignature } from '../src/crypto';
 
 describe('Wallet with mock provider', function () {
     async function getWallet(ethPrivateKey: Uint8Array, network: string): Promise<Wallet> {
@@ -86,5 +90,28 @@ describe('Wallet with mock provider', function () {
         const key = new Uint8Array(new Array(32).fill(60));
         const wallet = await getWallet(key, 'mainnet');
         expect(await wallet.isSigningKeySet()).eq(true, "Wallet's signing key is unset");
+    });
+
+    it("Test signing signature", async function() {
+        const key = new Uint8Array(new Array(32).fill(60));
+        const signer = Signer.fromPrivateKey(key);
+
+        const order = {
+            accountId: 12,
+            recipient: ethers.utils.hexlify(ethers.utils.randomBytes(20)),
+            nonce: 13,
+            tokenSell: 0,
+            tokenBuy: 1,
+            ratio: [1,2] as Ratio,
+            amount: '10',
+            validFrom: 0,
+            validUntil: MAX_TIMESTAMP
+        };
+
+        const signedOrder = await signer.signSyncOrder(order);
+        const orderSignedBytes = serializeOrder(order);
+        const valid = await verifySignature(orderSignedBytes, signedOrder.signature!);
+
+        console.log(valid);
     });
 });
