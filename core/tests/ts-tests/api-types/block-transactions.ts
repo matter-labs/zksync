@@ -10,90 +10,20 @@ import {
     DepositOp
 } from './transaction';
 
-type Transfer = {
+type PriorityOpInterface<T> = {
     tx_hash: string;
     block_number: number;
-    op: TransferOp;
-    success: boolean;
-    fail_reason: string | null;
-    created_at: string;
-    batch_id: number | null;
-};
-
-type Deposit = {
-    tx_hash: string;
-    block_number: number;
-    op: DepositOp;
+    op: T;
     success: boolean;
     fail_reason: null;
     created_at: string;
     batch_id: null;
 };
 
-type ChangePubKey = {
+type L2TxInterface<T> = {
     tx_hash: string;
     block_number: number;
-    op: ChangePubKeyOp;
-    success: boolean;
-    fail_reason: string | null;
-    created_at: string;
-    batch_id: number | null;
-};
-
-type Withdraw = {
-    tx_hash: string;
-    block_number: number;
-    op: WithdrawOp;
-    success: boolean;
-    fail_reason: string | null;
-    created_at: string;
-    batch_id: number | null;
-};
-
-type FullExit = {
-    tx_hash: string;
-    block_number: number;
-    op: FullExitOp;
-    success: boolean;
-    fail_reason: null;
-    created_at: string;
-    batch_id: null;
-};
-
-type ForcedExit = {
-    tx_hash: string;
-    block_number: number;
-    op: ForcedExitOp;
-    success: boolean;
-    fail_reason: string | null;
-    created_at: string;
-    batch_id: number | null;
-};
-
-type WithdrawNFT = {
-    tx_hash: string;
-    block_number: number;
-    op: WithdrawNFTOp;
-    success: boolean;
-    fail_reason: string | null;
-    created_at: string;
-    batch_id: number | null;
-};
-
-type MintNFT = {
-    tx_hash: string;
-    block_number: number;
-    op: MintNFTOp;
-    success: boolean;
-    fail_reason: string | null;
-    created_at: string;
-    batch_id: number | null;
-};
-
-type Swap = {
-    tx_hash: string;
-    block_number: number;
-    op: SwapOp;
+    op: T;
     success: boolean;
     fail_reason: string | null;
     created_at: string;
@@ -101,13 +31,13 @@ type Swap = {
 };
 
 export type Interface = (
-    | Deposit
-    | Transfer
-    | Withdraw
-    | ChangePubKey
-    | FullExit
-    | ForcedExit
-    | WithdrawNFT
-    | MintNFT
-    | Swap
+    | PriorityOpInterface<DepositOp>
+    | PriorityOpInterface<FullExitOp>
+    | L2TxInterface<TransferOp>
+    | L2TxInterface<WithdrawOp>
+    | L2TxInterface<ChangePubKeyOp>
+    | L2TxInterface<ForcedExitOp>
+    | L2TxInterface<WithdrawNFTOp>
+    | L2TxInterface<MintNFTOp>
+    | L2TxInterface<SwapOp>
 )[];

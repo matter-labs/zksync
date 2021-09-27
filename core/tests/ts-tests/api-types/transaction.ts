@@ -1,14 +1,14 @@
-interface ChangePubKeyOnchain {
+export interface ChangePubKeyOnchain {
     type: 'Onchain';
 }
 
-interface ChangePubKeyECDSA {
+export interface ChangePubKeyECDSA {
     type: 'ECDSA';
     ethSignature: string;
     batchHash?: string;
 }
 
-interface ChangePubKeyCREATE2 {
+export interface ChangePubKeyCREATE2 {
     type: 'CREATE2';
     creatorAddress: string;
     saltArg: string;
@@ -147,7 +147,7 @@ export type Order = {
     nonce: number;
     tokenBuy: number;
     tokenSell: number;
-    ratio: string[];
+    ratio: [string, string];
     amount: string;
     validFrom: number;
     validUntil: number;
@@ -161,8 +161,8 @@ export type SwapOp = {
     submitterId: number;
     submitterAddress: string;
     nonce: number;
-    orders: Order[];
-    amounts: string[];
+    orders: [Order, Order];
+    amounts: [string, string];
     fee: string;
     feeToken: number;
     signature: {
@@ -172,83 +172,23 @@ export type SwapOp = {
     type: 'Swap';
 };
 
-type ChangePubKey = {
-    tx_type: 'ChangePubKey';
+type PriorityOpInterface<T> = {
+    tx_type: string;
     from: string;
     to: string;
     token: number;
     amount: string;
     fee: string;
-    block_number: number;
-    nonce: number;
-    created_at: string;
-    fail_reason: string | null;
-    tx: ChangePubKeyOp;
-    batch_id: number | null;
-};
-
-type Transfer = {
-    tx_type: 'Transfer';
-    from: string;
-    to: string;
-    token: number;
-    amount: string;
-    fee: string;
-    block_number: number;
-    nonce: number;
-    created_at: string;
-    fail_reason: string | null;
-    tx: TransferOp;
-    batch_id: number | null;
-};
-
-type Withdraw = {
-    tx_type: 'Withdraw';
-    from: string;
-    to: string;
-    token: number;
-    amount: string;
-    fee: string;
-    block_number: number;
-    nonce: number;
-    created_at: string;
-    fail_reason: string | null;
-    tx: WithdrawOp;
-    batch_id: number | null;
-};
-
-type Deposit = {
-    tx_type: 'Deposit';
-    from: string;
-    to: string;
-    token: number;
-    amount: string;
-    fee: null;
     block_number: number;
     nonce: number;
     created_at: string;
     fail_reason: null;
-    tx: DepositOp;
+    tx: T;
     batch_id: null;
 };
 
-type FullExit = {
-    tx_type: 'FullExit';
-    from: string;
-    to: string;
-    token: number;
-    amount: string;
-    fee: null;
-    block_number: number;
-    nonce: number;
-    created_at: string;
-    fail_reason: null;
-    tx: FullExitOp;
-    batch_id: null;
-};
-
-type ForcedExit = {
-    tx_type: 'ForcedExit';
+type L2TxInterface<T> = {
+    tx_type: string;
     from: string;
     to: string;
     token: number;
@@ -258,62 +198,17 @@ type ForcedExit = {
     nonce: number;
     created_at: string;
     fail_reason: string | null;
-    tx: WithdrawNFTOp;
-    batch_id: number | null;
-};
-
-type MintNFT = {
-    tx_type: 'MintNFT';
-    from: string;
-    to: string;
-    token: number;
-    amount: string;
-    fee: string;
-    block_number: number;
-    nonce: number;
-    created_at: string;
-    fail_reason: string | null;
-    tx: MintNFTOp;
-    batch_id: number | null;
-};
-
-type WithdrawNFT = {
-    tx_type: 'WithdrawNFT';
-    from: string;
-    to: string;
-    token: number;
-    amount: string;
-    fee: string;
-    block_number: number;
-    nonce: number;
-    created_at: string;
-    fail_reason: string | null;
-    tx: WithdrawNFTOp;
-    batch_id: number | null;
-};
-
-type Swap = {
-    tx_type: 'Swap';
-    from: string;
-    to: string;
-    token: number;
-    amount: string;
-    fee: string;
-    block_number: number;
-    nonce: number;
-    created_at: string;
-    fail_reason: string | null;
-    tx: SwapOp;
+    tx: T;
     batch_id: number | null;
 };
 
 export type Interface =
-    | ChangePubKey
-    | Transfer
-    | Withdraw
-    | Deposit
-    | FullExit
-    | ForcedExit
-    | MintNFT
-    | WithdrawNFT
-    | Swap;
+    | PriorityOpInterface<DepositOp>
+    | PriorityOpInterface<FullExitOp>
+    | L2TxInterface<ChangePubKeyOp>
+    | L2TxInterface<TransferOp>
+    | L2TxInterface<WithdrawOp>
+    | L2TxInterface<ForcedExitOp>
+    | L2TxInterface<MintNFTOp>
+    | L2TxInterface<WithdrawNFTOp>
+    | L2TxInterface<SwapOp>;
