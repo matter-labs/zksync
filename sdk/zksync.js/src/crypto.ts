@@ -49,13 +49,6 @@ export async function rescueHashOrders(orders: Uint8Array): Promise<Uint8Array> 
     return _zks.rescueHashOrders(orders);
 }
 
-export async function verifySignature(msg: Uint8Array, signature: Signature): Promise<boolean> {
-    await loadZkSyncCrypto();
-
-    const _zks = asmJs || zks;
-    return _zks.verify_musig(utils.arrayify(signature.pubKey), msg, utils.arrayify(signature.signature));
-}
-
 let zksyncCryptoLoaded = false;
 export async function loadZkSyncCrypto(wasmFileUrl?: string) {
     if (zksyncCryptoLoaded) {

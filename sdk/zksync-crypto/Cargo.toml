@@ -40,8 +40,8 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 wee_alloc = { version = "0.4.2", optional = true }
 
 [dev-dependencies]
-zksync_types = { path = "../../core/lib/types" }
 wasm-bindgen-test = "0.2"
+zksync_types = { path = "../../core/lib/types" }
 crypto_lib = { package = "zksync_crypto", path = "../../core/lib/crypto" }
 
 [profile.release]
