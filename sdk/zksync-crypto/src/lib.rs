@@ -194,7 +194,7 @@ pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
         RESCUE_PARAMS.with(|rescue_params| {
             pubkey.verify_musig_rescue(
                 &msg,
-                &sig,
+                &signature,
                 FixedGenerators::SpendingKeyGenerator,
                 &rescue_params,
                 &jubjub_params,
