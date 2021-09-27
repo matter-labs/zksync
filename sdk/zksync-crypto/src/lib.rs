@@ -182,12 +182,12 @@ pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Result<Vec<u8>, JsValue> {
 
 #[wasm_bindgen]
 pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
-    let pubkey = &signature[..32];
+    let pubkey = &signature[..PACKED_POINT_SIZE];
     let pubkey = JUBJUB_PARAMS
         .with(|params| edwards::Point::read(&*pubkey, params).map(|p| PublicKey(p)))
         .map_err(|_| JsValue::from_str("couldn't read public key"))?;
 
-    let signature = deserialize_signature(&signature[32..])?;
+    let signature = deserialize_signature(&signature[PACKED_POINT_SIZE..])?;
 
     let msg = utils::rescue_hash_tx_msg(msg);
     let value = JUBJUB_PARAMS.with(|jubjub_params| {
@@ -206,10 +206,10 @@ pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
 }
 
 fn deserialize_signature(bytes: &[u8]) -> Result<Signature, JsValue> {
-    if bytes.len() != 64 {
+    if bytes.len() != PACKED_SIGNATURE_SIZE {
         return Err(JsValue::from_str("Signature length is not 64 bytes"));
     }
-    let (r_bar, s_bar) = bytes.split_at(32);
+    let (r_bar, s_bar) = bytes.split_at(PACKED_POINT_SIZE);
 
     let r = JUBJUB_PARAMS
         .with(|params| edwards::Point::read(r_bar, params))
