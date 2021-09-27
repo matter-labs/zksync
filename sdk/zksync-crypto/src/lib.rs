@@ -186,14 +186,18 @@ pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
     let signature = &signature[32..];
 
     let pubkey = JUBJUB_PARAMS
-        .with(|params| PublicKey::read(pubkey, params))
+        .with(|params| {
+            edwards::Point::read(&*pubkey, params).map(|p| PublicKey(p))
+        })
         .map_err(|_| JsValue::from_str("couldn't read public key"))?;
     let sig = deserialize_sig(signature)?;
+
+    let msg = utils::rescue_hash_tx_msg(msg);
 
     let value = JUBJUB_PARAMS.with(|jubjub_params| {
         RESCUE_PARAMS.with(|rescue_params| {
             pubkey.verify_musig_rescue(
-                msg,
+                &msg,
                 &sig,
                 FixedGenerators::SpendingKeyGenerator,
                 &rescue_params,
@@ -201,28 +205,11 @@ pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
             )
         })
     });
-    
 
     Ok(value)
 }
 
-// pub fn verify_musig_rescue(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
-//     let hashed_msg = rescue_hash_tx_msg(msg);
-//     let valid = self.pub_key.0.verify_musig_rescue(
-//         &hashed_msg,
-//         &self.signature.0,
-//         FixedGenerators::SpendingKeyGenerator,
-//         &RESCUE_PARAMS,
-//         &JUBJUB_PARAMS,
-//     );
-//     if valid {
-//         Some(self.pub_key.0.clone())
-//     } else {
-//         None
-//     }
-// }
-
-pub fn deserialize_sig(bytes: &[u8]) -> Result<Signature, JsValue> {
+fn deserialize_sig(bytes: &[u8]) -> Result<Signature, JsValue> {
     if bytes.len() != 64 {
         return Err(JsValue::from_str("Signature length is not 64 bytes"));
     }
