@@ -70,13 +70,11 @@ fn test_verify_signature() {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
     let mut random_msg = |len| rng.gen_iter::<u8>().take(len).collect::<Vec<_>>();
 
-    let (pk, serialized_pk) = gen_private_key_and_its_be_bytes();
-    let pubkey = public_key_from_private(&pk);
+    let (_, serialized_pk) = gen_private_key_and_its_be_bytes();
 
     let msg = random_msg(32);
-    let mut wasm_signature = sign_musig(&serialized_pk, &msg).unwrap();
+    let wasm_signature = sign_musig(&serialized_pk, &msg).unwrap();
 
-    let pk_part = &wasm_signature[..32];
     let valid = verify_musig(&msg, &wasm_signature).unwrap();
     assert!(valid);
 }
