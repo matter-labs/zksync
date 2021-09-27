@@ -308,13 +308,7 @@ export interface Tokens {
 
 export interface ExtendedTokens extends Tokens {
     // Tokens are indexed by their symbol (e.g. "ETH")
-    [token: string]: {
-        address: string;
-        id: number;
-        symbol: string;
-        decimals: number;
-        enabledForFees: boolean;
-    };
+    [token: string]: TokenInfo;
 }
 
 // we have to ignore this because of a bug in prettier causes this exact block
