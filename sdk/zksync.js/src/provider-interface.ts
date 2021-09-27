@@ -21,7 +21,7 @@ export abstract class SyncProvider {
     public tokenSet: TokenSet;
     public providerType: 'RPC' | 'Rest';
     // For HTTP provider
-    public pollIntervalMilliSecs = 500;
+    public pollIntervalMilliSecs = 1000;
 
     abstract submitTx(tx: any, signature?: TxEthSignatureVariant, fastProcessing?: boolean): Promise<string>;
     abstract submitTxsBatch(
