@@ -1,6 +1,6 @@
 //! Compare crypto primitives to those that we use in our `zksync_types` crate;
 
-use super::{private_key_to_pubkey_hash, read_signing_key, sign_musig};
+use super::{private_key_to_pubkey_hash, read_signing_key, sign_musig, verify_musig};
 
 use crypto_lib::{public_key_from_private, Engine};
 use franklin_crypto::bellman::pairing::ff::{self, PrimeField, PrimeFieldRepr};
@@ -63,4 +63,18 @@ fn test_signature() {
             hex::encode(&wasm_signature)
         );
     }
+}
+
+#[test]
+fn test_verify_signature() {
+    let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+    let mut random_msg = |len| rng.gen_iter::<u8>().take(len).collect::<Vec<_>>();
+
+    let (_, serialized_pk) = gen_private_key_and_its_be_bytes();
+
+    let msg = random_msg(32);
+    let wasm_signature = sign_musig(&serialized_pk, &msg).unwrap();
+
+    let valid = verify_musig(&msg, &wasm_signature).unwrap();
+    assert!(valid);
 }
