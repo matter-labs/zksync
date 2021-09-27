@@ -14,7 +14,7 @@ type PriorityOpInterface<T> = {
     tx_hash: string;
     block_number: number;
     op: T;
-    success: boolean;
+    success: true;
     fail_reason: null;
     created_at: string;
     batch_id: null;

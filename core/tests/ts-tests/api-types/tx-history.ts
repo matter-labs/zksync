@@ -144,10 +144,10 @@ type SwapOp = {
 type PriorityOpInterface<T> = {
     tx_id: string;
     hash: string;
-    eth_block: null;
-    pq_id: null;
+    eth_block: number;
+    pq_id: number;
     tx: T;
-    success: boolean;
+    success: true;
     fail_reason: null;
     commited: boolean;
     verified: boolean;

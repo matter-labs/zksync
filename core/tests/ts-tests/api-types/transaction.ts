@@ -178,7 +178,7 @@ type PriorityOpInterface<T> = {
     to: string;
     token: number;
     amount: string;
-    fee: string;
+    fee: null;
     block_number: number;
     nonce: number;
     created_at: string;
