@@ -471,6 +471,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 created_at,
                 fail_reason,
                 tx: tx.tx,
+                batch_id: tx.batch_id,
             })
         } else {
             None
@@ -551,6 +552,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 created_at,
                 fail_reason: None,
                 tx: operation,
+                batch_id: None,
             })
         } else {
             None
@@ -667,7 +669,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         success,
                         fail_reason,
                         block_number,
-                        created_at
+                        created_at,
+                        batch_id
                     FROM
                         executed_transactions
                     WHERE
@@ -698,7 +701,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         true as success,
                         null as fail_reason,
                         block_number,
-                        created_at
+                        created_at,
+                        Null::bigint as batch_id
                     from 
                         executed_priority_operations
                     where 
@@ -722,7 +726,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 fail_reason as "fail_reason?",
                 true as "commited!",
                 coalesce(verified.confirmed, false) as "verified!",
-                created_at as "created_at!"
+                created_at as "created_at!",
+                batch_id as "batch_id?"
             from transactions
             LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number
             order by transactions.block_number desc, created_at desc
@@ -856,7 +861,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         success,
                         fail_reason,
                         block_number,
-                        created_at
+                        created_at,
+                        batch_id
                     from
                         executed_transactions
                     where
@@ -891,7 +897,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         true as success,
                         null as fail_reason,
                         block_number,
-                        created_at
+                        created_at,
+                        Null::bigint as batch_id
                     from 
                         executed_priority_operations
                     where 
@@ -918,7 +925,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 fail_reason as "fail_reason?",
                 true as "commited!",
                 coalesce(verified.confirmed, false) as "verified!",
-                created_at as "created_at!"
+                created_at as "created_at!",
+                batch_id as "batch_id?"
             from transactions
             left join aggr_comm committed on
                 committed.block_number = transactions.block_number AND committed.confirmed = true

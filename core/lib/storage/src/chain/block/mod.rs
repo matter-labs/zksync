@@ -234,7 +234,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         block_number,
                         success,
                         fail_reason,
-                        created_at
+                        created_at,
+                        batch_id
                     FROM executed_transactions
                     WHERE block_number = $1
                 ), priority_ops AS (
@@ -244,7 +245,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         block_number,
                         true as success,
                         Null as fail_reason,
-                        created_at
+                        created_at,
+                        Null::bigint as batch_id
                     FROM executed_priority_operations
                     WHERE block_number = $1
                 ), everything AS (
@@ -258,7 +260,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     op as "op!",
                     success as "success!",
                     fail_reason as "fail_reason?",
-                    created_at as "created_at!"
+                    created_at as "created_at!",
+                    batch_id as "batch_id?"
                 FROM everything
                 ORDER BY created_at DESC
             "#,

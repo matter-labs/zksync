@@ -65,6 +65,7 @@ pub struct BlockTransactionItem {
     pub success: bool,
     pub fail_reason: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub batch_id: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
