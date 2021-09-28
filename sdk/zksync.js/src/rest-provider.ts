@@ -474,7 +474,7 @@ export class RestProvider extends SyncProvider {
         };
     }
 
-    async getTokens(limit?: number): Promise<types.Tokens> {
+    async getTokens(limit?: number): Promise<types.ExtendedTokens> {
         let tokens = {};
         let tmpId = 0;
         limit = limit ? limit : RestProvider.MAX_LIMIT;
@@ -490,7 +490,8 @@ export class RestProvider extends SyncProvider {
                     address: token.address,
                     id: token.id,
                     symbol: token.symbol,
-                    decimals: token.decimals
+                    decimals: token.decimals,
+                    enabledForFees: token.enabledForFees
                 };
             }
             tmpId += limit;
