@@ -12,7 +12,7 @@
     "@types/chai": "^4.2.14",
     "@types/mocha": "^8.0.3",
     "argparse": "^1.0.10",
-    "axios": "^0.21.1",
+    "axios": "^0.21.2",
     "chai": "^4.2.0",
     "chalk": "^4.1.0",
     "commander": "^6.0.0",
