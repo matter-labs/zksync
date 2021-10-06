@@ -718,21 +718,12 @@ async fn account_transactions_count(mut storage: StorageProcessor<'_>) -> QueryR
     setup.add_block(1);
     commit_schema_data(&mut storage, &setup).await?;
 
-    let count_before_commit = storage
+    let count_after_saving = storage
         .chain()
         .operations_ext_schema()
         .get_account_transactions_count(setup.from_zksync_account.address, None)
         .await?;
-    assert_eq!(count_before_commit, 0);
-
-    commit_block(&mut storage, BlockNumber(1)).await?;
-
-    let count_after_commit = storage
-        .chain()
-        .operations_ext_schema()
-        .get_account_transactions_count(setup.from_zksync_account.address, None)
-        .await?;
-    assert_eq!(count_after_commit, 10);
+    assert_eq!(count_after_saving, 10);
 
     Ok(())
 }
