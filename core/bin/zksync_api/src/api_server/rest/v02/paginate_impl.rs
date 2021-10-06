@@ -229,8 +229,8 @@ impl Paginate<AccountTxsRequest> for StorageProcessor<'_> {
 
         let query = PaginationQuery {
             from: AccountTxsRequest {
-                address: query.from.address,
                 tx_hash: ApiEither::from(tx_hash),
+                ..query.from
             },
             limit: query.limit,
             direction: query.direction,
@@ -246,7 +246,7 @@ impl Paginate<AccountTxsRequest> for StorageProcessor<'_> {
         let count = transaction
             .chain()
             .operations_ext_schema()
-            .get_account_transactions_count(query.from.address)
+            .get_account_transactions_count(query.from.address, query.from.token)
             .await
             .map_err(Error::storage)?;
 

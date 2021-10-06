@@ -338,6 +338,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
             from: AccountTxsRequest {
                 address: from,
                 tx_hash: ApiEither::from(setup.get_tx_hash(0, 0)),
+                token: None,
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -464,6 +465,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
                 from: AccountTxsRequest {
                     address: from,
                     tx_hash: ApiEither::from(request.tx_hash),
+                    token: None,
                 },
                 limit: request.limit,
                 direction: request.direction,
@@ -481,6 +483,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
             from: AccountTxsRequest {
                 address: from,
                 tx_hash: ApiEither::from(setup.get_tx_hash(1, 2)),
+                token: None,
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -497,6 +500,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
             from: AccountTxsRequest {
                 address: from,
                 tx_hash: ApiEither::from(setup.get_tx_hash(0, 9)),
+                token: None,
             },
             limit: 2,
             direction: PaginationDirection::Newer,
@@ -514,6 +518,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
             from: AccountTxsRequest {
                 address: from,
                 tx_hash: ApiEither::from(setup.get_tx_hash(0, 2)),
+                token: None,
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -527,6 +532,7 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
             from: AccountTxsRequest {
                 address: to,
                 tx_hash: ApiEither::from(setup.get_tx_hash(0, 2)),
+                token: None,
             },
             limit: 1,
             direction: PaginationDirection::Newer,
@@ -715,7 +721,7 @@ async fn account_transactions_count(mut storage: StorageProcessor<'_>) -> QueryR
     let count_before_commit = storage
         .chain()
         .operations_ext_schema()
-        .get_account_transactions_count(setup.from_zksync_account.address)
+        .get_account_transactions_count(setup.from_zksync_account.address, None)
         .await?;
     assert_eq!(count_before_commit, 0);
 
@@ -724,7 +730,7 @@ async fn account_transactions_count(mut storage: StorageProcessor<'_>) -> QueryR
     let count_after_commit = storage
         .chain()
         .operations_ext_schema()
-        .get_account_transactions_count(setup.from_zksync_account.address)
+        .get_account_transactions_count(setup.from_zksync_account.address, None)
         .await?;
     assert_eq!(count_after_commit, 10);
 
@@ -1164,6 +1170,7 @@ async fn test_getting_swap_for_acc(mut storage: StorageProcessor<'_>) -> QueryRe
                 from: AccountTxsRequest {
                     address: *address,
                     tx_hash: ApiEither::from(tx_hash),
+                    token: None,
                 },
                 limit: 1,
                 direction: PaginationDirection::Older,

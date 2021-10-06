@@ -9,7 +9,7 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_types::v02::{
-    account::{Account, AccountAddressOrId, AccountState},
+    account::{Account, AccountAddressOrId, AccountState, IncomingAccountTxsQuery},
     pagination::{
         parse_query, AccountTxsRequest, ApiEither, Paginated, PaginationQuery, PendingOpsRequest,
     },
@@ -17,7 +17,7 @@ use zksync_api_types::v02::{
 };
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId, TokenLike};
 
 // Local uses
 use super::{
@@ -303,12 +303,25 @@ impl ApiAccountData {
         &self,
         query: PaginationQuery<ApiEither<TxHash>>,
         address: Address,
+        token_like: Option<TokenLike>,
     ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let token = if let Some(token_like) = token_like {
+            Some(
+                self.tokens
+                    .get_token(&mut storage, token_like.clone())
+                    .await
+                    .map_err(Error::storage)?
+                    .ok_or_else(|| Error::from(PriceError::token_not_found(token_like)))?,
+            )
+        } else {
+            None
+        };
         let new_query = PaginationQuery {
             from: AccountTxsRequest {
-                address,
                 tx_hash: query.from,
+                address,
+                token: token.map(|token| token.id),
             },
             limit: query.limit,
             direction: query.direction,
@@ -382,12 +395,23 @@ async fn account_full_info(
 async fn account_txs(
     data: web::Data<ApiAccountData>,
     account_id_or_address: web::Path<String>,
-    web::Query(query): web::Query<PaginationQuery<String>>,
+    web::Query(query): web::Query<IncomingAccountTxsQuery>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
-    let query = api_try!(parse_query(query).map_err(Error::from));
+    let pagination = api_try!(parse_query(PaginationQuery {
+        from: query.from,
+        limit: query.limit,
+        direction: query.direction
+    })
+    .map_err(Error::from));
+
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(data.get_address_by_address_or_id(address_or_id).await);
-    data.account_txs(query, address).await.into()
+
+    let token_like = query.token.map(|token| TokenLike::parse(&token));
+
+    data.account_txs(pagination, address, token_like)
+        .await
+        .into()
 }
 
 async fn account_pending_txs(

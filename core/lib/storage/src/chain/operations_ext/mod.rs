@@ -1020,6 +1020,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .account_id_by_address(query.from.address)
             .await?;
         let account_id_value = serde_json::to_value(account_id).unwrap();
+        let token_id_value = serde_json::to_value(query.from.token).unwrap();
 
         let txs = if let Some((time_from, _)) = created_at_and_block {
             let raw_txs: Vec<TransactionItem> = match query.direction {
@@ -1058,6 +1059,20 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                             operation->'recipients'->1 = $2
                                         )
                                     )
+                                ) AND (
+                                    $4::jsonb = $5::jsonb
+                                    OR
+                                    tx->'token' = $4
+                                    OR
+                                    tx->'feeToken' = $4
+                                    OR (
+                                        tx->'type' = '"Swap"'
+                                        AND (
+                                            tx->'orders'->0->'tokenBuy' = $4
+                                            OR
+                                            tx->'orders'->0->'tokenSell' = $4
+                                        )
+                                    )
                                 )
                                     AND created_at >= $3
                                 ), priority_ops AS (
@@ -1073,7 +1088,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     block_index,
                                     Null::bigint as batch_id
                                 FROM executed_priority_operations
-                                WHERE (from_account = $1 OR to_account = $1) AND created_at >= $3
+                                WHERE (from_account = $1 OR to_account = $1)
+                                    AND ($4::jsonb = $5::jsonb OR operation->'priority_op'->'token' = $4)
+                                    AND created_at >= $3
                             ), everything AS (
                                 SELECT * FROM transactions
                                 UNION ALL
@@ -1091,11 +1108,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 batch_id as "batch_id?"
                             FROM everything
                             ORDER BY created_at ASC, block_index ASC
-                            LIMIT $4
+                            LIMIT $6
                         "#,
                         query.from.address.as_bytes(),
                         account_id_value,
                         time_from,
+                        token_id_value,
+                        serde_json::Value::Null,
                         i64::from(query.limit),
                     )
                     .fetch_all(transaction.conn())
@@ -1136,6 +1155,20 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                             operation->'recipients'->1 = $2
                                         )
                                     )
+                                ) AND (
+                                    $4::jsonb = $5::jsonb
+                                    OR
+                                    tx->'token' = $4
+                                    OR
+                                    tx->'feeToken' = $4
+                                    OR (
+                                        tx->'type' = '"Swap"'
+                                        AND (
+                                            tx->'orders'->0->'tokenBuy' = $4
+                                            OR
+                                            tx->'orders'->0->'tokenSell' = $4
+                                        )
+                                    )
                                 )
                                     AND created_at <= $3
                             ), priority_ops AS (
@@ -1151,7 +1184,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     block_index,
                                     Null::bigint as batch_id
                                 FROM executed_priority_operations
-                                WHERE (from_account = $1 OR to_account = $1) AND created_at <= $3
+                                WHERE (from_account = $1 OR to_account = $1)
+                                    AND ($4::jsonb = $5::jsonb OR operation->'priority_op'->'token' = $4)
+                                    AND created_at <= $3
                             ), everything AS (
                                 SELECT * FROM transactions
                                 UNION ALL
@@ -1169,11 +1204,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 batch_id as "batch_id"
                             FROM everything
                             ORDER BY created_at DESC, block_index DESC
-                            LIMIT $4
+                            LIMIT $6
                         "#,
                         query.from.address.as_bytes(),
                         account_id_value,
                         time_from,
+                        token_id_value,
+                        serde_json::Value::Null,
                         i64::from(query.limit),
                     )
                     .fetch_all(transaction.conn())
@@ -1313,7 +1350,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(record.map(|record| TxHash::from_slice(&record.tx_hash).unwrap()))
     }
 
-    pub async fn get_account_transactions_count(&mut self, address: Address) -> QueryResult<u32> {
+    pub async fn get_account_transactions_count(
+        &mut self,
+        address: Address,
+        token: Option<TokenId>,
+    ) -> QueryResult<u32> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         let last_committed = transaction
@@ -1327,6 +1368,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .account_id_by_address(address)
             .await?;
         let account_id_value = serde_json::to_value(account_id).unwrap();
+        let token_id_value = serde_json::to_value(token).unwrap();
         let tx_count = sqlx::query!(
             r#"
                 SELECT COUNT(*) as "count!" FROM executed_transactions
@@ -1348,23 +1390,44 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                             operation->'recipients'->1 = $3
                         )
                     )
+                ) AND (
+                    $4::jsonb = $5::jsonb
+                    OR
+                    tx->'token' = $4
+                    OR
+                    tx->'feeToken' = $4
+                    OR (
+                        tx->'type' = '"Swap"'
+                        AND (
+                            tx->'orders'->0->'tokenBuy' = $4
+                            OR
+                            tx->'orders'->0->'tokenSell' = $4
+                        )
+                    )
                 )
             "#,
             i64::from(*last_committed),
             address.as_bytes(),
-            account_id_value
+            account_id_value,
+            token_id_value,
+            serde_json::Value::Null
         )
         .fetch_one(transaction.conn())
         .await?
         .count;
 
+        println!("{:?}", token_id_value);
+
         let priority_op_count = sqlx::query!(
             r#"
                 SELECT COUNT(*) as "count!" FROM executed_priority_operations
                 WHERE block_number <= $1 AND (from_account = $2 OR to_account = $2)
+                    AND ($3::jsonb = $4::jsonb OR operation->'priority_op'->'token' = $3)
             "#,
             i64::from(*last_committed),
-            address.as_bytes()
+            address.as_bytes(),
+            token_id_value,
+            serde_json::Value::Null
         )
         .fetch_one(transaction.conn())
         .await?
