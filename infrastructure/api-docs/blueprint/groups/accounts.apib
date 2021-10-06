@@ -31,13 +31,14 @@ Returns both committed and finalized account states
         + result (Account.FullInfo, required{{isResultNullable}})
         + error (Error, required, nullable)
 
-## api/v0.2/accounts/{accountIdOrAddress}/transactions [/accounts/{accountIdOrAddress}/transactions{?from,limit,direction}]
+## api/v0.2/accounts/{accountIdOrAddress}/transactions [/accounts/{accountIdOrAddress}/transactions{?from,limit,direction,token}]
 
 + Parameters
     + accountIdOrAddress (required, string, `1`) ... Account ID or address in the zkSync network
     + from (required, "latest" | string, `latest`) ... The hash of the transaction from which to show or `latest`
     + limit (required, number, `2`) ... The limit of transactions to be shown
     + direction (required, "newer" | "older", `older`) ... Newer or older than the ID of the `from`
+    + token (optional, string, `0`) ... ID, address or symbol of the token used in transactions
 
 
 ### Get account transactions [GET]

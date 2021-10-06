@@ -133,9 +133,10 @@ export class RestProvider extends SyncProvider {
         paginationQuery: types.PaginationQuery<string>,
         token?: types.TokenLike
     ): Promise<Response<types.Paginated<types.ApiTransaction, string>>> {
-        let url = `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}` +
+        let url =
+            `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}` +
             `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`;
-        if(token) url += `&token=${token}`;
+        if (token) url += `&token=${token}`;
         return await this.get(url);
     }
 
