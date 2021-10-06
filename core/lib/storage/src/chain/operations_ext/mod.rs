@@ -1357,11 +1357,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     ) -> QueryResult<u32> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        let last_committed = transaction
-            .chain()
-            .block_schema()
-            .get_last_committed_confirmed_block()
-            .await?;
         let account_id = transaction
             .chain()
             .account_schema()
@@ -1372,41 +1367,40 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let tx_count = sqlx::query!(
             r#"
                 SELECT COUNT(*) as "count!" FROM executed_transactions
-                WHERE block_number <= $1 AND (
-                    from_account = $2
+                WHERE (
+                    from_account = $1
                     OR
-                    to_account = $2
+                    to_account = $1
                     OR
-                    primary_account_address = $2
+                    primary_account_address = $1
                     OR (
                         tx->'type' = '"Swap"'
                         AND (
-                            operation->'accounts'->0 = $3
+                            operation->'accounts'->0 = $2
                             OR
-                            operation->'accounts'->1 = $3
+                            operation->'accounts'->1 = $2
                             OR
-                            operation->'recipients'->0 = $3
+                            operation->'recipients'->0 = $2
                             OR
-                            operation->'recipients'->1 = $3
+                            operation->'recipients'->1 = $2
                         )
                     )
                 ) AND (
-                    $4::jsonb = $5::jsonb
+                    $3::jsonb = $4::jsonb
                     OR
-                    tx->'token' = $4
+                    tx->'token' = $3
                     OR
-                    tx->'feeToken' = $4
+                    tx->'feeToken' = $3
                     OR (
                         tx->'type' = '"Swap"'
                         AND (
-                            tx->'orders'->0->'tokenBuy' = $4
+                            tx->'orders'->0->'tokenBuy' = $3
                             OR
-                            tx->'orders'->0->'tokenSell' = $4
+                            tx->'orders'->0->'tokenSell' = $3
                         )
                     )
                 )
             "#,
-            i64::from(*last_committed),
             address.as_bytes(),
             account_id_value,
             token_id_value,
@@ -1421,10 +1415,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let priority_op_count = sqlx::query!(
             r#"
                 SELECT COUNT(*) as "count!" FROM executed_priority_operations
-                WHERE block_number <= $1 AND (from_account = $2 OR to_account = $2)
-                    AND ($3::jsonb = $4::jsonb OR operation->'priority_op'->'token' = $3)
+                WHERE (from_account = $1 OR to_account = $1)
+                    AND ($2::jsonb = $3::jsonb OR operation->'priority_op'->'token' = $2)
             "#,
-            i64::from(*last_committed),
             address.as_bytes(),
             token_id_value,
             serde_json::Value::Null
