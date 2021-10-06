@@ -121,9 +121,6 @@ describe('ZkSync REST API V0.2 tests', () => {
             ethTxs.list.length,
             `Endpoint returned incorrect number of transactions: ${ethTxs.list.length}, expected ${expectedETHTxs}`
         ).to.eql(expectedETHTxs);
-        console.log(ethTxs);
-
-        console.log(alice.address());
 
         const wbtcTxs = await provider.accountTxs(
             alice.accountId!,
@@ -134,7 +131,6 @@ describe('ZkSync REST API V0.2 tests', () => {
             },
             'wBTC'
         );
-        console.log(wbtcTxs);
         expect(
             wbtcTxs.list.length,
             `Endpoint returned incorrect number of transactions: ${wbtcTxs.list.length}, expected ${expectedETHTxs}`
@@ -145,7 +141,6 @@ describe('ZkSync REST API V0.2 tests', () => {
             limit: 10,
             direction: 'older'
         });
-        console.log(allTxs);
         expect(
             allTxs.list.length,
             `Endpoint returned incorrect number of transactions: ${allTxs.list.length}, expected ${expectedAll}`

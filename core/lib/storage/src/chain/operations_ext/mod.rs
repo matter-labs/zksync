@@ -1410,8 +1410,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await?
         .count;
 
-        println!("{:?}", token_id_value);
-
         let priority_op_count = sqlx::query!(
             r#"
                 SELECT COUNT(*) as "count!" FROM executed_priority_operations
