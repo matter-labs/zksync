@@ -2442,6 +2442,28 @@
       ]
     }
   },
+  "5a15d381ca75a5965c83584438bc200e11e3643a8b84e23e234b46dfb523bde3": {
+    "query": "\n                SELECT COUNT(*) as \"count!\" FROM executed_priority_operations\n                WHERE (from_account = $1 OR to_account = $1)\n                    AND ($2::jsonb = $3::jsonb OR operation->'priority_op'->'token' = $2)\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Jsonb",
+          "Jsonb"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "5ab853a2edb8a8e2ac1c95f30aa209cb4e06f41fb55872e2d1f28e3a59e38517": {
     "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5, timestamp = $6\n            ",
     "describe": {
@@ -2536,30 +2558,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "613323f3e14ab6e083c43f638f72b89f884d5a1cc5e2602fcea98259917999c6": {
-    "query": "\n                SELECT COUNT(*) as \"count!\" FROM executed_transactions\n                WHERE block_number <= $1 AND (\n                    from_account = $2\n                    OR\n                    to_account = $2\n                    OR\n                    primary_account_address = $2\n                    OR (\n                        tx->'type' = '\"Swap\"'\n                        AND (\n                            operation->'accounts'->0 = $3\n                            OR\n                            operation->'accounts'->1 = $3\n                            OR\n                            operation->'recipients'->0 = $3\n                            OR\n                            operation->'recipients'->1 = $3\n                        )\n                    )\n                ) AND (\n                    $4::jsonb = $5::jsonb\n                    OR\n                    tx->'token' = $4\n                    OR\n                    tx->'feeToken' = $4\n                    OR (\n                        tx->'type' = '\"Swap\"'\n                        AND (\n                            tx->'orders'->0->'tokenBuy' = $4\n                            OR\n                            tx->'orders'->0->'tokenSell' = $4\n                        )\n                    )\n                )\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea",
-          "Jsonb",
-          "Jsonb",
-          "Jsonb"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
@@ -4674,13 +4672,13 @@
         "Left": []
       },
       "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -5328,29 +5326,6 @@
       ]
     }
   },
-  "c2c98e81ceb48985c37c48ffd103c0257b3e7a4e7ab2b1f60a93386430913520": {
-    "query": "\n                SELECT COUNT(*) as \"count!\" FROM executed_priority_operations\n                WHERE block_number <= $1 AND (from_account = $2 OR to_account = $2)\n                    AND ($3::jsonb = $4::jsonb OR operation->'priority_op'->'token' = $3)\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea",
-          "Jsonb",
-          "Jsonb"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "c3632674ee6614b83e258c75447dc986507481a56fbdd5e05dedd0775f21fb79": {
     "query": "\n            SELECT\n                token_id as \"token_id!\", creator_account_id as \"creator_account_id!\",\n                creator_address as \"creator_address!\", serial_id as \"serial_id!\",\n                nft.address as \"address!\", content_hash as \"content_hash!\",\n                tokens.symbol as \"symbol!\"\n            FROM nft\n            INNER JOIN tokens\n            ON tokens.id = nft.token_id\n            ",
     "describe": {
@@ -5732,6 +5707,29 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "d07d6de8ad95aff46e3e8782adf6c6d675a998eec4c44236561c002e1df02a56": {
+    "query": "\n                SELECT COUNT(*) as \"count!\" FROM executed_transactions\n                WHERE (\n                    from_account = $1\n                    OR\n                    to_account = $1\n                    OR\n                    primary_account_address = $1\n                    OR (\n                        tx->'type' = '\"Swap\"'\n                        AND (\n                            operation->'accounts'->0 = $2\n                            OR\n                            operation->'accounts'->1 = $2\n                            OR\n                            operation->'recipients'->0 = $2\n                            OR\n                            operation->'recipients'->1 = $2\n                        )\n                    )\n                ) AND (\n                    $3::jsonb = $4::jsonb\n                    OR\n                    tx->'token' = $3\n                    OR\n                    tx->'feeToken' = $3\n                    OR (\n                        tx->'type' = '\"Swap\"'\n                        AND (\n                            tx->'orders'->0->'tokenBuy' = $3\n                            OR\n                            tx->'orders'->0->'tokenSell' = $3\n                        )\n                    )\n                )\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Jsonb",
+          "Jsonb",
+          "Jsonb"
+        ]
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "d18525d8bf10383d307bf56110fac63276a82dc8b65b358c098fca7c2991579e": {
