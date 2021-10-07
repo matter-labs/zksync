@@ -469,12 +469,12 @@ def tree_updates():
     fee_account.balance[TransferOp.tx.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x05
+    OnchainOp.opcode == 0x05
     OnchainOp.from_account == TransferOp.from_account_id
     OnchainOp.token == TransferOp.tx.token
     OnchainOp.to_account == TransferOp.to_account_id
-    OnhcainOp.packed_amount == TransferOp.tx.packed_amount
-    OnhcainOp.packed_fee == TransferOp.tx.packed_fee
+    OnchainOp.packed_amount == TransferOp.tx.packed_amount
+    OnchainOp.packed_fee == TransferOp.tx.packed_fee
 ```
 
 ### 3. Transfer to new
@@ -564,13 +564,13 @@ def tree_updates():
     fee_account.balance[TransferOp.tx.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x02
+    OnchainOp.opcode == 0x02
     OnchainOp.from_account == TransferToNewOp.from_account_id
     OnchainOp.token == TransferToNewOp.tx.token
-    OnhcainOp.packed_amount == TransferToNewOp.tx.packed_amount
+    OnchainOp.packed_amount == TransferToNewOp.tx.packed_amount
     OnchainOp.to_address == TransferToNewOp.tx.to_address
     OnchainOp.to_account == TransferToNewOp.to_account_id
-    OnhcainOp.packed_fee == TransferToNewOp.tx.packed_fee
+    OnchainOp.packed_fee == TransferToNewOp.tx.packed_fee
 ```
 
 ### 4. Withdraw (Partial Exit)
@@ -707,11 +707,11 @@ def tree_updates():
     fee_account.balance[WithdrawOp.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x03
+    OnchainOp.opcode == 0x03
     OnchainOp.from_account == WithdrawOp.tx.account_id
     OnchainOp.token == WithdrawOp.tx.token
-    OnhcainOp.full_amount == WithdrawOp.tx.amount
-    OnhcainOp.packed_fee == WithdrawOp.tx.packed_fee
+    OnchainOp.full_amount == WithdrawOp.tx.amount
+    OnchainOp.packed_fee == WithdrawOp.tx.packed_fee
     OnchainOp.to_address == WithdrawOp.tx.to_address
 ```
 
@@ -857,11 +857,11 @@ def tree_updates():
     fee_account.balance[WithdrawNFTOp.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x0a
+    OnchainOp.opcode == 0x0a
     OnchainOp.from_account == WithdrawNFTOp.tx.account_id
     OnchainOp.token == WithdrawNFTOp.tx.token
     OnchainOp.fee_token == WithdrawNFTOp.tx.fee_token
-    OnhcainOp.packed_fee == WithdrawNFTOp.tx.packed_fee
+    OnchainOp.packed_fee == WithdrawNFTOp.tx.packed_fee
     OnchainOp.to_address == WithdrawNFTOp.tx.to_address
 ```
 
@@ -996,11 +996,11 @@ def tree_updates():
     fee_account.balance[MintNFTOp.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x09
+    OnchainOp.opcode == 0x09
     OnchainOp.creator_account == MintNFTOp.tx.account_id
     OnchainOp.recipient == MintNFTOp.tx.recipient
     OnchainOp.fee_token == MintNFTOp.tx.fee_token
-    OnhcainOp.packed_fee == MintNFTOp.tx.packed_fee
+    OnchainOp.packed_fee == MintNFTOp.tx.packed_fee
 ```
 
 ### 7. Deposit
@@ -1079,10 +1079,10 @@ def tree_updates():
     account.balance[DepositOp.op.token] += DepositOp.op.full_amount
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x01
+    OnchainOp.opcode == 0x01
     OnchainOp.to_account == DepositOp.to_account_id
     OnchainOp.token == DepositOp.op.token
-    OnhcainOp.full_amount == DepositOp.op.amount
+    OnchainOp.full_amount == DepositOp.op.amount
     OnchainOp.to_address == DepositOp.op.to_address
 ```
 
@@ -1168,9 +1168,9 @@ def tree_updates():
         account.balance[FullExitOp.op.token] = 0
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x06
+    OnchainOp.opcode == 0x06
     OnchainOp.account_id == FullExitOp.op.account_id
-    OnhcainOp.owner == FullExitOp.op.eth_address
+    OnchainOp.owner == FullExitOp.op.eth_address
     OnchainOp.token == FullExitOp.op.token
     OnchainOp.full_amount == withdrawn_amount
 ```
@@ -1349,13 +1349,13 @@ def tree_updates():
     fee_account.balance[ChangePkOp.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x07
+    OnchainOp.opcode == 0x07
     OnchainOp.account_id == ChanePkOp.tx.account_id
-    OnhcainOp.new_pubkey_hash == ChangePkOp.tx.new_pubkey_hash
+    OnchainOp.new_pubkey_hash == ChangePkOp.tx.new_pubkey_hash
     OnchainOp.account_address == ChangePkOp.tx.account
     OnchainOp.nonce == ChangePkOp.tx.nonce
     OnchainOp.fee_token == ChangePkOp.tx.fee_token
-    OnhcainOp.packed_fee == ChangePkOp.tx.packed_fee
+    OnchainOp.packed_fee == ChangePkOp.tx.packed_fee
 ```
 
 #### Signature validity
@@ -1494,11 +1494,11 @@ def tree_updates():
     fee_account.balance[WithdrawOp.token] += fee
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x08
+    OnchainOp.opcode == 0x08
     OnchainOp.initiator_account_id == WithdrawOp.tx.initiator_account_id
     OnchainOp.token == WithdrawOp.tx.token
-    OnhcainOp.full_amount == target_account_initial_balance
-    OnhcainOp.packed_fee == WithdrawOp.tx.packed_fee
+    OnchainOp.full_amount == target_account_initial_balance
+    OnchainOp.packed_fee == WithdrawOp.tx.packed_fee
     OnchainOp.target == WithdrawOp.tx.target
 ```
 
@@ -1748,7 +1748,7 @@ def tree_updates():
         account_b.nonce += 1
 
 def pubdata_invariants():
-    OnhcainOp.opcode == 0x0b
+    OnchainOp.opcode == 0x0b
     OnchainOp.account_a == SwapOp.orders.0.account_id
     OnchainOp.recipient_a == SwapOp.orders.0.recipient
     OnchainOp.account_b == SwapOp.orders.1.account_id
@@ -1757,9 +1757,9 @@ def pubdata_invariants():
     OnchainOp.token_a == SwapOp.orders.0.token_sell
     OnchainOp.token_b == SwapOp.orders.1.token_sell
     OnchainOp.fee_token == SwapOp.fee_token
-    OnhcainOp.packed_amount_a == SwapOp.amounts.0
-    OnhcainOp.packed_amount_b == SwapOp.amounts.1
-    OnhcainOp.packed_fee == SwapOp.fee
+    OnchainOp.packed_amount_a == SwapOp.amounts.0
+    OnchainOp.packed_amount_b == SwapOp.amounts.1
+    OnchainOp.packed_fee == SwapOp.fee
     OnchainOp.nonce_mask == (SwapOp.orders.0.amount != 0) | (SwapOp.orders.1.amount != 0) << 1
 ```
 
