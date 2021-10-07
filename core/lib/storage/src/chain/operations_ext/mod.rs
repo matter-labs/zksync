@@ -1060,7 +1060,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                         )
                                     )
                                 ) AND (
-                                    $4::jsonb = $5::jsonb
+                                    $4::jsonb = 'null'::jsonb
                                     OR
                                     tx->'token' = $4
                                     OR
@@ -1089,7 +1089,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     Null::bigint as batch_id
                                 FROM executed_priority_operations
                                 WHERE (from_account = $1 OR to_account = $1)
-                                    AND ($4::jsonb = $5::jsonb OR operation->'priority_op'->'token' = $4)
+                                    AND ($4::jsonb = 'null'::jsonb OR operation->'priority_op'->'token' = $4)
                                     AND created_at >= $3
                             ), everything AS (
                                 SELECT * FROM transactions
@@ -1108,13 +1108,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 batch_id as "batch_id?"
                             FROM everything
                             ORDER BY created_at ASC, block_index ASC
-                            LIMIT $6
+                            LIMIT $5
                         "#,
                         query.from.address.as_bytes(),
                         account_id_value,
                         time_from,
                         token_id_value,
-                        serde_json::Value::Null,
                         i64::from(query.limit),
                     )
                     .fetch_all(transaction.conn())
@@ -1156,7 +1155,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                         )
                                     )
                                 ) AND (
-                                    $4::jsonb = $5::jsonb
+                                    $4::jsonb = 'null'::jsonb
                                     OR
                                     tx->'token' = $4
                                     OR
@@ -1185,7 +1184,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                     Null::bigint as batch_id
                                 FROM executed_priority_operations
                                 WHERE (from_account = $1 OR to_account = $1)
-                                    AND ($4::jsonb = $5::jsonb OR operation->'priority_op'->'token' = $4)
+                                    AND ($4::jsonb = 'null'::jsonb OR operation->'priority_op'->'token' = $4)
                                     AND created_at <= $3
                             ), everything AS (
                                 SELECT * FROM transactions
@@ -1204,13 +1203,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                                 batch_id as "batch_id"
                             FROM everything
                             ORDER BY created_at DESC, block_index DESC
-                            LIMIT $6
+                            LIMIT $5
                         "#,
                         query.from.address.as_bytes(),
                         account_id_value,
                         time_from,
                         token_id_value,
-                        serde_json::Value::Null,
                         i64::from(query.limit),
                     )
                     .fetch_all(transaction.conn())
@@ -1386,7 +1384,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         )
                     )
                 ) AND (
-                    $3::jsonb = $4::jsonb
+                    $3::jsonb = 'null'::jsonb
                     OR
                     tx->'token' = $3
                     OR
@@ -1403,8 +1401,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             "#,
             address.as_bytes(),
             account_id_value,
-            token_id_value,
-            serde_json::Value::Null
+            token_id_value
         )
         .fetch_one(transaction.conn())
         .await?
@@ -1414,11 +1411,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             r#"
                 SELECT COUNT(*) as "count!" FROM executed_priority_operations
                 WHERE (from_account = $1 OR to_account = $1)
-                    AND ($2::jsonb = $3::jsonb OR operation->'priority_op'->'token' = $2)
+                    AND ($2::jsonb = 'null'::jsonb OR operation->'priority_op'->'token' = $2)
             "#,
             address.as_bytes(),
-            token_id_value,
-            serde_json::Value::Null
+            token_id_value
         )
         .fetch_one(transaction.conn())
         .await?
