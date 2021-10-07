@@ -145,8 +145,40 @@ describe('ZkSync REST API V0.2 tests', () => {
             allTxs.list.length,
             `Endpoint returned incorrect number of transactions: ${allTxs.list.length}, expected ${expectedAll}`
         ).to.eql(expectedAll);
-
         expect(allTxs.list[0].txHash, 'Endpoint did not return first tx correctly').to.be.eql(lastTxHash);
+
+        const expectedAliceBob = 3;
+        const expectedAliceTester = 2;
+
+        const aliceAndBobTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            undefined,
+            bob.address()
+        );
+        expect(
+            aliceAndBobTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${aliceAndBobTxs.list.length}, expected ${expectedAliceBob}`
+        ).to.eql(expectedAliceBob);
+
+        const aliceAndTesterTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            undefined,
+            tester.syncWallet.address()
+        );
+        expect(
+            aliceAndTesterTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${aliceAndTesterTxs.list.length}, expected ${expectedAliceTester}`
+        ).to.eql(expectedAliceTester);
 
         const accTxs = await provider.accountPendingTxs(alice.accountId!, {
             from: 1,

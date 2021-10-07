@@ -137,4 +137,5 @@ pub struct AccountTxsRequest {
     pub address: Address,
     pub tx_hash: ApiEither<TxHash>,
     pub token: Option<TokenId>,
+    pub second_address: Option<Address>,
 }

@@ -39,6 +39,7 @@ Returns both committed and finalized account states
     + limit (required, number, `2`) ... The limit of transactions to be shown
     + direction (required, "newer" | "older", `older`) ... Newer or older than the ID of the `from`
     + token (optional, string, `0`) ... ID, address or symbol of the token used in transactions
+    + secondAddress (optional, string, `2`) ... Account ID or address of account to filter by. If specified it will return only transactions which affect both accounts
 
 
 ### Get account transactions [GET]

@@ -109,8 +109,9 @@ pub struct DepositingAccountBalances {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomingAccountTxsQuery {
-    pub token: Option<String>,
     pub from: String,
     pub limit: u32,
     pub direction: PaginationDirection,
+    pub token: Option<String>,
+    pub second_account: Option<String>,
 }

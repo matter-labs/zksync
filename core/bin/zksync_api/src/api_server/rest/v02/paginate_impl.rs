@@ -246,7 +246,11 @@ impl Paginate<AccountTxsRequest> for StorageProcessor<'_> {
         let count = transaction
             .chain()
             .operations_ext_schema()
-            .get_account_transactions_count(query.from.address, query.from.token)
+            .get_account_transactions_count(
+                query.from.address,
+                query.from.token,
+                query.from.second_address,
+            )
             .await
             .map_err(Error::storage)?;
 

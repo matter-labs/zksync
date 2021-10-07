@@ -304,6 +304,7 @@ impl ApiAccountData {
         query: PaginationQuery<ApiEither<TxHash>>,
         address: Address,
         token_like: Option<TokenLike>,
+        second_address: Option<Address>,
     ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let token = if let Some(token_like) = token_like {
@@ -322,6 +323,7 @@ impl ApiAccountData {
                 tx_hash: query.from,
                 address,
                 token: token.map(|token| token.id),
+                second_address,
             },
             limit: query.limit,
             direction: query.direction,
@@ -407,9 +409,18 @@ async fn account_txs(
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(data.get_address_by_address_or_id(address_or_id).await);
 
+    let second_address = if let Some(second_account) = query.second_account {
+        let address_or_id = api_try!(data.parse_account_id_or_address(&second_account));
+        Some(api_try!(
+            data.get_address_by_address_or_id(address_or_id).await
+        ))
+    } else {
+        None
+    };
+
     let token_like = query.token.map(|token| TokenLike::parse(&token));
 
-    data.account_txs(pagination, address, token_like)
+    data.account_txs(pagination, address, token_like, second_address)
         .await
         .into()
 }
