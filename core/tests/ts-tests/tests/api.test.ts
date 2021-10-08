@@ -80,10 +80,10 @@ describe('ZkSync REST API V0.2 tests', () => {
         tester = await Tester.init('localhost', 'HTTP', 'REST');
         alice = await tester.fundedWallet('1.0');
         bob = await tester.emptyWallet();
-        for (const token of ['ETH']) {
+        for (const token of ['ETH', 'wBTC']) {
             const thousand = tester.syncProvider.tokenSet.parseToken(token, '1000');
             await tester.testDeposit(alice, token, thousand, true);
-            await tester.testChangePubKey(alice, token, false);
+            if (token === 'ETH') await tester.testChangePubKey(alice, token, false);
             await tester.testTransfer(alice, bob, token, thousand.div(4));
         }
 
@@ -104,17 +104,81 @@ describe('ZkSync REST API V0.2 tests', () => {
         expect(fullState.committed, 'committed state differs').to.eql(committedState);
         expect(fullState.finalized, 'finalized state differs').to.eql(finalizedState);
 
-        const txs = await provider.accountTxs(alice.accountId!, {
+        const expectedETHTxs = 4;
+        const expectedWBTCTxs = 2;
+        const expectedAll = expectedETHTxs + expectedWBTCTxs;
+
+        const ethTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            'ETH'
+        );
+        expect(
+            ethTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${ethTxs.list.length}, expected ${expectedETHTxs}`
+        ).to.eql(expectedETHTxs);
+
+        const wbtcTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            'wBTC'
+        );
+        expect(
+            wbtcTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${wbtcTxs.list.length}, expected ${expectedETHTxs}`
+        ).to.eql(expectedWBTCTxs);
+
+        const allTxs = await provider.accountTxs(alice.accountId!, {
             from: lastTxHash,
             limit: 10,
             direction: 'older'
         });
-        const expected = 4;
         expect(
-            txs.list.length,
-            `Endpoint returned incorrect number of transactions: ${txs.list.length}, expected ${expected}`
-        ).to.eql(expected);
-        expect(txs.list[0].txHash, 'Endpoint did not return first tx correctly').to.be.eql(lastTxHash);
+            allTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${allTxs.list.length}, expected ${expectedAll}`
+        ).to.eql(expectedAll);
+        expect(allTxs.list[0].txHash, 'Endpoint did not return first tx correctly').to.be.eql(lastTxHash);
+
+        const expectedAliceBob = 3;
+        const expectedAliceTester = 2;
+
+        const aliceAndBobTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            undefined,
+            bob.address()
+        );
+        expect(
+            aliceAndBobTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${aliceAndBobTxs.list.length}, expected ${expectedAliceBob}`
+        ).to.eql(expectedAliceBob);
+
+        const aliceAndTesterTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            undefined,
+            tester.syncWallet.address()
+        );
+        expect(
+            aliceAndTesterTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${aliceAndTesterTxs.list.length}, expected ${expectedAliceTester}`
+        ).to.eql(expectedAliceTester);
 
         const accTxs = await provider.accountPendingTxs(alice.accountId!, {
             from: 1,

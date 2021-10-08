@@ -8,6 +8,7 @@ use zksync_types::{
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
+use super::pagination::PaginationDirection;
 use super::token::NFT;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
@@ -103,4 +104,14 @@ pub struct DepositingFunds {
 #[serde(rename_all = "camelCase")]
 pub struct DepositingAccountBalances {
     pub balances: HashMap<String, DepositingFunds>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomingAccountTxsQuery {
+    pub from: String,
+    pub limit: u32,
+    pub direction: PaginationDirection,
+    pub token: Option<String>,
+    pub second_account: Option<String>,
 }

@@ -556,6 +556,80 @@
       ]
     }
   },
+  "15c0b69531e76ac25b1a097520f1bea1126ca7a6dbe947143c6c1387e4710f1e": {
+    "query": "\n                            WITH transactions AS (\n                                SELECT\n                                    tx_hash,\n                                    tx as op,\n                                    block_number,\n                                    created_at,\n                                    success,\n                                    fail_reason,\n                                    Null::bytea as eth_hash,\n                                    Null::bigint as priority_op_serialid,\n                                    block_index,\n                                    batch_id\n                                FROM executed_transactions\n                                WHERE (\n                                    from_account = $1\n                                    OR\n                                    to_account = $1\n                                    OR\n                                    primary_account_address = $1\n                                    OR (\n                                        tx->'type' = '\"Swap\"'\n                                        AND (\n                                            operation->'accounts'->0 = $2\n                                            OR\n                                            operation->'accounts'->1 = $2\n                                            OR\n                                            operation->'recipients'->0 = $2\n                                            OR\n                                            operation->'recipients'->1 = $2\n                                        )\n                                    )\n                                ) AND (\n                                    $3::bytea = '\\x'::bytea\n                                    OR\n                                    from_account = $3\n                                    OR\n                                    to_account = $3\n                                    OR\n                                    primary_account_address = $3\n                                    OR (\n                                        tx->'type' = '\"Swap\"'\n                                        AND (\n                                            operation->'accounts'->0 = $4\n                                            OR\n                                            operation->'accounts'->1 = $4\n                                            OR\n                                            operation->'recipients'->0 = $4\n                                            OR\n                                            operation->'recipients'->1 = $4\n                                        )\n                                    )\n                                ) AND (\n                                    $6::jsonb = 'null'::jsonb\n                                    OR\n                                    tx->'token' = $6\n                                    OR\n                                    tx->'feeToken' = $6\n                                    OR (\n                                        tx->'type' = '\"Swap\"'\n                                        AND (\n                                            tx->'orders'->0->'tokenBuy' = $6\n                                            OR\n                                            tx->'orders'->0->'tokenSell' = $6\n                                        )\n                                    )\n                                )\n                                    AND created_at >= $5\n                                ), priority_ops AS (\n                                SELECT\n                                    tx_hash,\n                                    operation as op,\n                                    block_number,\n                                    created_at,\n                                    true as success,\n                                    Null as fail_reason,\n                                    eth_hash,\n                                    priority_op_serialid,\n                                    block_index,\n                                    Null::bigint as batch_id\n                                FROM executed_priority_operations\n                                WHERE (from_account = $1 OR to_account = $1)\n                                    AND ($3::bytea = '\\x'::bytea OR from_account = $3 OR to_account = $3)\n                                    AND ($6::jsonb = 'null'::jsonb OR operation->'priority_op'->'token' = $6)\n                                    AND created_at >= $5\n                            ), everything AS (\n                                SELECT * FROM transactions\n                                UNION ALL\n                                SELECT * FROM priority_ops\n                            )\n                            SELECT\n                                tx_hash as \"tx_hash!\",\n                                block_number as \"block_number!\",\n                                op as \"op!\",\n                                created_at as \"created_at!\",\n                                success as \"success!\",\n                                fail_reason as \"fail_reason?\",\n                                eth_hash as \"eth_hash?\",\n                                priority_op_serialid as \"priority_op_serialid?\",\n                                batch_id as \"batch_id?\"\n                            FROM everything\n                            ORDER BY created_at ASC, block_index ASC\n                            LIMIT $7\n                        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "op!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "fail_reason?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "eth_hash?",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 7,
+          "name": "priority_op_serialid?",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 8,
+          "name": "batch_id?",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Jsonb",
+          "Bytea",
+          "Jsonb",
+          "Timestamptz",
+          "Jsonb",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -2601,77 +2675,6 @@
       ]
     }
   },
-  "69ae1849ee94aeaa39d49384531ab2db1ee888a85c28bdbf75a1c3c8a253e143": {
-    "query": "\n                            WITH transactions AS (\n                                SELECT\n                                    tx_hash,\n                                    tx as op,\n                                    block_number,\n                                    created_at,\n                                    success,\n                                    fail_reason,\n                                    Null::bytea as eth_hash,\n                                    Null::bigint as priority_op_serialid,\n                                    block_index,\n                                    batch_id\n                                FROM executed_transactions\n                                WHERE (\n                                    from_account = $1\n                                    OR\n                                    to_account = $1\n                                    OR\n                                    primary_account_address = $1\n                                    OR (\n                                        tx->'type' = '\"Swap\"'\n                                        AND (\n                                            operation->'accounts'->0 = $2\n                                            OR\n                                            operation->'accounts'->1 = $2\n                                            OR\n                                            operation->'recipients'->0 = $2\n                                            OR\n                                            operation->'recipients'->1 = $2\n                                        )\n                                    )\n                                )\n                                    AND created_at >= $3\n                                ), priority_ops AS (\n                                SELECT\n                                    tx_hash,\n                                    operation as op,\n                                    block_number,\n                                    created_at,\n                                    true as success,\n                                    Null as fail_reason,\n                                    eth_hash,\n                                    priority_op_serialid,\n                                    block_index,\n                                    Null::bigint as batch_id\n                                FROM executed_priority_operations\n                                WHERE (from_account = $1 OR to_account = $1) AND created_at >= $3\n                            ), everything AS (\n                                SELECT * FROM transactions\n                                UNION ALL\n                                SELECT * FROM priority_ops\n                            )\n                            SELECT\n                                tx_hash as \"tx_hash!\",\n                                block_number as \"block_number!\",\n                                op as \"op!\",\n                                created_at as \"created_at!\",\n                                success as \"success!\",\n                                fail_reason as \"fail_reason?\",\n                                eth_hash as \"eth_hash?\",\n                                priority_op_serialid as \"priority_op_serialid?\",\n                                batch_id as \"batch_id?\"\n                            FROM everything\n                            ORDER BY created_at ASC, block_index ASC\n                            LIMIT $4\n                        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "op!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "eth_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "priority_op_serialid?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 8,
-          "name": "batch_id?",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Jsonb",
-          "Timestamptz",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
-    }
-  },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
     "query": "SELECT max(number) FROM blocks",
     "describe": {
@@ -3531,77 +3534,6 @@
       "nullable": []
     }
   },
-  "88991489b01ab4152957d06a51ac74833434e178f5c454852133cb651acd1f58": {
-    "query": "\n                            WITH transactions AS (\n                                SELECT\n                                    tx_hash,\n                                    tx as op,\n                                    block_number,\n                                    created_at,\n                                    success,\n                                    fail_reason,\n                                    Null::bytea as eth_hash,\n                                    Null::bigint as priority_op_serialid,\n                                    block_index,\n                                    batch_id\n                                FROM executed_transactions\n                                WHERE (\n                                    from_account = $1\n                                    OR\n                                    to_account = $1\n                                    OR\n                                    primary_account_address = $1\n                                    OR (\n                                        tx->'type' = '\"Swap\"'\n                                        AND (\n                                            operation->'accounts'->0 = $2\n                                            OR\n                                            operation->'accounts'->1 = $2\n                                            OR\n                                            operation->'recipients'->0 = $2\n                                            OR\n                                            operation->'recipients'->1 = $2\n                                        )\n                                    )\n                                )\n                                    AND created_at <= $3\n                            ), priority_ops AS (\n                                SELECT\n                                    tx_hash,\n                                    operation as op,\n                                    block_number,\n                                    created_at,\n                                    true as success,\n                                    Null as fail_reason,\n                                    eth_hash,\n                                    priority_op_serialid,\n                                    block_index,\n                                    Null::bigint as batch_id\n                                FROM executed_priority_operations\n                                WHERE (from_account = $1 OR to_account = $1) AND created_at <= $3\n                            ), everything AS (\n                                SELECT * FROM transactions\n                                UNION ALL\n                                SELECT * FROM priority_ops\n                            )\n                            SELECT\n                                tx_hash as \"tx_hash!\",\n                                block_number as \"block_number!\",\n                                op as \"op!\",\n                                created_at as \"created_at!\",\n                                success as \"success!\",\n                                fail_reason as \"fail_reason?\",\n                                eth_hash as \"eth_hash?\",\n                                priority_op_serialid as \"priority_op_serialid?\",\n                                batch_id as \"batch_id\"\n                            FROM everything\n                            ORDER BY created_at DESC, block_index DESC\n                            LIMIT $4\n                        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "op!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "eth_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "priority_op_serialid?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 8,
-          "name": "batch_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Jsonb",
-          "Timestamptz",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
-    }
-  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
@@ -4093,6 +4025,28 @@
       "nullable": []
     }
   },
+  "991777e5bd0599f9b08b6dc9b8f51f66403f4e5428d1334dde1d2ed8a01e6498": {
+    "query": "\n                SELECT COUNT(*) as \"count!\" FROM executed_priority_operations\n                WHERE (from_account = $1 OR to_account = $1)\n                    AND ($2::bytea = '\\x'::bytea OR from_account = $2 OR to_account = $2)\n                    AND ($3::jsonb = 'null'::jsonb OR operation->'priority_op'->'token' = $3)\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bytea",
+          "Jsonb"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "99345d28e9aa3a325a7b8027ccd73f1dcea835cdf80e4432404337b2bf62a64e": {
     "query": "DELETE FROM pending_block",
     "describe": {
@@ -4177,6 +4131,30 @@
         "Left": []
       },
       "nullable": []
+    }
+  },
+  "9e58e8f2c29861162a7cf6646fe34aa5f53d061a7d1030ebe009444f1e61f4af": {
+    "query": "\n                SELECT COUNT(*) as \"count!\" FROM executed_transactions\n                WHERE (\n                    from_account = $1\n                    OR\n                    to_account = $1\n                    OR\n                    primary_account_address = $1\n                    OR (\n                        tx->'type' = '\"Swap\"'\n                        AND (\n                            operation->'accounts'->0 = $2\n                            OR\n                            operation->'accounts'->1 = $2\n                            OR\n                            operation->'recipients'->0 = $2\n                            OR\n                            operation->'recipients'->1 = $2\n                        )\n                    )\n                ) AND (\n                    $3::bytea = '\\x'::bytea\n                    OR\n                    from_account = $3\n                    OR\n                    to_account = $3\n                    OR\n                    primary_account_address = $3\n                    OR (\n                        tx->'type' = '\"Swap\"'\n                        AND (\n                            operation->'accounts'->0 = $4\n                            OR\n                            operation->'accounts'->1 = $4\n                            OR\n                            operation->'recipients'->0 = $4\n                            OR\n                            operation->'recipients'->1 = $4\n                        )\n                    )\n                ) AND (\n                    $5::jsonb = 'null'::jsonb\n                    OR\n                    tx->'token' = $5\n                    OR\n                    tx->'feeToken' = $5\n                    OR (\n                        tx->'type' = '\"Swap\"'\n                        AND (\n                            tx->'orders'->0->'tokenBuy' = $5\n                            OR\n                            tx->'orders'->0->'tokenSell' = $5\n                        )\n                    )\n                )\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Jsonb",
+          "Bytea",
+          "Jsonb",
+          "Jsonb"
+        ]
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "9fbf3d0ae8610fb464ac74ff989860eb913f4bfb14790373021ef456b671ed96": {
@@ -4497,27 +4475,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "a8db70ecce6347665cfbc4dd9f43bb99d6681ad811b14ebb77ca57b685d92630": {
-    "query": "\n                SELECT COUNT(*) as \"count!\" FROM executed_priority_operations\n                WHERE block_number <= $1 AND (from_account = $2 OR to_account = $2)\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "aaaf2bcea738151db11f6152772516a46ef7d23ae885936094226b837369ee3c": {
@@ -4938,28 +4895,6 @@
         true,
         false,
         false
-      ]
-    }
-  },
-  "bef3c82185740c2beef2f8c0d67a8f8d1f766ee18cdbe59de7db5c9f717bdaf5": {
-    "query": "\n                SELECT COUNT(*) as \"count!\" FROM executed_transactions\n                WHERE block_number <= $1 AND (\n                    from_account = $2\n                    OR\n                    to_account = $2\n                    OR\n                    primary_account_address = $2\n                    OR (\n                        tx->'type' = '\"Swap\"'\n                        AND (\n                            operation->'accounts'->0 = $3\n                            OR\n                            operation->'accounts'->1 = $3\n                            OR\n                            operation->'recipients'->0 = $3\n                            OR\n                            operation->'recipients'->1 = $3\n                        )\n                    )\n                )\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea",
-          "Jsonb"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
@@ -5740,6 +5675,80 @@
         "Left": []
       },
       "nullable": [
+        null
+      ]
+    }
+  },
+  "d1fea8dfa27224e2987587d587c15af8c4bf6e5fb2c6d038ed71567c98da9021": {
+    "query": "\n                            WITH transactions AS (\n                                SELECT\n                                    tx_hash,\n                                    tx as op,\n                                    block_number,\n                                    created_at,\n                                    success,\n                                    fail_reason,\n                                    Null::bytea as eth_hash,\n                                    Null::bigint as priority_op_serialid,\n                                    block_index,\n                                    batch_id\n                                FROM executed_transactions\n                                WHERE (\n                                    from_account = $1\n                                    OR\n                                    to_account = $1\n                                    OR\n                                    primary_account_address = $1\n                                    OR (\n                                        tx->'type' = '\"Swap\"'\n                                        AND (\n                                            operation->'accounts'->0 = $2\n                                            OR\n                                            operation->'accounts'->1 = $2\n                                            OR\n                                            operation->'recipients'->0 = $2\n                                            OR\n                                            operation->'recipients'->1 = $2\n                                        )\n                                    )\n                                ) AND (\n                                    $3::bytea = '\\x'::bytea\n                                    OR\n                                    from_account = $3\n                                    OR\n                                    to_account = $3\n                                    OR\n                                    primary_account_address = $3\n                                    OR (\n                                        tx->'type' = '\"Swap\"'\n                                        AND (\n                                            operation->'accounts'->0 = $4\n                                            OR\n                                            operation->'accounts'->1 = $4\n                                            OR\n                                            operation->'recipients'->0 = $4\n                                            OR\n                                            operation->'recipients'->1 = $4\n                                        )\n                                    )\n                                ) AND (\n                                    $6::jsonb = 'null'::jsonb\n                                    OR\n                                    tx->'token' = $6\n                                    OR\n                                    tx->'feeToken' = $6\n                                    OR (\n                                        tx->'type' = '\"Swap\"'\n                                        AND (\n                                            tx->'orders'->0->'tokenBuy' = $6\n                                            OR\n                                            tx->'orders'->0->'tokenSell' = $6\n                                        )\n                                    )\n                                )\n                                    AND created_at <= $5\n                            ), priority_ops AS (\n                                SELECT\n                                    tx_hash,\n                                    operation as op,\n                                    block_number,\n                                    created_at,\n                                    true as success,\n                                    Null as fail_reason,\n                                    eth_hash,\n                                    priority_op_serialid,\n                                    block_index,\n                                    Null::bigint as batch_id\n                                FROM executed_priority_operations\n                                WHERE (from_account = $1 OR to_account = $1)\n                                    AND ($3::bytea = '\\x'::bytea OR from_account = $3 OR to_account = $3)\n                                    AND ($6::jsonb = 'null'::jsonb OR operation->'priority_op'->'token' = $6)\n                                    AND created_at <= $5\n                            ), everything AS (\n                                SELECT * FROM transactions\n                                UNION ALL\n                                SELECT * FROM priority_ops\n                            )\n                            SELECT\n                                tx_hash as \"tx_hash!\",\n                                block_number as \"block_number!\",\n                                op as \"op!\",\n                                created_at as \"created_at!\",\n                                success as \"success!\",\n                                fail_reason as \"fail_reason?\",\n                                eth_hash as \"eth_hash?\",\n                                priority_op_serialid as \"priority_op_serialid?\",\n                                batch_id as \"batch_id\"\n                            FROM everything\n                            ORDER BY created_at DESC, block_index DESC\n                            LIMIT $7\n                        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "op!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "fail_reason?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "eth_hash?",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 7,
+          "name": "priority_op_serialid?",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 8,
+          "name": "batch_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Jsonb",
+          "Bytea",
+          "Jsonb",
+          "Timestamptz",
+          "Jsonb",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         null
       ]
     }

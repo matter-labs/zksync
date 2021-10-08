@@ -130,19 +130,27 @@ export class RestProvider extends SyncProvider {
 
     async accountTxsDetailed(
         idOrAddress: number | types.Address,
-        paginationQuery: types.PaginationQuery<string>
+        paginationQuery: types.PaginationQuery<string>,
+        token?: types.TokenLike,
+        secondIdOrAddress?: number | types.Address
     ): Promise<Response<types.Paginated<types.ApiTransaction, string>>> {
-        return await this.get(
+        let url =
             `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}` +
-                `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
-        );
+            `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`;
+        if (token) url += `&token=${token}`;
+        if (secondIdOrAddress) url += `&secondAccount=${secondIdOrAddress}`;
+        return await this.get(url);
     }
 
     async accountTxs(
         idOrAddress: number | types.Address,
-        paginationQuery: types.PaginationQuery<string>
+        paginationQuery: types.PaginationQuery<string>,
+        token?: types.TokenLike,
+        secondIdOrAddress?: number | types.Address
     ): Promise<types.Paginated<types.ApiTransaction, string>> {
-        return this.parseResponse(await this.accountTxsDetailed(idOrAddress, paginationQuery));
+        return this.parseResponse(
+            await this.accountTxsDetailed(idOrAddress, paginationQuery, token, secondIdOrAddress)
+        );
     }
 
     async accountPendingTxsDetailed(
