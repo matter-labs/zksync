@@ -313,7 +313,8 @@ impl ApiAccountData {
                     .get_token(&mut storage, token_like.clone())
                     .await
                     .map_err(Error::storage)?
-                    .ok_or_else(|| Error::from(PriceError::token_not_found(token_like)))?,
+                    .ok_or_else(|| Error::from(PriceError::token_not_found(token_like)))?
+                    .id,
             )
         } else {
             None
@@ -322,7 +323,7 @@ impl ApiAccountData {
             from: AccountTxsRequest {
                 tx_hash: query.from,
                 address,
-                token: token.map(|token| token.id),
+                token,
                 second_address,
             },
             limit: query.limit,
