@@ -54,13 +54,12 @@ impl TransactionEvent {
     pub fn from_executed_operation(
         op: ExecutedOperations,
         block_number: BlockNumber,
-        account_id: AccountId,
         status: TransactionStatus,
     ) -> Self {
         match op {
             ExecutedOperations::Tx(exec_tx) => Self {
                 tx_hash: exec_tx.signed_tx.tx.hash().to_string(),
-                account_id,
+                account_id: exec_tx.signed_tx.account_id().unwrap(), // Close events cannot be emitted.
                 token_id: exec_tx.signed_tx.token_id(),
                 block_number,
                 tx: serde_json::to_value(exec_tx.signed_tx.tx).unwrap(),
@@ -75,7 +74,7 @@ impl TransactionEvent {
             },
             ExecutedOperations::PriorityOp(exec_prior_op) => Self {
                 tx_hash: format!("{:#x}", exec_prior_op.priority_op.eth_hash),
-                account_id,
+                account_id: exec_prior_op.account_id(),
                 token_id: exec_prior_op.priority_op.data.token_id(),
                 block_number,
                 tx: serde_json::to_value(&exec_prior_op.op).unwrap(),

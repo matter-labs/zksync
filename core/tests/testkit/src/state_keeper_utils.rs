@@ -38,6 +38,7 @@ pub fn spawn_state_keeper(
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
+    let (processed_tx_events_sender, _processed_tx_events_receiver) = mpsc::channel(256);
 
     let max_ops_in_block = 1000;
     let ops_chunks = vec![
@@ -63,6 +64,7 @@ pub fn spawn_state_keeper(
         block_chunks_sizes,
         max_miniblock_iterations,
         max_miniblock_iterations,
+        processed_tx_events_sender,
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();

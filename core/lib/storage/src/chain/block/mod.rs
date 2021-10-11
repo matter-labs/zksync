@@ -843,13 +843,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .save_block_transactions(block.block_number, block.block_transactions)
             .await?;
 
-        // Notify about queued and rejected transactions right away without
-        // waiting for the block commit.
-        transaction
-            .event_schema()
-            .store_executed_transaction_event(block.block_number)
-            .await?;
-
         let new_block = StorageBlock {
             number,
             root_hash,
