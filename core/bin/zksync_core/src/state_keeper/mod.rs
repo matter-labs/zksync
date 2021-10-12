@@ -133,8 +133,8 @@ pub struct ZkSyncStateKeeper {
     /// Amount of failed transactions in the pending block at the last pending block synchronization step.
     failed_txs_pending_len: usize,
 
-    // Channel used for sending queued transaction events. Required since state keeper
-    // has no access to the database.
+    /// Channel used for sending queued transaction events. Required since state keeper
+    /// has no access to the database.
     processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
 }
 
@@ -700,13 +700,15 @@ impl ZkSyncStateKeeper {
             }
         }
 
-        let _ = self
-            .processed_tx_events_sender
-            .send(ProcessedOperations {
-                block_number: self.state.block_number,
-                executed_ops,
-            })
-            .await;
+        if !executed_ops.is_empty() {
+            let _ = self
+                .processed_tx_events_sender
+                .send(ProcessedOperations {
+                    block_number: self.state.block_number,
+                    executed_ops,
+                })
+                .await;
+        }
 
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
