@@ -51,15 +51,18 @@ pub struct TransactionEvent {
 }
 
 impl TransactionEvent {
+    /// Creates transaction event from the executed operation.
+    ///
+    /// Returns [`None`] for [close](crate::tx::Close) operation.
     pub fn from_executed_operation(
         op: ExecutedOperations,
         block_number: BlockNumber,
         status: TransactionStatus,
-    ) -> Self {
-        match op {
+    ) -> Option<Self> {
+        Some(match op {
             ExecutedOperations::Tx(exec_tx) => Self {
                 tx_hash: exec_tx.signed_tx.tx.hash().to_string(),
-                account_id: exec_tx.signed_tx.account_id().unwrap(), // Close events cannot be emitted.
+                account_id: exec_tx.signed_tx.account_id().ok()?, // Close events cannot be emitted.
                 token_id: exec_tx.signed_tx.token_id(),
                 block_number,
                 tx: serde_json::to_value(exec_tx.signed_tx.tx).unwrap(),
@@ -83,7 +86,7 @@ impl TransactionEvent {
                 created_at: exec_prior_op.created_at,
                 tx_type: OnceCell::default(),
             },
-        }
+        })
     }
 
     pub fn tx_type(&self) -> TransactionType {

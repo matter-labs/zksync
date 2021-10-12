@@ -219,16 +219,22 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         let events: Vec<serde_json::Value> = block_operations
             .into_iter()
-            .filter(ExecutedOperations::is_successful) // Rejected transactions are not included into block.
-            .map(|executed_operation| {
-                let transaction_event = TransactionEvent::from_executed_operation(
-                    executed_operation,
-                    block_number,
-                    status,
-                );
+            .filter_map(|executed_operation| {
+                // Rejected transactions are not included into block.
+                let transaction_event = if !executed_operation.is_successful() {
+                    None
+                } else {
+                    TransactionEvent::from_executed_operation(
+                        executed_operation,
+                        block_number,
+                        status,
+                    )
+                }?;
 
-                serde_json::to_value(transaction_event)
-                    .expect("couldn't serialize transaction event")
+                Some(
+                    serde_json::to_value(transaction_event)
+                        .expect("couldn't serialize transaction event"),
+                )
             })
             .collect();
 
@@ -256,15 +262,17 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         let events: Vec<serde_json::Value> = block_operations
             .into_iter()
-            .map(|executed_tx| {
+            .filter_map(|executed_tx| {
                 let transaction_event = TransactionEvent::from_executed_operation(
                     executed_tx,
                     block_number,
                     TransactionStatus::Queued,
-                );
+                )?;
 
-                serde_json::to_value(transaction_event)
-                    .expect("couldn't serialize transaction event")
+                Some(
+                    serde_json::to_value(transaction_event)
+                        .expect("couldn't serialize transaction event"),
+                )
             })
             .collect();
 
