@@ -295,14 +295,15 @@ mod tests {
         token_id: TokenId,
         config: &ZkSyncConfig,
     ) -> anyhow::Result<bool> {
-        let market_volume = TokenDBCache::get_token_market_volume(storage, token_id).await?;
         let min_market_volume = Ratio::from(
             BigUint::from_f64(config.ticker.liquidity_volume)
                 .expect("TickerConfig::liquidity_volume must be positive"),
         );
-        Ok(market_volume
-            .map(|volume| volume.market_volume.ge(&min_market_volume))
-            .unwrap_or(false))
+        let filtered = storage
+            .tokens_schema()
+            .filter_tokens_by_market_volume(vec![token_id], &min_market_volume)
+            .await?;
+        Ok(!filtered.is_empty())
     }
 
     #[actix_rt::test]
