@@ -1,7 +1,7 @@
 CREATE TABLE tx_filters
 (
-    id BIGSERIAL PRIMARY KEY,
     address bytea NOT NULL,
     token INTEGER NOT NULL,
-    tx_hash bytea NOT NULL
+    tx_hash bytea NOT NULL,
+    PRIMARY KEY (address, token, tx_hash)
 );

@@ -284,6 +284,8 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
         batch_id: None,
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
     OperationsSchema(&mut storage)
         .store_executed_tx(executed_tx)
@@ -455,6 +457,8 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
             created_at: chrono::Utc::now(),
             eth_sign_data: None,
             batch_id: None,
+            affected_accounts: Vec::new(),
+            used_tokens: Vec::new(),
         };
 
         OperationsSchema(&mut storage)

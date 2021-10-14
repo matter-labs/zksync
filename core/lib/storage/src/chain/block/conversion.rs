@@ -120,6 +120,15 @@ impl NewExecutedPriorityOperation {
             ),
         };
 
+        let affected_accounts = exec_prior_op
+            .priority_op
+            .data
+            .affected_accounts()
+            .into_iter()
+            .map(|address| address.as_bytes().to_vec())
+            .collect();
+        let token = exec_prior_op.priority_op.data.token_id().0 as i32;
+
         Self {
             block_number: i64::from(*block),
             block_index: exec_prior_op.block_index as i32,
@@ -136,6 +145,8 @@ impl NewExecutedPriorityOperation {
                 .eth_block_index
                 .map(|index| index as i64),
             tx_hash,
+            affected_accounts,
+            token,
         }
     }
 }
@@ -195,18 +206,18 @@ impl NewExecutedTransaction {
             serde_json::to_value(sign_data).expect("Failed to encode EthSignData")
         });
 
-        // let affected_accounts = affected_accounts(&exec_tx.signed_tx.tx, storage)
-        //     .await?
-        //     .into_iter()
-        //     .map(|address| address.as_bytes().to_vec())
-        //     .collect();
-        // let used_tokens = exec_tx
-        //     .signed_tx
-        //     .tx
-        //     .tokens()
-        //     .into_iter()
-        //     .map(|id| id.0 as i32)
-        //     .collect();
+        let affected_accounts = affected_accounts(&exec_tx.signed_tx.tx, storage)
+            .await?
+            .into_iter()
+            .map(|address| address.as_bytes().to_vec())
+            .collect();
+        let used_tokens = exec_tx
+            .signed_tx
+            .tx
+            .tokens()
+            .into_iter()
+            .map(|id| id.0 as i32)
+            .collect();
         Ok(Self {
             block_number: i64::from(*block),
             tx_hash: exec_tx.signed_tx.hash().as_ref().to_vec(),
@@ -222,8 +233,8 @@ impl NewExecutedTransaction {
             created_at: exec_tx.created_at,
             eth_sign_data,
             batch_id: exec_tx.batch_id,
-            // affected_accounts,
-            // used_tokens,
+            affected_accounts,
+            used_tokens,
         })
     }
 }

@@ -2971,6 +2971,20 @@
       ]
     }
   },
+  "786c418fd011ff4f7be35ac33e8b495f18ecb34adeb4585bfd3beebdf1939ccf": {
+    "query": "\n            INSERT INTO tx_filters (address, token, tx_hash)\n            SELECT u.address, u.token, $3\n                FROM UNNEST ($1::bytea[], $2::integer[])\n                AS u(address, token)\n            ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
+          "Int4Array",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "790d46519ceaa7fbd152f1edf29b85c97ab491488b7302d8df3f57e5fc3eff55": {
     "query": "\n                SELECT account_id FROM account_creates\n                WHERE address = $1 AND is_create = $2\n                ORDER BY block_number desc\n                LIMIT 1\n            ",
     "describe": {
