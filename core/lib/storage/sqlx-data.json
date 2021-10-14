@@ -1699,6 +1699,30 @@
       "nullable": []
     }
   },
+  "368a2554817fe33f4f39ad2db04226d4980ce461853e7eddd1d50cb23e2762bc": {
+    "query": "SELECT tx_hash, tx FROM executed_transactions",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
     "query": "SELECT * FROM balances WHERE account_id = ANY($1)",
     "describe": {
@@ -3615,6 +3639,20 @@
       ]
     }
   },
+  "8c0c66910d1fdfd08ba2e1c3db282720a67b05067abf71d0f0b27c27047ce0c7": {
+    "query": "\n                INSERT INTO tx_filters (address, token, tx_hash)\n                SELECT u.address, u.token, u.tx_hash\n                FROM UNNEST ($1::bytea[], $2::integer[], $3::bytea[])\n                AS u(address, token, tx_hash)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
+          "Int4Array",
+          "ByteaArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8c2b6d94cb84616a33ecfb94be7153b3d760b456fa24af058076a69a6f4f204c": {
     "query": "\n            SELECT * FROM mint_nft_updates \n            WHERE token_id = $1\n            ",
     "describe": {
@@ -4967,6 +5005,30 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "bf9a61ef4f49f9929f2d814d0e252e4e9baa04b25fc3970b3b561a29061d539f": {
+    "query": "SELECT tx_hash, operation FROM executed_priority_operations",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "operation",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false
       ]
     }
   },

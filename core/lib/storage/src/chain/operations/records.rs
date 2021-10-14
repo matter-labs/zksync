@@ -89,6 +89,8 @@ pub struct NewExecutedTransaction {
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
     pub batch_id: Option<i64>,
+    // pub affected_accounts: Vec<Vec<u8>>,
+    // pub used_tokens: Vec<i32>,
 }
 
 #[derive(Debug, Clone)]

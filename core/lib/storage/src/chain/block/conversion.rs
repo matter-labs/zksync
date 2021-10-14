@@ -18,6 +18,7 @@ use zksync_types::{
 };
 // Local imports
 use crate::chain::operations::records::StoredAggregatedOperation;
+use crate::utils::affected_accounts;
 use crate::{
     chain::{
         block::{records::TransactionItem, BlockSchema},
@@ -140,7 +141,11 @@ impl NewExecutedPriorityOperation {
 }
 
 impl NewExecutedTransaction {
-    pub fn prepare_stored_tx(exec_tx: ExecutedTx, block: BlockNumber) -> Self {
+    pub async fn prepare_stored_tx(
+        exec_tx: ExecutedTx,
+        block: BlockNumber,
+        storage: &mut StorageProcessor<'_>,
+    ) -> QueryResult<Self> {
         fn cut_prefix(input: &str) -> String {
             if let Some(input) = input.strip_prefix("0x") {
                 input.into()
@@ -190,7 +195,19 @@ impl NewExecutedTransaction {
             serde_json::to_value(sign_data).expect("Failed to encode EthSignData")
         });
 
-        Self {
+        // let affected_accounts = affected_accounts(&exec_tx.signed_tx.tx, storage)
+        //     .await?
+        //     .into_iter()
+        //     .map(|address| address.as_bytes().to_vec())
+        //     .collect();
+        // let used_tokens = exec_tx
+        //     .signed_tx
+        //     .tx
+        //     .tokens()
+        //     .into_iter()
+        //     .map(|id| id.0 as i32)
+        //     .collect();
+        Ok(Self {
             block_number: i64::from(*block),
             tx_hash: exec_tx.signed_tx.hash().as_ref().to_vec(),
             from_account,
@@ -205,7 +222,9 @@ impl NewExecutedTransaction {
             created_at: exec_tx.created_at,
             eth_sign_data,
             batch_id: exec_tx.batch_id,
-        }
+            // affected_accounts,
+            // used_tokens,
+        })
     }
 }
 

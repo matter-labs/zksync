@@ -155,6 +155,22 @@ impl ZkSyncTx {
         }
     }
 
+    pub fn tokens(&self) -> Vec<TokenId> {
+        let mut tokens = match self {
+            ZkSyncTx::Transfer(tx) => vec![tx.token],
+            ZkSyncTx::Withdraw(tx) => vec![tx.token],
+            ZkSyncTx::Close(_) => Vec::new(),
+            ZkSyncTx::ChangePubKey(tx) => vec![tx.fee_token],
+            ZkSyncTx::ForcedExit(tx) => vec![tx.token],
+            ZkSyncTx::Swap(tx) => vec![tx.fee_token, tx.orders.0.token_buy, tx.orders.0.token_sell],
+            ZkSyncTx::MintNFT(tx) => vec![tx.fee_token],
+            ZkSyncTx::WithdrawNFT(tx) => vec![tx.token, tx.fee_token],
+        };
+        tokens.sort();
+        tokens.dedup();
+        tokens
+    }
+
     pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ZkSyncTx::Transfer(tx) => Ok(tx.account_id),

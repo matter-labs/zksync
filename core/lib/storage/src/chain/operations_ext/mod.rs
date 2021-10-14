@@ -18,6 +18,7 @@ use zksync_api_types::{
 use zksync_crypto::params;
 use zksync_types::{
     aggregated_operations::AggregatedActionType, tx::TxHash, Address, BlockNumber, TokenId,
+    ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local imports
@@ -1840,5 +1841,61 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.operations_ext.web3_receipts", start.elapsed());
         Ok(receipts)
+    }
+
+    pub async fn load_all_executed_transactions(&mut self) -> QueryResult<Vec<(H256, ZkSyncTx)>> {
+        let records = sqlx::query!("SELECT tx_hash, tx FROM executed_transactions")
+            .fetch_all(self.0.conn())
+            .await?;
+        let result = records
+            .into_iter()
+            .map(|record| {
+                (
+                    H256::from_slice(&record.tx_hash),
+                    serde_json::from_value(record.tx).unwrap(),
+                )
+            })
+            .collect();
+        Ok(result)
+    }
+
+    pub async fn load_all_executed_priority_operations(
+        &mut self,
+    ) -> QueryResult<Vec<(H256, ZkSyncOp)>> {
+        let records = sqlx::query!("SELECT tx_hash, operation FROM executed_priority_operations")
+            .fetch_all(self.0.conn())
+            .await?;
+        let result = records
+            .into_iter()
+            .map(|record| {
+                (
+                    H256::from_slice(&record.tx_hash),
+                    serde_json::from_value(record.operation).unwrap(),
+                )
+            })
+            .collect();
+        Ok(result)
+    }
+
+    pub async fn save_executed_tx_filters(
+        &mut self,
+        addresses: Vec<Vec<u8>>,
+        tokens: Vec<i32>,
+        hashes: Vec<Vec<u8>>,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "
+                INSERT INTO tx_filters (address, token, tx_hash)
+                SELECT u.address, u.token, u.tx_hash
+                FROM UNNEST ($1::bytea[], $2::integer[], $3::bytea[])
+                AS u(address, token, tx_hash)
+            ",
+            &addresses,
+            &tokens,
+            &hashes
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
     }
 }

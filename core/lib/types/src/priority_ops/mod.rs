@@ -96,6 +96,16 @@ impl ZkSyncPriorityOp {
         }
     }
 
+    pub fn affected_accounts(&self) -> Vec<Address> {
+        let mut accounts = match self {
+            ZkSyncPriorityOp::Deposit(deposit) => vec![deposit.from, deposit.to],
+            ZkSyncPriorityOp::FullExit(full_exit) => vec![full_exit.eth_address],
+        };
+        accounts.sort();
+        accounts.dedup();
+        accounts
+    }
+
     /// Parses legacy priority operation from the Ethereum logs.
     pub fn legacy_parse_from_priority_queue_logs(
         pub_data: &[u8],
