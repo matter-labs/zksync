@@ -519,7 +519,8 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             } = *reverted_tx;
             let SignedZkSyncTx { tx, eth_sign_data } = signed_tx;
 
-            let tx_hash = hex::encode(tx.hash().as_ref());
+            let tx_hash_bytes = tx.hash().as_ref().to_vec();
+            let tx_hash = hex::encode(&tx_hash_bytes);
             let tx_value =
                 serde_json::to_value(tx).expect("Failed to serialize reverted transaction");
             let eth_sign_data = eth_sign_data.as_ref().map(|sign_data| {
@@ -535,6 +536,14 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 eth_sign_data,
                 batch_id.unwrap_or(0i64),
                 next_priority_op_serial_id as i64,
+            )
+            .execute(transaction.conn())
+            .await?;
+
+            sqlx::query!(
+                "DELETE FROM tx_filters
+                WHERE tx_hash = $1",
+                &tx_hash_bytes
             )
             .execute(transaction.conn())
             .await?;

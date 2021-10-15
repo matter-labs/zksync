@@ -587,6 +587,19 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         last_block: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
+
+        let records = sqlx::query!(
+            "SELECT tx_hash FROM executed_priority_operations WHERE block_number > $1",
+            *last_block as i64
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+        let hashes: Vec<Vec<u8>> = records.into_iter().map(|r| r.tx_hash).collect();
+
+        sqlx::query!("DELETE FROM tx_filters WHERE tx_hash = ANY($1)", &hashes)
+            .execute(self.0.conn())
+            .await?;
+
         sqlx::query!(
             "DELETE FROM executed_priority_operations WHERE block_number > $1",
             *last_block as i64

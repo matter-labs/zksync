@@ -559,6 +559,18 @@
       ]
     }
   },
+  "14d749de7157743d742f91f106c8819bc509f3a4058311e1173d464ba1de9352": {
+    "query": "DELETE FROM tx_filters WHERE tx_hash = ANY($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -1778,6 +1790,38 @@
         "Left": [
           "Int8",
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "399d6d7196f0353420ebc7546baa916d5f963bbe97aa5b35543582f0b873d773": {
+    "query": "SELECT tx_hash FROM executed_priority_operations WHERE block_number > $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "3a61f335dc699e6126346c77cea44995e48efb57d39624c63c55d342ca2ea1b1": {
+    "query": "DELETE FROM tx_filters\n                WHERE tx_hash = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea"
         ]
       },
       "nullable": []
