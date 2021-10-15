@@ -217,7 +217,7 @@ async fn get_account_transactions_history(mut storage: StorageProcessor<'_>) -> 
         .await?;
 
     assert_eq!(from_history.len(), 10);
-    assert_eq!(to_history.len(), 5);
+    assert_eq!(to_history.len(), 7);
 
     Ok(())
 }
@@ -236,7 +236,7 @@ async fn get_account_transactions_history_from(
     let block_size = setup.blocks[0].block_transactions.len() as u64;
 
     let txs_from = 10; // Amount of transactions related to "from" account.
-    let txs_to = 5;
+    let txs_to = 7;
 
     // execute_operation
     commit_schema_data(&mut storage, &setup).await?;

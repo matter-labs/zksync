@@ -190,7 +190,7 @@ impl NewExecutedTransaction {
                 ),
                 ZkSyncTx::MintNFT(_) => (
                     serde_json::from_value(tx["creatorAddress"].clone()).unwrap(),
-                    serde_json::from_value(tx["recipientAddress"].clone()).unwrap(),
+                    serde_json::from_value(tx["recipient"].clone()).unwrap(),
                 ),
                 ZkSyncTx::Swap(_) => (
                     serde_json::from_value(tx["submitterAddress"].clone()).unwrap(),
