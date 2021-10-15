@@ -7,9 +7,12 @@ use futures::{
 };
 use num::{bigint::Sign, BigInt, BigUint, ToPrimitive, Zero};
 use std::collections::HashMap;
-use zksync_core::committer::{BlockCommitRequest, CommitRequest};
-use zksync_core::mempool::ProposedBlock;
-use zksync_core::state_keeper::{StateKeeperRequest, ZkSyncStateInitParams};
+use zksync_core::{
+    committer::{BlockCommitRequest, CommitRequest},
+    mempool::ProposedBlock,
+    state_keeper::{StateKeeperRequest, ZkSyncStateInitParams},
+    tx_event_emitter::ProcessedOperations,
+};
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation},
     block::Block,
@@ -41,6 +44,7 @@ use zksync_types::tx::TimeRange;
 pub struct TestSetup {
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
+    pub processed_tx_events_receiver: mpsc::Receiver<ProcessedOperations>,
 
     pub accounts: AccountSet,
     pub tokens: HashMap<TokenId, Address>,
@@ -87,6 +91,7 @@ impl TestSetup {
         Self {
             state_keeper_request_sender: sk_channels.requests,
             proposed_blocks_receiver: sk_channels.new_blocks,
+            processed_tx_events_receiver: sk_channels.queued_txs_events,
             accounts,
             tokens,
             expected_changes_for_current_block: ExpectedAccountState::default(),

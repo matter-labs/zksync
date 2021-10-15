@@ -4,9 +4,12 @@ use futures::{
 };
 use std::thread::JoinHandle;
 use tokio::runtime::Runtime;
-use zksync_core::committer::CommitRequest;
-use zksync_core::state_keeper::{
-    start_state_keeper, StateKeeperRequest, ZkSyncStateInitParams, ZkSyncStateKeeper,
+use zksync_core::{
+    committer::CommitRequest,
+    state_keeper::{
+        start_state_keeper, StateKeeperRequest, ZkSyncStateInitParams, ZkSyncStateKeeper,
+    },
+    tx_event_emitter::ProcessedOperations,
 };
 use zksync_types::{
     Account, AccountId, Address, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
@@ -29,6 +32,7 @@ pub async fn state_keeper_get_account(
 pub struct StateKeeperChannels {
     pub requests: mpsc::Sender<StateKeeperRequest>,
     pub new_blocks: mpsc::Receiver<CommitRequest>,
+    pub queued_txs_events: mpsc::Receiver<ProcessedOperations>,
 }
 
 // Thread join handle and stop channel sender.
@@ -38,7 +42,7 @@ pub fn spawn_state_keeper(
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
-    let (processed_tx_events_sender, _processed_tx_events_receiver) = mpsc::channel(256);
+    let (processed_tx_events_sender, processed_tx_events_receiver) = mpsc::channel(256);
 
     let max_ops_in_block = 1000;
     let ops_chunks = vec![
@@ -85,6 +89,7 @@ pub fn spawn_state_keeper(
         StateKeeperChannels {
             requests: state_keeper_req_sender,
             new_blocks: proposed_blocks_receiver,
+            queued_txs_events: processed_tx_events_receiver,
         },
     )
 }
