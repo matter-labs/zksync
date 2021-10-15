@@ -159,7 +159,7 @@ impl ZkSyncTx {
         let mut tokens = match self {
             ZkSyncTx::Transfer(tx) => vec![tx.token],
             ZkSyncTx::Withdraw(tx) => vec![tx.token],
-            ZkSyncTx::Close(_) => Vec::new(),
+            ZkSyncTx::Close(_) => vec![TokenId(0)],
             ZkSyncTx::ChangePubKey(tx) => vec![tx.fee_token],
             ZkSyncTx::ForcedExit(tx) => vec![tx.token],
             ZkSyncTx::Swap(tx) => vec![tx.fee_token, tx.orders.0.token_buy, tx.orders.0.token_sell],
