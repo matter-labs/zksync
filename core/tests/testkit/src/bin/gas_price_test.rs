@@ -250,6 +250,7 @@ async fn gas_price_test() {
         genesis_root,
         None,
     );
+    test_setup.processed_tx_events_receiver.close();
 
     let rng = &mut XorShiftRng::from_seed([0, 1, 2, 3]);
 
