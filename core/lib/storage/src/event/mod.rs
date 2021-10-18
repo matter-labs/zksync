@@ -3,7 +3,8 @@ use std::{slice, time::Instant};
 // External uses
 use serde_json::Value;
 // Workspace uses
-use zksync_basic_types::{AccountId, BlockNumber};
+use zksync_basic_types::BlockNumber;
+use zksync_types::block::ExecutedOperations;
 use zksync_types::event::{
     account::{
         AccountEvent, AccountStateChangeStatus, AccountStateChangeType, AccountUpdateDetails,
@@ -12,7 +13,6 @@ use zksync_types::event::{
     transaction::{TransactionEvent, TransactionStatus},
     EventId,
 };
-use zksync_types::{block::ExecutedOperations, priority_ops::ZkSyncPriorityOp};
 // Local uses
 use crate::{QueryResult, StorageProcessor};
 use records::StoredEvent;
@@ -201,32 +201,6 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Returns the account affected by the operation.
-    /// In case of `Deposit` we have to query the database in order
-    /// to get the id, at this point the account creation should be already
-    /// committed in storage.
-    async fn account_id_from_op(
-        &mut self,
-        executed_operation: &ExecutedOperations,
-    ) -> QueryResult<AccountId> {
-        let priority_op = match executed_operation {
-            ExecutedOperations::Tx(tx) => {
-                return tx.signed_tx.tx.account_id().map_err(anyhow::Error::from)
-            }
-            ExecutedOperations::PriorityOp(priority_op) => priority_op,
-        };
-        match &priority_op.priority_op.data {
-            ZkSyncPriorityOp::Deposit(deposit) => self
-                .0
-                .chain()
-                .account_schema()
-                .account_id_by_address(deposit.to)
-                .await?
-                .ok_or_else(|| anyhow::Error::msg("Account doesn't exist")),
-            ZkSyncPriorityOp::FullExit(full_exit) => Ok(full_exit.account_id),
-        }
-    }
-
     /// Create new transaction events and store them in the database.
     /// The block is expected to be either committed or finalized.
     pub async fn store_confirmed_transaction_event(
@@ -243,45 +217,26 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .get_block_executed_ops(block_number)
             .await?;
 
-        let mut events = Vec::with_capacity(block_operations.len());
-        for executed_operation in block_operations {
-            // Rejected transactions are not included in the block, skip them.
-            if !executed_operation.is_successful() {
-                continue;
-            }
-            // Like in the case of block events, we return `Ok`
-            // if we didn't manage to fetch the account id for the given
-            // operation.
-            let account_id = match transaction
-                .event_schema()
-                .account_id_from_op(&executed_operation)
-                .await
-            {
-                Ok(account_id) => account_id,
-                _ => {
-                    // Logging is currently disabled.
-                    //
-                    // vlog::warn!(
-                    //     "Couldn't create transaction event, no account id exists \
-                    //     in the database. Operation: {:?}",
-                    //     executed_operation
-                    // );
-                    continue;
-                }
-            };
+        let events: Vec<serde_json::Value> = block_operations
+            .into_iter()
+            .filter_map(|executed_operation| {
+                // Rejected transactions are not included into block.
+                let transaction_event = if !executed_operation.is_successful() {
+                    None
+                } else {
+                    TransactionEvent::from_executed_operation(
+                        executed_operation,
+                        block_number,
+                        status,
+                    )
+                }?;
 
-            let transaction_event = TransactionEvent::from_executed_operation(
-                executed_operation,
-                block_number,
-                account_id,
-                status,
-            );
-
-            let event_data = serde_json::to_value(transaction_event)
-                .expect("couldn't serialize transaction event");
-
-            events.push(event_data);
-        }
+                Some(
+                    serde_json::to_value(transaction_event)
+                        .expect("couldn't serialize transaction event"),
+                )
+            })
+            .collect();
 
         transaction
             .event_schema()
@@ -294,53 +249,32 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     }
 
     /// Fetch executed transactions for the given block and store corresponding
-    /// `Queued` or `Rejected` events in the database. This method is called when
-    /// the `committer` saves the block in the database.
+    /// `Queued` or `Rejected` events in the database. These events are created by
+    /// the state keeper and emitted by the special actor as soon as `block_operations`
+    /// are processed.
     pub async fn store_executed_transaction_event(
         &mut self,
         block_number: BlockNumber,
+        block_operations: Vec<ExecutedOperations>,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        // Load all operations executed in the given block.
-        let block_operations = transaction
-            .chain()
-            .block_schema()
-            .get_block_executed_ops(block_number)
-            .await?;
 
-        let mut events = Vec::with_capacity(block_operations.len());
-        for executed_tx in block_operations {
-            let account_id = match transaction
-                .event_schema()
-                .account_id_from_op(&executed_tx)
-                .await
-            {
-                Ok(account_id) => account_id,
-                _ => {
-                    // Logging is currently disabled.
-                    //
-                    // vlog::warn!(
-                    //     "Couldn't create transaction event, no account id exists \
-                    //     in the database. Operation: {:?}",
-                    //     rejected_tx
-                    // );
-                    continue;
-                }
-            };
+        let events: Vec<serde_json::Value> = block_operations
+            .into_iter()
+            .filter_map(|executed_tx| {
+                let transaction_event = TransactionEvent::from_executed_operation(
+                    executed_tx,
+                    block_number,
+                    TransactionStatus::Queued,
+                )?;
 
-            let transaction_event = TransactionEvent::from_executed_operation(
-                executed_tx,
-                block_number,
-                account_id,
-                TransactionStatus::Queued,
-            );
-
-            let event_data = serde_json::to_value(transaction_event)
-                .expect("couldn't serialize transaction event");
-
-            events.push(event_data);
-        }
+                Some(
+                    serde_json::to_value(transaction_event)
+                        .expect("couldn't serialize transaction event"),
+                )
+            })
+            .collect();
 
         transaction
             .event_schema()

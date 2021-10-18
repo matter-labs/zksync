@@ -31,6 +31,7 @@ use zksync_types::{
 use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
+    tx_event_emitter::ProcessedOperations,
 };
 use zksync_state::error::{OpError, TxBatchError};
 
@@ -131,6 +132,10 @@ pub struct ZkSyncStateKeeper {
     success_txs_pending_len: usize,
     /// Amount of failed transactions in the pending block at the last pending block synchronization step.
     failed_txs_pending_len: usize,
+
+    /// Channel used for sending queued transaction events. Required since state keeper
+    /// has no access to the database.
+    processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
 }
 
 #[derive(Debug, Clone)]
@@ -401,6 +406,7 @@ impl ZkSyncStateKeeper {
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
+        processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -447,6 +453,7 @@ impl ZkSyncStateKeeper {
 
             success_txs_pending_len: 0,
             failed_txs_pending_len: 0,
+            processed_tx_events_sender,
         };
 
         let root = keeper.state.root_hash();
@@ -691,6 +698,16 @@ impl ZkSyncStateKeeper {
                     }
                 }
             }
+        }
+
+        if !executed_ops.is_empty() {
+            let _ = self
+                .processed_tx_events_sender
+                .send(ProcessedOperations {
+                    block_number: self.state.block_number,
+                    executed_ops,
+                })
+                .await;
         }
 
         if !self.pending_block.success_operations.is_empty() {
