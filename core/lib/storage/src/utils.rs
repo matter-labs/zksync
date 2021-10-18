@@ -35,6 +35,8 @@ pub async fn affected_accounts(
                 .await?
             {
                 accounts.push(address);
+            } else {
+                anyhow::bail!("Order signer account id not found in db");
             }
             if let Some(address) = storage
                 .chain()
@@ -43,6 +45,8 @@ pub async fn affected_accounts(
                 .await?
             {
                 accounts.push(address);
+            } else {
+                anyhow::bail!("Order signer account id not found in db");
             }
             accounts
         }
