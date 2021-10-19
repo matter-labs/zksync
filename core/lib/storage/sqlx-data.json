@@ -42,6 +42,33 @@
       ]
     }
   },
+  "052bc740befe43cd3d8d915371cb055187d4ff4ebf019fe12c8dc85b296acc47": {
+    "query": "SELECT tx_hash, tx FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "065f83bfa5ed2f2dff30ce38b9d2dd4518ec00f81a98bc378f30a07db5f7b678": {
     "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                    INTERSECT\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE $4::boolean OR (address = $5 AND ($2::boolean OR token = $3))\n                )\n                SELECT COUNT(*) as \"count!\" FROM tx_hashes\n            ",
     "describe": {
@@ -571,6 +598,33 @@
       "nullable": []
     }
   },
+  "15021baae00c1cc0a1da3cfc3794e78ede86b761ef2765f90af050fdbf42a833": {
+    "query": "SELECT tx_hash, operation FROM executed_priority_operations WHERE block_number BETWEEN $1 AND $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "operation",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -867,6 +921,24 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "1befbe4a2d8c2847779eba2b1981da547cf6a646ce5451ac63c67f5b765194f9": {
+    "query": "\n                SELECT MAX(block_number) as \"max!\" FROM tx_filters\n                INNER JOIN executed_transactions\n                ON tx_filters.tx_hash = executed_transactions.tx_hash\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -1724,30 +1796,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "368a2554817fe33f4f39ad2db04226d4980ce461853e7eddd1d50cb23e2762bc": {
-    "query": "SELECT tx_hash, tx FROM executed_transactions",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 1,
-          "name": "tx",
-          "type_info": "Jsonb"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false
-      ]
     }
   },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
@@ -3794,20 +3842,6 @@
       ]
     }
   },
-  "8c0c66910d1fdfd08ba2e1c3db282720a67b05067abf71d0f0b27c27047ce0c7": {
-    "query": "\n                INSERT INTO tx_filters (address, token, tx_hash)\n                SELECT u.address, u.token, u.tx_hash\n                FROM UNNEST ($1::bytea[], $2::integer[], $3::bytea[])\n                AS u(address, token, tx_hash)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "ByteaArray",
-          "Int4Array",
-          "ByteaArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "8c2b6d94cb84616a33ecfb94be7153b3d760b456fa24af058076a69a6f4f204c": {
     "query": "\n            SELECT * FROM mint_nft_updates \n            WHERE token_id = $1\n            ",
     "describe": {
@@ -4090,6 +4124,24 @@
       },
       "nullable": [
         false
+      ]
+    }
+  },
+  "9442f24e1c161116ba90b100676a5ee1c3a68853c984fe5ec97575cc899aae14": {
+    "query": "\n                SELECT MAX(block_number) as \"max!\" FROM tx_filters\n                INNER JOIN executed_priority_operations\n                ON tx_filters.tx_hash = executed_priority_operations.tx_hash\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -4836,13 +4888,13 @@
         "Left": []
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
       ]
     }
   },
@@ -5179,30 +5231,6 @@
       },
       "nullable": [
         null
-      ]
-    }
-  },
-  "bf9a61ef4f49f9929f2d814d0e252e4e9baa04b25fc3970b3b561a29061d539f": {
-    "query": "SELECT tx_hash, operation FROM executed_priority_operations",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 1,
-          "name": "operation",
-          "type_info": "Jsonb"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false
       ]
     }
   },
@@ -5892,6 +5920,20 @@
           "Int4",
           "Numeric",
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "d106212871e6b0266259fa0f819ab51c1e58ec799a45b618a4ec4d67d00f49be": {
+    "query": "\n                INSERT INTO tx_filters (address, token, tx_hash)\n                SELECT u.address, u.token, u.tx_hash\n                FROM UNNEST ($1::bytea[], $2::integer[], $3::bytea[])\n                AS u(address, token, tx_hash)\n                ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
+          "Int4Array",
+          "ByteaArray"
         ]
       },
       "nullable": []

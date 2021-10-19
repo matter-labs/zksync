@@ -1593,10 +1593,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(receipts)
     }
 
-    pub async fn load_all_executed_transactions(&mut self) -> QueryResult<Vec<(H256, ZkSyncTx)>> {
-        let records = sqlx::query!("SELECT tx_hash, tx FROM executed_transactions")
-            .fetch_all(self.0.conn())
-            .await?;
+    pub async fn load_executed_txs_in_block_range(
+        &mut self,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+    ) -> QueryResult<Vec<(H256, ZkSyncTx)>> {
+        let records = sqlx::query!(
+            "SELECT tx_hash, tx FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
+            from_block.0 as i64,
+            to_block.0 as i64
+        )
+        .fetch_all(self.0.conn())
+        .await?;
         let result = records
             .into_iter()
             .map(|record| {
@@ -1609,10 +1617,16 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(result)
     }
 
-    pub async fn load_all_executed_priority_operations(
+    pub async fn load_executed_priority_ops_in_block_range(
         &mut self,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
     ) -> QueryResult<Vec<(H256, ZkSyncOp)>> {
-        let records = sqlx::query!("SELECT tx_hash, operation FROM executed_priority_operations")
+        let records = sqlx::query!(
+            "SELECT tx_hash, operation FROM executed_priority_operations WHERE block_number BETWEEN $1 AND $2",
+            from_block.0 as i64,
+            to_block.0 as i64
+        )
             .fetch_all(self.0.conn())
             .await?;
         let result = records
@@ -1627,6 +1641,33 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(result)
     }
 
+    pub async fn last_block_with_updated_tx_filters(&mut self) -> QueryResult<BlockNumber> {
+        let max1: i64 = sqlx::query!(
+            r#"
+                SELECT MAX(block_number) as "max?" FROM tx_filters
+                INNER JOIN executed_transactions
+                ON tx_filters.tx_hash = executed_transactions.tx_hash
+            "#
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max
+        .unwrap_or_default();
+        let max2: i64 = sqlx::query!(
+            r#"
+                SELECT MAX(block_number) as "max?" FROM tx_filters
+                INNER JOIN executed_priority_operations
+                ON tx_filters.tx_hash = executed_priority_operations.tx_hash
+            "#
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max
+        .unwrap_or_default();
+
+        Ok(BlockNumber(std::cmp::max(max1, max2) as u32))
+    }
+
     pub async fn save_executed_tx_filters(
         &mut self,
         addresses: Vec<Vec<u8>>,
@@ -1639,6 +1680,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 SELECT u.address, u.token, u.tx_hash
                 FROM UNNEST ($1::bytea[], $2::integer[], $3::bytea[])
                 AS u(address, token, tx_hash)
+                ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING
             ",
             &addresses,
             &tokens,
