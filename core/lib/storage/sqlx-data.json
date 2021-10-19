@@ -924,24 +924,6 @@
       ]
     }
   },
-  "1befbe4a2d8c2847779eba2b1981da547cf6a646ce5451ac63c67f5b765194f9": {
-    "query": "\n                SELECT MAX(block_number) as \"max!\" FROM tx_filters\n                INNER JOIN executed_transactions\n                ON tx_filters.tx_hash = executed_transactions.tx_hash\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "1c02281a5f82e18874515bad5038402ae5718ec633b56463c99fee0beb0e8afd": {
     "query": "\n                SELECT eth_operations.*,\n                    aggregate_operations.id as \"agg_op_id?\",\n                    aggregate_operations.arguments as \"arguments?\"\n                FROM eth_operations\n                LEFT JOIN eth_aggregated_ops_binding\n                    ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n                LEFT JOIN aggregate_operations\n                    ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                WHERE eth_operations.confirmed = false\n                ORDER BY eth_operations.id ASC\n            ",
     "describe": {
@@ -1475,6 +1457,24 @@
         true,
         false,
         false
+      ]
+    }
+  },
+  "297ebdc44b376aaa21c953f90172abccbebb65f52c1ffc6b07264de035e0f06f": {
+    "query": "\n                SELECT MAX(block_number) as \"max?\" FROM tx_filters\n                INNER JOIN executed_priority_operations\n                ON tx_filters.tx_hash = executed_priority_operations.tx_hash\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max?",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -4127,13 +4127,13 @@
       ]
     }
   },
-  "9442f24e1c161116ba90b100676a5ee1c3a68853c984fe5ec97575cc899aae14": {
-    "query": "\n                SELECT MAX(block_number) as \"max!\" FROM tx_filters\n                INNER JOIN executed_priority_operations\n                ON tx_filters.tx_hash = executed_priority_operations.tx_hash\n            ",
+  "9455d98f317f5718201a318cf488dd94b6370871d3bb0007ccd1a609612fd19a": {
+    "query": "\n                SELECT MAX(block_number) as \"max?\" FROM tx_filters\n                INNER JOIN executed_transactions\n                ON tx_filters.tx_hash = executed_transactions.tx_hash\n            ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "max!",
+          "name": "max?",
           "type_info": "Int8"
         }
       ],
