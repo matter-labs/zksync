@@ -23,7 +23,6 @@ zksync_prover_utils = { path = "../../lib/prover_utils", version = "1.0" }
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 
 vlog = { path = "../../lib/vlog", version = "1.0"}
-tracing = "0.1.22"
 
 serde = "1.0.90"
 serde_json = "1.0.0"
@@ -43,4 +42,3 @@ async-trait = "0.1.42"
 zksync_prover = { path = "../prover", version = "1.0" }
 num = { version = "0.3.1", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.11", features = ["blocking"] }

@@ -18,14 +18,12 @@ zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
-zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
 zksync_test_account = { path = "../../tests/test_account", version = "1.0" }
 
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 zksync_core = { path = "../zksync_core", version = "1.0" }
 zksync_api = { path = "../zksync_api", version = "1.0" }
-actix-web = "4.0.0-beta.8"
 ethabi = "14.0.0"
 web3 = "0.16.0"
 log = "0.4"

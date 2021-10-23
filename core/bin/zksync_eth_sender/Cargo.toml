@@ -11,22 +11,15 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
 [dependencies]
-zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
 zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 
 zksync_basic_types = { path = "../../lib/basic_types", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
-zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 zksync_gateway_watcher = { path = "../../lib/gateway_watcher", version = "1.0" }
-
-hex = "0.4"
-ethabi = "14.0.0"
 web3 = "0.16.0"
-serde = "1.0.90"
-serde_json = "1.0.0"
 metrics = "0.17"
 vlog = { path = "../../lib/vlog", version = "1.0" }
 

@@ -17,7 +17,6 @@ db_test = []
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 num = { version = "0.3.1", features = ["serde"] }
-tiny-keccak = "1.4.2"
 ethabi = "14.0.0"
 web3 = "0.16.0"
 hex = "0.4"
@@ -33,7 +32,6 @@ zksync_state = { path = "../../lib/state", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
-zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 
