@@ -200,8 +200,7 @@ impl<W: EthClient> EthWatch<W> {
             .sorted_by_key(|(id, _)| **id)
         {
             if *serial_id > next_priority_op_id {
-                // Either the previous block range contains missing operations
-                // or the new one has a gap in the beginning.
+                // Updated state misses some logs for new priority operations.
                 // We have to revert the block range back. This will only move the watcher
                 // backwards for a single time since `last_ethereum_block` and its backup will
                 // be equal.
@@ -596,7 +595,7 @@ impl<W: EthClient> EthWatch<W> {
                             );
                             self.enter_backoff_mode();
                         } else if is_missing_priority_op_error(&error) {
-                            vlog::warn!("{}", error);
+                            vlog::warn!("{}\nEntering the backoff mode", error);
                             // Wait for some time and try to fetch new logs again.
                             self.enter_backoff_mode();
                         } else {
