@@ -14,6 +14,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
+use thiserror::Error;
 
 pub use client::{get_web3_block_number, EthHttpClient};
 use itertools::Itertools;
@@ -32,7 +33,7 @@ use zksync_config::ZkSyncConfig;
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{
-    tx::TxHash, NewTokenEvent, Nonce, PriorityOp, PubKeyHash, RegisterNFTFactoryEvent,
+    tx::TxHash, NewTokenEvent, Nonce, PriorityOp, PubKeyHash, RegisterNFTFactoryEvent, SerialId,
     ZkSyncPriorityOp, H256,
 };
 
@@ -117,6 +118,14 @@ pub enum EthWatchRequest {
     },
 }
 
+#[derive(Debug, Error)]
+#[error("A priority op log is missing: last processed id is {0}, next is {1}")]
+struct MissingPriorityOpError(SerialId, SerialId);
+
+fn is_missing_priority_op_error(error: &anyhow::Error) -> bool {
+    error.is::<MissingPriorityOpError>()
+}
+
 pub struct EthWatch<W: EthClient> {
     client: W,
     eth_state: ETHState,
@@ -168,31 +177,44 @@ impl<W: EthClient> EthWatch<W> {
         // Note that we don't have to add `number_of_confirmations_for_event` here, because the check function takes
         // care of it on its own. Here we calculate "how many blocks should we watch", and the offsets with respect
         // to the `number_of_confirmations_for_event` are calculated by `update_eth_state`.
-        let block_difference =
-            last_ethereum_block.saturating_sub(self.eth_state.last_ethereum_block());
+        let mut next_priority_op_id = self.eth_state.next_priority_op_id();
+        let previous_ethereum_block = self.eth_state.last_ethereum_block();
+        let block_difference = last_ethereum_block.saturating_sub(previous_ethereum_block);
 
         let updated_state = self
             .update_eth_state(last_ethereum_block, block_difference)
             .await?;
 
+        // It's assumed that for the current state all priority operations have consecutive ids,
+        // i.e. there're no gaps. Thus, there're two opportunities for missing them: either
+        // we're missing last operations from the previous ethereum blocks range or there's a gap
+        // in the updated state.
+
         // Extend the existing priority operations with the new ones.
         let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
 
-        for (serial_id, op) in updated_state.priority_queue() {
-            priority_queue.insert(*serial_id, op.clone());
-        }
-
-        // Check for gaps in priority queue. If some event is missing we skip this `ETHState` update.
-        let mut priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
-        priority_op_ids.sort_unstable();
-        for i in 0..priority_op_ids.len().saturating_sub(1) {
-            let gap = priority_op_ids[i + 1] - priority_op_ids[i];
-            anyhow::ensure!(
-                gap == 1,
-                "Gap in priority op queue: gap={}, priority_op_before_gap={}",
-                gap,
-                priority_op_ids[i]
-            );
+        // Iterate through new priority operations sorted by their serial id.
+        for (serial_id, op) in updated_state
+            .priority_queue()
+            .iter()
+            .sorted_by_key(|(id, _)| **id)
+        {
+            if *serial_id > next_priority_op_id {
+                // Either the previous block range contains missing operations
+                // or the new one has a gap in the beginning.
+                // We have to revert the block range back. This will only move the watcher
+                // backwards for a single time since `last_ethereum_block` and its backup will
+                // be equal.
+                self.eth_state.reset_last_ethereum_block();
+                return Err(anyhow::Error::from(MissingPriorityOpError(
+                    next_priority_op_id,
+                    *serial_id,
+                )));
+            } else {
+                // Next serial id matched the expected one.
+                priority_queue.insert(*serial_id, op.clone());
+                next_priority_op_id = next_priority_op_id.max(*serial_id + 1);
+            }
         }
 
         // Extend the existing token events with the new ones.
@@ -215,6 +237,7 @@ impl<W: EthClient> EthWatch<W> {
 
         let new_state = ETHState::new(
             last_ethereum_block,
+            previous_ethereum_block,
             updated_state.unconfirmed_queue().to_vec(),
             priority_queue,
             new_tokens,
@@ -289,7 +312,9 @@ impl<W: EthClient> EthWatch<W> {
             new_priority_op_ids
         );
 
+        // The backup block number is not used.
         let state = ETHState::new(
+            current_ethereum_block,
             current_ethereum_block,
             unconfirmed_queue,
             priority_queue,
@@ -569,6 +594,10 @@ impl<W: EthClient> EthWatch<W> {
                                 "Rate limit was reached, as reported by Ethereum node. \
                                 Entering the backoff mode"
                             );
+                            self.enter_backoff_mode();
+                        } else if is_missing_priority_op_error(&error) {
+                            vlog::warn!("{}", error);
+                            // Wait for some time and try to fetch new logs again.
                             self.enter_backoff_mode();
                         } else {
                             // Some unexpected kind of error, we won't shutdown the node because of it,
