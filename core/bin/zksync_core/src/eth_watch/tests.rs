@@ -378,7 +378,6 @@ async fn test_restore_and_poll() {
         ])
         .await;
     watcher.poll_eth_node().await.unwrap();
-    dbg!(&watcher.eth_state);
     assert_eq!(watcher.eth_state.last_ethereum_block(), 5);
     let priority_queues = watcher.eth_state.priority_queue();
     let unconfirmed_queue = watcher.eth_state.unconfirmed_queue();
@@ -484,20 +483,32 @@ async fn test_serial_id_gaps() {
 
     // Add a gap.
     client
-        .add_operations(&[PriorityOp {
-            serial_id: 3, // Then next id is expected to be 2.
-            data: deposit.clone(),
-            deadline_block: 0,
-            eth_hash: [2; 32].into(),
-            eth_block: 2,
-            eth_block_index: Some(1),
-        }])
+        .add_operations(&[
+            PriorityOp {
+                serial_id: 2,
+                data: deposit.clone(),
+                deadline_block: 0,
+                eth_hash: [2; 32].into(),
+                eth_block: 2,
+                eth_block_index: Some(1),
+            },
+            PriorityOp {
+                serial_id: 4, // Then next id is expected to be 3.
+                data: deposit.clone(),
+                deadline_block: 0,
+                eth_hash: [3; 32].into(),
+                eth_block: 2,
+                eth_block_index: Some(3),
+            },
+        ])
         .await;
     client.set_last_block_number(3).await;
     // Should detect a gap.
     let err = watcher.poll_eth_node().await.unwrap_err();
     assert!(is_missing_priority_op_error(&err));
 
+    // The partially valid update is still discarded and we're waiting
+    // for the serial_id = 2 even though it was present.
     assert_eq!(watcher.eth_state.next_priority_op_id(), 2);
     // The range got reset.
     assert_eq!(watcher.eth_state.last_ethereum_block_backup(), 0);
@@ -506,16 +517,17 @@ async fn test_serial_id_gaps() {
     // Add a missing operations to the processed range.
     client
         .add_operations(&[PriorityOp {
-            serial_id: 2,
+            serial_id: 3,
             data: deposit.clone(),
             deadline_block: 0,
             eth_hash: [2; 32].into(),
-            eth_block: 1,
-            eth_block_index: Some(1),
+            eth_block: 2,
+            eth_block_index: Some(2),
         }])
         .await;
     watcher.poll_eth_node().await.unwrap();
-    assert_eq!(watcher.eth_state.next_priority_op_id(), 4);
+    assert_eq!(watcher.eth_state.next_priority_op_id(), 5);
+    assert_eq!(watcher.eth_state.priority_queue().len(), 5);
     assert_eq!(watcher.eth_state.last_ethereum_block_backup(), 0);
     assert_eq!(watcher.eth_state.last_ethereum_block(), 3);
 }

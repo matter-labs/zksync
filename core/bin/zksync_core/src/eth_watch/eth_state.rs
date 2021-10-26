@@ -50,6 +50,10 @@ impl ETHState {
         new_tokens: Vec<NewTokenEvent>,
         register_nft_factory_events: Vec<RegisterNFTFactoryEvent>,
     ) -> Self {
+        assert!(
+            last_ethereum_block_backup <= last_ethereum_block,
+            "Backup block cannot be greater than last known block"
+        );
         let next_priority_op_id = priority_queue
             .keys()
             .max()
