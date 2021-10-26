@@ -18,6 +18,7 @@ use zksync_types::{
 };
 // Local imports
 use crate::chain::operations::records::StoredAggregatedOperation;
+use crate::utils::affected_accounts;
 use crate::{
     chain::{
         block::{records::TransactionItem, BlockSchema},
@@ -119,6 +120,15 @@ impl NewExecutedPriorityOperation {
             ),
         };
 
+        let affected_accounts = exec_prior_op
+            .priority_op
+            .data
+            .affected_accounts()
+            .into_iter()
+            .map(|address| address.as_bytes().to_vec())
+            .collect();
+        let token = exec_prior_op.priority_op.data.token_id().0 as i32;
+
         Self {
             block_number: i64::from(*block),
             block_index: exec_prior_op.block_index as i32,
@@ -135,12 +145,18 @@ impl NewExecutedPriorityOperation {
                 .eth_block_index
                 .map(|index| index as i64),
             tx_hash,
+            affected_accounts,
+            token,
         }
     }
 }
 
 impl NewExecutedTransaction {
-    pub fn prepare_stored_tx(exec_tx: ExecutedTx, block: BlockNumber) -> Self {
+    pub async fn prepare_stored_tx(
+        exec_tx: ExecutedTx,
+        block: BlockNumber,
+        storage: &mut StorageProcessor<'_>,
+    ) -> QueryResult<Self> {
         fn cut_prefix(input: &str) -> String {
             if let Some(input) = input.strip_prefix("0x") {
                 input.into()
@@ -174,7 +190,7 @@ impl NewExecutedTransaction {
                 ),
                 ZkSyncTx::MintNFT(_) => (
                     serde_json::from_value(tx["creatorAddress"].clone()).unwrap(),
-                    serde_json::from_value(tx["recipientAddress"].clone()).unwrap(),
+                    serde_json::from_value(tx["recipient"].clone()).unwrap(),
                 ),
                 ZkSyncTx::Swap(_) => (
                     serde_json::from_value(tx["submitterAddress"].clone()).unwrap(),
@@ -190,7 +206,19 @@ impl NewExecutedTransaction {
             serde_json::to_value(sign_data).expect("Failed to encode EthSignData")
         });
 
-        Self {
+        let affected_accounts = affected_accounts(&exec_tx.signed_tx.tx, storage)
+            .await?
+            .into_iter()
+            .map(|address| address.as_bytes().to_vec())
+            .collect();
+        let used_tokens = exec_tx
+            .signed_tx
+            .tx
+            .tokens()
+            .into_iter()
+            .map(|id| id.0 as i32)
+            .collect();
+        Ok(Self {
             block_number: i64::from(*block),
             tx_hash: exec_tx.signed_tx.hash().as_ref().to_vec(),
             from_account,
@@ -205,7 +233,9 @@ impl NewExecutedTransaction {
             created_at: exec_tx.created_at,
             eth_sign_data,
             batch_id: exec_tx.batch_id,
-        }
+            affected_accounts,
+            used_tokens,
+        })
     }
 }
 

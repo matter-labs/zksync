@@ -9,6 +9,7 @@ members = [
     "core/bin/block_revert",
     "core/bin/mint_nft_nonce_migration",
     "core/bin/token_kind_migration",
+    "core/bin/tx_filters_migration",
 
     # Server micro-services
     "core/bin/zksync_api",

@@ -71,6 +71,8 @@ pub struct NewExecutedPriorityOperation {
     /// This field must be optional because of backward compatibility.
     pub eth_block_index: Option<i64>,
     pub tx_hash: Vec<u8>,
+    pub affected_accounts: Vec<Vec<u8>>,
+    pub token: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -89,6 +91,8 @@ pub struct NewExecutedTransaction {
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
     pub batch_id: Option<i64>,
+    pub affected_accounts: Vec<Vec<u8>>,
+    pub used_tokens: Vec<i32>,
 }
 
 #[derive(Debug, Clone)]

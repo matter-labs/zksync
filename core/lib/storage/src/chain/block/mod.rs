@@ -90,7 +90,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                             .await?;
                     }
                     // Store the executed operation in the corresponding schema.
-                    let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block_number);
+                    let new_tx = NewExecutedTransaction::prepare_stored_tx(
+                        *tx,
+                        block_number,
+                        &mut transaction,
+                    )
+                    .await?;
                     transaction
                         .chain()
                         .operations_schema()

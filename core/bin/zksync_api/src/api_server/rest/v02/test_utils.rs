@@ -656,6 +656,8 @@ impl TestServerConfig {
                 tx_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64)
                     .as_bytes()
                     .to_vec(),
+                affected_accounts: vec![Default::default()],
+                token: 0,
             },
             // Committed priority operation.
             NewExecutedPriorityOperation {
@@ -679,6 +681,8 @@ impl TestServerConfig {
                 tx_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64)
                     .as_bytes()
                     .to_vec(),
+                affected_accounts: vec![Default::default()],
+                token: 0,
             },
         ];
 

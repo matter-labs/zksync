@@ -35,6 +35,52 @@ pub async fn commit_schema_data(
     storage: &mut StorageProcessor<'_>,
     setup: &TransactionsHistoryTestSetup,
 ) -> QueryResult<()> {
+    if storage
+        .chain()
+        .account_schema()
+        .account_id_by_address(setup.from_zksync_account.address)
+        .await?
+        .is_none()
+    {
+        storage
+            .chain()
+            .state_schema()
+            .commit_state_update(
+                BlockNumber(0),
+                &[(
+                    AccountId(0xbabe),
+                    AccountUpdate::Create {
+                        address: setup.from_zksync_account.address,
+                        nonce: Nonce(0),
+                    },
+                )],
+                0,
+            )
+            .await?;
+    }
+    if storage
+        .chain()
+        .account_schema()
+        .account_id_by_address(setup.to_zksync_account.address)
+        .await?
+        .is_none()
+    {
+        storage
+            .chain()
+            .state_schema()
+            .commit_state_update(
+                BlockNumber(0),
+                &[(
+                    AccountId(0xdcba),
+                    AccountUpdate::Create {
+                        address: setup.to_zksync_account.address,
+                        nonce: Nonce(0),
+                    },
+                )],
+                1,
+            )
+            .await?;
+    }
     for token in &setup.tokens {
         let try_insert_token = storage.tokens_schema().store_token(token.clone()).await;
         // If the token is added or it already exists in the database,
@@ -217,7 +263,7 @@ async fn get_account_transactions_history(mut storage: StorageProcessor<'_>) -> 
         .await?;
 
     assert_eq!(from_history.len(), 10);
-    assert_eq!(to_history.len(), 5);
+    assert_eq!(to_history.len(), 7);
 
     Ok(())
 }
@@ -236,7 +282,7 @@ async fn get_account_transactions_history_from(
     let block_size = setup.blocks[0].block_transactions.len() as u64;
 
     let txs_from = 10; // Amount of transactions related to "from" account.
-    let txs_to = 5;
+    let txs_to = 7;
 
     // execute_operation
     commit_schema_data(&mut storage, &setup).await?;
