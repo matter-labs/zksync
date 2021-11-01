@@ -9,7 +9,6 @@ import "./ZkSync.sol";
 import "./Verifier.sol";
 import "./TokenInit.sol";
 import "./AdditionalZkSync.sol";
-import "./ZkSync.sol";
 
 contract DeployFactory is TokenDeployInit {
     // Why do we deploy contracts in the constructor?
