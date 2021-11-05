@@ -31,6 +31,7 @@ use crate::{
     data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor,
     inmemory_storage_interactor::InMemoryStorageInteractor,
+    storage_interactor::StorageInteractor,
     tests::utils::{create_log, u32_to_32bytes},
     END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
@@ -299,7 +300,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 
     let mut transport = Web3Transport::new();
 
-    let mut interactor = DatabaseStorageInteractor::new(storage);
+    let mut interactor = StorageInteractor::Database(DatabaseStorageInteractor::new(storage));
     let contract = zksync_contract();
     let gov_contract = governance_contract();
 
@@ -417,8 +418,13 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 
     driver.run_state_update(&mut interactor).await;
 
+    let db = match &mut interactor {
+        StorageInteractor::Database(db) => db,
+        _ => unreachable!(),
+    };
+
     // Check that it's stores some account, created by deposit
-    let (_, account) = AccountSchema(interactor.storage())
+    let (_, account) = AccountSchema(db.storage())
         .account_state_by_address(Address::default())
         .await
         .unwrap()
@@ -428,7 +434,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 
     assert_eq!(BigUint::from(40u32), balance);
     assert_eq!(driver.events_state.committed_events.len(), 2);
-    let events = DataRestoreSchema(interactor.storage())
+    let events = DataRestoreSchema(db.storage())
         .load_committed_events_state()
         .await
         .unwrap();
@@ -467,7 +473,7 @@ async fn test_with_inmemory_storage() {
 
     let mut transport = Web3Transport::new();
 
-    let mut interactor = InMemoryStorageInteractor::new();
+    let mut interactor = StorageInteractor::InMemory(InMemoryStorageInteractor::new());
     let contract = zksync_contract();
     let gov_contract = governance_contract();
 
@@ -642,15 +648,20 @@ async fn test_with_inmemory_storage() {
 
     driver.run_state_update(&mut interactor).await;
 
+    let inmemory = match &mut interactor {
+        StorageInteractor::InMemory(db) => db,
+        _ => unreachable!(),
+    };
+
     // Check that it's stores some account, created by deposit
-    let (_, account) = interactor
+    let (_, account) = inmemory
         .get_account_by_address(&Default::default())
         .unwrap();
     let balance = account.get_balance(TokenId(0));
 
     assert_eq!(BigUint::from(80u32), balance);
     assert_eq!(driver.events_state.committed_events.len(), 4);
-    let events = interactor.load_committed_events_state();
+    let events = inmemory.load_committed_events_state();
 
     assert_eq!(driver.events_state.committed_events.len(), events.len());
 

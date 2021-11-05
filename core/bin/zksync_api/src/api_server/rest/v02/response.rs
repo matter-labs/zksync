@@ -91,6 +91,6 @@ macro_rules! api_try {
             Err(err) => {
                 return ApiResult::from(err);
             }
-        };
+        }
     };
 }

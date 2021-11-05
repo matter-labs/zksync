@@ -10,6 +10,7 @@ use zksync_types::{AccountId, AccountMap, TokenId};
 use crate::{external_commands::Contracts, TestkitConfig};
 
 use zksync_data_restore::contract::ZkSyncDeployedContract;
+use zksync_data_restore::storage_interactor::StorageInteractor;
 
 pub async fn verify_restore(
     testkit_config: &TestkitConfig,
@@ -21,7 +22,6 @@ pub async fn verify_restore(
 ) {
     let web3 = Web3::new(Http::new(&testkit_config.web3_url).expect("http transport start"));
 
-    let mut interactor = InMemoryStorageInteractor::new();
     let contract = ZkSyncDeployedContract::version4(web3.eth(), contracts.contract);
     let mut driver = DataRestoreDriver::new(
         web3,
@@ -35,15 +35,24 @@ pub async fn verify_restore(
         contract,
     );
 
-    interactor.insert_new_account(AccountId(0), &fee_account_address);
+    let mut db = InMemoryStorageInteractor::new();
+
+    db.insert_new_account(AccountId(0), &fee_account_address);
+
+    let mut interactor = StorageInteractor::InMemory(db);
     driver.load_state_from_storage(&mut interactor).await;
     driver.run_state_update(&mut interactor).await;
 
     assert_eq!(driver.tree_state.root_hash(), root_hash);
 
+    let db = match &mut interactor {
+        StorageInteractor::InMemory(db) => db,
+        _ => unreachable!(),
+    };
+
     for (id, account) in acc_state_from_test_setup {
         let driver_acc = driver.tree_state.get_account(id).expect("Should exist");
-        let inter_acc = interactor.get_account(&id).expect("Should exist");
+        let inter_acc = db.get_account(&id).expect("Should exist");
         for id in &tokens {
             assert_eq!(driver_acc.address, inter_acc.address);
             assert_eq!(account.address, inter_acc.address);
