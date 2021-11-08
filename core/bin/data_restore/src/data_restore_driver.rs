@@ -24,8 +24,6 @@ use crate::{
     tree_state::TreeState,
 };
 
-use std::marker::PhantomData;
-
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
 /// - Events - The events fetched and saved successfully - now get operations from them and update tree
@@ -51,7 +49,7 @@ pub enum StorageUpdateState {
 /// - Operations
 /// - Tree
 /// - Storage
-pub struct DataRestoreDriver<T: Transport, I> {
+pub struct DataRestoreDriver<T: Transport> {
     /// Web3 provider endpoint
     pub web3: Web3<T>,
     /// Provides Ethereum Governance contract interface
@@ -81,14 +79,9 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// Serial id of the last priority operation processed by the driver. It's necessary to manually
     /// keep track of it since it's impossible to restore it from the contract.
     pub last_priority_op_serial_id: SerialId,
-    phantom_data: PhantomData<I>,
 }
 
-impl<T, I> DataRestoreDriver<T, I>
-where
-    T: Transport,
-    I: StorageInteractor,
-{
+impl<T: Transport> DataRestoreDriver<T> {
     /// Returns new data restore driver with empty events and tree states.
     ///
     /// # Arguments
@@ -138,7 +131,6 @@ where
             end_eth_blocks_offset,
             finite_mode,
             final_hash,
-            phantom_data: Default::default(),
             last_priority_op_serial_id: 0,
         }
     }
@@ -151,7 +143,11 @@ where
     ///
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     ///
-    pub async fn set_genesis_state(&mut self, interactor: &mut I, genesis_tx_hash: H256) {
+    pub async fn set_genesis_state(
+        &mut self,
+        interactor: &mut StorageInteractor<'_>,
+        genesis_tx_hash: H256,
+    ) {
         let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
             .await
             .expect("Cant get zkSync genesis transaction");
@@ -163,7 +159,9 @@ where
             .expect("Cant set genesis block number for events state");
         vlog::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
-        interactor
+        let mut transaction = interactor.start_transaction().await;
+
+        transaction
             .save_events_state(&[], &[], genesis_eth_block_number)
             .await;
 
@@ -175,7 +173,7 @@ where
             hex::encode(genesis_fee_account.address.as_ref())
         );
 
-        interactor
+        transaction
             .save_special_token(Token::new(
                 NFT_TOKEN_ID,
                 *NFT_STORAGE_ACCOUNT_ADDRESS,
@@ -231,14 +229,16 @@ where
         vlog::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         vlog::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
-        interactor.save_genesis_tree_state(&account_updates).await;
+        transaction.save_genesis_tree_state(&account_updates).await;
+
+        transaction.commit().await;
 
         vlog::info!("Saved genesis tree state\n");
 
         self.tree_state = tree_state;
     }
 
-    async fn store_tree_cache(&mut self, interactor: &mut I) {
+    async fn store_tree_cache(&mut self, interactor: &mut StorageInteractor<'_>) {
         vlog::info!(
             "Storing the tree cache, block number: {}",
             self.tree_state.state.block_number
@@ -254,14 +254,18 @@ where
     }
 
     /// Stops states from storage
-    pub async fn load_state_from_storage(&mut self, interactor: &mut I) -> bool {
+    pub async fn load_state_from_storage(
+        &mut self,
+        interactor: &mut StorageInteractor<'_>,
+    ) -> bool {
+        let mut transaction = interactor.start_transaction().await;
         vlog::info!("Loading state from storage");
-        let state = interactor.get_storage_state().await;
-        self.events_state = interactor.get_block_events_state_from_storage().await;
+        let state = transaction.get_storage_state().await;
+        self.events_state = transaction.get_block_events_state_from_storage().await;
 
         let mut is_cached = false;
         // Try to load tree cache from the database.
-        self.tree_state = if let Some(cache) = interactor.get_cached_tree_state().await {
+        self.tree_state = if let Some(cache) = transaction.get_cached_tree_state().await {
             vlog::info!("Using tree cache from the database");
             is_cached = true;
             TreeState::restore_from_cache(
@@ -271,7 +275,7 @@ where
                 cache.nfts,
             )
         } else {
-            let tree_state = interactor.get_tree_state().await;
+            let tree_state = transaction.get_tree_state().await;
             TreeState::load(
                 tree_state.last_block_number,
                 tree_state.account_map,
@@ -282,23 +286,28 @@ where
         match state {
             StorageUpdateState::Events => {
                 // Update operations
-                let new_ops_blocks = self.update_operations_state(interactor).await;
+                let new_ops_blocks = self.update_operations_state(&mut transaction).await;
                 // Update tree
-                self.update_tree_state(interactor, new_ops_blocks).await;
+                self.update_tree_state(&mut transaction, new_ops_blocks)
+                    .await;
             }
             StorageUpdateState::Operations => {
                 // Update operations
-                let new_ops_blocks = interactor.get_ops_blocks_from_storage().await;
+                let new_ops_blocks = transaction.get_ops_blocks_from_storage().await;
                 // Update tree
-                self.update_tree_state(interactor, new_ops_blocks).await;
+                self.update_tree_state(&mut transaction, new_ops_blocks)
+                    .await;
             }
             StorageUpdateState::None => {}
         }
 
-        self.last_priority_op_serial_id = interactor.get_max_priority_op_serial_id().await;
+        self.last_priority_op_serial_id = transaction.get_max_priority_op_serial_id().await;
         let total_verified_blocks = self.zksync_contract.get_total_verified_blocks().await;
 
         let last_verified_block = self.tree_state.state.block_number;
+
+        transaction.commit().await;
+
         vlog::info!(
             "State has been loaded\nProcessed {:?} blocks on contract\nRoot hash: {:?}\n",
             last_verified_block,
@@ -314,7 +323,7 @@ where
     }
 
     /// Activates states updates
-    pub async fn run_state_update(&mut self, interactor: &mut I) {
+    pub async fn run_state_update(&mut self, interactor: &mut StorageInteractor<'_>) {
         let mut last_watched_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
@@ -322,12 +331,17 @@ where
 
             // Update events
             if self.update_events_state(interactor).await {
+                vlog::debug!("Events state");
                 // Update operations
                 let new_ops_blocks = self.update_operations_state(interactor).await;
+                vlog::debug!("Operations state");
 
                 if !new_ops_blocks.is_empty() {
+                    let mut transaction = interactor.start_transaction().await;
+
                     // Update tree
-                    self.update_tree_state(interactor, new_ops_blocks).await;
+                    self.update_tree_state(&mut transaction, new_ops_blocks)
+                        .await;
 
                     let total_verified_blocks =
                         self.zksync_contract.get_total_verified_blocks().await;
@@ -336,7 +350,9 @@ where
 
                     // We must update the Ethereum stats table to match the actual stored state
                     // to keep the `state_keeper` consistent with the `eth_sender`.
-                    interactor.update_eth_state().await;
+                    transaction.update_eth_state().await;
+
+                    transaction.commit().await;
 
                     vlog::info!(
                         "State updated\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
@@ -386,7 +402,7 @@ where
 
     /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
     /// Returns bool flag, true if there are new block events
-    async fn update_events_state(&mut self, interactor: &mut I) -> bool {
+    async fn update_events_state(&mut self, interactor: &mut StorageInteractor<'_>) -> bool {
         let (block_events, token_events, last_watched_eth_block_number) = self
             .events_state
             .update_events_state(
@@ -417,7 +433,11 @@ where
     ///
     /// * `new_ops_blocks` - the new Rollup operations blocks
     ///
-    async fn update_tree_state(&mut self, interactor: &mut I, new_ops_blocks: Vec<RollupOpsBlock>) {
+    async fn update_tree_state(
+        &mut self,
+        interactor: &mut StorageInteractor<'_>,
+        new_ops_blocks: Vec<RollupOpsBlock>,
+    ) {
         let mut blocks = vec![];
         let mut updates = vec![];
         let mut count = 0;
@@ -445,18 +465,24 @@ where
             updates.push(acc_updates);
             count += 1;
         }
+
+        let mut transaction = interactor.start_transaction().await;
         for i in 0..count {
-            interactor
+            transaction
                 .update_tree_state(blocks[i].clone(), updates[i].clone())
                 .await;
         }
+        transaction.commit().await;
 
         vlog::debug!("Updated state");
     }
 
     /// Gets new operations blocks from events, updates rollup operations stored state.
     /// Returns new rollup operations blocks
-    async fn update_operations_state(&mut self, interactor: &mut I) -> Vec<RollupOpsBlock> {
+    async fn update_operations_state(
+        &mut self,
+        interactor: &mut StorageInteractor<'_>,
+    ) -> Vec<RollupOpsBlock> {
         let new_blocks = self.get_new_operation_blocks_from_events().await;
 
         interactor.save_rollup_ops(&new_blocks).await;

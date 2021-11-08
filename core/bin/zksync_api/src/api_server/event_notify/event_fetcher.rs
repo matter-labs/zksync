@@ -19,7 +19,7 @@ macro_rules! await_db {
                 vlog::warn!("Unable to connect to the database: {}", err);
                 $on_exit
             }
-        };
+        }
     };
 }
 
