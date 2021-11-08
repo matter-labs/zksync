@@ -322,7 +322,11 @@ impl TransferWitness<Bn256> {
                 b: Some(b),
                 valid_from: Some(fr_from(valid_from)),
                 valid_until: Some(fr_from(valid_until)),
-                eth_address: Some(account_witness_to_after.address.unwrap()),
+                eth_address: Some(
+                    account_witness_to_after
+                        .address
+                        .expect("receiver account should have address on transfer"),
+                ),
                 ..Default::default()
             },
             before_root: Some(before_root),
