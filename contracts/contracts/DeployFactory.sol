@@ -40,6 +40,8 @@ contract DeployFactory is TokenDeployInit {
         require(_governor != address(0), "governor check");
         require(_feeAccountAddress != address(0), "fee acc address check");
 
+        ZkSync(_zkSyncTarget).initialize(abi.encode(address(0), address(0), address(0), bytes32(0)));
+
         deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _genesisRoot, _firstValidator, _governor);
 
         selfdestruct(msg.sender);
