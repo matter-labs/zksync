@@ -79,3 +79,18 @@ Get NFT owner ID
         + status: success (string, required)
         + result (number, required{{isResultNullable}})
         + error (Error, required, nullable)
+
+## api/v0.2/tokens/nft_id_by_tx_hash/:tx_hash [/tokens/nft_id_by_tx_hash/{tx_hash}]
+
++ Parameters
+    + tx_hash (required, string, `{{mintNFTTxHash}}`) ... The hash of the MintNFT transaction
+
+### Get NFT ID by the MintNFT transaction hash [GET]
+Get NFT ID by the MintNFT transaction hash
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (number, required{{isResultNullable}})
+        + error (Error, required, nullable)
