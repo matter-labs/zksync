@@ -47,12 +47,16 @@ Tester.prototype.testMintNFT = async function (
     expect(receipt.success, `Mint NFT failed with a reason: ${receipt.failReason}`).to.be.true;
 
     const balanceAfter = await wallet.getBalance(feeToken);
-
     expect(balanceBefore.sub(balanceAfter).eq(fee), 'Wrong amount in wallet after withdraw').to.be.true;
+
+    const nftId = await wallet.provider.getNFTIdByTxHash(handle.txHash);
+    expect(nftId).to.exist;
+
     const state = await receiver.getAccountState();
     const nft = Object.values(state.committed.nfts)[0];
     expect(nft).to.exist;
     expect(nft.contentHash).eq(utils.hexlify(contentHash));
+    expect(nft.id).to.eq(nftId);
 
     return nft;
 };
