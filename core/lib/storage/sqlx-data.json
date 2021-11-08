@@ -3227,6 +3227,54 @@
       ]
     }
   },
+  "79ddd8e2392143e04fc8f9eafea8fbb0c7982d190467ef803045b0d5db78ee51": {
+    "query": "SELECT blocks.block_num AS block_num, ops, fee_account,\n            timestamp, previous_block_root_hash, contract_version\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation ORDER BY id) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN (\n                SELECT DISTINCT block_num, contract_version\n                FROM data_restore_events_state\n            ) events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_num",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "ops",
+          "type_info": "JsonbArray"
+        },
+        {
+          "ordinal": 2,
+          "name": "fee_account",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "timestamp",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "previous_block_root_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "contract_version",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        null,
+        false,
+        true,
+        true,
+        false
+      ]
+    }
+  },
   "7bc4a6d9e909dce159213d0826726c10c7ec4008db2a4f05cbe613aa849e8a40": {
     "query": "\n            UPDATE forced_exit_requests\n                SET fulfilled_by = $1\n                WHERE id = $2\n            ",
     "describe": {
@@ -6264,54 +6312,6 @@
         false,
         true,
         true
-      ]
-    }
-  },
-  "dcd0381b0098d3223ff90cb4a02f73b1107329f1e046eced766361cef5cf8e0d": {
-    "query": "SELECT blocks.block_num AS block_num, ops, fee_account,\n            timestamp, previous_block_root_hash, contract_version\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN (\n                SELECT DISTINCT block_num, contract_version\n                FROM data_restore_events_state\n            ) events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "block_num",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "ops",
-          "type_info": "JsonbArray"
-        },
-        {
-          "ordinal": 2,
-          "name": "fee_account",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "timestamp",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "previous_block_root_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "contract_version",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        null,
-        false,
-        true,
-        true,
-        false
       ]
     }
   },
