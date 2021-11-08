@@ -3819,7 +3819,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
         serialized_tx_bits_version1.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits_version1.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits_version1.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits_version1.extend(cur.token.get_bits_be());
         serialized_tx_bits_version1.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
@@ -3832,7 +3832,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits_old1.extend(global_variables.chunk_data.tx_type.get_bits_be());
         serialized_tx_bits_old1.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits_old1.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits_old1.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_old1.extend(op_data.eth_address.get_bits_be());
         // the old version contains token 2-byte representation
         serialized_tx_bits_old1.extend_from_slice(&cur.token.get_bits_be()[16..32]);
         serialized_tx_bits_old1.extend(op_data.amount_packed.get_bits_be());
@@ -3847,7 +3847,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits_old2.extend(global_variables.chunk_data.tx_type.get_bits_be());
         serialized_tx_bits_old2.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits_old2.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits_old2.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_old2.extend(op_data.eth_address.get_bits_be());
         // the old version contains token 2-byte representation
         serialized_tx_bits_old2.extend_from_slice(&cur.token.get_bits_be()[16..32]);
         serialized_tx_bits_old2.extend(op_data.amount_packed.get_bits_be());
@@ -4006,6 +4006,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         rhs_valid_flags.push(is_account_empty.not());
         rhs_valid_flags.push(is_special_nft_storage_account.not());
         rhs_valid_flags.push(is_special_nft_token.not());
+
+        let receiver_address_is_equal_to_signed = CircuitElement::equals(
+            cs.namespace(|| "receiver_address_is_equal_to_signed"),
+            &rhs.account.address,
+            &op_data.eth_address,
+        )?;
+        rhs_valid_flags.push(receiver_address_is_equal_to_signed);
 
         rhs_valid_flags.push(is_pubdata_chunk_correct);
         let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;

@@ -308,7 +308,7 @@ impl TransferWitness<Bn256> {
                 address: Some(account_address_to_fe),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
-                    account_witness: account_witness_to_after,
+                    account_witness: account_witness_to_after.clone(),
                     account_path: audit_path_to_after,
                     balance_value: Some(balance_to_after),
                     balance_subtree_path: audit_balance_path_to_after,
@@ -322,6 +322,7 @@ impl TransferWitness<Bn256> {
                 b: Some(b),
                 valid_from: Some(fr_from(valid_from)),
                 valid_until: Some(fr_from(valid_until)),
+                eth_address: Some(account_witness_to_after.address.unwrap()),
                 ..Default::default()
             },
             before_root: Some(before_root),
