@@ -127,7 +127,7 @@ impl TreeState {
         available_block_chunk_sizes: &[usize],
         last_priority_op_serial_id: &mut SerialId,
     ) -> Result<(Block, AccountUpdates), anyhow::Error> {
-        vlog::debug!("Updating tree for {:?}", ops_block.block_num);
+        vlog::debug!("Updating tree for block {}", *ops_block.block_num);
         let operations = ops_block.ops.clone();
 
         let mut accounts_updated = Vec::new();
