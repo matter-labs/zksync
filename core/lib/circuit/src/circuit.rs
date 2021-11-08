@@ -4094,7 +4094,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits_version1.extend(reversed_tx_type_bits_be(ForcedExitOp::OP_CODE));
         serialized_tx_bits_version1.extend(u8_into_bits_be(params::CURRENT_TX_VERSION));
         serialized_tx_bits_version1.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits_version1.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_version1.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits_version1.extend(cur.token.get_bits_be());
         serialized_tx_bits_version1.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits_version1.extend(lhs.account.nonce.get_bits_be());
@@ -4109,7 +4109,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut serialized_tx_bits_old = vec![];
         serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
         serialized_tx_bits_old.extend(lhs.account_id.get_bits_be());
-        serialized_tx_bits_old.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.eth_address.get_bits_be());
         // the old version contains token 2-byte representation
         serialized_tx_bits_old.extend_from_slice(&cur.token.get_bits_be()[16..32]);
         serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
