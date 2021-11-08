@@ -159,7 +159,9 @@ impl<T: Transport> DataRestoreDriver<T> {
             .expect("Cant set genesis block number for events state");
         vlog::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
-        interactor
+        let mut transaction = interactor.start_transaction().await;
+
+        transaction
             .save_events_state(&[], &[], genesis_eth_block_number)
             .await;
 
@@ -171,7 +173,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             hex::encode(genesis_fee_account.address.as_ref())
         );
 
-        interactor
+        transaction
             .save_special_token(Token::new(
                 NFT_TOKEN_ID,
                 *NFT_STORAGE_ACCOUNT_ADDRESS,
@@ -227,7 +229,9 @@ impl<T: Transport> DataRestoreDriver<T> {
         vlog::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         vlog::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
-        interactor.save_genesis_tree_state(&account_updates).await;
+        transaction.save_genesis_tree_state(&account_updates).await;
+
+        transaction.commit().await;
 
         vlog::info!("Saved genesis tree state\n");
 
