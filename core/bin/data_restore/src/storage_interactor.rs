@@ -50,7 +50,6 @@ macro_rules! storage_interact {
 
 impl StorageInteractor<'_> {
     pub async fn start_transaction<'c: 'b, 'b>(&'c mut self) -> StorageInteractor<'b> {
-        vlog::warn!("=======Starting db transaction=======");
         match self {
             StorageInteractor::Database(db) => {
                 let transaction = db.start_transaction().await;
@@ -64,7 +63,6 @@ impl StorageInteractor<'_> {
     }
 
     pub async fn commit(self) {
-        vlog::warn!("=======Commit=======");
         storage_interact!(self.commit())
     }
 
