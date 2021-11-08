@@ -335,4 +335,22 @@ impl RpcApp {
         metrics::histogram!("api.rpc.toggle_2fa", start.elapsed());
         response
     }
+
+    pub async fn _impl_get_nft_id_by_tx_hash(self, tx_hash: TxHash) -> Result<Option<TokenId>> {
+        let start = Instant::now();
+
+        let mut storage = self.access_storage().await?;
+        let response = storage
+            .chain()
+            .state_schema()
+            .get_nft_id_by_tx_hash(tx_hash)
+            .await
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
+                Error::internal_error()
+            })?;
+
+        metrics::histogram!("api.rpc.get_nft_id_by_tx_hash", start.elapsed());
+        Ok(response)
+    }
 }

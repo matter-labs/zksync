@@ -4063,6 +4063,26 @@
       "nullable": []
     }
   },
+  "924c04e90c91241f25e8ad84e6d274ff7769fbf11fa5ca54b0f848e701aaa03e": {
+    "query": "\n            SELECT token_id FROM executed_transactions\n            LEFT JOIN mint_nft_updates\n            ON executed_transactions.from_account = mint_nft_updates.creator_address\n                AND executed_transactions.nonce = mint_nft_updates.nonce\n            WHERE executed_transactions.tx_hash = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "92663f125319988e4b5d80d3d58286ca90a29ec2fa97d87750942c9e0615d1bc": {
     "query": "SELECT COUNT(*) FROM prover_job_queue WHERE job_status != $1",
     "describe": {
