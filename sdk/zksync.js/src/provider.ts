@@ -282,6 +282,10 @@ export class Provider extends SyncProvider {
         return result.success;
     }
 
+    async getNFTIdByTxHash(txHash: string): Promise<number> {
+        return await this.transport.request('get_nft_id_by_tx_hash', [txHash]);
+    }
+
     async disconnect() {
         return await this.transport.disconnect();
     }

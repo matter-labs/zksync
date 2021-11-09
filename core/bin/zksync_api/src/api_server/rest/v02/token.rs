@@ -23,7 +23,7 @@ use zksync_api_types::v02::{
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{AccountId, Token, TokenId, TokenLike};
+use zksync_types::{tx::TxHash, AccountId, Token, TokenId, TokenLike};
 
 // Local uses
 use super::{
@@ -260,6 +260,20 @@ async fn get_nft_owner(
     ApiResult::Ok(owner_id)
 }
 
+async fn get_nft_id_by_tx_hash(
+    data: web::Data<ApiTokenData>,
+    tx_hash: web::Path<TxHash>,
+) -> ApiResult<Option<TokenId>> {
+    let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
+    let nft_id = api_try!(storage
+        .chain()
+        .state_schema()
+        .get_nft_id_by_tx_hash(*tx_hash)
+        .await
+        .map_err(Error::storage));
+    ApiResult::Ok(nft_id)
+}
+
 pub fn api_scope(
     config: &ZkSyncConfig,
     pool: ConnectionPool,
@@ -278,6 +292,10 @@ pub fn api_scope(
         )
         .route("nft/{id}", web::get().to(get_nft))
         .route("nft/{id}/owner", web::get().to(get_nft_owner))
+        .route(
+            "nft_id_by_tx_hash/{tx_hash}",
+            web::get().to(get_nft_id_by_tx_hash),
+        )
 }
 
 #[cfg(test)]
@@ -288,7 +306,7 @@ mod tests {
         SharedData,
     };
     use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
-    use zksync_types::Address;
+    use zksync_types::{Address, BlockNumber, ZkSyncTx};
 
     async fn is_token_enabled_for_fees(
         storage: &mut StorageProcessor<'_>,
@@ -440,6 +458,32 @@ mod tests {
                 .unwrap()
         };
         assert_eq!(owner_id, expected_owner_id);
+
+        let mut block_number = BlockNumber(0);
+        let tx_hash = loop {
+            let mut storage = cfg.pool.access_storage().await?;
+            let ops = storage
+                .chain()
+                .block_schema()
+                .get_block_executed_ops(block_number)
+                .await?;
+            let mut tx_hash: Option<TxHash> = None;
+            for op in ops {
+                if let Some(tx) = op.get_executed_tx() {
+                    if matches!(tx.signed_tx.tx, ZkSyncTx::MintNFT(_)) {
+                        tx_hash = Some(tx.signed_tx.tx.hash());
+                    }
+                }
+            }
+            if let Some(tx_hash) = tx_hash {
+                break tx_hash;
+            }
+            block_number.0 += 1;
+        };
+
+        let response = client.nft_id_by_tx_hash(tx_hash).await?;
+        let nft_id: Option<TokenId> = deserialize_response_result(response)?;
+        assert!(nft_id.is_some());
 
         server.stop().await;
         Ok(())

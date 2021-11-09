@@ -50,6 +50,7 @@ export abstract class SyncProvider {
     abstract getNFT(id: number): Promise<NFTInfo>;
     abstract getNFTOwner(id: number): Promise<number>;
     abstract toggle2FA(data: Toggle2FARequest): Promise<boolean>;
+    abstract getNFTIdByTxHash(txHash: string): Promise<number>;
 
     async updateTokenSet(): Promise<void> {
         const updatedTokenSet = new TokenSet(await this.getTokens());

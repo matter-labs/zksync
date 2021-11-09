@@ -86,6 +86,7 @@ interface Parameters {
     toggle2FASignature: string;
     toggle2FATimestamp: number;
     toggle2FAPubKeyHash: string;
+    mintNFTTxHash: string;
 }
 
 async function getHashesAndSignatures() {
@@ -127,6 +128,7 @@ async function getHashesAndSignatures() {
         contentHash: ethers.utils.randomBytes(32),
         feeToken: 'ETH'
     });
+    const mintNFTTxHash = mintHandle.txHash;
     await mintHandle.awaitVerifyReceipt();
     const state = await syncWallet.getAccountState();
     const nftId = Object.values(state.verified.nfts)[0].id;
@@ -147,7 +149,8 @@ async function getHashesAndSignatures() {
         nftId,
         toggle2FASignature,
         toggle2FATimestamp,
-        toggle2FAPubKeyHash
+        toggle2FAPubKeyHash,
+        mintNFTTxHash
     };
     return result;
 }

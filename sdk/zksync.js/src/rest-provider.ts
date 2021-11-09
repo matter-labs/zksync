@@ -435,6 +435,14 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.getNFTOwnerDetailed(id));
     }
 
+    async getNFTIdByTxHashDetailed(txHash: string): Promise<Response<number>> {
+        return await this.get(`${this.address}/tokens/nft_id_by_tx_hash/${txHash}`);
+    }
+
+    async getNFTIdByTxHash(txHash: string): Promise<number> {
+        return this.parseResponse(await this.getNFTIdByTxHashDetailed(txHash));
+    }
+
     async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.ApiTxReceipt> {
         while (true) {
             let transactionStatus = await this.txStatus(hash);
