@@ -118,6 +118,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return !exodusMode;
     }
 
+    constructor() {
+        initializeReentrancyGuard();
+    }
+
     /// @notice zkSync contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
     /// @dev _governanceAddress The address of Governance contract
