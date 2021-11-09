@@ -112,9 +112,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= toProcess;
     }
 
-    uint256 internal constant SECURITY_COUNCIL_2_WEEKS_THRESHOLD = $$(SECURITY_COUNCIL_2_WEEKS_THRESHOLD);
-    uint256 internal constant SECURITY_COUNCIL_1_WEEK_THRESHOLD = $$(SECURITY_COUNCIL_1_WEEK_THRESHOLD);
-    uint256 internal constant SECURITY_COUNCIL_3_DAYS_THRESHOLD = $$(SECURITY_COUNCIL_3_DAYS_THRESHOLD);
+    uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
 
     function cutUpgradeNoticePeriod() external {
         requireActive();
@@ -129,19 +127,9 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil++;
 
-                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_2_WEEKS_THRESHOLD) {
-                    if (approvedUpgradeNoticePeriod > 2 weeks) {
-                        approvedUpgradeNoticePeriod = 2 weeks;
-                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
-                    }
-                } else if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_1_WEEK_THRESHOLD) {
-                    if (approvedUpgradeNoticePeriod > 1 weeks) {
-                        approvedUpgradeNoticePeriod = 1 weeks;
-                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
-                    }
-                } else if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_3_DAYS_THRESHOLD) {
-                    if (approvedUpgradeNoticePeriod > 3 days) {
-                        approvedUpgradeNoticePeriod = 3 days;
+                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_THRESHOLD) {
+                    if (approvedUpgradeNoticePeriod > 0) {
+                        approvedUpgradeNoticePeriod = 0;
                         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
                     }
                 }

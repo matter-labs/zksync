@@ -157,7 +157,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
     // solhint-disable-next-line no-empty-blocks
-    function upgrade(bytes calldata upgradeParameters) external nonReentrant {}
+    function upgrade(bytes calldata upgradeParameters) external nonReentrant {
+        approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+    }
 
     function cutUpgradeNoticePeriod() external {
         /// All functions delegated to additional contract should NOT be nonReentrant
