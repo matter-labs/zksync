@@ -1,12 +1,9 @@
 {
     "eth_network": "ropsten",
-    "governance_addr": "0xa7276Ef2Cb4Cbb069d94597251182d722E8e0940",
-    "upgrade_gatekeeper_addr": "0x3d3cDd04acBf3EcFb3c207F77b14C51Ea4E00c4b",
-    "genesis_tx_hash": "0xae5943cc4ff60ee85c91d317a2f144df40ff2689eef9528348601ed630428ac1",
-    "contract_addr": "0xc332679D243439048c8395DEfDe74D71cf5151e7",
-    "init_contract_version": 4,
-    "upgrade_eth_blocks": [
-        10277852,
-        10277852
-    ]
+    "governance_addr": "0x0515c9dcbd6e8b02a7297e03dce23e16234898af",
+    "upgrade_gatekeeper_addr": "0x96fafd628e21bf679f0215b87c61cd1484aad8f8",
+    "genesis_tx_hash": "0x2429f06276ab7e3709e24e030d37da0e1e31f0dd7f608cbf65c3c8db159ebff0",
+    "contract_addr": "0x0bc1c9ab8e7d9ddcbfb2a3a6373c852ad05c1bf9",
+    "init_contract_version": 6,
+    "upgrade_eth_blocks": []
 }
