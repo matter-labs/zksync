@@ -114,9 +114,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
 
-    function cutUpgradeNoticePeriod() external {
-        requireActive();
-
+    function approvedCutUpgradeNoticePeriod(address addr) internal {
         address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS = [
             $(SECURITY_COUNCIL_MEMBERS)
         ];
@@ -136,6 +134,27 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
                 break;
             }
+        }
+    }
+
+    function cutUpgradeNoticePeriod() external {
+        requireActive();
+
+        approvedCutUpgradeNoticePeriod(msg.sender);
+    }
+
+    function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
+        requireActive();
+
+        address gatekeeper = 0x38A43F4330f24fe920F943409709fc9A6084C939;
+        (, bytes memory newTargets) = gatekeeper.call(abi.encodeWithSignature("nextTargets()"));
+
+        bytes32 targetsHash = abi.encodePacked(newTargets);
+        bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", targetsHash));
+
+        for (uint256 i = 0; i < signatures.length; ++i) {
+            address recoveredAddress = Utils.recoverAddressFromEthSignature(signatures[i], messageHash);
+            approvedCutUpgradeNoticePeriod(recoveredAddress);
         }
     }
 
