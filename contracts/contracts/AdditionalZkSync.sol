@@ -120,7 +120,6 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         ];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
             if (SECURITY_COUNCIL_MEMBERS[id] == addr) {
-                require(upgradeStartTimestamp != 0);
                 require(securityCouncilApproves[id] == false);
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil++;
@@ -139,12 +138,14 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     function cutUpgradeNoticePeriod() external {
         requireActive();
+        require(upgradeStartTimestamp != 0);
 
         approvedCutUpgradeNoticePeriod(msg.sender);
     }
 
     function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
         requireActive();
+        require(upgradeStartTimestamp != 0);
 
         address gatekeeper = 0x38A43F4330f24fe920F943409709fc9A6084C939;
         (, bytes memory newTarget0) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint)", 0));
