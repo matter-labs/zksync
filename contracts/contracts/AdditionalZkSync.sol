@@ -148,9 +148,9 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         require(upgradeStartTimestamp != 0);
 
         address gatekeeper = 0x38A43F4330f24fe920F943409709fc9A6084C939;
-        (, bytes memory newTarget0) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint)", 0));
-        (, bytes memory newTarget1) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint)", 1));
-        (, bytes memory newTarget2) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint)", 2));
+        (, bytes memory newTarget0) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 0));
+        (, bytes memory newTarget1) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 1));
+        (, bytes memory newTarget2) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 2));
 
         bytes32 targetsHash = keccak256(abi.encodePacked(newTarget0, newTarget1, newTarget2));
         bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", targetsHash));
