@@ -119,8 +119,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             $(SECURITY_COUNCIL_MEMBERS)
         ];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
-            if (SECURITY_COUNCIL_MEMBERS[id] == addr) {
-                require(securityCouncilApproves[id] == false);
+            if (SECURITY_COUNCIL_MEMBERS[id] == addr && !securityCouncilApproves[id]) {
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil++;
 
