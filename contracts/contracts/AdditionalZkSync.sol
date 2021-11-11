@@ -112,42 +112,57 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= toProcess;
     }
 
-    uint256 internal constant SECURITY_COUNCIL_2_WEEKS_THRESHOLD = $$(SECURITY_COUNCIL_2_WEEKS_THRESHOLD);
-    uint256 internal constant SECURITY_COUNCIL_1_WEEK_THRESHOLD = $$(SECURITY_COUNCIL_1_WEEK_THRESHOLD);
-    uint256 internal constant SECURITY_COUNCIL_3_DAYS_THRESHOLD = $$(SECURITY_COUNCIL_3_DAYS_THRESHOLD);
+    uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
 
-    function cutUpgradeNoticePeriod() external {
-        requireActive();
-
+    function approvedCutUpgradeNoticePeriod(address addr) internal {
         address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS = [
             $(SECURITY_COUNCIL_MEMBERS)
         ];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
-            if (SECURITY_COUNCIL_MEMBERS[id] == msg.sender) {
-                require(upgradeStartTimestamp != 0);
-                require(securityCouncilApproves[id] == false);
+            if (SECURITY_COUNCIL_MEMBERS[id] == addr && !securityCouncilApproves[id]) {
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil++;
 
-                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_2_WEEKS_THRESHOLD) {
-                    if (approvedUpgradeNoticePeriod > 2 weeks) {
-                        approvedUpgradeNoticePeriod = 2 weeks;
-                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
-                    }
-                } else if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_1_WEEK_THRESHOLD) {
-                    if (approvedUpgradeNoticePeriod > 1 weeks) {
-                        approvedUpgradeNoticePeriod = 1 weeks;
-                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
-                    }
-                } else if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_3_DAYS_THRESHOLD) {
-                    if (approvedUpgradeNoticePeriod > 3 days) {
-                        approvedUpgradeNoticePeriod = 3 days;
+                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_THRESHOLD) {
+                    if (approvedUpgradeNoticePeriod > 0) {
+                        approvedUpgradeNoticePeriod = 0;
                         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
                     }
                 }
 
                 break;
             }
+        }
+    }
+
+    function cutUpgradeNoticePeriod() external {
+        requireActive();
+        require(upgradeStartTimestamp != 0);
+
+        approvedCutUpgradeNoticePeriod(msg.sender);
+    }
+
+    function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
+        requireActive();
+        require(upgradeStartTimestamp != 0);
+
+        address gatekeeper = 0x38A43F4330f24fe920F943409709fc9A6084C939;
+        (, bytes memory newTarget0) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 0));
+        (, bytes memory newTarget1) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 1));
+        (, bytes memory newTarget2) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 2));
+
+        bytes32 targetsHash = keccak256(abi.encodePacked(newTarget0, newTarget1, newTarget2));
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n110",
+                "Approved new ZkSync's target contracts hash\n0x",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked(targetsHash))
+            )
+        );
+
+        for (uint256 i = 0; i < signatures.length; ++i) {
+            address recoveredAddress = Utils.recoverAddressFromEthSignature(signatures[i], messageHash);
+            approvedCutUpgradeNoticePeriod(recoveredAddress);
         }
     }
 
