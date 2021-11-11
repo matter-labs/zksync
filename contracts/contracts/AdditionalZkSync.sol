@@ -153,7 +153,13 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         (, bytes memory newTarget2) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 2));
 
         bytes32 targetsHash = keccak256(abi.encodePacked(newTarget0, newTarget1, newTarget2));
-        bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n110", "Approved new ZkSync's target contracts hash\n0x", Bytes.bytesToHexASCIIBytes(abi.encodePacked(targetsHash))));
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n110",
+                "Approved new ZkSync's target contracts hash\n0x",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked(targetsHash))
+            )
+        );
 
         for (uint256 i = 0; i < signatures.length; ++i) {
             address recoveredAddress = Utils.recoverAddressFromEthSignature(signatures[i], messageHash);
