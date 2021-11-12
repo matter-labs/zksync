@@ -159,6 +159,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     // solhint-disable-next-line no-empty-blocks
     function upgrade(bytes calldata upgradeParameters) external nonReentrant {
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+        additionalZkSync = AdditionalZkSync($(NEW_ADDITIONAL_ZKSYNC_ADDRESS));
     }
 
     function cutUpgradeNoticePeriod() external {
