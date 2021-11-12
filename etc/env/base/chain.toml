@@ -2,7 +2,7 @@
 
 [chain.circuit]
 # Current directory for the circuit keys.
-key_dir="keys/contracts-8"
+key_dir="keys/contracts-9"
 # Actual supported block chunks sizes by verifier contract (determined by circuit size on setup boundaries)
 # and setup power needed to proof block of this size
 supported_block_chunks_sizes=[26,78,182,390]
