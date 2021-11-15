@@ -490,12 +490,14 @@ impl<T: Transport> DataRestoreDriver<T> {
         let mut blocks = Vec::new();
 
         let mut last_event_tx_hash = None;
+        // TODO (ZKS-722): either due to Ethereum node lag or unknown
+        // bug in the events state, we have to additionally filter out
+        // already processed rollup blocks.
         for event in self
             .events_state
             .get_only_verified_committed_events()
             .iter()
             .filter(|bl| bl.block_num > self.tree_state.state.block_number)
-        // TODO Fix event state and delete this code (ZKS-722)
         {
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.
