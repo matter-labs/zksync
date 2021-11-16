@@ -331,10 +331,8 @@ impl<T: Transport> DataRestoreDriver<T> {
 
             // Update events
             if self.update_events_state(interactor).await {
-                vlog::debug!("Events state");
                 // Update operations
                 let new_ops_blocks = self.update_operations_state(interactor).await;
-                vlog::debug!("Operations state");
 
                 if !new_ops_blocks.is_empty() {
                     let mut transaction = interactor.start_transaction().await;
@@ -442,11 +440,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         let mut updates = vec![];
         let mut count = 0;
 
-        // TODO Fix event state and delete this code (ZKS-722)
-        let new_ops_blocks: Vec<RollupOpsBlock> = new_ops_blocks
-            .into_iter()
-            .filter(|bl| bl.block_num > self.tree_state.state.block_number)
-            .collect();
         for op_block in new_ops_blocks {
             // Take the contract version into account when choosing block chunk sizes.
             let available_block_chunk_sizes = op_block
@@ -492,15 +485,19 @@ impl<T: Transport> DataRestoreDriver<T> {
         new_blocks
     }
 
-    /// Returns verified comitted operations blocks from verified op blocks events
+    /// Returns operations blocks from verified op blocks events.
     pub async fn get_new_operation_blocks_from_events(&mut self) -> Vec<RollupOpsBlock> {
         let mut blocks = Vec::new();
 
         let mut last_event_tx_hash = None;
+        // TODO (ZKS-722): either due to Ethereum node lag or unknown
+        // bug in the events state, we have to additionally filter out
+        // already processed rollup blocks.
         for event in self
             .events_state
             .get_only_verified_committed_events()
             .iter()
+            .filter(|bl| bl.block_num > self.tree_state.state.block_number)
         {
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.
@@ -511,7 +508,7 @@ impl<T: Transport> DataRestoreDriver<T> {
                 }
             }
 
-            let block = RollupOpsBlock::get_rollup_ops_blocks(&self.web3, &event)
+            let block = RollupOpsBlock::get_rollup_ops_blocks(&self.web3, event)
                 .await
                 .expect("Cant get new operation blocks from events");
             blocks.extend(block);
