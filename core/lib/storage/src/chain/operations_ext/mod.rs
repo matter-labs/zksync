@@ -33,6 +33,11 @@ use crate::{
     },
     QueryResult, StorageProcessor,
 };
+use itertools::Itertools;
+use sqlx::postgres::PgRow;
+use sqlx::Row;
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
 
 pub(crate) mod conversion;
 pub mod records;
@@ -972,159 +977,87 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .operations_ext_schema()
             .get_tx_created_at_and_block_number(tx_hash)
             .await?;
-        let second_address_bytes = query
-            .from
-            .second_address
-            .map(|address| address.as_bytes().to_vec())
-            .unwrap_or_default();
 
         let txs = if let Some((time_from, _)) = created_at_and_block {
-            let raw_txs: Vec<TransactionItem> = match query.direction {
-                PaginationDirection::Newer => {
-                    sqlx::query_as!(
-                        TransactionItem,
-                        r#"
-                            WITH tx_hashes AS (
-                                SELECT DISTINCT tx_hash FROM tx_filters
-                                WHERE address = $1 AND ($2::boolean OR token = $3)
-                                INTERSECT
-                                SELECT DISTINCT tx_hash FROM tx_filters
-                                WHERE $4::boolean OR (address = $5 AND ($2::boolean OR token = $3))
-                            ), transactions AS (
-                                SELECT
-                                    executed_transactions.tx_hash,
-                                    tx as op,
-                                    block_number,
-                                    created_at,
-                                    success,
-                                    fail_reason,
-                                    Null::bytea as eth_hash,
-                                    Null::bigint as priority_op_serialid,
-                                    block_index,
-                                    batch_id
-                                FROM tx_hashes
-                                INNER JOIN executed_transactions
-                                    ON tx_hashes.tx_hash = executed_transactions.tx_hash
-                                WHERE created_at >= $6
-                            ), priority_ops AS (
-                                SELECT
-                                    executed_priority_operations.tx_hash,
-                                    operation as op,
-                                    block_number,
-                                    created_at,
-                                    true as success,
-                                    Null as fail_reason,
-                                    eth_hash,
-                                    priority_op_serialid,
-                                    block_index,
-                                    Null::bigint as batch_id
-                                FROM tx_hashes
-                                INNER JOIN executed_priority_operations
-                                    ON tx_hashes.tx_hash = executed_priority_operations.tx_hash
-                                WHERE created_at >= $6
-                            ), everything AS (
-                                SELECT * FROM transactions
-                                UNION ALL
-                                SELECT * FROM priority_ops
+            let raw_txs: Vec<TransactionItem> = {
+                let mut txs = BTreeMap::new();
+                let mut append_txs = |new_txs: Vec<TransactionItem>| {
+                    for x in new_txs.into_iter() {
+                        txs.insert(x.tx_hash.clone(), x);
+                    }
+                };
+
+                append_txs(
+                    transaction
+                        .chain()
+                        .operations_ext_schema()
+                        .get_executed_txs_for_account(
+                            query.from.address,
+                            query.from.token,
+                            i64::from(query.limit),
+                            time_from,
+                            query.direction,
+                        )
+                        .await?,
+                );
+                append_txs(
+                    transaction
+                        .chain()
+                        .operations_ext_schema()
+                        .get_priority_operations_for_account(
+                            query.from.address,
+                            query.from.token,
+                            i64::from(query.limit),
+                            time_from,
+                            query.direction,
+                        )
+                        .await?,
+                );
+                if let Some(address) = query.from.second_address {
+                    append_txs(
+                        transaction
+                            .chain()
+                            .operations_ext_schema()
+                            .get_executed_txs_for_account(
+                                address,
+                                query.from.token,
+                                i64::from(query.limit),
+                                time_from,
+                                query.direction,
                             )
-                            SELECT
-                                tx_hash as "tx_hash!",
-                                block_number as "block_number!",
-                                op as "op!",
-                                created_at as "created_at!",
-                                success as "success!",
-                                fail_reason as "fail_reason?",
-                                eth_hash as "eth_hash?",
-                                priority_op_serialid as "priority_op_serialid?",
-                                batch_id as "batch_id?"
-                            FROM everything
-                            ORDER BY created_at ASC, block_index ASC
-                            LIMIT $7
-                        "#,
-                        query.from.address.as_bytes(),
-                        query.from.token.is_none(),
-                        query.from.token.unwrap_or_default().0 as i32,
-                        query.from.second_address.is_none(),
-                        &second_address_bytes,
-                        time_from,
-                        i64::from(query.limit),
-                    )
-                    .fetch_all(transaction.conn())
-                    .await?
-                }
-                PaginationDirection::Older => {
-                    sqlx::query_as!(
-                        TransactionItem,
-                        r#"
-                            WITH tx_hashes AS (
-                                SELECT DISTINCT tx_hash FROM tx_filters
-                                WHERE address = $1 AND ($2::boolean OR token = $3)
-                                INTERSECT
-                                SELECT DISTINCT tx_hash FROM tx_filters
-                                WHERE $4::boolean OR (address = $5 AND ($2::boolean OR token = $3))
-                            ), transactions AS (
-                                SELECT
-                                    executed_transactions.tx_hash,
-                                    tx as op,
-                                    block_number,
-                                    created_at,
-                                    success,
-                                    fail_reason,
-                                    Null::bytea as eth_hash,
-                                    Null::bigint as priority_op_serialid,
-                                    block_index,
-                                    batch_id
-                                FROM tx_hashes
-                                INNER JOIN executed_transactions
-                                    ON tx_hashes.tx_hash = executed_transactions.tx_hash
-                                WHERE created_at <= $6
-                            ), priority_ops AS (
-                                SELECT
-                                    executed_priority_operations.tx_hash,
-                                    operation as op,
-                                    block_number,
-                                    created_at,
-                                    true as success,
-                                    Null as fail_reason,
-                                    eth_hash,
-                                    priority_op_serialid,
-                                    block_index,
-                                    Null::bigint as batch_id
-                                FROM tx_hashes
-                                INNER JOIN executed_priority_operations
-                                    ON tx_hashes.tx_hash = executed_priority_operations.tx_hash
-                                WHERE created_at <= $6
-                            ), everything AS (
-                                SELECT * FROM transactions
-                                UNION ALL
-                                SELECT * FROM priority_ops
+                            .await?,
+                    );
+                    append_txs(
+                        transaction
+                            .chain()
+                            .operations_ext_schema()
+                            .get_priority_operations_for_account(
+                                address,
+                                query.from.token,
+                                i64::from(query.limit),
+                                time_from,
+                                query.direction,
                             )
-                            SELECT
-                                tx_hash as "tx_hash!",
-                                block_number as "block_number!",
-                                op as "op!",
-                                created_at as "created_at!",
-                                success as "success!",
-                                fail_reason as "fail_reason?",
-                                eth_hash as "eth_hash?",
-                                priority_op_serialid as "priority_op_serialid?",
-                                batch_id as "batch_id?"
-                            FROM everything
-                            ORDER BY created_at DESC, block_index DESC
-                            LIMIT $7
-                        "#,
-                        query.from.address.as_bytes(),
-                        query.from.token.is_none(),
-                        query.from.token.unwrap_or_default().0 as i32,
-                        query.from.second_address.is_none(),
-                        &second_address_bytes,
-                        time_from,
-                        i64::from(query.limit),
-                    )
-                    .fetch_all(transaction.conn())
-                    .await?
+                            .await?,
+                    );
                 }
+                txs.values()
+                    .sorted_by(|tx1, tx2| {
+                        if matches!(query.direction, PaginationDirection::Newer)
+                            && tx2.created_at >= tx1.created_at
+                            || matches!(query.direction, PaginationDirection::Older)
+                                && tx2.created_at <= tx1.created_at
+                        {
+                            Ordering::Less
+                        } else {
+                            Ordering::Greater
+                        }
+                    })
+                    .take(query.limit as usize)
+                    .cloned()
+                    .collect()
             };
+
             let last_finalized = transaction
                 .chain()
                 .block_schema()
@@ -1151,6 +1084,113 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             start.elapsed()
         );
         Ok(txs)
+    }
+    pub async fn get_priority_operations_for_account(
+        &mut self,
+        address: Address,
+        token: Option<TokenId>,
+        limit: i64,
+        time_from: DateTime<Utc>,
+        direction: PaginationDirection,
+    ) -> QueryResult<Vec<TransactionItem>> {
+        let query_direction = match direction {
+            PaginationDirection::Newer => {
+                "AND created_at >= $4 
+                ORDER BY created_at
+                LIMIT $5"
+            }
+            PaginationDirection::Older => {
+                "AND created_at <= $4
+                ORDER BY created_at DESC
+                LIMIT $5"
+            }
+        };
+
+        let query = format!(
+            r#"
+            SELECT
+                executed_priority_operations.tx_hash,
+                operation as op,
+                block_number,
+                created_at,
+                true as success,
+                Null as fail_reason,
+                eth_hash,
+                priority_op_serialid,
+                block_index,
+                Null::bigint as batch_id
+            FROM tx_filters
+            INNER JOIN executed_priority_operations
+                ON tx_filters.tx_hash = executed_priority_operations.tx_hash
+            WHERE address = $1 AND ($2::boolean OR token = $3) {}
+        "#,
+            query_direction
+        );
+        Ok(sqlx::query(&query)
+            .bind(address.as_bytes())
+            .bind(token.is_none())
+            .bind(token.unwrap_or_default().0 as i32)
+            .bind(time_from)
+            .bind(limit)
+            .fetch_all(self.0.conn())
+            .await?
+            .into_iter()
+            .map(extract_transaction_item)
+            .collect())
+    }
+
+    pub async fn get_executed_txs_for_account(
+        &mut self,
+        address: Address,
+        token: Option<TokenId>,
+        limit: i64,
+        time_from: DateTime<Utc>,
+        direction: PaginationDirection,
+    ) -> QueryResult<Vec<TransactionItem>> {
+        let query_direction = match direction {
+            PaginationDirection::Newer => {
+                "AND created_at >= $4
+                ORDER BY created_at
+                LIMIT $5"
+            }
+            PaginationDirection::Older => {
+                "AND created_at <= $4
+                ORDER BY created_at DESC
+                LIMIT $5"
+            }
+        };
+        let query = format!(
+            r#"
+               SELECT
+                    executed_transactions.tx_hash,
+                    tx as op,
+                    block_number,
+                    created_at,
+                    success,
+                    fail_reason,
+                    Null::bytea as eth_hash,
+                    Null::bigint as priority_op_serialid,
+                    block_index,
+                    batch_id
+                FROM tx_filters
+                INNER JOIN executed_transactions
+                    ON tx_filters.tx_hash = executed_transactions.tx_hash
+                WHERE address = $1 AND ($2::boolean OR token = $3) {}
+            "#,
+            query_direction
+        );
+
+        Ok(sqlx::query(&query)
+            .bind(address.as_bytes())
+            .bind(token.is_none())
+            .bind(token.unwrap_or_default().0 as i32)
+            .bind(time_from)
+            .bind(limit)
+            .fetch_all(self.0.conn())
+            .await?
+            .into_iter()
+            .map(extract_transaction_item)
+            .collect())
     }
 
     pub async fn get_account_last_tx_hash(
@@ -1689,5 +1729,19 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
         Ok(())
+    }
+}
+
+pub fn extract_transaction_item(db_row: PgRow) -> TransactionItem {
+    TransactionItem {
+        tx_hash: db_row.get("tx_hash"),
+        block_number: db_row.get("block_number"),
+        op: db_row.get("op"),
+        created_at: db_row.get("created_at"),
+        success: db_row.get("success"),
+        fail_reason: db_row.get("fail_reason"),
+        eth_hash: db_row.get("eth_hash"),
+        priority_op_serialid: db_row.get("priority_op_serialid"),
+        batch_id: db_row.get("batch_id"),
     }
 }
