@@ -28,7 +28,7 @@ impl DbPool {
     fn create(url: impl Into<String>, max_size: usize) -> Pool {
         let pool_config = PoolConfig {
             max_size,
-            timeouts: Timeouts::wait_millis(20_000), // wait 20 seconds before returning error
+            timeouts: Timeouts::wait_millis(50_000), // wait 20 seconds before returning error
             runtime: Runtime::Tokio1,
         };
         Pool::from_config(DbPool { url: url.into() }, pool_config)
