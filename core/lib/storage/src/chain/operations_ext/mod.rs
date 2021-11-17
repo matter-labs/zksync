@@ -1043,14 +1043,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 }
                 txs.values()
                     .sorted_by(|tx1, tx2| {
-                        if matches!(query.direction, PaginationDirection::Newer)
-                            && tx2.created_at >= tx1.created_at
-                            || matches!(query.direction, PaginationDirection::Older)
-                                && tx2.created_at <= tx1.created_at
-                        {
-                            Ordering::Less
-                        } else {
-                            Ordering::Greater
+                        match query.direction {
+                                PaginationDirection::Newer => tx1.created_at.cmp(tx2.created_at),
+                                PaginationDirection::Older => tx2.created_at.cmp(tx1.created_at),
                         }
                     })
                     .take(query.limit as usize)
