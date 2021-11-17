@@ -198,6 +198,19 @@
       "nullable": []
     }
   },
+  "09deba6b7a86cd2aa28246ea54e3f2c1f08e58ac627abf1864058f7134273042": {
+    "query": "INSERT INTO data_restore_priority_op_data VALUES ($1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0bdd32081fc9c8fbfb63787696884617129c30915c400e5647d2a81f882c6d4d": {
     "query": "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
     "describe": {
@@ -1623,6 +1636,30 @@
         false,
         false,
         true,
+        false
+      ]
+    }
+  },
+  "2f260906b05f4d37fcc1396ded15aee2ea2f8298682e4b19bb8c234e0a66ad66": {
+    "query": "SELECT * FROM data_restore_priority_op_data",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "op",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
         false
       ]
     }
@@ -4169,6 +4206,16 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "93415047b37d0a042a64fead136d30821f952cf9360831429edc74c41861d12d": {
+    "query": "DELETE FROM data_restore_priority_op_data",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
     }
   },
   "93fe4dceacf4e052ad807068272dc768eab33513e6c1e1ac62d2f989b1a26eee": {
@@ -6727,6 +6774,22 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "e7331aed7f3cf1f2b35399065520e7d2f9cbd890ecff973d3c3809b70eb88376": {
+    "query": "UPDATE executed_priority_operations \n                SET tx_hash = $1, eth_hash = $2, eth_block = $3, eth_block_index = $4\n                WHERE priority_op_serialid = $5",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {

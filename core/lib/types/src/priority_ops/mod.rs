@@ -111,16 +111,20 @@ impl ZkSyncPriorityOp {
         pub_data: &[u8],
         op_type_id: u8,
         sender: Address,
+        with_tx_type: bool,
     ) -> Result<Self, LogParseError> {
         // see contracts/contracts/Operations.sol
         match op_type_id {
             DepositOp::OP_CODE => {
-                let pub_data_left = pub_data;
+                let mut pub_data_left = pub_data;
 
-                if pub_data_left.len() < TX_TYPE_BIT_WIDTH / 8 {
-                    return Err(LogParseError::PubdataLengthMismatch);
+                if with_tx_type {
+                    if pub_data_left.len() < TX_TYPE_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (_, _pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
+                    pub_data_left = _pub_data_left;
                 }
-                let (_, pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
 
                 // account_id
                 if pub_data_left.len() < ACCOUNT_ID_BIT_WIDTH / 8 {
@@ -168,10 +172,15 @@ impl ZkSyncPriorityOp {
                 }))
             }
             FullExitOp::OP_CODE => {
-                if pub_data.len() < TX_TYPE_BIT_WIDTH / 8 {
-                    return Err(LogParseError::PubdataLengthMismatch);
+                let mut pub_data_left = pub_data;
+
+                if with_tx_type {
+                    if pub_data_left.len() < TX_TYPE_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (_, _pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
+                    pub_data_left = _pub_data_left;
                 }
-                let (_, pub_data_left) = pub_data.split_at(TX_TYPE_BIT_WIDTH / 8);
 
                 // account_id
                 let (account_id, pub_data_left) = {
@@ -430,14 +439,25 @@ impl TryFrom<Log> for PriorityOp {
                     ZkSyncPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type, sender);
 
                 // If parsing was unsuccessful it was probably because of the legacy pub data
-                match result {
-                    Ok(op) => op,
-                    _ => ZkSyncPriorityOp::legacy_parse_from_priority_queue_logs(
-                        &op_pubdata,
-                        op_type,
-                        sender,
-                    )?,
-                }
+                result
+                    .or_else(|_| {
+                        // First, try parsing it with a tx type specified.
+                        ZkSyncPriorityOp::legacy_parse_from_priority_queue_logs(
+                            &op_pubdata,
+                            op_type,
+                            sender,
+                            true,
+                        )
+                    })
+                    .or_else(|_| {
+                        // The last attempt without tx type.
+                        ZkSyncPriorityOp::legacy_parse_from_priority_queue_logs(
+                            &op_pubdata,
+                            op_type,
+                            sender,
+                            false,
+                        )
+                    })?
             },
             deadline_block: dec_ev
                 .remove(0)

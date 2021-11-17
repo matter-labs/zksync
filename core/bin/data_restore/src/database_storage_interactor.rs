@@ -7,7 +7,8 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    AccountId, BlockNumber, NewTokenEvent, SerialId, Token, TokenId, TokenInfo, TokenKind,
+    AccountId, BlockNumber, NewTokenEvent, PriorityOp, SerialId, Token, TokenId, TokenInfo,
+    TokenKind,
     {block::Block, AccountUpdate, AccountUpdates},
 };
 
@@ -129,6 +130,17 @@ impl<'a> DatabaseStorageInteractor<'a> {
             .expect("Unable to commit DB transaction");
     }
 
+    pub async fn apply_priority_op_data(
+        &mut self,
+        priority_op_data: impl Iterator<Item = &PriorityOp>,
+    ) -> Vec<SerialId> {
+        self.storage
+            .data_restore_schema()
+            .update_executed_priority_operations(priority_op_data)
+            .await
+            .expect("Failed to update executed priority operations")
+    }
+
     pub async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         self.storage
             .tokens_schema()
@@ -147,6 +159,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         &mut self,
         block_events: &[BlockEvent],
         tokens: &[NewTokenEvent],
+        priority_op_data: &[PriorityOp],
         last_watched_eth_block_number: u64,
     ) {
         let mut new_events: Vec<NewBlockEvent> = vec![];
@@ -167,7 +180,12 @@ impl<'a> DatabaseStorageInteractor<'a> {
             .collect();
         self.storage
             .data_restore_schema()
-            .save_events_state(new_events.as_slice(), &tokens, &block_number)
+            .save_events_state(
+                new_events.as_slice(),
+                &tokens,
+                priority_op_data,
+                &block_number,
+            )
             .await
             .expect("Cant update events state");
     }
@@ -230,10 +248,18 @@ impl<'a> DatabaseStorageInteractor<'a> {
             verified_events.push(block_event);
         }
 
+        let priority_op_data = self
+            .storage
+            .data_restore_schema()
+            .get_priority_op_data()
+            .await
+            .expect("Failed to load priority operations data");
+
         EventsState {
             committed_events,
             verified_events,
             last_watched_eth_block_number,
+            priority_op_data,
         }
     }
 

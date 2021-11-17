@@ -22,6 +22,12 @@ pub struct NewRollupOpsBlock<'a> {
     pub previous_block_root_hash: H256,
 }
 
+#[derive(Debug)]
+pub struct StoredPriorityOpData {
+    pub serial_id: i64,
+    pub op: Value,
+}
+
 #[derive(Debug, Clone, FromRow)]
 pub struct StoredRollupOpsBlock {
     pub block_num: i64,

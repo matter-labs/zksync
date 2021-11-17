@@ -162,7 +162,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         let mut transaction = interactor.start_transaction().await;
 
         transaction
-            .save_events_state(&[], &[], genesis_eth_block_number)
+            .save_events_state(&[], &[], &[], genesis_eth_block_number)
             .await;
 
         let genesis_fee_account =
@@ -401,7 +401,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
     /// Returns bool flag, true if there are new block events
     async fn update_events_state(&mut self, interactor: &mut StorageInteractor<'_>) -> bool {
-        let (block_events, token_events, last_watched_eth_block_number) = self
+        let (block_events, token_events, priority_op_data, last_watched_eth_block_number) = self
             .events_state
             .update_events_state(
                 &self.web3,
@@ -417,7 +417,8 @@ impl<T: Transport> DataRestoreDriver<T> {
         interactor
             .save_events_state(
                 &block_events,
-                token_events.as_slice(),
+                &token_events,
+                &priority_op_data,
                 last_watched_eth_block_number,
             )
             .await;
@@ -465,6 +466,17 @@ impl<T: Transport> DataRestoreDriver<T> {
                 .update_tree_state(blocks[i].clone(), updates[i].clone())
                 .await;
         }
+
+        let priority_op_data = self.events_state.priority_op_data.values();
+        let serial_ids = transaction.apply_priority_op_data(priority_op_data).await;
+        if !serial_ids.is_empty() {
+            vlog::debug!(
+                "Serial ids of operations with no corresponding blocks in storage: {:?}",
+                serial_ids
+            );
+        }
+        self.events_state.sift_priority_ops(&serial_ids);
+
         transaction.commit().await;
 
         vlog::debug!("Updated state");

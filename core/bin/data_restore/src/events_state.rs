@@ -1,12 +1,16 @@
+// Built-in deps
+use std::collections::HashMap;
+use std::convert::TryFrom;
 // External deps
 use anyhow::format_err;
-use std::convert::TryFrom;
 use web3::contract::Contract;
-use web3::types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, Transaction, H256, U256};
+use web3::types::{
+    BlockNumber as Web3BlockNumber, FilterBuilder, Log, Transaction, H256, U256, U64,
+};
 use web3::{Transport, Web3};
 // Workspace deps
 use zksync_contracts::upgrade_gatekeeper;
-use zksync_types::{Address, BlockNumber, NewTokenEvent};
+use zksync_types::{Address, BlockNumber, NewTokenEvent, PriorityOp, SerialId};
 // Local deps
 use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
@@ -21,6 +25,11 @@ pub struct EventsState {
     pub verified_events: Vec<BlockEvent>,
     /// Last watched ethereum block number
     pub last_watched_eth_block_number: u64,
+    /// Priority operations data parsed from logs
+    /// emitted by the zkSync contract. Required for
+    /// fetching fields which are not present in public data
+    /// such as Ethereum transaction hash.
+    pub priority_op_data: HashMap<SerialId, PriorityOp>,
 }
 
 impl std::default::Default for EventsState {
@@ -30,6 +39,7 @@ impl std::default::Default for EventsState {
             committed_events: Vec::new(),
             verified_events: Vec::new(),
             last_watched_eth_block_number: 0,
+            priority_op_data: HashMap::new(),
         }
     }
 }
@@ -50,6 +60,21 @@ impl EventsState {
             get_block_number_from_ethereum_transaction(&genesis_transaction)?;
         self.last_watched_eth_block_number = genesis_block_number;
         Ok(genesis_block_number)
+    }
+
+    /// Remove successfully stored priority operations from the queue.
+    ///
+    /// # Arguments
+    ///
+    /// * `serial_ids` - serial ids of operations that don't have a block in storage yet.
+    pub fn sift_priority_ops(&mut self, serial_ids: &[SerialId]) {
+        let mut priority_op_data = HashMap::with_capacity(self.priority_op_data.len());
+        for serial_id in serial_ids {
+            if let Some(priority_op) = self.priority_op_data.remove(&serial_id) {
+                priority_op_data.insert(*serial_id, priority_op);
+            }
+        }
+        self.priority_op_data = priority_op_data;
     }
 
     /// Update past events state from last watched ethereum block with delta between last eth block and last watched block.
@@ -75,10 +100,10 @@ impl EventsState {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         init_contract_version: u32,
-    ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, u64), anyhow::Error> {
+    ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, Vec<PriorityOp>, u64), anyhow::Error> {
         self.remove_verified_events();
 
-        let (events, token_events, to_block_number) =
+        let (events, token_events, priority_op_data, to_block_number) =
             EventsState::get_new_events_and_last_watched_block(
                 web3,
                 zksync_contract,
@@ -104,12 +129,19 @@ impl EventsState {
             );
         }
 
+        for priority_op in priority_op_data {
+            self.priority_op_data
+                .insert(priority_op.serial_id, priority_op);
+        }
         let mut events_to_return = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
+
+        let priority_op_data = self.priority_op_data.values().cloned().collect();
 
         Ok((
             events_to_return,
             token_events,
+            priority_op_data,
             self.last_watched_eth_block_number,
         ))
     }
@@ -146,13 +178,15 @@ impl EventsState {
     ) -> anyhow::Result<(
         Vec<(&'a ZkSyncDeployedContract<T>, Vec<Log>)>,
         Vec<NewTokenEvent>,
+        Vec<PriorityOp>,
         u64,
     )> {
         let latest_eth_block_minus_delta =
             EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
 
         if latest_eth_block_minus_delta == last_watched_block_number {
-            return Ok((vec![], vec![], last_watched_block_number)); // No new eth blocks
+            return Ok((vec![], vec![], vec![], last_watched_block_number));
+            // No new eth blocks
         }
 
         let from_block_number_u64 = last_watched_block_number + 1;
@@ -182,7 +216,15 @@ impl EventsState {
         .await?;
         logs.push((zksync_contract, block_logs));
 
-        Ok((logs, token_logs, to_block_number_u64))
+        let priority_op_data = EventsState::get_priority_operations_logs(
+            web3,
+            zksync_contract,
+            from_block_number_u64.into(),
+            to_block_number_u64.into(),
+        )
+        .await?;
+
+        Ok((logs, token_logs, priority_op_data, to_block_number_u64))
     }
 
     /// Returns logs about complete contract upgrades.
@@ -215,6 +257,96 @@ impl EventsState {
             .await
             .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
         Ok(result)
+    }
+
+    async fn get_priority_operations_logs_inner<T: Transport>(
+        web3: &Web3<T>,
+        contract: &ZkSyncDeployedContract<T>,
+        from: U64,
+        to: U64,
+    ) -> anyhow::Result<Vec<PriorityOp>> {
+        let priority_op_topic = contract
+            .abi
+            .event("NewPriorityRequest")
+            .expect("main contract abi error")
+            .signature();
+        let filter = FilterBuilder::default()
+            .address(vec![contract.web3_contract.address()])
+            .from_block(Web3BlockNumber::Number(from))
+            .to_block(Web3BlockNumber::Number(to))
+            .topics(Some(vec![priority_op_topic]), None, None, None)
+            .build();
+
+        let logs = web3.eth().logs(filter).await?;
+        logs.into_iter()
+            .map(|event| {
+                PriorityOp::try_from(event)
+                    .map_err(|e| format_err!("Failed to parse event log from ETH: {:?}", e))
+            })
+            .collect()
+    }
+
+    /// Returns priority operations logs emitted by the zkSync contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `web3` - Web3 provider.
+    /// * `contract` - zkSync contract.
+    /// * `start` - start of the block range
+    /// * `end` - end of the block range (inclusive).
+    ///
+    async fn get_priority_operations_logs<T: Transport>(
+        web3: &Web3<T>,
+        contract: &ZkSyncDeployedContract<T>,
+        start: U64,
+        end: U64,
+    ) -> Result<Vec<PriorityOp>, anyhow::Error> {
+        const LIMIT_ERR: &str = "query returned more than";
+        let mut from_number = start;
+        let mut to_number = end;
+
+        let mut priority_operations = Vec::new();
+
+        loop {
+            if from_number > end {
+                return Ok(priority_operations);
+            }
+
+            let result = EventsState::get_priority_operations_logs_inner(
+                web3,
+                contract,
+                from_number,
+                to_number,
+            )
+            .await;
+            let range_diff = to_number - from_number;
+
+            match result {
+                Ok(mut operations) => {
+                    priority_operations.append(&mut operations);
+
+                    from_number = to_number + 1;
+                    to_number = (from_number + range_diff).min(end);
+
+                    continue;
+                }
+                Err(err) => {
+                    if err.to_string().contains(LIMIT_ERR) {
+                        if to_number <= from_number || to_number - from_number == 1.into() {
+                            panic!("Ethereum node failed to return logs for a single block")
+                        }
+
+                        // Shorten the block range.
+                        to_number = from_number + (range_diff / 2u64);
+
+                        continue;
+                    } else {
+                        // Non-recoverable error.
+                        return Err(err);
+                    }
+                }
+            }
+        }
     }
 
     /// Returns new added token logs

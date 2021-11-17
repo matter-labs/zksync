@@ -7,7 +7,7 @@ use zksync_storage::data_restore::records::{
 };
 use zksync_types::{
     block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
-    SerialId, Token, TokenId, TokenInfo, NFT,
+    PriorityOp, SerialId, Token, TokenId, TokenInfo, NFT,
 };
 
 use crate::{
@@ -87,6 +87,25 @@ impl StorageInteractor<'_> {
         storage_interact!(self.update_tree_state(block, accounts_updated))
     }
 
+    /// Saves the priority operations metadata in storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `priority_op_data` - Priority operations.
+    ///
+    /// # Returns
+    ///
+    /// Ids of operations with no corresponding block in storage yet.
+    /// These should not be removed from the events state until the next
+    /// Ethereum block range.
+    ///
+    pub async fn apply_priority_op_data(
+        &mut self,
+        priority_op_data: impl Iterator<Item = &PriorityOp>,
+    ) -> Vec<SerialId> {
+        storage_interact!(self.apply_priority_op_data(priority_op_data))
+    }
+
     /// Store token to the storage  
     /// # Arguments
     ///
@@ -101,7 +120,7 @@ impl StorageInteractor<'_> {
     ///
     /// # Arguments
     ///
-    /// * `eveblock_eventsnts` - Rollup contract block events descriptions
+    /// * `block_events` - Rollup contract block events descriptions
     /// * `tokens` - Tokens that had been added to system
     /// * `last_watched_eth_block_number` - Last watched ethereum block
     ///
@@ -109,11 +128,13 @@ impl StorageInteractor<'_> {
         &mut self,
         block_events: &[BlockEvent],
         tokens: &[NewTokenEvent],
+        priority_op_data: &[PriorityOp],
         last_watched_eth_block_number: u64,
     ) {
         storage_interact!(self.save_events_state(
             block_events,
             tokens,
+            priority_op_data,
             last_watched_eth_block_number
         ))
     }
