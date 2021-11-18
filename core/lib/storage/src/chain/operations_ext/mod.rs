@@ -1088,7 +1088,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     SELECT DISTINCT tx_hash FROM tx_filters
                     WHERE address = $2 {}
                 )
-                SECECT                     
+                SELECT                     
                     executed_transactions.tx_hash,
                     tx as op,
                     block_number,
@@ -1099,8 +1099,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     Null::bigint as priority_op_serialid,
                     block_index,
                     batch_id
-                FROM tx_hashes INNER JOIN executed_priority_operations
-                    ON tx_hashes.tx_hash = executed_priority_operations.tx_hash
+                FROM tx_hashes INNER JOIN executed_transactions 
+                    ON tx_hashes.tx_hash = executed_transactions.tx_hash
                 {}
                 
             "#,
