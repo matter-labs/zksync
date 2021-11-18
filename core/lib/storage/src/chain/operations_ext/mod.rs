@@ -34,9 +34,6 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 use itertools::Itertools;
-use sqlx::postgres::PgRow;
-use sqlx::Row;
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 pub(crate) mod conversion;
@@ -1041,15 +1038,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                             .await?,
                     );
                 }
-                txs.values()
-                    .sorted_by(|tx1, tx2| {
-                        match query.direction {
-                                PaginationDirection::Newer => tx1.created_at.cmp(tx2.created_at),
-                                PaginationDirection::Older => tx2.created_at.cmp(tx1.created_at),
-                        }
+                txs.into_values()
+                    .sorted_by(|tx1, tx2| match query.direction {
+                        PaginationDirection::Newer => tx1.created_at.cmp(&tx2.created_at),
+                        PaginationDirection::Older => tx2.created_at.cmp(&tx1.created_at),
                     })
                     .take(query.limit as usize)
-                    .cloned()
                     .collect()
             };
 
@@ -1080,7 +1074,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         );
         Ok(txs)
     }
-    pub async fn get_priority_operations_for_account(
+    async fn get_priority_operations_for_account(
         &mut self,
         address: Address,
         token: Option<TokenId>,
@@ -1121,20 +1115,17 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         "#,
             query_direction
         );
-        Ok(sqlx::query(&query)
+        Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
             .bind(token.is_none())
             .bind(token.unwrap_or_default().0 as i32)
             .bind(time_from)
             .bind(limit)
             .fetch_all(self.0.conn())
-            .await?
-            .into_iter()
-            .map(extract_transaction_item)
-            .collect())
+            .await?)
     }
 
-    pub async fn get_executed_txs_for_account(
+    async fn get_executed_txs_for_account(
         &mut self,
         address: Address,
         token: Option<TokenId>,
@@ -1175,17 +1166,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             query_direction
         );
 
-        Ok(sqlx::query(&query)
+        Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
             .bind(token.is_none())
             .bind(token.unwrap_or_default().0 as i32)
             .bind(time_from)
             .bind(limit)
             .fetch_all(self.0.conn())
-            .await?
-            .into_iter()
-            .map(extract_transaction_item)
-            .collect())
+            .await?)
     }
 
     pub async fn get_account_last_tx_hash(
@@ -1724,19 +1712,5 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
         Ok(())
-    }
-}
-
-pub fn extract_transaction_item(db_row: PgRow) -> TransactionItem {
-    TransactionItem {
-        tx_hash: db_row.get("tx_hash"),
-        block_number: db_row.get("block_number"),
-        op: db_row.get("op"),
-        created_at: db_row.get("created_at"),
-        success: db_row.get("success"),
-        fail_reason: db_row.get("fail_reason"),
-        eth_hash: db_row.get("eth_hash"),
-        priority_op_serialid: db_row.get("priority_op_serialid"),
-        batch_id: db_row.get("batch_id"),
     }
 }

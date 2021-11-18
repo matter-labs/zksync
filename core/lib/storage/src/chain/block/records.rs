@@ -68,7 +68,7 @@ pub struct BlockTransactionItem {
     pub batch_id: Option<i64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct TransactionItem {
     pub tx_hash: Vec<u8>,
     pub block_number: i64,
