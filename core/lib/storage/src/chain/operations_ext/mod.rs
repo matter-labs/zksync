@@ -1084,15 +1084,21 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     ) -> QueryResult<Vec<TransactionItem>> {
         let query_direction = match direction {
             PaginationDirection::Newer => {
-                "AND created_at >= $4 
+                "AND created_at >= $3 
                 ORDER BY created_at
-                LIMIT $5"
+                LIMIT $4"
             }
             PaginationDirection::Older => {
-                "AND created_at <= $4
+                "AND created_at <= $3
                 ORDER BY created_at DESC
-                LIMIT $5"
+                LIMIT $4"
             }
+        };
+
+        let token_query = if token.is_some() {
+            "AND token = $2"
+        } else {
+            ""
         };
 
         let query = format!(
@@ -1111,13 +1117,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             FROM tx_filters
             INNER JOIN executed_priority_operations
                 ON tx_filters.tx_hash = executed_priority_operations.tx_hash
-            WHERE address = $1 AND ($2::boolean OR token = $3) {}
+            WHERE address = $1 {} {}
         "#,
-            query_direction
+            token_query, query_direction
         );
         Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
-            .bind(token.is_none())
             .bind(token.unwrap_or_default().0 as i32)
             .bind(time_from)
             .bind(limit)
@@ -1135,16 +1140,23 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     ) -> QueryResult<Vec<TransactionItem>> {
         let query_direction = match direction {
             PaginationDirection::Newer => {
-                "AND created_at >= $4
+                "AND created_at >= $3
                 ORDER BY created_at
-                LIMIT $5"
+                LIMIT $4"
             }
             PaginationDirection::Older => {
-                "AND created_at <= $4
+                "AND created_at <= $3
                 ORDER BY created_at DESC
-                LIMIT $5"
+                LIMIT $4"
             }
         };
+
+        let token_query = if token.is_some() {
+            "AND token = $2"
+        } else {
+            ""
+        };
+
         let query = format!(
             r#"
                SELECT
@@ -1161,14 +1173,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 FROM tx_filters
                 INNER JOIN executed_transactions
                     ON tx_filters.tx_hash = executed_transactions.tx_hash
-                WHERE address = $1 AND ($2::boolean OR token = $3) {}
+                WHERE address = $1 {} {}
             "#,
-            query_direction
+            token_query, query_direction
         );
 
         Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
-            .bind(token.is_none())
             .bind(token.unwrap_or_default().0 as i32)
             .bind(time_from)
             .bind(limit)
