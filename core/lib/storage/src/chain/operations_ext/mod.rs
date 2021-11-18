@@ -34,7 +34,6 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 use itertools::Itertools;
-use std::collections::BTreeMap;
 
 pub(crate) mod conversion;
 pub mod records;
