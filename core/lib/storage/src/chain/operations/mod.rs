@@ -243,8 +243,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
         let offset = Utc::now() - max_age;
         sqlx::query!(
-            "DELETE FROM executed_transactions
-            WHERE success = false AND created_at < $1",
+            "DELETE FROM executed_transactions WHERE tx_hash IN (SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000)",
             offset
         )
         .execute(self.0.conn())
