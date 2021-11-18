@@ -69,30 +69,6 @@
       ]
     }
   },
-  "065f83bfa5ed2f2dff30ce38b9d2dd4518ec00f81a98bc378f30a07db5f7b678": {
-    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                    INTERSECT\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE $4::boolean OR (address = $5 AND ($2::boolean OR token = $3))\n                )\n                SELECT COUNT(*) as \"count!\" FROM tx_hashes\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Bool",
-          "Int4",
-          "Bool",
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "06eb41e0b8385c6875b0355660a43e633172e01a20dcb3d81b4f47e4b70705c4": {
     "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n            VALUES ($1, $2, $3, $4, $5)",
     "describe": {
@@ -1954,6 +1930,28 @@
       ]
     }
   },
+  "41658b41160ecd5bc97cf22c82b63448f05bf1f8bd4c0b9dd64f6b16c830c093": {
+    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters \n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                )\n                SELECT COUNT(*) as \"count!\"\n                FROM tx_hashes\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bool",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "41a4d1c9fa9953cd94714a408afd892962f9eea9a9f1674b8dddfa72e2eb9ec2": {
     "query": "INSERT INTO eth_tx_hashes (eth_op_id, tx_hash) VALUES ($1, $2)",
     "describe": {
@@ -2500,6 +2498,29 @@
         false,
         true,
         true
+      ]
+    }
+  },
+  "51edc4a74becb050ee8727c6fd24e6793254386e3403f36509fffc11ceff40a1": {
+    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                    INTERSECT\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $4 AND ($2::boolean OR token = $3)\n                )\n                SELECT COUNT(*) as \"count!\" FROM tx_hashes\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bool",
+          "Int4",
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },

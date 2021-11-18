@@ -1324,33 +1324,45 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         second_address: Option<Address>,
     ) -> QueryResult<u32> {
         let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
-        let second_address_bytes = second_address
-            .map(|address| address.as_bytes().to_vec())
-            .unwrap_or_default();
 
-        let count = sqlx::query!(
-            r#"
+        let count = if let Some(second_address) = second_address {
+            sqlx::query!(
+                r#"
                 WITH tx_hashes AS (
                     SELECT DISTINCT tx_hash FROM tx_filters
                     WHERE address = $1 AND ($2::boolean OR token = $3)
                     INTERSECT
                     SELECT DISTINCT tx_hash FROM tx_filters
-                    WHERE $4::boolean OR (address = $5 AND ($2::boolean OR token = $3))
+                    WHERE address = $4 AND ($2::boolean OR token = $3)
                 )
                 SELECT COUNT(*) as "count!" FROM tx_hashes
-            "#,
-            address.as_bytes(),
-            token.is_none(),
-            token.unwrap_or_default().0 as i32,
-            second_address.is_none(),
-            &second_address_bytes
-        )
-        .fetch_one(transaction.conn())
-        .await?
-        .count;
-        transaction.commit().await?;
-
+                "#,
+                address.as_bytes(),
+                token.is_none(),
+                token.unwrap_or_default().0 as i32,
+                second_address.as_bytes()
+            )
+            .fetch_one(self.0.conn())
+            .await?
+            .count
+        } else {
+            sqlx::query!(
+                r#"
+                WITH tx_hashes AS (
+                    SELECT DISTINCT tx_hash FROM tx_filters 
+                    WHERE address = $1 AND ($2::boolean OR token = $3)
+                )
+                SELECT COUNT(*) as "count!"
+                FROM tx_hashes
+                "#,
+                address.as_bytes(),
+                token.is_none(),
+                token.unwrap_or_default().0 as i32,
+            )
+            .fetch_one(self.0.conn())
+            .await?
+            .count
+        };
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_count",
             start.elapsed()
