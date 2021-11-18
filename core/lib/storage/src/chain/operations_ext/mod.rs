@@ -976,29 +976,34 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .await?;
 
         let txs = if let Some((time_from, _)) = created_at_and_block {
-            let raw_txs: Vec<TransactionItem> = {
-                let mut txs = BTreeMap::new();
-                let mut append_txs = |new_txs: Vec<TransactionItem>| {
-                    for x in new_txs.into_iter() {
-                        txs.insert(x.tx_hash.clone(), x);
-                    }
-                };
-
-                append_txs(
-                    transaction
-                        .chain()
-                        .operations_ext_schema()
-                        .get_executed_txs_for_account(
-                            query.from.address,
-                            query.from.token,
-                            i64::from(query.limit),
-                            time_from,
-                            query.direction,
-                        )
-                        .await?,
-                );
-                append_txs(
-                    transaction
+            let raw_txs = if let Some(address) = query.from.second_address {
+                // It's impossible to have priority operations for two accounts
+                transaction
+                    .chain()
+                    .operations_ext_schema()
+                    .get_executed_transactions_for_two_accounts(
+                        query.from.address,
+                        address,
+                        query.from.token,
+                        i64::from(query.limit),
+                        time_from,
+                        query.direction,
+                    )
+                    .await?
+            } else {
+                let mut txs = transaction
+                    .chain()
+                    .operations_ext_schema()
+                    .get_executed_txs_for_account(
+                        query.from.address,
+                        query.from.token,
+                        i64::from(query.limit),
+                        time_from,
+                        query.direction,
+                    )
+                    .await?;
+                txs.append(
+                    &mut transaction
                         .chain()
                         .operations_ext_schema()
                         .get_priority_operations_for_account(
@@ -1010,35 +1015,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         )
                         .await?,
                 );
-                if let Some(address) = query.from.second_address {
-                    append_txs(
-                        transaction
-                            .chain()
-                            .operations_ext_schema()
-                            .get_executed_txs_for_account(
-                                address,
-                                query.from.token,
-                                i64::from(query.limit),
-                                time_from,
-                                query.direction,
-                            )
-                            .await?,
-                    );
-                    append_txs(
-                        transaction
-                            .chain()
-                            .operations_ext_schema()
-                            .get_priority_operations_for_account(
-                                address,
-                                query.from.token,
-                                i64::from(query.limit),
-                                time_from,
-                                query.direction,
-                            )
-                            .await?,
-                    );
-                }
-                txs.into_values()
+                txs.into_iter()
                     .sorted_by(|tx1, tx2| match query.direction {
                         PaginationDirection::Newer => tx1.created_at.cmp(&tx2.created_at),
                         PaginationDirection::Older => tx2.created_at.cmp(&tx1.created_at),
@@ -1074,6 +1051,72 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         );
         Ok(txs)
     }
+
+    async fn get_executed_transactions_for_two_accounts(
+        &mut self,
+        address: Address,
+        second_address: Address,
+        token: Option<TokenId>,
+        limit: i64,
+        time_from: DateTime<Utc>,
+        direction: PaginationDirection,
+    ) -> QueryResult<Vec<TransactionItem>> {
+        let query_direction = match direction {
+            PaginationDirection::Newer => {
+                "WHERE created_at >= $4 
+                ORDER BY created_at
+                LIMIT $5"
+            }
+            PaginationDirection::Older => {
+                "WHERE created_at <= $4
+                ORDER BY created_at DESC
+                LIMIT $5"
+            }
+        };
+
+        let token_query = if token.is_some() {
+            "AND token = $3"
+        } else {
+            ""
+        };
+
+        let query = format!(
+            r#"
+                WITH tx_hashes AS (
+                    SELECT DISTINCT tx_hash FROM tx_filters
+                    WHERE address = $1 {} 
+                    INTERSECT
+                    SELECT DISTINCT tx_hash FROM tx_filters
+                    WHERE address = $2 {}
+                )
+                SECECT                     
+                    executed_transactions.tx_hash,
+                    tx as op,
+                    block_number,
+                    created_at,
+                    success,
+                    fail_reason,
+                    Null::bytea as eth_hash,
+                    Null::bigint as priority_op_serialid,
+                    block_index,
+                    batch_id
+                FROM tx_hashes INNER JOIN executed_priority_operations
+                    ON tx_hashes.tx_hash = executed_priority_operations.tx_hash
+                {}
+                
+            "#,
+            token_query, token_query, query_direction
+        );
+
+        Ok(sqlx::query_as(&query)
+            .bind(address.as_bytes())
+            .bind(&second_address.as_bytes())
+            .bind(token.unwrap_or_default().0 as i32)
+            .bind(time_from)
+            .bind(limit)
+            .fetch_all(self.0.conn())
+            .await?)
+    }
     async fn get_priority_operations_for_account(
         &mut self,
         address: Address,
@@ -1103,7 +1146,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         let query = format!(
             r#"
-            SELECT
+            SELECT DISTINCT
                 executed_priority_operations.tx_hash,
                 operation as op,
                 block_number,
@@ -1159,7 +1202,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         let query = format!(
             r#"
-               SELECT
+               SELECT DISTINCT
                     executed_transactions.tx_hash,
                     tx as op,
                     block_number,
@@ -1204,11 +1247,15 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     FROM tx_hashes
                     INNER JOIN executed_transactions
                         ON tx_hashes.tx_hash = executed_transactions.tx_hash
+                ORDER BY created_at DESC, block_index DESC
+                LIMIT 1
                 ), priority_ops AS (
                     SELECT executed_priority_operations.tx_hash, created_at, block_index
                     FROM tx_hashes
                     INNER JOIN executed_priority_operations
                         ON tx_hashes.tx_hash = executed_priority_operations.tx_hash
+                ORDER BY created_at DESC, block_index DESC
+                LIMIT 1
                 ), everything AS (
                     SELECT * FROM transactions
                     UNION ALL
