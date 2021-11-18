@@ -25,12 +25,14 @@ pub fn run_rejected_tx_cleaner(config: &ZkSyncConfig, db_pool: ConnectionPool) -
                 .access_storage()
                 .await
                 .expect("transactions cleaner couldn't access the database");
-            storage
+            if let Err(e) = storage
                 .chain()
                 .operations_schema()
                 .remove_rejected_transactions(max_age)
                 .await
-                .expect("failed to delete rejected transactions from the database");
+            {
+                vlog::error!("Can't delete rejected transactions {:?}", e);
+            }
             timer.tick().await;
         }
     })
