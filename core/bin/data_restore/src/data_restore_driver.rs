@@ -467,6 +467,11 @@ impl<T: Transport> DataRestoreDriver<T> {
                 .await;
         }
 
+        // Store priority operations Ethereum metadata in the database.
+        // It may both happen that there's no priority operation for the given
+        // `NewPriorityRequest` log and vice versa.
+        // For this reason `apply_priority_op_data` returns serial ids for logs
+        // with no updates, we keep them in the events state removing the rest.
         let priority_op_data = self.events_state.priority_op_data.values();
         let serial_ids = transaction.apply_priority_op_data(priority_op_data).await;
         if !serial_ids.is_empty() {
@@ -475,6 +480,9 @@ impl<T: Transport> DataRestoreDriver<T> {
                 serial_ids
             );
         }
+        // This has a drawback that we're not updating events state in the database,
+        // but even if the data restore is restarted, applying the same log twice has
+        // no consequences.
         self.events_state.sift_priority_ops(&serial_ids);
 
         transaction.commit().await;

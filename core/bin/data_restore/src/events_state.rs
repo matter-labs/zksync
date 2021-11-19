@@ -66,10 +66,10 @@ impl EventsState {
     ///
     /// # Arguments
     ///
-    /// * `serial_ids` - serial ids of operations that don't have a block in storage yet.
-    pub fn sift_priority_ops(&mut self, serial_ids: &[SerialId]) {
+    /// * `serial_ids_to_keep` - serial ids of operations that don't have a block in storage yet.
+    pub fn sift_priority_ops(&mut self, serial_ids_to_keep: &[SerialId]) {
         let mut priority_op_data = HashMap::with_capacity(self.priority_op_data.len());
-        for serial_id in serial_ids {
+        for serial_id in serial_ids_to_keep {
             if let Some(priority_op) = self.priority_op_data.remove(&serial_id) {
                 priority_op_data.insert(*serial_id, priority_op);
             }
@@ -129,13 +129,14 @@ impl EventsState {
             );
         }
 
+        let mut events_to_return = self.committed_events.clone();
+        events_to_return.extend(self.verified_events.clone());
+
+        // Extend the queue with new operations and return it.
         for priority_op in priority_op_data {
             self.priority_op_data
                 .insert(priority_op.serial_id, priority_op);
         }
-        let mut events_to_return = self.committed_events.clone();
-        events_to_return.extend(self.verified_events.clone());
-
         let priority_op_data = self.priority_op_data.values().cloned().collect();
 
         Ok((
@@ -323,6 +324,7 @@ impl EventsState {
 
             match result {
                 Ok(mut operations) => {
+                    // Successfully processed block range.
                     priority_operations.append(&mut operations);
 
                     from_number = to_number + 1;
@@ -333,7 +335,10 @@ impl EventsState {
                 Err(err) => {
                     if err.to_string().contains(LIMIT_ERR) {
                         if to_number <= from_number || to_number - from_number == 1.into() {
-                            panic!("Ethereum node failed to return logs for a single block")
+                            return Err(format_err!(
+                                "Ethereum node failed to return logs for a single block: {}",
+                                err
+                            ));
                         }
 
                         // Shorten the block range.
