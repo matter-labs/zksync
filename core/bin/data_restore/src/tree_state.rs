@@ -137,9 +137,7 @@ impl TreeState {
         let last_unprocessed_prior_op = self.current_unprocessed_priority_op;
 
         for operation in operations {
-            if operation.is_priority_op() {
-                *last_priority_op_serial_id += 1;
-            }
+            let is_priority_op = operation.is_priority_op();
             match operation {
                 ZkSyncOp::Deposit(op) => {
                     let priority_op = ZkSyncPriorityOp::Deposit(op.priority_op);
@@ -443,6 +441,9 @@ impl TreeState {
                     );
                 }
                 ZkSyncOp::Noop(_) => {}
+            }
+            if is_priority_op {
+                *last_priority_op_serial_id += 1;
             }
         }
 
