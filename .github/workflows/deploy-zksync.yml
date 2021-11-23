@@ -18,6 +18,7 @@ on:
         description: 'Force scaling the server deployment up to 1 replica'
         required: false
 
+
 defaults:
   run:
     shell: bash -leo pipefail {0}
