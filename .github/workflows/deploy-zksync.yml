@@ -26,6 +26,7 @@ on:
         required: false
         default: 'prover'
 
+
 defaults:
   run:
     shell: bash -leo pipefail {0}
