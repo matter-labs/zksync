@@ -52,3 +52,14 @@ security_council_members_number=3
 security_council_members=["0x22C3F9177F485bF9a058cE4C7253Da81a59495Db","0x56dF84566a67e87808A73dA0Be61a40bda3e2AFA","0xCE004d039cD86b08274FC453bd5536E6e9F6Fac7"]
 
 security_council_threshold=2
+
+# Whitelisted IPs for subsisdies
+whitelisted_ips=myip
+
+# Please note, that both values are in cents, i.e. the 100 denotes $1
+subsidy_tx_cost_usd_cents=100
+max_subsidy_usd_cents=2500000
+
+# The type of the currently applied subsidy
+# At this moment, the server can support only one type of subsidy at a time
+subsidy_type=PartnerName

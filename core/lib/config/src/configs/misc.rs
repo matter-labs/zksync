@@ -35,6 +35,11 @@ pub struct MiscConfig {
     pub fee_account_private_key: H256,
     /// Log format
     pub log_format: LogFormat,
+
+    pub whitelisted_ips: Vec<String>,
+    pub max_subsidy_usd_cents: u64,
+    pub subsidy_tx_cost_usd_cents: u64,
+    pub subsidy_type: String,
 }
 
 impl MiscConfig {
@@ -60,6 +65,10 @@ mod tests {
                 "27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be",
             ),
             log_format: LogFormat::Json,
+            whitelisted_ips: vec![],
+            max_subsidy_usd_cents: 1000000,
+            subsidy_tx_cost_usd_cents: 100,
+            subsidy_type: "PartnerName".to_owned(),
         }
     }
 
