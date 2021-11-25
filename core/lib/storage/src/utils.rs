@@ -36,7 +36,7 @@ pub async fn affected_accounts(
             {
                 accounts.push(address);
             } else {
-                anyhow::bail!("Order signer account id not found in db");
+                vlog::error!("Order signer account id not found in db");
             }
             if let Some(address) = storage
                 .chain()
@@ -46,7 +46,7 @@ pub async fn affected_accounts(
             {
                 accounts.push(address);
             } else {
-                anyhow::bail!("Order signer account id not found in db");
+                vlog::error!("Order signer account id not found in db");
             }
             accounts
         }
