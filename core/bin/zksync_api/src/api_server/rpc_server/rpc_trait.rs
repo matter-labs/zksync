@@ -56,6 +56,7 @@ pub trait Rpc {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        ip: Option<String>,
     ) -> BoxFutureResult<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
@@ -72,6 +73,7 @@ pub trait Rpc {
         tx_type: ApiTxFeeTypes,
         _address: Address,
         token_like: TokenLike,
+        ip: Option<String>,
     ) -> BoxFutureResult<Fee>;
 
     // _addresses argument is left for the backward compatibility.
@@ -81,6 +83,7 @@ pub trait Rpc {
         tx_types: Vec<ApiTxFeeTypes>,
         _addresses: Vec<Address>,
         token_like: TokenLike,
+        ip: Option<String>,
     ) -> BoxFutureResult<TotalFee>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
@@ -136,8 +139,9 @@ impl Rpc for RpcApp {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        ip: Option<String>,
     ) -> BoxFutureResult<Vec<TxHash>> {
-        spawn!(self._impl_submit_txs_batch(txs, eth_signatures))
+        spawn!(self._impl_submit_txs_batch(txs, eth_signatures, ip))
     }
 
     fn contract_address(&self) -> BoxFutureResult<ContractAddressResp> {
@@ -153,8 +157,9 @@ impl Rpc for RpcApp {
         tx_type: ApiTxFeeTypes,
         address: Address,
         token_like: TokenLike,
+        ip: Option<String>,
     ) -> BoxFutureResult<Fee> {
-        spawn!(self._impl_get_tx_fee(tx_type, address, token_like))
+        spawn!(self._impl_get_tx_fee(tx_type, address, token_like, ip))
     }
 
     fn get_txs_batch_fee_in_wei(
@@ -162,8 +167,9 @@ impl Rpc for RpcApp {
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token_like: TokenLike,
+        ip: Option<String>,
     ) -> BoxFutureResult<TotalFee> {
-        spawn!(self._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like))
+        spawn!(self._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like, ip))
     }
 
     fn get_token_price(&self, token_like: TokenLike) -> BoxFutureResult<BigDecimal> {

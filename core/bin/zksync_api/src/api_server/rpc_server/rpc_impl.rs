@@ -147,6 +147,7 @@ impl RpcApp {
         self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        ip: Option<String>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
         let result: Result<Vec<TxHash>> = self
@@ -239,6 +240,7 @@ impl RpcApp {
         tx_type: ApiTxFeeTypes,
         address: Address,
         token: TokenLike,
+        ip: Option<String>,
     ) -> Result<Fee> {
         let start = Instant::now();
         let ticker = self.tx_sender.ticker_requests.clone();
@@ -258,6 +260,7 @@ impl RpcApp {
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
+        ip: Option<String>,
     ) -> Result<TotalFee> {
         let start = Instant::now();
         if tx_types.len() != addresses.len() {

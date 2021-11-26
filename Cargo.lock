@@ -5665,6 +5665,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bigdecimal",
+ "bytes 0.4.12",
  "chrono",
  "criterion",
  "ctrlc",

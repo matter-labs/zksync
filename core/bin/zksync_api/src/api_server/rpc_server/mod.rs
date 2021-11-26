@@ -1,12 +1,13 @@
 // Built-in uses
-use std::{convert::TryFrom, time::Instant};
+use std::{collections::HashMap, convert::TryFrom, time::Instant};
 
 // External uses
+use bytes::Bytes;
 use futures::{
     channel::{mpsc, oneshot},
     FutureExt, SinkExt, StreamExt,
 };
-use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
+use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Params, Result};
 use jsonrpc_http_server::{RequestMiddleware, RequestMiddlewareAction, ServerBuilder};
 
 // Workspace uses
@@ -89,81 +90,102 @@ impl RpcApp {
     }
 }
 
+struct MethodWithIpDescription {
+    minimum_params: usize,
+    // the last one is always the ip parameter
+    maximum_params: usize,
+}
+
+impl MethodWithIpDescription {
+    pub fn new(minimum_params: usize, maximum_params: usize) -> Self {
+        MethodWithIpDescription {
+            minimum_params,
+            maximum_params,
+        }
+    }
+}
 struct IpInsertMiddleWare {}
+
+fn get_call_with_ip_if_needed(
+    call: jsonrpc_core::MethodCall,
+    ip: String,
+) -> jsonrpc_core::MethodCall {
+    let methods_with_ip = HashMap::from([
+        ("tx_submit".to_owned(), MethodWithIpDescription::new(1, 4)),
+        (
+            "submit_txs_batch".to_owned(),
+            MethodWithIpDescription::new(1, 3),
+        ),
+        ("get_tx_fee".to_owned(), MethodWithIpDescription::new(3, 4)),
+        (
+            "get_txs_batch_fee_in_wei".to_owned(),
+            MethodWithIpDescription::new(3, 4),
+        ),
+    ]);
+
+    let description = methods_with_ip.get(&call.method);
+
+    let description = if description.is_some() {
+        description.unwrap()
+    } else {
+        return call;
+    };
+
+    let mut new_call = call.clone();
+    // We add ip only to array of parameters
+    if let Params::Array(mut params) = call.params {
+        // The query is definitely wrong. We may proceed and the server will handle it normally
+        if params.len() > description.maximum_params || params.len() < description.minimum_params {
+            return new_call;
+        }
+
+        // If the length is equsl to the maximum amount of the
+        // maximum_params, then the user tried to override ip
+        if params.len() == description.maximum_params {
+            params.pop();
+        }
+
+        // Fill optional params with null
+        while params.len() < description.maximum_params - 1 {
+            params.push(serde_json::Value::Null);
+        }
+
+        params.push(serde_json::Value::String(ip));
+
+        new_call.params = Params::Array(params);
+        new_call
+    } else {
+        call
+    }
+}
 
 async fn insert_ip(body: hyper::Body, ip: String) -> hyper::Result<Vec<u8>> {
     let body_stream: Vec<_> = body.collect().await;
 
     let body_bytes: hyper::Result<Vec<_>> = body_stream.into_iter().collect();
-    let body_bytes = (body_bytes)?;
 
-    let mut body_bytes: Vec<u8> = body_bytes
+    // The `?` is here to let Rust resolve body_bytes as a vector of Bytes structs
+    let mut body_bytes: Vec<u8> = body_bytes?
         .into_iter()
-        .map(|b| {
-            let d: Vec<u8> = b.into_iter().collect();
-            d
-        })
+        .map(|b| b.into_iter().collect::<Vec<u8>>())
         .flatten()
         .collect();
 
-    let tmp_str = String::from_utf8(body_bytes.clone());
-    if let Ok(s) = tmp_str {
-        dbg!("HAHA");
-        dbg!(s.clone());
+    let body_str = String::from_utf8(body_bytes.clone());
 
+    if let Ok(s) = body_str {
         let call: std::result::Result<jsonrpc_core::MethodCall, _> = serde_json::from_str(&s); //.map_err(|e| hyper::Error)
 
-        let new_call: Option<jsonrpc_core::MethodCall> = if let Ok(call) = call {
-            if call.method == "tx_submit" {
-                dbg!("TXXXXXXXX SUBMITTTTTTT");
+        dbg!(s);
 
-                let mut new_call = call.clone();
-                match call.params {
-                    jsonrpc_core::Params::Array(params) => {
-                        dbg!("ARRAY");
-                        dbg!(params.len());
-                        let mut new_params = params.clone();
-                        // The IP param can only be set by the middleware
-                        if params.len() > 3 {
-                            dbg!("MORE THAN 3");
-                            return Ok(vec![]);
-                        }
-
-                        if params.len() == 2 {
-                            // fast processing
-                            dbg!("EXACTLY 2");
-                            new_params.push(serde_json::Value::Null);
-                        }
-
-                        if params.len() == 3 {
-                            dbg!("DOING FOR 3");
-                            new_params.push(serde_json::Value::String(ip));
-                        }
-
-                        new_call.params = jsonrpc_core::Params::Array(new_params);
-                    }
-                    _ => {
-                        dbg!("OMG");
-                    }
-                };
-                Some(new_call)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        if let Some(call) = new_call {
-            let new_body_bytes = serde_json::to_string(&call);
+        if let Ok(call) = call {
+            let new_call = get_call_with_ip_if_needed(call, ip);
+            let new_body_bytes = serde_json::to_string(&new_call);
             if let Ok(s) = new_body_bytes {
-                dbg!("HERE IS THE NEW CALL");
                 dbg!(s.clone());
                 body_bytes = s.as_bytes().to_owned();
             }
-        }
-    } else {
-        dbg!("CANT UTF-8...");
+        };
     }
 
     Ok(body_bytes)
@@ -174,16 +196,27 @@ impl RequestMiddleware for IpInsertMiddleWare {
         let (parts, body) = request.into_parts();
         let cloudflare_sent_ip = "CF-Connecting-IP";
 
-        let remote_ip = match parts.headers.get(cloudflare_sent_ip) {
-            Some(ip) => ip.to_str(),
-            None => {
-                dbg!("NO CF IP HEADER, DEFAULTING TO NULL");
-                Ok("")
-            }
-        };
-        let remote_ip = "NEW_IP".to_owned();
+        // let remote_ip = match parts.headers.get(cloudflare_sent_ip) {
+        //     Some(ip) => ip.to_str(),
+        //     None => {
+        //         return RequestMiddlewareAction::Proceed {
+        //             should_continue_on_invalid_cors: false,
+        //             request: hyper::Request::from_parts(parts, body),
+        //         }
+        //     }
+        // };
+        // let remote_ip = if let Err(e) = remote_ip {
+        //     vlog::warn!("Failed to parse CF-Connecting-IP header. Reason: {}", e);
+        //     return RequestMiddlewareAction::Proceed {
+        //         should_continue_on_invalid_cors: false,
+        //         request: hyper::Request::from_parts(parts, body),
+        //     }
+        // } else {
+        //     remote_ip.unwrap()
+        // };
+        let remote_ip = "localhost";
 
-        let body_bytes = insert_ip(body, remote_ip).into_stream();
+        let body_bytes = insert_ip(body, remote_ip.to_owned()).into_stream();
         let body = hyper::Body::wrap_stream(body_bytes);
 
         RequestMiddlewareAction::Proceed {

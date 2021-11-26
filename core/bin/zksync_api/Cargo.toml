@@ -40,11 +40,12 @@ serde_json = "1.0.0"
 serde_repr = "0.1"
 itertools = "0.8"
 jsonrpc-core = "18"
-jsonrpc-core-client = {version= "18", features=["ws", "http"]}
+jsonrpc-core-client = { version= "18", features=["ws", "http"] }
 jsonrpc-pubsub = "18.0.0"
 jsonrpc-ws-server = "18"
 jsonrpc-http-server = "18"
-hyper = {version="0.14.14", features=["stream"]}
+hyper = { version = "0.14.14", features=["stream"] }
+bytes = { bytes = "1.1.0" }
 jsonrpc-derive = "18"
 qstring = "0.7.2"
 
