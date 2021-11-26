@@ -5,7 +5,6 @@ import * as fs from 'fs';
 import {
     encodeConstructorArgs,
     encodeProxyContstuctorArgs,
-    publishAbiToTesseracts,
     publishSourceCodeToEtherscan
 } from './publish-utils';
 import {
@@ -220,7 +219,7 @@ export class Deployer {
                     this.addresses.Verifier = parsedLog.args.verifier;
                     this.addresses.UpgradeGatekeeper = parsedLog.args.gatekeeper;
                 }
-            } catch (_) {}
+            } catch (_) { }
         }
         const txHash = deployFactoryTx.transactionHash;
         const gasUsed = deployFactoryTx.gasUsed;
@@ -403,19 +402,6 @@ export class Deployer {
             );
         }
         this.addresses.RegenesisMultisig = regenesisMultisigContract.address;
-    }
-
-    public async publishSourcesToTesseracts() {
-        console.log('Publishing ABI for UpgradeGatekeeper');
-        await publishAbiToTesseracts(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper);
-        console.log('Publishing ABI for ZkSync (proxy)');
-        await publishAbiToTesseracts(this.addresses.ZkSync, this.contracts.zkSync);
-        console.log('Publishing ABI for Verifier (proxy)');
-        await publishAbiToTesseracts(this.addresses.Verifier, this.contracts.verifier);
-        console.log('Publishing ABI for Governance (proxy)');
-        await publishAbiToTesseracts(this.addresses.Governance, this.contracts.governance);
-        console.log('Publishing ABI for ForcedExit');
-        await publishAbiToTesseracts(this.addresses.ForcedExit, this.contracts.forcedExit);
     }
 
     public async publishSourcesToEtherscan() {
