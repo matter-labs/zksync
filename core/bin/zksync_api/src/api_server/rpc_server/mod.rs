@@ -348,6 +348,7 @@ impl RpcApp {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
+        ip: Option<String>,
     ) -> Result<ResponseBatchFee> {
         let req = oneshot::channel();
         ticker_request_sender
@@ -355,6 +356,7 @@ impl RpcApp {
                 transactions,
                 token: token.clone(),
                 response: req.0,
+                ip,
             })
             .await
             .expect("ticker receiver dropped");
@@ -370,6 +372,7 @@ impl RpcApp {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
+        ip: Option<String>,
     ) -> Result<ResponseFee> {
         let req = oneshot::channel();
         ticker_request_sender
@@ -378,6 +381,7 @@ impl RpcApp {
                 address,
                 token: token.clone(),
                 response: req.0,
+                ip,
             })
             .await
             .expect("ticker receiver dropped");

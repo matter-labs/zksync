@@ -36,6 +36,14 @@ pub struct TickerConfig {
     pub token_market_update_time: u64,
     /// Number of tickers for load balancing.
     pub number_of_ticker_actors: u8,
+    /// The IPs which
+    pub subsidized_ips: Vec<String>,
+    /// Subsidized price for ChangePubKey in cents
+    pub subsidy_cpk_price_usd_cents: u64,
+    /// Maxiumum subsidized amout for current subsidy type
+    pub max_subsidy_usd_cents: u64,
+    /// The name of current subsidy. It is needed to conveniently fetch historical data regarding subsidies for different partners
+    pub subsidy_name: String,
 }
 
 impl TickerConfig {
@@ -71,6 +79,10 @@ mod tests {
             unconditionally_valid_tokens: vec![addr("0000000000000000000000000000000000000000")],
             token_market_update_time: 120,
             number_of_ticker_actors: 4,
+            subsidized_ips: vec![],
+            subsidy_cpk_price_usd_cents: 100,
+            max_subsidy_usd_cents: 20000,
+            subsidy_name: String::from("PartnerName"),
         }
     }
 

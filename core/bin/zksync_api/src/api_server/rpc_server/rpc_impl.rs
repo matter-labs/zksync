@@ -129,14 +129,14 @@ impl RpcApp {
     ) -> Result<TxHash> {
         let start = Instant::now();
 
-        if let Some(ip) = ip {
+        if let Some(ip) = ip.clone() {
             dbg!("IPPPPPPPPPPPPPPP");
             dbg!(ip);
         }
 
         let result = self
             .tx_sender
-            .submit_tx_with_separate_fp(*tx, *signature, fast_processing)
+            .submit_tx_with_separate_fp(*tx, *signature, fast_processing, ip)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.tx_submit", start.elapsed());
@@ -150,9 +150,10 @@ impl RpcApp {
         ip: Option<String>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
+
         let result: Result<Vec<TxHash>> = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signatures)
+            .submit_txs_batch(txs, eth_signatures, ip)
             .await
             .map_err(Error::from)
             .map(|response| {
@@ -248,8 +249,10 @@ impl RpcApp {
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
+
         let result =
-            Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
+            Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone(), ip)
+                .await?;
 
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
         Ok(result.normal_fee)
@@ -283,7 +286,9 @@ impl RpcApp {
             .map(|fee_type| fee_type.into())
             .zip(addresses.iter().cloned()))
         .collect();
-        let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
+
+        let result =
+            Self::ticker_batch_fee_request(ticker, transactions, token.clone(), ip).await?;
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
         Ok(TotalFee {

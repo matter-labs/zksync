@@ -22,3 +22,15 @@ token_market_update_time=120
 # Number of tickers for load balancing.
 number_of_ticker_actors=5
 scale_fee_percent=100
+
+
+# Whitelisted IPs for subsisdies
+subsidized_ips="myip"
+
+# Please note, that both values are in cents, i.e. the 100 denotes $1
+subsidy_cpk_price_usd_cents=100
+max_subsidy_usd_cents=2500000
+
+# The type of the currently applied subsidy
+# At this moment, the server can support only one type of subsidy at a time
+subsidy_name="PartnerName"

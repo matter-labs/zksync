@@ -44,7 +44,7 @@ async fn get_tx_fee(
         return Error::from(SubmitError::InappropriateFeeToken).into();
     }
     data.tx_sender
-        .get_txs_fee_in_wei(body.tx_type.into(), body.address, body.token_like)
+        .get_txs_fee_in_wei(body.tx_type.into(), body.address, body.token_like, None)
         .await
         .map_err(Error::from)
         .map(ApiFee::from)
@@ -70,7 +70,7 @@ async fn get_batch_fee(
         .map(|tx| (tx.tx_type.into(), tx.address))
         .collect();
     data.tx_sender
-        .get_txs_batch_fee_in_wei(txs, body.token_like)
+        .get_txs_batch_fee_in_wei(txs, body.token_like, None)
         .await
         .map_err(Error::from)
         .map(ApiFee::from)

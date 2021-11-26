@@ -353,6 +353,7 @@ impl TxSender {
         mut tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
+        ip: Option<String>,
     ) -> Result<TxHash, SubmitError> {
         let fast_processing = fast_processing.unwrap_or(false);
         if fast_processing && !tx.is_withdraw() {
@@ -370,13 +371,14 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        self.submit_tx(tx, signature).await
+        self.submit_tx(tx, signature, ip).await
     }
 
     pub async fn submit_tx(
         &self,
         tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
+        ip: Option<String>,
     ) -> Result<TxHash, SubmitError> {
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
@@ -418,7 +420,7 @@ impl TxSender {
             }
 
             let required_fee_data =
-                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
+                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone(), ip)
                     .await?;
 
             // Converting `BitUint` to `BigInt` is safe.
@@ -478,6 +480,7 @@ impl TxSender {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        ip: Option<String>,
     ) -> Result<SubmitBatchResponse, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
@@ -563,6 +566,7 @@ impl TxSender {
                 self.ticker_requests.clone(),
                 transaction_types.clone(),
                 batch_token.into(),
+                ip,
             )
             .await?;
             let user_provided_fee =
@@ -585,6 +589,7 @@ impl TxSender {
                 self.ticker_requests.clone(),
                 transaction_types,
                 eth_token.clone(),
+                ip,
             )
             .await?
             .normal_fee;
@@ -706,12 +711,14 @@ impl TxSender {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
+        ip: Option<String>,
     ) -> Result<Fee, SubmitError> {
         let resp_fee = Self::ticker_request(
             self.ticker_requests.clone(),
             tx_type,
             address,
             token.clone(),
+            ip,
         )
         .await?;
         Ok(resp_fee.normal_fee)
@@ -721,11 +728,13 @@ impl TxSender {
         &self,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
+        ip: Option<String>,
     ) -> Result<BatchFee, SubmitError> {
         let resp_fee = Self::ticker_batch_fee_request(
             self.ticker_requests.clone(),
             transactions,
             token.clone(),
+            ip,
         )
         .await?;
         Ok(resp_fee.normal_fee)
@@ -809,6 +818,7 @@ impl TxSender {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
+        ip: Option<String>,
     ) -> Result<ResponseBatchFee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender
@@ -816,6 +826,7 @@ impl TxSender {
                 transactions,
                 token: token.clone(),
                 response: req.0,
+                ip,
             })
             .await
             .map_err(SubmitError::internal)?;
@@ -828,6 +839,7 @@ impl TxSender {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
+        ip: Option<String>,
     ) -> Result<ResponseFee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender
@@ -836,6 +848,7 @@ impl TxSender {
                 address,
                 token: token.clone(),
                 response: req.0,
+                ip,
             })
             .await
             .map_err(SubmitError::internal)?;

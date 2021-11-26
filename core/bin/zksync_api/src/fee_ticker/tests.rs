@@ -115,6 +115,10 @@ fn get_test_ticker_config() -> TickerConfig {
             .collect(),
         scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
         max_blocks_to_aggregate: 5,
+        subsidized_ips: vec![],
+        subsidy_cpk_price_usd_cents: 0,
+        max_subsidy_usd_cents: 0,
+        subsidy_name: String::from(""),
     }
 }
 
@@ -290,7 +294,7 @@ fn test_ticker_formula() {
         }
         ticker.info.remaining_chunks = remaining_chunks;
         let fee_in_token =
-            block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
+            block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address, None))
                 .expect("failed to get fee in token");
         let token_precision = block_on(MockApiProvider.get_token(token.clone()))
             .unwrap()
@@ -545,6 +549,7 @@ fn test_zero_price_token_fee() {
         TxFeeTypes::Transfer,
         token.id.into(),
         Address::default(),
+        None,
     ))
     .unwrap_err();
 
@@ -617,6 +622,7 @@ async fn test_error_coingecko_api() {
                 TxFeeTypes::FastWithdraw,
                 token.id.into(),
                 Address::default(),
+                None,
             )
             .await
             .unwrap();
@@ -669,6 +675,7 @@ async fn test_error_api() {
             TxFeeTypes::FastWithdraw,
             TokenId(1).into(),
             Address::default(),
+            None,
         )
         .await
         .unwrap();

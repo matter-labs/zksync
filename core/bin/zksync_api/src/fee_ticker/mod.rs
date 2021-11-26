@@ -150,6 +150,10 @@ pub struct TickerConfig {
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
     scale_fee_coefficient: Ratio<BigUint>,
     max_blocks_to_aggregate: u32,
+    subsidized_ips: Vec<String>,
+    subsidy_cpk_price_usd_cents: u64,
+    max_subsidy_usd_cents: u64,
+    subsidy_name: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -175,11 +179,13 @@ pub enum TickerRequest {
         address: Address,
         token: TokenLike,
         response: oneshot::Sender<Result<ResponseFee, anyhow::Error>>,
+        ip: Option<String>,
     },
     GetBatchTxFee {
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
         response: oneshot::Sender<Result<ResponseBatchFee, anyhow::Error>>,
+        ip: Option<String>,
     },
     GetTokenPrice {
         token: TokenLike,
@@ -267,6 +273,10 @@ pub fn run_ticker_task(
             config.chain.state_keeper.max_aggregated_blocks_to_commit,
             config.chain.state_keeper.max_aggregated_blocks_to_execute,
         ) as u32,
+        subsidized_ips: config.ticker.subsidized_ips,
+        subsidy_cpk_price_usd_cents: config.ticker.subsidy_cpk_price_usd_cents,
+        max_subsidy_usd_cents: config.ticker.max_subsidy_usd_cents,
+        subsidy_name: config.ticker.subsidy_name,
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
@@ -378,9 +388,10 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     token,
                     response,
                     address,
+                    ip,
                 } => {
                     let fee = self
-                        .get_fee_from_ticker_in_wei(tx_type, token, address)
+                        .get_fee_from_ticker_in_wei(tx_type, token, address, ip)
                         .await;
                     metrics::histogram!("ticker.get_tx_fee", start.elapsed());
                     response.send(fee).unwrap_or_default()
@@ -403,6 +414,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     transactions,
                     token,
                     response,
+                    ip,
                 } => {
                     let fee = self.get_batch_from_ticker_in_wei(token, transactions).await;
                     metrics::histogram!("ticker.get_tx_fee", start.elapsed());
@@ -436,11 +448,26 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
 
+    async fn should_subsidie_cpk(&self, ip: Option<String>) -> bool {
+        let ip = if let Some(ip_str) = ip {
+            ip_str
+        } else {
+            return false;
+        };
+
+        if self.config.subsidized_ips.contains(&ip) {
+            true
+        } else {
+            false
+        }
+    }
+
     async fn get_fee_from_ticker_in_wei(
         &mut self,
         tx_type: TxFeeTypes,
         token: TokenLike,
         recipient: Address,
+        ip: Option<String>,
     ) -> Result<ResponseFee, anyhow::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token).await?;
@@ -467,6 +494,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             normal_gas_fee *= self.config.scale_fee_coefficient.clone();
         }
 
+        if matches!(fee_type, OutputFeeType::ChangePubKey(_)) && self.should_subsidie_cpk(ip) {}
+
         let normal_fee = Fee::new(
             fee_type,
             zkp_fee,
@@ -474,6 +503,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             gas_tx_amount,
             gas_price_wei.clone(),
         );
+
+        //let usd_price_fee =
 
         Ok(ResponseFee { normal_fee })
     }
