@@ -7,18 +7,13 @@ import * as db from './db/db';
 import { ethers } from 'ethers';
 
 export async function server() {
-    let child = utils.background('cargo run --bin zksync_server --release');
-
-    // delegate processing of pressing `Ctrl + C`
-    process.on('SIGINT', () => {
-        child.kill('SIGINT');
-    });
-
     // By the time this function is run the server is most likely not be running yet
     // However, it does not matter, since the only thing the function does is depositing
     // to the forced exit sender account, and server should be capable of recognizing
     // priority operaitons that happened before it was booted
-    await prepareForcedExitRequestAccount();
+    prepareForcedExitRequestAccount();
+
+    await utils.spawn('cargo run --bin zksync_server --release');
 }
 
 export async function genesis() {
