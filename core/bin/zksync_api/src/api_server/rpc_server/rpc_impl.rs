@@ -128,6 +128,12 @@ impl RpcApp {
         ip: Option<String>,
     ) -> Result<TxHash> {
         let start = Instant::now();
+
+        if let Some(ip) = ip {
+            dbg!("IPPPPPPPPPPPPPPP");
+            dbg!(ip);
+        }
+
         let result = self
             .tx_sender
             .submit_tx_with_separate_fp(*tx, *signature, fast_processing)
