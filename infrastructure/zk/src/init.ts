@@ -38,6 +38,15 @@ export async function init() {
     }
 }
 
+export async function reinit() {
+    await announced('Setting up containers', up());
+    await announced('Setting up database', db.setup());
+    await announced('Building contracts', contract.build());
+    await announced('Running server genesis setup', server.genesis());
+    await announced('Deploying main contracts', contract.redeploy());
+    await announced('Restarting dev liquidity watcher', docker.restart('dev-liquidity-token-watcher'));
+}
+
 // Wrapper that writes an announcement and completion notes for each executed task.
 async function announced(fn: string, promise: Promise<void>) {
     const announceLine = `${entry('>')} ${announce(fn)}`;
@@ -75,6 +84,9 @@ async function checkEnv() {
     }
 }
 
-export const command = new Command('init')
+export const initCommand = new Command('init')
     .description('perform zksync network initialization for development')
     .action(init);
+export const reinitCommand = new Command('reinit')
+    .description('"reinitializes" network. Runs faster than `init`, but requires `init` to be executed prior')
+    .action(reinit);
