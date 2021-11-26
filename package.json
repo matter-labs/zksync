@@ -26,6 +26,9 @@
     ]
   },
   "scripts": {
+    "build:zksync-sdk": "yarn zksync prepublish",
+    "build:crypto": "yarn crypto build",
+    "build:reading-tool": "yarn reading-tool build",
     "zksync": "yarn workspace zksync",
     "crypto": "yarn workspace zksync-crypto",
     "contracts": "yarn workspace franklin-contracts",
@@ -34,7 +37,8 @@
     "explorer": "yarn workspace sync-explorer",
     "zk": "yarn workspace zk",
     "reading-tool": "yarn workspace reading-tool",
-    "api-docs": "yarn workspace api-docs"
+    "api-docs": "yarn workspace api-docs",
+    "init-build": "yarn npm-run-all --parallel build:*"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.10.0",
@@ -46,6 +50,7 @@
     "markdownlint-cli": "^0.24.0",
     "prettier": "^2.2.1",
     "prettier-plugin-solidity": "^1.0.0-alpha.60",
-    "solhint": "^3.3.2"
+    "solhint": "^3.3.2",
+    "npm-run-all": "^4.1.5"
   }
 }

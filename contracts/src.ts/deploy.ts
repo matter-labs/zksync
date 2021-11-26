@@ -2,11 +2,7 @@ import { deployContract } from 'ethereum-waffle';
 import { ethers, Signer, providers } from 'ethers';
 import { formatEther, Interface } from 'ethers/lib/utils';
 import * as fs from 'fs';
-import {
-    encodeConstructorArgs,
-    encodeProxyContstuctorArgs,
-    publishSourceCodeToEtherscan
-} from './publish-utils';
+import { encodeConstructorArgs, encodeProxyContstuctorArgs, publishSourceCodeToEtherscan } from './publish-utils';
 import {
     Governance,
     GovernanceFactory,
@@ -219,7 +215,7 @@ export class Deployer {
                     this.addresses.Verifier = parsedLog.args.verifier;
                     this.addresses.UpgradeGatekeeper = parsedLog.args.gatekeeper;
                 }
-            } catch (_) { }
+            } catch (_) {}
         }
         const txHash = deployFactoryTx.transactionHash;
         const gasUsed = deployFactoryTx.gasUsed;
