@@ -125,6 +125,7 @@ impl RpcApp {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
+        ip: Option<String>,
     ) -> Result<TxHash> {
         let start = Instant::now();
         let result = self

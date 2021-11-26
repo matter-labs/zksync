@@ -44,6 +44,7 @@ jsonrpc-core-client = {version= "18", features=["ws", "http"]}
 jsonrpc-pubsub = "18.0.0"
 jsonrpc-ws-server = "18"
 jsonrpc-http-server = "18"
+hyper = "0.14.14"
 jsonrpc-derive = "18"
 qstring = "0.7.2"
 

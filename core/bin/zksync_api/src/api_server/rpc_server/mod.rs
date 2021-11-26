@@ -7,7 +7,7 @@ use futures::{
     SinkExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
-use jsonrpc_http_server::ServerBuilder;
+use jsonrpc_http_server::{RequestMiddleware, RequestMiddlewareAction, ServerBuilder};
 
 // Workspace uses
 use zksync_config::ZkSyncConfig;
@@ -86,6 +86,22 @@ impl RpcApp {
 
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
+    }
+}
+
+struct IpInsertMiddleWare {}
+
+impl RequestMiddleware for IpInsertMiddleWare {
+    fn on_request(&self, request: hyper::Request<hyper::Body>) -> RequestMiddlewareAction {
+        let (parts, body) = request.into_parts();
+
+        RequestMiddlewareAction::Proceed {
+            /// Should the request be processed even if invalid CORS headers are detected?
+            /// This allows for side effects to take place.
+            should_continue_on_invalid_cors: true,
+            /// The request object returned
+            request,
+        }
     }
 }
 
@@ -376,8 +392,11 @@ pub fn start_rpc_server(
         let mut io = IoHandler::new();
         rpc_app.extend(&mut io);
 
+        let middleware = IpInsertMiddleWare {};
+
         let server = ServerBuilder::new(io)
             .threads(super::THREADS_PER_SERVER)
+            .request_middleware(middleware)
             .start_http(&addr)
             .unwrap();
         server.wait();

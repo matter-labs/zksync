@@ -48,6 +48,7 @@ pub trait Rpc {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
+        ip: Option<String>,
     ) -> BoxFutureResult<TxHash>;
 
     #[rpc(name = "submit_txs_batch", returns = "Vec<TxHash>")]
@@ -126,8 +127,9 @@ impl Rpc for RpcApp {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
+        ip: Option<String>,
     ) -> BoxFutureResult<TxHash> {
-        spawn!(self._impl_tx_submit(tx, signature, fast_processing))
+        spawn!(self._impl_tx_submit(tx, signature, fast_processing, ip))
     }
 
     fn submit_txs_batch(
