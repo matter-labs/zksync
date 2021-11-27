@@ -7,11 +7,11 @@
 # operator_commit_eth_addr is defined in the `private.toml`
 
 # Amount of confirmations required to consider L1 transaction committed.
-wait_confirmations=1
+wait_confirmations=0
 # Amount of blocks we will wait before considering L1 transaction stuck.
 expected_wait_time_block=30
 # Node polling period in seconds.
-tx_poll_period=3
+tx_poll_period=1
 # The maximum amount of simultaneously sent Ethereum transactions.
 max_txs_in_flight=3
 # Whether sender should interact with L1 or not.
