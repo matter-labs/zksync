@@ -19,6 +19,8 @@ services:
     - type: bind
       source: ./volumes/geth
       target: /var/lib/geth/data
+    environment:
+      - PLUGIN_CONFIG=fast
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
     env_file:
