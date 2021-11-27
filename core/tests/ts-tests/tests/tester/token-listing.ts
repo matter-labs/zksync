@@ -13,7 +13,7 @@ declare module './tester' {
 Tester.prototype.testERC20Listing = async function () {
     // Simple ERC20 contract
     const bytecode =
-        require('../../../../contracts/artifacts/cache/solpp-generated-contracts/dev-contracts/TestnetERC20Token.sol/TestnetERC20Token.json').bytecode;
+        require('../../../../../contracts/artifacts/cache/solpp-generated-contracts/dev-contracts/TestnetERC20Token.sol/TestnetERC20Token.json').bytecode;
     const tokenAbi = ['constructor(string memory name, string memory symbol, uint8 decimals)'];
     const factory = new ContractFactory(tokenAbi, bytecode, this.ethWallet);
     const tokenContract = await factory.deploy('Test Token', 'TTT', 18);
@@ -37,7 +37,7 @@ Tester.prototype.testERC20Listing = async function () {
 Tester.prototype.testNonERC20Listing = async function () {
     // Non-ERC20 contract
     const bytecode =
-        require('../../../../contracts/artifacts/cache/solpp-generated-contracts/Config.sol/Config.json').bytecode;
+        require('../../../../../contracts/artifacts/cache/solpp-generated-contracts/Config.sol/Config.json').bytecode;
     const factory = new ContractFactory([], bytecode, this.ethWallet);
     const tokenContract = await factory.deploy();
     await tokenContract.deployTransaction.wait();

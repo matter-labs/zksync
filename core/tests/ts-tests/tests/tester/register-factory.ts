@@ -9,9 +9,12 @@ type TokenLike = types.TokenLike;
 function readContractCode(name: string) {
     const fileName = name.split('/').pop();
     return JSON.parse(
-        fs.readFileSync(`../../../contracts/artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`, {
-            encoding: 'utf-8'
-        })
+        fs.readFileSync(
+            `${process.env['ZKSYNC_HOME']}/contracts/artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`,
+            {
+                encoding: 'utf-8'
+            }
+        )
     );
 }
 function readFactoryCode() {
@@ -88,6 +91,10 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
     this.runningFee = this.runningFee.add(withdrawFee);
 
     nftInfo = await wallet.provider.getNFT(nft.id);
-    expect(nftInfo.currentFactory, 'NFT info after withdrawing is wrong (current factory)').to.eql(contract.address.toLowerCase());
-    expect(nftInfo.withdrawnFactory, 'NFT info after withdrawing is wrong (withdrawn factory)').to.eql(contract.address.toLowerCase());
+    expect(nftInfo.currentFactory, 'NFT info after withdrawing is wrong (current factory)').to.eql(
+        contract.address.toLowerCase()
+    );
+    expect(nftInfo.withdrawnFactory, 'NFT info after withdrawing is wrong (withdrawn factory)').to.eql(
+        contract.address.toLowerCase()
+    );
 };
