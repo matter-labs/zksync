@@ -1,6 +1,4 @@
-import { expect, use } from 'chai';
-import { BigNumber, utils } from 'ethers';
-import { Wallet, types, crypto, Signer, No2FAWalletSigner } from 'zksync';
+import { use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { Tester } from '../tester/tester';
 import '../tester/priority-ops';
@@ -17,14 +15,6 @@ import '../tester/register-factory';
 import '../tester/token-listing';
 
 use(chaiAsPromised);
-
-const TX_AMOUNT = utils.parseEther('10.0');
-// should be enough for ~200 test transactions (excluding fees), increase if needed
-const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
-
-// wBTC is chosen because it has decimals different from ETH (8 instead of 18).
-// Using this token will help us to detect decimals-related errors.
-const defaultERC20 = 'wBTC';
 
 describe(`Permissionless token listing tests`, () => {
     const transport = 'HTTP';

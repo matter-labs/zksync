@@ -1,6 +1,6 @@
 import { expect, use } from 'chai';
 import { BigNumber, utils } from 'ethers';
-import { Wallet, types, crypto, Signer, No2FAWalletSigner } from 'zksync';
+import { Wallet, types } from 'zksync';
 import chaiAsPromised from 'chai-as-promised';
 import { Tester } from '../tester/tester';
 import '../tester/priority-ops';
