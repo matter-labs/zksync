@@ -13,9 +13,7 @@ categories = ["cryptography"]
 [dependencies]
 zksync_circuit = { path = "../circuit", version = "1.0" }
 zksync_crypto = { path = "../crypto", version = "1.0" }
-zksync_basic_types = { path = "../basic_types", version = "1.0" }
 zksync_types = { path = "../types", version = "1.0" }
-zksync_config = { path = "../config", version = "1.0" }
 
 lazy_static = "1.2.0"
 anyhow = "1.0"

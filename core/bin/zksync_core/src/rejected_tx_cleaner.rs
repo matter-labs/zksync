@@ -15,7 +15,7 @@ use zksync_storage::ConnectionPool;
 
 #[must_use]
 pub fn run_rejected_tx_cleaner(config: &ZkSyncConfig, db_pool: ConnectionPool) -> JoinHandle<()> {
-    let max_age = config.db.rejected_transactions_max_age();
+    let max_age = chrono::Duration::from_std(config.db.rejected_transactions_max_age()).unwrap();
     let interval = config.db.rejected_transactions_cleaner_interval();
     let mut timer = time::interval(interval);
 
