@@ -88,6 +88,6 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
     this.runningFee = this.runningFee.add(withdrawFee);
 
     nftInfo = await wallet.provider.getNFT(nft.id);
-    expect(nftInfo.currentFactory, 'NFT info after withdrawing is wrong').to.eql(contract.address.toLowerCase());
-    expect(nftInfo.withdrawnFactory, 'NFT info after withdrawing is wrong').to.eql(contract.address.toLowerCase());
+    expect(nftInfo.currentFactory, 'NFT info after withdrawing is wrong (current factory)').to.eql(contract.address.toLowerCase());
+    expect(nftInfo.withdrawnFactory, 'NFT info after withdrawing is wrong (withdrawn factory)').to.eql(contract.address.toLowerCase());
 };
