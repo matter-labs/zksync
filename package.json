@@ -37,8 +37,7 @@
     "explorer": "yarn workspace sync-explorer",
     "zk": "yarn workspace zk",
     "reading-tool": "yarn workspace reading-tool",
-    "api-docs": "yarn workspace api-docs",
-    "init-build": "yarn npm-run-all --parallel build:*"
+    "api-docs": "yarn workspace api-docs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.10.0",
@@ -50,7 +49,6 @@
     "markdownlint-cli": "^0.24.0",
     "prettier": "^2.2.1",
     "prettier-plugin-solidity": "^1.0.0-alpha.60",
-    "solhint": "^3.3.2",
-    "npm-run-all": "^4.1.5"
+    "solhint": "^3.3.2"
   }
 }

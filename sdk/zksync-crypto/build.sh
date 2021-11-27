@@ -8,14 +8,11 @@ ASM=dist/zksync-crypto-bundler_asm.js
 which wasm-pack || cargo install wasm-pack
 
 # pack for bundler (!note this verion is used in the pkg.browser field)
-wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist &
+wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
 # pack for browser
-wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist &
+wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist
 # pack for node.js
-wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist &
-
-# wait for all three build commands to finish
-wait
+wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist
 
 rm dist/package.json dist/.gitignore
 
