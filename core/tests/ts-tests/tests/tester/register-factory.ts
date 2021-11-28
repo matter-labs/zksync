@@ -74,7 +74,7 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
     await tx.wait();
 
     // Wait until the server processes the new factory.
-    const processingIntervalSeconds = parseInt(process.env.ETH_SENDER_SENDER_TX_POLL_PERIOD || "1");
+    const processingIntervalSeconds = parseInt(process.env.TOKEN_HANDLER_POLL_INTERVAL || '1');
     await zkutils.sleep(processingIntervalSeconds * 1000);
 
     let { totalFee: withdrawFee } = await this.syncProvider.getTransactionFee(

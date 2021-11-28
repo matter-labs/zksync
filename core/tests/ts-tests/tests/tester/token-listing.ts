@@ -22,7 +22,7 @@ Tester.prototype.testERC20Listing = async function () {
     await this.submitToken(tokenContract.address);
 
     // Waiting for server process the token add event
-    const MAX_WAIT = 15000; // Maximum 15 seconds to wait.
+    const MAX_WAIT = maxWaitForTokenAdditionMs();
     const RETRY_INTERVAL = 100; // 100ms between attempts.
     let contains = false;
     for (let i = 0; i < MAX_WAIT / RETRY_INTERVAL; i++) {
@@ -52,8 +52,12 @@ Tester.prototype.testNonERC20Listing = async function () {
 
     await this.submitToken(tokenContract.address);
 
-    // Waiting for server process the token add event
-    await zksync.utils.sleep(15000);
+    // Waiting for server process the token add event.
+    // We use the same interval as in test that checks that we *can* process the token given that time.
+    // This interval is greater than the interval server uses internally for processing, so if token
+    // is not processed, it is *likely* that it will not be processed at all.
+    await zksync.utils.sleep(maxWaitForTokenAdditionMs());
+
     const tokens = await this.syncProvider.getTokens();
     let contains = false;
     for (const symbol in tokens) {
@@ -64,3 +68,13 @@ Tester.prototype.testNonERC20Listing = async function () {
     }
     expect(contains).to.eql(false);
 };
+
+function maxWaitForTokenAdditionMs(): number {
+    if (!process.env.TOKEN_HANDLER_POLL_INTERVAL) {
+        throw new Error('TOKEN_HANDLER_POLL_INTERVAL env is not defined');
+    }
+
+    // Server must process the event within two processing intervals that it uses.
+    const doubleServerIntervalSecs = 2 * parseInt(process.env.TOKEN_HANDLER_POLL_INTERVAL);
+    return doubleServerIntervalSecs * 1000;
+}
