@@ -3,7 +3,7 @@ import fs from 'fs';
 import { Tester } from './tester';
 import { utils } from 'ethers';
 import { expect } from 'chai';
-import { Wallet, types, ETHProxy } from 'zksync';
+import { Wallet, types, ETHProxy, utils as zkutils } from 'zksync';
 type TokenLike = types.TokenLike;
 
 function readContractCode(name: string) {
@@ -72,6 +72,10 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
         gasLimit: 5000000
     });
     await tx.wait();
+
+    // Wait until the server processes the new factory.
+    const processingIntervalSeconds = parseInt(process.env.ETH_SENDER_SENDER_TX_POLL_PERIOD || "1");
+    await zkutils.sleep(processingIntervalSeconds * 1000);
 
     let { totalFee: withdrawFee } = await this.syncProvider.getTransactionFee(
         'WithdrawNFT',
