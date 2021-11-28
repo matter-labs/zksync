@@ -196,6 +196,7 @@ impl RequestMiddleware for IpInsertMiddleWare {
         let (parts, body) = request.into_parts();
         let cloudflare_sent_ip = "CF-Connecting-IP";
 
+        // DONT MERGE IF THE FOLLOWING IS STILL COMMENTED OUT
         // let remote_ip = match parts.headers.get(cloudflare_sent_ip) {
         //     Some(ip) => ip.to_str(),
         //     None => {

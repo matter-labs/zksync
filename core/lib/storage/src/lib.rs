@@ -95,6 +95,7 @@ pub mod ethereum;
 pub mod event;
 pub mod forced_exit_requests;
 pub mod listener;
+pub mod misc;
 pub mod prover;
 pub mod test_data;
 pub mod tokens;
@@ -230,6 +231,10 @@ impl<'a> StorageProcessor<'a> {
 
     pub fn event_schema(&mut self) -> event::EventSchema<'_, 'a> {
         event::EventSchema(self)
+    }
+
+    pub fn misc_schema(&mut self) -> misc::MiscSchema<'_, 'a> {
+        misc::MiscSchema(self)
     }
 
     fn conn(&mut self) -> &mut PgConnection {

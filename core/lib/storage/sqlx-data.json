@@ -1296,6 +1296,26 @@
       "nullable": []
     }
   },
+  "27187ce827065774b9726aa23538098052083c9b023b8818787750a875e1748e": {
+    "query": "\n            SELECT SUM(usd_amount) as total FROM subsidies \n            WHERE subsidy_type = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "total",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "273c7371b1a13bbb03490e874b7f2eab969defa6aa9f2b416e4f9e8a135aa97c": {
     "query": "\n                        INSERT INTO account_creates ( account_id, is_create, block_number, address, nonce, update_order_id )\n                        VALUES ( $1, $2, $3, $4, $5, $6 )\n                        ",
     "describe": {
@@ -5212,6 +5232,24 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "bdbf11a93f2b2b67ce866194ad0ab2cbec3dd8882246fa8a184c258f95fab14b": {
+    "query": "\n            INSERT INTO subsidies ( tx_hash, usd_amount, full_cost_usd, token_id, token_amount, full_cost_token, subsidy_type )\n            VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Int4",
+          "Numeric",
+          "Numeric",
+          "Varchar"
+        ]
+      },
+      "nullable": []
     }
   },
   "bec05747dcfbf729bfd6e5d6aedf8da39f6d0d4ab5f0eae8dfed6c07adac1ba8": {

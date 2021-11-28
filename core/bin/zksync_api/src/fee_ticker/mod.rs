@@ -34,7 +34,7 @@ use zksync_types::{
     MintNFTOp, OutputFeeType, SwapOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp,
     TxFeeTypes, WithdrawNFTOp, WithdrawOp,
 };
-use zksync_utils::ratio_to_big_decimal;
+use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 
 // Local deps
 use crate::fee_ticker::constants::AMORTIZED_COST_PER_CHUNK;
@@ -151,8 +151,8 @@ pub struct TickerConfig {
     scale_fee_coefficient: Ratio<BigUint>,
     max_blocks_to_aggregate: u32,
     subsidized_ips: Vec<String>,
-    subsidy_cpk_price_usd_cents: u64,
-    max_subsidy_usd_cents: u64,
+    subsidy_cpk_price_usd_cents: Ratio<BigUint>,
+    left_subsidy_usd_cents: Ratio<BigUint>,
     subsidy_name: String,
 }
 
@@ -228,6 +228,7 @@ struct FeeTicker<API, INFO, WATCHER> {
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
     validator: FeeTokenValidator<WATCHER>,
+    db_pool: ConnectionPool,
 }
 
 struct FeeTickerBuilder<API, INFO, WATCHER> {
@@ -235,6 +236,7 @@ struct FeeTickerBuilder<API, INFO, WATCHER> {
     info: INFO,
     config: TickerConfig,
     validator: FeeTokenValidator<WATCHER>,
+    db_pool: ConnectionPool,
 }
 
 impl<API: Clone, INFO: Clone, WATCHER: Clone>
@@ -251,8 +253,26 @@ impl<API: Clone, INFO: Clone, WATCHER: Clone>
             requests: receiver,
             config: self.config.clone(),
             validator: self.validator.clone(),
+            db_pool: self.db_pool.clone(),
         }
     }
+}
+
+async fn get_left_subsidy_usd_cents(
+    config: &ZkSyncConfig,
+    db_pool: &ConnectionPool,
+) -> Result<Ratio<BigUint>> {
+    let max_subsidy = config.ticker.max_subsidy_usd_cents;
+    let subsidy_name = config.ticker.subsidy_name;
+
+    let get_used_subsidy = db_pool
+        .access_storage()
+        .await?
+        .misc_schema()
+        .get_total_used_subsidy_for_type(subsidy_name)
+        .await?;
+
+    big_decimal_to_ratio(&get_used_subsidy)
 }
 
 #[must_use]
@@ -261,6 +281,12 @@ pub fn run_ticker_task(
     tricker_requests: Receiver<TickerRequest>,
     config: &ZkSyncConfig,
 ) -> JoinHandle<()> {
+    // This unwrap is only called once on the startup of the ticker task, so it is safe to unwrap here
+    let left_subsidy_usd_cents =
+        get_left_subsidy_usd_cents(config.ticker.max_subsidy_usd_cents, &db_pool)
+            .await
+            .unwrap();
+
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: GasOperationsCost::from_constants(config.ticker.fast_processing_coeff),
@@ -273,10 +299,12 @@ pub fn run_ticker_task(
             config.chain.state_keeper.max_aggregated_blocks_to_commit,
             config.chain.state_keeper.max_aggregated_blocks_to_execute,
         ) as u32,
-        subsidized_ips: config.ticker.subsidized_ips,
-        subsidy_cpk_price_usd_cents: config.ticker.subsidy_cpk_price_usd_cents,
-        max_subsidy_usd_cents: config.ticker.max_subsidy_usd_cents,
-        subsidy_name: config.ticker.subsidy_name,
+        subsidized_ips: config.ticker.subsidized_ips.clone(),
+        subsidy_cpk_price_usd_cents: Ratio::from(BigUint::from(
+            config.ticker.subsidy_cpk_price_usd_cents,
+        )),
+        left_subsidy_usd_cents,
+        subsidy_name: config.ticker.subsidy_name.clone(),
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
@@ -299,8 +327,10 @@ pub fn run_ticker_task(
     let (price_source, base_url) = config.ticker.price_source();
     match price_source {
         TokenPriceSource::CoinMarketCap => {
-            let token_price_api =
-                CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
+            let token_price_api = CoinMarketCapAPI::new(
+                cslient,
+                base_url.parse().expect("Correct CoinMarketCap url"),
+            );
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
             let token_price_updater = ticker_api.clone();
@@ -462,6 +492,19 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         }
     }
 
+    fn can_apply_subsidy(&self, subsidy_amount_usd_cents: Ratio<BigUint>) -> bool {
+        self.config.left_subsidy_usd_cents > subsidy_amount_usd_cents
+    }
+
+    async fn apply_subsidy(
+        &mut self,
+        subsidy_amount_usd_cents: Ratio<BigUint>,
+    ) -> Result<(), anyhow::Error> {
+        self.config.left_subsidy_usd_cents -= subsidy_amount_usd_cents;
+
+        Ok(())
+    }
+
     async fn get_fee_from_ticker_in_wei(
         &mut self,
         tx_type: TxFeeTypes,
@@ -483,6 +526,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let mut normal_gas_fee =
             (&wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone()) * &token_usd_risk;
 
+        /*
+
+        $/wei   * (gas) * (wei/gas) = dollars needed $
+
+        dollars needed * R / (dollars per token) = tokens needed * R
+
+        */
+
         // Increase fee only for L2 operations
         if matches!(
             fee_type,
@@ -494,8 +545,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             normal_gas_fee *= self.config.scale_fee_coefficient.clone();
         }
 
-        if matches!(fee_type, OutputFeeType::ChangePubKey(_)) && self.should_subsidie_cpk(ip) {}
-
         let normal_fee = Fee::new(
             fee_type,
             zkp_fee,
@@ -504,7 +553,37 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             gas_price_wei.clone(),
         );
 
-        //let usd_price_fee =
+        if matches!(fee_type, OutputFeeType::ChangePubKey(_)) && self.should_subsidie_cpk(ip).await
+        {
+            // Division by 100, it is safe to unwrap here
+            let hundred = Ratio::from(BigUint::from(100u64));
+            let subsidized_fee_usd =
+                Ratio::from(BigUint::from(self.config.subsidy_cpk_price_usd_cents))
+                    .checked_div(&hundred)
+                    .unwrap();
+            let token_price = self
+                .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
+                .await?;
+
+            // It is safe to do unwrap in the next two lines, because token being acceptable for fees
+            // assumes that the token's price is > 0
+            let token_price = big_decimal_to_ratio(&token_price).unwrap();
+            let full_amount = subsidized_fee_usd.checked_div(&token_price).unwrap();
+
+            let subsidized_normal_fee = Fee::new(
+                fee_type,
+                Ratio::from(BigUint::zero()),
+                full_amount,
+                BigUint::zero(),
+                BigUint::zero(),
+            );
+
+            if subsidized_normal_fee.total_fee < normal_fee.total_fee {
+                return Ok(ResponseFee {
+                    normal_fee: subsidized_normal_fee,
+                });
+            }
+        }
 
         Ok(ResponseFee { normal_fee })
     }
@@ -515,6 +594,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         txs: Vec<(TxFeeTypes, Address)>,
     ) -> anyhow::Result<ResponseBatchFee> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
+
         let token = self.api.get_token(token).await?;
 
         let gas_price_wei = self.api.get_gas_price_wei().await?;
@@ -524,6 +604,30 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
 
         let mut total_normal_gas_tx_amount = Ratio::from(BigUint::zero());
         let mut total_op_chunks = Ratio::from(BigUint::zero());
+
+        /*
+            The input of each operation in the batch gas price is the following:
+            (&wei_price_usd * gas_amount * &scale_gas_price) * token_usd_risk
+            In case we wish to subsidize the tx
+            (&wei_price_usd * gas_amount * &scale_gas_price) * token_usd_risk = subsidized_fee_in_token
+
+            Since subsidized fee is denoted in usd
+            (&wei_price_usd * gas_amount * &scale_gas_price) * token_usd_risk * token_price = subsidized_fee_in_token * token_price = subsidized_fee_in_usd
+
+            Thus,
+            gas_amount = subsidized_fee_in_usd / (&wei_price_usd * &scale_gas_price * token_usd_risk * token_price)
+        */
+        let token_price = self
+            .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
+            .await?;
+        let token_price = big_decimal_to_ratio(&token_price).unwrap();
+        let subsidized_gas_amount = Ratio::from(self.config.subsidy_cpk_price_usd_cents)
+            .div(BigUint::from(100))
+            / (&wei_price_usd * &scale_gas_price * token_usd_risk * token_price);
+
+        let mut total_subsidized_usd_amount = 0;
+        let mut total_subsidized_gas_amount = 0;
+        let mut total_subsidized_chunks = 0;
 
         for (tx_type, recipient) in txs {
             let (output_fee_type, gas_tx_amount, op_chunks) =
@@ -541,8 +645,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                 gas_tx_amount.into()
             };
 
-            total_normal_gas_tx_amount += gas_tx_amount;
-            total_op_chunks += op_chunks;
+            if matches!(tx_type, TxFeeTypes::ChangePubKey(_)) && self.should_subsidie_cpk(ip).await
+            {
+                // The subsidy cost contains only gas cost
+                total_normal_gas_tx_amount += subsidized_gas_amount;
+            } else {
+                total_normal_gas_tx_amount += gas_tx_amount;
+                total_op_chunks += op_chunks;
+            }
         }
 
         let total_zkp_fee = (zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
