@@ -1,5 +1,5 @@
 use super::{CommitRequest, ZkSyncStateInitParams, ZkSyncStateKeeper};
-use crate::mempool::ProposedBlock;
+use crate::{mempool::ProposedBlock, state_keeper::utils::system_time_timestamp};
 use futures::{channel::mpsc, stream::StreamExt};
 use num::BigUint;
 use zksync_crypto::{
@@ -1360,4 +1360,120 @@ mod execute_proposed_block {
             panic!("Pending block is not received");
         }
     }
+}
+
+/// Checks that if transaction was executed correctly in the pending block,
+/// it will not be skipped when the block is restored even if the *current* timestamp
+/// does not allow it (but timestamp in the pending block allowed it at the moment of
+/// execution).
+#[tokio::test]
+async fn correctly_restore_pending_block_timestamp() {
+    let mut tester = StateKeeperTester::new(20, 3, 3);
+
+    // Amount of time transaction should be valid.
+    const VALID_UNTIL_DIFF: u64 = 1;
+    let valid_until = system_time_timestamp() + VALID_UNTIL_DIFF;
+
+    let token_id = TokenId(0);
+    let account_id = AccountId(1);
+    let balance = 200u32;
+    let transfer_amount = 145u32;
+
+    // We manually create an account, since we will re-use it in the new state keeper to re-initialize it.
+    let (account, sk) = tester.add_account(account_id);
+    tester.set_balance(account_id, token_id, balance);
+
+    let good_transfer = {
+        let time_range = TimeRange::new(0, valid_until);
+
+        let transfer = Transfer::new_signed(
+            account_id,
+            account.address,
+            account.address,
+            token_id,
+            transfer_amount.into(),
+            BigUint::from(1u32),
+            account.nonce,
+            time_range,
+            &sk,
+        )
+        .unwrap();
+        SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(transfer)),
+            eth_sign_data: None,
+        }
+    };
+    assert!(tester.state_keeper.apply_tx(&good_transfer).is_ok());
+
+    tester.state_keeper.store_pending_block().await;
+
+    let pending_block =
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.number, tester.state_keeper.state.block_number);
+            assert_eq!(block.success_operations.len(), 1);
+            assert_eq!(block.failed_txs.len(), 0);
+
+            block
+        } else {
+            panic!("Block is not received!");
+        };
+
+    // Sleep until tx is invalid.
+    while system_time_timestamp() <= valid_until {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    // Create new state keeper and re-execute transaction.
+    let mut tester = StateKeeperTester::new(20, 3, 3);
+
+    // Insert the account in its original form into state keeper.
+    tester
+        .state_keeper
+        .state
+        .insert_account(account_id, account.clone());
+    tester.set_balance(account_id, token_id, balance);
+
+    // Run initialize function and process the pending block.
+    // This operation should successfully execute the transfer even though now it's past the time it's valid.
+    tester
+        .state_keeper
+        .initialize(Some(pending_block.clone()))
+        .await;
+
+    assert_eq!(
+        tester.state_keeper.state.block_number, pending_block.number,
+        "Incorrect block number in state keeper"
+    );
+
+    assert_eq!(
+        tester.state_keeper.pending_block.success_operations.len(),
+        1,
+        "There should be 1 successful tx"
+    );
+    assert_eq!(
+        tester.state_keeper.pending_block.failed_txs.len(),
+        0,
+        "There should be 0 failed txs"
+    );
+
+    // Just in case try to execute a *new* transaction with the same timestamp.
+    // It should still be valid, because the timestamp was restored from the pending block.
+    let withdraw_with_same_valid_until = create_account_and_withdrawal(
+        &mut tester,
+        TokenId(2),
+        AccountId(2),
+        300u32,
+        145u32,
+        TimeRange::new(0, valid_until),
+    );
+    tester
+        .state_keeper
+        .apply_tx(&withdraw_with_same_valid_until)
+        .expect("Tx was not applied");
+
+    assert_eq!(
+        tester.state_keeper.pending_block.success_operations.len(),
+        2,
+        "Tx with the same valid_until as for previous transaction should've been processed"
+    );
 }

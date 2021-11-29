@@ -161,11 +161,18 @@ impl ZkSyncStateInitParams {
                 .get_block(block_number)
                 .await?
                 .expect("restored block must exist");
-            assert_eq!(
-                storage_root_hash.new_root_hash,
-                self.tree.root_hash(),
-                "restored root_hash is different"
-            );
+
+            let root_hash_db = storage_root_hash.new_root_hash;
+            let root_hash_calculated = self.tree.root_hash();
+            if root_hash_calculated != root_hash_db {
+                panic!(
+                    "Restored root_hash is different. \n \
+                     Root hash from the database: {:?} \n \
+                     Root hash from that was calculated: {:?} \n
+                     Current block number: {}",
+                    root_hash_db, root_hash_calculated, block_number
+                );
+            }
         }
 
         Ok(block_number)

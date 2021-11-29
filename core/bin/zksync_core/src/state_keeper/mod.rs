@@ -139,6 +139,7 @@ impl ZkSyncStateKeeper {
 
     pub async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
         let start = Instant::now();
+
         if let Some(pending_block) = pending_block {
             // Transform executed operations into non-executed, so they will be executed again.
             // Since it's a pending block, the state updates were not actually applied in the
@@ -148,9 +149,28 @@ impl ZkSyncStateKeeper {
             // `apply_txs_batch` to preserve the original execution order. Otherwise there may
             // be a state corruption, if e.g. `Deposit` will be executed before `TransferToNew`
             // and account IDs will change.
+
+            // Sanity check: ensure that we start from a "clean" state.
+            if !self.pending_block.failed_txs.is_empty()
+                || !self.pending_block.success_operations.is_empty()
+            {
+                panic!("State keeper was initialized from a dirty state. Pending block was expected to \
+                       be empty, but got this instead: \n \
+                       Block number: {} \n \
+                       Pending block state: {:?}",
+                    self.state.block_number, self.pending_block
+                );
+            }
+
+            // We have to take the timestamp from the pending block, since otherwise already executed
+            // transactions may fail because of invalid `valid_from` timestamp.
+            self.pending_block.timestamp = pending_block.timestamp;
+            self.pending_block.failed_txs = pending_block.failed_txs.clone();
+
             let mut txs_count = 0;
             let mut priority_op_count = 0;
-            for operation in pending_block.success_operations {
+            let success_operations_count = pending_block.success_operations.len();
+            for operation in pending_block.success_operations.clone() {
                 match operation {
                     ExecutedOperations::Tx(tx) => {
                         self.apply_tx(&tx.signed_tx)
@@ -166,14 +186,24 @@ impl ZkSyncStateKeeper {
             }
             self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
+            // Sanity check: every transaction we applied should succeed, since we already stored it in the database
+            // as successfully executed.
+            if success_operations_count != self.pending_block.success_operations.len() {
+                panic!(
+                    "After execution of pending block some transactions unexpectedly failed:\n \
+                    Block number: {} \n \
+                    Initial pending block state: {:?}\n \
+                    Pending block state: {:?}",
+                    self.state.block_number, pending_block, self.pending_block
+                );
+            }
+
             vlog::info!(
                 "Executed restored proposed block: {} transactions, {} priority operations, {} failed transactions",
                 txs_count,
                 priority_op_count,
-                pending_block.failed_txs.len()
+                self.pending_block.failed_txs.len()
             );
-            self.pending_block.failed_txs = pending_block.failed_txs;
-            self.pending_block.timestamp = pending_block.timestamp;
         } else {
             vlog::info!("There is no pending block to restore");
         }
