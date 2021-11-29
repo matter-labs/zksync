@@ -16,6 +16,9 @@ import '../tester/token-listing';
 
 use(chaiAsPromised);
 
+/**
+ * Tests for the permissionless token listing procedure.
+ */
 describe(`Permissionless token listing tests`, () => {
     const transport = 'HTTP';
     const providerType = 'REST';

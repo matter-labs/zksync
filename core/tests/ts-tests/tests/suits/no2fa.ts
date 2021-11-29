@@ -22,6 +22,9 @@ const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
+/**
+ * Tests for No2FA accounts.
+ */
 describe(`No2FA tests`, () => {
     const transport = 'HTTP';
     const providerType = 'REST';

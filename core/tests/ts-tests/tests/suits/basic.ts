@@ -26,6 +26,9 @@ const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 // Using this token will help us to detect decimals-related errors.
 const defaultERC20 = 'wBTC';
 
+// We need to check that we can work with both ETH and ERC20 tokens, and both with RPC and REST APIs.
+// In order to cover the whole flow, three combinations are sufficient: if either of tokens or APIs
+// doesn't work as it supposed to, some test will fail.
 let tokenAndTransport = [
     {
         transport: 'HTTP',
@@ -39,19 +42,30 @@ let tokenAndTransport = [
     },
     {
         transport: 'HTTP',
-        token: 'ETH',
-        providerType: 'REST'
-    },
-    {
-        transport: 'HTTP',
         token: defaultERC20,
         providerType: 'REST'
     }
 ];
 
 // prettier-ignore
-/// We don't want to run tests with all tokens, so we highlight basic operations such as: Deposit, Withdrawal, Forced Exit
-/// We want to check basic operations with all tokens, and other operations only if it's necessary
+
+/**
+ * Basic test suite covers the, well, basic server functionality: availability of API, ability to execute transactions
+ * and priority opertations, etc.
+ *
+ * Since we have two main APIs (REST and RPC) and processing of ERC20 tokens and ETH differs, we run the same set of basic
+ * tests multiple times to cover APIs and tokens combinations.
+ * Because of that the tests in the basic suite are expected to be fast, so running them three times won't become a burden.
+ *
+ * If you need to perform a more complex check of some concept, consider either adding it to the `extended` suite (or some
+ * other already-existing one), or creating a new one if you need several tests.
+ *
+ * Example of decision making:
+ * - To ensure that batch transfers work, basic suite has a simple test that batches two transactions together. It will check
+ *   that server is capable of processing batches in either of APIs.
+ * - For a more in-depth testing of SDK capabilities and the server-side execution of complex batches, there is a bigger test
+ *   in the `extended` suite.
+ */
 const BasicTestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', providerType: 'REST' | 'RPC') =>
     describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, provider: ${providerType})`, () => {
         let tester: Tester;
