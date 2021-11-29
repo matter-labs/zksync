@@ -51,7 +51,7 @@ let tokenAndTransport = [
 
 /**
  * Basic test suite covers the, well, basic server functionality: availability of API, ability to execute transactions
- * and priority opertations, etc.
+ * and priority operations, etc.
  *
  * Since we have two main APIs (REST and RPC) and processing of ERC20 tokens and ETH differs, we run the same set of basic
  * tests multiple times to cover APIs and tokens combinations.

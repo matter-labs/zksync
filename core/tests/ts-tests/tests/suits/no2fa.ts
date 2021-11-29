@@ -95,7 +95,7 @@ describe(`No2FA tests`, () => {
         // Here the transfer without Ethereum signature, but with wrong l2 private key
         await expect(tester.testTransfer(hilda, frida, token, TX_AMOUNT)).to.be.rejected;
 
-        // No let's go back to the correct l2 private key
+        // Now let's go back to the correct l2 private key
         hildaWithEthSigner.signer = Signer.fromPrivateKey(zkPrivateKey);
         await (
             await hildaWithEthSigner.setSigningKey({
