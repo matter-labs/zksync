@@ -2,7 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
-import { closestPackableTransactionFee } from '../../../../sdk/zksync.js';
+import { closestPackableTransactionFee } from 'zksync';
 
 type TokenLike = types.TokenLike;
 

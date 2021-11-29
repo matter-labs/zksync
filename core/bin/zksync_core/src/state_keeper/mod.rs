@@ -1,12 +1,8 @@
-use std::collections::{HashMap, VecDeque};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::collections::VecDeque;
+use std::time::Instant;
 
 // External uses
-use futures::{
-    channel::{mpsc, oneshot},
-    stream::StreamExt,
-    SinkExt,
-};
+use futures::{channel::mpsc, stream::StreamExt, SinkExt};
 use itertools::Itertools;
 use tokio::task::JoinHandle;
 // Workspace uses
@@ -14,7 +10,7 @@ use zksync_crypto::{
     ff::{self, PrimeField, PrimeFieldRepr},
     params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
 };
-use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
+use zksync_state::state::{OpSuccess, ZkSyncState};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{
@@ -23,11 +19,12 @@ use zksync_types::{
     },
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
-    tx::{TxHash, ZkSyncTx},
-    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
-    PriorityOp, SignedZkSyncTx, Token, TokenId, TokenKind, H256, NFT,
+    tx::ZkSyncTx,
+    Account, AccountId, AccountUpdate, Address, BlockNumber, PriorityOp, SignedZkSyncTx, Token,
+    TokenKind, H256,
 };
 // Local uses
+use self::{pending_block::PendingBlock, utils::system_time_timestamp};
 use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
@@ -35,79 +32,15 @@ use crate::{
 };
 use zksync_state::error::{OpError, TxBatchError};
 
+pub use self::{init_params::ZkSyncStateInitParams, types::StateKeeperRequest};
+
+mod init_params;
+mod pending_block;
+mod types;
+mod utils;
+
 #[cfg(test)]
 mod tests;
-
-pub enum ExecutedOpId {
-    Transaction(TxHash),
-    PriorityOp(u64),
-}
-
-pub enum StateKeeperRequest {
-    GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
-    GetPendingBlockTimestamp(oneshot::Sender<u64>),
-    GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
-    ExecuteMiniBlock(ProposedBlock),
-    SealBlock,
-    GetCurrentState(oneshot::Sender<ZkSyncStateInitParams>),
-}
-
-#[derive(Debug, Clone)]
-struct PendingBlock {
-    success_operations: Vec<ExecutedOperations>,
-    failed_txs: Vec<ExecutedTx>,
-    account_updates: AccountUpdates,
-    chunks_left: usize,
-    pending_op_block_index: u32,
-    unprocessed_priority_op_before: u64,
-    pending_block_iteration: usize,
-    gas_counter: GasCounter,
-    /// Option denoting if this block should be generated faster than usual.
-    fast_processing_required: bool,
-    /// Fee should be applied only when sealing the block (because of corresponding logic in the circuit)
-    collected_fees: Vec<CollectedFee>,
-    /// Number of stored account updates in the db (from `account_updates` field)
-    stored_account_updates: usize,
-    previous_block_root_hash: H256,
-    timestamp: u64,
-}
-
-impl PendingBlock {
-    fn new(
-        unprocessed_priority_op_before: u64,
-        available_chunks_sizes: &[usize],
-        previous_block_root_hash: H256,
-        timestamp: u64,
-    ) -> Self {
-        // TransferOp chunks are subtracted to reserve space for last transfer.
-        let chunks_left = *available_chunks_sizes
-            .iter()
-            .max()
-            .expect("Expected at least one block chunks size");
-        Self {
-            success_operations: Vec::new(),
-            failed_txs: Vec::new(),
-            account_updates: Vec::new(),
-            chunks_left,
-            pending_op_block_index: 0,
-            unprocessed_priority_op_before,
-            pending_block_iteration: 0,
-            gas_counter: GasCounter::new(),
-            fast_processing_required: false,
-            collected_fees: Vec::new(),
-            stored_account_updates: 0,
-            previous_block_root_hash,
-            timestamp,
-        }
-    }
-}
-
-pub fn system_time_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("failed to get system time")
-        .as_secs()
-}
 
 /// Responsible for tx processing and block forming.
 pub struct ZkSyncStateKeeper {
@@ -136,264 +69,6 @@ pub struct ZkSyncStateKeeper {
     /// Channel used for sending queued transaction events. Required since state keeper
     /// has no access to the database.
     processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ZkSyncStateInitParams {
-    pub tree: AccountTree,
-    pub acc_id_by_addr: HashMap<Address, AccountId>,
-    pub nfts: HashMap<TokenId, NFT>,
-    pub last_block_number: BlockNumber,
-    pub unprocessed_priority_op: u64,
-}
-
-impl Default for ZkSyncStateInitParams {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ZkSyncStateInitParams {
-    pub fn new() -> Self {
-        Self {
-            tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
-            acc_id_by_addr: HashMap::new(),
-            nfts: HashMap::new(),
-            last_block_number: BlockNumber(0),
-            unprocessed_priority_op: 0,
-        }
-    }
-
-    pub async fn get_pending_block(
-        &self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Option<SendablePendingBlock> {
-        let pending_block = storage
-            .chain()
-            .block_schema()
-            .load_pending_block()
-            .await
-            .unwrap_or_default()?;
-
-        if pending_block.number <= self.last_block_number {
-            // If after generating several pending block node generated
-            // full blocks, they may be sealed on the first iteration
-            // and stored pending block will be outdated.
-            // Thus, if the stored pending block has the lower number than
-            // last committed one, we just ignore it.
-            return None;
-        }
-
-        // We've checked that pending block is greater than the last committed block,
-        // but it must be greater exactly by 1.
-        assert_eq!(*pending_block.number, *self.last_block_number + 1);
-
-        Some(pending_block)
-    }
-
-    pub async fn restore_from_db(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<Self, anyhow::Error> {
-        let mut init_params = Self::new();
-        init_params.load_from_db(storage).await?;
-
-        Ok(init_params)
-    }
-
-    async fn load_account_tree(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<BlockNumber, anyhow::Error> {
-        let (last_cached_block_number, accounts) = if let Some((block, _)) = storage
-            .chain()
-            .block_schema()
-            .get_account_tree_cache()
-            .await?
-        {
-            storage
-                .chain()
-                .state_schema()
-                .load_committed_state(Some(block))
-                .await?
-        } else {
-            storage.chain().state_schema().load_verified_state().await?
-        };
-
-        for (id, account) in accounts {
-            self.insert_account(id, account);
-        }
-
-        if let Some(account_tree_cache) = storage
-            .chain()
-            .block_schema()
-            .get_account_tree_cache_block(last_cached_block_number)
-            .await?
-        {
-            self.tree
-                .set_internals(serde_json::from_value(account_tree_cache)?);
-        } else {
-            self.tree.root_hash();
-            let account_tree_cache = self.tree.get_internals();
-            storage
-                .chain()
-                .block_schema()
-                .store_account_tree_cache(
-                    last_cached_block_number,
-                    serde_json::to_value(account_tree_cache)?,
-                )
-                .await?;
-        }
-
-        let (block_number, accounts) = storage
-            .chain()
-            .state_schema()
-            .load_committed_state(None)
-            .await
-            .map_err(|e| anyhow::format_err!("couldn't load committed state: {}", e))?;
-
-        if block_number != last_cached_block_number {
-            if let Some((_, account_updates)) = storage
-                .chain()
-                .state_schema()
-                .load_state_diff(last_cached_block_number, Some(block_number))
-                .await?
-            {
-                let mut updated_accounts = account_updates
-                    .into_iter()
-                    .map(|(id, _)| id)
-                    .collect::<Vec<_>>();
-                updated_accounts.sort_unstable();
-                updated_accounts.dedup();
-                for idx in updated_accounts {
-                    if let Some(acc) = accounts.get(&idx).cloned() {
-                        self.insert_account(idx, acc);
-                    } else {
-                        self.remove_account(idx);
-                    }
-                }
-            }
-        }
-
-        // We have to load actual number of the last committed block, since above we load the block number from state,
-        // and in case of empty block being sealed (that may happen because of bug).
-        // Note that if this block is greater than the `block_number`, it means that some empty blocks were committed,
-        // so the root hash has not changed and we don't need to update the tree in order to get the right root hash.
-        let last_actually_committed_block_number = storage
-            .chain()
-            .block_schema()
-            .get_last_saved_block()
-            .await?;
-
-        let block_number = std::cmp::max(last_actually_committed_block_number, block_number);
-
-        if *block_number != 0 {
-            let storage_root_hash = storage
-                .chain()
-                .block_schema()
-                .get_block(block_number)
-                .await?
-                .expect("restored block must exist");
-            assert_eq!(
-                storage_root_hash.new_root_hash,
-                self.tree.root_hash(),
-                "restored root_hash is different"
-            );
-        }
-
-        Ok(block_number)
-    }
-
-    async fn load_from_db(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), anyhow::Error> {
-        let block_number = self.load_account_tree(storage).await?;
-        self.last_block_number = block_number;
-        self.unprocessed_priority_op =
-            Self::unprocessed_priority_op_id(storage, block_number).await?;
-        self.nfts = Self::load_nft_tokens(storage, block_number).await?;
-
-        vlog::info!(
-            "Loaded committed state: last block number: {}, unprocessed priority op: {}",
-            *self.last_block_number,
-            self.unprocessed_priority_op
-        );
-        Ok(())
-    }
-
-    pub async fn load_state_diff(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), anyhow::Error> {
-        let state_diff = storage
-            .chain()
-            .state_schema()
-            .load_state_diff(self.last_block_number, None)
-            .await
-            .map_err(|e| anyhow::format_err!("failed to load committed state: {}", e))?;
-
-        if let Some((block_number, updates)) = state_diff {
-            for (id, update) in updates.into_iter() {
-                let updated_account = Account::apply_update(self.remove_account(id), update);
-                if let Some(account) = updated_account {
-                    self.insert_account(id, account);
-                }
-            }
-            self.unprocessed_priority_op =
-                Self::unprocessed_priority_op_id(storage, block_number).await?;
-            self.last_block_number = block_number;
-        }
-        Ok(())
-    }
-
-    pub fn insert_account(&mut self, id: AccountId, acc: Account) {
-        self.acc_id_by_addr.insert(acc.address, id);
-        self.tree.insert(*id, acc);
-    }
-
-    pub fn remove_account(&mut self, id: AccountId) -> Option<Account> {
-        if let Some(acc) = self.tree.remove(*id) {
-            self.acc_id_by_addr.remove(&acc.address);
-            Some(acc)
-        } else {
-            None
-        }
-    }
-
-    async fn load_nft_tokens(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-        block_number: BlockNumber,
-    ) -> anyhow::Result<HashMap<TokenId, NFT>> {
-        let nfts = storage
-            .chain()
-            .state_schema()
-            .load_committed_nft_tokens(Some(block_number))
-            .await?
-            .into_iter()
-            .map(|nft| {
-                let token: NFT = nft.into();
-                (token.id, token)
-            })
-            .collect();
-        Ok(nfts)
-    }
-
-    async fn unprocessed_priority_op_id(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-        block_number: BlockNumber,
-    ) -> Result<u64, anyhow::Error> {
-        let block = storage
-            .chain()
-            .block_schema()
-            .get_block(block_number)
-            .await?;
-
-        if let Some(block) = block {
-            Ok(block.processed_priority_ops.1)
-        } else {
-            Ok(0)
-        }
-    }
 }
 
 impl ZkSyncStateKeeper {

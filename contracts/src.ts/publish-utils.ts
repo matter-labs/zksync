@@ -42,26 +42,6 @@ export async function publishSourceCodeToEtherscan(
     }
 }
 
-export async function publishAbiToTesseracts(address: string, contractCode) {
-    const network = process.env.CHAIN_ETH_NETWORK;
-    if (network !== 'localhost') {
-        throw new Error('Only localhost network is supported by Tesseracts');
-    }
-    const req = {
-        contract_source: JSON.stringify(contractCode.abi),
-        contract_compiler: 'abi-only',
-        contract_name: '',
-        contract_optimized: false
-    };
-
-    const config = {
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-    };
-    await Axios.post(`http://localhost:8000/${address}/contract`, qs.stringify(req), config);
-}
-
 export function encodeConstructorArgs(contractCode, args) {
     const iface = contractCode.abi.filter((i) => i.type === 'constructor');
     if (iface.length === 0) {

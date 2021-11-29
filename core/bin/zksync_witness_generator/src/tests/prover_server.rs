@@ -29,7 +29,7 @@ impl Default for MockProverOptions {
         zksync_config.api.prover.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
         zksync_config.prover.prover.heartbeat_interval = 20000;
         zksync_config.prover.prover.cycle_wait = 500;
-        zksync_config.prover.witness_generator.prepare_data_interval = 0;
+        zksync_config.prover.witness_generator.prepare_data_interval = 100;
         zksync_config.prover.witness_generator.witness_generators = 1;
         zksync_config.prover.core.idle_provers = 1;
 

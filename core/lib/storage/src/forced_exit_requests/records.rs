@@ -2,9 +2,7 @@ use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
 use num::{bigint::ToBigInt, BigInt};
 use sqlx::types::BigDecimal;
-use zksync_basic_types::TokenId;
-use zksync_types::forced_exit_requests::ForcedExitRequest;
-use zksync_types::tx::TxHash;
+use zksync_types::{forced_exit_requests::ForcedExitRequest, tx::TxHash, TokenId};
 
 use super::utils;
 

@@ -3,15 +3,18 @@ import fs from 'fs';
 import { Tester } from './tester';
 import { utils } from 'ethers';
 import { expect } from 'chai';
-import { Wallet, types, ETHProxy } from 'zksync';
+import { Wallet, types, ETHProxy, utils as zkutils } from 'zksync';
 type TokenLike = types.TokenLike;
 
 function readContractCode(name: string) {
     const fileName = name.split('/').pop();
     return JSON.parse(
-        fs.readFileSync(`../../../contracts/artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`, {
-            encoding: 'utf-8'
-        })
+        fs.readFileSync(
+            `${process.env['ZKSYNC_HOME']}/contracts/artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`,
+            {
+                encoding: 'utf-8'
+            }
+        )
     );
 }
 function readFactoryCode() {
@@ -70,6 +73,10 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
     });
     await tx.wait();
 
+    // Wait until the server processes the new factory.
+    const processingIntervalSeconds = parseInt(process.env.TOKEN_HANDLER_POLL_INTERVAL || '1');
+    await zkutils.sleep(processingIntervalSeconds * 1000);
+
     let { totalFee: withdrawFee } = await this.syncProvider.getTransactionFee(
         'WithdrawNFT',
         wallet.address(),
@@ -88,6 +95,10 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
     this.runningFee = this.runningFee.add(withdrawFee);
 
     nftInfo = await wallet.provider.getNFT(nft.id);
-    expect(nftInfo.currentFactory, 'NFT info after withdrawing is wrong').to.eql(contract.address.toLowerCase());
-    expect(nftInfo.withdrawnFactory, 'NFT info after withdrawing is wrong').to.eql(contract.address.toLowerCase());
+    expect(nftInfo.currentFactory, 'NFT info after withdrawing is wrong (current factory)').to.eql(
+        contract.address.toLowerCase()
+    );
+    expect(nftInfo.withdrawnFactory, 'NFT info after withdrawing is wrong (withdrawn factory)').to.eql(
+        contract.address.toLowerCase()
+    );
 };

@@ -3,7 +3,6 @@
 use chrono::{DateTime, Duration, Utc};
 use num::BigUint;
 // Workspace imports
-use zksync_basic_types::H256;
 use zksync_crypto::{franklin_crypto::bellman::pairing::ff::Field, Fr};
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
@@ -13,6 +12,7 @@ use zksync_types::{
     tx::{ChangePubKeyType, TxHash},
     AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, MintNFTOp,
     SwapOp, Token, TokenId, TokenKind, TransferOp, TransferToNewOp, WithdrawNFTOp, WithdrawOp,
+    H256,
 };
 // Local imports
 
