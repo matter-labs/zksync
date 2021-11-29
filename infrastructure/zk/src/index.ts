@@ -8,7 +8,7 @@ import { command as down } from './down';
 import { command as db } from './db/db';
 import { command as contract } from './contract';
 import { command as dummyProver } from './dummy-prover';
-import { command as init } from './init';
+import { initCommand as init, reinitCommand as reinit } from './init';
 import { command as kube } from './kube';
 import { command as prover } from './prover';
 import { command as run } from './run/run';
@@ -29,6 +29,7 @@ const COMMANDS = [
     contract,
     dummyProver,
     init,
+    reinit,
     kube,
     prover,
     run,

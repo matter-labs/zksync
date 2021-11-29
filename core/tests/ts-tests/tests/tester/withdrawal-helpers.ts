@@ -5,7 +5,7 @@ import { BigNumber, ethers } from 'ethers';
 import { Address } from 'zksync/build/types';
 import { sleep } from 'zksync/build/utils';
 
-import { RevertReceiveAccountFactory, RevertTransferERC20Factory } from '../../../../contracts/typechain';
+import { RevertReceiveAccountFactory, RevertTransferERC20Factory } from '../../../../../contracts/typechain';
 import { loadTestConfig } from 'reading-tool';
 
 const TEST_CONFIG = loadTestConfig(true);

@@ -38,10 +38,10 @@ export const command = new Command('fmt')
                 await prettier(extension, cmd.check);
             }
         } else {
-            for (const ext of EXTENSIONS) {
-                await prettier(ext, cmd.check);
-            }
-            await rustfmt(cmd.check);
+            // Run all the checks in parallel.
+            const promises = EXTENSIONS.map((ext) => prettier(ext, cmd.check));
+            promises.push(rustfmt(cmd.check));
+            await Promise.all(promises);
         }
     });
 

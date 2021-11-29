@@ -1,12 +1,11 @@
 // Built-in deps
 use std::str::FromStr;
 // External imports
-use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     ethereum::ETHOperation,
-    BlockNumber,
+    BlockNumber, H256, U256,
 };
 // Local imports
 use crate::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};

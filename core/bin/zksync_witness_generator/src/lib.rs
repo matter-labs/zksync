@@ -282,8 +282,14 @@ async fn required_replicas<DB: DatabaseInterface>(
     Ok(HttpResponse::Ok().json(response))
 }
 
-async fn update_prover_job_queue_loop<DB: DatabaseInterface>(database: DB) {
-    let mut interval = tokio::time::interval(Duration::from_secs(5));
+async fn update_prover_job_queue_loop<DB: DatabaseInterface>(
+    database: DB,
+    prepare_data_interval: Duration,
+) {
+    // We use `prepare_data_interval` as timeout in this function to align creating prover jobs
+    // with witness generator routine.
+
+    let mut interval = tokio::time::interval(prepare_data_interval);
     loop {
         interval.tick().await;
 
@@ -394,7 +400,10 @@ pub fn run_prover_server<DB: DatabaseInterface>(
             let actix_runtime = actix_rt::System::new();
 
             actix_runtime.block_on(async move {
-                tokio::spawn(update_prover_job_queue_loop(database.clone()));
+                tokio::spawn(update_prover_job_queue_loop(
+                    database.clone(),
+                    witness_generator_opts.prepare_data_interval(),
+                ));
 
                 let last_verified_block = {
                     let mut storage = database

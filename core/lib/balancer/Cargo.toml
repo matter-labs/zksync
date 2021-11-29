@@ -12,4 +12,6 @@ categories = ["cryptography"]
 [dependencies]
 futures = "0.3"
 metrics = "0.17"
+
+[dev-dependencies]
 tokio = { version = "1", features = ["full"] }

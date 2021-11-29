@@ -27,6 +27,12 @@ export async function build() {
 }
 
 export async function publish() {
+    // Spawning a new script is expensive, so if we know that publishing is disabled, it's better to not launch
+    // it at all (even though `publish-sources` checks the network as well).
+    if (process.env.CHAIN_ETH_NETWORK == 'localhost') {
+        console.log('Skip contract publish on localhost');
+        return;
+    }
     await utils.spawn('yarn contracts publish-sources');
 }
 
