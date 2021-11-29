@@ -2,12 +2,7 @@ import { deployContract } from 'ethereum-waffle';
 import { ethers, Signer, providers } from 'ethers';
 import { formatEther, Interface } from 'ethers/lib/utils';
 import * as fs from 'fs';
-import {
-    encodeConstructorArgs,
-    encodeProxyContstuctorArgs,
-    publishAbiToTesseracts,
-    publishSourceCodeToEtherscan
-} from './publish-utils';
+import { encodeConstructorArgs, encodeProxyContstuctorArgs, publishSourceCodeToEtherscan } from './publish-utils';
 import {
     Governance,
     GovernanceFactory,
@@ -403,19 +398,6 @@ export class Deployer {
             );
         }
         this.addresses.RegenesisMultisig = regenesisMultisigContract.address;
-    }
-
-    public async publishSourcesToTesseracts() {
-        console.log('Publishing ABI for UpgradeGatekeeper');
-        await publishAbiToTesseracts(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper);
-        console.log('Publishing ABI for ZkSync (proxy)');
-        await publishAbiToTesseracts(this.addresses.ZkSync, this.contracts.zkSync);
-        console.log('Publishing ABI for Verifier (proxy)');
-        await publishAbiToTesseracts(this.addresses.Verifier, this.contracts.verifier);
-        console.log('Publishing ABI for Governance (proxy)');
-        await publishAbiToTesseracts(this.addresses.Governance, this.contracts.governance);
-        console.log('Publishing ABI for ForcedExit');
-        await publishAbiToTesseracts(this.addresses.ForcedExit, this.contracts.forcedExit);
     }
 
     public async publishSourcesToEtherscan() {

@@ -3,15 +3,17 @@ use std::{slice, time::Instant};
 // External uses
 use serde_json::Value;
 // Workspace uses
-use zksync_basic_types::BlockNumber;
-use zksync_types::block::ExecutedOperations;
-use zksync_types::event::{
-    account::{
-        AccountEvent, AccountStateChangeStatus, AccountStateChangeType, AccountUpdateDetails,
+use zksync_types::{
+    block::ExecutedOperations,
+    event::{
+        account::{
+            AccountEvent, AccountStateChangeStatus, AccountStateChangeType, AccountUpdateDetails,
+        },
+        block::{BlockEvent, BlockStatus},
+        transaction::{TransactionEvent, TransactionStatus},
+        EventId,
     },
-    block::{BlockEvent, BlockStatus},
-    transaction::{TransactionEvent, TransactionStatus},
-    EventId,
+    BlockNumber,
 };
 // Local uses
 use crate::{QueryResult, StorageProcessor};

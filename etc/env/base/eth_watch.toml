@@ -3,4 +3,4 @@
 # In production this should be a non-zero value because of block reverts.
 confirmations_for_eth_event=0
 # How often we want to poll the Ethereum node.
-eth_node_poll_interval=300
+eth_node_poll_interval=100

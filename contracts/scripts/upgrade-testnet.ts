@@ -14,7 +14,7 @@ async function main() {
     const parser = new ArgumentParser({
         version: '0.1.0',
         addHelp: true,
-        description: 'Deploy new contracts and upgrade testnet proxy Tesseracts'
+        description: 'Deploy new contracts and upgrade testnet proxy'
     });
     parser.addArgument('--deployerPrivateKey', { required: false, help: 'Wallet used to deploy contracts.' });
     parser.addArgument('--governor', { required: false, help: 'governor address' });
