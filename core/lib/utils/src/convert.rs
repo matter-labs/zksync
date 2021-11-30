@@ -13,6 +13,10 @@ pub fn ratio_to_big_decimal(num: &Ratio<BigUint>, precision: usize) -> BigDecima
     BigDecimal::new(bigint, precision as i64)
 }
 
+pub fn biguint_to_big_decimal(num: BigUint) -> BigDecimal {
+    ratio_to_big_decimal(&Ratio::from(num), 0)
+}
+
 pub fn big_decimal_to_ratio(num: &BigDecimal) -> Result<Ratio<BigUint>, anyhow::Error> {
     let (big_int, exp) = num.as_bigint_and_exponent();
     anyhow::ensure!(!big_int.is_negative(), "BigDecimal should be unsigned");

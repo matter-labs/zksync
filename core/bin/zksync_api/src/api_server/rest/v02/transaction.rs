@@ -165,7 +165,7 @@ async fn submit_batch(
 ) -> ApiResult<SubmitBatchResponse> {
     let response = data
         .tx_sender
-        .submit_txs_batch(body.txs, body.signature, None)
+        .submit_txs_batch(body.txs, body.signature, false)
         .await
         .map_err(Error::from);
     response.into()

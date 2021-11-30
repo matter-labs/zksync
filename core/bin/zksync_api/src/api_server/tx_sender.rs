@@ -35,7 +35,7 @@ use zksync_types::{
     AccountId, Address, BatchFee, Fee, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
     H160,
 };
-use zksync_utils::big_decimal_to_ratio;
+use zksync_utils::{big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_u64};
 
 // Local uses
 use crate::{
@@ -173,7 +173,7 @@ impl TxSender {
             fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
-            current_subsidy_type: config.ticker.subsidy_name,
+            current_subsidy_type: config.ticker.subsidy_name.clone(),
         }
     }
 
@@ -384,24 +384,23 @@ impl TxSender {
     }
 
     pub async fn store_subsidy_data(
-        &mut self,
+        &self,
         hash: TxHash,
-        fee_data: ResponseFee,
+        normal_fee: BigUint,
+        subsidized_fee: BigUint,
         token_id: TokenId,
     ) -> Result<(), anyhow::Error> {
         let token_price_in_usd = Self::ticker_price_request(
             self.ticker_requests.clone(),
-            check_token.clone(),
+            TokenLike::Id(token_id),
             TokenPriceRequestType::USDForOneWei,
         )
         .await?;
 
-        let full_cost_usd_cents = big_decimal_to_ratio(&token_price_in_usd)
-            * fee_data.normal_fee.total_fee
-            * BigUint::from(100);
-        let subsidized_cost_usd_cents = big_decimal_to_ratio(&token_price_in_usd)
-            * fee_data.subsidized_fee.total_fee
-            * BigUint::from(100);
+        let full_cost_usd_cents =
+            big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee * BigUint::from(100u32);
+        let subsidized_cost_usd_cents =
+            big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee * BigUint::from(100u32);
 
         let full_cost_usd_cents = ratio_to_u64(full_cost_usd_cents);
         let subsidized_cost_usd_cents = ratio_to_u64(subsidized_cost_usd_cents);
@@ -412,11 +411,11 @@ impl TxSender {
 
         let subsidy = Subsidy {
             usd_amount: full_cost_usd_cents - subsidized_cost_usd_cents,
-            full_cost_usd: fee_data.full_cost_usd_cents,
+            full_cost_usd: full_cost_usd_cents,
             token_id,
-            token_amount: fee_data.subsidized_fee.total_fee,
-            full_cost_token: fee_data.normal_fee.total_fee,
-            subsidy_type: self.current_subsidy_type,
+            token_amount: biguint_to_big_decimal(subsidized_fee),
+            full_cost_token: biguint_to_big_decimal(normal_fee),
+            subsidy_type: self.current_subsidy_type.clone(),
             tx_hash: hash,
         };
 
@@ -426,6 +425,8 @@ impl TxSender {
             .misc_schema()
             .store_subsidy(subsidy)
             .await?;
+
+        Ok(())
     }
 
     pub async fn submit_tx(
@@ -477,7 +478,7 @@ impl TxSender {
             }
 
             let required_fee_data =
-                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone(), ip)
+                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
 
             fee_data = Some(required_fee_data.clone());
@@ -546,8 +547,19 @@ impl TxSender {
             //
             // Trying to omit these scenarios unfortunately leads to large code restructure
             // which is not worth it for subsidies (we prefer stability here)
-            self.store_subsidy_data(tx.hash(), fee_data, token.id)
-                .await?;
+            self.store_subsidy_data(
+                tx.hash(),
+                fee_data.normal_fee.total_fee,
+                fee_data.subsidized_fee.total_fee,
+                token.id,
+            )
+            .await
+            .map_err(|e| {
+                SubmitError::Other(format!(
+                    "Failed to store the subsidy to database. Reason: {}",
+                    e
+                ))
+            })?;
         }
 
         // if everything is OK, return the transactions hashes.
@@ -628,7 +640,7 @@ impl TxSender {
                 .await?;
 
                 let token_data = self.token_info_from_id(token).await?;
-                token_fees_ids.push(token);
+                token_fees_ids.push(token_data.id);
                 let mut token_fee = token_fees.remove(&token_data.address).unwrap_or_default();
                 token_fee += &provided_fee;
                 token_fees.insert(token_data.address, token_fee);
@@ -688,7 +700,7 @@ impl TxSender {
                 && self.can_subsidize(required_eth_fee.subsidy_size_usd_cents)
             {
                 subsidized = true;
-                fee_data = Some(batch_token_fee.clone());
+                fee_data = Some(required_eth_fee.clone());
                 required_eth_fee.subsidized_fee.total_fee
             } else {
                 required_eth_fee.normal_fee.total_fee
@@ -816,8 +828,19 @@ impl TxSender {
             //
             // Trying to omit these scenarios unfortunately leads to large code restructure
             // which is not worth it for subsidies (we prefer stability here)
-            self.store_subsidy_data(tx_hashes[0], fee_data, subsidy_token_id)
-                .await?;
+            self.store_subsidy_data(
+                tx_hashes[0],
+                fee_data.normal_fee.total_fee,
+                fee_data.subsidized_fee.total_fee,
+                subsidy_token_id,
+            )
+            .await
+            .map_err(|e| {
+                SubmitError::Other(format!(
+                    "Failed to store the subsidy to database. Reason: {}",
+                    e
+                ))
+            })?;
         }
 
         Ok(SubmitBatchResponse {
@@ -831,14 +854,12 @@ impl TxSender {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-        ip: Option<String>,
     ) -> Result<Fee, SubmitError> {
         let resp_fee = Self::ticker_request(
             self.ticker_requests.clone(),
             tx_type,
             address,
             token.clone(),
-            ip,
         )
         .await?;
         Ok(resp_fee.normal_fee)
@@ -955,7 +976,6 @@ impl TxSender {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-        ip: Option<String>,
     ) -> Result<ResponseFee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender

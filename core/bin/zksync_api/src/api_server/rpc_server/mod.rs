@@ -1,5 +1,9 @@
 // Built-in uses
-use std::{collections::HashMap, convert::TryFrom, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    time::Instant,
+};
 
 // External uses
 use bytes::Bytes;
@@ -50,6 +54,8 @@ pub struct RpcApp {
     pub confirmations_for_eth_event: u64,
 
     tx_sender: TxSender,
+
+    pub subsidized_ips: HashSet<String>,
 }
 
 impl RpcApp {
@@ -82,6 +88,8 @@ impl RpcApp {
             confirmations_for_eth_event,
 
             tx_sender,
+
+            subsidized_ips: config.ticker.subsidized_ips.clone().into_iter().collect(),
         }
     }
 
@@ -349,7 +357,6 @@ impl RpcApp {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-        ip: Option<String>,
     ) -> Result<ResponseBatchFee> {
         let req = oneshot::channel();
         ticker_request_sender
@@ -372,7 +379,6 @@ impl RpcApp {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-        ip: Option<String>,
     ) -> Result<ResponseFee> {
         let req = oneshot::channel();
         ticker_request_sender

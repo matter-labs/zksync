@@ -30,7 +30,7 @@ use super::{types::*, RpcApp};
 impl RpcApp {
     fn should_subsidie_cpk(&self, ip: Option<String>) -> bool {
         if let Some(ip_str) = ip {
-            self.config.subsidized_ips.contains(&ip_str)
+            self.subsidized_ips.contains(&ip_str)
         } else {
             false
         }
@@ -165,7 +165,7 @@ impl RpcApp {
 
         let result: Result<Vec<TxHash>> = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signatures, ip, is_subsidized_ip)
+            .submit_txs_batch(txs, eth_signatures, is_subsidized_ip)
             .await
             .map_err(Error::from)
             .map(|response| {
@@ -263,8 +263,7 @@ impl RpcApp {
         }
 
         let result =
-            Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone(), ip)
-                .await?;
+            Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
         let is_subsidized_ip = self.should_subsidie_cpk(ip);
 
@@ -308,8 +307,7 @@ impl RpcApp {
             .zip(addresses.iter().cloned()))
         .collect();
 
-        let result =
-            Self::ticker_batch_fee_request(ticker, transactions, token.clone(), ip).await?;
+        let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
         let is_subsidized_ip = self.should_subsidie_cpk(ip);
 
