@@ -73,7 +73,7 @@ impl Order {
         out.extend_from_slice(&[Self::MSG_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.recipient_address.as_bytes());
+        out.extend_from_slice(self.recipient_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out.extend_from_slice(&self.token_sell.to_be_bytes());
         out.extend_from_slice(&self.token_buy.to_be_bytes());
@@ -263,7 +263,7 @@ impl Swap {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[CURRENT_TX_VERSION]);
         out.extend_from_slice(&self.submitter_id.to_be_bytes());
-        out.extend_from_slice(&self.submitter_address.as_bytes());
+        out.extend_from_slice(self.submitter_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out.extend_from_slice(order_bytes);
         out.extend_from_slice(&self.fee_token.to_be_bytes());

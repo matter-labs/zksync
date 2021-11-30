@@ -41,7 +41,7 @@ pub(crate) fn rendered_key(
     map.insert("omega".to_owned(), to_json(render_scalar_to_hex(&omega)));
 
     for (i, c) in vk.gate_setup_commitments.iter().enumerate() {
-        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(c);
 
         for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
@@ -52,7 +52,7 @@ pub(crate) fn rendered_key(
     }
 
     for (i, c) in vk.gate_selectors_commitments.iter().enumerate() {
-        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(c);
 
         for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
@@ -63,7 +63,7 @@ pub(crate) fn rendered_key(
     }
 
     for (i, c) in vk.permutation_commitments.iter().enumerate() {
-        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(c);
 
         for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
@@ -106,7 +106,7 @@ pub(crate) fn rendered_key_single_proof(
     let omega = domain.generator;
     map.insert("omega".to_owned(), to_json(render_scalar_to_hex(&omega)));
     for (i, c) in vk.selector_commitments.iter().enumerate() {
-        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(c);
 
         for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
@@ -116,7 +116,7 @@ pub(crate) fn rendered_key_single_proof(
         }
     }
     for (i, c) in vk.next_step_selector_commitments.iter().enumerate() {
-        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(c);
 
         for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
@@ -126,7 +126,7 @@ pub(crate) fn rendered_key_single_proof(
         }
     }
     for (i, c) in vk.permutation_commitments.iter().enumerate() {
-        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(c);
         for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
                 format!("permutation_commitment_{}_{}", i, j),

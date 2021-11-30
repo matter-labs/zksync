@@ -150,6 +150,6 @@ impl AccountPool {
 }
 
 fn pk_to_address(eth_pk: &H256) -> Address {
-    PackedEthSignature::address_from_private_key(&eth_pk)
+    PackedEthSignature::address_from_private_key(eth_pk)
         .expect("Can't get an address from the private key")
 }

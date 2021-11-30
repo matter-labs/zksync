@@ -369,7 +369,7 @@ pub fn start_rpc_server(
         connection_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        &config,
+        config,
     );
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);

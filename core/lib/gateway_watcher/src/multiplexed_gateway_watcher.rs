@@ -120,6 +120,7 @@ impl MultiplexedGatewayWatcher {
     async fn check_client_gateways(&self) {
         // Fetch latest block for each client.
         // Each request will resolve to (client key, client latest block) pair.
+        #[allow(clippy::needless_collect)] // False positive
         let latest_block_reqs: Vec<_> =
             self.client
                 .clients()
@@ -180,7 +181,7 @@ impl MultiplexedGatewayWatcher {
                             .get(&block1.hash)
                             .cmp(&hash_counts.get(&block2.hash))
                         {
-                            Ordering::Equal => lat2.cmp(&lat1),
+                            Ordering::Equal => lat2.cmp(lat1),
                             other => other,
                         },
                         other => other,

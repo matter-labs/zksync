@@ -274,7 +274,7 @@ impl EthereumGateway {
 
     pub fn get_mock(&self) -> Option<&MockEthereum> {
         match self {
-            EthereumGateway::Mock(m) => Some(&m),
+            EthereumGateway::Mock(m) => Some(m),
             _ => None,
         }
     }

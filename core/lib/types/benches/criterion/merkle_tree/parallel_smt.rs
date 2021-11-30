@@ -55,11 +55,10 @@ fn smt_insert_empty(b: &mut Bencher<'_>) {
 /// Measures the time of insertion into a non-empty SMT.
 fn smt_insert_filled(b: &mut Bencher<'_>) {
     let depth = zksync_crypto::params::account_tree_depth();
-    let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
-    for (id, account) in accounts.into_iter().enumerate() {
+    for (id, account) in (0..N_ACCOUNTS).map(gen_account).enumerate() {
         let id = id as u32;
         tree.insert(id, account.clone())
     }
@@ -80,11 +79,10 @@ fn smt_insert_filled(b: &mut Bencher<'_>) {
 /// Measures the time of obtaining a SMT root hash.
 fn smt_root_hash(b: &mut Bencher<'_>) {
     let depth = zksync_crypto::params::account_tree_depth();
-    let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
-    for (id, account) in accounts.into_iter().enumerate() {
+    for (id, account) in (0..N_ACCOUNTS).map(gen_account).enumerate() {
         let id = id as u32;
         tree.insert(id, account.clone());
     }
@@ -107,11 +105,10 @@ fn smt_root_hash(b: &mut Bencher<'_>) {
 /// to some hashes being cached.
 fn smt_root_hash_cached(b: &mut Bencher<'_>) {
     let depth = zksync_crypto::params::account_tree_depth();
-    let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
-    for (id, account) in accounts.into_iter().enumerate() {
+    for (id, account) in (0..N_ACCOUNTS).map(gen_account).enumerate() {
         let id = id as u32;
         tree.insert(id, account.clone());
 

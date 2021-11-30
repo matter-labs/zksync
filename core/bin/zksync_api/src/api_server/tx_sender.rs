@@ -645,7 +645,7 @@ impl TxSender {
                     .await
                     .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
             );
-            tx_sender_types.push(self.get_tx_sender_type(&tx).await?);
+            tx_sender_types.push(self.get_tx_sender_type(tx).await?);
         }
 
         let batch_sign_data = if !eth_signatures.is_empty() {

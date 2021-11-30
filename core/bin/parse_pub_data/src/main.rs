@@ -15,7 +15,7 @@ fn main() {
             "not enough bytes in the pubdata for current op"
         );
         let (current_op, unparsed) = unparsed_data.split_at(op_data_len);
-        let op = ZkSyncOp::from_public_data(&current_op).expect("failed to parse pubdata");
+        let op = ZkSyncOp::from_public_data(current_op).expect("failed to parse pubdata");
         println!("{:#?}", op);
         unparsed_data = unparsed;
     }

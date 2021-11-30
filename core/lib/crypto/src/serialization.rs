@@ -270,12 +270,12 @@ pub fn serialize_new_proof<C: NewCircuit<Engine>>(
 ) -> (Vec<U256>, Vec<U256>) {
     let mut inputs = vec![];
     for input in proof.inputs.iter() {
-        inputs.push(EthereumSerializer::serialize_fe(&input));
+        inputs.push(EthereumSerializer::serialize_fe(input));
     }
     let mut serialized_proof = vec![];
 
     for c in proof.state_polys_commitments.iter() {
-        let (x, y) = EthereumSerializer::serialize_g1(&c);
+        let (x, y) = EthereumSerializer::serialize_g1(c);
         serialized_proof.push(x);
         serialized_proof.push(y);
     }
@@ -285,27 +285,27 @@ pub fn serialize_new_proof<C: NewCircuit<Engine>>(
     serialized_proof.push(y);
 
     for c in proof.quotient_poly_parts_commitments.iter() {
-        let (x, y) = EthereumSerializer::serialize_g1(&c);
+        let (x, y) = EthereumSerializer::serialize_g1(c);
         serialized_proof.push(x);
         serialized_proof.push(y);
     }
 
     for c in proof.state_polys_openings_at_z.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(&c));
+        serialized_proof.push(EthereumSerializer::serialize_fe(c));
     }
 
     for (_, _, c) in proof.state_polys_openings_at_dilations.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(&c));
+        serialized_proof.push(EthereumSerializer::serialize_fe(c));
     }
 
     assert_eq!(proof.gate_setup_openings_at_z.len(), 0);
 
     for (_, c) in proof.gate_selectors_openings_at_z.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(&c));
+        serialized_proof.push(EthereumSerializer::serialize_fe(c));
     }
 
     for c in proof.copy_permutation_polys_openings_at_z.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(&c));
+        serialized_proof.push(EthereumSerializer::serialize_fe(c));
     }
 
     serialized_proof.push(EthereumSerializer::serialize_fe(

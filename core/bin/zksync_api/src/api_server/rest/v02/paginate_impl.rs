@@ -276,7 +276,7 @@ impl Paginate<PendingOpsRequest> for CoreApiClient {
         query: &PaginationQuery<PendingOpsRequest>,
     ) -> Result<Paginated<Transaction, SerialId>, Error> {
         let result = self
-            .get_unconfirmed_ops(&query)
+            .get_unconfirmed_ops(query)
             .await
             .map_err(Error::core_api)?;
         Ok(result)

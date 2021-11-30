@@ -165,7 +165,7 @@ async fn revert_blocks_on_contract(
         .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(gas_limit))))
         .await
         .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
-    let receipt = send_raw_tx_and_wait_confirmation(&client, signed_tx.raw_tx).await?;
+    let receipt = send_raw_tx_and_wait_confirmation(client, signed_tx.raw_tx).await?;
     storage.ethereum_schema().get_next_nonce().await
         .expect("Ethereum tx has been sent but updating operator nonce in storage has failed. You need to update it manually");
     ensure!(

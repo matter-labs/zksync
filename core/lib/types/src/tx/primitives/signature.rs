@@ -42,7 +42,7 @@ impl TxSignature {
         Engine: RescueEngine,
     {
         let hashed_msg = rescue_hash_tx_msg(msg);
-        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
+        let seed = Seed::deterministic_seed(pk, &hashed_msg);
         let signature = pk.musig_rescue_sign(
             &hashed_msg,
             &seed,

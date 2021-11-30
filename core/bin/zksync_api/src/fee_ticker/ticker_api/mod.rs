@@ -180,7 +180,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
 
     async fn update_price(&self, token: &Token) -> Result<(), PriceError> {
         let start = Instant::now();
-        let api_price = match self.token_price_api.get_price(&token).await {
+        let api_price = match self.token_price_api.get_price(token).await {
             Ok(api_price) => api_price,
 
             // Database contain this token, but is not listed in CoinGecko(CoinMarketCap)

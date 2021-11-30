@@ -25,7 +25,7 @@ impl DepositOp {
         data.extend_from_slice(&self.account_id.to_be_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(&self.priority_op.amount.to_u128().unwrap().to_be_bytes());
-        data.extend_from_slice(&self.priority_op.to.as_bytes());
+        data.extend_from_slice(self.priority_op.to.as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }

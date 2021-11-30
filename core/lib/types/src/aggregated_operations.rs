@@ -105,7 +105,7 @@ pub struct BlocksExecuteOperation {
 
 impl BlocksExecuteOperation {
     fn get_eth_tx_args_for_block(block: &Block) -> Token {
-        let stored_block = stored_block_info(&block);
+        let stored_block = stored_block_info(block);
 
         let processable_ops_pubdata = Token::Array(
             block

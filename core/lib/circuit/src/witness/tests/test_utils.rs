@@ -155,7 +155,7 @@ pub fn generic_test_scenario<W, F>(
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,
@@ -212,7 +212,7 @@ pub fn corrupted_input_test_scenario<W, F, B>(
     B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,
@@ -280,7 +280,7 @@ pub fn incorrect_op_test_scenario<W, F, B>(
     B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize WitnessBuilder.
-    let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,

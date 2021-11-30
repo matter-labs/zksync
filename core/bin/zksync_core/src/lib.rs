@@ -119,7 +119,7 @@ pub async fn run_core(
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
         eth_gateway.clone(),
-        &config,
+        config,
     );
 
     // Insert pending withdrawals into database (if required)
@@ -148,7 +148,7 @@ pub async fn run_core(
         proposed_blocks_receiver,
         mempool_block_request_sender.clone(),
         connection_pool.clone(),
-        &config,
+        config,
     );
 
     // Start mempool.
@@ -157,28 +157,28 @@ pub async fn run_core(
         mempool_tx_request_receiver,
         mempool_block_request_receiver,
         eth_watch_req_sender.clone(),
-        &config,
+        config,
         4,
         DEFAULT_CHANNEL_CAPACITY,
     );
 
-    let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config);
+    let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), config);
 
     // Start token handler.
     let token_handler_task = run_token_handler(
         connection_pool.clone(),
         eth_watch_req_sender.clone(),
-        &config,
+        config,
     );
 
     // Start token handler.
     let register_factory_task = run_register_factory_handler(
         connection_pool.clone(),
         eth_watch_req_sender.clone(),
-        &config,
+        config,
     );
     // Start rejected transactions cleaner task.
-    let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
+    let rejected_tx_cleaner_task = run_rejected_tx_cleaner(config, connection_pool.clone());
 
     let tx_event_emitter_task = tx_event_emitter::run_tx_event_emitter_task(
         connection_pool.clone(),
@@ -187,7 +187,7 @@ pub async fn run_core(
 
     // Start block proposer.
     let proposer_task = run_block_proposer_task(
-        &config,
+        config,
         mempool_block_request_sender.clone(),
         state_keeper_req_sender.clone(),
     );

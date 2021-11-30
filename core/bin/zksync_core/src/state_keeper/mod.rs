@@ -662,7 +662,7 @@ impl ZkSyncStateKeeper {
 
     fn apply_tx(&mut self, tx: &SignedZkSyncTx) -> Result<ExecutedOperations, ()> {
         let start = Instant::now();
-        let chunks_needed = self.state.chunks_for_tx(&tx);
+        let chunks_needed = self.state.chunks_for_tx(tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
