@@ -16,7 +16,7 @@ use zksync_types::{
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
     tx::ZkSyncTx,
-    Account, AccountId, Address, PriorityOp, SignedZkSyncTx, H256,
+    AccountId, Address, PriorityOp, SignedZkSyncTx, H256,
 };
 // Local uses
 use self::{pending_block::PendingBlock, utils::system_time_timestamp};
@@ -132,7 +132,7 @@ impl ZkSyncStateKeeper {
         keeper
     }
 
-    pub async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
+    async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
         let start = Instant::now();
 
         if let Some(pending_block) = pending_block {
@@ -211,8 +211,9 @@ impl ZkSyncStateKeeper {
 
         while let Some(req) = self.rx_for_blocks.next().await {
             match req {
-                StateKeeperRequest::GetAccount(addr, sender) => {
-                    sender.send(self.account(&addr)).unwrap_or_default();
+                StateKeeperRequest::GetAccount(address, sender) => {
+                    let account = self.state.get_account_by_address(&address);
+                    sender.send(account).unwrap_or_default();
                 }
                 StateKeeperRequest::GetPendingBlockTimestamp(sender) => {
                     sender
@@ -444,7 +445,6 @@ impl ZkSyncStateKeeper {
 
     fn execute_tx(&mut self, tx: ZkSyncTx, block_timestamp: u64) -> Result<OpSuccess, OpError> {
         self.check_transaction_timestamps(tx.clone(), block_timestamp)?;
-
         self.state.execute_tx(tx)
     }
 
@@ -791,9 +791,6 @@ impl ZkSyncStateKeeper {
         metrics::histogram!("state_keeper.store_pending_block", start.elapsed());
     }
 
-    fn account(&self, address: &Address) -> Option<(AccountId, Account)> {
-        self.state.get_account_by_address(address)
-    }
     pub fn get_current_state(&self) -> ZkSyncStateInitParams {
         ZkSyncStateInitParams {
             tree: self.state.get_balance_tree(),
@@ -804,6 +801,7 @@ impl ZkSyncStateKeeper {
         }
     }
 }
+
 #[must_use]
 pub fn start_state_keeper(
     sk: ZkSyncStateKeeper,

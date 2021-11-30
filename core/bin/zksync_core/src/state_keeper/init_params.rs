@@ -196,31 +196,6 @@ impl ZkSyncStateInitParams {
         Ok(())
     }
 
-    pub async fn load_state_diff(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), anyhow::Error> {
-        let state_diff = storage
-            .chain()
-            .state_schema()
-            .load_state_diff(self.last_block_number, None)
-            .await
-            .map_err(|e| anyhow::format_err!("failed to load committed state: {}", e))?;
-
-        if let Some((block_number, updates)) = state_diff {
-            for (id, update) in updates.into_iter() {
-                let updated_account = Account::apply_update(self.remove_account(id), update);
-                if let Some(account) = updated_account {
-                    self.insert_account(id, account);
-                }
-            }
-            self.unprocessed_priority_op =
-                Self::unprocessed_priority_op_id(storage, block_number).await?;
-            self.last_block_number = block_number;
-        }
-        Ok(())
-    }
-
     pub fn insert_account(&mut self, id: AccountId, acc: Account) {
         self.acc_id_by_addr.insert(acc.address, id);
         self.tree.insert(*id, acc);
