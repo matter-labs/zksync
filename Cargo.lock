@@ -2737,15 +2737,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mint_nft_nonce_migration"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "tokio",
- "zksync_storage",
-]
-
-[[package]]
 name = "mio"
 version = "0.6.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4891,19 +4882,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
-name = "token_kind_migration"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "tokio",
- "zksync_config",
- "zksync_contracts",
- "zksync_eth_client",
- "zksync_storage",
- "zksync_types",
-]
-
-[[package]]
 name = "tokio"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5158,16 +5136,6 @@ name = "try-lock"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
-
-[[package]]
-name = "tx_filters_migration"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "tokio",
- "zksync_storage",
- "zksync_types",
-]
 
 [[package]]
 name = "typeable"
