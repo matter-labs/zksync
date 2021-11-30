@@ -263,7 +263,7 @@ async fn get_left_subsidy_usd_cents(
     db_pool: &ConnectionPool,
 ) -> Result<Ratio<BigUint>> {
     let max_subsidy = config.ticker.max_subsidy_usd_cents;
-    let subsidy_name = config.ticker.subsidy_name;
+    let subsidy_name = config.ticker.subsidy_name.clone();
 
     let get_used_subsidy = db_pool
         .access_storage()
@@ -416,7 +416,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     token,
                     response,
                     address,
-                    ip,
                 } => {
                     let fee = self
                         .get_fee_from_ticker_in_wei(tx_type, token, address)
@@ -442,7 +441,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     transactions,
                     token,
                     response,
-                    ip,
                 } => {
                     let fee = self.get_batch_from_ticker_in_wei(token, transactions).await;
                     metrics::histogram!("ticker.get_tx_fee", start.elapsed());
@@ -536,8 +534,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             gas_price_wei.clone(),
         );
 
-        if matches!(fee_type, OutputFeeType::ChangePubKey(_)) && self.should_subsidie_cpk(ip).await
-        {
+        if matches!(fee_type, OutputFeeType::ChangePubKey(_)) {
             // Division by 100, it is safe to unwrap here
             let hundred = Ratio::from(BigUint::from(100u64));
             let subsidized_fee_usd = self
@@ -554,7 +551,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             let token_price = big_decimal_to_ratio(&token_price).unwrap();
             let full_amount = subsidized_fee_usd.checked_div(&token_price).unwrap();
 
-            let subsidized_fee = if full_amount > normal_fee.total_fee {
+            let subsidized_fee = if full_amount > Ratio::from(normal_fee.total_fee) {
                 normal_fee.clone()
             } else {
                 Fee::new(

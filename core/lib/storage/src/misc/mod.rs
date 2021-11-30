@@ -15,7 +15,7 @@ use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NF
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 
-use self::records::{DbSubsidy, Subsidy};
+use self::records::Subsidy;
 use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
 use zksync_types::tokens::TokenMarketVolume;
@@ -32,15 +32,17 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
     pub async fn store_subsidy(&mut self, subsidy: Subsidy) -> QueryResult<()> {
         let start = Instant::now();
 
+        //let hash_ref: &[u8] = &();
+
         sqlx::query!(
             r#"
             INSERT INTO subsidies ( tx_hash, usd_amount, full_cost_usd, token_id, token_amount, full_cost_token, subsidy_type )
             VALUES ( $1, $2, $3, $4, $5, $6, $7 )
             "#,
-            subsidy.tx_hash,
+            subsidy.tx_hash.as_ref(),
             subsidy.usd_amount as i64,
             subsidy.full_cost_usd as i64,
-            subsidy.token_id,
+            subsidy.token_id.0 as i32,
             subsidy.token_amount,
             subsidy.full_cost_token,
             subsidy.subsidy_type

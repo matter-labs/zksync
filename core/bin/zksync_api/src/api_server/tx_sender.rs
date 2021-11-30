@@ -376,7 +376,7 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        self.submit_tx(tx, signature, ip).await
+        self.submit_tx(tx, signature, should_subsidie_cpk).await
     }
 
     pub fn can_subsidize(&self, new_subsidy_usd_cents: u64) -> bool {

@@ -152,7 +152,7 @@ async fn submit_tx(
 ) -> ApiResult<TxHashSerializeWrapper> {
     let tx_hash = data
         .tx_sender
-        .submit_tx(body.tx, body.signature, None)
+        .submit_tx(body.tx, body.signature, false)
         .await
         .map_err(Error::from);
 
