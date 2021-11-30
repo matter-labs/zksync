@@ -25,7 +25,6 @@ use crate::{
     mempool::ProposedBlock,
     tx_event_emitter::ProcessedOperations,
 };
-use zksync_state::error::{OpError, TxBatchError};
 
 pub use self::{init_params::ZkSyncStateInitParams, types::StateKeeperRequest};
 
@@ -395,59 +394,6 @@ impl ZkSyncStateKeeper {
         Ok(exec_result)
     }
 
-    /// Checks that block timestamp is valid for the execution of the transaction.
-    /// Returns a corresponding error if the transaction can't be executed in the block because of an invalid timestamp.
-    fn check_transaction_timestamps(
-        &mut self,
-        tx: ZkSyncTx,
-        block_timestamp: u64,
-    ) -> Result<(), OpError> {
-        let time_range = match tx {
-            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::ForcedExit(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::Close(tx) => tx.time_range,
-            ZkSyncTx::MintNFT(_) => Default::default(),
-            ZkSyncTx::Swap(tx) => tx.time_range(),
-            ZkSyncTx::WithdrawNFT(tx) => tx.time_range,
-        };
-        if !time_range.is_valid(block_timestamp) {
-            return Err(OpError::TimestampError);
-        }
-        Ok(())
-    }
-
-    fn execute_txs_batch(
-        &mut self,
-        txs: &[SignedZkSyncTx],
-        block_timestamp: u64,
-    ) -> Vec<Result<OpSuccess, TxBatchError>> {
-        for (id, tx) in txs.iter().enumerate() {
-            if let Err(error) = self.check_transaction_timestamps(tx.tx.clone(), block_timestamp) {
-                // Create the same error for each transaction.
-                let errors = (0..txs.len())
-                    .map(|_| {
-                        Err(TxBatchError {
-                            failed_tx_index: id + 1,
-                            reason: error.clone(),
-                        })
-                    })
-                    .collect();
-
-                // Stop execution and return an error.
-                return errors;
-            }
-        }
-
-        self.state.execute_txs_batch(txs)
-    }
-
-    fn execute_tx(&mut self, tx: ZkSyncTx, block_timestamp: u64) -> Result<OpSuccess, OpError> {
-        self.check_transaction_timestamps(tx.clone(), block_timestamp)?;
-        self.state.execute_tx(tx)
-    }
-
     fn apply_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
@@ -499,7 +445,9 @@ impl ZkSyncStateKeeper {
             return Err(());
         }
 
-        let all_updates = self.execute_txs_batch(txs, self.pending_block.timestamp);
+        let all_updates = self
+            .state
+            .execute_txs_batch(txs, self.pending_block.timestamp);
 
         for (tx, tx_updates) in txs.iter().zip(all_updates) {
             match tx_updates {
@@ -591,7 +539,9 @@ impl ZkSyncStateKeeper {
             }
         }
 
-        let tx_updates = self.execute_tx(tx.tx.clone(), self.pending_block.timestamp);
+        let tx_updates = self
+            .state
+            .execute_tx(tx.tx.clone(), self.pending_block.timestamp);
 
         let exec_result = match tx_updates {
             Ok(OpSuccess {
