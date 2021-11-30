@@ -31,6 +31,8 @@ pub mod state_keeper;
 pub mod token_handler;
 pub mod tx_event_emitter;
 
+mod genesis;
+
 /// Waits for any of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
 /// as application runs, any possible outcome (either `Ok` or `Err`) is considered
@@ -55,11 +57,7 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
     let pool = ConnectionPool::new(Some(1));
 
     vlog::info!("Generating genesis block.");
-    ZkSyncStateKeeper::create_genesis_block(
-        pool.clone(),
-        &config.chain.state_keeper.fee_account_addr,
-    )
-    .await;
+    genesis::create_genesis_block(pool.clone(), &config.chain.state_keeper.fee_account_addr).await;
     vlog::info!("Adding initial tokens to db");
     let genesis_tokens = get_genesis_token_list(&config.chain.eth.network.to_string())
         .expect("Initial token list not found");
