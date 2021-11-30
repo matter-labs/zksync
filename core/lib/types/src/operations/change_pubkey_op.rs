@@ -29,7 +29,7 @@ impl ChangePubKeyOp {
         let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.new_pk_hash.data);
-        data.extend_from_slice(&self.tx.account.as_bytes());
+        data.extend_from_slice(self.tx.account.as_bytes());
         data.extend_from_slice(&self.tx.nonce.to_be_bytes());
         data.extend_from_slice(&self.tx.fee_token.to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));

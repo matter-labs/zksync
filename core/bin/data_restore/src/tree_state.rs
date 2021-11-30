@@ -469,7 +469,7 @@ impl TreeState {
                 last_unprocessed_prior_op,
                 self.current_unprocessed_priority_op,
             ),
-            &available_block_chunk_sizes,
+            available_block_chunk_sizes,
             gas_limit,
             gas_limit,
             ops_block.previous_block_root_hash,

@@ -127,8 +127,8 @@ impl Transfer {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.from.as_bytes());
-        out.extend_from_slice(&self.to.as_bytes());
+        out.extend_from_slice(self.from.as_bytes());
+        out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -152,8 +152,8 @@ impl Transfer {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.from.as_bytes());
-        out.extend_from_slice(&self.to.as_bytes());
+        out.extend_from_slice(self.from.as_bytes());
+        out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&(u16::try_from(self.token.0).unwrap()).to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));

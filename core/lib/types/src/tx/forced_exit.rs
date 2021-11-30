@@ -117,7 +117,7 @@ impl ForcedExit {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
-        out.extend_from_slice(&self.target.as_bytes());
+        out.extend_from_slice(self.target.as_bytes());
         out.extend_from_slice(&(self.token.0 as u16).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -135,7 +135,7 @@ impl ForcedExit {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
-        out.extend_from_slice(&self.target.as_bytes());
+        out.extend_from_slice(self.target.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());

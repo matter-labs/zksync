@@ -131,7 +131,7 @@ async fn heartbeat_future_handle<CLIENT>(
         vlog::debug!("Starting sending heartbeats for job with ID: {}", job_id);
 
         client
-            .working_on(job_id, &prover_name)
+            .working_on(job_id, prover_name)
             .await
             .map_err(|e| vlog::warn!("Failed to send heartbeat: {}", e))
             .unwrap_or_default();

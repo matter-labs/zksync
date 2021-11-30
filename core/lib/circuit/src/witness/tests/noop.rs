@@ -58,7 +58,7 @@ fn insert_validator(
     // Validator account credentials
     let validator_address_number = 7;
     let validator_address = fr_from(validator_address_number);
-    let validator_pub_key_hash = generate_pubkey_hash(rng, p_g, &jubjub_params, &phasher);
+    let validator_pub_key_hash = generate_pubkey_hash(rng, p_g, jubjub_params, phasher);
 
     // Create a validator account as an account tree leaf.
     let validator_leaf = CircuitAccount::<Bn256> {
@@ -93,7 +93,7 @@ fn insert_sender(
     let sender_balance_token_id: u32 = 2;
     let sender_balance_value: u128 = 2000;
     let sender_balance = fr_from(sender_balance_value);
-    let sender_pub_key_hash = generate_pubkey_hash(rng, p_g, &jubjub_params, &phasher);
+    let sender_pub_key_hash = generate_pubkey_hash(rng, p_g, jubjub_params, phasher);
 
     // Create a sender account as an account tree leaf.
     // Balance tree of this account will only contain one token with non-zero amount of funds.
@@ -180,10 +180,10 @@ fn incorrect_circuit_pubdata() {
 
     // Validator account credentials
     let (validator_address_number, validator_address, validator_balances) =
-        insert_validator(&mut tree, rng, p_g, &jubjub_params, &phasher);
+        insert_validator(&mut tree, rng, p_g, jubjub_params, &phasher);
 
     // Insert sender into a tree.
-    insert_sender(&mut tree, rng, p_g, &jubjub_params, &phasher);
+    insert_sender(&mut tree, rng, p_g, jubjub_params, &phasher);
 
     // Perform the `noop` operation and collect the data required for circuit instance creation.
     let operation = noop_operation(&tree, validator_address_number);

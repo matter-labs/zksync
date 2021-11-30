@@ -121,9 +121,9 @@ impl MintNFT {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.creator_id.to_be_bytes());
-        out.extend_from_slice(&self.creator_address.as_bytes());
-        out.extend_from_slice(&self.content_hash.as_bytes());
-        out.extend_from_slice(&self.recipient.as_bytes());
+        out.extend_from_slice(self.creator_address.as_bytes());
+        out.extend_from_slice(self.content_hash.as_bytes());
+        out.extend_from_slice(self.recipient.as_bytes());
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());

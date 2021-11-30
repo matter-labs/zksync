@@ -823,7 +823,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     // Also check that we can find the transaction by its hash.
     assert!(
         OperationsExtSchema(&mut storage)
-            .get_tx_by_hash(&tx_1.hash().as_ref())
+            .get_tx_by_hash(tx_1.hash().as_ref())
             .await?
             .is_some(),
         "Cannot find the pending transaction by hash"
@@ -866,14 +866,14 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     // Also check that we can find the transaction by its hash.
     assert!(
         OperationsExtSchema(&mut storage)
-            .get_tx_by_hash(&tx_1.hash().as_ref())
+            .get_tx_by_hash(tx_1.hash().as_ref())
             .await?
             .is_some(),
         "Cannot find the pending transaction by hash"
     );
     assert!(
         OperationsExtSchema(&mut storage)
-            .get_tx_by_hash(&tx_2.hash().as_ref())
+            .get_tx_by_hash(tx_2.hash().as_ref())
             .await?
             .is_some(),
         "Cannot find the pending transaction by hash"

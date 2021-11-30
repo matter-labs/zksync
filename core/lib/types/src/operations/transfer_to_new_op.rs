@@ -30,7 +30,7 @@ impl TransferToNewOp {
         data.extend_from_slice(&self.from.to_be_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&pack_token_amount(&self.tx.amount));
-        data.extend_from_slice(&self.tx.to.as_bytes());
+        data.extend_from_slice(self.tx.to.as_bytes());
         data.extend_from_slice(&self.to.to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);

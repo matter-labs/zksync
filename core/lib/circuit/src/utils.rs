@@ -48,10 +48,10 @@ where
 {
     let message_bytes = BitConvert::into_bytes(msg_data.to_vec());
 
-    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let seed = Seed::deterministic_seed(private_key, &message_bytes);
     let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
 
-    let pk = PublicKey::from_private(&private_key, p_g, params);
+    let pk = PublicKey::from_private(private_key, p_g, params);
     let _is_valid_signature = pk.verify_musig_sha256(&message_bytes, &signature, p_g, params);
 
     // TODO: handle the case where it is not valid (ZKS-101)
@@ -78,11 +78,11 @@ where
 {
     let message_bytes = BitConvert::into_bytes(msg_data.to_vec());
 
-    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let seed = Seed::deterministic_seed(private_key, &message_bytes);
     let signature =
         private_key.musig_rescue_sign(&message_bytes, &seed, p_g, rescue_params, jubjub_params);
 
-    let pk = PublicKey::from_private(&private_key, p_g, jubjub_params);
+    let pk = PublicKey::from_private(private_key, p_g, jubjub_params);
     let _is_valid_signature = pk.verify_musig_rescue(
         &message_bytes,
         &signature,
@@ -175,10 +175,10 @@ where
         message_bytes.push(byte);
     }
 
-    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let seed = Seed::deterministic_seed(private_key, &message_bytes);
     let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
 
-    let pk = PublicKey::from_private(&private_key, p_g, params);
+    let pk = PublicKey::from_private(private_key, p_g, params);
     let is_valid_signature = pk.verify_musig_sha256(&message_bytes, &signature, p_g, params);
     if !is_valid_signature {
         return None;
@@ -243,7 +243,7 @@ pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     let mut data_from_lc = Num::<E>::zero();
     let mut coeff = E::Fr::one();
     for bit in bits {
-        data_from_lc = data_from_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+        data_from_lc = data_from_lc.add_bool_with_coeff(CS::one(), bit, coeff);
         coeff.double();
     }
 
@@ -284,7 +284,7 @@ where
 {
     let mut counter = Num::zero();
     for bit in a.iter() {
-        counter = counter.add_bool_with_coeff(CS::one(), &bit, E::Fr::one());
+        counter = counter.add_bool_with_coeff(CS::one(), bit, E::Fr::one());
     }
 
     let result = AllocatedNum::alloc(cs.namespace(|| "number of zeroes number"), || {
@@ -429,7 +429,7 @@ pub fn vectorized_compare<E: Engine, CS: ConstraintSystem<E>>(
     old_data: &[AllocatedNum<E>],
     new_bits: &[Boolean],
 ) -> Result<(Boolean, Vec<AllocatedNum<E>>), SynthesisError> {
-    let packed = multipack::pack_into_witness(cs.namespace(|| "pack claimed data"), &new_bits)?;
+    let packed = multipack::pack_into_witness(cs.namespace(|| "pack claimed data"), new_bits)?;
 
     assert_eq!(packed.len(), old_data.len());
 
@@ -440,8 +440,8 @@ pub fn vectorized_compare<E: Engine, CS: ConstraintSystem<E>>(
     for (i, (old, new)) in old_data.iter().zip(packed.iter()).enumerate() {
         let is_equal_bit = AllocatedNum::<E>::equals(
             cs.namespace(|| format!("equality for chunk {}", i)),
-            &old,
-            &new,
+            old,
+            new,
         )?;
 
         let equal_bool = Boolean::from(is_equal_bit);
@@ -466,8 +466,8 @@ pub fn sequences_equal<E: Engine, CS: ConstraintSystem<E>>(
         .map(|(idx, (lhs, rhs))| {
             CircuitElement::equals(
                 cs.namespace(|| format!("element with index {}", idx)),
-                &lhs,
-                &rhs,
+                lhs,
+                rhs,
             )
         })
         .collect::<Result<Vec<_>, SynthesisError>>()?;

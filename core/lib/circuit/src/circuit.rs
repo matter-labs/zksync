@@ -239,7 +239,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
 
             let (next_chunk, chunk_data) = self.verify_correct_chunking(
-                &operation,
+                operation,
                 &next_chunk_number,
                 cs.namespace(|| "verify_correct_chunking"),
             )?;
@@ -328,7 +328,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 &mut current_branch,
                 &lhs,
                 &rhs,
-                &operation,
+                operation,
                 &global_variables,
                 &is_account_empty,
                 &operation_pub_data_chunk.get_number(),
@@ -411,7 +411,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             calc_account_state_tree_root(
                 cs.namespace(|| "old_operator_state_root"),
                 &balance_root,
-                &self.rescue_params,
+                self.rescue_params,
             )?
         };
         operator_account_data.extend(validator_account.nonce.get_bits_le());
@@ -467,7 +467,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             calc_account_state_tree_root(
                 cs.namespace(|| "new_operator_state_root"),
                 &balance_root,
-                &self.rescue_params,
+                self.rescue_params,
             )?
         };
         operator_account_data.extend(validator_account.nonce.get_bits_le());
@@ -1006,7 +1006,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_valid_timestamp = self.verify_operation_timestamp(
             cs.namespace(|| "verify operation timestamp"),
             &op_data,
-            &global_variables,
+            global_variables,
         )?;
 
         let nft_content_as_balance = hash_nft_content_to_balance_type(
@@ -1028,22 +1028,22 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 cs.namespace(|| "deposit"),
                 &mut cur,
                 global_variables,
-                &is_account_empty,
+                is_account_empty,
                 &op_data,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &mut previous_pubdatas[DepositOp::OP_CODE as usize],
             )?,
             self.transfer(
                 cs.namespace(|| "transfer"),
                 &mut cur,
-                &lhs,
-                &rhs,
+                lhs,
+                rhs,
                 global_variables,
                 &is_a_geq_b,
-                &is_account_empty,
+                is_account_empty,
                 &op_data,
                 &signer_key,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[TransferOp::OP_CODE as usize],
@@ -1054,14 +1054,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             self.transfer_to_new(
                 cs.namespace(|| "transfer_to_new"),
                 &mut cur,
-                &lhs,
-                &rhs,
+                lhs,
+                rhs,
                 global_variables,
                 &is_a_geq_b,
-                &is_account_empty,
+                is_account_empty,
                 &op_data,
                 &signer_key,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[TransferToNewOp::OP_CODE as usize],
@@ -1076,7 +1076,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_a_geq_b,
                 &op_data,
                 &signer_key,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[WithdrawOp::OP_CODE as usize],
@@ -1101,7 +1101,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &mut cur,
                 global_variables,
                 &op_data,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &mut previous_pubdatas[FullExitOp::OP_CODE as usize],
                 &nft_content_as_balance,
                 is_special_nft_storage_account,
@@ -1110,11 +1110,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
             self.change_pubkey_offchain(
                 cs.namespace(|| "change_pubkey_offchain"),
-                &lhs,
+                lhs,
                 &mut cur,
                 global_variables,
                 &op_data,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &is_valid_timestamp,
                 &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
                 &is_a_geq_b,
@@ -1127,21 +1127,21 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             self.noop(
                 cs.namespace(|| "noop"),
                 global_variables,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &op_data,
                 &mut previous_pubdatas[NoopOp::OP_CODE as usize],
             )?,
             self.forced_exit(
                 cs.namespace(|| "forced_exit"),
                 &mut cur,
-                &lhs,
-                &rhs,
+                lhs,
+                rhs,
                 global_variables,
                 &is_a_geq_b,
-                &is_account_empty,
+                is_account_empty,
                 &op_data,
                 &signer_key,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
@@ -1154,10 +1154,10 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &mut cur,
                 global_variables,
                 &is_a_geq_b,
-                &is_account_empty,
+                is_account_empty,
                 &op_data,
                 &signer_key,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[MintNFTOp::OP_CODE as usize],
                 &nft_content_as_balance,
@@ -1171,7 +1171,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_a_geq_b,
                 &op_data,
                 &signer_key,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[WithdrawNFTOp::OP_CODE as usize],
@@ -1184,10 +1184,10 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &mut cur,
                 global_variables,
                 &is_a_geq_b,
-                &is_account_empty,
+                is_account_empty,
                 &op_data,
                 &signer_key,
-                &ext_pubdata_chunk,
+                ext_pubdata_chunk,
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[SwapOp::OP_CODE as usize],
@@ -1224,7 +1224,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             chunk"
             }),
             &cur.token.get_number(),
-            &last_token_id,
+            last_token_id,
             &global_variables.chunk_data.is_chunk_first,
         )?;
 
@@ -1403,13 +1403,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_version1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_version1_serialized_tx_correct"),
             serialized_tx_bits_version1,
-            &op_data,
+            op_data,
         )?;
 
         let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old1_serialized_tx_correct"),
             serialized_tx_bits_old1,
-            &op_data,
+            op_data,
         )?;
         is_old1_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
@@ -1419,7 +1419,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old2_serialized_tx_correct"),
             serialized_tx_bits_old2,
-            &op_data,
+            op_data,
         )?;
         is_old2_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
@@ -1679,7 +1679,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let is_nft_stored_content_valid = CircuitElement::equals(
                 cs.namespace(|| "is_nft_stored_content_valid"),
-                &nft_content_as_balance,
+                nft_content_as_balance,
                 &cur.balance,
             )?;
             flags.push(multi_or(
@@ -1973,13 +1973,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_version1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_version1_serialized_tx_correct"),
             serialized_tx_bits_version1,
-            &op_data,
+            op_data,
         )?;
 
         let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old1_serialized_tx_correct"),
             serialized_tx_bits_old1,
-            &op_data,
+            op_data,
         )?;
         is_old1_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
@@ -1989,7 +1989,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old2_serialized_tx_correct"),
             serialized_tx_bits_old2,
-            &op_data,
+            op_data,
         )?;
         is_old2_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
@@ -2359,7 +2359,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             let is_serialized_tx_correct = verify_signature_message_construction(
                 cs.namespace(|| "is_serialized_tx_correct"),
                 serialized_tx_bits_version1,
-                &op_data,
+                op_data,
             )?;
             flags.push(is_serialized_tx_correct);
             let is_signer_valid = CircuitElement::equals(
@@ -2671,7 +2671,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             let is_serialized_tx_correct = verify_signature_message_construction(
                 cs.namespace(|| "is_serialized_tx_correct"),
                 serialized_tx_bits_version1,
-                &op_data,
+                op_data,
             )?;
             flags.push(is_serialized_tx_correct);
             let is_signer_valid = CircuitElement::equals(
@@ -2755,7 +2755,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             flags.push(is_token_to_withdraw);
             let stored_content_valid = CircuitElement::equals(
                 cs.namespace(|| "stored_content_valid"),
-                &nft_content_as_balance,
+                nft_content_as_balance,
                 &cur.balance,
             )?;
             flags.push(stored_content_valid);
@@ -2965,13 +2965,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_version1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_version1_serialized_tx_correct"),
             serialized_tx_bits_version1,
-            &op_data,
+            op_data,
         )?;
 
         let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old1_serialized_tx_correct"),
             serialized_tx_bits_old1,
-            &op_data,
+            op_data,
         )?;
         is_old1_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
@@ -2981,7 +2981,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old2_serialized_tx_correct"),
             serialized_tx_bits_old2,
-            &op_data,
+            op_data,
         )?;
         is_old2_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
@@ -3611,19 +3611,19 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_serialized_swap_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_swap_correct"),
             serialized_tx_bits_version1,
-            &op_data,
+            op_data,
         )?;
 
         let is_serialized_order_0_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_order_0_correct"),
             serialized_order_bits_0,
-            &op_data,
+            op_data,
         )?;
 
         let is_serialized_order_1_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_order_1_correct"),
             serialized_order_bits_1,
-            &op_data,
+            op_data,
         )?;
 
         let correct_messages_in_corresponding_chunks = &[
@@ -3927,13 +3927,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_version1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_version1_serialized_tx_correct"),
             serialized_tx_bits_version1,
-            &op_data,
+            op_data,
         )?;
 
         let mut is_old1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old1_serialized_tx_correct"),
             serialized_tx_bits_old1,
-            &op_data,
+            op_data,
         )?;
         is_old1_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old1_serialized_tx_correct and fungible"),
@@ -3943,7 +3943,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut is_old2_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old2_serialized_tx_correct"),
             serialized_tx_bits_old2,
-            &op_data,
+            op_data,
         )?;
         is_old2_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old2_serialized_tx_correct and fungible"),
@@ -4188,13 +4188,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_version1_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_version1_serialized_tx_correct"),
             serialized_tx_bits_version1,
-            &op_data,
+            op_data,
         )?;
 
         let mut is_old_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_old_serialized_tx_correct"),
             serialized_tx_bits_old,
-            &op_data,
+            op_data,
         )?;
         is_old_serialized_tx_correct = multi_and(
             cs.namespace(|| "is_old_serialized_tx_correct and fungible"),
@@ -4506,7 +4506,7 @@ pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
 
     let leaf_packed = multipack::pack_into_witness(
         cs.namespace(|| "pack leaf bits into field elements"),
-        &leaf_bits,
+        leaf_bits,
     )?;
 
     let mut account_leaf_hash = rescue::rescue_hash(
@@ -4535,7 +4535,7 @@ pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
             cs.namespace(|| "conditional reversal of preimage"),
             &cur_hash,
             path_element,
-            &direction_bit,
+            direction_bit,
         )?;
 
         // we do not use any personalization here cause
@@ -4689,7 +4689,7 @@ fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: Constraint
         for (chunk_number, x) in chunks.enumerate() {
             let cs = &mut cs.namespace(|| format!("chunk number {}", chunk_number));
 
-            let mut sponge_output = rescue::rescue_hash(cs, &x, params)?;
+            let mut sponge_output = rescue::rescue_hash(cs, x, params)?;
 
             assert_eq!(sponge_output.len(), 1);
 
@@ -4788,7 +4788,7 @@ fn calculate_validator_root_from_processable_values<E: RescueEngine, CS: Constra
         for (chunk_number, x) in chunks.enumerate() {
             let cs = &mut cs.namespace(|| format!("chunk number {}", chunk_number));
 
-            let mut sponge_output = rescue::rescue_hash(cs, &x, params)?;
+            let mut sponge_output = rescue::rescue_hash(cs, x, params)?;
 
             assert_eq!(sponge_output.len(), 1);
 
@@ -4947,7 +4947,7 @@ fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSyst
 ) -> Result<Vec<Boolean>, SynthesisError> {
     let input = multipack::pack_into_witness(
         cs.namespace(|| "pack transaction bits into field elements for rescue"),
-        &bits,
+        bits,
     )?;
 
     let sponge_output = rescue::rescue_hash(cs.namespace(|| "rescue hash"), &input, rescue_params)?;

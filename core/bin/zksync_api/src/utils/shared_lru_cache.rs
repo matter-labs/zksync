@@ -22,7 +22,7 @@ impl<K: Eq + Hash, V: Clone> SharedLruCache<K, V> {
     }
 
     pub fn get(&self, key: &K) -> Option<V> {
-        self.0.lock().unwrap().get_mut(&key).cloned()
+        self.0.lock().unwrap().get_mut(key).cloned()
     }
 }
 
@@ -45,6 +45,6 @@ impl<K: Eq + Hash, V: Clone> AsyncLruCache<K, V> {
     }
 
     pub async fn get(&self, key: &K) -> Option<V> {
-        self.0.lock().await.get_mut(&key).cloned()
+        self.0.lock().await.get_mut(key).cloned()
     }
 }

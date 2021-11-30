@@ -20,8 +20,7 @@ pub const ETH_BLOCKS_STEP: u64 = 10_000;
 pub const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 pub async fn add_tokens_to_storage(interactor: &mut StorageInteractor<'_>, eth_network: &str) {
-    let genesis_tokens =
-        get_genesis_token_list(&eth_network).expect("Initial token list not found");
+    let genesis_tokens = get_genesis_token_list(eth_network).expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
         let add_token_log = format!(
             "Adding token: {}, id:{}, address: {}, decimals: {}",

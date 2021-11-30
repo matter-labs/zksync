@@ -61,7 +61,7 @@ fn test_withdraw() {
             withdraw_op,
             input,
             |plasma_state, op| {
-                let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(plasma_state, &op)
+                let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(plasma_state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();
@@ -123,7 +123,7 @@ fn test_withdraw_old_signature() {
             withdraw_op,
             input,
             |plasma_state, op| {
-                let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(plasma_state, &op)
+                let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(plasma_state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();
@@ -174,7 +174,7 @@ fn corrupted_ops_input() {
             input,
             EXPECTED_PANIC_MSG,
             |plasma_state, op| {
-                let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(plasma_state, &op)
+                let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(plasma_state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();

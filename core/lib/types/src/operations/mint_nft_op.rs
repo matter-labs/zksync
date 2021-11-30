@@ -28,7 +28,7 @@ impl MintNFTOp {
         let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.creator_account_id.to_be_bytes());
         data.extend_from_slice(&self.recipient_account_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.content_hash.as_bytes());
+        data.extend_from_slice(self.tx.content_hash.as_bytes());
         data.extend_from_slice(&self.tx.fee_token.to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);

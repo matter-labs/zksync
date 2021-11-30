@@ -494,7 +494,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
                     // operations out of order.
                     if !self
                         .db
-                        .is_previous_operation_confirmed(&mut transaction, &op)
+                        .is_previous_operation_confirmed(&mut transaction, op)
                         .await?
                     {
                         vlog::info!("ETH Operation <id: {}> is confirmed ahead of time, considering it pending for now", op.id);

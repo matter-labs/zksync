@@ -51,9 +51,9 @@ impl FullExitOp {
                 .to_be_bytes(),
         );
         data.extend_from_slice(&self.creator_account_id.unwrap_or_default().to_be_bytes());
-        data.extend_from_slice(&self.creator_address.unwrap_or_default().as_bytes());
+        data.extend_from_slice(self.creator_address.unwrap_or_default().as_bytes());
         data.extend_from_slice(&self.serial_id.unwrap_or_default().to_be_bytes());
-        data.extend_from_slice(&self.content_hash.unwrap_or_default().as_bytes());
+        data.extend_from_slice(self.content_hash.unwrap_or_default().as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }

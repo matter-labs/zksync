@@ -133,7 +133,7 @@ impl<'a> WitnessBuilder<'a> {
             .expect("failed to get number of noops");
         for _ in 0..chunks_remaining {
             self.operations.push(crate::witness::noop::noop_operation(
-                &self.account_tree,
+                self.account_tree,
                 *self.fee_account_id,
             ));
             self.pubdata.extend(vec![false; CHUNK_BIT_WIDTH]);
@@ -204,7 +204,7 @@ impl<'a> WitnessBuilder<'a> {
     /// After fees collected creates public data commitment
     pub fn calculate_pubdata_commitment(&mut self) {
         let (fee_account_audit_path, _) =
-            crate::witness::utils::get_audits(&self.account_tree, *self.fee_account_id, 0);
+            crate::witness::utils::get_audits(self.account_tree, *self.fee_account_id, 0);
         self.fee_account_audit_path = Some(fee_account_audit_path);
 
         let public_data_commitment = crate::witness::utils::public_data_commitment::<Engine>(
@@ -265,7 +265,7 @@ pub fn generate_dummy_sig_data(
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let private_key = PrivateKey::<Bn256>(rng.gen());
-    let sender_pk = PublicKey::from_private(&private_key, p_g, &jubjub_params);
+    let sender_pk = PublicKey::from_private(&private_key, p_g, jubjub_params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
     assert!(sig_bits_to_hash.len() < MAX_CIRCUIT_MSG_HASH_BITS);
@@ -274,9 +274,9 @@ pub fn generate_dummy_sig_data(
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
-    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
-    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
-    let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(first_sig_part_bits);
+    let second_sig_part: Fr = le_bit_vector_into_field_element(second_sig_part_bits);
+    let third_sig_part: Fr = le_bit_vector_into_field_element(third_sig_part_bits);
     let sig_msg = rescue_hasher.hash_bits(sig_bits_to_hash.clone());
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
@@ -301,9 +301,9 @@ pub fn generate_sig_witness(bits: &[bool]) -> (Fr, Fr, Fr) {
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
-    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
-    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
-    let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(first_sig_part_bits);
+    let second_sig_part: Fr = le_bit_vector_into_field_element(second_sig_part_bits);
+    let third_sig_part: Fr = le_bit_vector_into_field_element(third_sig_part_bits);
     (first_sig_part, second_sig_part, third_sig_part)
 }
 
@@ -526,11 +526,11 @@ impl SigDataInput {
         pub_key: &PackedPublicKey,
     ) -> Result<SigDataInput, anyhow::Error> {
         let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-        let r_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(&r_bytes)
+        let r_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(r_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
-        let s_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(&s_bytes)
+        let s_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(s_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
@@ -538,7 +538,7 @@ impl SigDataInput {
             r_packed: r_bits,
             s: s_bits,
         };
-        let sig_bits: Vec<bool> = zksync_crypto::primitives::BitConvert::from_be_bytes(&tx_bytes);
+        let sig_bits: Vec<bool> = zksync_crypto::primitives::BitConvert::from_be_bytes(tx_bytes);
 
         let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(&sig_bits);
 
@@ -723,10 +723,7 @@ pub fn get_used_subtree_root_hash(account_tree: &CircuitAccountTree) -> Fr {
     // We take account 0, and hash it with it's Merkle proof.
     let account_index = 0;
     let account_merkle_path = account_tree.merkle_path(account_index);
-    let account = account_tree
-        .get(account_index)
-        .cloned()
-        .unwrap_or_else(CircuitAccount::default);
+    let account = account_tree.get(account_index).cloned().unwrap_or_default();
     let mut current_hash = account_tree.hasher.hash_bits(account.get_bits_le());
     for merkle_path_item in account_merkle_path
         .iter()

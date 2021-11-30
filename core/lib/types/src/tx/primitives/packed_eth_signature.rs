@@ -48,7 +48,7 @@ impl PackedEthSignature {
         }
 
         let mut bytes_array = [0u8; 65];
-        bytes_array.copy_from_slice(&bytes);
+        bytes_array.copy_from_slice(bytes);
 
         if bytes_array[64] >= 27 {
             bytes_array[64] -= 27;

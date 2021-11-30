@@ -59,7 +59,7 @@ fn test_mint_nft_success() {
             mint_nft_op,
             input,
             |plasma_state, op| {
-                let fee = <ZkSyncState as TxHandler<MintNFT>>::apply_op(plasma_state, &op)
+                let fee = <ZkSyncState as TxHandler<MintNFT>>::apply_op(plasma_state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();
@@ -359,7 +359,7 @@ fn test_mint_nft_corrupted_ops_input() {
             input,
             ERR_MSG,
             |plasma_state, op| {
-                let fee = <ZkSyncState as TxHandler<MintNFT>>::apply_op(plasma_state, &op)
+                let fee = <ZkSyncState as TxHandler<MintNFT>>::apply_op(plasma_state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();

@@ -56,8 +56,7 @@ impl EventsState {
         &mut self,
         genesis_transaction: &Transaction,
     ) -> Result<u64, anyhow::Error> {
-        let genesis_block_number =
-            get_block_number_from_ethereum_transaction(&genesis_transaction)?;
+        let genesis_block_number = get_block_number_from_ethereum_transaction(genesis_transaction)?;
         self.last_watched_eth_block_number = genesis_block_number;
         Ok(genesis_block_number)
     }
@@ -70,7 +69,7 @@ impl EventsState {
     pub fn sift_priority_ops(&mut self, serial_ids_to_keep: &[SerialId]) {
         let mut priority_op_data = HashMap::with_capacity(self.priority_op_data.len());
         for serial_id in serial_ids_to_keep {
-            if let Some(priority_op) = self.priority_op_data.remove(&serial_id) {
+            if let Some(priority_op) = self.priority_op_data.remove(serial_id) {
                 priority_op_data.insert(*serial_id, priority_op);
             }
         }
