@@ -25,6 +25,7 @@ use zksync_api_types::{
     TxWithSignature,
 };
 use zksync_config::ZkSyncConfig;
+use zksync_storage::misc::records::Subsidy;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
     tx::{
@@ -34,6 +35,7 @@ use zksync_types::{
     AccountId, Address, BatchFee, Fee, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
     H160,
 };
+use zksync_utils::big_decimal_to_ratio;
 
 // Local uses
 use crate::{
@@ -67,6 +69,8 @@ pub struct TxSender {
     // Limit the number of both transactions and Ethereum signatures per batch.
     pub max_number_of_transactions_per_batch: usize,
     pub max_number_of_authors_per_batch: usize,
+
+    pub current_subsidy_type: String,
 }
 
 #[derive(Debug, Error)]
@@ -169,6 +173,7 @@ impl TxSender {
             fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
+            current_subsidy_type: config.ticker.subsidy_name,
         }
     }
 
@@ -353,7 +358,7 @@ impl TxSender {
         mut tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
-        ip: Option<String>,
+        should_subsidie_cpk: bool,
     ) -> Result<TxHash, SubmitError> {
         let fast_processing = fast_processing.unwrap_or(false);
         if fast_processing && !tx.is_withdraw() {
@@ -374,11 +379,60 @@ impl TxSender {
         self.submit_tx(tx, signature, ip).await
     }
 
+    pub fn can_subsidize(&self, new_subsidy_usd_cents: u64) -> bool {
+        100 >= new_subsidy_usd_cents
+    }
+
+    pub async fn store_subsidy_data(
+        &mut self,
+        hash: TxHash,
+        fee_data: ResponseFee,
+        token_id: TokenId,
+    ) -> Result<(), anyhow::Error> {
+        let token_price_in_usd = Self::ticker_price_request(
+            self.ticker_requests.clone(),
+            check_token.clone(),
+            TokenPriceRequestType::USDForOneWei,
+        )
+        .await?;
+
+        let full_cost_usd_cents = big_decimal_to_ratio(&token_price_in_usd)
+            * fee_data.normal_fee.total_fee
+            * BigUint::from(100);
+        let subsidized_cost_usd_cents = big_decimal_to_ratio(&token_price_in_usd)
+            * fee_data.subsidized_fee.total_fee
+            * BigUint::from(100);
+
+        let full_cost_usd_cents = ratio_to_u64(full_cost_usd_cents);
+        let subsidized_cost_usd_cents = ratio_to_u64(subsidized_cost_usd_cents);
+
+        if full_cost_usd_cents > subsidized_cost_usd_cents {
+            panic!("Trying to subsidize transaction which should not be subsidized");
+        }
+
+        let subsidy = Subsidy {
+            usd_amount: full_cost_usd_cents - subsidized_cost_usd_cents,
+            full_cost_usd: fee_data.full_cost_usd_cents,
+            token_id,
+            token_amount: fee_data.subsidized_fee.total_fee,
+            full_cost_token: fee_data.normal_fee.total_fee,
+            subsidy_type: self.current_subsidy_type,
+            tx_hash: hash,
+        };
+
+        self.pool
+            .access_storage()
+            .await?
+            .misc_schema()
+            .store_subsidy(subsidy)
+            .await?;
+    }
+
     pub async fn submit_tx(
         &self,
         tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
-        ip: Option<String>,
+        should_subsidie_cpk: bool,
     ) -> Result<TxHash, SubmitError> {
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
@@ -408,6 +462,9 @@ impl TxSender {
         let sign_verify_channel = self.sign_verify_requests.clone();
         let ticker_request_sender = self.ticker_requests.clone();
 
+        let mut fee_data: Option<ResponseFee> = None;
+        let mut subsidized = false;
+
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
             let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
                 || self.enforce_pubkey_change_fee;
@@ -423,13 +480,19 @@ impl TxSender {
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone(), ip)
                     .await?;
 
+            fee_data = Some(required_fee_data.clone());
+
+            let required_fee_data = if should_subsidie_cpk
+                && self.can_subsidize(required_fee_data.subsidy_size_usd_cents)
+            {
+                subsidized = true;
+                required_fee_data.subsidized_fee
+            } else {
+                required_fee_data.normal_fee
+            };
+
             // Converting `BitUint` to `BigInt` is safe.
-            let required_fee: BigDecimal = required_fee_data
-                .normal_fee
-                .total_fee
-                .to_bigint()
-                .unwrap()
-                .into();
+            let required_fee: BigDecimal = required_fee_data.total_fee.to_bigint().unwrap().into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee = scale_user_fee_up(provided_fee);
@@ -472,6 +535,21 @@ impl TxSender {
             .await
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
+
+        if subsidized {
+            // `subsidized` is set to true only if we calculated the fee
+            let fee_data = fee_data.unwrap();
+
+            // The following two bad scenarios are possible when applying subsidy for the tx:
+            // - The subsidy is stored, but the tx is then rejected by the state keeper
+            // - The tx is accepted by the state keeper, but the the `store_subsidy_data` returns an error for some reason
+            //
+            // Trying to omit these scenarios unfortunately leads to large code restructure
+            // which is not worth it for subsidies (we prefer stability here)
+            self.store_subsidy_data(tx.hash(), fee_data, token.id)
+                .await?;
+        }
+
         // if everything is OK, return the transactions hashes.
         Ok(tx.hash())
     }
@@ -480,7 +558,7 @@ impl TxSender {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-        ip: Option<String>,
+        should_subsidie_cpk: bool,
     ) -> Result<SubmitBatchResponse, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
@@ -510,6 +588,7 @@ impl TxSender {
         let eth_token = TokenLike::Id(TokenId(0));
 
         let mut token_fees = HashMap::<Address, BigUint>::new();
+        let mut token_fees_ids = vec![];
 
         for tx in &txs {
             let tx_fee_info = tx.tx.get_fee_info();
@@ -549,6 +628,7 @@ impl TxSender {
                 .await?;
 
                 let token_data = self.token_info_from_id(token).await?;
+                token_fees_ids.push(token);
                 let mut token_fee = token_fees.remove(&token_data.address).unwrap_or_default();
                 token_fee += &provided_fee;
                 token_fees.insert(token_data.address, token_fee);
@@ -559,6 +639,9 @@ impl TxSender {
             }
         }
 
+        let mut subsidized = false;
+        let mut fee_data: Option<ResponseBatchFee> = None;
+
         // Only one token in batch
         if token_fees.len() == 1 {
             let (batch_token, fee_paid) = token_fees.into_iter().next().unwrap();
@@ -566,13 +649,22 @@ impl TxSender {
                 self.ticker_requests.clone(),
                 transaction_types.clone(),
                 batch_token.into(),
-                ip,
             )
             .await?;
+
+            let required_fee = if should_subsidie_cpk
+                && self.can_subsidize(batch_token_fee.subsidy_size_usd_cents)
+            {
+                subsidized = true;
+                fee_data = Some(batch_token_fee.clone());
+                batch_token_fee.subsidized_fee.total_fee
+            } else {
+                batch_token_fee.normal_fee.total_fee
+            };
+
             let user_provided_fee =
                 scale_user_fee_up(BigDecimal::from(fee_paid.to_bigint().unwrap()));
-            let required_normal_fee =
-                BigDecimal::from(batch_token_fee.normal_fee.total_fee.to_bigint().unwrap());
+            let required_normal_fee = BigDecimal::from(required_fee.to_bigint().unwrap());
 
             // Not enough fee
             if required_normal_fee > user_provided_fee {
@@ -589,10 +681,18 @@ impl TxSender {
                 self.ticker_requests.clone(),
                 transaction_types,
                 eth_token.clone(),
-                ip,
             )
-            .await?
-            .normal_fee;
+            .await?;
+
+            let required_fee = if should_subsidie_cpk
+                && self.can_subsidize(required_eth_fee.subsidy_size_usd_cents)
+            {
+                subsidized = true;
+                fee_data = Some(batch_token_fee.clone());
+                required_eth_fee.subsidized_fee.total_fee
+            } else {
+                required_eth_fee.normal_fee.total_fee
+            };
 
             let eth_price_in_usd = Self::ticker_price_request(
                 self.ticker_requests.clone(),
@@ -602,8 +702,7 @@ impl TxSender {
             .await?;
 
             let required_total_usd_fee =
-                BigDecimal::from(required_eth_fee.total_fee.to_bigint().unwrap())
-                    * &eth_price_in_usd;
+                BigDecimal::from(required_fee.to_bigint().unwrap()) * &eth_price_in_usd;
 
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
@@ -700,6 +799,27 @@ impl TxSender {
             .map_err(SubmitError::TxAdd)?;
 
         let batch_hash = TxHash::batch_hash(&tx_hashes);
+
+        if subsidized {
+            // `subsidized` is set to true only if we calculated the fee
+            let fee_data = fee_data.unwrap();
+
+            let subsidy_token_id = if token_fees_ids.len() > 1 {
+                TokenId(0) // eth
+            } else {
+                token_fees_ids[0]
+            };
+
+            // The following two bad scenarios are possible when applying subsidy for the tx:
+            // - The subsidy is stored, but the tx is then rejected by the state keeper
+            // - The tx is accepted by the state keeper, but the the `store_subsidy_data` returns an error for some reason
+            //
+            // Trying to omit these scenarios unfortunately leads to large code restructure
+            // which is not worth it for subsidies (we prefer stability here)
+            self.store_subsidy_data(tx_hashes[0], fee_data, subsidy_token_id)
+                .await?;
+        }
+
         Ok(SubmitBatchResponse {
             transaction_hashes: tx_hashes.into_iter().map(TxHashSerializeWrapper).collect(),
             batch_hash,
@@ -728,13 +848,11 @@ impl TxSender {
         &self,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-        ip: Option<String>,
     ) -> Result<BatchFee, SubmitError> {
         let resp_fee = Self::ticker_batch_fee_request(
             self.ticker_requests.clone(),
             transactions,
             token.clone(),
-            ip,
         )
         .await?;
         Ok(resp_fee.normal_fee)
@@ -818,7 +936,6 @@ impl TxSender {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-        ip: Option<String>,
     ) -> Result<ResponseBatchFee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender
@@ -826,7 +943,6 @@ impl TxSender {
                 transactions,
                 token: token.clone(),
                 response: req.0,
-                ip,
             })
             .await
             .map_err(SubmitError::internal)?;
@@ -848,7 +964,6 @@ impl TxSender {
                 address,
                 token: token.clone(),
                 response: req.0,
-                ip,
             })
             .await
             .map_err(SubmitError::internal)?;

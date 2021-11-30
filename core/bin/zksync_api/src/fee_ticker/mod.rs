@@ -165,11 +165,16 @@ pub enum TokenPriceRequestType {
 #[derive(Debug)]
 pub struct ResponseFee {
     pub normal_fee: Fee,
+    pub subsidized_fee: Fee,
+    pub subsidy_size_usd_cents: u64,
+    //  pub normal_fee_usd_cents: u64
 }
 
 #[derive(Debug)]
 pub struct ResponseBatchFee {
     pub normal_fee: BatchFee,
+    pub subsidized_fee: BatchFee,
+    pub subsidy_size_usd_cents: u64,
 }
 
 #[derive(Debug)]
@@ -179,13 +184,11 @@ pub enum TickerRequest {
         address: Address,
         token: TokenLike,
         response: oneshot::Sender<Result<ResponseFee, anyhow::Error>>,
-        ip: Option<String>,
     },
     GetBatchTxFee {
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
         response: oneshot::Sender<Result<ResponseBatchFee, anyhow::Error>>,
-        ip: Option<String>,
     },
     GetTokenPrice {
         token: TokenLike,
@@ -228,7 +231,6 @@ struct FeeTicker<API, INFO, WATCHER> {
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
     validator: FeeTokenValidator<WATCHER>,
-    db_pool: ConnectionPool,
 }
 
 struct FeeTickerBuilder<API, INFO, WATCHER> {
@@ -236,7 +238,6 @@ struct FeeTickerBuilder<API, INFO, WATCHER> {
     info: INFO,
     config: TickerConfig,
     validator: FeeTokenValidator<WATCHER>,
-    db_pool: ConnectionPool,
 }
 
 impl<API: Clone, INFO: Clone, WATCHER: Clone>
@@ -253,7 +254,6 @@ impl<API: Clone, INFO: Clone, WATCHER: Clone>
             requests: receiver,
             config: self.config.clone(),
             validator: self.validator.clone(),
-            db_pool: self.db_pool.clone(),
         }
     }
 }
@@ -327,10 +327,8 @@ pub fn run_ticker_task(
     let (price_source, base_url) = config.ticker.price_source();
     match price_source {
         TokenPriceSource::CoinMarketCap => {
-            let token_price_api = CoinMarketCapAPI::new(
-                cslient,
-                base_url.parse().expect("Correct CoinMarketCap url"),
-            );
+            let token_price_api =
+                CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
             let token_price_updater = ticker_api.clone();
@@ -421,7 +419,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     ip,
                 } => {
                     let fee = self
-                        .get_fee_from_ticker_in_wei(tx_type, token, address, ip)
+                        .get_fee_from_ticker_in_wei(tx_type, token, address)
                         .await;
                     metrics::histogram!("ticker.get_tx_fee", start.elapsed());
                     response.send(fee).unwrap_or_default()
@@ -478,20 +476,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
 
-    async fn should_subsidie_cpk(&self, ip: Option<String>) -> bool {
-        let ip = if let Some(ip_str) = ip {
-            ip_str
-        } else {
-            return false;
-        };
-
-        if self.config.subsidized_ips.contains(&ip) {
-            true
-        } else {
-            false
-        }
-    }
-
     fn can_apply_subsidy(&self, subsidy_amount_usd_cents: Ratio<BigUint>) -> bool {
         self.config.left_subsidy_usd_cents > subsidy_amount_usd_cents
     }
@@ -510,7 +494,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         tx_type: TxFeeTypes,
         token: TokenLike,
         recipient: Address,
-        ip: Option<String>,
     ) -> Result<ResponseFee, anyhow::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token).await?;
@@ -557,10 +540,11 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         {
             // Division by 100, it is safe to unwrap here
             let hundred = Ratio::from(BigUint::from(100u64));
-            let subsidized_fee_usd =
-                Ratio::from(BigUint::from(self.config.subsidy_cpk_price_usd_cents))
-                    .checked_div(&hundred)
-                    .unwrap();
+            let subsidized_fee_usd = self
+                .config
+                .subsidy_cpk_price_usd_cents
+                .checked_div(&hundred)
+                .unwrap();
             let token_price = self
                 .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
                 .await?;
@@ -570,22 +554,35 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             let token_price = big_decimal_to_ratio(&token_price).unwrap();
             let full_amount = subsidized_fee_usd.checked_div(&token_price).unwrap();
 
-            let subsidized_normal_fee = Fee::new(
-                fee_type,
-                Ratio::from(BigUint::zero()),
-                full_amount,
-                BigUint::zero(),
-                BigUint::zero(),
-            );
+            let subsidized_fee = if full_amount > normal_fee.total_fee {
+                normal_fee.clone()
+            } else {
+                Fee::new(
+                    fee_type,
+                    Ratio::from(BigUint::zero()),
+                    full_amount,
+                    BigUint::zero(),
+                    BigUint::zero(),
+                )
+            };
 
-            if subsidized_normal_fee.total_fee < normal_fee.total_fee {
-                return Ok(ResponseFee {
-                    normal_fee: subsidized_normal_fee,
-                });
-            }
+            let subsidy_size_usd_cents = token_price
+                * (normal_fee.total_fee - subsidized_fee.total_fee)
+                * BigUint::from(100);
+
+            return Ok(ResponseFee {
+                normal_fee,
+                subsidized_fee: subsidized_fee,
+                subsidy_size_usd_cents: ratio_to_u64(subsidy_size_usd_cents), //subsidized_fee_usd_cents: biguint_to_u64(subsidized_fee_usd_cents.to_integer()),
+                                                                              //normal_fee_usd_cents: biguint_to_u64(normal_fee_usd_cents.to_integer())
+            });
         }
 
-        Ok(ResponseFee { normal_fee })
+        Ok(ResponseFee {
+            normal_fee,
+            subsidized_fee: normal_fee,
+            subsidy_size_usd_cents: 0,
+        })
     }
 
     async fn get_batch_from_ticker_in_wei(
@@ -604,6 +601,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
 
         let mut total_normal_gas_tx_amount = Ratio::from(BigUint::zero());
         let mut total_op_chunks = Ratio::from(BigUint::zero());
+        let mut total_subsidized_gas_tx_amount = Ratio::from(BigUint::zero());
+        let mut total_subsidized_op_chunks = Ratio::from(BigUint::zero());
 
         /*
             The input of each operation in the batch gas price is the following:
@@ -621,13 +620,12 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
             .await?;
         let token_price = big_decimal_to_ratio(&token_price).unwrap();
-        let subsidized_gas_amount = Ratio::from(self.config.subsidy_cpk_price_usd_cents)
-            .div(BigUint::from(100))
-            / (&wei_price_usd * &scale_gas_price * token_usd_risk * token_price);
-
-        let mut total_subsidized_usd_amount = 0;
-        let mut total_subsidized_gas_amount = 0;
-        let mut total_subsidized_chunks = 0;
+        let subsidized_gas_amount = self.config.subsidy_cpk_price_usd_cents
+            / (&wei_price_usd
+                * &scale_gas_price
+                * token_usd_risk
+                * token_price
+                * BigUint::from(100));
 
         for (tx_type, recipient) in txs {
             let (output_fee_type, gas_tx_amount, op_chunks) =
@@ -645,22 +643,48 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                 gas_tx_amount.into()
             };
 
-            if matches!(tx_type, TxFeeTypes::ChangePubKey(_)) && self.should_subsidie_cpk(ip).await
-            {
+            total_normal_gas_tx_amount += gas_tx_amount;
+            total_op_chunks += op_chunks;
+
+            if matches!(tx_type, TxFeeTypes::ChangePubKey(_)) {
                 // The subsidy cost contains only gas cost
-                total_normal_gas_tx_amount += subsidized_gas_amount;
+                total_subsidized_gas_tx_amount += subsidized_gas_amount;
             } else {
-                total_normal_gas_tx_amount += gas_tx_amount;
-                total_op_chunks += op_chunks;
+                // No subsidy applied, so the standard fee goes even for subsidized fee
+                total_subsidized_gas_tx_amount += gas_tx_amount;
+                total_subsidized_op_chunks += op_chunks;
             }
         }
 
-        let total_zkp_fee = (zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
-        let total_normal_gas_fee =
-            (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price) * &token_usd_risk;
-        let normal_fee = BatchFee::new(total_zkp_fee, total_normal_gas_fee);
+        let normal_fee = {
+            let total_zkp_fee = (zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
+            let total_gas_fee =
+                (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price) * &token_usd_risk;
+            BatchFee::new(total_zkp_fee, total_gas_fee)
+        };
 
-        Ok(ResponseBatchFee { normal_fee })
+        let subsidized_fee = {
+            let total_zkp_fee =
+                (zkp_cost_chunk * total_subsidized_op_chunks) * token_usd_risk.clone();
+            let total_gas_fee =
+                (&wei_price_usd * total_subsidized_gas_tx_amount * &scale_gas_price)
+                    * &token_usd_risk;
+            BatchFee::new(total_zkp_fee, total_gas_fee)
+        };
+        let subsidized_fee = if normal_fee.total_fee < subsidized_fee.total_fee {
+            normal_fee.clone()
+        } else {
+            subsidized_fee
+        };
+
+        let subsidy_size_usd_cents =
+            token_price * (normal_fee.total_fee - subsidized_fee.total_fee) * BigUint::from(100);
+
+        Ok(ResponseBatchFee {
+            normal_fee,
+            subsidized_fee,
+            subsidy_size_usd_cents: ratio_to_u64(subsidy_size_usd_cents),
+        })
     }
 
     async fn wei_price_usd(&mut self) -> anyhow::Result<Ratio<BigUint>> {

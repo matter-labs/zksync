@@ -357,7 +357,6 @@ impl RpcApp {
                 transactions,
                 token: token.clone(),
                 response: req.0,
-                ip,
             })
             .await
             .expect("ticker receiver dropped");
@@ -382,7 +381,6 @@ impl RpcApp {
                 address,
                 token: token.clone(),
                 response: req.0,
-                ip,
             })
             .await
             .expect("ticker receiver dropped");

@@ -27,10 +27,10 @@ pub struct DbSubsidy {
 }
 
 pub struct Subsidy {
-    pub tx_hash: Vec<u8>,
+    pub tx_hash: TxHash,
     pub usd_amount: u64,
     pub full_cost_usd: u64,
-    pub token_id: i32,
+    pub token_id: TokenId,
     pub token_amount: BigDecimal,
     pub full_cost_token: BigDecimal,
     pub subsidy_type: String,

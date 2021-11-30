@@ -28,6 +28,14 @@ use crate::{
 use super::{types::*, RpcApp};
 
 impl RpcApp {
+    fn should_subsidie_cpk(&self, ip: Option<String>) -> bool {
+        if let Some(ip_str) = ip {
+            self.config.subsidized_ips.contains(&ip_str)
+        } else {
+            false
+        }
+    }
+
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
 
@@ -134,9 +142,11 @@ impl RpcApp {
             dbg!(ip);
         }
 
+        let is_subsidized_ip = self.should_subsidie_cpk(ip);
+
         let result = self
             .tx_sender
-            .submit_tx_with_separate_fp(*tx, *signature, fast_processing, ip)
+            .submit_tx_with_separate_fp(*tx, *signature, fast_processing, is_subsidized_ip)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.tx_submit", start.elapsed());
@@ -151,9 +161,11 @@ impl RpcApp {
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
 
+        let is_subsidized_ip = self.should_subsidie_cpk(ip);
+
         let result: Result<Vec<TxHash>> = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signatures, ip)
+            .submit_txs_batch(txs, eth_signatures, ip, is_subsidized_ip)
             .await
             .map_err(Error::from)
             .map(|response| {
@@ -254,8 +266,18 @@ impl RpcApp {
             Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone(), ip)
                 .await?;
 
+        let is_subsidized_ip = self.should_subsidie_cpk(ip);
+
+        let fee = if is_subsidized_ip
+            && result.subsidy_size_usd_cents <= self.tx_sender.subsidy_left_usd_cents
+        {
+            result.subsidized_fee
+        } else {
+            result.normal_fee
+        };
+
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
-        Ok(result.normal_fee)
+        Ok(fee)
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -290,9 +312,19 @@ impl RpcApp {
         let result =
             Self::ticker_batch_fee_request(ticker, transactions, token.clone(), ip).await?;
 
+        let is_subsidized_ip = self.should_subsidie_cpk(ip);
+
+        let fee = if is_subsidized_ip
+            && result.subsidy_size_usd_cents <= self.tx_sender.subsidy_left_usd_cents
+        {
+            result.subsidized_fee
+        } else {
+            result.normal_fee
+        };
+
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
         Ok(TotalFee {
-            total_fee: result.normal_fee.total_fee,
+            total_fee: fee.total_fee,
         })
     }
 
