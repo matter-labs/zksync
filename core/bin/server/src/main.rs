@@ -40,12 +40,12 @@ pub enum Component {
     RpcWebSocketApi,
 
     EthSender,
+    Core,
 
     WitnessGenerator,
     ForcedExit,
     Prometheus,
 
-    Core,
     RejectedTaskCleaner,
 }
 
@@ -142,11 +142,7 @@ async fn run_server(components: &ComponentsToRun) {
     if components.0.iter().any(|c| {
         matches!(
             c,
-            Component::Core
-                | Component::RpcWebSocketApi
-                | Component::RpcApi
-                | Component::RestApi
-                | Component::EthSender
+            Component::RpcWebSocketApi | Component::RpcApi | Component::RestApi
         )
     }) {
         let eth_client_config = ETHClientConfig::from_env();
@@ -161,27 +157,16 @@ async fn run_server(components: &ComponentsToRun) {
 
         let gateway_watcher_config = GatewayWatcherConfig::from_env();
 
-        run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &gateway_watcher_config)
-            .map(|task| tasks.push(task));
+        if let Some(task) =
+            run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &gateway_watcher_config)
+        {
+            tasks.push(task);
+        }
 
         let channel_size = 32768;
 
         let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(channel_size);
         let chain_config = ChainConfig::from_env();
-
-        if components.0.contains(&Component::Core) {
-            let all_config = ZkSyncConfig::from_env();
-            tasks.append(
-                &mut run_core(
-                    connection_pool.clone(),
-                    &all_config,
-                    stop_signal_sender.clone(),
-                    eth_gateway.clone(),
-                )
-                .await
-                .unwrap(),
-            );
-        }
 
         let max_blocks_to_aggregate = std::cmp::max(
             chain_config.state_keeper.max_aggregated_blocks_to_commit,
@@ -200,7 +185,7 @@ async fn run_server(components: &ComponentsToRun) {
         let (sign_check_sender, sign_check_receiver) = mpsc::channel(32768);
 
         zksync_api::signature_checker::start_sign_checker_detached(
-            eth_gateway.clone(),
+            eth_gateway,
             sign_check_receiver,
             stop_signal_sender.clone(),
         );
@@ -251,14 +236,46 @@ async fn run_server(components: &ComponentsToRun) {
                 private_config.url,
             );
         }
-        if components.0.contains(&Component::EthSender) {
-            // Run Ethereum sender actors.
-            vlog::info!("Starting the Ethereum sender actors");
-            let config = ETHSenderConfig::from_env();
-            tasks.push(run_eth_sender(connection_pool.clone(), eth_gateway, config));
-        }
     }
 
+    if components.0.contains(&Component::EthSender) {
+        // Run Ethereum sender actors.
+        vlog::info!("Starting the Ethereum sender actors");
+        let eth_client_config = ETHClientConfig::from_env();
+        let eth_sender_config = ETHSenderConfig::from_env();
+        let contracts = ContractsConfig::from_env();
+        let eth_gateway = EthereumGateway::from_config(
+            &eth_client_config,
+            &eth_sender_config,
+            contracts.contract_addr,
+        );
+
+        tasks.push(run_eth_sender(
+            connection_pool.clone(),
+            eth_gateway,
+            eth_sender_config,
+        ));
+    }
+
+    if components.0.contains(&Component::Core) {
+        let all_config = ZkSyncConfig::from_env();
+        let eth_gateway = EthereumGateway::from_config(
+            &all_config.eth_client,
+            &all_config.eth_sender,
+            all_config.contracts.contract_addr,
+        );
+
+        tasks.append(
+            &mut run_core(
+                connection_pool.clone(),
+                &all_config,
+                stop_signal_sender.clone(),
+                eth_gateway.clone(),
+            )
+            .await
+            .unwrap(),
+        );
+    }
     if components.0.contains(&Component::WitnessGenerator) {
         vlog::info!("Starting the Prover server actors");
         let prover_api_config = ProverApiConfig::from_env();

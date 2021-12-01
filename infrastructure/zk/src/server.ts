@@ -20,7 +20,7 @@ export async function web3Node() {
 
 export async function apiNode() {
     await utils.spawn(
-        'cargo run --bin zksync_server --release -- --components=web3-api,rest-api,rpc-api,rpc-websocket-api,prometheus'
+        'cargo run --bin zksync_server --release -- --components=web3-api,rest-api,rpc-api,rpc-websocket-api'
     );
 }
 

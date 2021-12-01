@@ -13,7 +13,6 @@ use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
 use zksync_config::{ChainConfig, ZkSyncConfig};
 use zksync_eth_client::EthereumGateway;
-use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_storage::ConnectionPool;
 use zksync_types::{tokens::get_genesis_token_list, Token, TokenId, TokenKind};
 
@@ -159,14 +158,11 @@ pub async fn run_core(
         config.chain.state_keeper.block_chunk_sizes.clone(),
     );
 
-    let gateway_watcher_task_opt =
-        run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config.gateway_watcher);
-
     // Start token handler.
     let token_handler_task = run_token_handler(
         connection_pool.clone(),
         eth_watch_req_sender.clone(),
-        config,
+        &config.token_handler,
     );
 
     // Start token handler.
@@ -196,7 +192,7 @@ pub async fn run_core(
         config.api.private.clone(),
     );
 
-    let mut task_futures = vec![
+    let task_futures = vec![
         eth_watch_task,
         state_keeper_task,
         committer_task,
@@ -206,10 +202,6 @@ pub async fn run_core(
         register_factory_task,
         tx_event_emitter_task,
     ];
-
-    if let Some(task) = gateway_watcher_task_opt {
-        task_futures.push(task);
-    }
 
     Ok(task_futures)
 }
