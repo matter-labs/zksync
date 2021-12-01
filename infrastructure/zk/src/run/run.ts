@@ -115,8 +115,8 @@ export async function catLogs(exitCode?: number) {
 export async function testAccounts() {
     const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
     const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
-    const NUM_TEST_WALLETS = 10;
-    const baseWalletPath = "m/44'/137'/0'/0/";
+    //const NUM_TEST_WALLETS = 10;
+    //const baseWalletPath = "m/44'/137'/0'/0/";
     const walletKeys = [];
 
     let ethWallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'));

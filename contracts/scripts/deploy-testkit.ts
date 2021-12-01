@@ -1,4 +1,4 @@
-import { ethers, Wallet } from 'ethers';
+import { Wallet } from 'ethers';
 import { Deployer, readContractCode, readProductionContracts } from '../src.ts/deploy';
 import { deployContract } from 'ethereum-waffle';
 import { ArgumentParser } from 'argparse';
