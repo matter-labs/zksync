@@ -2,7 +2,7 @@
 use std::str::FromStr;
 // External uses
 use ethabi::{ParamType, Token};
-use futures::future::{join, join5, Future};
+use futures::future::{join, join4, join5, Future};
 use jsonrpc_core::{Error, ErrorCode, IoHandler, Params};
 use jsonrpc_core_client::{RawClient, RpcError, RpcResult};
 use num::BigUint;
@@ -51,7 +51,6 @@ async fn static_methods() -> anyhow::Result<()> {
     let fut = {
         let (client, server) = local_client().await?;
         let web3_client_version = client.call_method("web3_clientVersion", Params::None);
-        let net_version = client.call_method("net_version", Params::None);
         let protocol_version = client.call_method("eth_protocolVersion", Params::None);
         let mining = client.call_method("eth_mining", Params::None);
         let hashrate = client.call_method("eth_hashrate", Params::None);
@@ -65,13 +64,7 @@ async fn static_methods() -> anyhow::Result<()> {
             "eth_getUncleCountByBlockNumber",
             Params::Array(vec![serde_json::to_value(U64::zero()).unwrap()]),
         );
-        let first_join = join5(
-            web3_client_version,
-            net_version,
-            protocol_version,
-            mining,
-            hashrate,
-        );
+        let first_join = join4(web3_client_version, protocol_version, mining, hashrate);
         let second_join = join5(
             gas_price,
             accounts,
@@ -83,11 +76,10 @@ async fn static_methods() -> anyhow::Result<()> {
         join(first_join, second_join)
     };
     let (
-        (web3_client_version, net_version, protocol_version, mining, hashrate),
+        (web3_client_version, protocol_version, mining, hashrate),
         (gas_price, accounts, get_uncle_count_by_block_hash, get_uncle_count_by_block_number, _),
     ) = fut.await;
     assert_eq!(web3_client_version.unwrap().as_str().unwrap(), "zkSync");
-    assert_eq!(net_version.unwrap().as_str().unwrap(), "9");
     assert_eq!(protocol_version.unwrap().as_str().unwrap(), "0");
     assert!(!mining.unwrap().as_bool().unwrap());
     assert_eq!(hashrate.unwrap().as_str().unwrap(), "0x0");

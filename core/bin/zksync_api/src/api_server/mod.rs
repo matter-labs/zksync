@@ -4,15 +4,6 @@
 //! `mod rpc_server` - JSON rpc via HTTP (for request reply functions)
 //! `mod rpc_subscriptions` - JSON rpc via WebSocket (for request reply functions and subscriptions)
 
-// External uses
-use futures::channel::mpsc;
-// Workspace uses
-
-use zksync_eth_client::EthereumGateway;
-use zksync_storage::ConnectionPool;
-// Local uses
-use crate::fee_ticker::TickerRequest;
-
 mod event_notify;
 pub mod forced_exit_checker;
 mod helpers;
