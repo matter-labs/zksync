@@ -2,7 +2,7 @@
 use std::str::FromStr;
 // External uses
 use ethabi::{ParamType, Token};
-use futures::future::{join, join4, join5, Future};
+use futures::future::{join, join5, Future};
 use jsonrpc_core::{Error, ErrorCode, IoHandler, Params};
 use jsonrpc_core_client::{RawClient, RpcError, RpcResult};
 use num::BigUint;

@@ -140,7 +140,8 @@ async fn run_server(components: &ComponentsToRun) {
     if components.0.iter().any(|c| {
         matches!(
             c,
-            Component::RpcWebSocketApi
+            Component::Core
+                | Component::RpcWebSocketApi
                 | Component::RpcApi
                 | Component::RestApi
                 | Component::EthSender
@@ -157,8 +158,10 @@ async fn run_server(components: &ComponentsToRun) {
         );
 
         let gateway_watcher_config = GatewayWatcherConfig::from_env();
-        let _gateway_watcher_task_opt =
-            run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &gateway_watcher_config);
+
+        run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &gateway_watcher_config)
+            .map(|task| tasks.push(task));
+
         let channel_size = 32768;
 
         let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(channel_size);
