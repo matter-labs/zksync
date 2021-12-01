@@ -4,7 +4,7 @@ use structopt::StructOpt;
 
 use serde::{Deserialize, Serialize};
 
-use zksync_core::{genesis_init, wait_for_tasks};
+use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_eth_sender::run_eth_sender;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
@@ -19,7 +19,7 @@ use zksync_config::configs::api::{
 };
 use zksync_config::{
     ChainConfig, ContractsConfig, DBConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig,
-    ForcedExitRequestsConfig, GatewayWatcherConfig, ProverConfig, TickerConfig,
+    ForcedExitRequestsConfig, GatewayWatcherConfig, ProverConfig, TickerConfig, ZkSyncConfig,
 };
 use zksync_core::rejected_tx_cleaner::run_rejected_tx_cleaner;
 use zksync_storage::ConnectionPool;
@@ -67,7 +67,9 @@ impl FromStr for Component {
     }
 }
 
+#[derive(Debug)]
 struct ComponentsToRun(Vec<Component>);
+
 impl FromStr for ComponentsToRun {
     type Err = String;
 
@@ -121,6 +123,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn run_server(components: &ComponentsToRun) {
+    println!("{:?}", components);
     let connection_pool = ConnectionPool::new(None);
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
 
@@ -185,9 +188,22 @@ async fn run_server(components: &ComponentsToRun) {
         );
 
         let private_config = PrivateApiConfig::from_env();
-        let contracts_config = ContractsConfig::from_env();
 
+        let all_config = ZkSyncConfig::from_env();
+        tasks.append(
+            &mut run_core(
+                connection_pool.clone(),
+                &all_config,
+                stop_signal_sender.clone(),
+                eth_gateway.clone(),
+            )
+            .await
+            .unwrap(),
+        );
+
+        let contracts_config = ContractsConfig::from_env();
         let common_config = CommonApiConfig::from_env();
+
         if components.0.contains(&Component::RpcWebSocketApi) {
             let config = JsonRpcConfig::from_env();
             zksync_api::api_server::rpc_subscriptions::start_ws_server(
@@ -202,6 +218,21 @@ async fn run_server(components: &ComponentsToRun) {
                 eth_watch_config.confirmations_for_eth_event,
             );
         }
+
+        if components.0.contains(&Component::RpcApi) {
+            let config = JsonRpcConfig::from_env();
+            zksync_api::api_server::rpc_server::start_rpc_server(
+                connection_pool.clone(),
+                sign_check_sender.clone(),
+                ticker_request_sender.clone(),
+                stop_signal_sender.clone(),
+                &config,
+                &common_config,
+                private_config.url.clone(),
+                eth_watch_config.confirmations_for_eth_event,
+            );
+        }
+
         if components.0.contains(&Component::RestApi) {
             let config = RestApiConfig::from_env();
             zksync_api::api_server::rest::start_server_thread_detached(
