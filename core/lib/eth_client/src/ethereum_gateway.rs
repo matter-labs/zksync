@@ -4,7 +4,7 @@ use web3::transports::Http;
 use web3::types::{Address, BlockId, Filter, Log, Transaction, U64};
 
 use std::fmt::Debug;
-use zksync_config::{ETHClientConfig, ETHSenderConfig, ZkSyncConfig};
+use zksync_config::{ETHClientConfig, ETHSenderConfig};
 use zksync_contracts::zksync_contract;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};

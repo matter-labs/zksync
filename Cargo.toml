@@ -36,7 +36,6 @@ members = [
     "core/lib/notifier",
     "core/lib/api_types",
     "core/lib/balancer",
-    "core/lib/envy_macro",
 
     # Test infrastructure
     "core/tests/test_account",

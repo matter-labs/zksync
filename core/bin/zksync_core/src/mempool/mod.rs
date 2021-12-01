@@ -32,7 +32,7 @@ use tokio::task::JoinHandle;
 
 // Workspace uses
 use zksync_balancer::{Balancer, BuildBalancedItem};
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},

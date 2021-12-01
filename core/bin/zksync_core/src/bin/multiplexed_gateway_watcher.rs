@@ -1,7 +1,4 @@
-use zksync_config::{
-    ContractsConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig, GatewayWatcherConfig,
-    ZkSyncConfig,
-};
+use zksync_config::{ContractsConfig, ETHClientConfig, ETHSenderConfig, GatewayWatcherConfig};
 use zksync_eth_client::EthereumGateway;
 use zksync_gateway_watcher::MultiplexedGatewayWatcher;
 

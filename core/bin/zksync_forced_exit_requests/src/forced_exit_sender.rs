@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use num::BigUint;
 use tokio::time;
 
-use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
+use zksync_config::ForcedExitRequestsConfig;
 
 use zksync_types::{
     forced_exit_requests::ForcedExitRequest, tx::TimeRange, tx::TxHash, AccountId, Address, Nonce,
@@ -297,7 +297,7 @@ mod test {
         let forced_exit_requests = ForcedExitRequestsConfig {
             // There must be 10 digits in id
             digits_in_id: 10,
-            ..config.forced_exit_requests
+            ..ForcedExitRequestsConfig::from_env()
         };
 
         let forced_exit_sender = get_test_forced_exit_sender(Some(forced_exit_requests));

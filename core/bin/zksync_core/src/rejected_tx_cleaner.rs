@@ -10,7 +10,7 @@
 use tokio::{task::JoinHandle, time};
 
 // Workspace deps
-use zksync_config::{DBConfig, ZkSyncConfig};
+use zksync_config::DBConfig;
 use zksync_storage::ConnectionPool;
 
 #[must_use]

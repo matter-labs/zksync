@@ -20,7 +20,7 @@ use crate::{
 };
 use std::time::Duration;
 use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
-use zksync_config::ZkSyncConfig;
+
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[rpc]

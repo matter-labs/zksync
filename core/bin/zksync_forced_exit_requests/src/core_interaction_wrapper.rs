@@ -1,6 +1,6 @@
 use chrono::Utc;
 use num::Zero;
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::{chain::operations_ext::records::TxReceiptResponse, ConnectionPool};
 use zksync_types::{
     forced_exit_requests::{ForcedExitRequest, ForcedExitRequestId},

@@ -7,7 +7,7 @@ use tokio::{task::JoinHandle, time};
 use tokio_stream::wrappers::IntervalStream;
 use web3::types::{Block, BlockId, BlockNumber, H256, U64};
 
-use zksync_config::{GatewayWatcherConfig, ZkSyncConfig};
+use zksync_config::GatewayWatcherConfig;
 use zksync_eth_client::{EthereumGateway, MultiplexerEthereumClient};
 use zksync_utils::retry_opt;
 

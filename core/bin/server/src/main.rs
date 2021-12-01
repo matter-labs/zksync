@@ -1,18 +1,17 @@
-use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
-use std::cell::RefCell;
+use futures::{channel::mpsc, StreamExt};
+
 use structopt::StructOpt;
 
 use serde::{Deserialize, Serialize};
 
-use zksync_core::{genesis_init, run_core, wait_for_tasks};
+use zksync_core::{genesis_init, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_eth_sender::run_eth_sender;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
 use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
-use zksync_prometheus_exporter::run_prometheus_exporter;
+
 use zksync_witness_generator::run_prover_server;
 
-use crate::Component::EthSender;
 use std::str::FromStr;
 use zksync_api::fee_ticker::run_ticker_task;
 use zksync_config::configs::api::{
@@ -20,12 +19,10 @@ use zksync_config::configs::api::{
 };
 use zksync_config::{
     ChainConfig, ContractsConfig, DBConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig,
-    ForcedExitRequestsConfig, GatewayWatcherConfig, ProverConfig, TickerConfig, ZkSyncConfig,
+    ForcedExitRequestsConfig, GatewayWatcherConfig, ProverConfig, TickerConfig,
 };
 use zksync_core::rejected_tx_cleaner::run_rejected_tx_cleaner;
 use zksync_storage::ConnectionPool;
-use zksync_types::tx::EthSignData;
-use zksync_utils::{get_env, parse_env};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ServerCommand {
@@ -158,7 +155,7 @@ async fn run_server(components: &ComponentsToRun) {
         );
 
         let gateway_watcher_config = GatewayWatcherConfig::from_env();
-        let gateway_watcher_task_opt =
+        let _gateway_watcher_task_opt =
             run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &gateway_watcher_config);
         let channel_size = 32768;
 
@@ -212,20 +209,16 @@ async fn run_server(components: &ComponentsToRun) {
                 config.bind_addr(),
                 contracts_config.contract_addr,
                 stop_signal_sender.clone(),
-                ticker_request_sender.clone(),
-                sign_check_sender.clone(),
-                private_config.url.clone(),
+                ticker_request_sender,
+                sign_check_sender,
+                private_config.url,
             );
         }
         if components.0.contains(&Component::EthSender) {
             // Run Ethereum sender actors.
             vlog::info!("Starting the Ethereum sender actors");
             let config = ETHSenderConfig::from_env();
-            tasks.push(run_eth_sender(
-                connection_pool.clone(),
-                eth_gateway.clone(),
-                config,
-            ));
+            tasks.push(run_eth_sender(connection_pool.clone(), eth_gateway, config));
         }
     }
 
@@ -236,7 +229,7 @@ async fn run_server(components: &ComponentsToRun) {
         let database = zksync_witness_generator::database::Database::new(connection_pool.clone());
         run_prover_server(
             database,
-            stop_signal_sender.clone(),
+            stop_signal_sender,
             prover_api_config,
             prover_config,
         );
@@ -262,6 +255,15 @@ async fn run_server(components: &ComponentsToRun) {
 
     if components.0.contains(&Component::RejectedTaskCleaner) {
         let config = DBConfig::from_env();
-        run_rejected_tx_cleaner(&config, connection_pool.clone());
+        tasks.push(run_rejected_tx_cleaner(&config, connection_pool));
     }
+
+    tokio::select! {
+        _ = async { wait_for_tasks(tasks).await } => {
+            panic!("ForcedExitRequests actor is not supposed to finish its execution")
+        },
+        _ = async { stop_signal_receiver.next().await } => {
+            vlog::warn!("Stop signal received, shutting down");
+        }
+    };
 }

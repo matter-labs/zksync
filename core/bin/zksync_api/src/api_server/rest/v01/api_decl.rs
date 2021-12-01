@@ -11,7 +11,7 @@ use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
 use zksync_api_types::PriorityOpLookupQuery;
-use zksync_config::configs::api::CommonApiConfig;
+
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::{

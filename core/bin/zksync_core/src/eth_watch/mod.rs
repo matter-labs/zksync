@@ -29,7 +29,7 @@ use zksync_api_types::{
     },
     Either,
 };
-use zksync_config::{ContractsConfig, ETHWatchConfig, ZkSyncConfig};
+use zksync_config::{ContractsConfig, ETHWatchConfig};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{

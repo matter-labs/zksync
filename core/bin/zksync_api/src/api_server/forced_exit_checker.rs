@@ -1,5 +1,5 @@
 use crate::api_server::tx_sender::SubmitError;
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::StorageProcessor;
 use zksync_types::Address;
 

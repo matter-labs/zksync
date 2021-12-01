@@ -19,7 +19,7 @@ pub use zksync_api_client::rest::forced_exit_requests::{
 };
 
 use zksync_api_client::rest::forced_exit_requests::ConfigInfo;
-use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
+use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     forced_exit_requests::{
@@ -254,7 +254,7 @@ mod tests {
     use num::BigUint;
 
     use zksync_api_client::rest::client::Client;
-    use zksync_config::ForcedExitRequestsConfig;
+    use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
     use zksync_storage::ConnectionPool;
     use zksync_types::{Address, TokenId};
 

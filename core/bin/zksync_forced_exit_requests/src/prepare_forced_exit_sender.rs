@@ -1,6 +1,6 @@
 use num::BigUint;
 use std::time::Duration;
-use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
+use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, ConnectionPool, StorageProcessor,
 };

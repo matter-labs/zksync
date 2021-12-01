@@ -1,5 +1,5 @@
 use tokio::task::JoinHandle;
-use zksync_config::{ContractsConfig, ForcedExitRequestsConfig, ZkSyncConfig};
+use zksync_config::{ContractsConfig, ForcedExitRequestsConfig};
 use zksync_storage::ConnectionPool;
 
 use zksync_api::core_api_client::CoreApiClient;

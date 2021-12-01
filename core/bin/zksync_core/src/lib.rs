@@ -6,7 +6,6 @@ use crate::{
     eth_watch::start_eth_watch,
     mempool::run_mempool_tasks,
     private_api::start_private_core_api,
-    rejected_tx_cleaner::run_rejected_tx_cleaner,
     state_keeper::{start_state_keeper, ZkSyncStateKeeper},
     token_handler::run_token_handler,
 };

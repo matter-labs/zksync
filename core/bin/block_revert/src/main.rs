@@ -7,9 +7,7 @@ use web3::{
     contract::Options,
     types::{TransactionReceipt, U256, U64},
 };
-use zksync_config::{
-    ContractsConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig, ZkSyncConfig,
-};
+use zksync_config::{ContractsConfig, ETHClientConfig, ETHSenderConfig};
 use zksync_eth_client::EthereumGateway;
 use zksync_storage::StorageProcessor;
 use zksync_types::{aggregated_operations::stored_block_info, block::Block, BlockNumber, H256};

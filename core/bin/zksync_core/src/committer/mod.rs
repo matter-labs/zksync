@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::mempool::MempoolBlocksRequest;
-use zksync_config::{ChainConfig, ZkSyncConfig};
+use zksync_config::ChainConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},

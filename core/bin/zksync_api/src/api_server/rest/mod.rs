@@ -11,8 +11,8 @@ use self::v01::api_decl::ApiV01;
 use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest};
 
 use super::tx_sender::TxSender;
-use zksync_config::configs::api::CommonApiConfig;
-use zksync_config::{ApiConfig, ZkSyncConfig};
+
+use zksync_config::ZkSyncConfig;
 
 mod forced_exit_requests;
 mod helpers;

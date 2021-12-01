@@ -27,7 +27,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 // Workspace deps
 use zksync_balancer::{Balancer, BuildBalancedItem};
-use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
+use zksync_config::configs::ticker::TokenPriceSource;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address, BatchFee, ChangePubKeyOp, Fee,

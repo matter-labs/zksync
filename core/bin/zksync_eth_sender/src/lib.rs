@@ -14,7 +14,7 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use zksync_config::{ETHSenderConfig, ZkSyncConfig};
+use zksync_config::ETHSenderConfig;
 use zksync_eth_client::{EthereumGateway, SignedCallResult};
 use zksync_storage::ConnectionPool;
 use zksync_types::ethereum::ETHOperation;

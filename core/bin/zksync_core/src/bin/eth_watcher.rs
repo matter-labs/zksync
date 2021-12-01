@@ -3,9 +3,7 @@ use std::time::Duration;
 use futures::{channel::mpsc, SinkExt};
 use tokio::{runtime::Runtime, time};
 
-use zksync_config::{
-    ContractsConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig, ZkSyncConfig,
-};
+use zksync_config::{ContractsConfig, ETHClientConfig, ETHSenderConfig};
 use zksync_core::eth_watch::{EthHttpClient, EthWatch, EthWatchRequest};
 use zksync_eth_client::EthereumGateway;
 

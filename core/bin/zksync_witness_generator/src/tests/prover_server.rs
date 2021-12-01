@@ -42,7 +42,12 @@ async fn spawn_server(database: MockDatabase) {
     let (tx, _rx) = mpsc::channel(1);
 
     thread::spawn(move || {
-        run_prover_server(database, tx, prover_options.0);
+        run_prover_server(
+            database,
+            tx,
+            prover_options.0.api.prover,
+            prover_options.0.prover,
+        );
     });
 }
 

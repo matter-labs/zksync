@@ -8,7 +8,7 @@ use futures::{
 };
 use tokio::task::JoinHandle;
 // Workspace uses
-use zksync_config::{TokenHandlerConfig, ZkSyncConfig};
+use zksync_config::TokenHandlerConfig;
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::RegisterNFTFactoryEvent;
 // Local uses

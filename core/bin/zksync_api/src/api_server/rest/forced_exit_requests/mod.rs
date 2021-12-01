@@ -3,14 +3,13 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 pub use zksync_api_client::rest::client::{Client, ClientError};
-use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
+use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::ConnectionPool;
 
 // Local uses
 use crate::api_server::forced_exit_checker::ForcedExitChecker;
 use error::ApiError;
 use ethabi::Address;
-use zksync_config::configs::api::CommonApiConfig;
 
 mod error;
 mod v01;

@@ -14,7 +14,7 @@ use web3::{
     types::{BlockNumber, FilterBuilder, Log},
     Web3,
 };
-use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
+use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::ConnectionPool;
 
 use zksync_contracts::forced_exit_contract;
@@ -482,7 +482,7 @@ pub async fn infinite_async_loop() {
 mod test {
     use num::{BigUint, FromPrimitive};
     use std::{str::FromStr, sync::Mutex};
-    use zksync_config::ZkSyncConfig;
+
     use zksync_types::{forced_exit_requests::ForcedExitRequest, Address, TokenId};
 
     use super::*;
@@ -683,7 +683,7 @@ mod test {
         let mut watcher = get_test_forced_exit_contract_watcher();
 
         let wait_confirmations = 5;
-        watcher.config.forced_exit_requests.wait_confirmations = wait_confirmations;
+        watcher.config.wait_confirmations = wait_confirmations;
 
         watcher.eth_client.events = vec![
             FundsReceivedEvent {

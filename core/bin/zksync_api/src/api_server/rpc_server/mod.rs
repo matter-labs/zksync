@@ -10,7 +10,7 @@ use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result
 use jsonrpc_http_server::ServerBuilder;
 
 // Workspace uses
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::{
     chain::{
         block::records::StorageBlockDetails, operations::records::StoredExecutedPriorityOperation,

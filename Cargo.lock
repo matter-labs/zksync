@@ -1468,19 +1468,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "envy_macro"
-version = "0.1.0"
-dependencies = [
- "envy",
- "num",
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
- "syn",
-]
-
-[[package]]
 name = "ethabi"
 version = "14.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

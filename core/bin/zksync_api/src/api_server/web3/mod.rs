@@ -4,7 +4,7 @@ use futures::channel::mpsc;
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
