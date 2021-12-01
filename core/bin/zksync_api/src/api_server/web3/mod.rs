@@ -9,6 +9,7 @@ use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
 use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
+use std::thread::JoinHandle;
 use zksync_config::configs::api::Web3Config;
 
 mod calls;
@@ -63,7 +64,7 @@ pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     web3_config: &Web3Config,
-) {
+) -> JoinHandle<()> {
     let addr = web3_config.bind_addr();
 
     let rpc_app = Web3RpcApp::new(connection_pool, web3_config);
@@ -77,5 +78,5 @@ pub fn start_rpc_server(
             .start_http(&addr)
             .unwrap();
         server.wait();
-    });
+    })
 }

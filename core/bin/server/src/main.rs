@@ -1,23 +1,25 @@
-use futures::{channel::mpsc, StreamExt};
+use futures::{channel::mpsc, SinkExt, StreamExt};
+use std::str::FromStr;
 
 use structopt::StructOpt;
 
 use serde::{Deserialize, Serialize};
 
+use zksync_api::fee_ticker::run_ticker_task;
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_eth_sender::run_eth_sender;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
 use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
-
 use zksync_witness_generator::run_prover_server;
 
-use std::str::FromStr;
-use zksync_api::fee_ticker::run_ticker_task;
-use zksync_config::configs::api::{
-    CommonApiConfig, JsonRpcConfig, PrivateApiConfig, ProverApiConfig, RestApiConfig, Web3Config,
-};
+use futures::executor::block_on;
+use std::cell::RefCell;
 use zksync_config::{
+    configs::api::{
+        CommonApiConfig, JsonRpcConfig, PrivateApiConfig, ProverApiConfig, RestApiConfig,
+        Web3Config,
+    },
     ChainConfig, ContractsConfig, DBConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig,
     ForcedExitRequestsConfig, GatewayWatcherConfig, ProverConfig, TickerConfig, ZkSyncConfig,
 };
@@ -264,7 +266,7 @@ async fn run_server(components: &ComponentsToRun) {
         let database = zksync_witness_generator::database::Database::new(connection_pool.clone());
         run_prover_server(
             database,
-            stop_signal_sender,
+            stop_signal_sender.clone(),
             prover_api_config,
             prover_config,
         );
@@ -293,12 +295,29 @@ async fn run_server(components: &ComponentsToRun) {
         tasks.push(run_rejected_tx_cleaner(&config, connection_pool));
     }
 
-    tokio::select! {
-        _ = async { wait_for_tasks(tasks).await } => {
-            panic!("ForcedExitRequests actor is not supposed to finish its execution")
-        },
-        _ = async { stop_signal_receiver.next().await } => {
-            vlog::warn!("Stop signal received, shutting down");
-        }
-    };
+    {
+        let stop_signal_sender = RefCell::new(stop_signal_sender.clone());
+        ctrlc::set_handler(move || {
+            let mut sender = stop_signal_sender.borrow_mut();
+            block_on(sender.send(true)).expect("Ctrl+C signal send");
+        })
+        .expect("Error setting Ctrl+C handler");
+    }
+
+    if tasks.is_empty() {
+        tokio::select! {
+            _ = async { stop_signal_receiver.next().await } => {
+                vlog::warn!("Stop signal received, shutting down");
+            }
+        };
+    } else {
+        tokio::select! {
+            _ = async { wait_for_tasks(tasks).await } => {
+                panic!("ForcedExitRequests actor is not supposed to finish its execution")
+            },
+            _ = async { stop_signal_receiver.next().await } => {
+                vlog::warn!("Stop signal received, shutting down");
+            }
+        };
+    }
 }
