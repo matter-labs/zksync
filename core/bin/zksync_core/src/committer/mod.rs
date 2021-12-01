@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::mempool::MempoolBlocksRequest;
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ChainConfig, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
@@ -197,7 +197,7 @@ async fn commit_block(
     metrics::histogram!("committer.commit_block", start.elapsed());
 }
 
-async fn poll_for_new_proofs_task(pool: ConnectionPool, config: ZkSyncConfig) {
+async fn poll_for_new_proofs_task(pool: ConnectionPool, config: ChainConfig) {
     let mut timer = time::interval(PROOF_POLL_INTERVAL);
     loop {
         timer.tick().await;
@@ -219,12 +219,12 @@ pub fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
     mempool_req_sender: Sender<MempoolBlocksRequest>,
     pool: ConnectionPool,
-    config: &ZkSyncConfig,
+    config: ChainConfig,
 ) -> JoinHandle<()> {
     tokio::spawn(handle_new_commit_task(
         rx_for_ops,
         mempool_req_sender,
         pool.clone(),
     ));
-    tokio::spawn(poll_for_new_proofs_task(pool, config.clone()))
+    tokio::spawn(poll_for_new_proofs_task(pool, config))
 }

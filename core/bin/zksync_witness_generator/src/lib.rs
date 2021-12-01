@@ -16,11 +16,12 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 // Workspace deps
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ProverConfig, ZkSyncConfig};
 // Local deps
 use self::database_interface::DatabaseInterface;
 use self::scaler::ScalerOracle;
 use zksync_circuit::serialization::ProverData;
+use zksync_config::configs::api::ProverApiConfig;
 use zksync_prover_utils::api::{
     JobRequestData, JobResultData, ProverInputRequest, ProverInputResponse, ProverOutputRequest,
     WorkingOn,
@@ -387,11 +388,11 @@ async fn update_prover_job_queue<DB: DatabaseInterface>(database: DB) -> anyhow:
 pub fn run_prover_server<DB: DatabaseInterface>(
     database: DB,
     panic_notify: mpsc::Sender<bool>,
-    config: ZkSyncConfig,
+    prover_api_opts: ProverApiConfig,
+    prover_opts: ProverConfig,
 ) {
-    let witness_generator_opts = config.prover.witness_generator;
-    let core_opts = config.prover.core;
-    let prover_api_opts = config.api.prover;
+    let witness_generator_opts = prover_opts.witness_generator;
+    let core_opts = prover_opts.core;
 
     thread::Builder::new()
         .name("prover_server".to_string())

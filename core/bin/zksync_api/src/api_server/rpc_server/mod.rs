@@ -37,6 +37,7 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 
 #[derive(Clone)]
 pub struct RpcApp {
@@ -56,19 +57,21 @@ impl RpcApp {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config: &ZkSyncConfig,
+        config: &CommonApiConfig,
+        private_url: String,
+        confirmations_for_eth_event: u64,
     ) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
 
-        let api_requests_caches_size = config.api.common.caches_size;
-        let confirmations_for_eth_event = config.eth_watch.confirmations_for_eth_event;
+        let api_requests_caches_size = config.caches_size;
 
         let tx_sender = TxSender::new(
             connection_pool,
             sign_verify_request_sender,
             ticker_request_sender,
             config,
+            private_url,
         );
 
         RpcApp {
@@ -361,15 +364,20 @@ pub fn start_rpc_server(
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    config: &ZkSyncConfig,
+    config: &JsonRpcConfig,
+    common_api_config: &CommonApiConfig,
+    private_url: String,
+    confirmations_for_eth_event: u64,
 ) {
-    let addr = config.api.json_rpc.http_bind_addr();
+    let addr = config.http_bind_addr();
 
     let rpc_app = RpcApp::new(
         connection_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        config,
+        common_api_config,
+        private_url,
+        confirmations_for_eth_event,
     );
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);

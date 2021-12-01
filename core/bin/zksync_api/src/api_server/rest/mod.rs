@@ -11,7 +11,8 @@ use self::v01::api_decl::ApiV01;
 use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest};
 
 use super::tx_sender::TxSender;
-use zksync_config::ZkSyncConfig;
+use zksync_config::configs::api::CommonApiConfig;
+use zksync_config::{ApiConfig, ZkSyncConfig};
 
 mod forced_exit_requests;
 mod helpers;
@@ -27,15 +28,24 @@ async fn start_server(
     HttpServer::new(move || {
         let api_v01 = api_v01.clone();
 
-        let forced_exit_requests_api_scope =
-            forced_exit_requests::api_scope(api_v01.connection_pool.clone(), &api_v01.config);
+        let forced_exit_requests_api_scope = forced_exit_requests::api_scope(
+            api_v01.connection_pool.clone(),
+            api_v01
+                .config
+                .api
+                .common
+                .forced_exit_minimum_account_age_secs as i64,
+            &api_v01.config.forced_exit_requests,
+            api_v01.config.contracts.forced_exit_addr,
+        );
 
         let api_v02_scope = {
             let tx_sender = TxSender::new(
                 api_v01.connection_pool.clone(),
                 sign_verifier.clone(),
                 fee_ticker.clone(),
-                &api_v01.config,
+                &api_v01.config.api.common,
+                api_v01.config.api.private.url.clone(),
             );
             v02::api_scope(tx_sender, &api_v01.config)
         };
@@ -68,14 +78,14 @@ async fn start_server(
 
 /// Start HTTP REST API
 #[allow(clippy::too_many_arguments)]
-pub(super) fn start_server_thread_detached(
+pub fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
     panic_notify: mpsc::Sender<bool>,
     fee_ticker: mpsc::Sender<TickerRequest>,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
-    config: ZkSyncConfig,
+    private_url: String,
 ) {
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
@@ -83,7 +93,10 @@ pub(super) fn start_server_thread_detached(
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
             actix_rt::System::new().block_on(async move {
-                let api_v01 = ApiV01::new(connection_pool, contract_address, config.clone());
+                // TODO remove this config
+                let config = ZkSyncConfig::from_env();
+
+                let api_v01 = ApiV01::new(connection_pool, contract_address, private_url, config);
                 api_v01.spawn_network_status_updater(panic_notify);
 
                 start_server(api_v01, fee_ticker, sign_verifier, listen_addr).await;

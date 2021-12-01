@@ -798,12 +798,12 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 pub fn run_eth_sender(
     pool: ConnectionPool,
     eth_gateway: EthereumGateway,
-    options: ZkSyncConfig,
+    options: ETHSenderConfig,
 ) -> JoinHandle<()> {
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(options.eth_sender, db, eth_gateway).await;
+        let eth_sender = ETHSender::new(options, db, eth_gateway).await;
 
         eth_sender.run().await
     })

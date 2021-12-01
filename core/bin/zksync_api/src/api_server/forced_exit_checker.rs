@@ -29,10 +29,9 @@ pub struct ForcedExitChecker {
 }
 
 impl ForcedExitChecker {
-    pub fn new(config: &ZkSyncConfig) -> Self {
-        let forced_exit_minimum_account_age = chrono::Duration::seconds(
-            config.api.common.forced_exit_minimum_account_age_secs as i64,
-        );
+    pub fn new(forced_exit_minimum_account_age_secs: i64) -> Self {
+        let forced_exit_minimum_account_age =
+            chrono::Duration::seconds(forced_exit_minimum_account_age_secs);
 
         Self {
             forced_exit_minimum_account_age,

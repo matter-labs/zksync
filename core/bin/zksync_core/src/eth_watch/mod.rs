@@ -29,7 +29,7 @@ use zksync_api_types::{
     },
     Either,
 };
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ContractsConfig, ETHWatchConfig, ZkSyncConfig};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{
@@ -680,22 +680,20 @@ pub fn start_eth_watch(
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     eth_gateway: EthereumGateway,
-    config_options: &ZkSyncConfig,
+    contract_config: &ContractsConfig,
+    eth_watcher_config: &ETHWatchConfig,
 ) -> JoinHandle<()> {
     let eth_client = EthHttpClient::new(
         eth_gateway,
-        config_options.contracts.contract_addr,
-        config_options.contracts.governance_addr,
+        contract_config.contract_addr,
+        contract_config.governance_addr,
     );
 
-    let eth_watch = EthWatch::new(
-        eth_client,
-        config_options.eth_watch.confirmations_for_eth_event,
-    );
+    let eth_watch = EthWatch::new(eth_client, eth_watcher_config.confirmations_for_eth_event);
 
     tokio::spawn(eth_watch.run(eth_req_receiver));
 
-    let poll_interval = config_options.eth_watch.poll_interval();
+    let poll_interval = eth_watcher_config.poll_interval();
     tokio::spawn(async move {
         let mut timer = time::interval(poll_interval);
 

@@ -11,6 +11,7 @@ use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
 use zksync_api_types::PriorityOpLookupQuery;
+use zksync_config::configs::api::CommonApiConfig;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::{
@@ -40,16 +41,17 @@ impl ApiV01 {
     pub fn new(
         connection_pool: ConnectionPool,
         contract_address: H160,
-        config: ZkSyncConfig,
+        private_url: String,
+        common_api: ZkSyncConfig,
     ) -> Self {
-        let api_client = CoreApiClient::new(config.api.private.url.clone());
+        let api_client = CoreApiClient::new(private_url);
         Self {
-            caches: Caches::new(config.api.common.caches_size),
+            caches: Caches::new(common_api.api.common.caches_size),
             connection_pool,
             api_client,
             network_status: SharedNetworkStatus::default(),
             contract_address: format!("{:?}", contract_address),
-            config,
+            config: common_api,
         }
     }
 

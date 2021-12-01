@@ -20,7 +20,7 @@ use zksync_api_types::{
     v02::pagination::{ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest},
     PriorityOpLookupQuery,
 };
-use zksync_config::configs::api::PrivateApi;
+use zksync_config::configs::api::PrivateApiConfig;
 use zksync_types::{tx::TxEthSignature, AccountId, Address, SignedZkSyncTx};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
@@ -183,7 +183,7 @@ pub fn start_private_core_api(
     panic_notify: mpsc::Sender<bool>,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
-    config: PrivateApi,
+    config: PrivateApiConfig,
 ) {
     thread::Builder::new()
         .name("core-private-api".to_string())

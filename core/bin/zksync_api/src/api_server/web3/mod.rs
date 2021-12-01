@@ -9,6 +9,7 @@ use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
 use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
+use zksync_config::configs::api::Web3Config;
 
 mod calls;
 mod converter;
@@ -28,12 +29,11 @@ pub struct Web3RpcApp {
     connection_pool: ConnectionPool,
     logs_helper: LogsHelper,
     calls_helper: CallsHelper,
-    chain_id: u8,
     max_block_range: u32,
 }
 
 impl Web3RpcApp {
-    pub fn new(connection_pool: ConnectionPool, config: &ZkSyncConfig) -> Self {
+    pub fn new(connection_pool: ConnectionPool, max_block_range: u32) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("Web3RpcApp must be created from the context of Tokio Runtime");
         Web3RpcApp {
@@ -41,8 +41,7 @@ impl Web3RpcApp {
             connection_pool,
             logs_helper: LogsHelper::new(),
             calls_helper: CallsHelper::new(),
-            chain_id: config.eth_client.chain_id,
-            max_block_range: config.api.web3.max_block_range,
+            max_block_range,
         }
     }
 
@@ -61,11 +60,11 @@ impl Web3RpcApp {
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
-    config: &ZkSyncConfig,
+    web3_config: &Web3Config,
 ) {
-    let addr = config.api.web3.bind_addr();
+    let addr = web3_config.bind_addr();
 
-    let rpc_app = Web3RpcApp::new(connection_pool, config);
+    let rpc_app = Web3RpcApp::new(connection_pool, web3_config.max_block_range);
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);
         let mut io = IoHandler::new();

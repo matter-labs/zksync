@@ -24,9 +24,6 @@ pub trait Web3Rpc {
     #[rpc(name = "web3_clientVersion", returns = "String")]
     fn web3_client_version(&self) -> Result<String>;
 
-    #[rpc(name = "net_version", returns = "String")]
-    fn net_version(&self) -> Result<String>;
-
     #[rpc(name = "eth_protocolVersion", returns = "String")]
     fn protocol_version(&self) -> Result<String>;
 
@@ -99,10 +96,6 @@ pub trait Web3Rpc {
 impl Web3Rpc for Web3RpcApp {
     fn web3_client_version(&self) -> Result<String> {
         Ok(String::from("zkSync"))
-    }
-
-    fn net_version(&self) -> Result<String> {
-        Ok(self.chain_id.to_string())
     }
 
     fn protocol_version(&self) -> Result<String> {

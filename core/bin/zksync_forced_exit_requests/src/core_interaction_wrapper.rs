@@ -52,11 +52,11 @@ pub struct MempoolCoreInteractionWrapper {
 
 impl MempoolCoreInteractionWrapper {
     pub fn new(
-        config: ZkSyncConfig,
+        forced_exit_minimum_account_age_secs: i64,
         core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
     ) -> Self {
-        let forced_exit_checker = ForcedExitChecker::new(&config);
+        let forced_exit_checker = ForcedExitChecker::new(forced_exit_minimum_account_age_secs);
         Self {
             core_api_client,
             connection_pool,

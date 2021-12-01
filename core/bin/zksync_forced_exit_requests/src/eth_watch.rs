@@ -14,7 +14,7 @@ use web3::{
     types::{BlockNumber, FilterBuilder, Log},
     Web3,
 };
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 
 use zksync_contracts::forced_exit_contract;
@@ -129,7 +129,7 @@ where
     Interactor: CoreInteractionWrapper,
 {
     core_interaction_wrapper: Interactor,
-    config: ZkSyncConfig,
+    config: ForcedExitRequestsConfig,
     eth_client: Client,
     last_viewed_block: u64,
     forced_exit_sender: Sender,
@@ -183,7 +183,7 @@ where
 {
     pub fn new(
         core_interaction_wrapper: Interactor,
-        config: ZkSyncConfig,
+        config: ForcedExitRequestsConfig,
         eth_client: Client,
         forced_exit_sender: Sender,
         db_cleanup_interval: chrono::Duration,
@@ -207,7 +207,7 @@ where
             .core_interaction_wrapper
             .get_oldest_unfulfilled_request()
             .await?;
-        let wait_confirmations = self.config.forced_exit_requests.wait_confirmations;
+        let wait_confirmations = self.config.wait_confirmations;
 
         // No oldest request means that there are no requests that were possibly ignored
         let oldest_request = match oldest_request {
@@ -276,7 +276,6 @@ where
     pub async fn delete_expired(&mut self) -> anyhow::Result<()> {
         let expiration_time = chrono::Duration::milliseconds(
             self.config
-                .forced_exit_requests
                 .expiration_period
                 .try_into()
                 .expect("Failed to convert expiration period to i64"),
@@ -301,7 +300,7 @@ where
             }
         };
 
-        let wait_confirmations = self.config.forced_exit_requests.wait_confirmations;
+        let wait_confirmations = self.config.wait_confirmations;
         let last_confirmed_block = last_block.saturating_sub(wait_confirmations);
         if last_confirmed_block <= self.last_viewed_block {
             return;
@@ -309,7 +308,7 @@ where
 
         let block_to_watch_from = self
             .last_viewed_block
-            .saturating_sub(self.config.forced_exit_requests.blocks_check_amount);
+            .saturating_sub(self.config.blocks_check_amount);
 
         let events = self
             .eth_client
@@ -374,7 +373,7 @@ where
             .await
             .expect("Failed to restore state for ForcedExit eth_watcher");
 
-        let mut timer = time::interval(self.config.forced_exit_requests.poll_interval());
+        let mut timer = time::interval(self.config.poll_interval());
 
         loop {
             timer.tick().await;
@@ -386,15 +385,18 @@ where
 pub fn run_forced_exit_contract_watcher(
     core_api_client: CoreApiClient,
     connection_pool: ConnectionPool,
-    config: ZkSyncConfig,
+    config: ForcedExitRequestsConfig,
+    forced_exit_minimum_account_age_secs: i64,
+    contract: Address,
+    web3_url: String,
 ) -> JoinHandle<()> {
-    let transport = web3::transports::Http::new(&config.eth_client.web3_url[0]).unwrap();
+    let transport = web3::transports::Http::new(&web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
-    let eth_client = EthHttpClient::new(web3, config.contracts.forced_exit_addr);
+    let eth_client = EthHttpClient::new(web3, contract);
 
     tokio::spawn(async move {
         // We should not proceed if the feature is disabled
-        if !config.forced_exit_requests.enabled {
+        if !config.enabled {
             infinite_async_loop().await
         }
 
@@ -409,7 +411,7 @@ pub fn run_forced_exit_contract_watcher(
         .unwrap();
 
         let core_interaction_wrapper = MempoolCoreInteractionWrapper::new(
-            config.clone(),
+            forced_exit_minimum_account_age_secs,
             core_api_client,
             connection_pool.clone(),
         );
@@ -540,7 +542,7 @@ mod test {
 
     fn get_test_forced_exit_contract_watcher() -> TestForcedExitContractWatcher {
         let core_interaction_wrapper = MockCoreInteractionWrapper::default();
-        let config = ZkSyncConfig::from_env();
+        let config = ForcedExitRequestsConfig::from_env();
         let eth_client = MockEthClient {
             events: vec![],
             current_block_number: TEST_FIRST_CURRENT_BLOCK,
@@ -611,9 +613,7 @@ mod test {
         // that both wait_confirmations and the time of creation of the oldest unfulfilled request
         // is taken into account
 
-        let confirmations_time = ZkSyncConfig::from_env()
-            .forced_exit_requests
-            .wait_confirmations;
+        let confirmations_time = ForcedExitRequestsConfig::from_env().wait_confirmations;
 
         // Case 1. No requests => choose the youngest stable block
         let mut watcher = get_test_forced_exit_contract_watcher();
