@@ -123,7 +123,6 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn run_server(components: &ComponentsToRun) {
-    println!("{:?}", components);
     let connection_pool = ConnectionPool::new(None);
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
 
@@ -165,6 +164,20 @@ async fn run_server(components: &ComponentsToRun) {
         let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(channel_size);
         let chain_config = ChainConfig::from_env();
 
+        if components.0.contains(&Component::Core) {
+            let all_config = ZkSyncConfig::from_env();
+            tasks.append(
+                &mut run_core(
+                    connection_pool.clone(),
+                    &all_config,
+                    stop_signal_sender.clone(),
+                    eth_gateway.clone(),
+                )
+                .await
+                .unwrap(),
+            );
+        }
+
         let max_blocks_to_aggregate = std::cmp::max(
             chain_config.state_keeper.max_aggregated_blocks_to_commit,
             chain_config.state_keeper.max_aggregated_blocks_to_execute,
@@ -188,18 +201,6 @@ async fn run_server(components: &ComponentsToRun) {
         );
 
         let private_config = PrivateApiConfig::from_env();
-
-        let all_config = ZkSyncConfig::from_env();
-        tasks.append(
-            &mut run_core(
-                connection_pool.clone(),
-                &all_config,
-                stop_signal_sender.clone(),
-                eth_gateway.clone(),
-            )
-            .await
-            .unwrap(),
-        );
 
         let contracts_config = ContractsConfig::from_env();
         let common_config = CommonApiConfig::from_env();
