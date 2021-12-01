@@ -30,7 +30,7 @@ async fn local_client() -> anyhow::Result<(RawClient, impl Future<Output = RpcRe
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
 
-    let rpc_app = Web3RpcApp::new(cfg.pool, cfg.config.api.web3.max_block_range);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3);
     let mut io = IoHandler::new();
     rpc_app.extend(&mut io);
 
@@ -51,6 +51,7 @@ async fn static_methods() -> anyhow::Result<()> {
     let fut = {
         let (client, server) = local_client().await?;
         let web3_client_version = client.call_method("web3_clientVersion", Params::None);
+        let net_version = client.call_method("net_version", Params::None);
         let protocol_version = client.call_method("eth_protocolVersion", Params::None);
         let mining = client.call_method("eth_mining", Params::None);
         let hashrate = client.call_method("eth_hashrate", Params::None);
@@ -64,7 +65,13 @@ async fn static_methods() -> anyhow::Result<()> {
             "eth_getUncleCountByBlockNumber",
             Params::Array(vec![serde_json::to_value(U64::zero()).unwrap()]),
         );
-        let first_join = join4(web3_client_version, protocol_version, mining, hashrate);
+        let first_join = join5(
+            web3_client_version,
+            net_version,
+            protocol_version,
+            mining,
+            hashrate,
+        );
         let second_join = join5(
             gas_price,
             accounts,
@@ -76,11 +83,12 @@ async fn static_methods() -> anyhow::Result<()> {
         join(first_join, second_join)
     };
     let (
-        (web3_client_version, protocol_version, mining, hashrate),
+        (web3_client_version, net_version, protocol_version, mining, hashrate),
         (gas_price, accounts, get_uncle_count_by_block_hash, get_uncle_count_by_block_number, _),
     ) = fut.await;
     assert_eq!(web3_client_version.unwrap().as_str().unwrap(), "zkSync");
     assert_eq!(protocol_version.unwrap().as_str().unwrap(), "0");
+    assert_eq!(net_version.unwrap().as_str().unwrap(), "240");
     assert!(!mining.unwrap().as_bool().unwrap());
     assert_eq!(hashrate.unwrap().as_str().unwrap(), "0x0");
     assert_eq!(gas_price.unwrap().as_str().unwrap(), "0x0");
@@ -457,7 +465,7 @@ async fn get_block() -> anyhow::Result<()> {
 async fn create_logs() -> anyhow::Result<()> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
-    let rpc_app = Web3RpcApp::new(cfg.pool, cfg.config.api.web3.max_block_range);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3);
 
     let from_account_id = AccountId(3);
     let from_account = ZkSyncAccount::rand_with_seed([1, 2, 3, 4]);
@@ -845,7 +853,7 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
             .web3_receipt_by_hash(&tx_hash)
             .await?
             .unwrap();
-        let rpc_app = Web3RpcApp::new(pool.clone(), Web3Config::from_env().max_block_range);
+        let rpc_app = Web3RpcApp::new(pool.clone(), &Web3Config::from_env());
         rpc_app.tx_receipt(&mut storage, receipt).await?
     };
     assert_eq!(
@@ -864,7 +872,7 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
 )]
 async fn get_logs() -> anyhow::Result<()> {
     let pool = ConnectionPool::new(Some(1));
-    let rpc_app = Web3RpcApp::new(pool.clone(), Web3Config::from_env().max_block_range);
+    let rpc_app = Web3RpcApp::new(pool.clone(), &Web3Config::from_env());
 
     // Checks that it returns error if `fromBlock` is greater than `toBlock`.
     let fut = {
@@ -889,7 +897,13 @@ async fn get_logs() -> anyhow::Result<()> {
     // Checks that it returns error if block range is too big.
     let fut = {
         let (client, server) = {
-            let rpc_app = Web3RpcApp::new(pool.clone(), 3);
+            let config = Web3Config {
+                port: 0,
+                url: "".to_string(),
+                max_block_range: 3,
+                chain_id: 9,
+            };
+            let rpc_app = Web3RpcApp::new(pool.clone(), &config);
             let mut io = IoHandler::new();
             rpc_app.extend(&mut io);
 

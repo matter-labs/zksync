@@ -21,6 +21,9 @@ macro_rules! spawn {
 
 #[rpc]
 pub trait Web3Rpc {
+    #[rpc(name = "net_version", returns = "String")]
+    fn net_version(&self) -> Result<String>;
+
     #[rpc(name = "web3_clientVersion", returns = "String")]
     fn web3_client_version(&self) -> Result<String>;
 
@@ -94,6 +97,10 @@ pub trait Web3Rpc {
 }
 
 impl Web3Rpc for Web3RpcApp {
+    fn net_version(&self) -> Result<String> {
+        Ok(self.chain_id.to_string())
+    }
+
     fn web3_client_version(&self) -> Result<String> {
         Ok(String::from("zkSync"))
     }

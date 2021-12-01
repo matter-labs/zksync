@@ -43,6 +43,7 @@ ws_url="ws://127.0.0.1:3031"
 port=3002
 url="http://127.0.0.1:3002"
 max_block_range=10
+chain_id=240
 
 # Configuration for the core private server.
 [api.private]

@@ -196,6 +196,7 @@ pub struct Web3Config {
     pub url: String,
     /// Max difference between blocks in `eth_getLogs` method.
     pub max_block_range: u32,
+    pub chain_id: u32,
 }
 
 impl Web3Config {
