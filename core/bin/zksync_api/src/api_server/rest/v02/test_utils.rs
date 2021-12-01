@@ -833,7 +833,11 @@ pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<Tick
                         1_u64.into(),
                     );
 
-                    let res = Ok(ResponseFee { normal_fee });
+                    let res = Ok(ResponseFee {
+                        normal_fee: normal_fee.clone(),
+                        subsidized_fee: normal_fee,
+                        subsidy_size_usd_cents: 0,
+                    });
 
                     response.send(res).expect("Unable to send response");
                 }
@@ -867,7 +871,11 @@ pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<Tick
                         BigUint::from(transactions.len()).into(),
                     );
 
-                    let res = Ok(ResponseBatchFee { normal_fee });
+                    let res = Ok(ResponseBatchFee {
+                        normal_fee: normal_fee.clone(),
+                        subsidized_fee: normal_fee,
+                        subsidy_size_usd_cents: 0,
+                    });
 
                     response.send(res).expect("Unable to send response");
                 }

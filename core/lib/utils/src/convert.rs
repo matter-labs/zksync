@@ -38,7 +38,11 @@ pub fn round_precision(num: &Ratio<BigUint>, precision: usize) -> Ratio<BigUint>
 
 pub fn ratio_to_u64(num: Ratio<BigUint>) -> u64 {
     let digits = num.to_integer().to_u64_digits();
-    digits[0]
+    if digits.is_empty() {
+        0
+    } else {
+        digits[0]
+    }
 }
 
 #[cfg(test)]

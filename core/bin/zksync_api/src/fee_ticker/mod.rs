@@ -546,23 +546,29 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             // It is safe to do unwrap in the next two lines, because token being acceptable for fees
             // assumes that the token's price is > 0
             let token_price = big_decimal_to_ratio(&token_price).unwrap();
+            dbg!("ABA");
+            dbg!(subsidized_fee_usd.clone());
+            dbg!(token_price.clone());
+            dbg!("CABA");
             let full_amount = subsidized_fee_usd.checked_div(&token_price).unwrap();
+            dbg!(full_amount.clone());
+            dbg!(full_amount.clone() * token_price.clone());
 
-            let subsidized_fee = if full_amount > Ratio::from(normal_fee.clone().total_fee) {
-                normal_fee.clone()
+            let subsidized_fee = Fee::new(
+                fee_type,
+                Ratio::from(BigUint::zero()),
+                full_amount,
+                BigUint::zero(),
+                BigUint::zero(),
+            );
+
+            let subsidy_size_usd_cents = if normal_fee.total_fee > subsidized_fee.total_fee {
+                token_price
+                    * (&normal_fee.total_fee - &subsidized_fee.total_fee)
+                    * BigUint::from(100u32)
             } else {
-                Fee::new(
-                    fee_type,
-                    Ratio::from(BigUint::zero()),
-                    full_amount,
-                    BigUint::zero(),
-                    BigUint::zero(),
-                )
+                Ratio::from(BigUint::from(0u32))
             };
-
-            let subsidy_size_usd_cents = token_price
-                * (&normal_fee.total_fee - &subsidized_fee.total_fee)
-                * BigUint::from(100u32);
 
             return Ok(ResponseFee {
                 normal_fee,
@@ -665,15 +671,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     * &token_usd_risk;
             BatchFee::new(total_zkp_fee, total_gas_fee)
         };
-        let subsidized_fee = if normal_fee.total_fee < subsidized_fee.total_fee {
-            normal_fee.clone()
-        } else {
-            subsidized_fee
-        };
 
-        let subsidy_size_usd_cents = token_price
-            * (&normal_fee.total_fee - &subsidized_fee.total_fee)
-            * BigUint::from(100u32);
+        let subsidy_size_usd_cents = if normal_fee.total_fee > subsidized_fee.total_fee {
+            token_price
+                * (&normal_fee.total_fee - &subsidized_fee.total_fee)
+                * BigUint::from(100u32)
+        } else {
+            Ratio::from(BigUint::from(0u32))
+        };
 
         Ok(ResponseBatchFee {
             normal_fee,
