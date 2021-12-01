@@ -246,6 +246,7 @@ mod tests {
                 port: 3002,
                 url: "http://127.0.0.1:3002".into(),
                 max_block_range: 10,
+                chain_id: 240,
             },
             private: PrivateApiConfig {
                 port: 8090,
@@ -280,6 +281,7 @@ API_JSON_RPC_WS_PORT="3031"
 API_JSON_RPC_WS_URL="ws://127.0.0.1:3031"
 API_WEB3_PORT="3002"
 API_WEB3_URL="http://127.0.0.1:3002"
+API_WEB3_CHAIN_ID="240"
 API_WEB3_MAX_BLOCK_RANGE="10"
 API_PRIVATE_PORT="8090"
 API_PRIVATE_URL="http://127.0.0.1:8090"
