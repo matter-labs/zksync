@@ -51,13 +51,15 @@ tokio = { version = "1", features = ["full"] }
 futures = { version = "0.3", features = ["compat"] }
 actix-rt = "2.2.0"
 actix-cors = "0.6.0-beta.2"
-rustls = "0.19.1"
-actix-web = {version = "4.0.0-beta.8", features=["rustls"]}
+
+#for automatic detection. https://docs.rs/openssl/0.10.38/openssl/
+openssl-sys = "0.9"
+openssl = "0.10"
+actix-web = {version = "4.0.0-beta.10", features=["openssl"]}
 actix-web-httpauth = "0.6.0-beta.2"
-actix-files = "0.5.0"
 
 num = { version = "0.3.1", features = ["serde"] }
-bigdecimal = { version = "0.2.0", features = ["serde"]}
+bigdecimal = { version = "=0.2.0", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"

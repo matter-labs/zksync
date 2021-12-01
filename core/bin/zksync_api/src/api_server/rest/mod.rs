@@ -2,7 +2,7 @@ use actix_cors::Cors;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+
 use zksync_storage::ConnectionPool;
 use zksync_types::H160;
 
@@ -14,10 +14,7 @@ use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest
 use super::tx_sender::TxSender;
 use zksync_config::ZkSyncConfig;
 
-use rustls::internal::pemfile::{certs, pkcs8_private_keys};
-use rustls::{NoClientAuth, ServerConfig};
-use std::fs::File;
-use std::io::BufReader;
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 
 mod forced_exit_requests;
 mod helpers;
@@ -67,19 +64,19 @@ async fn start_server(
 
     // load ssl keys
     if use_https {
-        let mut config = ServerConfig::new(NoClientAuth::new());
-        let mut path = PathBuf::new();
-        path.push(std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "".to_string()));
-        path.push("keys/tls_keys");
-        let key_file = &mut BufReader::new(File::open(path.join("key.pem")).unwrap());
-        let cert_file = &mut BufReader::new(File::open(path.join("cert.pem")).unwrap());
-        let cert_chain = certs(cert_file).unwrap();
-        let mut keys = pkcs8_private_keys(key_file).unwrap();
-        config.set_single_cert(cert_chain, keys.remove(0)).unwrap();
+        // following example in https://github.com/actix/examples/blob/master/security/openssl/src/main.rs
+        // and https://actix.rs/docs/http2/ (similar)
+        // to create a self-signed temporary cert for testing:
+        // `openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'`
+        let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+        builder
+            .set_private_key_file("key.pem", SslFiletype::PEM)
+            .unwrap();
+        builder.set_certificate_chain_file("cert.pem").unwrap();
 
         server
             .workers(super::THREADS_PER_SERVER)
-            .bind_rustls(bind_to, config)
+            .bind_openssl(bind_to, builder)
             .unwrap()
             .shutdown_timeout(1)
             .run()
