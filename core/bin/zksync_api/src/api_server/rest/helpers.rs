@@ -70,6 +70,7 @@ pub fn deposit_op_to_tx_by_hash(
                     .to_string(),
                 fail_reason: None,
                 tx: tx_json,
+                batch_id: None,
             })
         }
         _ => None,
@@ -126,6 +127,7 @@ pub fn priority_op_to_tx_history(
         commited: false,
         verified: false,
         created_at: current_time,
+        batch_id: None,
     }
 }
 

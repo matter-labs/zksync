@@ -6,6 +6,7 @@ use sqlx::types::BigDecimal;
 // Workspace imports
 use zksync_types::{
     helpers::{apply_updates, reverse_updates},
+    tx::TxHash,
     AccountId, AccountMap, AccountUpdate, AccountUpdates, Address, BlockNumber, Nonce, PubKeyHash,
     TokenId, ZkSyncTx, NFT,
 };
@@ -692,10 +693,29 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!(
-            "sql.token.get_mint_nft_update_by_creator_and_nonce",
+            "sql.chain.state.get_mint_nft_update_by_creator_and_nonce",
             start.elapsed()
         );
         Ok(nft.map(|p| p.into()))
+    }
+
+    pub async fn get_nft_id_by_tx_hash(&mut self, tx_hash: TxHash) -> QueryResult<Option<TokenId>> {
+        let start = Instant::now();
+        let record = sqlx::query!(
+            r#"
+            SELECT token_id FROM executed_transactions
+            LEFT JOIN mint_nft_updates
+            ON executed_transactions.from_account = mint_nft_updates.creator_address
+                AND executed_transactions.nonce = mint_nft_updates.nonce
+            WHERE executed_transactions.tx_hash = $1
+            "#,
+            tx_hash.as_ref()
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.state.get_nft_id_by_tx_hash", start.elapsed());
+        Ok(record.map(|r| TokenId(r.token_id as u32)))
     }
 
     pub async fn load_committed_nft_tokens(

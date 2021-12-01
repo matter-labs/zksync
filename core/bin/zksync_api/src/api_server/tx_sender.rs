@@ -31,7 +31,8 @@ use zksync_types::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
         TxEthSignatureVariant, TxHash,
     },
-    AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
+    AccountId, Address, BatchFee, Fee, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    H160,
 };
 
 // Local uses
@@ -227,7 +228,7 @@ impl TxSender {
         let new_type = if toggle_2fa.enable {
             EthAccountType::Owned
         } else {
-            EthAccountType::No2FA
+            EthAccountType::No2FA(toggle_2fa.pub_key_hash)
         };
 
         self.verify_toggle_2fa_request_eth_signature(toggle_2fa)
@@ -304,9 +305,18 @@ impl TxSender {
                 Ok(())
             };
         }
-        if matches!(signer_type, EthAccountType::No2FA) {
+
+        if matches!(signer_type, EthAccountType::No2FA(None)) {
             // We don't verify signatures for accounts with no 2FA
             return Ok(());
+        }
+        if let EthAccountType::No2FA(Some(unchecked_hash)) = signer_type {
+            let order_pub_key_hash = PubKeyHash::from_pubkey(&order.signature.pub_key.0);
+            // We don't scheck the signature only if the order was signed with the same
+            // is the same as unchecked PubKey
+            if order_pub_key_hash == unchecked_hash {
+                return Ok(());
+            }
         }
 
         let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
@@ -910,8 +920,17 @@ async fn verify_tx_info_message_signature(
 
     let should_check_eth_signature = match (account_type, tx) {
         (EthAccountType::CREATE2, _) => false,
-        (EthAccountType::No2FA, ZkSyncTx::ChangePubKey(_)) => true,
-        (EthAccountType::No2FA, _) => false,
+        (EthAccountType::No2FA(_), ZkSyncTx::ChangePubKey(_)) => true,
+        (EthAccountType::No2FA(hash), _) => {
+            if let Some(not_checked_hash) = hash {
+                let tx_pub_key_hash = PubKeyHash::from_pubkey(&tx.signature().pub_key.0);
+
+                tx_pub_key_hash != not_checked_hash
+            } else {
+                false
+            }
+        }
+
         _ => true,
     };
 
@@ -992,11 +1011,22 @@ async fn verify_txs_batch_signature(
                         .clone()
                         .map(|signature| EthSignData { signature, message })
                 }
-                EthAccountType::No2FA => {
-                    // Even if the user supplies some eth signature we won't
-                    // check it
-                    None
+                EthAccountType::No2FA(Some(unchecked_hash)) => {
+                    let tx_pub_key_hash = PubKeyHash::from_pubkey(&tx.tx.signature().pub_key.0);
+                    if tx_pub_key_hash != unchecked_hash {
+                        if batch_sign_data.is_none() && !tx.signature.exists() {
+                            return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                        }
+
+                        tx.signature
+                            .tx_signature()
+                            .clone()
+                            .map(|signature| EthSignData { signature, message })
+                    } else {
+                        None
+                    }
                 }
+                EthAccountType::No2FA(None) => None,
             }
         } else {
             None

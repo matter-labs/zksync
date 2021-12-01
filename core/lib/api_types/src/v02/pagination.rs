@@ -2,7 +2,7 @@ use either::Either;
 use serde::{Deserialize, Serialize, Serializer};
 use std::str::FromStr;
 use thiserror::Error;
-use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId, TokenId};
 
 pub const MAX_LIMIT: u32 = 100;
 
@@ -136,4 +136,6 @@ pub struct PendingOpsRequest {
 pub struct AccountTxsRequest {
     pub address: Address,
     pub tx_hash: ApiEither<TxHash>,
+    pub token: Option<TokenId>,
+    pub second_address: Option<Address>,
 }

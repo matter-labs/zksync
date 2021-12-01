@@ -2,7 +2,8 @@
 
 set -e
 
-ASM=dist/zksync-crypto-bundler_bg_asm.js
+BG_ASM=dist/zksync-crypto-bundler_bg_asm.js
+ASM=dist/zksync-crypto-bundler_asm.js
 
 which wasm-pack || cargo install wasm-pack
 
@@ -21,14 +22,20 @@ fi
 
 # convert the bundler build into JS in case the environment doesn't support WebAssembly
 ../build_binaryen.sh
-../binaryen/bin/wasm2js ./dist/zksync-crypto-bundler_bg.wasm -o $ASM
+../binaryen/bin/wasm2js ./dist/zksync-crypto-bundler_bg.wasm -o $BG_ASM
 
 # save another copy for bg_asm import
-cp ./dist/zksync-crypto-bundler.js ./dist/zksync-crypto-bundler_asm.js
+# note that due to the behavior of wasm-pack we copy the different file:
+# for a bundler build it extracts the content of .js file into _bg.js,
+# we fix it ourselves
+cp ./dist/zksync-crypto-bundler_bg.js $ASM
 
 # fix imports for asm
 sed -i.backup "s/^import.*/\
-let wasm = require('.\/zksync-crypto-bundler_bg_asm.js');/" ./dist/zksync-crypto-bundler_asm.js
-sed -i.backup "s/\.js/_asm\.js/g" $ASM
+let wasm = require('.\/zksync-crypto-bundler_bg_asm.js');/" $ASM
+sed -i.backup "s/\_bg.js/_asm\.js/g" $BG_ASM
 
 rm dist/*.backup
+
+# this is again related to how wasm-pack works
+echo -e "\nwasm.__wbindgen_start();\n" >> $ASM

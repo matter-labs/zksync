@@ -107,7 +107,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             timestamp, previous_block_root_hash, contract_version
             FROM data_restore_rollup_blocks AS blocks
             JOIN (
-                SELECT block_num, array_agg(operation) as ops
+                SELECT block_num, array_agg(operation ORDER BY id) as ops
                 FROM data_restore_rollup_block_ops
                 GROUP BY block_num
             ) ops

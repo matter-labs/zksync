@@ -21,6 +21,7 @@ struct StateKeeperTester {
 impl StateKeeperTester {
     fn new(available_chunk_size: usize, max_iterations: usize, fast_iterations: usize) -> Self {
         const CHANNEL_SIZE: usize = 32768;
+        let (events_sender, _events_receiver) = mpsc::channel(CHANNEL_SIZE);
         let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
         let (response_tx, response_rx) = mpsc::channel(CHANNEL_SIZE);
 
@@ -37,6 +38,7 @@ impl StateKeeperTester {
             vec![available_chunk_size],
             max_iterations,
             fast_iterations,
+            events_sender,
         );
 
         Self {
@@ -236,6 +238,7 @@ fn test_create_incorrect_state_keeper() {
     const MAX_ITERATIONS: usize = 100;
     const FAST_ITERATIONS: usize = 100;
 
+    let (events_sender, _events_receiver) = mpsc::channel(CHANNEL_SIZE);
     let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
     let (response_tx, _response_rx) = mpsc::channel(CHANNEL_SIZE);
 
@@ -253,6 +256,7 @@ fn test_create_incorrect_state_keeper() {
         vec![1, 2, 2], // `available_block_chunk_sizes` must be strictly increasing.
         MAX_ITERATIONS,
         FAST_ITERATIONS,
+        events_sender,
     );
 }
 

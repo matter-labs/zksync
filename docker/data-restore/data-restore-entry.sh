@@ -43,6 +43,20 @@ case $NETWORK in
     ;;
 esac
 
+# Default to executing data restore in a finite mode.
+MODE="--finite"
+case $FINITE_MODE in
+  "true" | "")
+    ;;
+  "false")
+    MODE=""
+    ;;
+  *)
+    echo "Invalid value of FINITE_MODE: expected boolean"
+    exit 1
+  ;;
+esac
+
 if [[ -n $PG_DUMP && "$COMMAND" == "--continue" ]]
 then
   # Do not drop db if the file doesn't exist.
@@ -56,4 +70,4 @@ fi
 
 CONFIG_FILE="/usr/src/configs/${NETWORK}.json"
 
-zk f ./target/release/zksync_data_restore $COMMAND --finite --config $CONFIG_FILE --web3 $WEB3_URL || exit 1
+zk f ./target/release/zksync_data_restore $COMMAND $MODE --config $CONFIG_FILE --web3 $WEB3_URL || exit 1

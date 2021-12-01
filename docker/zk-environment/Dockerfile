@@ -1,4 +1,4 @@
-FROM debian:buster-slim
+FROM debian:bullseye
 
 WORKDIR /usr/src/zksync
 

@@ -1,7 +1,7 @@
-import { expect } from 'chai';
-import { BigNumber, utils, ethers } from 'ethers';
+import { expect, use } from 'chai';
+import { BigNumber, utils } from 'ethers';
 import { Wallet, types, crypto, Signer, No2FAWalletSigner } from 'zksync';
-
+import chaiAsPromised from 'chai-as-promised';
 import { Tester } from './tester';
 import './priority-ops';
 import './change-pub-key';
@@ -15,6 +15,8 @@ import './create2';
 import './swap';
 import './register-factory';
 import './token-listing';
+
+use(chaiAsPromised);
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -340,16 +342,24 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         let hildaWithEthSigner: Wallet;
         let frida: Wallet;
 
+        // The private key which won't require 2FA
+        let zkPrivateKey: Uint8Array;
+        // The private key whcih will require 2FA
+        let zkPrivateKeyWith2FA: Uint8Array;
+
         step('should setup an account without 2fa', async () => {
             if (onlyBasic) {
                 return;
             }
 
-            const zkPrivateKey = await crypto.privateKeyFromSeed(utils.arrayify(ethers.constants.HashZero))
+            // The 2FA will be off only for this L2 private key
+            zkPrivateKey = await crypto.privateKeyFromSeed(utils.randomBytes(32));
+            zkPrivateKeyWith2FA = await crypto.privateKeyFromSeed(utils.randomBytes(32));
+            
             // Even the wallets with no 2fa should sign message for CPK with their private key
             hilda = await tester.fundedWallet('1.0');
             frida = await tester.fundedWallet('1.0');
-            hilda.signer = Signer.fromPrivateKey(zkPrivateKey);
+            hilda.signer = Signer.fromPrivateKey(zkPrivateKeyWith2FA);
             await tester.testDeposit(hilda, token, DEPOSIT_AMOUNT, true);
             await tester.testDeposit(frida, token, DEPOSIT_AMOUNT, true);
             await (await hilda.setSigningKey({
@@ -360,20 +370,42 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
                 feeToken: token,
                 ethAuthType: 'ECDSA'
             })).awaitReceipt();
-            await hilda.toggle2FA(false);
+            const pubKeyHash = await crypto.privateKeyToPubKeyHash(zkPrivateKey);
+            await hilda.toggle2FA(false, pubKeyHash);
 
             const accountState = await hilda.getAccountState();
-            expect(accountState.accountType, 'Incorrect account type').to.be.eql('No2FA');
+            expect(accountState.accountType, 'Incorrect account type').to.be.eql({
+                No2FA: pubKeyHash
+            });
+        });
+
+        step('Test No2FA with wrong PubKeyHash', async () => {
+            if(onlyBasic) {
+                return;
+            }
 
             hildaWithEthSigner = hilda;
+
             // Making sure that the wallet has no Ethereum private key
-            const ethSigner = new No2FAWalletSigner(hilda.address(), hilda.ethSigner.provider);
-            const syncSigner = Signer.fromPrivateKey(zkPrivateKey);
+            // but has wrong l2 private key
             hilda = await Wallet.fromSyncSigner(
-                ethSigner,
-                syncSigner,
+                new No2FAWalletSigner(hilda.address(), hilda.ethSigner.provider),
+                Signer.fromPrivateKey(zkPrivateKeyWith2FA),
                 hilda.provider
             );
+
+            // Here the transfer without Ethereum signature, but with wrong l2 private key
+            await expect(tester.testTransfer(hilda, frida, token, TX_AMOUNT)).to.be.rejected;
+                
+            // No let's go back to the correct l2 private key
+            hildaWithEthSigner.signer = Signer.fromPrivateKey(zkPrivateKey);
+            await (await hildaWithEthSigner.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'ECDSA'
+            })).awaitReceipt();
+
+            // Making sure that hilda has correct signer
+            hilda.signer = Signer.fromPrivateKey(zkPrivateKey);
         });
 
         step('Test No2FA transfers', async () => {
@@ -467,7 +499,7 @@ if (process.env.TEST_TRANSPORT) {
             transport: 'HTTP',
             token: 'ETH',
             providerType: 'RPC',
-            onlyBasic: true
+            onlyBasic: false
         },
         {
             transport: 'HTTP',

@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:experimental
-FROM rust:1.53 as builder
+FROM rust:1.55 as builder
 WORKDIR /usr/src/zksync
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release
 
-FROM debian:buster-slim
+FROM debian:bullseye
 RUN apt-get update && apt-get install -y libpq5 ca-certificates && rm -rf /var/lib/apt/lists/*
 EXPOSE 3000
 EXPOSE 3031

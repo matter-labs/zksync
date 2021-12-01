@@ -118,9 +118,9 @@ jobs:
       - name: run-services
         run: |
           ci_run zk server &>server.log &
-          ci_run sleep 1
-          ci_run zk dummy-prover run &>dummy_prover.log &
           ci_run sleep 10
+          ci_run zk dummy-prover run &>dummy_prover.log &
+          ci_run sleep 100
 
       - name: integration-server
         run: ci_run zk test i server

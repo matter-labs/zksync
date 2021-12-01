@@ -285,16 +285,21 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        let result = Ok(tokens
+        let mut result: HashSet<_> = tokens
             .into_iter()
             .map(|t| TokenId(t.token_id as u32))
-            .collect());
+            .collect();
+
+        // ETH always has enough market volume
+        if tokens_to_check.contains(&0) && !result.contains(&TokenId(0)) {
+            result.insert(TokenId(0));
+        }
 
         metrics::histogram!(
             "sql.token.load_token_ids_that_enabled_for_fees",
             start.elapsed()
         );
-        result
+        Ok(result)
     }
 
     /// Get the number of ERC20 tokens from Database
@@ -326,7 +331,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .map(|token| token.id)
         .unwrap_or(0);
 
-        metrics::histogram!("sql.token.get_count", start.elapsed());
+        metrics::histogram!("sql.token.get_max_erc20_token_id", start.elapsed());
         Ok(last_token_id as u32)
     }
 
@@ -343,7 +348,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .map(|token| token.id)
         .unwrap_or(0);
 
-        metrics::histogram!("sql.token.get_count", start.elapsed());
+        metrics::histogram!("sql.token.get_max_token_id", start.elapsed());
         Ok(last_token_id as u32)
     }
 

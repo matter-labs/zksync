@@ -19,10 +19,10 @@ Returns the tokens that are currently supported by zkSync
             + list (array[Token.Token], required)
         + error (Error, required, nullable)
 
-## api/v0.2/tokens/tokenIdOrAddress [/tokens/{tokenIdOrAddress}]
+## api/v0.2/tokens/:tokenLike [/tokens/{tokenLike}]
 
 + Parameters
-    + tokenIdOrAddress (required, string, `2`) ... ID or address of the token in the zkSync network
+    + tokenLike (required, string, `2`) ... ID, address or symbol of the token in the zkSync network
 
 ### Get token info [GET]
 Get token into
@@ -34,10 +34,10 @@ Get token into
         + result (Token.Token, required{{isResultNullable}})
         + error (Error, required, nullable)
 
-## api/v0.2/tokens/:tokenIdOrAddress/priceIn/:currency [/tokens/{tokenIdOrAddress}/priceIn/{currency}]
+## api/v0.2/tokens/:tokenLike/priceIn/:currency [/tokens/{tokenLike}/priceIn/{currency}]
 
 + Parameters
-    + tokenIdOrAddress (required, string, `2`) ... ID or address of the token in the zkSync network
+    + tokenLike (required, string, `2`) ... ID, address or symbol of the token in the zkSync network
     + currency (required, `usd` | number, `usd`) ... Either `usd` or ID of any of the supported tokens in the zkSync network
 
 ### Get token price [GET]
@@ -72,6 +72,21 @@ Get NFT info
 
 ### Get NFT owner ID [GET]
 Get NFT owner ID
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (number, required{{isResultNullable}})
+        + error (Error, required, nullable)
+
+## api/v0.2/tokens/nft_id_by_tx_hash/:tx_hash [/tokens/nft_id_by_tx_hash/{tx_hash}]
+
++ Parameters
+    + tx_hash (required, string, `{{mintNFTTxHash}}`) ... The hash of the MintNFT transaction
+
+### Get NFT ID by the MintNFT transaction hash [GET]
+Get NFT ID by the MintNFT transaction hash
 
 + Response 200 (application/json)
     + Attributes

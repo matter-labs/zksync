@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:experimental
-FROM rust:1.53 as builder
+FROM rust:1.55 as builder
 WORKDIR /usr/src/zksync
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release
 
-FROM debian:buster-slim
+FROM debian:bullseye
 RUN apt-get update && apt-get install -y axel ca-certificates tini && rm -rf /var/lib/apt/lists/*
 # Docs of env variables used for this image
 # to test this locally just run

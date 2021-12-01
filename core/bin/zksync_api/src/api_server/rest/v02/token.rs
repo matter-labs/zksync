@@ -23,7 +23,7 @@ use zksync_api_types::v02::{
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{AccountId, Token, TokenId, TokenLike};
+use zksync_types::{tx::TxHash, AccountId, Token, TokenId, TokenLike};
 
 // Local uses
 use super::{
@@ -198,21 +198,11 @@ async fn token_pagination(
     data.token_page(query).await.into()
 }
 
-async fn token_by_id_or_address(
+async fn token_info(
     data: web::Data<ApiTokenData>,
     token_like_string: web::Path<String>,
 ) -> ApiResult<ApiToken> {
     let token_like = TokenLike::parse(&token_like_string);
-    let token_like = match token_like {
-        TokenLike::Symbol(_) => {
-            return Error::from(PriceError::token_not_found(
-                "Could not parse token as id or address",
-            ))
-            .into();
-        }
-        _ => token_like,
-    };
-
     data.api_token(token_like).await.into()
 }
 
@@ -224,15 +214,6 @@ async fn token_price(
 ) -> ApiResult<TokenPrice> {
     let (token_like_string, currency) = path.into_inner();
     let first_token = TokenLike::parse(&token_like_string);
-    let first_token = match first_token {
-        TokenLike::Symbol(_) => {
-            return Error::from(PriceError::token_not_found(
-                "Could not parse token as id or address",
-            ))
-            .into();
-        }
-        _ => first_token,
-    };
 
     let price = api_try!(data.token_price_in(first_token.clone(), &currency).await);
     let token = api_try!(data.token(first_token).await);
@@ -279,6 +260,20 @@ async fn get_nft_owner(
     ApiResult::Ok(owner_id)
 }
 
+async fn get_nft_id_by_tx_hash(
+    data: web::Data<ApiTokenData>,
+    tx_hash: web::Path<TxHash>,
+) -> ApiResult<Option<TokenId>> {
+    let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
+    let nft_id = api_try!(storage
+        .chain()
+        .state_schema()
+        .get_nft_id_by_tx_hash(*tx_hash)
+        .await
+        .map_err(Error::storage));
+    ApiResult::Ok(nft_id)
+}
+
 pub fn api_scope(
     config: &ZkSyncConfig,
     pool: ConnectionPool,
@@ -290,16 +285,17 @@ pub fn api_scope(
     web::scope("tokens")
         .app_data(web::Data::new(data))
         .route("", web::get().to(token_pagination))
+        .route("{token_like}", web::get().to(token_info))
         .route(
-            "{token_id_or_address}",
-            web::get().to(token_by_id_or_address),
-        )
-        .route(
-            "{token_id_or_address}/priceIn/{currency}",
+            "{token_like}/priceIn/{currency}",
             web::get().to(token_price),
         )
         .route("nft/{id}", web::get().to(get_nft))
         .route("nft/{id}/owner", web::get().to(get_nft_owner))
+        .route(
+            "nft_id_by_tx_hash/{tx_hash}",
+            web::get().to(get_nft_id_by_tx_hash),
+        )
 }
 
 #[cfg(test)]
@@ -310,21 +306,22 @@ mod tests {
         SharedData,
     };
     use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
-    use zksync_types::Address;
+    use zksync_types::{Address, BlockNumber, ZkSyncTx};
 
     async fn is_token_enabled_for_fees(
         storage: &mut StorageProcessor<'_>,
         token_id: TokenId,
         config: &ZkSyncConfig,
     ) -> anyhow::Result<bool> {
-        let market_volume = TokenDBCache::get_token_market_volume(storage, token_id).await?;
         let min_market_volume = Ratio::from(
             BigUint::from_f64(config.ticker.liquidity_volume)
                 .expect("TickerConfig::liquidity_volume must be positive"),
         );
-        Ok(market_volume
-            .map(|volume| volume.market_volume.ge(&min_market_volume))
-            .unwrap_or(false))
+        let filtered = storage
+            .tokens_schema()
+            .filter_tokens_by_market_volume(vec![token_id], &min_market_volume)
+            .await?;
+        Ok(!filtered.is_empty())
     }
 
     #[actix_rt::test]
@@ -338,6 +335,7 @@ mod tests {
 
         let prices = [
             (TokenLike::Id(TokenId(1)), 10_u64.into()),
+            (TokenLike::Symbol(String::from("PHNX")), 10_u64.into()),
             (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
             (Address::default().into(), 1_u64.into()),
         ];
@@ -412,7 +410,7 @@ mod tests {
         };
         assert_eq!(pagination, expected_pagination);
 
-        let token_like = TokenLike::Id(TokenId(1));
+        let token_like = TokenLike::Symbol(String::from("PHNX"));
         let token = {
             let mut storage = cfg.pool.access_storage().await?;
             storage
@@ -460,6 +458,32 @@ mod tests {
                 .unwrap()
         };
         assert_eq!(owner_id, expected_owner_id);
+
+        let mut block_number = BlockNumber(0);
+        let tx_hash = loop {
+            let mut storage = cfg.pool.access_storage().await?;
+            let ops = storage
+                .chain()
+                .block_schema()
+                .get_block_executed_ops(block_number)
+                .await?;
+            let mut tx_hash: Option<TxHash> = None;
+            for op in ops {
+                if let Some(tx) = op.get_executed_tx() {
+                    if matches!(tx.signed_tx.tx, ZkSyncTx::MintNFT(_)) {
+                        tx_hash = Some(tx.signed_tx.tx.hash());
+                    }
+                }
+            }
+            if let Some(tx_hash) = tx_hash {
+                break tx_hash;
+            }
+            block_number.0 += 1;
+        };
+
+        let response = client.nft_id_by_tx_hash(tx_hash).await?;
+        let nft_id: Option<TokenId> = deserialize_response_result(response)?;
+        assert!(nft_id.is_some());
 
         server.stop().await;
         Ok(())

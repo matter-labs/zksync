@@ -232,6 +232,30 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             .await?;
         };
 
+        let mut addresses = Vec::new();
+        let mut tokens = Vec::new();
+        for address in operation.affected_accounts {
+            for token in operation.used_tokens.iter() {
+                addresses.push(address.clone());
+                tokens.push(*token);
+            }
+        }
+
+        sqlx::query!(
+            "
+            INSERT INTO tx_filters (address, token, tx_hash)
+            SELECT u.address, u.token, $3
+                FROM UNNEST ($1::bytea[], $2::integer[])
+                AS u(address, token)
+            ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING
+            ",
+            &addresses,
+            &tokens,
+            &operation.tx_hash
+        )
+        .execute(transaction.conn())
+        .await?;
+
         transaction.commit().await?;
         metrics::histogram!("sql.chain.operations.store_executed_tx", start.elapsed());
         Ok(())
@@ -267,6 +291,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         operation: NewExecutedPriorityOperation,
     ) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
 
         sqlx::query!(
             "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account,
@@ -287,8 +312,28 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             operation.eth_block_index,
             operation.tx_hash,
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
+
+        let mut tokens = Vec::new();
+        tokens.resize(operation.affected_accounts.len(), operation.token);
+
+        sqlx::query!(
+            "
+            INSERT INTO tx_filters (address, token, tx_hash)
+            SELECT u.address, u.token, $3
+                FROM UNNEST ($1::bytea[], $2::integer[])
+                AS u(address, token)
+            ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING
+            ",
+            &operation.affected_accounts,
+            &tokens,
+            &operation.tx_hash
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        transaction.commit().await?;
         metrics::histogram!(
             "sql.chain.operations.store_executed_priority_op",
             start.elapsed()
@@ -542,6 +587,19 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         last_block: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
+
+        let records = sqlx::query!(
+            "SELECT tx_hash FROM executed_priority_operations WHERE block_number > $1",
+            *last_block as i64
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+        let hashes: Vec<Vec<u8>> = records.into_iter().map(|r| r.tx_hash).collect();
+
+        sqlx::query!("DELETE FROM tx_filters WHERE tx_hash = ANY($1)", &hashes)
+            .execute(self.0.conn())
+            .await?;
+
         sqlx::query!(
             "DELETE FROM executed_priority_operations WHERE block_number > $1",
             *last_block as i64

@@ -98,7 +98,7 @@ pub mod listener;
 pub mod prover;
 pub mod test_data;
 pub mod tokens;
-mod utils;
+pub mod utils;
 
 use forced_exit_requests::ForcedExitRequestsSchema;
 

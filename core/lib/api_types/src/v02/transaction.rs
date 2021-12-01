@@ -8,8 +8,8 @@ use zksync_types::{
         ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
         TxEthSignature, TxHash, Withdraw, WithdrawNFT,
     },
-    AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
-    H256,
+    AccountId, Address, BlockNumber, EthBlockId, PubKeyHash, SerialId, TokenId, ZkSyncOp,
+    ZkSyncPriorityOp, H256,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, ZeroPrefixHexSerde};
 
@@ -81,6 +81,7 @@ pub struct Transaction {
     pub status: TxInBlockStatus,
     pub fail_reason: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
+    pub batch_id: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -256,13 +257,16 @@ pub struct Toggle2FA {
     pub timestamp: DateTime<Utc>,
     pub account_id: AccountId,
     pub signature: TxEthSignature,
+    // If supplied, only transaction signed with this pubkey hash will not
+    // have their Ethereum signature checked
+    pub pub_key_hash: Option<PubKeyHash>,
 }
 
 impl Toggle2FA {
     // Even though the function returns constant value, it is made for consistency
     // with Order and transactions
     pub fn get_ethereum_sign_message(&self) -> String {
-        if self.enable {
+        let message = if self.enable {
             format!(
                 "By signing this message, you are opting into Two-factor Authentication protection by the zkSync Server.\n\
                 Transactions now require signatures by both your L1 and L2 private key.\n\
@@ -277,6 +281,12 @@ impl Toggle2FA {
                 Timestamp: {}", 
                 self.timestamp.timestamp_millis()
             )
+        };
+
+        if let Some(hash) = self.pub_key_hash {
+            format!("{}\nPubKeyHash: {}", message, hash.as_hex())
+        } else {
+            message
         }
     }
 }

@@ -11,6 +11,7 @@ use zksync_types::{
     TokenId, ZkSyncPriorityOp, H256,
 };
 
+use super::is_missing_priority_op_error;
 use crate::eth_watch::{client::EthClient, EthWatch};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -62,6 +63,11 @@ impl FakeEthClient {
             BlockNumber::Pending => unreachable!(),
             BlockNumber::Number(number) => number.as_u64(),
         }
+    }
+
+    async fn set_last_block_number(&mut self, block_number: u64) {
+        let mut inner = self.inner.write().await;
+        inner.last_block_number = block_number;
     }
 }
 
@@ -143,11 +149,11 @@ async fn test_operation_queues() {
                 from: from_addr,
                 token: TokenId(0),
                 amount: Default::default(),
-                to: to_addr,
+                to: Default::default(),
             }),
             deadline_block: 0,
             eth_hash: [2; 32].into(),
-            eth_block: 4,
+            eth_block: 3,
             eth_block_index: Some(1),
         },
         PriorityOp {
@@ -156,11 +162,11 @@ async fn test_operation_queues() {
                 from: Default::default(),
                 token: TokenId(0),
                 amount: Default::default(),
-                to: Default::default(),
+                to: to_addr,
             }),
             deadline_block: 0,
             eth_hash: [3; 32].into(),
-            eth_block: 3,
+            eth_block: 4,
             eth_block_index: Some(1),
         },
         PriorityOp {
@@ -189,15 +195,15 @@ async fn test_operation_queues() {
     assert_eq!(priority_queues.len(), 1);
     assert_eq!(
         priority_queues.values().next().unwrap().as_ref().serial_id,
-        1
+        0
     );
     assert_eq!(unconfirmed_queue.len(), 2);
-    assert_eq!(unconfirmed_queue[0].serial_id, 0);
+    assert_eq!(unconfirmed_queue[0].serial_id, 1);
     assert_eq!(unconfirmed_queue[1].serial_id, 2);
 
-    priority_queues.get(&1).unwrap();
+    priority_queues.get(&0).unwrap();
     watcher
-        .find_ongoing_op_by_eth_hash(H256::from_slice(&[2u8; 32]))
+        .find_ongoing_op_by_eth_hash(H256::from_slice(&[3u8; 32]))
         .unwrap();
 
     // Make sure that the old behavior of the pending deposits getter has not changed.
@@ -213,7 +219,7 @@ async fn test_operation_queues() {
         limit: 2,
         direction: PaginationDirection::Newer,
     });
-    assert_eq!(ops.list[0].tx_hash, priority_ops[0].tx_hash());
+    assert_eq!(ops.list[0].tx_hash, priority_ops[1].tx_hash());
     assert_eq!(ops.list[1].tx_hash, priority_ops[2].tx_hash());
     assert!(watcher
         .get_ongoing_ops_for(PaginationQuery {
@@ -428,4 +434,100 @@ async fn test_restore_and_poll_time_lag() {
     assert_eq!(priority_queues.len(), 2);
     priority_queues.get(&0).unwrap();
     priority_queues.get(&1).unwrap();
+}
+
+#[tokio::test]
+async fn test_serial_id_gaps() {
+    let deposit = ZkSyncPriorityOp::Deposit(Deposit {
+        from: Default::default(),
+        token: TokenId(0),
+        amount: Default::default(),
+        to: [2u8; 20].into(),
+    });
+
+    let mut client = FakeEthClient::new();
+    client
+        .add_operations(&[
+            PriorityOp {
+                serial_id: 0,
+                data: deposit.clone(),
+                deadline_block: 0,
+                eth_hash: [2; 32].into(),
+                eth_block: 1,
+                eth_block_index: Some(1),
+            },
+            PriorityOp {
+                serial_id: 1,
+                data: deposit.clone(),
+                deadline_block: 0,
+                eth_hash: [3; 32].into(),
+                eth_block: 1,
+                eth_block_index: Some(2),
+            },
+        ])
+        .await;
+
+    let mut watcher = create_watcher(client.clone());
+    // Restore the valid (empty) state.
+    watcher.restore_state_from_eth(0).await.unwrap();
+    assert_eq!(watcher.eth_state.last_ethereum_block(), 0);
+    assert!(watcher.eth_state.priority_queue().is_empty());
+    assert_eq!(watcher.eth_state.next_priority_op_id(), 0);
+
+    // Advance the block number and poll the valid block range.
+    client.set_last_block_number(2).await;
+    watcher.poll_eth_node().await.unwrap();
+    assert_eq!(watcher.eth_state.next_priority_op_id(), 2);
+    assert_eq!(watcher.eth_state.last_ethereum_block_backup(), 0);
+    assert_eq!(watcher.eth_state.last_ethereum_block(), 2);
+
+    // Add a gap.
+    client
+        .add_operations(&[
+            PriorityOp {
+                serial_id: 2,
+                data: deposit.clone(),
+                deadline_block: 0,
+                eth_hash: [2; 32].into(),
+                eth_block: 2,
+                eth_block_index: Some(1),
+            },
+            PriorityOp {
+                serial_id: 4, // Then next id is expected to be 3.
+                data: deposit.clone(),
+                deadline_block: 0,
+                eth_hash: [3; 32].into(),
+                eth_block: 2,
+                eth_block_index: Some(3),
+            },
+        ])
+        .await;
+    client.set_last_block_number(3).await;
+    // Should detect a gap.
+    let err = watcher.poll_eth_node().await.unwrap_err();
+    assert!(is_missing_priority_op_error(&err));
+
+    // The partially valid update is still discarded and we're waiting
+    // for the serial_id = 2 even though it was present.
+    assert_eq!(watcher.eth_state.next_priority_op_id(), 2);
+    // The range got reset.
+    assert_eq!(watcher.eth_state.last_ethereum_block_backup(), 0);
+    assert_eq!(watcher.eth_state.last_ethereum_block(), 0);
+
+    // Add a missing operations to the processed range.
+    client
+        .add_operations(&[PriorityOp {
+            serial_id: 3,
+            data: deposit.clone(),
+            deadline_block: 0,
+            eth_hash: [2; 32].into(),
+            eth_block: 2,
+            eth_block_index: Some(2),
+        }])
+        .await;
+    watcher.poll_eth_node().await.unwrap();
+    assert_eq!(watcher.eth_state.next_priority_op_id(), 5);
+    assert_eq!(watcher.eth_state.priority_queue().len(), 5);
+    assert_eq!(watcher.eth_state.last_ethereum_block_backup(), 0);
+    assert_eq!(watcher.eth_state.last_ethereum_block(), 3);
 }

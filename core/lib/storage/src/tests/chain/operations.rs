@@ -60,6 +60,8 @@ async fn executed_operations(mut storage: StorageProcessor<'_>) -> QueryResult<(
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
         batch_id: Some(10),
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
 
     OperationsSchema(&mut storage)
@@ -106,6 +108,8 @@ async fn executed_priority_operations(mut storage: StorageProcessor<'_>) -> Quer
         created_at: chrono::Utc::now(),
         tx_hash: Default::default(),
         eth_block_index: Some(1),
+        affected_accounts: Default::default(),
+        token: Default::default(),
     };
     OperationsSchema(&mut storage)
         .store_executed_priority_op(executed_tx.clone())
@@ -151,6 +155,8 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
         batch_id: None,
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
 
     let executed_priority_op = NewExecutedPriorityOperation {
@@ -166,6 +172,8 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         created_at: chrono::Utc::now(),
         tx_hash: Default::default(),
         eth_block_index: Some(1),
+        affected_accounts: Default::default(),
+        token: Default::default(),
     };
 
     // Save the same operations twice.
@@ -222,6 +230,8 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
         batch_id: None,
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
 
     // Save the failed operation.
@@ -300,6 +310,8 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         created_at: timestamp_1,
         eth_sign_data: None,
         batch_id: None,
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
     let timestamp_2 = timestamp_1 - Duration::weeks(1);
     let mut executed_tx_2 = executed_tx_1.clone();
@@ -391,6 +403,8 @@ async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<(
         created_at: chrono::Utc::now(),
         tx_hash: vec![0xBB, 0xBB, 0xBB, 0xBB],
         eth_block_index: Some(1),
+        affected_accounts: Default::default(),
+        token: Default::default(),
     };
     // Store executed priority op and try to get it by `eth_hash`.
     storage
@@ -439,6 +453,8 @@ async fn test_remove_executed_priority_operations(
             created_at: chrono::Utc::now(),
             eth_block_index: Some(1),
             tx_hash: Default::default(),
+            affected_accounts: Default::default(),
+            token: Default::default(),
         };
         OperationsSchema(&mut storage)
             .store_executed_priority_op(executed_priority_op)

@@ -21,7 +21,7 @@ export abstract class SyncProvider {
     public tokenSet: TokenSet;
     public providerType: 'RPC' | 'Rest';
     // For HTTP provider
-    public pollIntervalMilliSecs = 500;
+    public pollIntervalMilliSecs = 1000;
 
     abstract submitTx(tx: any, signature?: TxEthSignatureVariant, fastProcessing?: boolean): Promise<string>;
     abstract submitTxsBatch(
@@ -50,6 +50,7 @@ export abstract class SyncProvider {
     abstract getNFT(id: number): Promise<NFTInfo>;
     abstract getNFTOwner(id: number): Promise<number>;
     abstract toggle2FA(data: Toggle2FARequest): Promise<boolean>;
+    abstract getNFTIdByTxHash(txHash: string): Promise<number>;
 
     async updateTokenSet(): Promise<void> {
         const updatedTokenSet = new TokenSet(await this.getTokens());

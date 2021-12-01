@@ -103,6 +103,9 @@ pub trait Rpc {
 
     #[rpc(name = "toggle_2fa", returns = "Toggle2FAResponse")]
     fn toggle_2fa(&self, toggle_2fa: Toggle2FA) -> BoxFutureResult<Toggle2FAResponse>;
+
+    #[rpc(name = "get_nft_id_by_tx_hash", returns = "Option<TokenId>")]
+    fn get_nft_id_by_tx_hash(&self, tx_hash: TxHash) -> BoxFutureResult<Option<TokenId>>;
 }
 
 impl Rpc for RpcApp {
@@ -190,5 +193,9 @@ impl Rpc for RpcApp {
 
     fn toggle_2fa(&self, toggle_2fa: Toggle2FA) -> BoxFutureResult<Toggle2FAResponse> {
         spawn!(self._impl_toggle_2fa(toggle_2fa))
+    }
+
+    fn get_nft_id_by_tx_hash(&self, tx_hash: TxHash) -> BoxFutureResult<Option<TokenId>> {
+        spawn!(self._impl_get_nft_id_by_tx_hash(tx_hash))
     }
 }

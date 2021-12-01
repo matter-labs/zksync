@@ -10,7 +10,8 @@ use web3::Web3;
 use zksync_data_restore::contract::ZkSyncDeployedContract;
 use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
-    database_storage_interactor::DatabaseStorageInteractor, END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
+    database_storage_interactor::DatabaseStorageInteractor, storage_interactor::StorageInteractor,
+    END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
 use zksync_types::network::Network;
 
@@ -120,7 +121,7 @@ async fn main() {
         contract,
     );
 
-    let mut interactor = DatabaseStorageInteractor::new(storage);
+    let mut interactor = StorageInteractor::Database(DatabaseStorageInteractor::new(storage));
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,

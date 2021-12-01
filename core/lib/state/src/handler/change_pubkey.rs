@@ -3,7 +3,7 @@ use zksync_crypto::params;
 use zksync_types::{
     operations::{ChangePubKeyOp, ZkSyncOp},
     tx::ChangePubKey,
-    AccountUpdate, AccountUpdates,
+    AccountUpdate, AccountUpdates, Nonce,
 };
 
 use crate::{
@@ -11,6 +11,7 @@ use crate::{
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 use zksync_crypto::params::max_processable_token;
+use zksync_types::tx::ChangePubKeyEthAuthData;
 
 impl TxHandler<ChangePubKey> for ZkSyncState {
     type Op = ChangePubKeyOp;
@@ -74,6 +75,11 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
 
         let old_pub_key_hash = account.pub_key_hash;
         let old_nonce = account.nonce;
+
+        if let Some(ChangePubKeyEthAuthData::CREATE2(_)) = op.tx.eth_auth_data {
+            // This type of change pubkey can be done only once
+            invariant!(op.tx.nonce == Nonce(0), ChangePubKeyOpError::NonceMismatch);
+        }
 
         // Update nonce.
         invariant!(

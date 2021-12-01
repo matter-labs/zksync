@@ -1,9 +1,7 @@
 //! zkSync network block definition.
 
-use super::PriorityOp;
-use super::ZkSyncOp;
-use super::{AccountId, BlockNumber, Fr};
-use crate::SignedZkSyncTx;
+use super::{AccountId, BlockNumber, Fr, PriorityOp, ZkSyncOp};
+use crate::{tx::error::CloseOperationsDisabled, SignedZkSyncTx};
 use chrono::Utc;
 use chrono::{DateTime, TimeZone};
 use parity_crypto::digest::sha256;
@@ -62,6 +60,22 @@ pub struct ExecutedPriorityOp {
     pub created_at: DateTime<Utc>,
 }
 
+impl ExecutedPriorityOp {
+    /// Returns Id of the account affected by the priority operation.
+    pub fn account_id(&self) -> AccountId {
+        match &self.priority_op.data {
+            crate::ZkSyncPriorityOp::Deposit(_) => {
+                if let ZkSyncOp::Deposit(ref deposit) = self.op {
+                    deposit.account_id
+                } else {
+                    panic!("Invalid type of zkSync operation, expected deposit")
+                }
+            }
+            crate::ZkSyncPriorityOp::FullExit(full_exit) => full_exit.account_id,
+        }
+    }
+}
+
 /// Representation of executed operation, which can be either L1 or L2.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -71,6 +85,14 @@ pub enum ExecutedOperations {
 }
 
 impl ExecutedOperations {
+    /// Returns Id of the account affected by the operation.
+    pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
+        match self {
+            ExecutedOperations::Tx(tx) => tx.signed_tx.account_id(),
+            ExecutedOperations::PriorityOp(priority_op) => Ok(priority_op.account_id()),
+        }
+    }
+
     /// Returns the `ZkSyncOp` object associated with the operation, if any.
     pub fn get_executed_op(&self) -> Option<&ZkSyncOp> {
         match self {

@@ -80,10 +80,10 @@ describe('ZkSync REST API V0.2 tests', () => {
         tester = await Tester.init('localhost', 'HTTP', 'REST');
         alice = await tester.fundedWallet('1.0');
         bob = await tester.emptyWallet();
-        for (const token of ['ETH']) {
+        for (const token of ['ETH', 'wBTC']) {
             const thousand = tester.syncProvider.tokenSet.parseToken(token, '1000');
             await tester.testDeposit(alice, token, thousand, true);
-            await tester.testChangePubKey(alice, token, false);
+            if (token === 'ETH') await tester.testChangePubKey(alice, token, false);
             await tester.testTransfer(alice, bob, token, thousand.div(4));
         }
 
@@ -104,17 +104,81 @@ describe('ZkSync REST API V0.2 tests', () => {
         expect(fullState.committed, 'committed state differs').to.eql(committedState);
         expect(fullState.finalized, 'finalized state differs').to.eql(finalizedState);
 
-        const txs = await provider.accountTxs(alice.accountId!, {
+        const expectedETHTxs = 4;
+        const expectedWBTCTxs = 2;
+        const expectedAll = expectedETHTxs + expectedWBTCTxs;
+
+        const ethTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            'ETH'
+        );
+        expect(
+            ethTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${ethTxs.list.length}, expected ${expectedETHTxs}`
+        ).to.eql(expectedETHTxs);
+
+        const wbtcTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            'wBTC'
+        );
+        expect(
+            wbtcTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${wbtcTxs.list.length}, expected ${expectedETHTxs}`
+        ).to.eql(expectedWBTCTxs);
+
+        const allTxs = await provider.accountTxs(alice.accountId!, {
             from: lastTxHash,
             limit: 10,
             direction: 'older'
         });
-        const expected = 4;
         expect(
-            txs.list.length,
-            `Endpoint returned incorrect number of transactions: ${txs.list.length}, expected ${expected}`
-        ).to.eql(expected);
-        expect(txs.list[0].txHash, 'Endpoint did not return first tx correctly').to.be.eql(lastTxHash);
+            allTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${allTxs.list.length}, expected ${expectedAll}`
+        ).to.eql(expectedAll);
+        expect(allTxs.list[0].txHash, 'Endpoint did not return first tx correctly').to.be.eql(lastTxHash);
+
+        const expectedAliceBob = 3;
+        const expectedAliceTester = 2;
+
+        const aliceAndBobTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            undefined,
+            bob.address()
+        );
+        expect(
+            aliceAndBobTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${aliceAndBobTxs.list.length}, expected ${expectedAliceBob}`
+        ).to.eql(expectedAliceBob);
+
+        const aliceAndTesterTxs = await provider.accountTxs(
+            alice.accountId!,
+            {
+                from: lastTxHash,
+                limit: 10,
+                direction: 'older'
+            },
+            undefined,
+            tester.syncWallet.address()
+        );
+        expect(
+            aliceAndTesterTxs.list.length,
+            `Endpoint returned incorrect number of transactions: ${aliceAndTesterTxs.list.length}, expected ${expectedAliceTester}`
+        ).to.eql(expectedAliceTester);
 
         const accTxs = await provider.accountPendingTxs(alice.accountId!, {
             from: 1,
@@ -181,10 +245,16 @@ describe('ZkSync REST API V0.2 tests', () => {
             direction: 'newer'
         });
         expect(tokens.list.length).to.be.eql(2);
-        const firstToken = await provider.tokenByIdOrAddress('0x'.padEnd(42, '0'));
-        const secondToken = await provider.tokenByIdOrAddress(1);
+        const firstToken = await provider.tokenInfo('0x'.padEnd(42, '0'));
+        const secondToken = await provider.tokenInfo(1);
         expect(tokens.list[0]).to.be.eql(firstToken);
         expect(tokens.list[1]).to.be.eql(secondToken);
+        const firstTokenUSDPrice = await provider.getTokenPrice(0);
+        const secondTokenUSDPrice = await provider.getTokenPrice(1);
+        const expectedPrice = firstTokenUSDPrice / secondTokenUSDPrice;
+        const actualPrice = parseFloat((await provider.tokenPriceInfo(0, 1)).price);
+        expect(expectedPrice).to.be.lessThan(1.05 * actualPrice);
+        expect(expectedPrice).to.be.greaterThan(0.95 * actualPrice);
     });
 
     it('should check api v0.2 transaction scope', async () => {
@@ -193,6 +263,7 @@ describe('ZkSync REST API V0.2 tests', () => {
 
         const txData = await provider.txData(lastTxHash);
         expect(txData!.tx.op.type).to.eql('Transfer');
+        expect(txData!.tx.batchId).to.not.exist;
 
         const batch = await alice
             .batchBuilder()
@@ -203,6 +274,11 @@ describe('ZkSync REST API V0.2 tests', () => {
         await provider.notifyAnyTransaction(submitBatchResponse.transactionHashes[0], 'COMMIT');
         const batchInfo = await provider.getBatch(submitBatchResponse.batchHash);
         expect(batchInfo.batchHash).to.eql(submitBatchResponse.batchHash);
+
+        const txInBatchData1 = await provider.txData(batchInfo.transactionHashes[0]);
+        const txInBatchData2 = await provider.txData(batchInfo.transactionHashes[1]);
+        expect(txInBatchData1.tx.batchId).to.exist;
+        expect(txInBatchData1.tx.batchId).to.eql(txInBatchData2.tx.batchId);
     });
 });
 
@@ -373,5 +449,18 @@ describe('ZkSync web3 API tests', () => {
         balance = nftFactoryContract.interface.decodeFunctionResult(balanceOfFunction, callResult)[0];
         expectedBalance = (await alice.getAccountState()).verified.balances[token] as string;
         expect(balance.toString(), 'Incorrect balance after transfer').to.eql(expectedBalance);
+    });
+
+    it('should check eth_call error', async () => {
+        const ownerOfFunction = nftFactoryContract.interface.functions['ownerOf(uint256)'];
+        const ownerOfCallData = nftFactoryContract.interface.encodeFunctionData(ownerOfFunction, [99999]);
+        let failed = false;
+        try {
+            await web3Provider.call({ to: nftFactoryAddress, data: ownerOfCallData });
+        } catch (e) {
+            expect(e.toString().includes('execution reverted: ERC721: owner query for nonexistent token')).to.be.true;
+            failed = true;
+        }
+        expect(failed).to.be.true;
     });
 });

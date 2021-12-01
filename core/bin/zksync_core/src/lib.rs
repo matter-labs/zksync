@@ -29,6 +29,7 @@ pub mod register_factory_handler;
 pub mod rejected_tx_cleaner;
 pub mod state_keeper;
 pub mod token_handler;
+pub mod tx_event_emitter;
 
 /// Waits for any of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
@@ -110,6 +111,9 @@ pub async fn run_core(
     let (mempool_block_request_sender, mempool_block_request_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
 
+    let (processed_tx_events_sender, processed_tx_events_receiver) =
+        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+
     // Start Ethereum Watcher.
     let eth_watch_task = start_eth_watch(
         eth_watch_req_sender.clone(),
@@ -135,6 +139,7 @@ pub async fn run_core(
         config.chain.state_keeper.block_chunk_sizes.clone(),
         config.chain.state_keeper.miniblock_iterations as usize,
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
+        processed_tx_events_sender,
     );
     let state_keeper_task = start_state_keeper(state_keeper, pending_block);
 
@@ -175,6 +180,11 @@ pub async fn run_core(
     // Start rejected transactions cleaner task.
     let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
 
+    let tx_event_emitter_task = tx_event_emitter::run_tx_event_emitter_task(
+        connection_pool.clone(),
+        processed_tx_events_receiver,
+    );
+
     // Start block proposer.
     let proposer_task = run_block_proposer_task(
         &config,
@@ -199,6 +209,7 @@ pub async fn run_core(
         rejected_tx_cleaner_task,
         token_handler_task,
         register_factory_task,
+        tx_event_emitter_task,
     ];
 
     if let Some(task) = gateway_watcher_task_opt {
