@@ -36,7 +36,7 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
 
         sqlx::query!(
             r#"
-            INSERT INTO subsidies ( tx_hash, usd_amount, full_cost_usd, token_id, token_amount, full_cost_token, subsidy_type )
+            INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )
             VALUES ( $1, $2, $3, $4, $5, $6, $7 )
             "#,
             subsidy.tx_hash.as_ref(),
@@ -62,7 +62,7 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
         let start = Instant::now();
         let sum = sqlx::query!(
             r#"
-            SELECT SUM(usd_amount) as total FROM subsidies 
+            SELECT SUM(usd_amount_scale6) as total FROM subsidies 
             WHERE subsidy_type = $1
             "#,
             subsidy_type

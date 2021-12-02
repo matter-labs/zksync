@@ -205,25 +205,26 @@ impl RequestMiddleware for IpInsertMiddleWare {
         let cloudflare_sent_ip = "CF-Connecting-IP";
 
         // DONT MERGE IF THE FOLLOWING IS STILL COMMENTED OUT
-        // let remote_ip = match parts.headers.get(cloudflare_sent_ip) {
-        //     Some(ip) => ip.to_str(),
-        //     None => {
-        //         return RequestMiddlewareAction::Proceed {
-        //             should_continue_on_invalid_cors: false,
-        //             request: hyper::Request::from_parts(parts, body),
-        //         }
-        //     }
-        // };
-        // let remote_ip = if let Err(e) = remote_ip {
-        //     vlog::warn!("Failed to parse CF-Connecting-IP header. Reason: {}", e);
-        //     return RequestMiddlewareAction::Proceed {
-        //         should_continue_on_invalid_cors: false,
-        //         request: hyper::Request::from_parts(parts, body),
-        //     }
-        // } else {
-        //     remote_ip.unwrap()
-        // };
-        let remote_ip = "localhost";
+        let remote_ip = match parts.headers.get(cloudflare_sent_ip) {
+            Some(ip) => ip.to_str(),
+            None => {
+                return RequestMiddlewareAction::Proceed {
+                    should_continue_on_invalid_cors: false,
+                    request: hyper::Request::from_parts(parts, body),
+                }
+            }
+        };
+        let remote_ip = if let Err(e) = remote_ip {
+            vlog::warn!("Failed to parse CF-Connecting-IP header. Reason: {}", e);
+            return RequestMiddlewareAction::Proceed {
+                should_continue_on_invalid_cors: false,
+                request: hyper::Request::from_parts(parts, body),
+            };
+        } else {
+            remote_ip.unwrap()
+        };
+        dbg!(remote_ip.clone());
+        //let remote_ip = "localhost";
 
         let body_bytes = insert_ip(body, remote_ip.to_owned()).into_stream();
         let body = hyper::Body::wrap_stream(body_bytes);

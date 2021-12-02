@@ -1,6 +1,6 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types } from 'zksync';
+import { Wallet, types, Create2WalletSigner } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
@@ -16,6 +16,9 @@ import {
     serializeTimestamp,
     numberToBytesBE
 } from 'zksync/build/utils';
+import { HTTPTransport } from 'zksync/build/transport';
+import { assert } from 'console';
+import exp from 'constants';
 
 type TokenLike = types.TokenLike;
 
@@ -37,6 +40,7 @@ declare module './tester' {
             providerType: 'REST' | 'RPC'
         ): Promise<void>;
         testBackwardCompatibleEthMessages(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testSubsidyForCREATE2ChangePubKey(create2Wallet: Wallet, token: TokenLike): Promise<void>;
     }
 }
 
@@ -65,7 +69,7 @@ Tester.prototype.testWrongSignature = async function (
     try {
         await from.provider.submitTx(signedTransfer.tx, fakeEthSignature);
         thrown = false; // this line should be unreachable
-    } catch (e) {
+    } catch (e: any) {
         if (providerType === 'REST') {
             expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
         } else {
@@ -87,7 +91,7 @@ Tester.prototype.testWrongSignature = async function (
     try {
         await from.provider.submitTx(signedWithdraw.tx, fakeEthSignature);
         thrown = false; // this line should be unreachable
-    } catch (e) {
+    } catch (e: any) {
         if (providerType === 'REST') {
             expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
         } else {
@@ -142,7 +146,7 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
 
     const senderBefore = await batchSender.getBalance(token);
     const handles = await submitSignedTransactionsBatch(batchSender.provider, batch, ethSignatures);
-    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(handles.map((handle: any) => handle.awaitReceipt()));
     const senderAfter = await batchSender.getBalance(token);
     // Sender paid totalFee for this cycle.
     expect(senderBefore.sub(senderAfter).eq(totalFee), 'Batched transfer failed').to.be.true;
@@ -194,7 +198,7 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
     try {
         await submitSignedTransactionsBatch(from.provider, batch, [ethSignature]);
         thrown = false; // this line should be unreachable
-    } catch (e) {
+    } catch (e: any) {
         if (providerType === 'REST') {
             expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
         } else {
@@ -278,8 +282,85 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
 
     const handles = await submitSignedTransactionsBatch(to.provider, batch, ethSignatures);
     // We only expect that API doesn't reject this batch due to Eth signature error.
-    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(handles.map((handle: any) => handle.awaitReceipt()));
     this.runningFee = this.runningFee.add(totalFee);
+};
+
+Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wallet: Wallet, token: TokenLike) {
+    // Unfortunately due to different rounds and precision lost
+    // the price might differ from the expected one
+    const ACCEPTED_SCALED_DIFFERENCE = 10; // 10^-5 USD
+
+    const subsidizedIps = process.env.FEE_TICKER_SUBSIDIZED_IPS?.split(',')!;
+    const subsidizedCpkPriceScaled = BigNumber.from(process.env.FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED)!;
+
+    const config = {
+        headers: {
+            'CF-Connecting-IP': subsidizedIps[0]
+        }
+    };
+
+    const transport = new HTTPTransport('http://127.0.0.1:3030');
+    const weiInEth = BigNumber.from(10).pow(18);
+    const scaledTokenPrice = BigNumber.from(Math.round(1000000 * (await this.syncProvider.getTokenPrice(token))));
+
+    // Check that the subsidized fee is returned when requested with appropriate headers
+    const transactionFee = await transport.request(
+        'get_tx_fee',
+        [
+            {
+                ChangePubKey: 'CREATE2'
+            },
+            ethers.constants.AddressZero,
+            token
+        ],
+        config
+    );
+    const totalFee = BigNumber.from(transactionFee.totalFee);
+    const totalFeeUSDScaled = totalFee.mul(scaledTokenPrice).div(weiInEth);
+    expect(totalFeeUSDScaled.sub(subsidizedCpkPriceScaled).abs().lte(ACCEPTED_SCALED_DIFFERENCE)).to.be.true;
+
+    // However, without the necessary headers, the API should return the normal fee
+    const normaltransactionFee = await transport.request('get_tx_fee', [
+        {
+            ChangePubKey: 'CREATE2'
+        },
+        ethers.constants.AddressZero,
+        token
+    ]);
+    const normalTotalFee = BigNumber.from(normaltransactionFee.totalFee);
+    const normalTotalFeeUSDScaled = normalTotalFee.mul(scaledTokenPrice).div(weiInEth);
+
+    // The difference is huge (at least 5x times tolerated difference)
+    expect(
+        normalTotalFeeUSDScaled
+            .sub(subsidizedCpkPriceScaled)
+            .abs()
+            .gte(5 * ACCEPTED_SCALED_DIFFERENCE)
+    ).to.be.true;
+
+    // Now we submit the CREATE2 ChangePubKey
+    const create2data = (create2Wallet.ethSigner as Create2WalletSigner).create2WalletData;
+    const cpkTx = await create2Wallet.getChangePubKey({
+        feeToken: token,
+        fee: BigNumber.from(transactionFee.totalFee),
+        nonce: 0,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP,
+        ethAuthData: {
+            type: 'CREATE2',
+            ...create2data
+        }
+    });
+    let failed = false;
+    try {
+        await transport.request('tx_submit', [cpkTx, null]);
+    } catch (e) {
+        failed = true;
+    }
+    expect(failed).to.be.true;
+
+    await transport.request('tx_submit', [cpkTx, null], config);
 };
 
 export function serializeOldTransfer(transfer: Transfer): Uint8Array {

@@ -12,7 +12,7 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 export async function expectThrow(promise: Promise<any>, message: String) {
-    let error = null;
+    let error: any = null;
     try {
         await promise;
     } catch (err) {

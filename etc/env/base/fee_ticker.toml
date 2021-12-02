@@ -25,11 +25,13 @@ scale_fee_percent=100
 
 
 # Whitelisted IPs for subsisdies
-subsidized_ips="myip"
+subsidized_ips=["SUBSIDY_IP"]
 
-# Please note, that both values are in cents, i.e. the 100 denotes $1
-subsidy_cpk_price_usd_cents=100
-max_subsidy_usd_cents=2500000
+# Please note, that the prices are scaled by 10^6
+# CPK price is 0.00001 USD
+subsidy_cpk_price_usd_scaled=10 
+# The scaled maximum number of dollars to be subsidized is $250000
+max_subsidy_usd_scaled=250000000000
 
 # The type of the currently applied subsidy
 # At this moment, the server can support only one type of subsidy at a time

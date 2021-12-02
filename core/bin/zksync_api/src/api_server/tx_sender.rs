@@ -397,8 +397,10 @@ impl TxSender {
             .await?;
         let subsidized_already = big_decimal_to_ratio(&subsidized_already)?;
 
+        //dbg!(subsidized_already.clone());
+
         let result = if self.max_subsidy_usd > subsidized_already {
-            &self.max_subsidy_usd - subsidized_already < new_subsidy_usd
+            &self.max_subsidy_usd - subsidized_already >= new_subsidy_usd
         } else {
             false
         };
@@ -423,7 +425,7 @@ impl TxSender {
         let full_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee;
         let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
 
-        if full_cost_usd > subsidized_cost_usd {
+        if full_cost_usd < subsidized_cost_usd {
             panic!("Trying to subsidize transaction which should not be subsidized");
         }
 
@@ -506,6 +508,8 @@ impl TxSender {
                     .can_subsidize(required_fee_data.subsidy_size_usd.clone())
                     .await
                     .map_err(SubmitError::Internal)?
+                && required_fee_data.subsidized_fee.total_fee
+                    < required_fee_data.normal_fee.total_fee
             {
                 subsidized = true;
                 required_fee_data.subsidized_fee
@@ -690,6 +694,7 @@ impl TxSender {
                     .can_subsidize(batch_token_fee.subsidy_size_usd.clone())
                     .await
                     .map_err(SubmitError::Internal)?
+                && batch_token_fee.subsidized_fee.total_fee < batch_token_fee.normal_fee.total_fee
             {
                 subsidized = true;
                 fee_data = Some(batch_token_fee.clone());
@@ -725,6 +730,7 @@ impl TxSender {
                     .can_subsidize(required_eth_fee.subsidy_size_usd.clone())
                     .await
                     .map_err(SubmitError::Internal)?
+                && required_eth_fee.subsidized_fee.total_fee < required_eth_fee.normal_fee.total_fee
             {
                 subsidized = true;
                 fee_data = Some(required_eth_fee.clone());

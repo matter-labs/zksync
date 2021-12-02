@@ -87,6 +87,20 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         await tester.testChangePubKey(alice, token, true);
     });
 
+    step('Should test subsidy', async () => {
+        if(onlyBasic || transport != 'HTTP') {
+            return;
+        }
+
+        const wallet = await tester.create2Wallet();
+        await tester.testTransfer(alice, wallet, token, TX_AMOUNT);
+        
+        await tester.testSubsidyForCREATE2ChangePubKey(
+            wallet,
+            token
+        );
+    });
+
     step('should execute a transfer to new account', async () => {
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
@@ -514,7 +528,7 @@ if (process.env.TEST_TRANSPORT) {
     ];
 }
 
-for (const input of tokenAndTransport) {
+for (const input of tokenAndTransport.slice(0, 1)) {
     // @ts-ignore
     TestSuite(input.token, input.transport, input.providerType, input.onlyBasic);
 }

@@ -254,6 +254,10 @@ impl<API: Clone, INFO: Clone, WATCHER: Clone>
     }
 }
 
+const CPK_CREATE2_FEE_TYPE: OutputFeeType = OutputFeeType::ChangePubKey(
+    ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::CREATE2),
+);
+
 // async fn get_left_subsidy_usd_cents(
 //     config: &ZkSyncConfig,
 //     db_pool: &ConnectionPool,
@@ -519,9 +523,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             gas_price_wei.clone(),
         );
 
-        if matches!(fee_type, OutputFeeType::ChangePubKey(_)) {
-            // Division by 100, it is safe to unwrap here
-            let hundred = Ratio::from(BigUint::from(100u64));
+        if fee_type == CPK_CREATE2_FEE_TYPE {
             let subsidized_fee_usd = self.config.subsidy_cpk_price_usd.clone();
             let token_price = self
                 .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
@@ -530,13 +532,13 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             // It is safe to do unwrap in the next two lines, because token being acceptable for fees
             // assumes that the token's price is > 0
             let token_price = big_decimal_to_ratio(&token_price).unwrap();
-            dbg!("ABA");
-            dbg!(subsidized_fee_usd.clone());
-            dbg!(token_price.clone());
-            dbg!("CABA");
+            // dbg!("ABA");
+            // dbg!(subsidized_fee_usd.clone());
+            // dbg!(token_price.clone());
+            // dbg!("CABA");
             let full_amount = subsidized_fee_usd.checked_div(&token_price).unwrap();
-            dbg!(full_amount.clone());
-            dbg!(full_amount.clone() * token_price.clone());
+            // dbg!(full_amount.clone());
+            // dbg!(full_amount.clone() * token_price.clone());
 
             let subsidized_fee = Fee::new(
                 fee_type,
@@ -624,7 +626,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             total_normal_gas_tx_amount += &gas_tx_amount;
             total_op_chunks += &op_chunks;
 
-            if matches!(tx_type, TxFeeTypes::ChangePubKey(_)) {
+            if output_fee_type == CPK_CREATE2_FEE_TYPE {
                 // The subsidy cost contains only gas cost
                 total_subsidized_gas_tx_amount += &subsidized_gas_amount;
             } else {

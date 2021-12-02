@@ -397,15 +397,13 @@ fn test_ticker_subsidy() {
     );
 
     // Only CREATE2 is subsidized
-    let cpk_create2 = || {
-        TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-            ChangePubKeyType::CREATE2,
-        ))
+    let cpk = |cpk_type: ChangePubKeyType| {
+        TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(cpk_type))
     };
 
     let (create2_normal_price, create2_subsidy_price) = get_normal_and_subsidy_fee(
         &mut ticker,
-        cpk_create2(),
+        cpk(ChangePubKeyType::CREATE2),
         TokenId(0).into(),
         Address::default(),
         None,
@@ -438,7 +436,26 @@ fn test_ticker_subsidy() {
     // Just to check that subsidy fee does not coincide with normal fee
     assert_ne!(create2_normal_price, create2_subsidy_price);
 
-    // Transactions that are not ChangePubKey(CREATE2) are not subsidized
+    // ChangePubKey (ECDSA) is not subsidized
+    let (normal_cpk_onchain_price, subsidy_cpk_onchain_price) = get_normal_and_subsidy_fee(
+        &mut ticker,
+        cpk(ChangePubKeyType::ECDSA),
+        TokenId(0).into(),
+        Address::default(),
+        None,
+        None,
+    );
+    assert_eq!(normal_cpk_onchain_price, subsidy_cpk_onchain_price);
+
+    let (normal_cpk_ecdsa_price, subsidy_cpk_ecdsa_price) = get_normal_and_subsidy_fee(
+        &mut ticker,
+        cpk(ChangePubKeyType::Onchain),
+        TokenId(0).into(),
+        Address::default(),
+        None,
+        None,
+    );
+    assert_eq!(normal_cpk_ecdsa_price, subsidy_cpk_ecdsa_price);
 
     // Transfer is not subsidized
     let (normal_transfer_price, subsidy_transfer_price) = get_normal_and_subsidy_fee(
@@ -458,8 +475,8 @@ fn test_ticker_subsidy() {
         TokenId(0).into(),
         vec![
             (TxFeeTypes::Transfer, Address::default()),
-            (cpk_create2(), Address::default()),
-            (cpk_create2(), Address::default()),
+            (cpk(ChangePubKeyType::CREATE2), Address::default()),
+            (cpk(ChangePubKeyType::CREATE2), Address::default()),
         ],
     ))
     .unwrap();
@@ -487,7 +504,7 @@ fn test_ticker_subsidy() {
     for token in tokens.clone().into_iter() {
         let price_usd = get_subsidy_token_fee_in_usd(
             &mut ticker,
-            cpk_create2(),
+            cpk(ChangePubKeyType::CREATE2),
             token.id.into(),
             Address::default(),
             None,
