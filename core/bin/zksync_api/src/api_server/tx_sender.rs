@@ -164,7 +164,7 @@ impl TxSender {
             ticker_requests: ticker_request_sender,
             tokens: TokenDBCache::new(),
             forced_exit_checker: ForcedExitChecker::new(
-                config.forced_exit_minimum_account_age_secs as i64,
+                config.forced_exit_minimum_account_age_secs,
             ),
             enforce_pubkey_change_fee: config.enforce_pubkey_change_fee,
             blocks: BlockDetailsCache::new(config.caches_size),

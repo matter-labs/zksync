@@ -20,6 +20,8 @@ use zksync_config::ProverConfig;
 // Local deps
 use self::database_interface::DatabaseInterface;
 use self::scaler::ScalerOracle;
+use futures::StreamExt;
+use tokio::task::JoinHandle;
 use zksync_circuit::serialization::ProverData;
 use zksync_config::configs::api::ProverApiConfig;
 use zksync_prover_utils::api::{
@@ -387,17 +389,17 @@ async fn update_prover_job_queue<DB: DatabaseInterface>(database: DB) -> anyhow:
 
 pub fn run_prover_server<DB: DatabaseInterface>(
     database: DB,
-    panic_notify: mpsc::Sender<bool>,
     prover_api_opts: ProverApiConfig,
     prover_opts: ProverConfig,
-) {
+) -> JoinHandle<()> {
     let witness_generator_opts = prover_opts.witness_generator;
     let core_opts = prover_opts.core;
+    let (panic_sender, mut panic_receiver) = mpsc::channel(1);
 
     thread::Builder::new()
         .name("prover_server".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
+            let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
             let actix_runtime = actix_rt::System::new();
 
             actix_runtime.block_on(async move {
@@ -434,7 +436,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                         BlockNumber(start_block),
                         BlockNumber(block_step),
                     );
-                    pool_maintainer.start(panic_notify.clone());
+                    pool_maintainer.start(panic_sender.clone());
                 }
                 // Start HTTP server.
                 let secret_auth = prover_api_opts.secret_auth.clone();
@@ -476,4 +478,8 @@ pub fn run_prover_server<DB: DatabaseInterface>(
             })
         })
         .expect("failed to start prover server");
+
+    tokio::spawn(async move {
+        panic_receiver.next().await.unwrap();
+    })
 }

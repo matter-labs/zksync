@@ -42,16 +42,16 @@ impl ApiV01 {
         connection_pool: ConnectionPool,
         contract_address: H160,
         private_url: String,
-        common_api: ZkSyncConfig,
+        config: ZkSyncConfig,
     ) -> Self {
         let api_client = CoreApiClient::new(private_url);
         Self {
-            caches: Caches::new(common_api.api.common.caches_size),
+            caches: Caches::new(config.api.common.caches_size),
             connection_pool,
             api_client,
             network_status: SharedNetworkStatus::default(),
             contract_address: format!("{:?}", contract_address),
-            config: common_api,
+            config,
         }
     }
 

@@ -97,7 +97,7 @@ pub struct CommonApiConfig {
     pub caches_size: usize,
     // Determines the required minimum account age for `ForcedExit` operation to be allowed.
     // Type of value is seconds.
-    pub forced_exit_minimum_account_age_secs: u64,
+    pub forced_exit_minimum_account_age_secs: i64,
     /// List of account IDs that do not have to pay fees for operations.
     pub fee_free_accounts: Vec<AccountId>,
     pub enforce_pubkey_change_fee: bool,

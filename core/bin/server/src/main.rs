@@ -15,6 +15,7 @@ use zksync_witness_generator::run_prover_server;
 
 use futures::executor::block_on;
 use std::cell::RefCell;
+
 use zksync_config::{
     configs::api::{
         CommonApiConfig, JsonRpcConfig, PrivateApiConfig, ProverApiConfig, RestApiConfig,
@@ -71,12 +72,28 @@ impl FromStr for Component {
 
 #[derive(Debug)]
 struct ComponentsToRun(Vec<Component>);
+impl Default for ComponentsToRun {
+    fn default() -> Self {
+        Self(vec![
+            Component::RestApi,
+            Component::Web3Api,
+            Component::RpcApi,
+            Component::RpcWebSocketApi,
+            Component::EthSender,
+            Component::WitnessGenerator,
+            Component::ForcedExit,
+            Component::Prometheus,
+            Component::Core,
+            Component::RejectedTaskCleaner,
+        ])
+    }
+}
 
 impl FromStr for ComponentsToRun {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(ComponentsToRun(
+        Ok(Self(
             s.split(',')
                 .map(|x| Component::from_str(x.trim()))
                 .collect::<Result<Vec<Component>, String>>()?,
@@ -96,6 +113,10 @@ struct Opt {
         default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner"
     )]
     components: ComponentsToRun,
+}
+
+trait Runner {
+    fn run(&self, stop_signal_sender: mpsc::Sender<bool>);
 }
 
 #[tokio::main]
@@ -132,11 +153,10 @@ async fn run_server(components: &ComponentsToRun) {
 
     if components.0.contains(&Component::Web3Api) {
         let config = Web3Config::from_env();
-        zksync_api::api_server::web3::start_rpc_server(
+        tasks.push(zksync_api::api_server::web3::start_rpc_server(
             connection_pool.clone(),
-            stop_signal_sender.clone(),
             &config,
-        );
+        ));
     }
 
     if components.0.iter().any(|c| {
@@ -182,13 +202,12 @@ async fn run_server(components: &ComponentsToRun) {
         );
 
         tasks.push(ticker_task);
-        let (sign_check_sender, sign_check_receiver) = mpsc::channel(32768);
+        let (sign_check_sender, sign_check_receiver) = mpsc::channel(channel_size);
 
-        zksync_api::signature_checker::start_sign_checker_detached(
+        tasks.push(zksync_api::signature_checker::start_sign_checker(
             eth_gateway,
             sign_check_receiver,
-            stop_signal_sender.clone(),
-        );
+        ));
 
         let private_config = PrivateApiConfig::from_env();
 
@@ -197,31 +216,29 @@ async fn run_server(components: &ComponentsToRun) {
 
         if components.0.contains(&Component::RpcWebSocketApi) {
             let config = JsonRpcConfig::from_env();
-            zksync_api::api_server::rpc_subscriptions::start_ws_server(
+            tasks.push(zksync_api::api_server::rpc_subscriptions::start_ws_server(
                 connection_pool.clone(),
                 sign_check_sender.clone(),
                 ticker_request_sender.clone(),
-                stop_signal_sender.clone(),
                 &common_config,
                 &config,
                 chain_config.state_keeper.miniblock_iteration_interval(),
                 private_config.url.clone(),
                 eth_watch_config.confirmations_for_eth_event,
-            );
+            ));
         }
 
         if components.0.contains(&Component::RpcApi) {
             let config = JsonRpcConfig::from_env();
-            zksync_api::api_server::rpc_server::start_rpc_server(
+            tasks.push(zksync_api::api_server::rpc_server::start_rpc_server(
                 connection_pool.clone(),
                 sign_check_sender.clone(),
                 ticker_request_sender.clone(),
-                stop_signal_sender.clone(),
                 &config,
                 &common_config,
                 private_config.url.clone(),
                 eth_watch_config.confirmations_for_eth_event,
-            );
+            ));
         }
 
         if components.0.contains(&Component::RestApi) {
@@ -230,7 +247,6 @@ async fn run_server(components: &ComponentsToRun) {
                 connection_pool.clone(),
                 config.bind_addr(),
                 contracts_config.contract_addr,
-                stop_signal_sender.clone(),
                 ticker_request_sender,
                 sign_check_sender,
                 private_config.url,
@@ -266,14 +282,9 @@ async fn run_server(components: &ComponentsToRun) {
         );
 
         tasks.append(
-            &mut run_core(
-                connection_pool.clone(),
-                &all_config,
-                stop_signal_sender.clone(),
-                eth_gateway.clone(),
-            )
-            .await
-            .unwrap(),
+            &mut run_core(connection_pool.clone(), &all_config, eth_gateway.clone())
+                .await
+                .unwrap(),
         );
     }
     if components.0.contains(&Component::WitnessGenerator) {
@@ -281,12 +292,11 @@ async fn run_server(components: &ComponentsToRun) {
         let prover_api_config = ProverApiConfig::from_env();
         let prover_config = ProverConfig::from_env();
         let database = zksync_witness_generator::database::Database::new(connection_pool.clone());
-        run_prover_server(
+        tasks.push(run_prover_server(
             database,
-            stop_signal_sender.clone(),
             prover_api_config,
             prover_config,
-        );
+        ));
     }
 
     if components.0.contains(&Component::ForcedExit) {
@@ -330,10 +340,11 @@ async fn run_server(components: &ComponentsToRun) {
     } else {
         tokio::select! {
             _ = async { wait_for_tasks(tasks).await } => {
-                panic!("ForcedExitRequests actor is not supposed to finish its execution")
+                panic!("One if the actors is not supposed to finish its execution")
             },
             _ = async { stop_signal_receiver.next().await } => {
                 vlog::warn!("Stop signal received, shutting down");
+                panic!("");
             }
         };
     }

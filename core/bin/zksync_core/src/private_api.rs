@@ -13,9 +13,11 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::{
     channel::{mpsc, oneshot},
     sink::SinkExt,
+    StreamExt,
 };
 use serde::Deserialize;
 use std::{str::FromStr, thread};
+use tokio::task::JoinHandle;
 use zksync_api_types::{
     v02::pagination::{ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest},
     PriorityOpLookupQuery,
@@ -180,15 +182,16 @@ async fn unconfirmed_op(
 
 #[allow(clippy::too_many_arguments)]
 pub fn start_private_core_api(
-    panic_notify: mpsc::Sender<bool>,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
     config: PrivateApiConfig,
-) {
+) -> JoinHandle<()> {
+    let (panic_sender, mut panic_receiver) = mpsc::channel(1);
+
     thread::Builder::new()
         .name("core-private-api".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
+            let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
             let actix_runtime = actix_rt::System::new();
 
             actix_runtime.block_on(async move {
@@ -218,4 +221,7 @@ pub fn start_private_core_api(
             })
         })
         .expect("failed to start prover server");
+    tokio::spawn(async move {
+        panic_receiver.next().await.unwrap();
+    })
 }

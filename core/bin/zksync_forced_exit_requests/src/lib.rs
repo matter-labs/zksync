@@ -30,7 +30,7 @@ pub fn run_forced_exit_requests_actors(
         core_api_client,
         pool,
         config,
-        common.forced_exit_minimum_account_age_secs as i64,
+        common.forced_exit_minimum_account_age_secs,
         contracts.forced_exit_addr,
         web3_url,
     )

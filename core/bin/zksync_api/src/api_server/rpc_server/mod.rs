@@ -4,7 +4,7 @@ use std::time::Instant;
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
-    SinkExt,
+    SinkExt, StreamExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
@@ -37,6 +37,7 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use tokio::task::JoinHandle;
 use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 
 #[derive(Clone)]
@@ -363,14 +364,12 @@ pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
-    panic_notify: mpsc::Sender<bool>,
     config: &JsonRpcConfig,
     common_api_config: &CommonApiConfig,
     private_url: String,
     confirmations_for_eth_event: u64,
-) {
+) -> JoinHandle<()> {
     let addr = config.http_bind_addr();
-
     let rpc_app = RpcApp::new(
         connection_pool,
         sign_verify_request_sender,
@@ -379,8 +378,10 @@ pub fn start_rpc_server(
         private_url,
         confirmations_for_eth_event,
     );
+
+    let (panic_sender, mut panic_receiver) = mpsc::channel(1);
     std::thread::spawn(move || {
-        let _panic_sentinel = ThreadPanicNotify(panic_notify);
+        let _panic_sentinel = ThreadPanicNotify(panic_sender);
         let mut io = IoHandler::new();
         rpc_app.extend(&mut io);
 
@@ -390,6 +391,9 @@ pub fn start_rpc_server(
             .unwrap();
         server.wait();
     });
+    tokio::spawn(async move {
+        panic_receiver.next().await.unwrap();
+    })
 }
 
 #[cfg(test)]

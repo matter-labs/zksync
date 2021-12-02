@@ -93,7 +93,6 @@ pub async fn genesis_init(config: &ChainConfig) {
 pub async fn run_core(
     connection_pool: ConnectionPool,
     config: &ZkSyncConfig,
-    panic_notify: mpsc::Sender<bool>,
     eth_gateway: EthereumGateway,
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let (proposed_blocks_sender, proposed_blocks_receiver) =
@@ -185,8 +184,7 @@ pub async fn run_core(
     );
 
     // Start private API.
-    start_private_core_api(
-        panic_notify.clone(),
+    let private_api_task = start_private_core_api(
         mempool_tx_request_sender,
         eth_watch_req_sender,
         config.api.private.clone(),
@@ -201,6 +199,7 @@ pub async fn run_core(
         token_handler_task,
         register_factory_task,
         tx_event_emitter_task,
+        private_api_task,
     ];
 
     Ok(task_futures)

@@ -9,7 +9,8 @@ use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 // Local uses
 use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
-use std::thread::JoinHandle;
+use futures::StreamExt;
+use tokio::task::JoinHandle;
 use zksync_config::configs::api::Web3Config;
 
 mod calls;
@@ -62,14 +63,16 @@ impl Web3RpcApp {
 
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
-    panic_notify: mpsc::Sender<bool>,
     web3_config: &Web3Config,
 ) -> JoinHandle<()> {
     let addr = web3_config.bind_addr();
 
     let rpc_app = Web3RpcApp::new(connection_pool, web3_config);
+    let (panic_sender, mut panic_receiver) = mpsc::channel(1);
+
     std::thread::spawn(move || {
-        let _panic_sentinel = ThreadPanicNotify(panic_notify);
+        let _panic_sentinel = ThreadPanicNotify(panic_sender);
+
         let mut io = IoHandler::new();
         rpc_app.extend(&mut io);
 
@@ -78,5 +81,8 @@ pub fn start_rpc_server(
             .start_http(&addr)
             .unwrap();
         server.wait();
+    });
+    tokio::spawn(async move {
+        panic_receiver.next().await.unwrap();
     })
 }

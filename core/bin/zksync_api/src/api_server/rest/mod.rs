@@ -12,6 +12,8 @@ use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest
 
 use super::tx_sender::TxSender;
 
+use futures::StreamExt;
+use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
 
 mod forced_exit_requests;
@@ -34,7 +36,7 @@ async fn start_server(
                 .config
                 .api
                 .common
-                .forced_exit_minimum_account_age_secs as i64,
+                .forced_exit_minimum_account_age_secs,
             &api_v01.config.forced_exit_requests,
             api_v01.config.contracts.forced_exit_addr,
         );
@@ -82,25 +84,29 @@ pub fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
-    panic_notify: mpsc::Sender<bool>,
     fee_ticker: mpsc::Sender<TickerRequest>,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     private_url: String,
-) {
+) -> JoinHandle<()> {
+    let (panic_sender, mut panic_receiver) = mpsc::channel(2);
+
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
+            let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
 
             actix_rt::System::new().block_on(async move {
                 // TODO remove this config
                 let config = ZkSyncConfig::from_env();
 
                 let api_v01 = ApiV01::new(connection_pool, contract_address, private_url, config);
-                api_v01.spawn_network_status_updater(panic_notify);
+                api_v01.spawn_network_status_updater(panic_sender);
 
                 start_server(api_v01, fee_ticker, sign_verifier, listen_addr).await;
             });
         })
         .expect("Api server thread");
+    tokio::spawn(async move {
+        panic_receiver.next().await.unwrap();
+    })
 }
