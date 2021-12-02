@@ -40,8 +40,8 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
             VALUES ( $1, $2, $3, $4, $5, $6, $7 )
             "#,
             subsidy.tx_hash.as_ref(),
-            subsidy.usd_amount as i64,
-            subsidy.full_cost_usd as i64,
+            subsidy.usd_amount_scaled as i64,
+            subsidy.full_cost_usd_scaled as i64,
             subsidy.token_id.0 as i32,
             subsidy.token_amount,
             subsidy.full_cost_token,

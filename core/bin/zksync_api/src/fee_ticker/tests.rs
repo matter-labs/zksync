@@ -9,7 +9,10 @@ use std::str::FromStr;
 use std::thread::sleep;
 use tokio::time::Duration;
 use zksync_types::{Address, Token, TokenId, TokenKind, TokenPrice};
-use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
+use zksync_utils::{
+    big_decimal_to_ratio, ratio_to_big_decimal, ratio_to_scaled_u64, scaled_u64_to_ratio,
+    UnsignedRatioSerializeAsDecimal,
+};
 
 use crate::fee_ticker::{
     ticker_api::{
@@ -101,7 +104,7 @@ impl TestToken {
     }
 }
 
-const SUBSIDY_CPK_PRICE_USD_CENTS: u64 = 1000; // 10 dollars
+const SUBSIDY_CPK_PRICE_USD_SCALED: u64 = 10000000; // 10 dollars
 
 fn get_test_ticker_config() -> TickerConfig {
     TickerConfig {
@@ -117,7 +120,7 @@ fn get_test_ticker_config() -> TickerConfig {
             .collect(),
         scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
         max_blocks_to_aggregate: 5,
-        subsidy_cpk_price_usd_cents: Ratio::from(BigUint::from(SUBSIDY_CPK_PRICE_USD_CENTS)),
+        subsidy_cpk_price_usd: scaled_u64_to_ratio(SUBSIDY_CPK_PRICE_USD_SCALED),
     }
 }
 
@@ -371,6 +374,9 @@ fn convert_to_usd(amount: Ratio<BigUint>, token: TokenLike) -> Ratio<BigUint> {
         * amount
 }
 
+// Because of various precision errors, the USD price may differ, but no more than by 3 cents
+const TOLERARED_PRICE_DIFFERENCE_SCALED: i64 = 3000000;
+
 #[test]
 fn test_ticker_subsidy() {
     let validator = FeeTokenValidator::new(
@@ -426,9 +432,8 @@ fn test_ticker_subsidy() {
     // );
     // Due to precision-rounding, the price might differ, but it shouldn't by more than 1 cent
     assert!(
-        SUBSIDY_CPK_PRICE_USD_CENTS
-            - ratio_to_u64(create2_subsidy_price_usd.clone() * BigUint::from(100u32))
-            <= 1
+        SUBSIDY_CPK_PRICE_USD_SCALED - ratio_to_scaled_u64(create2_subsidy_price_usd.clone())
+            <= TOLERARED_PRICE_DIFFERENCE_SCALED as u64
     );
     // Just to check that subsidy fee does not coincide with normal fee
     assert_ne!(create2_normal_price, create2_subsidy_price);
@@ -444,8 +449,6 @@ fn test_ticker_subsidy() {
         None,
         None,
     );
-    // let normal_transfer_price_usd = get_token_fee_in_usd();
-    // let subsidy_transfer_price_usd = get_subsidy_token_fee_in_usd(&mut ticker, TxFeeTypes::Transfer, TokenId(0).into(), Address::default(), None, None);
     assert_eq!(normal_transfer_price, subsidy_transfer_price);
     let normal_transfer_price_usd =
         convert_to_usd(normal_transfer_price, TokenLike::Id(TokenId(0)));
@@ -468,15 +471,14 @@ fn test_ticker_subsidy() {
     let separate_tx_price =
         normal_transfer_price_usd + &create2_subsidy_price_usd + &create2_subsidy_price_usd;
 
-    let hundred = Ratio::from(BigUint::from(100u32));
-    let diff_cents = if subsidy_batch_price_usd > separate_tx_price {
-        (subsidy_batch_price_usd - separate_tx_price) * hundred
+    let diff_usd = if subsidy_batch_price_usd > separate_tx_price {
+        subsidy_batch_price_usd - separate_tx_price
     } else {
-        (separate_tx_price - subsidy_batch_price_usd) * hundred
+        separate_tx_price - subsidy_batch_price_usd
     };
-    let diff_cents = ratio_to_u64(diff_cents);
+    let diff_cents = ratio_to_scaled_u64(diff_usd);
     // The batch price and the actual price may differ, but no more than by a few cents
-    assert!(diff_cents < 2);
+    assert!(diff_cents < TOLERARED_PRICE_DIFFERENCE_SCALED as u64);
 
     // The subsidy price is more-or-less same in all tokens
     let mut prices: Vec<i64> = vec![];
@@ -495,7 +497,7 @@ fn test_ticker_subsidy() {
         prices.push(price_cents);
     }
     for i in 0..=1 {
-        assert!((prices[i] - prices[i + 1]).abs() <= 2);
+        assert!((prices[i] - prices[i + 1]).abs() <= TOLERARED_PRICE_DIFFERENCE_SCALED);
     }
 
     //    assert_eq!(abs(subsidy_batch_price_usd - normal_transfer_price + &create2_subsidy_price + &create2_subsidy_price);

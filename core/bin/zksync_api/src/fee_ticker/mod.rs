@@ -150,7 +150,7 @@ pub struct TickerConfig {
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
     scale_fee_coefficient: Ratio<BigUint>,
     max_blocks_to_aggregate: u32,
-    subsidy_cpk_price_usd_cents: Ratio<BigUint>,
+    subsidy_cpk_price_usd: Ratio<BigUint>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -163,15 +163,14 @@ pub enum TokenPriceRequestType {
 pub struct ResponseFee {
     pub normal_fee: Fee,
     pub subsidized_fee: Fee,
-    pub subsidy_size_usd_cents: u64,
-    //  pub normal_fee_usd_cents: u64
+    pub subsidy_size_usd: Ratio<BigUint>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ResponseBatchFee {
     pub normal_fee: BatchFee,
     pub subsidized_fee: BatchFee,
-    pub subsidy_size_usd_cents: u64,
+    pub subsidy_size_usd: Ratio<BigUint>,
 }
 
 #[derive(Debug)]
@@ -278,12 +277,6 @@ pub fn run_ticker_task(
     tricker_requests: Receiver<TickerRequest>,
     config: &ZkSyncConfig,
 ) -> JoinHandle<()> {
-    // This unwrap is only called once on the startup of the ticker task, so it is safe to unwrap here
-    // let left_subsidy_usd_cents =
-    //     get_left_subsidy_usd_cents(config.ticker.max_subsidy_usd_cents, &db_pool)
-    //         .await
-    //         .unwrap();
-
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: GasOperationsCost::from_constants(config.ticker.fast_processing_coeff),
@@ -296,12 +289,7 @@ pub fn run_ticker_task(
             config.chain.state_keeper.max_aggregated_blocks_to_commit,
             config.chain.state_keeper.max_aggregated_blocks_to_execute,
         ) as u32,
-        //subsidized_ips: config.ticker.subsidized_ips.clone(),
-        subsidy_cpk_price_usd_cents: Ratio::from(BigUint::from(
-            config.ticker.subsidy_cpk_price_usd_cents,
-        )),
-        //left_subsidy_usd_cents,
-        //subsidy_name: config.ticker.subsidy_name.clone(),
+        subsidy_cpk_price_usd: config.ticker.subsidy_cpk_price_usd(),
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
@@ -534,11 +522,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         if matches!(fee_type, OutputFeeType::ChangePubKey(_)) {
             // Division by 100, it is safe to unwrap here
             let hundred = Ratio::from(BigUint::from(100u64));
-            let subsidized_fee_usd = self
-                .config
-                .subsidy_cpk_price_usd_cents
-                .checked_div(&hundred)
-                .unwrap();
+            let subsidized_fee_usd = self.config.subsidy_cpk_price_usd.clone();
             let token_price = self
                 .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
                 .await?;
@@ -562,26 +546,24 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                 BigUint::zero(),
             );
 
-            let subsidy_size_usd_cents = if normal_fee.total_fee > subsidized_fee.total_fee {
-                token_price
-                    * (&normal_fee.total_fee - &subsidized_fee.total_fee)
-                    * BigUint::from(100u32)
+            let subsidy_size_usd = if normal_fee.total_fee > subsidized_fee.total_fee {
+                token_price * (&normal_fee.total_fee - &subsidized_fee.total_fee)
             } else {
                 Ratio::from(BigUint::from(0u32))
             };
 
             return Ok(ResponseFee {
                 normal_fee,
-                subsidized_fee: subsidized_fee,
-                subsidy_size_usd_cents: ratio_to_u64(subsidy_size_usd_cents), //subsidized_fee_usd_cents: biguint_to_u64(subsidized_fee_usd_cents.to_integer()),
-                                                                              //normal_fee_usd_cents: biguint_to_u64(normal_fee_usd_cents.to_integer())
+                subsidized_fee,
+                subsidy_size_usd, //subsidized_fee_usd_cents: biguint_to_u64(subsidized_fee_usd_cents.to_integer()),
+                                  //normal_fee_usd_cents: biguint_to_u64(normal_fee_usd_cents.to_integer())
             });
         }
 
         Ok(ResponseFee {
             normal_fee: normal_fee.clone(),
             subsidized_fee: normal_fee,
-            subsidy_size_usd_cents: 0,
+            subsidy_size_usd: Ratio::from(BigUint::from(0u32)),
         })
     }
 
@@ -620,12 +602,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
             .await?;
         let token_price = big_decimal_to_ratio(&token_price).unwrap();
-        let subsidized_gas_amount = &self.config.subsidy_cpk_price_usd_cents
-            / (&wei_price_usd
-                * &scale_gas_price
-                * &token_usd_risk
-                * &token_price
-                * BigUint::from(100u32));
+        let subsidized_gas_amount = &self.config.subsidy_cpk_price_usd
+            / (&wei_price_usd * &scale_gas_price * &token_usd_risk * &token_price);
 
         for (tx_type, recipient) in txs {
             let (output_fee_type, gas_tx_amount, op_chunks) =
@@ -672,10 +650,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             BatchFee::new(total_zkp_fee, total_gas_fee)
         };
 
-        let subsidy_size_usd_cents = if normal_fee.total_fee > subsidized_fee.total_fee {
-            token_price
-                * (&normal_fee.total_fee - &subsidized_fee.total_fee)
-                * BigUint::from(100u32)
+        let subsidy_size_usd = if normal_fee.total_fee > subsidized_fee.total_fee {
+            token_price * (&normal_fee.total_fee - &subsidized_fee.total_fee)
         } else {
             Ratio::from(BigUint::from(0u32))
         };
@@ -683,7 +659,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         Ok(ResponseBatchFee {
             normal_fee,
             subsidized_fee,
-            subsidy_size_usd_cents: ratio_to_u64(subsidy_size_usd_cents),
+            subsidy_size_usd,
         })
     }
 

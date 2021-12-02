@@ -29,8 +29,8 @@ use zksync_utils::big_decimal_to_ratio;
 
 pub struct Subsidy {
     pub tx_hash: TxHash,
-    pub usd_amount: u64,
-    pub full_cost_usd: u64,
+    pub usd_amount_scaled: u64,
+    pub full_cost_usd_scaled: u64,
     pub token_id: TokenId,
     pub token_amount: BigDecimal,
     pub full_cost_token: BigDecimal,

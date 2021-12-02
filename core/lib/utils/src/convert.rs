@@ -45,6 +45,20 @@ pub fn ratio_to_u64(num: Ratio<BigUint>) -> u64 {
     }
 }
 
+/// The number scaled by which the subsidies are stored in the db
+const SUBSIDY_USD_AMOUNTS_SCALE: u64 = 1_000_000;
+
+pub fn ratio_to_scaled_u64(num: Ratio<BigUint>) -> u64 {
+    let ten_pow = BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE);
+    let scaled_num = num * ten_pow;
+
+    ratio_to_u64(scaled_num)
+}
+
+pub fn scaled_u64_to_ratio(num: u64) -> Ratio<BigUint> {
+    Ratio::from(BigUint::from(num)) / BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

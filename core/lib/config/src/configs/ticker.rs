@@ -5,6 +5,7 @@ use num::{rational::Ratio, BigUint, CheckedDiv};
 use serde::Deserialize;
 // Workspace uses
 use zksync_types::Address;
+use zksync_utils::scaled_u64_to_ratio;
 // Local uses
 use crate::envy_load;
 
@@ -13,9 +14,6 @@ pub enum TokenPriceSource {
     CoinGecko,
     CoinMarketCap,
 }
-
-/// The number scaled by which the subsidies are stored in the db
-const SUBSIDY_USD_AMOUNTS_SCALE: u64 = 100_000_000;
 
 /// Configuration for the fee ticker.
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -54,13 +52,11 @@ pub struct TickerConfig {
 
 impl TickerConfig {
     pub fn subsidy_cpk_price_usd(&self) -> Ratio<BigUint> {
-        Ratio::from(BigUint::from(self.subsidy_cpk_price_usd_scaled))
-            / BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE)
+        scaled_u64_to_ratio(self.subsidy_cpk_price_usd_scaled.clone())
     }
 
     pub fn max_subsidy_usd(&self) -> Ratio<BigUint> {
-        Ratio::from(BigUint::from(self.max_subsidy_usd_scaled))
-            / BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE)
+        scaled_u64_to_ratio(self.max_subsidy_usd_scaled.clone())
     }
 
     pub fn from_env() -> Self {

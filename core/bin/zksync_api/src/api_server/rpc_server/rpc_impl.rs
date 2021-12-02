@@ -267,7 +267,12 @@ impl RpcApp {
 
         let is_subsidized_ip = self.should_subsidie_cpk(ip);
 
-        let fee = if is_subsidized_ip && self.tx_sender.can_subsidize(result.subsidy_size_usd_cents)
+        let fee = if is_subsidized_ip
+            && self
+                .tx_sender
+                .can_subsidize(result.subsidy_size_usd)
+                .await
+                .map_err(SubmitError::Internal)?
         {
             result.subsidized_fee
         } else {
@@ -311,7 +316,12 @@ impl RpcApp {
 
         let is_subsidized_ip = self.should_subsidie_cpk(ip);
 
-        let fee = if is_subsidized_ip && self.tx_sender.can_subsidize(result.subsidy_size_usd_cents)
+        let fee = if is_subsidized_ip
+            && self
+                .tx_sender
+                .can_subsidize(result.subsidy_size_usd)
+                .await
+                .map_err(SubmitError::Internal)?
         {
             result.subsidized_fee
         } else {

@@ -16,6 +16,7 @@ use futures::{
     prelude::*,
 };
 use itertools::izip;
+use num::rational::Ratio;
 use num::{bigint::ToBigInt, BigUint, Zero};
 use thiserror::Error;
 
@@ -35,7 +36,9 @@ use zksync_types::{
     AccountId, Address, BatchFee, Fee, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
     H160,
 };
-use zksync_utils::{big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_u64};
+use zksync_utils::{
+    big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, ratio_to_u64,
+};
 
 // Local uses
 use crate::{
@@ -71,6 +74,7 @@ pub struct TxSender {
     pub max_number_of_authors_per_batch: usize,
 
     pub current_subsidy_type: String,
+    pub max_subsidy_usd: Ratio<BigUint>,
 }
 
 #[derive(Debug, Error)]
@@ -174,6 +178,7 @@ impl TxSender {
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
             current_subsidy_type: config.ticker.subsidy_name.clone(),
+            max_subsidy_usd: config.ticker.max_subsidy_usd(),
         }
     }
 
@@ -379,8 +384,26 @@ impl TxSender {
         self.submit_tx(tx, signature, should_subsidie_cpk).await
     }
 
-    pub fn can_subsidize(&self, new_subsidy_usd_cents: u64) -> bool {
-        100 >= new_subsidy_usd_cents
+    pub async fn can_subsidize(
+        &self,
+        new_subsidy_usd: Ratio<BigUint>,
+    ) -> Result<bool, anyhow::Error> {
+        let subsidized_already = self
+            .pool
+            .access_storage()
+            .await?
+            .misc_schema()
+            .get_total_used_subsidy_for_type(self.current_subsidy_type.clone())
+            .await?;
+        let subsidized_already = big_decimal_to_ratio(&subsidized_already)?;
+
+        let result = if self.max_subsidy_usd > subsidized_already {
+            &self.max_subsidy_usd - subsidized_already < new_subsidy_usd
+        } else {
+            false
+        };
+
+        Ok(result)
     }
 
     pub async fn store_subsidy_data(
@@ -397,21 +420,16 @@ impl TxSender {
         )
         .await?;
 
-        let full_cost_usd_cents =
-            big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee * BigUint::from(100u32);
-        let subsidized_cost_usd_cents =
-            big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee * BigUint::from(100u32);
+        let full_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee;
+        let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
 
-        let full_cost_usd_cents = ratio_to_u64(full_cost_usd_cents);
-        let subsidized_cost_usd_cents = ratio_to_u64(subsidized_cost_usd_cents);
-
-        if full_cost_usd_cents > subsidized_cost_usd_cents {
+        if full_cost_usd > subsidized_cost_usd {
             panic!("Trying to subsidize transaction which should not be subsidized");
         }
 
         let subsidy = Subsidy {
-            usd_amount: full_cost_usd_cents - subsidized_cost_usd_cents,
-            full_cost_usd: full_cost_usd_cents,
+            usd_amount_scaled: ratio_to_scaled_u64(&full_cost_usd - &subsidized_cost_usd),
+            full_cost_usd_scaled: ratio_to_scaled_u64(full_cost_usd),
             token_id,
             token_amount: biguint_to_big_decimal(subsidized_fee),
             full_cost_token: biguint_to_big_decimal(normal_fee),
@@ -484,7 +502,10 @@ impl TxSender {
             fee_data = Some(required_fee_data.clone());
 
             let required_fee_data = if should_subsidie_cpk
-                && self.can_subsidize(required_fee_data.subsidy_size_usd_cents)
+                && self
+                    .can_subsidize(required_fee_data.subsidy_size_usd.clone())
+                    .await
+                    .map_err(SubmitError::Internal)?
             {
                 subsidized = true;
                 required_fee_data.subsidized_fee
@@ -665,7 +686,10 @@ impl TxSender {
             .await?;
 
             let required_fee = if should_subsidie_cpk
-                && self.can_subsidize(batch_token_fee.subsidy_size_usd_cents)
+                && self
+                    .can_subsidize(batch_token_fee.subsidy_size_usd.clone())
+                    .await
+                    .map_err(SubmitError::Internal)?
             {
                 subsidized = true;
                 fee_data = Some(batch_token_fee.clone());
@@ -697,7 +721,10 @@ impl TxSender {
             .await?;
 
             let required_fee = if should_subsidie_cpk
-                && self.can_subsidize(required_eth_fee.subsidy_size_usd_cents)
+                && self
+                    .can_subsidize(required_eth_fee.subsidy_size_usd.clone())
+                    .await
+                    .map_err(SubmitError::Internal)?
             {
                 subsidized = true;
                 fee_data = Some(required_eth_fee.clone());
