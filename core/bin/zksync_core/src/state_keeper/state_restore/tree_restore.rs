@@ -6,18 +6,18 @@ use std::collections::HashMap;
 // Workspace uses
 use zksync_types::{Account, AccountId, AccountTree, AccountUpdates, Address, BlockNumber};
 // Local uses
-use super::db::PostgresImpl;
+use super::db::StateRestoreDb;
 
 #[derive(Debug)]
 pub(super) struct RestoredTree<'a, 'b> {
-    storage: PostgresImpl<'a, 'b>,
+    storage: StateRestoreDb<'a, 'b>,
 
     tree: AccountTree,
     acc_id_by_addr: HashMap<Address, AccountId>,
 }
 
 impl<'a, 'b> RestoredTree<'a, 'b> {
-    pub(super) fn new(storage: PostgresImpl<'a, 'b>) -> Self {
+    pub(super) fn new(storage: StateRestoreDb<'a, 'b>) -> Self {
         Self {
             storage,
 

@@ -1,2 +1,2 @@
-mod tree_restore;
 mod db;
+mod tree_restore;

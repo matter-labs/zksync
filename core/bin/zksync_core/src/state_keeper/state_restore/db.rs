@@ -7,6 +7,69 @@ use zksync_crypto::{merkle_tree::parallel_smt::SparseMerkleTreeSerializableCache
 use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
 
 #[derive(Debug)]
+pub(super) enum StateRestoreDb<'a, 'b> {
+    Postgres(PostgresImpl<'a, 'b>),
+    Mock(MockImpl),
+}
+
+macro_rules! delegate_call {
+    ($self:ident.$method:ident($($args:ident),*)) => {
+        match $self {
+            Self::Postgres(d) => d.$method($($args),*).await,
+            Self::Mock(d) => d.$method($($args),*).await,
+        }
+    }
+}
+
+impl<'a, 'b> StateRestoreDb<'a, 'b> {
+    pub(super) async fn load_last_committed_block(&mut self) -> BlockNumber {
+        delegate_call!(self.load_last_committed_block())
+    }
+
+    pub(super) async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
+        delegate_call!(self.load_last_cached_block())
+    }
+
+    pub(super) async fn load_state_diff(
+        &mut self,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+    ) -> Option<AccountUpdates> {
+        delegate_call!(self.load_state_diff(from_block, to_block))
+    }
+
+    pub(super) async fn load_committed_state(
+        &mut self,
+        block: BlockNumber,
+    ) -> (BlockNumber, AccountMap) {
+        delegate_call!(self.load_committed_state(block))
+    }
+
+    pub(super) async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
+        delegate_call!(self.load_verified_state())
+    }
+
+    pub(super) async fn load_account_tree_cache(
+        &mut self,
+        block: BlockNumber,
+    ) -> SparseMerkleTreeSerializableCacheBN256 {
+        delegate_call!(self.load_account_tree_cache(block))
+    }
+
+    pub(super) async fn store_account_tree_cache(
+        &mut self,
+        block: BlockNumber,
+        account_tree_cache: SparseMerkleTreeSerializableCacheBN256,
+    ) {
+        delegate_call!(self.store_account_tree_cache(block, account_tree_cache))
+    }
+
+    pub(super) async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
+        delegate_call!(self.load_block_hash_from_db(block))
+    }
+}
+
+#[derive(Debug)]
 pub(super) struct PostgresImpl<'a, 'b> {
     storage: &'a mut zksync_storage::StorageProcessor<'b>,
 }
@@ -114,5 +177,60 @@ impl<'a, 'b> PostgresImpl<'a, 'b> {
             .unwrap_or_else(|err| panic!("Cannot load block {} from the database: {}", block, err))
             .unwrap_or_else(|| panic!("Block {} does not exist in the databse", block))
             .new_root_hash
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct MockImpl {}
+
+impl MockImpl {
+    pub(super) fn new() -> Self {
+        Self {}
+    }
+
+    pub(super) async fn load_last_committed_block(&mut self) -> BlockNumber {
+        todo!()
+    }
+
+    pub(super) async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
+        todo!()
+    }
+
+    pub(super) async fn load_state_diff(
+        &mut self,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+    ) -> Option<AccountUpdates> {
+        todo!()
+    }
+
+    pub(super) async fn load_committed_state(
+        &mut self,
+        block: BlockNumber,
+    ) -> (BlockNumber, AccountMap) {
+        todo!()
+    }
+
+    pub(super) async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
+        todo!()
+    }
+
+    pub(super) async fn load_account_tree_cache(
+        &mut self,
+        block: BlockNumber,
+    ) -> SparseMerkleTreeSerializableCacheBN256 {
+        todo!()
+    }
+
+    pub(super) async fn store_account_tree_cache(
+        &mut self,
+        block: BlockNumber,
+        account_tree_cache: SparseMerkleTreeSerializableCacheBN256,
+    ) {
+        todo!()
+    }
+
+    pub(super) async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
+        todo!()
     }
 }
