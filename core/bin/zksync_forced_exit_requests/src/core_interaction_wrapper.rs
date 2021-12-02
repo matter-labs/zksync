@@ -52,7 +52,7 @@ pub struct MempoolCoreInteractionWrapper {
 
 impl MempoolCoreInteractionWrapper {
     pub fn new(
-        forced_exit_minimum_account_age_secs: i64,
+        forced_exit_minimum_account_age_secs: u64,
         core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
     ) -> Self {

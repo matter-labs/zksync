@@ -10,7 +10,7 @@ use actix_web_httpauth::extractors::{
     AuthenticationError,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use futures::channel::mpsc;
+
 use jsonwebtoken::errors::Error as JwtError;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,6 @@ use zksync_config::ProverConfig;
 // Local deps
 use self::database_interface::DatabaseInterface;
 use self::scaler::ScalerOracle;
-use futures::StreamExt;
 use tokio::task::JoinHandle;
 use zksync_circuit::serialization::ProverData;
 use zksync_config::configs::api::ProverApiConfig;
@@ -35,7 +34,7 @@ use zksync_types::prover::{
     ProverJobType, AGGREGATED_PROOF_JOB_PRIORITY, SINGLE_PROOF_JOB_PRIORITY,
 };
 use zksync_types::BlockNumber;
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 #[cfg(test)]
 mod tests;
@@ -394,7 +393,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
 ) -> JoinHandle<()> {
     let witness_generator_opts = prover_opts.witness_generator;
     let core_opts = prover_opts.core;
-    let (panic_sender, mut panic_receiver) = mpsc::channel(1);
+    let (handler, panic_sender) = spawn_panic_handler();
 
     thread::Builder::new()
         .name("prover_server".to_string())
@@ -479,7 +478,5 @@ pub fn run_prover_server<DB: DatabaseInterface>(
         })
         .expect("failed to start prover server");
 
-    tokio::spawn(async move {
-        panic_receiver.next().await.unwrap();
-    })
+    handler
 }

@@ -1,15 +1,15 @@
 // Built-in uses
 // External uses
-use futures::channel::mpsc;
+
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
 
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 // Local uses
 use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
-use futures::StreamExt;
+
 use tokio::task::JoinHandle;
 use zksync_config::configs::api::Web3Config;
 
@@ -68,7 +68,7 @@ pub fn start_rpc_server(
     let addr = web3_config.bind_addr();
 
     let rpc_app = Web3RpcApp::new(connection_pool, web3_config);
-    let (panic_sender, mut panic_receiver) = mpsc::channel(1);
+    let (handler, panic_sender) = spawn_panic_handler();
 
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_sender);
@@ -82,7 +82,5 @@ pub fn start_rpc_server(
             .unwrap();
         server.wait();
     });
-    tokio::spawn(async move {
-        panic_receiver.next().await.unwrap();
-    })
+    handler
 }

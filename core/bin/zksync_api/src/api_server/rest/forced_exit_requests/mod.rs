@@ -18,7 +18,7 @@ pub type JsonResult<T> = std::result::Result<web::Json<T>, ApiError>;
 
 pub(crate) fn api_scope(
     connection_pool: ConnectionPool,
-    forced_exit_minimum_account_age_secs: i64,
+    forced_exit_minimum_account_age_secs: u64,
     config: &ForcedExitRequestsConfig,
     contract: Address,
 ) -> Scope {

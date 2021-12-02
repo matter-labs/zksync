@@ -5,14 +5,13 @@ use std::net::SocketAddr;
 use zksync_storage::ConnectionPool;
 use zksync_types::H160;
 
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 use self::v01::api_decl::ApiV01;
 use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest};
 
 use super::tx_sender::TxSender;
 
-use futures::StreamExt;
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
 
@@ -88,7 +87,7 @@ pub fn start_server_thread_detached(
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     private_url: String,
 ) -> JoinHandle<()> {
-    let (panic_sender, mut panic_receiver) = mpsc::channel(2);
+    let (handler, panic_sender) = spawn_panic_handler();
 
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
@@ -106,7 +105,5 @@ pub fn start_server_thread_detached(
             });
         })
         .expect("Api server thread");
-    tokio::spawn(async move {
-        panic_receiver.next().await.unwrap();
-    })
+    handler
 }

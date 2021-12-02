@@ -386,7 +386,7 @@ pub fn run_forced_exit_contract_watcher(
     core_api_client: CoreApiClient,
     connection_pool: ConnectionPool,
     config: ForcedExitRequestsConfig,
-    forced_exit_minimum_account_age_secs: i64,
+    forced_exit_minimum_account_age_secs: u64,
     contract: Address,
     web3_url: String,
 ) -> JoinHandle<()> {

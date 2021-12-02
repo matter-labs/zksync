@@ -4,7 +4,7 @@ use std::time::Instant;
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
-    SinkExt, StreamExt,
+    SinkExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
@@ -27,7 +27,7 @@ use crate::{
     utils::shared_lru_cache::AsyncLruCache,
 };
 use bigdecimal::BigDecimal;
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 pub mod error;
 mod rpc_impl;
@@ -379,7 +379,7 @@ pub fn start_rpc_server(
         confirmations_for_eth_event,
     );
 
-    let (panic_sender, mut panic_receiver) = mpsc::channel(1);
+    let (handler, panic_sender) = spawn_panic_handler();
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_sender);
         let mut io = IoHandler::new();
@@ -391,9 +391,7 @@ pub fn start_rpc_server(
             .unwrap();
         server.wait();
     });
-    tokio::spawn(async move {
-        panic_receiver.next().await.unwrap();
-    })
+    handler
 }
 
 #[cfg(test)]

@@ -29,9 +29,9 @@ pub struct ForcedExitChecker {
 }
 
 impl ForcedExitChecker {
-    pub fn new(forced_exit_minimum_account_age_secs: i64) -> Self {
+    pub fn new(forced_exit_minimum_account_age_secs: u64) -> Self {
         let forced_exit_minimum_account_age =
-            chrono::Duration::seconds(forced_exit_minimum_account_age_secs);
+            chrono::Duration::seconds(forced_exit_minimum_account_age_secs as i64);
 
         Self {
             forced_exit_minimum_account_age,

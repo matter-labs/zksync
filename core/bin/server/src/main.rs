@@ -287,6 +287,7 @@ async fn run_server(components: &ComponentsToRun) {
                 .unwrap(),
         );
     }
+
     if components.0.contains(&Component::WitnessGenerator) {
         vlog::info!("Starting the Prover server actors");
         let prover_api_config = ProverApiConfig::from_env();
@@ -331,21 +332,12 @@ async fn run_server(components: &ComponentsToRun) {
         .expect("Error setting Ctrl+C handler");
     }
 
-    if tasks.is_empty() {
-        tokio::select! {
-            _ = async { stop_signal_receiver.next().await } => {
-                vlog::warn!("Stop signal received, shutting down");
-            }
-        };
-    } else {
-        tokio::select! {
-            _ = async { wait_for_tasks(tasks).await } => {
-                panic!("One if the actors is not supposed to finish its execution")
-            },
-            _ = async { stop_signal_receiver.next().await } => {
-                vlog::warn!("Stop signal received, shutting down");
-                panic!("");
-            }
-        };
-    }
+    tokio::select! {
+        _ = async { wait_for_tasks(tasks).await } => {
+            panic!("One if the actors is not supposed to finish its execution")
+        },
+        _ = async { stop_signal_receiver.next().await } => {
+            vlog::warn!("Stop signal received, shutting down");
+        }
+    };
 }
