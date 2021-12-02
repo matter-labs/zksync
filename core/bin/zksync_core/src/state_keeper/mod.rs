@@ -30,6 +30,7 @@ pub use self::{init_params::ZkSyncStateInitParams, types::StateKeeperRequest};
 
 mod init_params;
 mod pending_block;
+mod state_restore;
 mod types;
 mod utils;
 

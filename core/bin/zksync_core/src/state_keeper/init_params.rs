@@ -72,6 +72,8 @@ impl ZkSyncStateInitParams {
         &mut self,
         storage: &mut zksync_storage::StorageProcessor<'_>,
     ) -> Result<BlockNumber, anyhow::Error> {
+        // Find the block from which we will start building the tree.
+        // It's either the last block for which we have cache, or the last verified block.
         let (last_cached_block_number, accounts) = if let Some((block, _)) = storage
             .chain()
             .block_schema()
@@ -91,6 +93,7 @@ impl ZkSyncStateInitParams {
             self.insert_account(id, account);
         }
 
+        // Either look up the Merkle tree cache for the block we start with, or re-calculate it and store to the database.
         if let Some(account_tree_cache) = storage
             .chain()
             .block_schema()
@@ -100,7 +103,9 @@ impl ZkSyncStateInitParams {
             self.tree
                 .set_internals(serde_json::from_value(account_tree_cache)?);
         } else {
-            self.tree.root_hash();
+            self.tree.root_hash(); // `root_hash` method has side effects: it recalculates the tree.
+
+            // After tree is updated, we may store the transaction cache.
             let account_tree_cache = self.tree.get_internals();
             storage
                 .chain()
@@ -112,6 +117,7 @@ impl ZkSyncStateInitParams {
                 .await?;
         }
 
+        // Now load the *latest* state, so we can update to it.
         let (block_number, accounts) = storage
             .chain()
             .state_schema()
@@ -201,7 +207,7 @@ impl ZkSyncStateInitParams {
         self.tree.insert(*id, acc);
     }
 
-    pub fn remove_account(&mut self, id: AccountId) -> Option<Account> {
+    fn remove_account(&mut self, id: AccountId) -> Option<Account> {
         if let Some(acc) = self.tree.remove(*id) {
             self.acc_id_by_addr.remove(&acc.address);
             Some(acc)
