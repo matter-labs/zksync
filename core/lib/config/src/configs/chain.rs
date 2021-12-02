@@ -26,6 +26,12 @@ impl ChainConfig {
             state_keeper: envy_load!("state_keeper", "CHAIN_STATE_KEEPER_"),
         }
     }
+    pub fn max_blocks_to_aggregate(&self) -> u32 {
+        std::cmp::max(
+            self.state_keeper.max_aggregated_blocks_to_commit,
+            self.state_keeper.max_aggregated_blocks_to_execute,
+        ) as u32
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]

@@ -1,5 +1,5 @@
 // Built-in deps
-use std::{thread, time::Duration};
+use std::time::Duration;
 // External deps
 
 use num::BigUint;
@@ -40,12 +40,12 @@ impl Default for MockProverOptions {
 async fn spawn_server(database: MockDatabase) {
     let prover_options = MockProverOptions::default();
 
-    thread::spawn(move || {
+    tokio::spawn({
         run_prover_server(
             database,
             prover_options.0.api.prover,
             prover_options.0.prover,
-        );
+        )
     });
 }
 
