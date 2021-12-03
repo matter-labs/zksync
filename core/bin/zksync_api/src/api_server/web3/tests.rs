@@ -8,7 +8,7 @@ use jsonrpc_core_client::{RawClient, RpcError, RpcResult};
 use num::BigUint;
 use serde_json::{Map, Value};
 // Workspace uses
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::{chain::operations_ext::records::Web3TxReceipt, ConnectionPool};
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
@@ -24,12 +24,13 @@ use super::{
     Web3RpcApp, NFT_FACTORY_ADDRESS, ZKSYNC_PROXY_ADDRESS,
 };
 use crate::api_server::rest::v02::test_utils::TestServerConfig;
+use zksync_config::configs::api::Web3Config;
 
 async fn local_client() -> anyhow::Result<(RawClient, impl Future<Output = RpcResult<()>>)> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
 
-    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3);
     let mut io = IoHandler::new();
     rpc_app.extend(&mut io);
 
@@ -86,8 +87,8 @@ async fn static_methods() -> anyhow::Result<()> {
         (gas_price, accounts, get_uncle_count_by_block_hash, get_uncle_count_by_block_number, _),
     ) = fut.await;
     assert_eq!(web3_client_version.unwrap().as_str().unwrap(), "zkSync");
-    assert_eq!(net_version.unwrap().as_str().unwrap(), "9");
     assert_eq!(protocol_version.unwrap().as_str().unwrap(), "0");
+    assert_eq!(net_version.unwrap().as_str().unwrap(), "240");
     assert!(!mining.unwrap().as_bool().unwrap());
     assert_eq!(hashrate.unwrap().as_str().unwrap(), "0x0");
     assert_eq!(gas_price.unwrap().as_str().unwrap(), "0x0");
@@ -464,7 +465,7 @@ async fn get_block() -> anyhow::Result<()> {
 async fn create_logs() -> anyhow::Result<()> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
-    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3);
 
     let from_account_id = AccountId(3);
     let from_account = ZkSyncAccount::rand_with_seed([1, 2, 3, 4]);
@@ -852,7 +853,7 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
             .web3_receipt_by_hash(&tx_hash)
             .await?
             .unwrap();
-        let rpc_app = Web3RpcApp::new(pool.clone(), &ZkSyncConfig::from_env());
+        let rpc_app = Web3RpcApp::new(pool.clone(), &Web3Config::from_env());
         rpc_app.tx_receipt(&mut storage, receipt).await?
     };
     assert_eq!(
@@ -871,7 +872,7 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
 )]
 async fn get_logs() -> anyhow::Result<()> {
     let pool = ConnectionPool::new(Some(1));
-    let rpc_app = Web3RpcApp::new(pool.clone(), &ZkSyncConfig::from_env());
+    let rpc_app = Web3RpcApp::new(pool.clone(), &Web3Config::from_env());
 
     // Checks that it returns error if `fromBlock` is greater than `toBlock`.
     let fut = {
@@ -896,9 +897,12 @@ async fn get_logs() -> anyhow::Result<()> {
     // Checks that it returns error if block range is too big.
     let fut = {
         let (client, server) = {
-            let mut config = ZkSyncConfig::from_env();
-            config.api.web3.max_block_range = 3;
-
+            let config = Web3Config {
+                port: 0,
+                url: "".to_string(),
+                max_block_range: 3,
+                chain_id: 9,
+            };
             let rpc_app = Web3RpcApp::new(pool.clone(), &config);
             let mut io = IoHandler::new();
             rpc_app.extend(&mut io);

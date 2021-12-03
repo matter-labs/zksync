@@ -52,9 +52,9 @@ export async function tokenInfo(address: string) {
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn');
-    await utils.spawn('yarn crypto build');
-    await utils.spawn('yarn reading-tool build');
-    await utils.spawn('yarn zksync prepublish');
+    await utils.spawn('yarn build:crypto');
+    await utils.spawn('yarn build:zksync-sdk');
+    await utils.spawn('yarn build:reading-tool');
 }
 
 export async function deployTestkit(genesisRoot: string, prodContracts: boolean = false) {

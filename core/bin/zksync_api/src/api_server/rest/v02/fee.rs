@@ -114,13 +114,15 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
+
         let (client, server) = cfg.start_server(
             move |cfg: &TestServerConfig| {
                 api_scope(TxSender::new(
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
                     dummy_fee_ticker(&[]),
-                    &cfg.config,
+                    &cfg.config.api.common,
+                    cfg.config.api.private.url.clone(),
                 ))
             },
             Some(shared_data),

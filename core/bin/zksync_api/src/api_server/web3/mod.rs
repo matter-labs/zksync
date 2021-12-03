@@ -1,14 +1,17 @@
 // Built-in uses
 // External uses
-use futures::channel::mpsc;
+
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 // Local uses
 use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
+
+use tokio::task::JoinHandle;
+use zksync_config::configs::api::Web3Config;
 
 mod calls;
 mod converter;
@@ -28,12 +31,12 @@ pub struct Web3RpcApp {
     connection_pool: ConnectionPool,
     logs_helper: LogsHelper,
     calls_helper: CallsHelper,
-    chain_id: u8,
     max_block_range: u32,
+    chain_id: u32,
 }
 
 impl Web3RpcApp {
-    pub fn new(connection_pool: ConnectionPool, config: &ZkSyncConfig) -> Self {
+    pub fn new(connection_pool: ConnectionPool, config: &Web3Config) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("Web3RpcApp must be created from the context of Tokio Runtime");
         Web3RpcApp {
@@ -41,8 +44,8 @@ impl Web3RpcApp {
             connection_pool,
             logs_helper: LogsHelper::new(),
             calls_helper: CallsHelper::new(),
-            chain_id: config.eth_client.chain_id,
-            max_block_range: config.api.web3.max_block_range,
+            max_block_range: config.max_block_range,
+            chain_id: config.chain_id,
         }
     }
 
@@ -60,14 +63,16 @@ impl Web3RpcApp {
 
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
-    panic_notify: mpsc::Sender<bool>,
-    config: &ZkSyncConfig,
-) {
-    let addr = config.api.web3.bind_addr();
+    web3_config: &Web3Config,
+) -> JoinHandle<()> {
+    let addr = web3_config.bind_addr();
 
-    let rpc_app = Web3RpcApp::new(connection_pool, config);
+    let rpc_app = Web3RpcApp::new(connection_pool, web3_config);
+    let (handler, panic_sender) = spawn_panic_handler();
+
     std::thread::spawn(move || {
-        let _panic_sentinel = ThreadPanicNotify(panic_notify);
+        let _panic_sentinel = ThreadPanicNotify(panic_sender);
+
         let mut io = IoHandler::new();
         rpc_app.extend(&mut io);
 
@@ -77,4 +82,5 @@ pub fn start_rpc_server(
             .unwrap();
         server.wait();
     });
+    handler
 }

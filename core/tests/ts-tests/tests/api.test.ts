@@ -1,12 +1,12 @@
 import { Wallet, RestProvider, getDefaultRestProvider, types, utils } from 'zksync';
-import { Tester } from './tester';
+import { Tester } from './tester/tester';
 import * as ethers from 'ethers';
-import './priority-ops';
-import './change-pub-key';
-import './transfer';
-import './withdraw';
-import './forced-exit';
-import './mint-nft';
+import './tester/priority-ops';
+import './tester/change-pub-key';
+import './tester/transfer';
+import './tester/withdraw';
+import './tester/forced-exit';
+import './tester/mint-nft';
 import { expect } from 'chai';
 import path from 'path';
 

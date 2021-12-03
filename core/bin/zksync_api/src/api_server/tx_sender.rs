@@ -52,6 +52,7 @@ use crate::{
     tx_error::{Toggle2FAError, TxAddError},
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
+use zksync_config::configs::api::CommonApiConfig;
 
 const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
@@ -139,9 +140,10 @@ impl TxSender {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config: &ZkSyncConfig,
+        config: &CommonApiConfig,
+        private_url: String,
     ) -> Self {
-        let core_api_client = CoreApiClient::new(config.api.private.url.clone());
+        let core_api_client = CoreApiClient::new(private_url);
 
         Self::with_client(
             core_api_client,
@@ -157,12 +159,11 @@ impl TxSender {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config: &ZkSyncConfig,
+        config: &CommonApiConfig,
     ) -> Self {
         let max_number_of_transactions_per_batch =
-            config.api.common.max_number_of_transactions_per_batch as usize;
-        let max_number_of_authors_per_batch =
-            config.api.common.max_number_of_authors_per_batch as usize;
+            config.max_number_of_transactions_per_batch as usize;
+        let max_number_of_authors_per_batch = config.max_number_of_authors_per_batch as usize;
 
         Self {
             core_api_client,
@@ -170,15 +171,17 @@ impl TxSender {
             sign_verify_requests: sign_verify_request_sender,
             ticker_requests: ticker_request_sender,
             tokens: TokenDBCache::new(),
-            forced_exit_checker: ForcedExitChecker::new(config),
-            enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
-            blocks: BlockDetailsCache::new(config.api.common.caches_size),
+            forced_exit_checker: ForcedExitChecker::new(
+                config.forced_exit_minimum_account_age_secs,
+            ),
+            enforce_pubkey_change_fee: config.enforce_pubkey_change_fee,
+            blocks: BlockDetailsCache::new(config.caches_size),
 
-            fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
+            fee_free_accounts: HashSet::from_iter(config.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
-            current_subsidy_type: config.ticker.subsidy_name.clone(),
-            max_subsidy_usd: config.ticker.max_subsidy_usd(),
+            current_subsidy_type: config.subsidy_name.clone(),
+            max_subsidy_usd: config.max_subsidy_usd(),
         }
     }
 
@@ -786,7 +789,7 @@ impl TxSender {
                     .await
                     .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
             );
-            tx_sender_types.push(self.get_tx_sender_type(&tx).await?);
+            tx_sender_types.push(self.get_tx_sender_type(tx).await?);
         }
 
         let batch_sign_data = if !eth_signatures.is_empty() {

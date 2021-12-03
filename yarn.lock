@@ -10625,7 +10625,7 @@ yocto-queue@^0.1.0:
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
 
 "zksync@link:sdk/zksync.js":
-  version "0.11.4"
+  version "0.11.6"
   dependencies:
     axios "^0.21.2"
     websocket "^1.0.30"

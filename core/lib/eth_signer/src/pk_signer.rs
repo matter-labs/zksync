@@ -34,7 +34,7 @@ impl EthereumSigner for PrivateKeySigner {
     /// The sign method calculates an Ethereum specific signature with:
     /// sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
     async fn sign_message(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
-        let pack = PackedEthSignature::sign(&self.private_key, &message)
+        let pack = PackedEthSignature::sign(&self.private_key, message)
             .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
         Ok(TxEthSignature::EthereumSignature(pack))
     }

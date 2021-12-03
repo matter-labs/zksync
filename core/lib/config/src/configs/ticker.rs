@@ -1,6 +1,4 @@
-use std::ops::Div;
-
-use num::{rational::Ratio, BigUint, CheckedDiv};
+use num::{rational::Ratio, BigUint};
 // External uses
 use serde::Deserialize;
 // Workspace uses
@@ -40,23 +38,13 @@ pub struct TickerConfig {
     pub token_market_update_time: u64,
     /// Number of tickers for load balancing.
     pub number_of_ticker_actors: u8,
-    /// The IPs which
-    pub subsidized_ips: Vec<String>,
     /// Subsidized price for ChangePubKey in cents scaled by SUBSIDY_USD_AMOUNTS_SCALE
     pub subsidy_cpk_price_usd_scaled: u64,
-    /// Maxiumum subsidized amout for current subsidy type scaled by SUBSIDY_USD_AMOUNTS_SCALE
-    pub max_subsidy_usd_scaled: u64,
-    /// The name of current subsidy. It is needed to conveniently fetch historical data regarding subsidies for different partners
-    pub subsidy_name: String,
 }
 
 impl TickerConfig {
     pub fn subsidy_cpk_price_usd(&self) -> Ratio<BigUint> {
-        scaled_u64_to_ratio(self.subsidy_cpk_price_usd_scaled.clone())
-    }
-
-    pub fn max_subsidy_usd(&self) -> Ratio<BigUint> {
-        scaled_u64_to_ratio(self.max_subsidy_usd_scaled.clone())
+        scaled_u64_to_ratio(self.subsidy_cpk_price_usd_scaled)
     }
 
     pub fn from_env() -> Self {
@@ -91,10 +79,7 @@ mod tests {
             unconditionally_valid_tokens: vec![addr("0000000000000000000000000000000000000000")],
             token_market_update_time: 120,
             number_of_ticker_actors: 4,
-            subsidized_ips: vec![],
             subsidy_cpk_price_usd_scaled: 100,
-            max_subsidy_usd_scaled: 20000,
-            subsidy_name: String::from("PartnerName"),
         }
     }
 

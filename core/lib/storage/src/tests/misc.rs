@@ -1,5 +1,5 @@
 use sqlx::types::BigDecimal;
-use zksync_basic_types::TokenId;
+use zksync_types::TokenId;
 
 use crate::tests::db_test;
 use crate::{misc::records::Subsidy, misc::MiscSchema};

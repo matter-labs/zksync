@@ -74,7 +74,7 @@ impl TxHandler<Swap> for ZkSyncState {
         &mut self,
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), SwapOpError> {
-        self.apply_swap_op(&op)
+        self.apply_swap_op(op)
     }
 }
 

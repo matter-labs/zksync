@@ -14,7 +14,7 @@ async function main() {
     const parser = new ArgumentParser({
         version: '0.1.0',
         addHelp: true,
-        description: 'Deploy contracts and publish them on Etherscan/Tesseracts'
+        description: 'Deploy contracts and publish them on Etherscan'
     });
     parser.addArgument('--deployerPrivateKey', { required: false, help: 'Wallet used to deploy contracts.' });
     parser.addArgument('--governor', { required: false, help: 'governor address' });

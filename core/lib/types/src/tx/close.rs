@@ -23,7 +23,7 @@ impl Close {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(self.account.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out.extend_from_slice(&self.time_range.as_be_bytes());
         out

@@ -77,8 +77,7 @@ use std::env;
 // External imports
 use sqlx::{postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
-use zksync_basic_types::BlockNumber;
-use zksync_types::ActionType;
+use zksync_types::{ActionType, BlockNumber};
 // Local imports
 use crate::connection::{holder::ConnectionHolder, PooledConnection};
 

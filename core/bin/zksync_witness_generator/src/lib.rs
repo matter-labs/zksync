@@ -10,17 +10,19 @@ use actix_web_httpauth::extractors::{
     AuthenticationError,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use futures::channel::mpsc;
+
 use jsonwebtoken::errors::Error as JwtError;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 // Workspace deps
-use zksync_config::ZkSyncConfig;
+use zksync_config::ProverConfig;
 // Local deps
 use self::database_interface::DatabaseInterface;
 use self::scaler::ScalerOracle;
+use tokio::task::JoinHandle;
 use zksync_circuit::serialization::ProverData;
+use zksync_config::configs::api::ProverApiConfig;
 use zksync_prover_utils::api::{
     JobRequestData, JobResultData, ProverInputRequest, ProverInputResponse, ProverOutputRequest,
     WorkingOn,
@@ -32,7 +34,7 @@ use zksync_types::prover::{
     ProverJobType, AGGREGATED_PROOF_JOB_PRIORITY, SINGLE_PROOF_JOB_PRIORITY,
 };
 use zksync_types::BlockNumber;
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 #[cfg(test)]
 mod tests;
@@ -282,8 +284,14 @@ async fn required_replicas<DB: DatabaseInterface>(
     Ok(HttpResponse::Ok().json(response))
 }
 
-async fn update_prover_job_queue_loop<DB: DatabaseInterface>(database: DB) {
-    let mut interval = tokio::time::interval(Duration::from_secs(5));
+async fn update_prover_job_queue_loop<DB: DatabaseInterface>(
+    database: DB,
+    prepare_data_interval: Duration,
+) {
+    // We use `prepare_data_interval` as timeout in this function to align creating prover jobs
+    // with witness generator routine.
+
+    let mut interval = tokio::time::interval(prepare_data_interval);
     loop {
         interval.tick().await;
 
@@ -380,21 +388,24 @@ async fn update_prover_job_queue<DB: DatabaseInterface>(database: DB) -> anyhow:
 
 pub fn run_prover_server<DB: DatabaseInterface>(
     database: DB,
-    panic_notify: mpsc::Sender<bool>,
-    config: ZkSyncConfig,
-) {
-    let witness_generator_opts = config.prover.witness_generator;
-    let core_opts = config.prover.core;
-    let prover_api_opts = config.api.prover;
+    prover_api_opts: ProverApiConfig,
+    prover_opts: ProverConfig,
+) -> JoinHandle<()> {
+    let witness_generator_opts = prover_opts.witness_generator;
+    let core_opts = prover_opts.core;
+    let (handler, panic_sender) = spawn_panic_handler();
 
     thread::Builder::new()
         .name("prover_server".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
+            let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
             let actix_runtime = actix_rt::System::new();
 
             actix_runtime.block_on(async move {
-                tokio::spawn(update_prover_job_queue_loop(database.clone()));
+                tokio::spawn(update_prover_job_queue_loop(
+                    database.clone(),
+                    witness_generator_opts.prepare_data_interval(),
+                ));
 
                 let last_verified_block = {
                     let mut storage = database
@@ -424,7 +435,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                         BlockNumber(start_block),
                         BlockNumber(block_step),
                     );
-                    pool_maintainer.start(panic_notify.clone());
+                    pool_maintainer.start(panic_sender.clone());
                 }
                 // Start HTTP server.
                 let secret_auth = prover_api_opts.secret_auth.clone();
@@ -466,4 +477,6 @@ pub fn run_prover_server<DB: DatabaseInterface>(
             })
         })
         .expect("failed to start prover server");
+
+    handler
 }

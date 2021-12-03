@@ -126,7 +126,7 @@ impl WithdrawNFT {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(self.from.as_bytes());
         out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&self.fee_token.to_be_bytes());

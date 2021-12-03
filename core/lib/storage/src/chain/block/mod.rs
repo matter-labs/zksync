@@ -9,13 +9,12 @@ use zksync_api_types::{
     },
     Either,
 };
-use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
     block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
     event::block::BlockStatus,
-    AccountId, BlockNumber, Fr, ZkSyncOp,
+    AccountId, BlockNumber, Fr, ZkSyncOp, H256, U256,
 };
 // Local imports
 use self::records::{

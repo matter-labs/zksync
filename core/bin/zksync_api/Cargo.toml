@@ -38,7 +38,7 @@ web3 = "0.16.0"
 serde = "1.0.90"
 serde_json = "1.0.0"
 serde_repr = "0.1"
-itertools = "0.8"
+itertools = "0.9"
 jsonrpc-core = "18"
 jsonrpc-core-client = { version= "18", features=["ws", "http"] }
 jsonrpc-pubsub = "18.0.0"

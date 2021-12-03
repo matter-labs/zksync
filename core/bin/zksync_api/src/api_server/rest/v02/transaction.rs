@@ -281,7 +281,7 @@ mod tests {
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
                     dummy_fee_ticker(&[]),
-                    &cfg.config,
+                    &cfg.config.api.common,
                 ))
             },
             Some(shared_data),

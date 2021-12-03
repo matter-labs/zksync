@@ -211,8 +211,8 @@ impl<E: Engine> CircuitElement<E> {
 
         let selected_number = AllocatedNum::select_ifeq(
             cs.namespace(|| "select_ifeq"),
-            &a,
-            &b,
+            a,
+            b,
             &x.get_number(),
             &y.get_number(),
         )?;
@@ -238,7 +238,7 @@ impl<E: Engine> CircuitElement<E> {
             cs.namespace(|| "conditionally_select"),
             &x.get_number(),
             &y.get_number(),
-            &condition,
+            condition,
         )?;
 
         CircuitElement::from_number_with_known_length(
@@ -262,7 +262,7 @@ impl<E: Engine> CircuitElement<E> {
             cs.namespace(|| "conditionally_select"),
             x,
             &y.get_number(),
-            &condition,
+            condition,
         )?;
 
         CircuitElement::from_number_with_known_length(
@@ -407,19 +407,19 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
             cs.namespace(|| "conditionally_select_x"),
             &a.get_x(),
             &b.get_x(),
-            &condition,
+            condition,
         )?;
         let selected_y = CircuitElement::conditionally_select(
             cs.namespace(|| "conditionally_select_y"),
             &a.get_y(),
             &b.get_y(),
-            &condition,
+            condition,
         )?;
         let selected_hash = CircuitElement::conditionally_select(
             cs.namespace(|| "conditionally_select_hash"),
             &a.get_hash(),
             &b.get_hash(),
-            &condition,
+            condition,
         )?;
         Ok(CircuitPubkey {
             x: selected_x,

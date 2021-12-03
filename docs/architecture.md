@@ -87,7 +87,6 @@ This section provides an overview on folders / sub-projects that exist in this r
 - `/etc`: Configration files.
   - `/env`: `.env` files that contain environment variables for different configuration of zkSync Server / Prover.
   - `/js`: Configuration files for JavaScript applications (such as Explorer).
-  - `/tesseracts`: Configuration for `tesseracts` minimalistic blockchain explorer (used for development).
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
 - `/infrastructure`: Application that aren't naturally a part of zkSync core, but are related to it.
   - `/explorer`: A blockchain explorer for zkSync network.

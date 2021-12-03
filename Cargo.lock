@@ -2191,15 +2191,6 @@ checksum = "68f2d64f2edebec4ce84ad108148e67e1064789bee435edc5b60ad398714a3a9"
 
 [[package]]
 name = "itertools"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f56a2d0bc861f9165be4eb3442afd3c236d8a98afd426f65d92324ae1091a484"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
@@ -2743,16 +2734,6 @@ checksum = "a92518e98c078586bc6c934028adcca4c92a53d6a958196de835170a01d84e4b"
 dependencies = [
  "adler",
  "autocfg 1.0.1",
-]
-
-[[package]]
-name = "mint_nft_nonce_migration"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "tokio",
- "zksync_config",
- "zksync_storage",
 ]
 
 [[package]]
@@ -4901,19 +4882,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
-name = "token_kind_migration"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "tokio",
- "zksync_config",
- "zksync_contracts",
- "zksync_eth_client",
- "zksync_storage",
- "zksync_types",
-]
-
-[[package]]
 name = "tokio"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5168,16 +5136,6 @@ name = "try-lock"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
-
-[[package]]
-name = "tx_filters_migration"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "tokio",
- "zksync_storage",
- "zksync_types",
-]
 
 [[package]]
 name = "typeable"
@@ -5672,7 +5630,7 @@ dependencies = [
  "futures 0.3.17",
  "hex",
  "hyper 0.14.14",
- "itertools 0.8.2",
+ "itertools 0.9.0",
  "jsonrpc-core 18.0.0",
  "jsonrpc-core-client",
  "jsonrpc-derive",
@@ -5725,7 +5683,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "zksync_api_types",
- "zksync_config",
  "zksync_crypto",
  "zksync_types",
  "zksync_utils",
@@ -5743,7 +5700,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "zksync_config",
  "zksync_crypto",
  "zksync_types",
  "zksync_utils",
@@ -5789,15 +5745,10 @@ dependencies = [
 name = "zksync_config"
 version = "1.0.0"
 dependencies = [
- "chrono",
  "envy",
  "num",
- "reqwest",
  "serde",
  "serde_json",
- "toml",
- "tracing",
- "url 2.2.2",
  "zksync_crypto",
  "zksync_types",
  "zksync_utils",
@@ -6050,7 +6001,6 @@ name = "zksync_prometheus_exporter"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "ctrlc",
  "futures 0.3.17",
  "metrics",
  "metrics-exporter-prometheus",
@@ -6059,7 +6009,6 @@ dependencies = [
  "tokio",
  "tracing",
  "vlog",
- "zksync_config",
  "zksync_storage",
  "zksync_types",
 ]
@@ -6108,9 +6057,7 @@ dependencies = [
  "structopt",
  "tokio",
  "vlog",
- "zksync_basic_types",
  "zksync_circuit",
- "zksync_config",
  "zksync_crypto",
  "zksync_storage",
  "zksync_types",
@@ -6173,7 +6120,7 @@ dependencies = [
  "deadpool",
  "futures-util",
  "hex",
- "itertools 0.8.2",
+ "itertools 0.9.0",
  "metrics",
  "num",
  "once_cell",
@@ -6185,7 +6132,6 @@ dependencies = [
  "tokio",
  "vlog",
  "zksync_api_types",
- "zksync_basic_types",
  "zksync_config",
  "zksync_crypto",
  "zksync_prover_utils",

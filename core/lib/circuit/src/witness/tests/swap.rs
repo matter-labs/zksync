@@ -345,7 +345,7 @@ fn test_swap_success() {
             swap_op,
             input,
             |state, op| {
-                let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+                let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();
@@ -459,7 +459,7 @@ fn test_swap_sign_and_submit() {
         swap_op,
         input,
         |state, op| {
-            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, op)
                 .expect("Operation failed")
                 .0
                 .unwrap();
@@ -642,7 +642,7 @@ fn test_swap_corrupted_input() {
             (sig, input.1.clone(), input.2.clone()),
             "op_valid is true",
             |state, op| {
-                let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+                let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();
@@ -659,7 +659,7 @@ fn test_swap_corrupted_input() {
             (input.0.clone(), input.1.clone(), sig),
             "op_valid is true",
             |state, op| {
-                let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+                let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();
@@ -700,7 +700,7 @@ fn test_swap_limit_orders() {
         swap_op,
         input.clone(),
         |state, op| {
-            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, op)
                 .expect("Operation failed")
                 .0
                 .unwrap();
@@ -738,7 +738,7 @@ fn test_swap_limit_orders() {
         second_swap_op,
         (input.0, input.1, second_swap_input),
         |state, op| {
-            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, op)
                 .expect("Operation failed")
                 .0
                 .unwrap();

@@ -48,20 +48,14 @@ impl From<Account> for CircuitAccount<super::Engine> {
     fn from(acc: Account) -> Self {
         let mut circuit_account = CircuitAccount::default();
 
-        let balances: Vec<_> = acc
-            .balances
-            .iter()
-            .map(|(id, b)| {
-                (
-                    *id,
-                    Balance {
-                        value: Fr::from_str(&b.0.to_string()).unwrap(),
-                    },
-                )
-            })
-            .collect();
-
-        for (i, b) in balances.into_iter() {
+        for (i, b) in acc.balances.iter().map(|(id, b)| {
+            (
+                *id,
+                Balance {
+                    value: Fr::from_str(&b.0.to_string()).unwrap(),
+                },
+            )
+        }) {
             circuit_account.subtree.insert(*i, b);
         }
 

@@ -260,7 +260,7 @@ impl ChangePubKey {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
         out.extend_from_slice(&(self.fee_token.0 as u16).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -281,7 +281,7 @@ impl ChangePubKey {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));

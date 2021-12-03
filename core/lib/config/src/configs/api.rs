@@ -1,7 +1,9 @@
+use num::{rational::Ratio, BigUint};
 /// External uses
 use serde::Deserialize;
 /// Built-in uses
 use std::net::SocketAddr;
+use zksync_utils::scaled_u64_to_ratio;
 // Workspace uses
 use zksync_types::AccountId;
 // Local uses
@@ -11,21 +13,21 @@ use crate::envy_load;
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ApiConfig {
     /// Common configuration options for the API.
-    pub common: Common,
+    pub common: CommonApiConfig,
     /// Configuration options for the Admin API server.
-    pub admin: AdminApi,
+    pub admin: AdminApiConfig,
     /// Configuration options for the REST API server.
-    pub rest: RestApi,
+    pub rest: RestApiConfig,
     /// Configuration options for the JSON RPC servers.
-    pub json_rpc: JsonRpc,
+    pub json_rpc: JsonRpcConfig,
     /// Configuration options for the web3 JSON RPC server.
-    pub web3: Web3,
+    pub web3: Web3Config,
     /// Configuration options for the private core API.
-    pub private: PrivateApi,
+    pub private: PrivateApiConfig,
     /// Configuration options for the prover server.
-    pub prover: ProverApi,
+    pub prover: ProverApiConfig,
     /// Configuration options for the Prometheus exporter.
-    pub prometheus: Prometheus,
+    pub prometheus: PrometheusConfig,
 }
 
 impl ApiConfig {
@@ -43,9 +45,60 @@ impl ApiConfig {
     }
 }
 
+impl CommonApiConfig {
+    pub fn max_subsidy_usd(&self) -> Ratio<BigUint> {
+        scaled_u64_to_ratio(self.max_subsidy_usd_scaled)
+    }
+
+    pub fn from_env() -> Self {
+        envy_load!("common", "API_COMMON_")
+    }
+}
+
+impl AdminApiConfig {
+    pub fn from_env() -> Self {
+        envy_load!("admin", "API_ADMIN_")
+    }
+}
+
+impl RestApiConfig {
+    pub fn from_env() -> Self {
+        envy_load!("rest", "API_REST_")
+    }
+}
+
+impl JsonRpcConfig {
+    pub fn from_env() -> Self {
+        envy_load!("json_rpc", "API_JSON_RPC_")
+    }
+}
+
+impl Web3Config {
+    pub fn from_env() -> Self {
+        envy_load!("web3", "API_WEB3_")
+    }
+}
+
+impl PrivateApiConfig {
+    pub fn from_env() -> Self {
+        envy_load!("private", "API_PRIVATE_")
+    }
+}
+impl ProverApiConfig {
+    pub fn from_env() -> Self {
+        envy_load!("prover", "API_PROVER_")
+    }
+}
+
+impl PrometheusConfig {
+    pub fn from_env() -> Self {
+        envy_load!("prometheus", "API_PROMETHEUS_")
+    }
+}
+
 // Common configuration options for the API
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct Common {
+pub struct CommonApiConfig {
     // Size of LRU caches for requests
     pub caches_size: usize,
     // Determines the required minimum account age for `ForcedExit` operation to be allowed.
@@ -57,10 +110,19 @@ pub struct Common {
 
     pub max_number_of_transactions_per_batch: u64,
     pub max_number_of_authors_per_batch: u64,
+
+    /// The IPs which have their CPK (CREATE2) subsidized
+    pub subsidized_ips: Vec<String>,
+
+    /// Maxiumum subsidized amout for current subsidy type scaled by SUBSIDY_USD_AMOUNTS_SCALE
+    pub max_subsidy_usd_scaled: u64,
+
+    /// The name of current subsidy. It is needed to conveniently fetch historical data regarding subsidies for different partners
+    pub subsidy_name: String,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct AdminApi {
+pub struct AdminApiConfig {
     /// Port to which the API server is listening.
     pub port: u16,
     /// URL to access API server.
@@ -69,14 +131,14 @@ pub struct AdminApi {
     pub secret_auth: String,
 }
 
-impl AdminApi {
+impl AdminApiConfig {
     pub fn bind_addr(&self) -> SocketAddr {
         SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
     }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct ProverApi {
+pub struct ProverApiConfig {
     /// Port to which the API server is listening.
     pub port: u16,
     /// URL to access API server.
@@ -85,42 +147,42 @@ pub struct ProverApi {
     pub secret_auth: String,
 }
 
-impl ProverApi {
+impl ProverApiConfig {
     pub fn bind_addr(&self) -> SocketAddr {
         SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
     }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct PrivateApi {
+pub struct PrivateApiConfig {
     /// Port to which the API server is listening.
     pub port: u16,
     /// URL to access API server.
     pub url: String,
 }
 
-impl PrivateApi {
+impl PrivateApiConfig {
     pub fn bind_addr(&self) -> SocketAddr {
         SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
     }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct RestApi {
+pub struct RestApiConfig {
     /// Port to which the API server is listening.
     pub port: u16,
     /// URL to access API server.
     pub url: String,
 }
 
-impl RestApi {
+impl RestApiConfig {
     pub fn bind_addr(&self) -> SocketAddr {
         SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
     }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct JsonRpc {
+pub struct JsonRpcConfig {
     /// Port to which the HTTP RPC server is listening.
     pub http_port: u16,
     /// URL to access HTTP RPC server.
@@ -131,7 +193,7 @@ pub struct JsonRpc {
     pub ws_url: String,
 }
 
-impl JsonRpc {
+impl JsonRpcConfig {
     pub fn http_bind_addr(&self) -> SocketAddr {
         SocketAddr::new("0.0.0.0".parse().unwrap(), self.http_port)
     }
@@ -142,23 +204,24 @@ impl JsonRpc {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct Web3 {
+pub struct Web3Config {
     /// Port to which the web3 JSON RPC server is listening.
     pub port: u16,
     /// URL to access web3 JSON RPC server.
     pub url: String,
     /// Max difference between blocks in `eth_getLogs` method.
     pub max_block_range: u32,
+    pub chain_id: u32,
 }
 
-impl Web3 {
+impl Web3Config {
     pub fn bind_addr(&self) -> SocketAddr {
         SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
     }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct Prometheus {
+pub struct PrometheusConfig {
     /// Port to which the Prometheus exporter server is listening.
     pub port: u16,
 }
@@ -171,44 +234,48 @@ mod tests {
 
     fn expected_config() -> ApiConfig {
         ApiConfig {
-            common: Common {
+            common: CommonApiConfig {
                 caches_size: 10_000,
                 forced_exit_minimum_account_age_secs: 0,
                 enforce_pubkey_change_fee: true,
                 max_number_of_transactions_per_batch: 200,
                 max_number_of_authors_per_batch: 10,
                 fee_free_accounts: vec![AccountId(4078), AccountId(387)],
+                subsidized_ips: vec![],
+                max_subsidy_usd_scaled: 20000,
+                subsidy_name: String::from("PartnerName"),
             },
-            admin: AdminApi {
+            admin: AdminApiConfig {
                 port: 8080,
                 url: "http://127.0.0.1:8080".into(),
                 secret_auth: "sample".into(),
             },
-            rest: RestApi {
+            rest: RestApiConfig {
                 port: 3001,
                 url: "http://127.0.0.1:3001".into(),
             },
-            json_rpc: JsonRpc {
+            json_rpc: JsonRpcConfig {
                 http_port: 3030,
                 http_url: "http://127.0.0.1:3030".into(),
                 ws_port: 3031,
                 ws_url: "ws://127.0.0.1:3031".into(),
             },
-            web3: Web3 {
+            web3: Web3Config {
                 port: 3002,
                 url: "http://127.0.0.1:3002".into(),
                 max_block_range: 10,
+                chain_id: 240,
             },
-            private: PrivateApi {
+            private: PrivateApiConfig {
                 port: 8090,
                 url: "http://127.0.0.1:8090".into(),
             },
-            prover: ProverApi {
+            prover: ProverApiConfig {
                 port: 8088,
                 url: "http://127.0.0.1:8088".into(),
                 secret_auth: "sample".into(),
             },
-            prometheus: Prometheus { port: 3312 },
+            prometheus: PrometheusConfig { port: 3312 },
         }
     }
 
@@ -232,6 +299,7 @@ API_JSON_RPC_WS_PORT="3031"
 API_JSON_RPC_WS_URL="ws://127.0.0.1:3031"
 API_WEB3_PORT="3002"
 API_WEB3_URL="http://127.0.0.1:3002"
+API_WEB3_CHAIN_ID="240"
 API_WEB3_MAX_BLOCK_RANGE="10"
 API_PRIVATE_PORT="8090"
 API_PRIVATE_URL="http://127.0.0.1:8090"

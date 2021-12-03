@@ -14,7 +14,7 @@ use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Params
 use jsonrpc_http_server::{RequestMiddleware, RequestMiddlewareAction, ServerBuilder};
 
 // Workspace uses
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::{
     chain::{
         block::records::StorageBlockDetails, operations::records::StoredExecutedPriorityOperation,
@@ -31,7 +31,7 @@ use crate::{
     utils::shared_lru_cache::AsyncLruCache,
 };
 use bigdecimal::BigDecimal;
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 pub mod error;
 mod rpc_impl;
@@ -41,6 +41,8 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use tokio::task::JoinHandle;
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 
 const CLOUDFLARE_CONNECTING_IP_HEADER: &str = "CF-Connecting-IP";
 
@@ -64,19 +66,21 @@ impl RpcApp {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config: &ZkSyncConfig,
+        config: &CommonApiConfig,
+        private_url: String,
+        confirmations_for_eth_event: u64,
     ) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
 
-        let api_requests_caches_size = config.api.common.caches_size;
-        let confirmations_for_eth_event = config.eth_watch.confirmations_for_eth_event;
+        let api_requests_caches_size = config.caches_size;
 
         let tx_sender = TxSender::new(
             connection_pool,
             sign_verify_request_sender,
             ticker_request_sender,
             config,
+            private_url,
         );
 
         RpcApp {
@@ -90,7 +94,7 @@ impl RpcApp {
 
             tx_sender,
 
-            subsidized_ips: config.ticker.subsidized_ips.clone().into_iter().collect(),
+            subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
         }
     }
 
@@ -199,9 +203,8 @@ async fn insert_ip(body: hyper::Body, ip: String) -> hyper::Result<Vec<u8>> {
 impl RequestMiddleware for IpInsertMiddleWare {
     fn on_request(&self, request: hyper::Request<hyper::Body>) -> RequestMiddlewareAction {
         let (parts, body) = request.into_parts();
-        let cloudflare_sent_ip = "CF-Connecting-IP";
 
-        let remote_ip = match parts.headers.get(cloudflare_sent_ip) {
+        let remote_ip = match parts.headers.get(CLOUDFLARE_CONNECTING_IP_HEADER) {
             Some(ip) => ip.to_str(),
             None => {
                 return RequestMiddlewareAction::Proceed {
@@ -501,19 +504,24 @@ pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
-    panic_notify: mpsc::Sender<bool>,
-    config: &ZkSyncConfig,
-) {
-    let addr = config.api.json_rpc.http_bind_addr();
-
+    config: &JsonRpcConfig,
+    common_api_config: &CommonApiConfig,
+    private_url: String,
+    confirmations_for_eth_event: u64,
+) -> JoinHandle<()> {
+    let addr = config.http_bind_addr();
     let rpc_app = RpcApp::new(
         connection_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        &config,
+        common_api_config,
+        private_url,
+        confirmations_for_eth_event,
     );
+
+    let (handler, panic_sender) = spawn_panic_handler();
     std::thread::spawn(move || {
-        let _panic_sentinel = ThreadPanicNotify(panic_notify);
+        let _panic_sentinel = ThreadPanicNotify(panic_sender);
         let mut io = IoHandler::new();
         rpc_app.extend(&mut io);
 
@@ -524,6 +532,7 @@ pub fn start_rpc_server(
             .unwrap();
         server.wait();
     });
+    handler
 }
 
 #[cfg(test)]

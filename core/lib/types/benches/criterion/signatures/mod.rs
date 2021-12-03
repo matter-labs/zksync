@@ -58,7 +58,7 @@ fn bench_signature_seckp_recover(b: &mut Bencher<'_>) {
         &secp256k1::SecretKey::from_slice(&rng.gen::<[u8; 32]>()).expect("secret key creation");
 
     let secp = secp256k1::Secp256k1::new();
-    let signature = secp.sign_recoverable(&message, &secret_key);
+    let signature = secp.sign_recoverable(&message, secret_key);
 
     let verify_secp = secp256k1::Secp256k1::verification_only();
 

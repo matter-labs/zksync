@@ -25,8 +25,12 @@ pub fn check_circuit_non_panicking(circuit: ZkSyncCircuit<Engine>) -> Result<(),
     let mut cs = TestConstraintSystem::<Engine>::new();
     circuit.synthesize(&mut cs).unwrap();
 
-    println!("unconstrained: {}", cs.find_unconstrained());
-    println!("number of constraints {}", cs.num_constraints());
+    // Notes for future us: these lines may be helpful when updating circuits.
+    // They don't test anything, but show the info about the circuit (which pubdata is not constrained
+    // and how many constraints do we have)
+    // println!("unconstrained: {}", cs.find_unconstrained());
+    // println!("number of constraints {}", cs.num_constraints());
+
     if let Some(err) = cs.which_is_unsatisfied() {
         Err(err.into())
     } else {
@@ -151,7 +155,7 @@ pub fn generic_test_scenario<W, F>(
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,
@@ -208,7 +212,7 @@ pub fn corrupted_input_test_scenario<W, F, B>(
     B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,
@@ -276,7 +280,7 @@ pub fn incorrect_op_test_scenario<W, F, B>(
     B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize WitnessBuilder.
-    let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,

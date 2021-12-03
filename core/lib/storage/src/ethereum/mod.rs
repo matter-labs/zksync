@@ -4,7 +4,6 @@ use std::{collections::VecDeque, convert::TryFrom, str::FromStr, time::Instant};
 use anyhow::format_err;
 use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
-use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
@@ -12,7 +11,7 @@ use zksync_types::{
     event::{
         account::AccountStateChangeStatus, block::BlockStatus, transaction::TransactionStatus,
     },
-    BlockNumber,
+    BlockNumber, H256, U256,
 };
 // Local imports
 use self::records::{ETHOperationData, ETHParams, ETHStats, ETHTxHash, StorageETHOperation};

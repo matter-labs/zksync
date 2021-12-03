@@ -1,7 +1,7 @@
 // Built-in deps
-use std::{thread, time::Duration};
+use std::time::Duration;
 // External deps
-use futures::channel::mpsc;
+
 use num::BigUint;
 // Workspace deps
 use zksync_config::ZkSyncConfig;
@@ -29,7 +29,7 @@ impl Default for MockProverOptions {
         zksync_config.api.prover.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
         zksync_config.prover.prover.heartbeat_interval = 20000;
         zksync_config.prover.prover.cycle_wait = 500;
-        zksync_config.prover.witness_generator.prepare_data_interval = 0;
+        zksync_config.prover.witness_generator.prepare_data_interval = 100;
         zksync_config.prover.witness_generator.witness_generators = 1;
         zksync_config.prover.core.idle_provers = 1;
 
@@ -39,10 +39,13 @@ impl Default for MockProverOptions {
 
 async fn spawn_server(database: MockDatabase) {
     let prover_options = MockProverOptions::default();
-    let (tx, _rx) = mpsc::channel(1);
 
-    thread::spawn(move || {
-        run_prover_server(database, tx, prover_options.0);
+    tokio::spawn({
+        run_prover_server(
+            database,
+            prover_options.0.api.prover,
+            prover_options.0.prover,
+        )
     });
 }
 

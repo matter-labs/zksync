@@ -27,8 +27,8 @@ impl DBConfig {
         envy_load!("database", "DATABASE_")
     }
 
-    pub fn rejected_transactions_max_age(&self) -> chrono::Duration {
-        chrono::Duration::hours(self.rejected_transactions_max_age as i64)
+    pub fn rejected_transactions_max_age(&self) -> time::Duration {
+        time::Duration::from_secs(self.rejected_transactions_max_age * Self::SECS_PER_HOUR)
     }
 
     pub fn rejected_transactions_cleaner_interval(&self) -> time::Duration {

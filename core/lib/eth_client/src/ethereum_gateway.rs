@@ -4,7 +4,7 @@ use web3::transports::Http;
 use web3::types::{Address, BlockId, Filter, Log, Transaction, U64};
 
 use std::fmt::Debug;
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ETHClientConfig, ETHSenderConfig};
 use zksync_contracts::zksync_contract;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
@@ -49,35 +49,39 @@ pub enum EthereumGateway {
 }
 
 impl EthereumGateway {
-    pub fn from_config(config: &ZkSyncConfig) -> Self {
-        if config.eth_client.web3_url.len() == 1 {
-            let transport = web3::transports::Http::new(&config.eth_client.web3_url()).unwrap();
+    pub fn from_config(
+        eth_client_config: &ETHClientConfig,
+        eth_sender_config: &ETHSenderConfig,
+        main_contract: Address,
+    ) -> Self {
+        if eth_client_config.web3_url.len() == 1 {
+            let transport = web3::transports::Http::new(&eth_client_config.web3_url()).unwrap();
 
             EthereumGateway::Direct(ETHDirectClient::new(
                 transport,
                 zksync_contract(),
-                config.eth_sender.sender.operator_commit_eth_addr,
-                PrivateKeySigner::new(config.eth_sender.sender.operator_private_key),
-                config.contracts.contract_addr,
-                config.eth_client.chain_id,
-                config.eth_client.gas_price_factor,
+                eth_sender_config.sender.operator_commit_eth_addr,
+                PrivateKeySigner::new(eth_sender_config.sender.operator_private_key),
+                main_contract,
+                eth_client_config.chain_id,
+                eth_client_config.gas_price_factor,
             ))
         } else {
             let mut client = MultiplexerEthereumClient::new();
 
             let contract = zksync_contract();
-            for web3_url in config.eth_client.web3_url.iter() {
-                let transport = web3::transports::Http::new(web3_url).unwrap();
+            for web3_url in eth_client_config.web3_url.iter().cloned() {
+                let transport = web3::transports::Http::new(&web3_url).unwrap();
                 client.add_client(
-                    web3_url.clone(),
+                    web3_url,
                     ETHDirectClient::new(
                         transport,
                         contract.clone(),
-                        config.eth_sender.sender.operator_commit_eth_addr,
-                        PrivateKeySigner::new(config.eth_sender.sender.operator_private_key),
-                        config.contracts.contract_addr,
-                        config.eth_client.chain_id,
-                        config.eth_client.gas_price_factor,
+                        eth_sender_config.sender.operator_commit_eth_addr,
+                        PrivateKeySigner::new(eth_sender_config.sender.operator_private_key),
+                        main_contract,
+                        eth_client_config.chain_id,
+                        eth_client_config.gas_price_factor,
                     ),
                 );
             }
@@ -274,7 +278,7 @@ impl EthereumGateway {
 
     pub fn get_mock(&self) -> Option<&MockEthereum> {
         match self {
-            EthereumGateway::Mock(m) => Some(&m),
+            EthereumGateway::Mock(m) => Some(m),
             _ => None,
         }
     }

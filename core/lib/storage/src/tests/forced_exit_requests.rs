@@ -9,10 +9,10 @@ use crate::QueryResult;
 use crate::StorageProcessor;
 use chrono::{Duration, Timelike, Utc};
 use num::{BigUint, FromPrimitive};
-use zksync_basic_types::Address;
 use zksync_types::{
     forced_exit_requests::{ForcedExitRequest, SaveForcedExitRequestQuery},
     tx::TxHash,
+    Address,
 };
 
 use std::ops::Add;
