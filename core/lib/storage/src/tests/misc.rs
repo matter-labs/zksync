@@ -7,7 +7,7 @@ use crate::{QueryResult, StorageProcessor};
 use std::time::SystemTime;
 
 fn get_subsidy(name: String, value: u64) -> Subsidy {
-    // The only fields that matter are `subsidy_type` and value
+    // The only fields that matter are `subsidy_type` and `value`
     Subsidy {
         tx_hash: Default::default(),
         usd_amount_scaled: value,

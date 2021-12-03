@@ -136,11 +136,11 @@ impl RpcApp {
         ip: Option<String>,
     ) -> Result<TxHash> {
         let start = Instant::now();
-        let is_subsidized_ip = self.should_subsidie_cpk(ip);
+        let should_subsidie_cpk = self.should_subsidie_cpk(ip);
 
         let result = self
             .tx_sender
-            .submit_tx_with_separate_fp(*tx, *signature, fast_processing, is_subsidized_ip)
+            .submit_tx_with_separate_fp(*tx, *signature, fast_processing, should_subsidie_cpk)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.tx_submit", start.elapsed());
@@ -155,11 +155,11 @@ impl RpcApp {
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
 
-        let is_subsidized_ip = self.should_subsidie_cpk(ip);
+        let should_subsidie_cpk = self.should_subsidie_cpk(ip);
 
         let result: Result<Vec<TxHash>> = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signatures, is_subsidized_ip)
+            .submit_txs_batch(txs, eth_signatures, should_subsidie_cpk)
             .await
             .map_err(Error::from)
             .map(|response| {
@@ -259,15 +259,9 @@ impl RpcApp {
         let result =
             Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
-        let is_subsidized_ip = self.should_subsidie_cpk(ip);
+        let should_subsidie_cpk = self.should_subsidie_cpk(ip);
 
-        let can = self
-            .tx_sender
-            .can_subsidize(result.subsidy_size_usd.clone())
-            .await
-            .map_err(SubmitError::Internal)?;
-
-        let fee = if is_subsidized_ip
+        let fee = if should_subsidie_cpk
             && result.subsidized_fee.total_fee < result.normal_fee.total_fee
             && self
                 .tx_sender
@@ -315,9 +309,10 @@ impl RpcApp {
 
         let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
-        let is_subsidized_ip = self.should_subsidie_cpk(ip);
+        let should_subsidie_cpk = self.should_subsidie_cpk(ip);
 
-        let fee = if is_subsidized_ip
+        let fee = if should_subsidie_cpk
+            && result.subsidized_fee.total_fee < result.normal_fee.total_fee
             && self
                 .tx_sender
                 .can_subsidize(result.subsidy_size_usd)

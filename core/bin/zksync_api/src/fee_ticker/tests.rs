@@ -412,22 +412,6 @@ fn test_ticker_subsidy() {
     let create2_subsidy_price_usd =
         convert_to_usd(create2_subsidy_price.clone(), TokenLike::Id(TokenId(0)));
 
-    // let create2_subsidy_price_usd = get_subsidy_token_fee_in_usd(
-    //     &mut ticker,
-    //     cpk_create2(),
-    //     TokenId(0).into(),
-    //     Address::default(),
-    //     None,
-    //     None
-    // );
-    // let create2_token_price_usd = get_token_fee_in_usd(
-    //     &mut ticker,
-    //     cpk_create2(),
-    //     TokenId(0).into(),
-    //     Address::default(),
-    //     None,
-    //     None
-    // );
     // Due to precision-rounding, the price might differ, but it shouldn't by more than 1 cent
     assert!(
         SUBSIDY_CPK_PRICE_USD_SCALED - ratio_to_scaled_u64(create2_subsidy_price_usd.clone())
@@ -436,7 +420,7 @@ fn test_ticker_subsidy() {
     // Just to check that subsidy fee does not coincide with normal fee
     assert_ne!(create2_normal_price, create2_subsidy_price);
 
-    // ChangePubKey (ECDSA) is not subsidized
+    // ChangePubKey (Onchain) is not subsidized
     let (normal_cpk_onchain_price, subsidy_cpk_onchain_price) = get_normal_and_subsidy_fee(
         &mut ticker,
         cpk(ChangePubKeyType::ECDSA),
@@ -447,6 +431,7 @@ fn test_ticker_subsidy() {
     );
     assert_eq!(normal_cpk_onchain_price, subsidy_cpk_onchain_price);
 
+    // ChangePubKey (ECDSA) is not subsidized
     let (normal_cpk_ecdsa_price, subsidy_cpk_ecdsa_price) = get_normal_and_subsidy_fee(
         &mut ticker,
         cpk(ChangePubKeyType::Onchain),
@@ -498,7 +483,7 @@ fn test_ticker_subsidy() {
     assert!(diff_cents < TOLERARED_PRICE_DIFFERENCE_SCALED as u64);
 
     // The subsidy price is more-or-less same in all tokens
-    let mut prices: Vec<i64> = vec![];
+    let mut scaled_prices: Vec<i64> = vec![];
     let tokens: Vec<_> = TestToken::all_tokens().into_iter().take(3).collect();
 
     for token in tokens.clone().into_iter() {
@@ -510,32 +495,14 @@ fn test_ticker_subsidy() {
             None,
             None,
         );
-        let price_cents = ratio_to_u64(price_usd * BigUint::from(100u64)) as i64; // Converting to i64 to easier find differences
-        prices.push(price_cents);
+        let scaled_price = ratio_to_scaled_u64(price_usd * BigUint::from(100u64)) as i64; // Converting to i64 to easier find differences
+        scaled_prices.push(scaled_price);
     }
     for i in 0..=1 {
-        assert!((prices[i] - prices[i + 1]).abs() <= TOLERARED_PRICE_DIFFERENCE_SCALED);
+        assert!(
+            (scaled_prices[i] - scaled_prices[i + 1]).abs() <= TOLERARED_PRICE_DIFFERENCE_SCALED
+        );
     }
-
-    //    assert_eq!(abs(subsidy_batch_price_usd - normal_transfer_price + &create2_subsidy_price + &create2_subsidy_price);
-
-    // Even ChangePubKeys of other types are not subsidized
-    // let normal_cpk_ecdsa_price_usd = get_token_fee_in_usd(
-    //     &mut ticker,
-    //     TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::CREATE2)),
-    //     TokenId(0).into(),
-    //     Address::default(),
-    //     None,
-    //     None
-    // );
-    // let subsidy_cpk_ecdsa_price_usd = get_subsidy_token_fee_in_usd(
-    //     &mut ticker,
-    //     TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::CREATE2)),
-    //     TokenId(0).into(),
-    //     Address::default(),
-    //     None,
-    //     None
-    // );
 }
 
 #[test]

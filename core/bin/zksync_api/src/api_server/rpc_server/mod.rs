@@ -6,7 +6,6 @@ use std::{
 };
 
 // External uses
-use bytes::Bytes;
 use futures::{
     channel::{mpsc, oneshot},
     FutureExt, SinkExt, StreamExt,
@@ -42,6 +41,8 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+
+const CLOUDFLARE_CONNECTING_IP_HEADER: &str = "CF-Connecting-IP";
 
 #[derive(Clone)]
 pub struct RpcApp {
@@ -114,6 +115,7 @@ impl MethodWithIpDescription {
 }
 struct IpInsertMiddleWare {}
 
+// Appends `ip` as one of the call's parameters if needed
 fn get_call_with_ip_if_needed(
     call: jsonrpc_core::MethodCall,
     ip: String,
@@ -169,7 +171,6 @@ fn get_call_with_ip_if_needed(
 
 async fn insert_ip(body: hyper::Body, ip: String) -> hyper::Result<Vec<u8>> {
     let body_stream: Vec<_> = body.collect().await;
-
     let body_bytes: hyper::Result<Vec<_>> = body_stream.into_iter().collect();
 
     // The `?` is here to let Rust resolve body_bytes as a vector of Bytes structs
@@ -182,7 +183,7 @@ async fn insert_ip(body: hyper::Body, ip: String) -> hyper::Result<Vec<u8>> {
     let body_str = String::from_utf8(body_bytes.clone());
 
     if let Ok(s) = body_str {
-        let call: std::result::Result<jsonrpc_core::MethodCall, _> = serde_json::from_str(&s); //.map_err(|e| hyper::Error)
+        let call: std::result::Result<jsonrpc_core::MethodCall, _> = serde_json::from_str(&s);
         if let Ok(call) = call {
             let new_call = get_call_with_ip_if_needed(call, ip);
             let new_body_bytes = serde_json::to_string(&new_call);
@@ -516,11 +517,9 @@ pub fn start_rpc_server(
         let mut io = IoHandler::new();
         rpc_app.extend(&mut io);
 
-        let middleware = IpInsertMiddleWare {};
-
         let server = ServerBuilder::new(io)
             .threads(super::THREADS_PER_SERVER)
-            .request_middleware(middleware)
+            .request_middleware(IpInsertMiddleWare {})
             .start_http(&addr)
             .unwrap();
         server.wait();

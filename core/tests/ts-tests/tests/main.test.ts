@@ -94,7 +94,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
 
         const wallet1 = await tester.create2Wallet();
         await tester.testTransfer(alice, wallet1, token, TX_AMOUNT);
-        
         await tester.testSubsidyForCREATE2ChangePubKey(
             wallet1,
             token
@@ -535,7 +534,7 @@ if (process.env.TEST_TRANSPORT) {
     ];
 }
 
-for (const input of tokenAndTransport.slice(0, 1)) {
+for (const input of tokenAndTransport) {
     // @ts-ignore
     TestSuite(input.token, input.transport, input.providerType, input.onlyBasic);
 }

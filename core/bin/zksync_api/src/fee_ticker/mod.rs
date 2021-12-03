@@ -34,7 +34,7 @@ use zksync_types::{
     MintNFTOp, OutputFeeType, SwapOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp,
     TxFeeTypes, WithdrawNFTOp, WithdrawOp,
 };
-use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal, ratio_to_u64};
+use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 
 // Local deps
 use crate::fee_ticker::constants::AMORTIZED_COST_PER_CHUNK;
@@ -446,19 +446,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
 
-    // fn can_apply_subsidy(&self, subsidy_amount_usd_cents: Ratio<BigUint>) -> bool {
-    //     self.config.left_subsidy_usd_cents > subsidy_amount_usd_cents
-    // }
-
-    // async fn apply_subsidy(
-    //     &mut self,
-    //     subsidy_amount_usd_cents: Ratio<BigUint>,
-    // ) -> Result<(), anyhow::Error> {
-    //     self.config.left_subsidy_usd_cents -= subsidy_amount_usd_cents;
-
-    //     Ok(())
-    // }
-
     async fn get_fee_from_ticker_in_wei(
         &mut self,
         tx_type: TxFeeTypes,
@@ -478,14 +465,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
         let mut normal_gas_fee =
             (&wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone()) * &token_usd_risk;
-
-        /*
-
-        $/wei   * (gas) * (wei/gas) = dollars needed $
-
-        dollars needed * R / (dollars per token) = tokens needed * R
-
-        */
 
         // Increase fee only for L2 operations
         if matches!(
@@ -534,8 +513,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             return Ok(ResponseFee {
                 normal_fee,
                 subsidized_fee,
-                subsidy_size_usd, //subsidized_fee_usd_cents: biguint_to_u64(subsidized_fee_usd_cents.to_integer()),
-                                  //normal_fee_usd_cents: biguint_to_u64(normal_fee_usd_cents.to_integer())
+                subsidy_size_usd,
             });
         }
 

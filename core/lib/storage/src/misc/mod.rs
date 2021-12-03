@@ -32,8 +32,6 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
     pub async fn store_subsidy(&mut self, subsidy: Subsidy) -> QueryResult<()> {
         let start = Instant::now();
 
-        //let hash_ref: &[u8] = &();
-
         sqlx::query!(
             r#"
             INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )

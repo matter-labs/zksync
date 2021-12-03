@@ -45,7 +45,6 @@ jsonrpc-pubsub = "18.0.0"
 jsonrpc-ws-server = "18"
 jsonrpc-http-server = "18"
 hyper = { version = "0.14.14", features=["stream"] }
-bytes = { bytes = "1.1.0" }
 jsonrpc-derive = "18"
 qstring = "0.7.2"
 

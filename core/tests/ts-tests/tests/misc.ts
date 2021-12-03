@@ -315,18 +315,13 @@ Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wall
     // Check that the subsidized fee is returned when requested with appropriate headers
     const transactionFee = await transport.request(
         'get_tx_fee',
-        [
-            {
-                ChangePubKey: 'CREATE2'
-            },
-            ethers.constants.AddressZero,
-            token
-        ],
+        [{ ChangePubKey: 'CREATE2' }, ethers.constants.AddressZero, token],
         subsidyAxiosConfig()
     );
-    const totalFee = BigNumber.from(transactionFee.totalFee);
-    const totalFeeUSDScaled = totalFee.mul(scaledTokenPrice).div(unitsInOneToken);
-    expect(totalFeeUSDScaled.sub(subsidizedCpkPriceScaled).abs().lte(SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)).to.be.true;
+    const subsidyYotalFee = BigNumber.from(transactionFee.totalFee);
+    const subsidyTotalFeeUSDScaled = subsidyYotalFee.mul(scaledTokenPrice).div(unitsInOneToken);
+    expect(subsidyTotalFeeUSDScaled.sub(subsidizedCpkPriceScaled).abs().lte(SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)).to.be
+        .true;
 
     // However, without the necessary headers, the API should return the normal fee
     const normaltransactionFee = await transport.request('get_tx_fee', [
@@ -350,7 +345,7 @@ Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wall
     const create2data = (create2Wallet.ethSigner as Create2WalletSigner).create2WalletData;
     const cpkTx = await create2Wallet.getChangePubKey({
         feeToken: token,
-        fee: totalFee,
+        fee: subsidyYotalFee,
         nonce: 0,
         validFrom: 0,
         validUntil: MAX_TIMESTAMP,
@@ -365,7 +360,7 @@ Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wall
     const hash = await transport.request('tx_submit', [cpkTx, null], subsidyAxiosConfig());
     await new Transaction(cpkTx, hash, this.syncProvider).awaitReceipt();
 
-    this.runningFee = this.runningFee.add(totalFee);
+    this.runningFee = this.runningFee.add(subsidyYotalFee);
 };
 
 Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, token: TokenLike) {
@@ -395,20 +390,16 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
         ],
         subsidyAxiosConfig()
     );
-    const totalFee = BigNumber.from(subsidyFee.totalFee);
-    const totalFeeUSDScaled = totalFee.mul(scaledTokenPrice).div(unitsInOneToken);
+    const subsidyYotalFee = BigNumber.from(subsidyFee.totalFee);
+    const subsidyTotalFeeUSDScaled = subsidyYotalFee.mul(scaledTokenPrice).div(unitsInOneToken);
 
     const expectedBatchFeeUsdScaled = subsidizedCpkFeeUsdScaled.add(transferFeeUsdScaled);
-    expect(totalFeeUSDScaled.sub(expectedBatchFeeUsdScaled).abs().lte(SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)).to.be.true;
+    expect(subsidyTotalFeeUSDScaled.sub(expectedBatchFeeUsdScaled).abs().lte(SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)).to.be
+        .true;
 
     // However, without the necessary headers, the API should return the normal fee
     const normalFee = await transport.request('get_txs_batch_fee_in_wei', [
-        [
-            {
-                ChangePubKey: 'CREATE2'
-            },
-            'Transfer'
-        ],
+        [{ ChangePubKey: 'CREATE2' }, 'Transfer'],
         [create2Wallet.address(), create2Wallet.address()],
         token
     ]);
@@ -437,7 +428,7 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
     });
     const transferTx = await create2Wallet.getTransfer({
         token,
-        fee: totalFee,
+        fee: subsidyYotalFee,
         nonce: 1,
         validFrom: 0,
         validUntil: MAX_TIMESTAMP,
@@ -451,7 +442,7 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
 
     const hashes = await transport.request('submit_txs_batch', [txs, []], subsidyAxiosConfig());
     await new Transaction(txs[0].tx, hashes[0], this.syncProvider).awaitReceipt();
-    this.runningFee = this.runningFee.add(totalFee);
+    this.runningFee = this.runningFee.add(subsidyYotalFee);
 };
 
 export function serializeOldTransfer(transfer: Transfer): Uint8Array {

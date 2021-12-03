@@ -37,8 +37,7 @@ use zksync_types::{
     H160,
 };
 use zksync_utils::{
-    big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, ratio_to_u64,
-    scaled_big_decimal_to_ratio,
+    big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, scaled_big_decimal_to_ratio,
 };
 
 // Local uses
@@ -396,10 +395,10 @@ impl TxSender {
             .misc_schema()
             .get_total_used_subsidy_for_type(self.current_subsidy_type.clone())
             .await?;
-        let subsidized_already = scaled_big_decimal_to_ratio(subsidized_already)?;
+        let subsidized_already_usd = scaled_big_decimal_to_ratio(subsidized_already)?;
 
-        let result = if self.max_subsidy_usd > subsidized_already {
-            &self.max_subsidy_usd - subsidized_already >= new_subsidy_usd
+        let result = if self.max_subsidy_usd > subsidized_already_usd {
+            &self.max_subsidy_usd - subsidized_already_usd >= new_subsidy_usd
         } else {
             false
         };
@@ -425,7 +424,9 @@ impl TxSender {
         let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
 
         if full_cost_usd < subsidized_cost_usd {
-            panic!("Trying to subsidize transaction which should not be subsidized");
+            return Err(anyhow::Error::msg(
+                "Trying to subsidize transaction which should not be subsidized",
+            ));
         }
 
         let subsidy = Subsidy {
@@ -482,8 +483,7 @@ impl TxSender {
         let sign_verify_channel = self.sign_verify_requests.clone();
         let ticker_request_sender = self.ticker_requests.clone();
 
-        let mut fee_data: Option<ResponseFee> = None;
-        let mut subsidized = false;
+        let mut fee_data_for_subsidy: Option<ResponseFee> = None;
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
             let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
@@ -500,17 +500,15 @@ impl TxSender {
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
 
-            fee_data = Some(required_fee_data.clone());
-
             let required_fee_data = if should_subsidie_cpk
+                && required_fee_data.subsidized_fee.total_fee
+                    < required_fee_data.normal_fee.total_fee
                 && self
                     .can_subsidize(required_fee_data.subsidy_size_usd.clone())
                     .await
                     .map_err(SubmitError::Internal)?
-                && required_fee_data.subsidized_fee.total_fee
-                    < required_fee_data.normal_fee.total_fee
             {
-                subsidized = true;
+                fee_data_for_subsidy = Some(required_fee_data.clone());
                 required_fee_data.subsidized_fee
             } else {
                 required_fee_data.normal_fee
@@ -561,10 +559,8 @@ impl TxSender {
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
 
-        if subsidized {
-            // `subsidized` is set to true only if we calculated the fee
-            let fee_data = fee_data.unwrap();
-
+        // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
+        if let Some(fee_data_for_subsidy) = fee_data_for_subsidy {
             // The following two bad scenarios are possible when applying subsidy for the tx:
             // - The subsidy is stored, but the tx is then rejected by the state keeper
             // - The tx is accepted by the state keeper, but the the `store_subsidy_data` returns an error for some reason
@@ -573,8 +569,8 @@ impl TxSender {
             // which is not worth it for subsidies (we prefer stability here)
             self.store_subsidy_data(
                 tx.hash(),
-                fee_data.normal_fee.total_fee,
-                fee_data.subsidized_fee.total_fee,
+                fee_data_for_subsidy.normal_fee.total_fee,
+                fee_data_for_subsidy.subsidized_fee.total_fee,
                 token.id,
             )
             .await
@@ -675,8 +671,7 @@ impl TxSender {
             }
         }
 
-        let mut subsidized = false;
-        let mut fee_data: Option<ResponseBatchFee> = None;
+        let mut fee_data_for_subsidy: Option<ResponseBatchFee> = None;
 
         // Only one token in batch
         if token_fees.len() == 1 {
@@ -695,8 +690,7 @@ impl TxSender {
                     .map_err(SubmitError::Internal)?
                 && batch_token_fee.subsidized_fee.total_fee < batch_token_fee.normal_fee.total_fee
             {
-                subsidized = true;
-                fee_data = Some(batch_token_fee.clone());
+                fee_data_for_subsidy = Some(batch_token_fee.clone());
                 batch_token_fee.subsidized_fee.total_fee
             } else {
                 batch_token_fee.normal_fee.total_fee
@@ -725,14 +719,13 @@ impl TxSender {
             .await?;
 
             let required_fee = if should_subsidie_cpk
+                && required_eth_fee.subsidized_fee.total_fee < required_eth_fee.normal_fee.total_fee
                 && self
                     .can_subsidize(required_eth_fee.subsidy_size_usd.clone())
                     .await
                     .map_err(SubmitError::Internal)?
-                && required_eth_fee.subsidized_fee.total_fee < required_eth_fee.normal_fee.total_fee
             {
-                subsidized = true;
-                fee_data = Some(required_eth_fee.clone());
+                fee_data_for_subsidy = Some(required_eth_fee.clone());
                 required_eth_fee.subsidized_fee.total_fee
             } else {
                 required_eth_fee.normal_fee.total_fee
@@ -844,10 +837,8 @@ impl TxSender {
 
         let batch_hash = TxHash::batch_hash(&tx_hashes);
 
-        if subsidized {
-            // `subsidized` is set to true only if we calculated the fee
-            let fee_data = fee_data.unwrap();
-
+        // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
+        if let Some(fee_data) = fee_data_for_subsidy {
             let subsidy_token_id = if token_fees_ids.len() > 1 {
                 TokenId(0) // eth
             } else {
