@@ -92,11 +92,18 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
             return;
         }
 
-        const wallet = await tester.create2Wallet();
-        await tester.testTransfer(alice, wallet, token, TX_AMOUNT);
+        const wallet1 = await tester.create2Wallet();
+        await tester.testTransfer(alice, wallet1, token, TX_AMOUNT);
         
         await tester.testSubsidyForCREATE2ChangePubKey(
-            wallet,
+            wallet1,
+            token
+        );
+
+        const wallet2 = await tester.create2Wallet();
+        await tester.testTransfer(alice, wallet2, token, TX_AMOUNT);
+        await tester.testSubsidyForBatch(
+            wallet2,
             token
         );
     });
