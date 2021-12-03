@@ -1,10 +1,11 @@
-import { Tester } from './tester';
+import { expectThrow, Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, Create2WalletSigner } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
 import { MAX_TIMESTAMP } from 'zksync/build/utils';
+import { Transaction } from 'zksync';
 import { Transfer, Withdraw } from 'zksync/build/types';
 import {
     serializeAccountId,
@@ -285,7 +286,12 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     this.runningFee = this.runningFee.add(totalFee);
 };
 
-// This function is needed to emulate the CF-Connecting-IP header being set by the 
+// Unfortunately due to different rounds and precix sion lost
+// the price might differ from the expected one
+const SUBSIDY_ACCEPTED_SCALED_DIFFERENCE = 100; // 0.0001 USD
+const SUBSIDY_SCALE = 1000000;
+
+// This function is needed to emulate the CF-Connecting-IP header being set by the
 // Cloudflare Proxy. In production, this header is set by Cloudflare Proxy and can not be manually
 // set by the client.
 const subsidyAxiosConfig = () => {
@@ -297,18 +303,14 @@ const subsidyAxiosConfig = () => {
         }
     };
     return config;
-}
+};
 
 Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wallet: Wallet, token: TokenLike) {
-    // Unfortunately due to different rounds and precision lost
-    // the price might differ from the expected one
-    const ACCEPTED_SCALED_DIFFERENCE = 10; // 10^-5 USD
-
     const subsidizedCpkPriceScaled = BigNumber.from(process.env.FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED)!;
 
     const transport = new HTTPTransport('http://127.0.0.1:3030');
-    const weiInEth = BigNumber.from(10).pow(18);
-    const scaledTokenPrice = BigNumber.from(Math.round(1000000 * (await this.syncProvider.getTokenPrice(token))));
+    const unitsInOneToken = BigNumber.from(10).pow(this.syncProvider.tokenSet.resolveTokenDecimals(token));
+    const scaledTokenPrice = BigNumber.from(Math.round(SUBSIDY_SCALE * (await this.syncProvider.getTokenPrice(token))));
 
     // Check that the subsidized fee is returned when requested with appropriate headers
     const transactionFee = await transport.request(
@@ -323,26 +325,25 @@ Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wall
         subsidyAxiosConfig()
     );
     const totalFee = BigNumber.from(transactionFee.totalFee);
-    const totalFeeUSDScaled = totalFee.mul(scaledTokenPrice).div(weiInEth);
-    expect(totalFeeUSDScaled.sub(subsidizedCpkPriceScaled).abs().lte(ACCEPTED_SCALED_DIFFERENCE)).to.be.true;
+    const totalFeeUSDScaled = totalFee.mul(scaledTokenPrice).div(unitsInOneToken);
+    expect(totalFeeUSDScaled.sub(subsidizedCpkPriceScaled).abs().lte(SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)).to.be.true;
 
     // However, without the necessary headers, the API should return the normal fee
     const normaltransactionFee = await transport.request('get_tx_fee', [
-        {
-            ChangePubKey: 'CREATE2'
-        },
+        { ChangePubKey: 'CREATE2' },
         ethers.constants.AddressZero,
         token
     ]);
-    const normalTotalFee = BigNumber.from(normaltransactionFee.totalFee);
-    const normalTotalFeeUSDScaled = normalTotalFee.mul(scaledTokenPrice).div(weiInEth);
+    const normalTotalFeeUSDScaled = BigNumber.from(normaltransactionFee.totalFee)
+        .mul(scaledTokenPrice)
+        .div(unitsInOneToken);
 
     // The difference is huge (at least 5x times tolerated difference)
     expect(
         normalTotalFeeUSDScaled
             .sub(subsidizedCpkPriceScaled)
             .abs()
-            .gte(5 * ACCEPTED_SCALED_DIFFERENCE)
+            .gte(5 * SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)
     ).to.be.true;
 
     // Now we submit the CREATE2 ChangePubKey
@@ -358,34 +359,28 @@ Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wall
             ...create2data
         }
     });
-    let failed = false;
-    try {
-        await transport.request('tx_submit', [cpkTx, null]);
-    } catch (e) {
-        failed = true;
-    }
-    expect(failed).to.be.true;
+    await expect(transport.request('tx_submit', [cpkTx, null])).to.be.rejected;
 
     // The transaction is submitted successfully
-    await transport.request('tx_submit', [cpkTx, null], subsidyAxiosConfig());
+    const hash = await transport.request('tx_submit', [cpkTx, null], subsidyAxiosConfig());
+    await new Transaction(cpkTx, hash, this.syncProvider).awaitReceipt();
+
+    this.runningFee = this.runningFee.add(totalFee);
 };
 
 Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, token: TokenLike) {
-    // Unfortunately due to different rounds and precision lost
-    // the price might differ from the expected one
-    const ACCEPTED_SCALED_DIFFERENCE = 10; // 10^-5 USD
-
-    const subsidizedCpkPriceScaled = BigNumber.from(process.env.FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED)!;
+    const subsidizedCpkFeeUsdScaled = BigNumber.from(process.env.FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED)!;
 
     const transport = new HTTPTransport('http://127.0.0.1:3030');
-    const weiInEth = BigNumber.from(10).pow(18);
-    const scaledTokenPrice = BigNumber.from(Math.round(1000000 * (await this.syncProvider.getTokenPrice(token))));
+    const unitsInOneToken = BigNumber.from(10).pow(this.syncProvider.tokenSet.resolveTokenDecimals(token));
+    const tokenPrice = await this.syncProvider.getTokenPrice(token);
+    const scaledTokenPrice = BigNumber.from(Math.round(SUBSIDY_SCALE * tokenPrice));
+
+    const transferFee = (await this.syncProvider.getTransactionFee('Transfer', create2Wallet.address(), token))
+        .totalFee;
+    const transferFeeUsdScaled = transferFee.mul(scaledTokenPrice).div(unitsInOneToken);
 
     // Check that the subsidized fee is returned when requested with appropriate headers
-
-    const transferFee = (await this.syncProvider.getTransactionFee('Transfer', create2Wallet.address(), token)).totalFee;
-    const transferFeeUsdScaled = transferFee.mul(scaledTokenPrice).div(weiInEth);
-
     const subsidyFee = await transport.request(
         'get_txs_batch_fee_in_wei',
         [
@@ -395,17 +390,16 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
                 },
                 'Transfer'
             ],
-            [
-                create2Wallet.address(),
-                create2Wallet.address(),
-            ],
-            token,
+            [create2Wallet.address(), create2Wallet.address()],
+            token
         ],
         subsidyAxiosConfig()
     );
     const totalFee = BigNumber.from(subsidyFee.totalFee);
-    const totalFeeUSDScaled = totalFee.mul(scaledTokenPrice).div(weiInEth);
-    expect(totalFeeUSDScaled.sub(subsidizedCpkPriceScaled).sub(transferFeeUsdScaled).abs().lte(ACCEPTED_SCALED_DIFFERENCE)).to.be.true;
+    const totalFeeUSDScaled = totalFee.mul(scaledTokenPrice).div(unitsInOneToken);
+
+    const expectedBatchFeeUsdScaled = subsidizedCpkFeeUsdScaled.add(transferFeeUsdScaled);
+    expect(totalFeeUSDScaled.sub(expectedBatchFeeUsdScaled).abs().lte(SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)).to.be.true;
 
     // However, without the necessary headers, the API should return the normal fee
     const normalFee = await transport.request('get_txs_batch_fee_in_wei', [
@@ -415,24 +409,20 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
             },
             'Transfer'
         ],
-        [
-            create2Wallet.address(),
-            create2Wallet.address(),
-        ],
-        token,
+        [create2Wallet.address(), create2Wallet.address()],
+        token
     ]);
     const normalTotalFee = BigNumber.from(normalFee.totalFee);
-    const normalTotalFeeUSDScaled = normalTotalFee.mul(scaledTokenPrice).div(weiInEth);
+    const normalTotalFeeUSDScaled = normalTotalFee.mul(scaledTokenPrice).div(unitsInOneToken);
 
     // The difference is huge (at least 5x times tolerated difference)
     expect(
         normalTotalFeeUSDScaled
-            .sub(subsidizedCpkPriceScaled)
+            .sub(subsidizedCpkFeeUsdScaled)
             .abs()
-            .gte(5 * ACCEPTED_SCALED_DIFFERENCE)
+            .gte(5 * SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)
     ).to.be.true;
 
-    // Now we submit the CREATE2 ChangePubKey
     const create2data = (create2Wallet.ethSigner as Create2WalletSigner).create2WalletData;
     const cpkTx = await create2Wallet.getChangePubKey({
         feeToken: token,
@@ -448,23 +438,20 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
     const transferTx = await create2Wallet.getTransfer({
         token,
         fee: totalFee,
-        nonce: 0,
+        nonce: 1,
         validFrom: 0,
         validUntil: MAX_TIMESTAMP,
         amount: BigNumber.from('1'),
-        to: create2Wallet.address(),    
+        to: create2Wallet.address()
     });
     const txs = [{ tx: cpkTx }, { tx: transferTx }];
-    
-    let failed = false;
-    try {
-        await transport.request('submit_txs_batch', [txs, []]);
-    } catch (e) {
-        failed = true;
-    }
-    expect(failed).to.be.true;
 
-    await transport.request('submit_txs_batch', [txs, []], subsidyAxiosConfig());
+    await expect(transport.request('submit_txs_batch', [txs, []]), 'Submitted transaction with the wrong fee').to.be
+        .rejected;
+
+    const hashes = await transport.request('submit_txs_batch', [txs, []], subsidyAxiosConfig());
+    await new Transaction(txs[0].tx, hashes[0], this.syncProvider).awaitReceipt();
+    this.runningFee = this.runningFee.add(totalFee);
 };
 
 export function serializeOldTransfer(transfer: Transfer): Uint8Array {

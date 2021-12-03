@@ -183,14 +183,10 @@ async fn insert_ip(body: hyper::Body, ip: String) -> hyper::Result<Vec<u8>> {
 
     if let Ok(s) = body_str {
         let call: std::result::Result<jsonrpc_core::MethodCall, _> = serde_json::from_str(&s); //.map_err(|e| hyper::Error)
-
-        dbg!(s);
-
         if let Ok(call) = call {
             let new_call = get_call_with_ip_if_needed(call, ip);
             let new_body_bytes = serde_json::to_string(&new_call);
             if let Ok(s) = new_body_bytes {
-                dbg!(s.clone());
                 body_bytes = s.as_bytes().to_owned();
             }
         };
@@ -204,7 +200,6 @@ impl RequestMiddleware for IpInsertMiddleWare {
         let (parts, body) = request.into_parts();
         let cloudflare_sent_ip = "CF-Connecting-IP";
 
-        // DONT MERGE IF THE FOLLOWING IS STILL COMMENTED OUT
         let remote_ip = match parts.headers.get(cloudflare_sent_ip) {
             Some(ip) => ip.to_str(),
             None => {
@@ -223,8 +218,6 @@ impl RequestMiddleware for IpInsertMiddleWare {
         } else {
             remote_ip.unwrap()
         };
-        dbg!(remote_ip.clone());
-        //let remote_ip = "localhost";
 
         let body_bytes = insert_ip(body, remote_ip.to_owned()).into_stream();
         let body = hyper::Body::wrap_stream(body_bytes);

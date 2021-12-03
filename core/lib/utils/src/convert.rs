@@ -49,14 +49,22 @@ pub fn ratio_to_u64(num: Ratio<BigUint>) -> u64 {
 const SUBSIDY_USD_AMOUNTS_SCALE: u64 = 1_000_000;
 
 pub fn ratio_to_scaled_u64(num: Ratio<BigUint>) -> u64 {
-    let ten_pow = BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE);
-    let scaled_num = num * ten_pow;
+    let scale = BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE);
+    let scaled_num = num * scale;
 
     ratio_to_u64(scaled_num)
 }
 
 pub fn scaled_u64_to_ratio(num: u64) -> Ratio<BigUint> {
     Ratio::from(BigUint::from(num)) / BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE)
+}
+
+pub fn scaled_big_decimal_to_ratio(num: BigDecimal) -> Result<Ratio<BigUint>, anyhow::Error> {
+    let scale = BigDecimal::from(SUBSIDY_USD_AMOUNTS_SCALE);
+
+    let unscaled = num / scale;
+
+    big_decimal_to_ratio(&unscaled)
 }
 
 #[cfg(test)]

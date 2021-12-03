@@ -136,12 +136,6 @@ impl RpcApp {
         ip: Option<String>,
     ) -> Result<TxHash> {
         let start = Instant::now();
-
-        if let Some(ip) = ip.clone() {
-            dbg!("IPPPPPPPPPPPPPPP");
-            dbg!(ip);
-        }
-
         let is_subsidized_ip = self.should_subsidie_cpk(ip);
 
         let result = self
@@ -255,7 +249,6 @@ impl RpcApp {
         token: TokenLike,
         ip: Option<String>,
     ) -> Result<Fee> {
-        dbg!(ip.clone());
         let start = Instant::now();
         let ticker = self.tx_sender.ticker_requests.clone();
         let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
@@ -273,7 +266,6 @@ impl RpcApp {
             .can_subsidize(result.subsidy_size_usd.clone())
             .await
             .map_err(SubmitError::Internal)?;
-        dbg!(can);
 
         let fee = if is_subsidized_ip
             && result.subsidized_fee.total_fee < result.normal_fee.total_fee
@@ -283,13 +275,10 @@ impl RpcApp {
                 .await
                 .map_err(SubmitError::Internal)?
         {
-            dbg!("YES!!!");
             result.subsidized_fee
         } else {
             result.normal_fee
         };
-
-        dbg!(is_subsidized_ip);
 
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
         Ok(fee)

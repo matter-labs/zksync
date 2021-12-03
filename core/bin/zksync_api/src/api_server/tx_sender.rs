@@ -38,6 +38,7 @@ use zksync_types::{
 };
 use zksync_utils::{
     big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, ratio_to_u64,
+    scaled_big_decimal_to_ratio,
 };
 
 // Local uses
@@ -395,9 +396,7 @@ impl TxSender {
             .misc_schema()
             .get_total_used_subsidy_for_type(self.current_subsidy_type.clone())
             .await?;
-        let subsidized_already = big_decimal_to_ratio(&subsidized_already)?;
-
-        //dbg!(subsidized_already.clone());
+        let subsidized_already = scaled_big_decimal_to_ratio(subsidized_already)?;
 
         let result = if self.max_subsidy_usd > subsidized_already {
             &self.max_subsidy_usd - subsidized_already >= new_subsidy_usd

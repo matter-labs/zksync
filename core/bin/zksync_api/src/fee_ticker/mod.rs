@@ -258,23 +258,6 @@ const CPK_CREATE2_FEE_TYPE: OutputFeeType = OutputFeeType::ChangePubKey(
     ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::CREATE2),
 );
 
-// async fn get_left_subsidy_usd_cents(
-//     config: &ZkSyncConfig,
-//     db_pool: &ConnectionPool,
-// ) -> Result<Ratio<BigUint>> {
-//     let max_subsidy = config.ticker.max_subsidy_usd_cents;
-//     let subsidy_name = config.ticker.subsidy_name.clone();
-
-//     let get_used_subsidy = db_pool
-//         .access_storage()
-//         .await?
-//         .misc_schema()
-//         .get_total_used_subsidy_for_type(subsidy_name)
-//         .await?;
-
-//     big_decimal_to_ratio(&get_used_subsidy)
-// }
-
 #[must_use]
 pub fn run_ticker_task(
     db_pool: ConnectionPool,
@@ -532,13 +515,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             // It is safe to do unwrap in the next two lines, because token being acceptable for fees
             // assumes that the token's price is > 0
             let token_price = big_decimal_to_ratio(&token_price).unwrap();
-            // dbg!("ABA");
-            // dbg!(subsidized_fee_usd.clone());
-            // dbg!(token_price.clone());
-            // dbg!("CABA");
             let full_amount = subsidized_fee_usd.checked_div(&token_price).unwrap();
-            // dbg!(full_amount.clone());
-            // dbg!(full_amount.clone() * token_price.clone());
 
             let subsidized_fee = Fee::new(
                 fee_type,
