@@ -6,15 +6,13 @@ use crate::{
     eth_watch::start_eth_watch,
     mempool::run_mempool_tasks,
     private_api::start_private_core_api,
-    rejected_tx_cleaner::run_rejected_tx_cleaner,
     state_keeper::{start_state_keeper, ZkSyncStateKeeper},
     token_handler::run_token_handler,
 };
 use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ChainConfig, ZkSyncConfig};
 use zksync_eth_client::EthereumGateway;
-use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_storage::ConnectionPool;
 use zksync_types::{tokens::get_genesis_token_list, Token, TokenId, TokenKind};
 
@@ -51,17 +49,14 @@ pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
 }
 
 /// Inserts the initial information about zkSync tokens into the database.
-pub async fn genesis_init(config: &ZkSyncConfig) {
+pub async fn genesis_init(config: &ChainConfig) {
     let pool = ConnectionPool::new(Some(1));
 
     vlog::info!("Generating genesis block.");
-    ZkSyncStateKeeper::create_genesis_block(
-        pool.clone(),
-        &config.chain.state_keeper.fee_account_addr,
-    )
-    .await;
+    ZkSyncStateKeeper::create_genesis_block(pool.clone(), &config.state_keeper.fee_account_addr)
+        .await;
     vlog::info!("Adding initial tokens to db");
-    let genesis_tokens = get_genesis_token_list(&config.chain.eth.network.to_string())
+    let genesis_tokens = get_genesis_token_list(&config.eth.network.to_string())
         .expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
         vlog::info!(
@@ -97,9 +92,8 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
 /// - private Core API server.
 pub async fn run_core(
     connection_pool: ConnectionPool,
-    panic_notify: mpsc::Sender<bool>,
-    eth_gateway: EthereumGateway,
     config: &ZkSyncConfig,
+    eth_gateway: EthereumGateway,
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let (proposed_blocks_sender, proposed_blocks_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
@@ -119,7 +113,8 @@ pub async fn run_core(
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
         eth_gateway.clone(),
-        config,
+        &config.contracts,
+        &config.eth_watch,
     );
 
     // Insert pending withdrawals into database (if required)
@@ -148,7 +143,7 @@ pub async fn run_core(
         proposed_blocks_receiver,
         mempool_block_request_sender.clone(),
         connection_pool.clone(),
-        config,
+        config.chain.clone(),
     );
 
     // Start mempool.
@@ -157,28 +152,24 @@ pub async fn run_core(
         mempool_tx_request_receiver,
         mempool_block_request_receiver,
         eth_watch_req_sender.clone(),
-        config,
         4,
         DEFAULT_CHANNEL_CAPACITY,
+        config.chain.state_keeper.block_chunk_sizes.clone(),
     );
-
-    let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), config);
 
     // Start token handler.
     let token_handler_task = run_token_handler(
         connection_pool.clone(),
         eth_watch_req_sender.clone(),
-        config,
+        &config.token_handler,
     );
 
     // Start token handler.
     let register_factory_task = run_register_factory_handler(
         connection_pool.clone(),
         eth_watch_req_sender.clone(),
-        config,
+        config.token_handler.clone(),
     );
-    // Start rejected transactions cleaner task.
-    let rejected_tx_cleaner_task = run_rejected_tx_cleaner(config, connection_pool.clone());
 
     let tx_event_emitter_task = tx_event_emitter::run_tx_event_emitter_task(
         connection_pool.clone(),
@@ -193,28 +184,23 @@ pub async fn run_core(
     );
 
     // Start private API.
-    start_private_core_api(
-        panic_notify.clone(),
+    let private_api_task = start_private_core_api(
         mempool_tx_request_sender,
         eth_watch_req_sender,
         config.api.private.clone(),
     );
 
-    let mut task_futures = vec![
+    let task_futures = vec![
         eth_watch_task,
         state_keeper_task,
         committer_task,
         mempool_task,
         proposer_task,
-        rejected_tx_cleaner_task,
         token_handler_task,
         register_factory_task,
         tx_event_emitter_task,
+        private_api_task,
     ];
-
-    if let Some(task) = gateway_watcher_task_opt {
-        task_futures.push(task);
-    }
 
     Ok(task_futures)
 }

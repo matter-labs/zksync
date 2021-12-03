@@ -91,7 +91,7 @@ fn rescue_hash_fr(input: Vec<bool>) -> Fr {
 
 fn rescue_hash_elements(input: &[Fr]) -> Fr {
     RESCUE_PARAMS.with(|params| {
-        let sponge_output = rescue_hash::<Engine>(params, &input);
+        let sponge_output = rescue_hash::<Engine>(params, input);
         assert_eq!(sponge_output.len(), 1, "rescue hash problem");
         sponge_output[0]
     })

@@ -7,7 +7,7 @@ use tokio::{task::JoinHandle, time};
 use tokio_stream::wrappers::IntervalStream;
 use web3::types::{Block, BlockId, BlockNumber, H256, U64};
 
-use zksync_config::ZkSyncConfig;
+use zksync_config::GatewayWatcherConfig;
 use zksync_eth_client::{EthereumGateway, MultiplexerEthereumClient};
 use zksync_utils::retry_opt;
 
@@ -209,15 +209,15 @@ impl MultiplexedGatewayWatcher {
 #[must_use]
 pub fn run_multiplexed_gateway_watcher(
     eth_gateway: EthereumGateway,
-    config: &ZkSyncConfig,
+    config: &GatewayWatcherConfig,
 ) -> JoinHandle<()> {
     let gateway_watcher = MultiplexedGatewayWatcher::new(
         eth_gateway,
-        config.gateway_watcher.check_interval(),
-        config.gateway_watcher.retry_delay(),
-        config.gateway_watcher.request_timeout(),
-        Some(config.gateway_watcher.request_per_task_limit()),
-        Some(config.gateway_watcher.task_limit()),
+        config.check_interval(),
+        config.retry_delay(),
+        config.request_timeout(),
+        Some(config.request_per_task_limit()),
+        Some(config.task_limit()),
     );
 
     tokio::spawn(gateway_watcher.run())
@@ -227,7 +227,7 @@ pub fn run_multiplexed_gateway_watcher(
 #[must_use]
 pub fn run_gateway_watcher_if_multiplexed(
     eth_gateway: EthereumGateway,
-    config: &ZkSyncConfig,
+    config: &GatewayWatcherConfig,
 ) -> Option<JoinHandle<()>> {
     if eth_gateway.is_multiplexed() {
         Some(run_multiplexed_gateway_watcher(eth_gateway, config))
