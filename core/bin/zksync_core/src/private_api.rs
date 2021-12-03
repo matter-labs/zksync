@@ -82,21 +82,22 @@ async fn unconfirmed_deposits(
     data: web::Data<AppState>,
     address: web::Path<Address>,
 ) -> actix_web::Result<HttpResponse> {
-    let (sender, receiver) = oneshot::channel();
-    let item = EthWatchRequest::GetUnconfirmedDeposits {
-        address: *address,
-        resp: sender,
-    };
-    let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender.send(item).await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    let response = receiver.await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    Ok(HttpResponse::Ok().json(response))
+    todo!()
+    // let (sender, receiver) = oneshot::channel();
+    // let item = EthWatchRequest::GetUnconfirmedDeposits {
+    //     address: *address,
+    //     resp: sender,
+    // };
+    // let mut eth_watch_sender = data.eth_watch_req_sender.clone();
+    // eth_watch_sender.send(item).await.map_err(|err| {
+    //     InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    // })?;
+    //
+    // let response = receiver.await.map_err(|err| {
+    //     InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    // })?;
+    //
+    // Ok(HttpResponse::Ok().json(response))
 }
 
 #[derive(Debug, Deserialize)]
@@ -118,34 +119,35 @@ async fn unconfirmed_ops(
     data: web::Data<AppState>,
     web::Query(params): web::Query<PendingOpsFlattenRequest>,
 ) -> actix_web::Result<HttpResponse> {
-    let (sender, receiver) = oneshot::channel();
-    // Serializing enum query parameters doesn't work, so parse it separately.
-    let serial_id = ApiEither::from_str(&params.serial_id).map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-    let query = PaginationQuery {
-        from: PendingOpsRequest {
-            address: params.address,
-            account_id: params.account_id,
-            serial_id,
-        },
-        limit: params.limit,
-        direction: params.direction,
-    };
-    let item = EthWatchRequest::GetUnconfirmedOps {
-        query,
-        resp: sender,
-    };
-    let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender.send(item).await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    let response = receiver.await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    Ok(HttpResponse::Ok().json(response))
+    todo!()
+    // let (sender, receiver) = oneshot::channel();
+    // // Serializing enum query parameters doesn't work, so parse it separately.
+    // let serial_id = ApiEither::from_str(&params.serial_id).map_err(|err| {
+    //     InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    // })?;
+    // let query = PaginationQuery {
+    //     from: PendingOpsRequest {
+    //         address: params.address,
+    //         account_id: params.account_id,
+    //         serial_id,
+    //     },
+    //     limit: params.limit,
+    //     direction: params.direction,
+    // };
+    // let item = EthWatchRequest::GetUnconfirmedOps {
+    //     query,
+    //     resp: sender,
+    // };
+    // let mut eth_watch_sender = data.eth_watch_req_sender.clone();
+    // eth_watch_sender.send(item).await.map_err(|err| {
+    //     InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    // })?;
+    //
+    // let response = receiver.await.map_err(|err| {
+    //     InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    // })?;
+    //
+    // Ok(HttpResponse::Ok().json(response))
 }
 
 /// Returns information about unconfirmed operation.
@@ -154,30 +156,31 @@ async fn unconfirmed_op(
     data: web::Data<AppState>,
     web::Json(query): web::Json<PriorityOpLookupQuery>,
 ) -> actix_web::Result<HttpResponse> {
-    let (sender, receiver) = oneshot::channel();
-    let item = match query {
-        PriorityOpLookupQuery::ByEthHash(eth_hash) => EthWatchRequest::GetUnconfirmedOpByEthHash {
-            eth_hash,
-            resp: sender,
-        },
-        PriorityOpLookupQuery::BySyncHash(tx_hash) => EthWatchRequest::GetUnconfirmedOpByTxHash {
-            tx_hash,
-            resp: sender,
-        },
-        PriorityOpLookupQuery::ByAnyHash(hash) => {
-            EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp: sender }
-        }
-    };
-    let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender.send(item).await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    let response = receiver.await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    Ok(HttpResponse::Ok().json(response))
+    todo!()
+    // let (sender, receiver) = oneshot::channel();
+    // let item = match query {
+    // PriorityOpLookupQuery::ByEthHash(eth_hash) => EthWatchRequest::GetUnconfirmedOpByEthHash {
+    //     eth_hash,
+    //     resp: sender,
+    // },
+    // PriorityOpLookupQuery::BySyncHash(tx_hash) => EthWatchRequest::GetUnconfirmedOpByTxHash {
+    //     tx_hash,
+    //     resp: sender,
+    // },
+    // PriorityOpLookupQuery::ByAnyHash(hash) => {
+    //     EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp: sender }
+    // }
+    // };
+    // let mut eth_watch_sender = data.eth_watch_req_sender.clone();
+    // eth_watch_sender.send(item).await.map_err(|err| {
+    //     InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    // })?;
+    //
+    // let response = receiver.await.map_err(|err| {
+    //     InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+    // })?;
+    //
+    // Ok(HttpResponse::Ok().json(response))
 }
 
 #[allow(clippy::too_many_arguments)]

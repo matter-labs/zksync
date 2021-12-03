@@ -160,8 +160,9 @@ pub async fn run_core(
     // Start token handler.
     let token_handler_task = run_token_handler(
         connection_pool.clone(),
-        eth_watch_req_sender.clone(),
+        eth_gateway.clone(),
         &config.token_handler,
+        eth_watch_req_sender.clone(),
     );
 
     // Start token handler.

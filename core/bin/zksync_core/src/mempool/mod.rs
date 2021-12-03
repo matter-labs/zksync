@@ -275,26 +275,27 @@ impl MempoolBlocksHandler {
         // First, fill the block with missing priority operations.
         // Unlike transactions, they are requested from the Eth watch.
         while next_serial_id < reverted_tx.next_priority_op_id {
-            let (sender, receiver) = oneshot::channel();
-            self.eth_watch_req
-                .send(EthWatchRequest::GetPriorityOpBySerialId {
-                    serial_id: next_serial_id,
-                    resp: sender,
-                })
-                .await
-                .expect("Eth watch requests receiver is dropped");
-            let priority_op = receiver
-                .await
-                .expect("Failed to receive priority operation from Eth watch")
-                .expect("Operation not found in the priority queue");
-            // If the operation doesn't fit, return the proposed block.
-            if priority_op.data.chunks() <= chunks_left {
-                chunks_left -= priority_op.data.chunks();
-                proposed_block.priority_ops.push(priority_op);
-                next_serial_id += 1;
-            } else {
-                return (chunks_left, proposed_block);
-            }
+            todo!()
+            // let (sender, receiver) = oneshot::channel();
+            // self.eth_watch_req
+            //     .send(EthWatchRequest::GetPriorityOpBySerialId {
+            //         serial_id: next_serial_id,
+            //         resp: sender,
+            //     })
+            //     .await
+            //     .expect("Eth watch requests receiver is dropped");
+            // let priority_op = receiver
+            //     .await
+            //     .expect("Failed to receive priority operation from Eth watch")
+            //     .expect("Operation not found in the priority queue");
+            // // If the operation doesn't fit, return the proposed block.
+            // if priority_op.data.chunks() <= chunks_left {
+            //     chunks_left -= priority_op.data.chunks();
+            //     proposed_block.priority_ops.push(priority_op);
+            //     next_serial_id += 1;
+            // } else {
+            //     return (chunks_left, proposed_block);
+            // }
         }
 
         while let Some(reverted_tx) = mempool_state.transactions_queue.reverted_queue_front() {

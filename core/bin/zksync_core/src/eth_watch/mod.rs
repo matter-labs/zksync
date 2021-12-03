@@ -69,34 +69,10 @@ pub enum WatcherMode {
 #[derive(Debug)]
 pub enum EthWatchRequest {
     PollETHNode,
-    GetPriorityOpBySerialId {
-        serial_id: u64,
-        resp: oneshot::Sender<Option<PriorityOp>>,
-    },
     GetPriorityQueueOps {
         op_start_id: u64,
         max_chunks: usize,
         resp: oneshot::Sender<Vec<PriorityOp>>,
-    },
-    GetUnconfirmedDeposits {
-        address: Address,
-        resp: oneshot::Sender<Vec<PriorityOp>>,
-    },
-    GetUnconfirmedOps {
-        query: PaginationQuery<PendingOpsRequest>,
-        resp: oneshot::Sender<Paginated<Transaction, u64>>,
-    },
-    GetUnconfirmedOpByEthHash {
-        eth_hash: H256,
-        resp: oneshot::Sender<Option<PriorityOp>>,
-    },
-    GetUnconfirmedOpByTxHash {
-        tx_hash: TxHash,
-        resp: oneshot::Sender<Option<PriorityOp>>,
-    },
-    GetUnconfirmedOpByAnyHash {
-        hash: TxHash,
-        resp: oneshot::Sender<Option<PriorityOp>>,
     },
     GetNewTokens {
         last_eth_block: Option<u64>,
@@ -105,16 +81,6 @@ pub enum EthWatchRequest {
     GetRegisterNFTFactoryEvents {
         last_eth_block: Option<u64>,
         resp: oneshot::Sender<Vec<RegisterNFTFactoryEvent>>,
-    },
-    IsPubkeyChangeAuthorized {
-        address: Address,
-        nonce: Nonce,
-        pubkey_hash: PubKeyHash,
-        resp: oneshot::Sender<bool>,
-    },
-    IsContractERC20 {
-        address: Address,
-        resp: oneshot::Sender<bool>,
     },
 }
 
@@ -372,139 +338,6 @@ impl<W: EthClient> EthWatch<W> {
         result
     }
 
-    async fn is_new_pubkey_hash_authorized(
-        &self,
-        address: Address,
-        nonce: Nonce,
-        pub_key_hash: &PubKeyHash,
-    ) -> anyhow::Result<bool> {
-        let auth_fact_reset_time = self.client.get_auth_fact_reset_time(address, nonce).await?;
-        if auth_fact_reset_time != 0 {
-            return Ok(false);
-        }
-        let auth_fact = self.client.get_auth_fact(address, nonce).await?;
-        Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
-    }
-
-    fn find_ongoing_op_by_eth_hash(&self, eth_hash: H256) -> Option<PriorityOp> {
-        self.eth_state
-            .unconfirmed_queue()
-            .iter()
-            .find(|op| op.eth_hash == eth_hash)
-            .cloned()
-    }
-
-    fn find_ongoing_op_by_tx_hash(&self, tx_hash: TxHash) -> Option<PriorityOp> {
-        self.eth_state
-            .unconfirmed_queue()
-            .iter()
-            .find(|op| op.tx_hash() == tx_hash)
-            .cloned()
-    }
-
-    fn find_ongoing_op_by_any_hash(&self, hash: TxHash) -> Option<PriorityOp> {
-        self.eth_state
-            .unconfirmed_queue()
-            .iter()
-            .find(|op| op.tx_hash() == hash || op.eth_hash.as_ref() == hash.as_ref())
-            .cloned()
-    }
-
-    fn get_ongoing_deposits_for(&self, address: Address) -> Vec<PriorityOp> {
-        self.eth_state
-            .unconfirmed_queue()
-            .iter()
-            .filter(|op| match &op.data {
-                ZkSyncPriorityOp::Deposit(deposit) => {
-                    // Address may be set to either sender or recipient.
-                    deposit.from == address || deposit.to == address
-                }
-                _ => false,
-            })
-            .cloned()
-            .collect()
-    }
-
-    fn get_ongoing_ops_for(
-        &self,
-        query: PaginationQuery<PendingOpsRequest>,
-    ) -> Paginated<Transaction, u64> {
-        let all_ops = self
-            .eth_state
-            .unconfirmed_queue()
-            .iter()
-            .filter(|op| match &op.data {
-                ZkSyncPriorityOp::Deposit(deposit) => {
-                    // Address may be set to recipient.
-                    deposit.to == query.from.address
-                }
-                ZkSyncPriorityOp::FullExit(full_exit) => query
-                    .from
-                    .account_id
-                    .map(|account_id| account_id == full_exit.account_id)
-                    .unwrap_or(false),
-            });
-        let count = all_ops.clone().count();
-        let from_serial_id = match query.from.serial_id.inner {
-            Either::Left(id) => id,
-            Either::Right(_) => {
-                if let Some(op) = all_ops.clone().max_by_key(|op| op.serial_id) {
-                    op.serial_id
-                } else {
-                    return Paginated::new(
-                        Vec::new(),
-                        Default::default(),
-                        query.limit,
-                        query.direction,
-                        0,
-                    );
-                }
-            }
-        };
-        let ops: Vec<PriorityOp> = match query.direction {
-            PaginationDirection::Newer => all_ops
-                .sorted_by_key(|op| op.serial_id)
-                .filter(|op| op.serial_id >= from_serial_id)
-                .take(query.limit as usize)
-                .cloned()
-                .collect(),
-            PaginationDirection::Older => all_ops
-                .sorted_by(|a, b| b.serial_id.cmp(&a.serial_id))
-                .filter(|op| op.serial_id <= from_serial_id)
-                .take(query.limit as usize)
-                .cloned()
-                .collect(),
-        };
-        let txs: Vec<Transaction> = ops
-            .into_iter()
-            .map(|op| {
-                let tx_hash = op.tx_hash();
-                let tx = L1Transaction::from_pending_op(
-                    op.data.clone(),
-                    op.eth_hash,
-                    op.serial_id,
-                    tx_hash,
-                );
-                Transaction {
-                    tx_hash,
-                    block_number: None,
-                    op: TransactionData::L1(tx),
-                    status: TxInBlockStatus::Queued,
-                    fail_reason: None,
-                    created_at: None,
-                    batch_id: None,
-                }
-            })
-            .collect();
-        Paginated::new(
-            txs,
-            from_serial_id,
-            query.limit,
-            query.direction,
-            count as u32,
-        )
-    }
-
     async fn poll_eth_node(&mut self) -> anyhow::Result<()> {
         let start = Instant::now();
         let last_block_number = self.client.block_number().await?;
@@ -613,26 +446,6 @@ impl<W: EthClient> EthWatch<W> {
                     resp.send(self.get_priority_requests(op_start_id, max_chunks))
                         .unwrap_or_default();
                 }
-                EthWatchRequest::GetUnconfirmedDeposits { address, resp } => {
-                    let deposits_for_address = self.get_ongoing_deposits_for(address);
-                    resp.send(deposits_for_address).ok();
-                }
-                EthWatchRequest::GetUnconfirmedOps { query, resp } => {
-                    let unconfirmed_ops = self.get_ongoing_ops_for(query);
-                    resp.send(unconfirmed_ops).ok();
-                }
-                EthWatchRequest::GetUnconfirmedOpByEthHash { eth_hash, resp } => {
-                    let unconfirmed_op = self.find_ongoing_op_by_eth_hash(eth_hash);
-                    resp.send(unconfirmed_op).unwrap_or_default();
-                }
-                EthWatchRequest::GetUnconfirmedOpByTxHash { tx_hash, resp } => {
-                    let unconfirmed_op = self.find_ongoing_op_by_tx_hash(tx_hash);
-                    resp.send(unconfirmed_op).unwrap_or_default();
-                }
-                EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp } => {
-                    let unconfirmed_op = self.find_ongoing_op_by_any_hash(hash);
-                    resp.send(unconfirmed_op).unwrap_or_default();
-                }
                 EthWatchRequest::GetNewTokens {
                     last_eth_block,
                     resp,
@@ -646,30 +459,6 @@ impl<W: EthClient> EthWatch<W> {
                     resp.send(self.get_register_factory_event(last_eth_block))
                         .ok();
                 }
-                EthWatchRequest::IsPubkeyChangeAuthorized {
-                    address,
-                    nonce,
-                    pubkey_hash,
-                    resp,
-                } => {
-                    let authorized = self
-                        .is_new_pubkey_hash_authorized(address, nonce, &pubkey_hash)
-                        .await
-                        .unwrap_or(false);
-                    resp.send(authorized).unwrap_or_default();
-                }
-                EthWatchRequest::GetPriorityOpBySerialId { serial_id, resp } => {
-                    resp.send(
-                        self.eth_state
-                            .priority_queue()
-                            .get(&serial_id)
-                            .map(|received_op| received_op.as_ref().clone()),
-                    )
-                    .unwrap_or_default();
-                }
-                EthWatchRequest::IsContractERC20 { address, resp } => resp
-                    .send(self.client.is_contract_erc20(address).await)
-                    .unwrap_or_default(),
             }
         }
     }
