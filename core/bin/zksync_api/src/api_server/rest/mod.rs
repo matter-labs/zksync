@@ -95,7 +95,7 @@ pub fn start_server_thread_detached(
             let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
 
             actix_rt::System::new().block_on(async move {
-                // TODO remove this config
+                // TODO remove this config ZKS-815
                 let config = ZkSyncConfig::from_env();
 
                 let api_v01 = ApiV01::new(connection_pool, contract_address, private_url, config);
