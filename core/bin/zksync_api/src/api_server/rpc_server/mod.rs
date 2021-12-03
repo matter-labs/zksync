@@ -123,23 +123,24 @@ fn get_call_with_ip_if_needed(
     call: jsonrpc_core::MethodCall,
     ip: String,
 ) -> jsonrpc_core::MethodCall {
-    let methods_with_ip = HashMap::from([
-        ("tx_submit".to_owned(), MethodWithIpDescription::new(1, 4)),
-        (
-            "submit_txs_batch".to_owned(),
-            MethodWithIpDescription::new(1, 3),
-        ),
-        ("get_tx_fee".to_owned(), MethodWithIpDescription::new(3, 4)),
-        (
-            "get_txs_batch_fee_in_wei".to_owned(),
-            MethodWithIpDescription::new(3, 4),
-        ),
-    ]);
+    let mut methods_with_ip: HashMap<String, MethodWithIpDescription> = HashMap::new();
+
+    // Unfortunately at this moment the compiler from the CI does not support creating HashMap from iterator/array
+    methods_with_ip.insert("tx_submit".to_owned(), MethodWithIpDescription::new(1, 4));
+    methods_with_ip.insert(
+        "submit_txs_batch".to_owned(),
+        MethodWithIpDescription::new(1, 3),
+    );
+    methods_with_ip.insert("get_tx_fee".to_owned(), MethodWithIpDescription::new(3, 4));
+    methods_with_ip.insert(
+        "get_txs_batch_fee_in_wei".to_owned(),
+        MethodWithIpDescription::new(3, 4),
+    );
 
     let description = methods_with_ip.get(&call.method);
 
-    let description = if let Some(description) = description {
-        description
+    let description = if let Some(desc) = description {
+        desc
     } else {
         return call;
     };
