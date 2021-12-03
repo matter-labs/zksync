@@ -295,7 +295,7 @@ const SUBSIDY_SCALE = 1000000;
 // Cloudflare Proxy. In production, this header is set by Cloudflare Proxy and can not be manually
 // set by the client.
 const subsidyAxiosConfig = () => {
-    const subsidizedIps = process.env.FEE_TICKER_SUBSIDIZED_IPS?.split(',')!;
+    const subsidizedIps = process.env.API_COMMON_SUBSIDIZED_IPS?.split(',')!;
 
     const config = {
         headers: {
