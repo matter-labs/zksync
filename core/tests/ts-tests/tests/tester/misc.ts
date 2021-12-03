@@ -1,4 +1,4 @@
-import { expectThrow, Tester } from './tester';
+import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, Create2WalletSigner } from 'zksync';
 import { BigNumber, ethers } from 'ethers';

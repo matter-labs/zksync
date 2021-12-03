@@ -4,7 +4,6 @@ use zksync_types::TokenId;
 use crate::tests::db_test;
 use crate::{misc::records::Subsidy, misc::MiscSchema};
 use crate::{QueryResult, StorageProcessor};
-use std::time::SystemTime;
 
 fn get_subsidy(name: String, value: u64) -> Subsidy {
     // The only fields that matter are `subsidy_type` and `value`

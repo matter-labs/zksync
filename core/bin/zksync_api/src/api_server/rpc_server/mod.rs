@@ -1,7 +1,6 @@
 // Built-in uses
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
     time::Instant,
 };
 
@@ -139,8 +138,8 @@ fn get_call_with_ip_if_needed(
 
     let description = methods_with_ip.get(&call.method);
 
-    let description = if description.is_some() {
-        description.unwrap()
+    let description = if let Some(description) = description {
+        description
     } else {
         return call;
     };

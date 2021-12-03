@@ -1,6 +1,6 @@
-import { expect, use } from 'chai';
-import { BigNumber, utils } from 'ethers';
-import { Wallet, types } from 'zksync';
+import { use } from 'chai';
+import { utils } from 'ethers';
+import { Wallet } from 'zksync';
 import chaiAsPromised from 'chai-as-promised';
 import { Tester } from '../tester/tester';
 import '../tester/priority-ops';
@@ -38,25 +38,10 @@ describe.only(`Subsidy tests`, () => {
 
     let tester: Tester;
     let alice: Wallet;
-    let bob: Wallet;
-    let chuck: Wallet;
-    let david: Wallet;
-    let frank: Wallet;
-    let judy: Wallet;
-    let chris: Wallet;
-    let operatorBalance: BigNumber;
-    let nft: types.NFT;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', transport, providerType);
         alice = await tester.fundedWallet('5.0');
-        bob = await tester.emptyWallet();
-        chuck = await tester.emptyWallet();
-        david = await tester.fundedWallet('1.0');
-        frank = await tester.fundedWallet('1.0');
-        judy = await tester.emptyWallet();
-        chris = await tester.emptyWallet();
-        operatorBalance = await tester.operatorBalance(token);
     });
 
     after('disconnect tester', async () => {

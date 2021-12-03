@@ -25,7 +25,6 @@ use zksync_api_types::{
     v02::transaction::{SubmitBatchResponse, Toggle2FA, Toggle2FAResponse, TxHashSerializeWrapper},
     TxWithSignature,
 };
-use zksync_config::ZkSyncConfig;
 use zksync_storage::misc::records::Subsidy;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{

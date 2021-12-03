@@ -1,24 +1,11 @@
 // Built-in deps
-use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 // External imports
-use num::{rational::Ratio, BigUint};
-
 use sqlx::types::BigDecimal;
-use thiserror::Error;
-// Workspace imports
-use zksync_api_types::v02::{
-    pagination::{PaginationDirection, PaginationQuery},
-    token::ApiNFT,
-};
-use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT};
-use zksync_utils::ratio_to_big_decimal;
 // Local imports
 
 use self::records::Subsidy;
-use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
-use zksync_types::tokens::TokenMarketVolume;
 
 pub mod records;
 
@@ -68,7 +55,7 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?
         .total
-        .unwrap_or(BigDecimal::from(0));
+        .unwrap_or_else(|| BigDecimal::from(0));
 
         metrics::histogram!("sql.token.load_tokens_asc", start.elapsed());
         Ok(sum)

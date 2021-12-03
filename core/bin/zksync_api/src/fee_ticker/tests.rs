@@ -284,7 +284,7 @@ fn get_normal_and_subsidy_fee(
         .expect("failed to get fee in token");
 
     let batched_fee_in_token =
-        block_on(ticker.get_batch_from_ticker_in_wei(token.clone(), vec![(tx_type, address)]))
+        block_on(ticker.get_batch_from_ticker_in_wei(token, vec![(tx_type, address)]))
             .expect("failed to get batched fee for token");
 
     assert_eq!(
@@ -484,9 +484,8 @@ fn test_ticker_subsidy() {
 
     // The subsidy price is more-or-less same in all tokens
     let mut scaled_prices: Vec<i64> = vec![];
-    let tokens: Vec<_> = TestToken::all_tokens().into_iter().take(3).collect();
 
-    for token in tokens.clone().into_iter() {
+    for token in TestToken::all_tokens().into_iter().take(3) {
         let price_usd = get_subsidy_token_fee_in_usd(
             &mut ticker,
             cpk(ChangePubKeyType::CREATE2),
