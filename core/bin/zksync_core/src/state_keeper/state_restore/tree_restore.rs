@@ -61,7 +61,7 @@ impl<'a, 'b> RestoredTree<'a, 'b> {
         let root_hash_from_db = self.storage.load_block_hash_from_db(last_block).await;
         if root_hash_from_tree != root_hash_from_db {
             // Root hash from the database doesn't match the hash we calculated now.
-            // This is an extereme situation meaning that there is some horrible error
+            // This is an extreme situation meaning that there is some horrible error
             // in the application logic, so to help developers identify the cause, we get back
             // to the point at which we started and apply the blocks diff one-by-one until we
             // precisely find the block at which root hash doesn't match.
@@ -99,7 +99,7 @@ impl<'a, 'b> RestoredTree<'a, 'b> {
     }
 
     /// This function should be called when the resulting hash at the latest state doesn't match the root hash
-    /// for the last block in the databse.
+    /// for the last block in the database.
     ///
     /// It loads the verified state (because the root hash for the last verified state was checked by circuit
     /// to be correct) and applies blocks from it one by one in order to find the block at which hashes
