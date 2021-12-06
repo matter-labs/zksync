@@ -2,13 +2,16 @@
 
 // Built-in deps
 use std::sync::Arc;
+use std::time::Duration;
 // External uses
 use futures::channel::mpsc;
 use jsonrpc_core::{MetaIoHandler, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
+use tokio::task::JoinHandle;
 // Workspace uses
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Address};
 // Local uses
@@ -18,10 +21,6 @@ use crate::{
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
     signature_checker::VerifySignatureRequest,
 };
-use std::time::Duration;
-use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
-
-use tokio::task::JoinHandle;
 
 #[rpc]
 pub trait RpcPubSub {
@@ -206,7 +205,10 @@ pub fn start_ws_server(
         confirmations_for_eth_event,
     );
 
-    tokio::spawn(async move {
+    let (handler, panic_sender) = spawn_panic_handler();
+
+    std::thread::spawn(move || {
+        let _panic_sentinel = ThreadPanicNotify(panic_sender);
         let mut io = PubSubHandler::new(MetaIoHandler::default());
 
         req_rpc_app.extend(&mut io);
@@ -224,5 +226,6 @@ pub fn start_ws_server(
         .expect("Unable to start RPC ws server");
 
         server.wait().expect("rpc ws server start");
-    })
+    });
+    handler
 }
