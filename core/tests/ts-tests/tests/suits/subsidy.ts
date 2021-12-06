@@ -31,7 +31,7 @@ const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
  * These tests are allowed to run longer than ones in `basic` test suite, but please try to keep them as fast
  * as possible without compromising on the test behavior and stability.
  */
-describe.only(`Subsidy tests`, () => {
+describe(`Subsidy tests`, () => {
     const transport = 'HTTP';
     const providerType = 'RPC';
     const token = 'wBTC';
