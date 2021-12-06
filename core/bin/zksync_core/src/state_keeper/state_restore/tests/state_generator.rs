@@ -7,8 +7,8 @@ use crate::state_keeper::state_restore::db::mock::{MockBlock, MockImpl};
 
 #[derive(Debug)]
 pub struct StateGenerator {
-    pub(super) tree: AccountTree,
-    pub(super) mock_db: MockImpl,
+    pub(crate) tree: AccountTree,
+    pub(crate) mock_db: MockImpl,
     current_block: MockBlock,
     account_id: u32,
 }

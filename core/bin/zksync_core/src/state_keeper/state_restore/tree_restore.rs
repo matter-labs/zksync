@@ -6,15 +6,15 @@ use zksync_types::{Account, AccountId, AccountTree, AccountUpdates, Address, Blo
 use super::db::StateRestoreDb;
 
 #[derive(Debug)]
-pub(super) struct RestoredTree<'a, 'b> {
-    pub(super) storage: StateRestoreDb<'a, 'b>,
+pub(crate) struct RestoredTree<'a, 'b> {
+    pub(crate) storage: StateRestoreDb<'a, 'b>,
 
-    pub(super) tree: AccountTree,
-    pub(super) acc_id_by_addr: HashMap<Address, AccountId>,
+    pub(crate) tree: AccountTree,
+    pub(crate) acc_id_by_addr: HashMap<Address, AccountId>,
 }
 
 impl<'a, 'b> RestoredTree<'a, 'b> {
-    pub(super) fn new(storage: StateRestoreDb<'a, 'b>) -> Self {
+    pub(crate) fn new(storage: StateRestoreDb<'a, 'b>) -> Self {
         Self {
             storage,
 
@@ -23,7 +23,7 @@ impl<'a, 'b> RestoredTree<'a, 'b> {
         }
     }
 
-    pub(super) async fn restore(&mut self) -> BlockNumber {
+    pub(crate) async fn restore(&mut self) -> BlockNumber {
         let last_block = self.storage.load_last_committed_block().await;
 
         if let Some(cached_block) = self.storage.load_last_cached_block().await {

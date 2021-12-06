@@ -9,11 +9,11 @@ use self::postgres::PostgresImpl;
 use self::mock::MockImpl;
 
 #[cfg(test)]
-pub(super) mod mock;
-pub(super) mod postgres;
+pub(crate) mod mock;
+pub(crate) mod postgres;
 
 #[derive(Debug)]
-pub(super) enum StateRestoreDb<'a, 'b> {
+pub(crate) enum StateRestoreDb<'a, 'b> {
     Postgres(PostgresImpl<'a, 'b>),
     #[cfg(test)]
     Mock(MockImpl),
@@ -43,15 +43,15 @@ impl<'a, 'b> From<MockImpl> for StateRestoreDb<'a, 'b> {
 }
 
 impl<'a, 'b> StateRestoreDb<'a, 'b> {
-    pub(super) async fn load_last_committed_block(&mut self) -> BlockNumber {
+    pub(crate) async fn load_last_committed_block(&mut self) -> BlockNumber {
         delegate_call!(self.load_last_committed_block())
     }
 
-    pub(super) async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
+    pub(crate) async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
         delegate_call!(self.load_last_cached_block())
     }
 
-    pub(super) async fn load_state_diff(
+    pub(crate) async fn load_state_diff(
         &mut self,
         from_block: BlockNumber,
         to_block: BlockNumber,
@@ -59,25 +59,25 @@ impl<'a, 'b> StateRestoreDb<'a, 'b> {
         delegate_call!(self.load_state_diff(from_block, to_block))
     }
 
-    pub(super) async fn load_committed_state(
+    pub(crate) async fn load_committed_state(
         &mut self,
         block: BlockNumber,
     ) -> (BlockNumber, AccountMap) {
         delegate_call!(self.load_committed_state(block))
     }
 
-    pub(super) async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
+    pub(crate) async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
         delegate_call!(self.load_verified_state())
     }
 
-    pub(super) async fn load_account_tree_cache(
+    pub(crate) async fn load_account_tree_cache(
         &mut self,
         block: BlockNumber,
     ) -> SparseMerkleTreeSerializableCacheBN256 {
         delegate_call!(self.load_account_tree_cache(block))
     }
 
-    pub(super) async fn store_account_tree_cache(
+    pub(crate) async fn store_account_tree_cache(
         &mut self,
         block: BlockNumber,
         account_tree_cache: SparseMerkleTreeSerializableCacheBN256,
@@ -85,7 +85,7 @@ impl<'a, 'b> StateRestoreDb<'a, 'b> {
         delegate_call!(self.store_account_tree_cache(block, account_tree_cache))
     }
 
-    pub(super) async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
+    pub(crate) async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
         delegate_call!(self.load_block_hash_from_db(block))
     }
 }
