@@ -5,17 +5,17 @@ use zksync_crypto::{merkle_tree::parallel_smt::SparseMerkleTreeSerializableCache
 // Workspace uses
 use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
 
-#[derive(Debug)]
-pub(crate) struct MicroBlock {
-    updates: AccountUpdates,
-    accounts: AccountMap,
-    hash: Fr,
+#[derive(Debug, Clone, Default)]
+pub(crate) struct MockBlock {
+    pub(crate) updates: AccountUpdates,
+    pub(crate) accounts: AccountMap,
+    pub(crate) hash: Fr,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct MockImpl {
     tree_caches: HashMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>,
-    blocks: Vec<MicroBlock>,
+    blocks: Vec<MockBlock>,
     verified_at: BlockNumber,
 }
 
@@ -24,9 +24,15 @@ impl MockImpl {
         Self::default()
     }
 
-    // pub(crate) fn add_block(&mut self, ac)
+    pub(crate) fn add_block(&mut self, block: MockBlock) {
+        self.blocks.push(block);
+    }
 
-    fn get_block(&self, block: BlockNumber) -> &MicroBlock {
+    pub(crate) fn set_last_verified_block(&mut self, block: BlockNumber) {
+        self.verified_at = block;
+    }
+
+    fn get_block(&self, block: BlockNumber) -> &MockBlock {
         &self.blocks[block.0 as usize - 1]
     }
 

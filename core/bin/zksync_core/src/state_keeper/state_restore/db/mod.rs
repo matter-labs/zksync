@@ -8,8 +8,8 @@ use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
 // Local uses
 use self::{mock::MockImpl, postgres::PostgresImpl};
 
-mod mock;
-mod postgres;
+pub(super) mod mock;
+pub(super) mod postgres;
 
 #[derive(Debug)]
 pub(super) enum StateRestoreDb<'a, 'b> {
