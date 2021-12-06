@@ -138,12 +138,27 @@ impl<'a, 'b> RestoredTree<'a, 'b> {
 
     /// Loads the most recent state and updates the current state to match it.
     async fn apply_state_diff(&mut self, current_block: BlockNumber, diff: AccountUpdates) {
+        // Committed state contains the latest state, every account in it already has everything from `diff` applied.
+        // We could've just go though all the accounts in the committed state and insert it to the tree to achieve the same
+        // result. However, it would be less efficient, as we would have to do it even for accounts that did not change,
+        // and assuming that the tree is big enough, it's a lot of extra work.
+        //
+        // Instead, we are looking at the accounts that *actually* changed at least once and insert them to the tree only.
+        // This way, we obtain the most recent state in a efficient way.
         let (_, committed_state) = self.storage.load_committed_state(current_block).await;
 
+        // List of account IDs that were changed at least once between the currently observed state and the committed state.
+        // `sort_unstable` and `dedup` is needed to list each account exactly once.
         let mut updated_accounts = diff.into_iter().map(|(id, _)| id).collect::<Vec<_>>();
         updated_accounts.sort_unstable();
         updated_accounts.dedup();
+
         for idx in updated_accounts {
+            // Normally, accounts should not disappear from the state, as we don't have a "remove account" operation.
+            // However, we have a `Delete` account update type, so if there was an update applied to some account, and later
+            // this account is not observed in the state at all, it is safe to assume that it was deleted from the state.
+            //
+            // If that's not the case and it's some bug, the root hash will not match.
             if let Some(acc) = committed_state.get(&idx).cloned() {
                 self.insert_account(idx, acc);
             } else {
