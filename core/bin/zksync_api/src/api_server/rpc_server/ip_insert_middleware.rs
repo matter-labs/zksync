@@ -6,6 +6,8 @@ use futures::{FutureExt, StreamExt};
 use jsonrpc_core::Params;
 use jsonrpc_http_server::{RequestMiddleware, RequestMiddlewareAction};
 
+use super::types::RequestMetadata;
+
 const CLOUDFLARE_CONNECTING_IP_HEADER: &str = "CF-Connecting-IP";
 
 ///
@@ -84,7 +86,10 @@ fn get_call_with_ip_if_needed(
             params.push(serde_json::Value::Null);
         }
 
-        params.push(serde_json::Value::String(ip));
+        let metadata = RequestMetadata { ip };
+        let metadata = serde_json::to_value(metadata).unwrap();
+
+        params.push(metadata);
 
         new_call.params = Params::Array(params);
         new_call

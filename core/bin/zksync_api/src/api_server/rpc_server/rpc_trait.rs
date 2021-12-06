@@ -48,7 +48,7 @@ pub trait Rpc {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
-        ip: Option<String>,
+        ip: Option<RequestMetadata>,
     ) -> BoxFutureResult<TxHash>;
 
     #[rpc(name = "submit_txs_batch", returns = "Vec<TxHash>")]
@@ -56,7 +56,7 @@ pub trait Rpc {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
@@ -73,7 +73,7 @@ pub trait Rpc {
         tx_type: ApiTxFeeTypes,
         _address: Address,
         token_like: TokenLike,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<Fee>;
 
     // _addresses argument is left for the backward compatibility.
@@ -83,7 +83,7 @@ pub trait Rpc {
         tx_types: Vec<ApiTxFeeTypes>,
         _addresses: Vec<Address>,
         token_like: TokenLike,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<TotalFee>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
@@ -130,18 +130,18 @@ impl Rpc for RpcApp {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<TxHash> {
-        spawn!(self._impl_tx_submit(tx, signature, fast_processing, ip))
+        spawn!(self._impl_tx_submit(tx, signature, fast_processing, meta))
     }
 
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<Vec<TxHash>> {
-        spawn!(self._impl_submit_txs_batch(txs, eth_signatures, ip))
+        spawn!(self._impl_submit_txs_batch(txs, eth_signatures, meta))
     }
 
     fn contract_address(&self) -> BoxFutureResult<ContractAddressResp> {
@@ -157,9 +157,9 @@ impl Rpc for RpcApp {
         tx_type: ApiTxFeeTypes,
         address: Address,
         token_like: TokenLike,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<Fee> {
-        spawn!(self._impl_get_tx_fee(tx_type, address, token_like, ip))
+        spawn!(self._impl_get_tx_fee(tx_type, address, token_like, meta))
     }
 
     fn get_txs_batch_fee_in_wei(
@@ -167,9 +167,9 @@ impl Rpc for RpcApp {
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token_like: TokenLike,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<TotalFee> {
-        spawn!(self._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like, ip))
+        spawn!(self._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like, meta))
     }
 
     fn get_token_price(&self, token_like: TokenLike) -> BoxFutureResult<BigDecimal> {

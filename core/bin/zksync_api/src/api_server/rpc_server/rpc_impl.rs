@@ -29,9 +29,9 @@ use crate::{
 use super::{types::*, RpcApp};
 
 impl RpcApp {
-    fn should_subsidie_ip(&self, ip: Option<String>) -> bool {
-        if let Some(ip_str) = ip {
-            self.subsidized_ips.contains(&ip_str)
+    fn should_subsidie_ip(&self, meta: Option<RequestMetadata>) -> bool {
+        if let Some(meta) = meta {
+            self.subsidized_ips.contains(&meta.ip)
         } else {
             false
         }
@@ -134,10 +134,10 @@ impl RpcApp {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> Result<TxHash> {
         let start = Instant::now();
-        let should_subsidie_cpk = self.should_subsidie_ip(ip);
+        let should_subsidie_cpk = self.should_subsidie_ip(meta);
 
         let result = self
             .tx_sender
@@ -152,11 +152,11 @@ impl RpcApp {
         self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
 
-        let should_subsidize_ip = self.should_subsidie_ip(ip);
+        let should_subsidize_ip = self.should_subsidie_ip(meta);
 
         let result: Result<Vec<TxHash>> = self
             .tx_sender
@@ -248,7 +248,7 @@ impl RpcApp {
         tx_type: ApiTxFeeTypes,
         address: Address,
         token: TokenLike,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> Result<Fee> {
         let start = Instant::now();
         let ticker = self.tx_sender.ticker_requests.clone();
@@ -265,7 +265,7 @@ impl RpcApp {
                 &result.normal_fee.total_fee,
                 &result.subsidized_fee.total_fee,
                 &result.subsidy_size_usd,
-                ip,
+                meta,
             )
             .await?;
 
@@ -284,9 +284,9 @@ impl RpcApp {
         normal_fee: &BigUint,
         subsidized_fee: &BigUint,
         subsidy_size_usd: &Ratio<BigUint>,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> Result<bool> {
-        let should_subsidize_ip = self.should_subsidie_ip(ip);
+        let should_subsidize_ip = self.should_subsidie_ip(meta);
 
         let result = should_subsidize_ip
             && subsidized_fee < normal_fee
@@ -304,7 +304,7 @@ impl RpcApp {
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
-        ip: Option<String>,
+        meta: Option<RequestMetadata>,
     ) -> Result<TotalFee> {
         let start = Instant::now();
         if tx_types.len() != addresses.len() {
@@ -335,7 +335,7 @@ impl RpcApp {
                 &result.normal_fee.total_fee,
                 &result.subsidized_fee.total_fee,
                 &result.subsidy_size_usd,
-                ip,
+                meta,
             )
             .await?;
 
