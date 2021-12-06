@@ -104,7 +104,13 @@ pub async fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Ad
         .await
         .expect("Unable to commit transaction in statekeeper");
     vlog::info!("Genesis block created, state: {}", state.root_hash());
+
+    // Below we are intentionally using `println`, because during genesis we parse the genesis root from
+    // the server output in order to save it into the config file.
+    // See `server.genesis()` in the `zk` tool for details.
+    // TODO: Find a better and a more intuitive approach (ZKS-816).
     let genesis_root = format!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     println!("{}", &genesis_root);
+
     metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
 }
