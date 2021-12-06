@@ -26,6 +26,18 @@ macro_rules! delegate_call {
     }
 }
 
+impl<'a, 'b> From<&'a mut zksync_storage::StorageProcessor<'b>> for StateRestoreDb<'a, 'b> {
+    fn from(storage: &'a mut zksync_storage::StorageProcessor<'b>) -> Self {
+        Self::Postgres(PostgresImpl::new(storage))
+    }
+}
+
+impl<'a, 'b> From<MockImpl> for StateRestoreDb<'a, 'b> {
+    fn from(storage: MockImpl) -> Self {
+        Self::Mock(storage)
+    }
+}
+
 impl<'a, 'b> StateRestoreDb<'a, 'b> {
     pub(super) async fn load_last_committed_block(&mut self) -> BlockNumber {
         delegate_call!(self.load_last_committed_block())

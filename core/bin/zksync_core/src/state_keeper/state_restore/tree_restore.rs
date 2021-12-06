@@ -10,10 +10,10 @@ use super::db::StateRestoreDb;
 
 #[derive(Debug)]
 pub(super) struct RestoredTree<'a, 'b> {
-    storage: StateRestoreDb<'a, 'b>,
+    pub(super) storage: StateRestoreDb<'a, 'b>,
 
-    tree: AccountTree,
-    acc_id_by_addr: HashMap<Address, AccountId>,
+    pub(super) tree: AccountTree,
+    pub(super) acc_id_by_addr: HashMap<Address, AccountId>,
 }
 
 impl<'a, 'b> RestoredTree<'a, 'b> {

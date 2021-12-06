@@ -28,17 +28,37 @@ impl MockImpl {
         self.blocks.push(block);
     }
 
+    pub(crate) fn save_cache(
+        &mut self,
+        block: BlockNumber,
+        cache: SparseMerkleTreeSerializableCacheBN256,
+    ) {
+        self.tree_caches.insert(block, cache);
+    }
+
     pub(crate) fn set_last_verified_block(&mut self, block: BlockNumber) {
         self.verified_at = block;
+    }
+
+    pub(crate) fn set_block_root_hash(&mut self, block: BlockNumber, root_hash: Fr) {
+        self.get_block_mut(block).hash = root_hash;
+    }
+
+    fn current_block(&self) -> BlockNumber {
+        let blocks_amount = self.blocks.len() as u32;
+        BlockNumber(blocks_amount)
     }
 
     fn get_block(&self, block: BlockNumber) -> &MockBlock {
         &self.blocks[block.0 as usize - 1]
     }
 
+    fn get_block_mut(&mut self, block: BlockNumber) -> &mut MockBlock {
+        &mut self.blocks[block.0 as usize - 1]
+    }
+
     pub(crate) async fn load_last_committed_block(&mut self) -> BlockNumber {
-        let blocks_amount = self.blocks.len() as u32;
-        BlockNumber(blocks_amount + 1)
+        self.current_block()
     }
 
     pub(crate) async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
@@ -70,6 +90,10 @@ impl MockImpl {
     }
 
     pub(crate) async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
+        if self.verified_at == BlockNumber(0) {
+            return self.load_committed_state(BlockNumber(1)).await;
+        }
+
         (
             self.verified_at,
             self.get_block(self.verified_at).accounts.clone(),
@@ -88,7 +112,7 @@ impl MockImpl {
         block: BlockNumber,
         account_tree_cache: SparseMerkleTreeSerializableCacheBN256,
     ) {
-        self.tree_caches.insert(block, account_tree_cache);
+        self.save_cache(block, account_tree_cache);
     }
 
     pub(crate) async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
