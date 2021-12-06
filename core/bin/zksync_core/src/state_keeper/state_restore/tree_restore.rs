@@ -23,7 +23,7 @@ impl<'a, 'b> RestoredTree<'a, 'b> {
         }
     }
 
-    pub(super) async fn restore(&mut self) {
+    pub(super) async fn restore(&mut self) -> BlockNumber {
         let last_block = self.storage.load_last_committed_block().await;
 
         if let Some(cached_block) = self.storage.load_last_cached_block().await {
@@ -62,6 +62,8 @@ impl<'a, 'b> RestoredTree<'a, 'b> {
         self.storage
             .store_account_tree_cache(last_block, self.tree.get_internals())
             .await;
+
+        last_block
     }
 
     async fn init_tree_with_cache(&mut self, cache_block: BlockNumber) {

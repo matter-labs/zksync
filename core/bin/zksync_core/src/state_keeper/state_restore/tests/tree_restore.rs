@@ -32,7 +32,8 @@ async fn no_cache_restore() {
     assert_eq!(db.load_last_cached_block().await, None);
 
     let mut restorer = RestoredTree::new(db.into());
-    restorer.restore().await;
+    let last_block = restorer.restore().await;
+    assert_eq!(last_block, LAST_BLOCK);
 
     // Check that root hash is actually restored.
     assert_eq!(restorer.tree.root_hash(), state_generator.tree.root_hash());
@@ -52,7 +53,8 @@ async fn cached_state_restore_last_block() {
     assert_eq!(db.load_last_cached_block().await, Some(LAST_BLOCK));
 
     let mut restorer = RestoredTree::new(db.into());
-    restorer.restore().await;
+    let last_block = restorer.restore().await;
+    assert_eq!(last_block, LAST_BLOCK);
 
     // Check that root hash is actually restored.
     assert_eq!(restorer.tree.root_hash(), state_generator.tree.root_hash());
@@ -72,7 +74,8 @@ async fn cached_state_restore_previous_block() {
     assert_eq!(db.load_last_cached_block().await, Some(LAST_BLOCK - 1));
 
     let mut restorer = RestoredTree::new(db.into());
-    restorer.restore().await;
+    let last_block = restorer.restore().await;
+    assert_eq!(last_block, LAST_BLOCK);
 
     // Check that root hash is actually restored.
     assert_eq!(restorer.tree.root_hash(), state_generator.tree.root_hash());
