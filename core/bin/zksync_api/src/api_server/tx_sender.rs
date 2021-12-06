@@ -841,10 +841,14 @@ impl TxSender {
 
         // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
         if let Some(fee_data) = fee_data_for_subsidy {
-            let subsidy_token_id = if token_fees_ids.len() > 1 {
-                TokenId(0) // eth
-            } else {
+            let subsidy_token_id = if token_fees_ids.len() == 1 {
                 token_fees_ids[0]
+            } else {
+                // When there are more than token to pay the fee with,
+                // We get the price of the batch in ETH and then convert it to USD.
+                // Since the `subsidies` table contains the token_id field and the only fee which is fetched from the fee_ticker is
+                // in ETH, then we can consider ETH as the token_id of the subsidy. Even though formally this is not the case.
+                TokenId(0)
             };
 
             // The following two bad scenarios are possible when applying subsidy for the tx:
@@ -854,7 +858,7 @@ impl TxSender {
             // Trying to omit these scenarios unfortunately leads to large code restructure
             // which is not worth it for subsidies (we prefer stability here)
             self.store_subsidy_data(
-                tx_hashes[0],
+                batch_hash,
                 fee_data.normal_fee.total_fee,
                 fee_data.subsidized_fee.total_fee,
                 subsidy_token_id,

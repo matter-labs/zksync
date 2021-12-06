@@ -1,16 +1,13 @@
 // Built-in uses
-use std::{
-    collections::{HashMap, HashSet},
-    time::Instant,
-};
+use std::{collections::HashSet, time::Instant};
 
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
-    FutureExt, SinkExt, StreamExt,
+    SinkExt,
 };
-use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Params, Result};
-use jsonrpc_http_server::{RequestMiddleware, RequestMiddlewareAction, ServerBuilder};
+use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
+use jsonrpc_http_server::ServerBuilder;
 
 // Workspace uses
 
@@ -33,6 +30,7 @@ use bigdecimal::BigDecimal;
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 pub mod error;
+mod ip_insert_middleware;
 mod rpc_impl;
 mod rpc_trait;
 pub mod types;
@@ -40,10 +38,9 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use ip_insert_middleware::IpInsertMiddleWare;
 use tokio::task::JoinHandle;
 use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
-
-const CLOUDFLARE_CONNECTING_IP_HEADER: &str = "CF-Connecting-IP";
 
 #[derive(Clone)]
 pub struct RpcApp {
@@ -99,137 +96,6 @@ impl RpcApp {
 
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
-    }
-}
-
-struct MethodWithIpDescription {
-    minimum_params: usize,
-    // the last one is always the ip parameter
-    maximum_params: usize,
-}
-
-impl MethodWithIpDescription {
-    pub fn new(minimum_params: usize, maximum_params: usize) -> Self {
-        MethodWithIpDescription {
-            minimum_params,
-            maximum_params,
-        }
-    }
-}
-struct IpInsertMiddleWare {}
-
-// Appends `ip` as one of the call's parameters if needed
-fn get_call_with_ip_if_needed(
-    call: jsonrpc_core::MethodCall,
-    ip: String,
-) -> jsonrpc_core::MethodCall {
-    let mut methods_with_ip: HashMap<String, MethodWithIpDescription> = HashMap::new();
-
-    // Unfortunately at this moment the compiler from the CI does not support creating HashMap from iterator/array
-    methods_with_ip.insert("tx_submit".to_owned(), MethodWithIpDescription::new(1, 4));
-    methods_with_ip.insert(
-        "submit_txs_batch".to_owned(),
-        MethodWithIpDescription::new(1, 3),
-    );
-    methods_with_ip.insert("get_tx_fee".to_owned(), MethodWithIpDescription::new(3, 4));
-    methods_with_ip.insert(
-        "get_txs_batch_fee_in_wei".to_owned(),
-        MethodWithIpDescription::new(3, 4),
-    );
-
-    let description = methods_with_ip.get(&call.method);
-
-    let description = if let Some(desc) = description {
-        desc
-    } else {
-        return call;
-    };
-
-    let mut new_call = call.clone();
-    // We add ip only to array of parameters
-    if let Params::Array(mut params) = call.params {
-        // The query is definitely wrong. We may proceed and the server will handle it normally
-        if params.len() > description.maximum_params || params.len() < description.minimum_params {
-            return new_call;
-        }
-
-        // If the length is equsl to the maximum amount of the
-        // maximum_params, then the user tried to override ip
-        if params.len() == description.maximum_params {
-            params.pop();
-        }
-
-        // Fill optional params with null
-        while params.len() < description.maximum_params - 1 {
-            params.push(serde_json::Value::Null);
-        }
-
-        params.push(serde_json::Value::String(ip));
-
-        new_call.params = Params::Array(params);
-        new_call
-    } else {
-        call
-    }
-}
-
-async fn insert_ip(body: hyper::Body, ip: String) -> hyper::Result<Vec<u8>> {
-    let body_stream: Vec<_> = body.collect().await;
-    let body_bytes: hyper::Result<Vec<_>> = body_stream.into_iter().collect();
-
-    // The `?` is here to let Rust resolve body_bytes as a vector of Bytes structs
-    let mut body_bytes: Vec<u8> = body_bytes?
-        .into_iter()
-        .map(|b| b.into_iter().collect::<Vec<u8>>())
-        .flatten()
-        .collect();
-
-    let body_str = String::from_utf8(body_bytes.clone());
-
-    if let Ok(s) = body_str {
-        let call: std::result::Result<jsonrpc_core::MethodCall, _> = serde_json::from_str(&s);
-        if let Ok(call) = call {
-            let new_call = get_call_with_ip_if_needed(call, ip);
-            let new_body_bytes = serde_json::to_string(&new_call);
-            if let Ok(s) = new_body_bytes {
-                body_bytes = s.as_bytes().to_owned();
-            }
-        };
-    }
-
-    Ok(body_bytes)
-}
-
-impl RequestMiddleware for IpInsertMiddleWare {
-    fn on_request(&self, request: hyper::Request<hyper::Body>) -> RequestMiddlewareAction {
-        let (parts, body) = request.into_parts();
-
-        let remote_ip = match parts.headers.get(CLOUDFLARE_CONNECTING_IP_HEADER) {
-            Some(ip) => ip.to_str(),
-            None => {
-                return RequestMiddlewareAction::Proceed {
-                    should_continue_on_invalid_cors: false,
-                    request: hyper::Request::from_parts(parts, body),
-                }
-            }
-        };
-        let remote_ip = if let Err(e) = remote_ip {
-            vlog::warn!("Failed to parse CF-Connecting-IP header. Reason: {}", e);
-            return RequestMiddlewareAction::Proceed {
-                should_continue_on_invalid_cors: false,
-                request: hyper::Request::from_parts(parts, body),
-            };
-        } else {
-            remote_ip.unwrap()
-        };
-
-        let body_bytes = insert_ip(body, remote_ip.to_owned()).into_stream();
-        let body = hyper::Body::wrap_stream(body_bytes);
-
-        RequestMiddlewareAction::Proceed {
-            should_continue_on_invalid_cors: false,
-            request: hyper::Request::from_parts(parts, body),
-        }
     }
 }
 

@@ -127,3 +127,8 @@ pub struct ContractAddressResp {
     pub main_contract: String,
     pub gov_contract: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RequestMetadata {
+    pub ip: String,
+}
