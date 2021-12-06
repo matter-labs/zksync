@@ -3,12 +3,12 @@ use zksync_types::{
     Account, AccountId, AccountTree, AccountUpdate, Address, BlockNumber, Nonce, TokenId,
 };
 
-use crate::state_keeper::state_restore::db::mock::{MockBlock, MockImpl};
+use crate::state_keeper::state_restore::db::mock::{MockBlock, StateRestoreMockImpl};
 
 #[derive(Debug)]
 pub struct StateGenerator {
     pub(crate) tree: AccountTree,
-    pub(crate) mock_db: MockImpl,
+    pub(crate) mock_db: StateRestoreMockImpl,
     current_block: MockBlock,
     account_id: u32,
 }
@@ -17,7 +17,7 @@ impl StateGenerator {
     pub(crate) fn new() -> Self {
         Self {
             tree: Self::empty_tree(),
-            mock_db: MockImpl::new(),
+            mock_db: StateRestoreMockImpl::new(),
             current_block: MockBlock::default(),
             account_id: 0,
         }
@@ -27,7 +27,7 @@ impl StateGenerator {
         AccountTree::new(zksync_crypto::params::account_tree_depth())
     }
 
-    pub(crate) fn create_db(&self) -> MockImpl {
+    pub(crate) fn create_db(&self) -> StateRestoreMockImpl {
         self.mock_db.clone()
     }
 

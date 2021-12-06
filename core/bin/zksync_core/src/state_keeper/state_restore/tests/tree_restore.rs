@@ -1,7 +1,7 @@
 use zksync_types::{BlockNumber, TokenId};
 
 use super::state_generator::StateGenerator;
-use crate::state_keeper::state_restore::tree_restore::RestoredTree;
+use crate::state_keeper::state_restore::{db::StateRestoreDb, RestoredTree};
 
 fn generate_blocks(generator: &mut StateGenerator, blocks: usize, cache_on: Option<BlockNumber>) {
     let accounts: Vec<_> = (0..20).map(|_| generator.create_account()).collect();
@@ -32,7 +32,7 @@ async fn no_cache_restore() {
     assert_eq!(db.load_last_committed_block().await, LAST_BLOCK);
     assert_eq!(db.load_last_cached_block().await, None);
 
-    let mut restorer = RestoredTree::new(db.into());
+    let mut restorer = RestoredTree::new(db);
     let last_block = restorer.restore().await;
     assert_eq!(last_block, LAST_BLOCK);
 
@@ -64,7 +64,7 @@ async fn cached_state_restore_last_block() {
     assert_eq!(db.load_last_committed_block().await, LAST_BLOCK);
     assert_eq!(db.load_last_cached_block().await, Some(LAST_BLOCK));
 
-    let mut restorer = RestoredTree::new(db.into());
+    let mut restorer = RestoredTree::new(db);
     let last_block = restorer.restore().await;
     assert_eq!(last_block, LAST_BLOCK);
 
@@ -85,7 +85,7 @@ async fn cached_state_restore_previous_block() {
     assert_eq!(db.load_last_committed_block().await, LAST_BLOCK);
     assert_eq!(db.load_last_cached_block().await, Some(LAST_BLOCK - 1));
 
-    let mut restorer = RestoredTree::new(db.into());
+    let mut restorer = RestoredTree::new(db);
     let last_block = restorer.restore().await;
     assert_eq!(last_block, LAST_BLOCK);
 
@@ -111,7 +111,7 @@ async fn no_cache_wrong_root() {
     // Restoring must panic.
     db.set_block_root_hash(LAST_BLOCK, Default::default());
 
-    let mut restorer = RestoredTree::new(db.into());
+    let mut restorer = RestoredTree::new(db);
     restorer.restore().await;
 }
 
@@ -140,7 +140,7 @@ async fn no_cache_wrong_root_previous() {
     db.set_block_root_hash(LAST_BLOCK - 1, Default::default());
     db.set_block_root_hash(LAST_BLOCK, Default::default());
 
-    let mut restorer = RestoredTree::new(db.into());
+    let mut restorer = RestoredTree::new(db);
     restorer.restore().await;
 }
 
@@ -159,7 +159,7 @@ async fn wrong_cache() {
     let mut db = state_generator.create_db();
     db.save_cache(LAST_BLOCK, StateGenerator::empty_tree().get_internals());
 
-    let mut restorer = RestoredTree::new(db.into());
+    let mut restorer = RestoredTree::new(db);
     restorer.restore().await;
 }
 
@@ -184,7 +184,7 @@ async fn with_cache_wrong_root_previous() {
     db.set_block_root_hash(LAST_BLOCK - 1, Default::default());
     db.set_block_root_hash(LAST_BLOCK, Default::default());
 
-    let mut restorer = RestoredTree::new(db.into());
+    let mut restorer = RestoredTree::new(db);
     restorer.restore().await;
 }
 
@@ -209,6 +209,6 @@ async fn verified_state_wrong_root() {
     // Restoring must panic.
     db.set_block_root_hash(LAST_BLOCK, Default::default());
 
-    let mut restorer = RestoredTree::new(db.into());
+    let mut restorer = RestoredTree::new(db);
     restorer.restore().await;
 }

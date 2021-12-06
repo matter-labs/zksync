@@ -2,18 +2,31 @@ use zksync_crypto::{merkle_tree::parallel_smt::SparseMerkleTreeSerializableCache
 // External uses
 // Workspace uses
 use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
+// Local uses
+use super::StateRestoreDb;
 
 #[derive(Debug)]
-pub(crate) struct PostgresImpl<'a, 'b> {
+pub(crate) struct StateRestorePostgresImpl<'a, 'b> {
     storage: &'a mut zksync_storage::StorageProcessor<'b>,
 }
 
-impl<'a, 'b> PostgresImpl<'a, 'b> {
+impl<'a, 'b> From<&'a mut zksync_storage::StorageProcessor<'b>>
+    for StateRestorePostgresImpl<'a, 'b>
+{
+    fn from(storage: &'a mut zksync_storage::StorageProcessor<'b>) -> Self {
+        Self::new(storage)
+    }
+}
+
+impl<'a, 'b> StateRestorePostgresImpl<'a, 'b> {
     pub(crate) fn new(storage: &'a mut zksync_storage::StorageProcessor<'b>) -> Self {
         Self { storage }
     }
+}
 
-    pub(crate) async fn load_last_committed_block(&mut self) -> BlockNumber {
+#[async_trait::async_trait]
+impl<'a, 'b> StateRestoreDb for StateRestorePostgresImpl<'a, 'b> {
+    async fn load_last_committed_block(&mut self) -> BlockNumber {
         self.storage
             .chain()
             .block_schema()
@@ -22,7 +35,7 @@ impl<'a, 'b> PostgresImpl<'a, 'b> {
             .expect("Can't load the last saved block")
     }
 
-    pub(crate) async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
+    async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
         self.storage
             .chain()
             .block_schema()
@@ -31,7 +44,7 @@ impl<'a, 'b> PostgresImpl<'a, 'b> {
             .expect("Can't load the last block with cache")
     }
 
-    pub(crate) async fn load_state_diff(
+    async fn load_state_diff(
         &mut self,
         from_block: BlockNumber,
         to_block: BlockNumber,
@@ -50,10 +63,7 @@ impl<'a, 'b> PostgresImpl<'a, 'b> {
             .map(|(_block, updates)| updates)
     }
 
-    pub(crate) async fn load_committed_state(
-        &mut self,
-        block: BlockNumber,
-    ) -> (BlockNumber, AccountMap) {
+    async fn load_committed_state(&mut self, block: BlockNumber) -> (BlockNumber, AccountMap) {
         self.storage
             .chain()
             .state_schema()
@@ -62,7 +72,7 @@ impl<'a, 'b> PostgresImpl<'a, 'b> {
             .expect("Can't load committed state")
     }
 
-    pub(crate) async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
+    async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
         self.storage
             .chain()
             .state_schema()
@@ -71,7 +81,7 @@ impl<'a, 'b> PostgresImpl<'a, 'b> {
             .expect("Can't load committed state")
     }
 
-    pub(crate) async fn load_account_tree_cache(
+    async fn load_account_tree_cache(
         &mut self,
         block: BlockNumber,
     ) -> SparseMerkleTreeSerializableCacheBN256 {
@@ -87,7 +97,7 @@ impl<'a, 'b> PostgresImpl<'a, 'b> {
         serde_json::from_value(cache).expect("Unable to decode tree cache")
     }
 
-    pub(crate) async fn store_account_tree_cache(
+    async fn store_account_tree_cache(
         &mut self,
         block: BlockNumber,
         account_tree_cache: SparseMerkleTreeSerializableCacheBN256,
@@ -102,7 +112,7 @@ impl<'a, 'b> PostgresImpl<'a, 'b> {
             .expect("Unable to store account tree cache in the database");
     }
 
-    pub(crate) async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
+    async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
         self.storage
             .chain()
             .block_schema()

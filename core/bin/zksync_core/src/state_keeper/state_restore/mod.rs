@@ -6,4 +6,4 @@ pub(crate) mod tree_restore;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use self::{db::StateRestoreDb, tree_restore::RestoredTree};
+pub(crate) use self::tree_restore::RestoredTree;

@@ -4,6 +4,8 @@ use zksync_crypto::{merkle_tree::parallel_smt::SparseMerkleTreeSerializableCache
 // External uses
 // Workspace uses
 use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
+// Local uses
+use super::StateRestoreDb;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct MockBlock {
@@ -13,13 +15,13 @@ pub(crate) struct MockBlock {
 }
 
 #[derive(Debug, Default, Clone)]
-pub(crate) struct MockImpl {
+pub(crate) struct StateRestoreMockImpl {
     tree_caches: HashMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>,
     blocks: Vec<MockBlock>,
     verified_at: BlockNumber,
 }
 
-impl MockImpl {
+impl StateRestoreMockImpl {
     pub(crate) fn new() -> Self {
         Self::default()
     }
@@ -56,16 +58,19 @@ impl MockImpl {
     fn get_block_mut(&mut self, block: BlockNumber) -> &mut MockBlock {
         &mut self.blocks[block.0 as usize - 1]
     }
+}
 
-    pub(crate) async fn load_last_committed_block(&mut self) -> BlockNumber {
+#[async_trait::async_trait]
+impl StateRestoreDb for StateRestoreMockImpl {
+    async fn load_last_committed_block(&mut self) -> BlockNumber {
         self.current_block()
     }
 
-    pub(crate) async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
+    async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
         self.tree_caches.keys().copied().max()
     }
 
-    pub(crate) async fn load_state_diff(
+    async fn load_state_diff(
         &mut self,
         from_block: BlockNumber,
         to_block: BlockNumber,
@@ -82,14 +87,11 @@ impl MockImpl {
         Some(updates)
     }
 
-    pub(crate) async fn load_committed_state(
-        &mut self,
-        block: BlockNumber,
-    ) -> (BlockNumber, AccountMap) {
+    async fn load_committed_state(&mut self, block: BlockNumber) -> (BlockNumber, AccountMap) {
         (block, self.get_block(block).accounts.clone())
     }
 
-    pub(crate) async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
+    async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
         if self.verified_at == BlockNumber(0) {
             return self.load_committed_state(BlockNumber(1)).await;
         }
@@ -100,14 +102,14 @@ impl MockImpl {
         )
     }
 
-    pub(crate) async fn load_account_tree_cache(
+    async fn load_account_tree_cache(
         &mut self,
         block: BlockNumber,
     ) -> SparseMerkleTreeSerializableCacheBN256 {
         self.tree_caches[&block].clone()
     }
 
-    pub(crate) async fn store_account_tree_cache(
+    async fn store_account_tree_cache(
         &mut self,
         block: BlockNumber,
         account_tree_cache: SparseMerkleTreeSerializableCacheBN256,
@@ -115,7 +117,7 @@ impl MockImpl {
         self.save_cache(block, account_tree_cache);
     }
 
-    pub(crate) async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
+    async fn load_block_hash_from_db(&mut self, block: BlockNumber) -> Fr {
         self.get_block(block).hash
     }
 }

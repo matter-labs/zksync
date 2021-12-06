@@ -6,7 +6,7 @@ use zksync_types::{
     BlockNumber, TokenId, NFT,
 };
 
-use super::state_restore::{RestoredTree, StateRestoreDb};
+use super::state_restore::{db::StateRestorePostgresImpl, RestoredTree};
 
 #[derive(Debug, Clone)]
 pub struct ZkSyncStateInitParams {
@@ -74,7 +74,7 @@ impl ZkSyncStateInitParams {
         &mut self,
         storage: &mut zksync_storage::StorageProcessor<'_>,
     ) -> BlockNumber {
-        let mut restored_tree = RestoredTree::new(StateRestoreDb::from(storage));
+        let mut restored_tree = RestoredTree::new(StateRestorePostgresImpl::new(storage));
         let last_block_number = restored_tree.restore().await;
         self.tree = restored_tree.tree;
         self.acc_id_by_addr = restored_tree.acc_id_by_addr;

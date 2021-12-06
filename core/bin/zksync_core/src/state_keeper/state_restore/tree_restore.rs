@@ -14,15 +14,18 @@ use super::db::StateRestoreDb;
 /// If the tree root hash will not match the hash from the database, `RestoredTree` will find the block
 /// at which hashes diverged and panic with the corresponding message containing the block number.
 #[derive(Debug)]
-pub(crate) struct RestoredTree<'a, 'b> {
-    pub(crate) storage: StateRestoreDb<'a, 'b>,
+pub(crate) struct RestoredTree<S: StateRestoreDb> {
+    pub(crate) storage: S,
 
     pub(crate) tree: AccountTree,
     pub(crate) acc_id_by_addr: HashMap<Address, AccountId>,
 }
 
-impl<'a, 'b> RestoredTree<'a, 'b> {
-    pub(crate) fn new(storage: StateRestoreDb<'a, 'b>) -> Self {
+impl<S> RestoredTree<S>
+where
+    S: StateRestoreDb,
+{
+    pub(crate) fn new(storage: S) -> Self {
         Self {
             storage,
 
