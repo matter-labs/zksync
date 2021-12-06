@@ -241,7 +241,7 @@ mod tests {
                 max_number_of_transactions_per_batch: 200,
                 max_number_of_authors_per_batch: 10,
                 fee_free_accounts: vec![AccountId(4078), AccountId(387)],
-                subsidized_ips: vec![],
+                subsidized_ips: vec!["127.0.0.1".to_owned()],
                 max_subsidy_usd_scaled: 20000,
                 subsidy_name: String::from("PartnerName"),
             },
@@ -286,6 +286,9 @@ API_COMMON_CACHES_SIZE="10000"
 API_COMMON_FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS="0"
 API_COMMON_FEE_FREE_ACCOUNTS=4078,387
 API_COMMON_ENFORCE_PUBKEY_CHANGE_FEE=true
+API_COMMON_SUBSIDIZED_IPS="127.0.0.1"
+API_COMMON_MAX_SUBSIDY_USD_SCALED=20000
+API_COMMON_SUBSIDY_NAME=PartnerName
 API_COMMON_MAX_NUMBER_OF_TRANSACTIONS_PER_BATCH=200
 API_COMMON_MAX_NUMBER_OF_AUTHORS_PER_BATCH=10
 API_ADMIN_PORT="8080"
