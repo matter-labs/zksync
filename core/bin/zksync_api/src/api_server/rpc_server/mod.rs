@@ -2,15 +2,17 @@
 use std::time::Instant;
 
 // External uses
+use bigdecimal::BigDecimal;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
+use tokio::task::JoinHandle;
 
 // Workspace uses
-
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 use zksync_storage::{
     chain::{
         block::records::StorageBlockDetails, operations::records::StoredExecutedPriorityOperation,
@@ -19,6 +21,7 @@ use zksync_storage::{
     ConnectionPool, StorageProcessor,
 };
 use zksync_types::{tx::TxHash, Address, BlockNumber, TokenLike, TxFeeTypes};
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 // Local uses
 use crate::{
@@ -26,8 +29,6 @@ use crate::{
     signature_checker::VerifySignatureRequest,
     utils::shared_lru_cache::AsyncLruCache,
 };
-use bigdecimal::BigDecimal;
-use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 pub mod error;
 mod rpc_impl;
@@ -37,8 +38,6 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
-use tokio::task::JoinHandle;
-use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 
 #[derive(Clone)]
 pub struct RpcApp {

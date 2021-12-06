@@ -40,13 +40,11 @@ impl Default for MockProverOptions {
 async fn spawn_server(database: MockDatabase) {
     let prover_options = MockProverOptions::default();
 
-    tokio::spawn({
-        run_prover_server(
-            database,
-            prover_options.0.api.prover,
-            prover_options.0.prover,
-        )
-    });
+    run_prover_server(
+        database,
+        prover_options.0.api.prover,
+        prover_options.0.prover,
+    );
 }
 
 #[tokio::test]
