@@ -3,14 +3,19 @@ use zksync_crypto::{merkle_tree::parallel_smt::SparseMerkleTreeSerializableCache
 // Workspace uses
 use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
 // Local uses
-use self::{mock::MockImpl, postgres::PostgresImpl};
+use self::postgres::PostgresImpl;
 
+#[cfg(test)]
+use self::mock::MockImpl;
+
+#[cfg(test)]
 pub(super) mod mock;
 pub(super) mod postgres;
 
 #[derive(Debug)]
 pub(super) enum StateRestoreDb<'a, 'b> {
     Postgres(PostgresImpl<'a, 'b>),
+    #[cfg(test)]
     Mock(MockImpl),
 }
 
@@ -18,6 +23,7 @@ macro_rules! delegate_call {
     ($self:ident.$method:ident($($args:ident),*)) => {
         match $self {
             Self::Postgres(d) => d.$method($($args),*).await,
+            #[cfg(test)]
             Self::Mock(d) => d.$method($($args),*).await,
         }
     }
@@ -29,6 +35,7 @@ impl<'a, 'b> From<&'a mut zksync_storage::StorageProcessor<'b>> for StateRestore
     }
 }
 
+#[cfg(test)]
 impl<'a, 'b> From<MockImpl> for StateRestoreDb<'a, 'b> {
     fn from(storage: MockImpl) -> Self {
         Self::Mock(storage)
