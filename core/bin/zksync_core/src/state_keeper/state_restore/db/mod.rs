@@ -1,6 +1,3 @@
-// TODO: To not be annoyed by warnings while in development. If you see this line in the PR, tell me that I'm stupid.
-#![allow(dead_code)]
-
 use zksync_crypto::{merkle_tree::parallel_smt::SparseMerkleTreeSerializableCacheBN256, Fr};
 // External uses
 // Workspace uses

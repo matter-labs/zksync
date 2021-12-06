@@ -1,6 +1,3 @@
-// TODO: To not be annoyed by warnings while in development. If you see this line in the PR, tell me that I'm stupid.
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 // External uses
 // Workspace uses
@@ -145,9 +142,6 @@ impl<'a, 'b> RestoredTree<'a, 'b> {
     /// Checks that current root hash matches the hash from the database.
     /// Panics with provided message otherwise.
     async fn assert_calculated_root(&mut self, message: &str, current_block: BlockNumber) {
-        // Sanity check: the current root hash *must* be equal to what we have in the database.
-        // At this point we are either at the point for which root hash was calculated previously,
-        // or at the verified point (so the root hash was verified in circuit).
         let root_hash_from_tree = self.tree.root_hash();
         let root_hash_from_db = self.storage.load_block_hash_from_db(current_block).await;
 

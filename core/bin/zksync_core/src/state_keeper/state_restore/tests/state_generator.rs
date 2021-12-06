@@ -16,11 +16,15 @@ pub struct StateGenerator {
 impl StateGenerator {
     pub(crate) fn new() -> Self {
         Self {
-            tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
+            tree: Self::empty_tree(),
             mock_db: MockImpl::new(),
             current_block: MockBlock::default(),
             account_id: 0,
         }
+    }
+
+    pub(crate) fn empty_tree() -> AccountTree {
+        AccountTree::new(zksync_crypto::params::account_tree_depth())
     }
 
     pub(crate) fn create_db(&self) -> MockImpl {

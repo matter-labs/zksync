@@ -20,6 +20,7 @@ fn generate_blocks(generator: &mut StateGenerator, blocks: usize, cache_on: Opti
     }
 }
 
+/// Checks that the tree is restored correctly without cache.
 #[tokio::test]
 async fn no_cache_restore() {
     const N_BLOCKS: usize = 3;
@@ -39,6 +40,7 @@ async fn no_cache_restore() {
     assert_eq!(restorer.tree.root_hash(), state_generator.tree.root_hash());
 }
 
+/// Checks that the tree is restored correctly if cache corresponds to the last block.
 #[tokio::test]
 async fn cached_state_restore_last_block() {
     const N_BLOCKS: usize = 3;
@@ -58,6 +60,7 @@ async fn cached_state_restore_last_block() {
     assert_eq!(restorer.tree.root_hash(), state_generator.tree.root_hash());
 }
 
+/// Checks that the tree is restored correctly if cache corresponds to some block in the past.
 #[tokio::test]
 async fn cached_state_restore_previous_block() {
     const N_BLOCKS: usize = 3;
@@ -77,6 +80,7 @@ async fn cached_state_restore_previous_block() {
     assert_eq!(restorer.tree.root_hash(), state_generator.tree.root_hash());
 }
 
+/// Checks that if the last block hash is incorrect, restoring panics.
 #[tokio::test]
 #[should_panic(expected = "Root hashes diverged. \n Block 3.")]
 async fn no_cache_wrong_root() {
@@ -98,6 +102,8 @@ async fn no_cache_wrong_root() {
     restorer.restore().await;
 }
 
+/// Checks that if some block in the past has incorrect hash, restoring
+/// finds its number and reports in the panic message.
 #[tokio::test]
 #[should_panic(expected = "Root hashes diverged. \n Block 2.")]
 async fn no_cache_wrong_root_previous() {
@@ -110,6 +116,50 @@ async fn no_cache_wrong_root_previous() {
     let mut db = state_generator.create_db();
     assert_eq!(db.load_last_committed_block().await, LAST_BLOCK);
     assert_eq!(db.load_last_cached_block().await, None);
+
+    // Here we set two blocks with the wrong root hash: the last and the previous.
+    // Last must be set, as initially we only check for the latest root.
+    // Previous is set to check that restoring finds the block where hashes diverged correctly.
+    // Restoring must panic.
+    db.set_block_root_hash(LAST_BLOCK - 1, Default::default());
+    db.set_block_root_hash(LAST_BLOCK, Default::default());
+
+    let mut restorer = RestoredTree::new(db.into());
+    restorer.restore().await;
+}
+
+/// Checks that if cache for the block is incorrect, it is reported.
+#[tokio::test]
+#[should_panic(
+    expected = "Root hash from the cached tree doesn't match the root hash from the database"
+)]
+async fn wrong_cache() {
+    const N_BLOCKS: usize = 3;
+    const LAST_BLOCK: BlockNumber = BlockNumber(N_BLOCKS as u32);
+
+    let mut state_generator = StateGenerator::new();
+    generate_blocks(&mut state_generator, N_BLOCKS, None);
+
+    let mut db = state_generator.create_db();
+    db.save_cache(LAST_BLOCK, StateGenerator::empty_tree().get_internals());
+
+    let mut restorer = RestoredTree::new(db.into());
+    restorer.restore().await;
+}
+
+/// Same as `no_cache_wrong_root_previous` but with the cache for the tree at some point.
+#[tokio::test]
+#[should_panic(expected = "Root hashes diverged. \n Block 2.")]
+async fn with_cache_wrong_root_previous() {
+    const N_BLOCKS: usize = 3;
+    const LAST_BLOCK: BlockNumber = BlockNumber(N_BLOCKS as u32);
+
+    let mut state_generator = StateGenerator::new();
+    generate_blocks(&mut state_generator, N_BLOCKS, Some(LAST_BLOCK - 2));
+
+    let mut db = state_generator.create_db();
+    assert_eq!(db.load_last_committed_block().await, LAST_BLOCK);
+    assert_eq!(db.load_last_cached_block().await, Some(LAST_BLOCK - 2));
 
     // Here we set two blocks with the wrong root hash: the last and the previous.
     // Last must be set, as initially we only check for the latest root.
