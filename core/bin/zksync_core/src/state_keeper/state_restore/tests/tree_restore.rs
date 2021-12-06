@@ -131,7 +131,10 @@ async fn no_cache_wrong_root_previous() {
     assert_eq!(db.load_last_cached_block().await, None);
 
     // Here we set two blocks with the wrong root hash: the last and the previous.
-    // Last must be set, as initially we only check for the latest root.
+    // Last must be set, as initially we only check for the latest root: when we restore the tree initially,
+    // we don't calculate hash block-by-block, we only apply all the updates to get the tree at its latest state
+    // and compare it against the hash in the database.
+    //
     // Previous is set to check that restoring finds the block where hashes diverged correctly.
     // Restoring must panic.
     db.set_block_root_hash(LAST_BLOCK - 1, Default::default());
