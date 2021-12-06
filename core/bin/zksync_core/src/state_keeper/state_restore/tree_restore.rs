@@ -5,6 +5,14 @@ use zksync_types::{Account, AccountId, AccountTree, AccountUpdates, Address, Blo
 // Local uses
 use super::db::StateRestoreDb;
 
+/// `RestoredTree` is an entity capable of restoring the account tree to the latest observed state
+/// using the database.
+///
+/// By default, it will try to load the last tree cache and update from there by loading the state difference.
+/// If there is no cache, tree will be recalculated from scratch.
+///
+/// If the tree root hash will not match the hash from the database, `RestoredTree` will find the block
+/// at which hashes diverged and panic with the corresponding message containing the block number.
 #[derive(Debug)]
 pub(crate) struct RestoredTree<'a, 'b> {
     pub(crate) storage: StateRestoreDb<'a, 'b>,
@@ -23,6 +31,9 @@ impl<'a, 'b> RestoredTree<'a, 'b> {
         }
     }
 
+    /// Restores the tree state.
+    /// Returns the block number to which the state was initialized.
+    /// This block number is guaranteed to be the last committed block.
     pub(crate) async fn restore(&mut self) -> BlockNumber {
         let last_block = self.storage.load_last_committed_block().await;
 

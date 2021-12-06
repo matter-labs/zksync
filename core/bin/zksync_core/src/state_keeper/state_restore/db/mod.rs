@@ -12,6 +12,9 @@ use self::mock::MockImpl;
 pub(crate) mod mock;
 pub(crate) mod postgres;
 
+/// Database abstraction for the state keeper state restoring.
+/// Mock implementation allows us to write tests for the state restoring logic
+/// without having to interact with an actual database.
 #[derive(Debug)]
 pub(crate) enum StateRestoreDb<'a, 'b> {
     Postgres(PostgresImpl<'a, 'b>),
