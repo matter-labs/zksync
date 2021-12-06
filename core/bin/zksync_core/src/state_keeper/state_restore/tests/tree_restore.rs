@@ -19,6 +19,7 @@ fn generate_blocks(generator: &mut StateGenerator, blocks: usize, cache_on: Opti
 }
 
 /// Checks that the tree is restored correctly without cache.
+/// Also checks that after running restore, the cache is saved into the database.
 #[tokio::test]
 async fn no_cache_restore() {
     const N_BLOCKS: usize = 3;
@@ -37,6 +38,17 @@ async fn no_cache_restore() {
 
     // Check that root hash is actually restored.
     assert_eq!(restorer.tree.root_hash(), state_generator.tree.root_hash());
+
+    // Check that cache is saved to the database.
+    assert_eq!(
+        restorer.storage.load_last_cached_block().await,
+        Some(LAST_BLOCK)
+    );
+    // Check that cache corresponds to the last stored state.
+    let cache = restorer.storage.load_account_tree_cache(LAST_BLOCK).await;
+    let mut tree_from_cache = StateGenerator::empty_tree();
+    tree_from_cache.set_internals(cache);
+    assert_eq!(tree_from_cache.root_hash(), restorer.tree.root_hash())
 }
 
 /// Checks that the tree is restored correctly if cache corresponds to the last block.
