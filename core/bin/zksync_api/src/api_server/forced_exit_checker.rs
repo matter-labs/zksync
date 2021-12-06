@@ -1,5 +1,5 @@
 use crate::api_server::tx_sender::SubmitError;
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::StorageProcessor;
 use zksync_types::Address;
 
@@ -29,10 +29,9 @@ pub struct ForcedExitChecker {
 }
 
 impl ForcedExitChecker {
-    pub fn new(config: &ZkSyncConfig) -> Self {
-        let forced_exit_minimum_account_age = chrono::Duration::seconds(
-            config.api.common.forced_exit_minimum_account_age_secs as i64,
-        );
+    pub fn new(forced_exit_minimum_account_age_secs: u64) -> Self {
+        let forced_exit_minimum_account_age =
+            chrono::Duration::seconds(forced_exit_minimum_account_age_secs as i64);
 
         Self {
             forced_exit_minimum_account_age,

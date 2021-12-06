@@ -32,7 +32,7 @@ use tokio::task::JoinHandle;
 
 // Workspace uses
 use zksync_balancer::{Balancer, BuildBalancedItem};
-use zksync_config::ZkSyncConfig;
+
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
@@ -636,17 +636,13 @@ pub fn run_mempool_tasks(
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    config: &ZkSyncConfig,
     number_of_mempool_transaction_handlers: u8,
     channel_capacity: usize,
+    block_chunk_sizes: Vec<usize>,
 ) -> JoinHandle<()> {
-    let config = config.clone();
     tokio::spawn(async move {
         let mempool_state = Arc::new(RwLock::new(MempoolState::restore_from_db(&db_pool).await));
-        let max_block_size_chunks = *config
-            .chain
-            .state_keeper
-            .block_chunk_sizes
+        let max_block_size_chunks = *block_chunk_sizes
             .iter()
             .max()
             .expect("failed to find max block chunks size");

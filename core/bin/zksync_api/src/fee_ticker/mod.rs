@@ -27,7 +27,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 // Workspace deps
 use zksync_balancer::{Balancer, BuildBalancedItem};
-use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
+use zksync_config::configs::ticker::TokenPriceSource;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address, BatchFee, ChangePubKeyOp, Fee,
@@ -253,40 +253,38 @@ impl<API: Clone, INFO: Clone, WATCHER: Clone>
 pub fn run_ticker_task(
     db_pool: ConnectionPool,
     tricker_requests: Receiver<TickerRequest>,
-    config: &ZkSyncConfig,
+    config: &zksync_config::TickerConfig,
+    max_blocks_to_aggregate: u32,
 ) -> JoinHandle<()> {
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
-        gas_cost_tx: GasOperationsCost::from_constants(config.ticker.fast_processing_coeff),
+        gas_cost_tx: GasOperationsCost::from_constants(config.fast_processing_coeff),
         tokens_risk_factors: HashMap::new(),
         scale_fee_coefficient: Ratio::new(
-            BigUint::from(config.ticker.scale_fee_percent),
+            BigUint::from(config.scale_fee_percent),
             BigUint::from(100u32),
         ),
-        max_blocks_to_aggregate: std::cmp::max(
-            config.chain.state_keeper.max_aggregated_blocks_to_commit,
-            config.chain.state_keeper.max_aggregated_blocks_to_execute,
-        ) as u32,
+        max_blocks_to_aggregate,
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
-    let watcher = UniswapTokenWatcher::new(config.ticker.uniswap_url.clone());
+    let watcher = UniswapTokenWatcher::new(config.uniswap_url.clone());
     let validator = FeeTokenValidator::new(
         cache.clone(),
-        chrono::Duration::seconds(config.ticker.available_liquidity_seconds as i64),
-        BigDecimal::try_from(config.ticker.liquidity_volume).expect("Valid f64 for decimal"),
-        HashSet::from_iter(config.ticker.unconditionally_valid_tokens.clone()),
+        chrono::Duration::seconds(config.available_liquidity_seconds as i64),
+        BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
+        HashSet::from_iter(config.unconditionally_valid_tokens.clone()),
         watcher.clone(),
     );
 
     let updater = MarketUpdater::new(cache, watcher);
-    tokio::spawn(updater.keep_updated(config.ticker.token_market_update_time));
+    tokio::spawn(updater.keep_updated(config.token_market_update_time));
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
         .build()
         .expect("Failed to build reqwest::Client");
-    let (price_source, base_url) = config.ticker.price_source();
+    let (price_source, base_url) = config.price_source();
     match price_source {
         TokenPriceSource::CoinMarketCap => {
             let token_price_api =
@@ -332,7 +330,7 @@ pub fn run_ticker_task(
                     validator,
                 },
                 tricker_requests,
-                config.ticker.number_of_ticker_actors,
+                config.number_of_ticker_actors,
                 TICKER_CHANNEL_SIZE,
             );
 

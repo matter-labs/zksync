@@ -14,7 +14,7 @@ use futures::{
 };
 use tokio::task::JoinHandle;
 // Workspace uses
-use zksync_config::{TokenHandlerConfig, ZkSyncConfig};
+use zksync_config::TokenHandlerConfig;
 use zksync_notifier::Notifier;
 use zksync_storage::{tokens::StoreTokenError, ConnectionPool, StorageProcessor};
 use zksync_types::{
@@ -234,12 +234,11 @@ impl TokenHandler {
 pub fn run_token_handler(
     db_pool: ConnectionPool,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    config: &ZkSyncConfig,
+    config: &TokenHandlerConfig,
 ) -> JoinHandle<()> {
     let config = config.clone();
     tokio::spawn(async move {
-        let mut token_handler =
-            TokenHandler::new(db_pool, eth_watch_req, config.token_handler.clone()).await;
+        let mut token_handler = TokenHandler::new(db_pool, eth_watch_req, config.clone()).await;
 
         token_handler.run().await
     })

@@ -8,7 +8,7 @@ use futures::{
 };
 use tokio::task::JoinHandle;
 // Workspace uses
-use zksync_config::{TokenHandlerConfig, ZkSyncConfig};
+use zksync_config::TokenHandlerConfig;
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::RegisterNFTFactoryEvent;
 // Local uses
@@ -27,7 +27,7 @@ impl NFTFactoryHandler {
     async fn new(
         connection_pool: ConnectionPool,
         eth_watch_req: mpsc::Sender<EthWatchRequest>,
-        config: TokenHandlerConfig,
+        config: &TokenHandlerConfig,
     ) -> Self {
         let poll_interval = config.poll_interval();
 
@@ -124,12 +124,10 @@ impl NFTFactoryHandler {
 pub fn run_register_factory_handler(
     db_pool: ConnectionPool,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    config: &ZkSyncConfig,
+    config: TokenHandlerConfig,
 ) -> JoinHandle<()> {
-    let config = config.clone();
     tokio::spawn(async move {
-        let mut handler =
-            NFTFactoryHandler::new(db_pool, eth_watch_req, config.token_handler.clone()).await;
+        let mut handler = NFTFactoryHandler::new(db_pool, eth_watch_req, &config).await;
 
         handler.run().await
     })

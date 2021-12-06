@@ -6,6 +6,24 @@ import * as db from './db/db';
 
 import { ethers } from 'ethers';
 
+export async function core() {
+    prepareForcedExitRequestAccount();
+
+    await utils.spawn(
+        'cargo run --bin zksync_server --release -- --components=eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner'
+    );
+}
+
+export async function web3Node() {
+    await utils.spawn('cargo run --bin zksync_server --release -- --components=web3-api');
+}
+
+export async function apiNode() {
+    await utils.spawn(
+        'cargo run --bin zksync_server --release -- --components=web3-api,rest-api,rpc-api,rpc-websocket-api'
+    );
+}
+
 export async function server() {
     // By the time this function is run the server is most likely not be running yet
     // However, it does not matter, since the only thing the function does is depositing
@@ -90,3 +108,7 @@ export const command = new Command('server')
             await server();
         }
     });
+
+command.command('api').description('start api node').action(apiNode);
+command.command('web3').description('start web3 node').action(web3Node);
+command.command('core').description('start core').action(core);

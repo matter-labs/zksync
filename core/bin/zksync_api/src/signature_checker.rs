@@ -13,16 +13,16 @@ use futures::{
     channel::{mpsc, oneshot},
     StreamExt,
 };
-use tokio::runtime::{Builder, Handle};
+use tokio::task::JoinHandle;
+
 // Workspace uses
+use zksync_eth_client::EthereumGateway;
 use zksync_types::{
     tx::{EthBatchSignData, EthSignData, TxEthSignature},
     Address, Order, SignedZkSyncTx, Token, ZkSyncTx,
 };
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_eth_client::EthereumGateway;
-use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
 /// either a single transaction, or the transaction batch.
@@ -380,42 +380,26 @@ impl RequestData {
 
 /// Main routine of the concurrent signature checker.
 /// See the module documentation for details.
-pub fn start_sign_checker_detached(
+pub fn start_sign_checker(
     client: EthereumGateway,
     input: mpsc::Receiver<VerifySignatureRequest>,
-    panic_notify: mpsc::Sender<bool>,
-) {
+) -> JoinHandle<()> {
     let eth_checker = EthereumChecker::new(client);
 
-    /// Main signature check requests handler.
     /// Basically it receives the requests through the channel and verifies signatures,
     /// notifying the request sender about the check result.
     async fn checker_routine(
-        handle: Handle,
         mut input: mpsc::Receiver<VerifySignatureRequest>,
         eth_checker: EthereumChecker,
     ) {
         while let Some(VerifySignatureRequest { data, response }) = input.next().await {
             let eth_checker = eth_checker.clone();
-            handle.spawn(async move {
+            tokio::spawn(async move {
                 let resp = VerifiedTx::verify(data, &eth_checker).await;
 
                 response.send(resp).unwrap_or_default();
             });
         }
     }
-
-    std::thread::Builder::new()
-        .name("Signature checker thread".to_string())
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-
-            let runtime = Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .expect("failed to build runtime for signature processor");
-            let handle = runtime.handle().clone();
-            runtime.block_on(checker_routine(handle, input, eth_checker));
-        })
-        .expect("failed to start signature checker thread");
+    tokio::spawn(checker_routine(input, eth_checker))
 }

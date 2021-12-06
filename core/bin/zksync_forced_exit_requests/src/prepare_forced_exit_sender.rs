@@ -1,6 +1,6 @@
 use num::BigUint;
 use std::time::Duration;
-use zksync_config::ZkSyncConfig;
+use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, ConnectionPool, StorageProcessor,
 };
@@ -24,18 +24,18 @@ use super::utils::{read_signing_key, Engine};
 pub async fn prepare_forced_exit_sender_account(
     connection_pool: ConnectionPool,
     api_client: CoreApiClient,
-    config: &ZkSyncConfig,
+    config: &ForcedExitRequestsConfig,
 ) -> anyhow::Result<AccountId> {
     let mut storage = connection_pool
         .access_storage()
         .await
         .expect("forced_exit_requests: Failed to get the connection to storage");
 
-    let sender_sk = hex::decode(&config.forced_exit_requests.sender_private_key[2..])
+    let sender_sk = hex::decode(&config.sender_private_key[2..])
         .expect("Failed to decode forced_exit_sender sk");
     let sender_sk = read_signing_key(&sender_sk).expect("Failed to read forced exit sender sk");
-    let sender_address = config.forced_exit_requests.sender_account_address;
-    let sender_eth_private_key = config.forced_exit_requests.sender_eth_private_key;
+    let sender_address = config.sender_account_address;
+    let sender_eth_private_key = config.sender_eth_private_key;
 
     let is_sender_prepared =
         check_forced_exit_sender_prepared(&mut storage, &sender_sk, sender_address)

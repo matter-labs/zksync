@@ -107,7 +107,8 @@ jobs:
 
       - name: run-services
         run: |
-          ci_run zk server &>server.log &
+          ci_run zk server core &>server.log &
+          ci_run zk server api &>api.log &
           ci_run sleep 10
           ci_run zk dummy-prover run &>dummy_prover.log &
           ci_run sleep 100
@@ -133,6 +134,7 @@ jobs:
         if: always()
         run: |
           ci_run cat server.log
+          ci_run cat api.log
           ci_run cat dummy_prover.log
 
   circuit-tests:
