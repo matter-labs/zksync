@@ -1,5 +1,5 @@
 // Built-in uses
-use std::{collections::HashSet, time::Instant};
+use std::time::Instant;
 
 // External uses
 use futures::{
@@ -53,8 +53,6 @@ pub struct RpcApp {
     pub confirmations_for_eth_event: u64,
 
     tx_sender: TxSender,
-
-    pub subsidized_ips: HashSet<String>,
 }
 
 impl RpcApp {
@@ -89,8 +87,6 @@ impl RpcApp {
             confirmations_for_eth_event,
 
             tx_sender,
-
-            subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
         }
     }
 

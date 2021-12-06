@@ -53,6 +53,8 @@ use crate::{
 };
 use zksync_config::configs::api::CommonApiConfig;
 
+use super::rpc_server::types::RequestMetadata;
+
 const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
 #[derive(Clone)]
@@ -75,6 +77,7 @@ pub struct TxSender {
 
     pub current_subsidy_type: String,
     pub max_subsidy_usd: Ratio<BigUint>,
+    pub subsidized_ips: HashSet<String>,
 }
 
 #[derive(Debug, Error)]
@@ -181,6 +184,7 @@ impl TxSender {
             max_number_of_authors_per_batch,
             current_subsidy_type: config.subsidy_name.clone(),
             max_subsidy_usd: config.max_subsidy_usd(),
+            subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
         }
     }
 
@@ -365,7 +369,7 @@ impl TxSender {
         mut tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
-        should_subsidie_cpk: bool,
+        meta: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
         let fast_processing = fast_processing.unwrap_or(false);
         if fast_processing && !tx.is_withdraw() {
@@ -383,7 +387,7 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        self.submit_tx(tx, signature, should_subsidie_cpk).await
+        self.submit_tx(tx, signature, meta).await
     }
 
     pub async fn can_subsidize(
@@ -404,6 +408,29 @@ impl TxSender {
         } else {
             false
         };
+
+        Ok(result)
+    }
+
+    pub async fn should_subsidize_cpk(
+        &self,
+        normal_fee: &BigUint,
+        subsidized_fee: &BigUint,
+        subsidy_size_usd: &Ratio<BigUint>,
+        meta: Option<RequestMetadata>,
+    ) -> Result<bool, SubmitError> {
+        let should_subsidize_ip = if let Some(meta) = meta {
+            self.subsidized_ips.contains(&meta.ip)
+        } else {
+            false
+        };
+
+        let result = should_subsidize_ip
+            && subsidized_fee < normal_fee
+            && self
+                .can_subsidize(subsidy_size_usd.clone())
+                .await
+                .map_err(SubmitError::Internal)?;
 
         Ok(result)
     }
@@ -455,7 +482,7 @@ impl TxSender {
         &self,
         tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
-        should_subsidie_cpk: bool,
+        meta: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
@@ -502,13 +529,14 @@ impl TxSender {
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
 
-            let required_fee_data = if should_subsidie_cpk
-                && required_fee_data.subsidized_fee.total_fee
-                    < required_fee_data.normal_fee.total_fee
-                && self
-                    .can_subsidize(required_fee_data.subsidy_size_usd.clone())
-                    .await
-                    .map_err(SubmitError::Internal)?
+            let required_fee_data = if self
+                .should_subsidize_cpk(
+                    &required_fee_data.normal_fee.total_fee,
+                    &required_fee_data.subsidized_fee.total_fee,
+                    &required_fee_data.subsidy_size_usd,
+                    meta,
+                )
+                .await?
             {
                 fee_data_for_subsidy = Some(required_fee_data.clone());
                 required_fee_data.subsidized_fee
@@ -592,7 +620,7 @@ impl TxSender {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-        should_subsidie_cpk: bool,
+        meta: Option<RequestMetadata>,
     ) -> Result<SubmitBatchResponse, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
@@ -685,12 +713,14 @@ impl TxSender {
             )
             .await?;
 
-            let required_fee = if should_subsidie_cpk
-                && self
-                    .can_subsidize(batch_token_fee.subsidy_size_usd.clone())
-                    .await
-                    .map_err(SubmitError::Internal)?
-                && batch_token_fee.subsidized_fee.total_fee < batch_token_fee.normal_fee.total_fee
+            let required_fee = if self
+                .should_subsidize_cpk(
+                    &batch_token_fee.normal_fee.total_fee,
+                    &batch_token_fee.subsidized_fee.total_fee,
+                    &batch_token_fee.subsidy_size_usd,
+                    meta,
+                )
+                .await?
             {
                 fee_data_for_subsidy = Some(batch_token_fee.clone());
                 batch_token_fee.subsidized_fee.total_fee
@@ -720,12 +750,14 @@ impl TxSender {
             )
             .await?;
 
-            let required_fee = if should_subsidie_cpk
-                && required_eth_fee.subsidized_fee.total_fee < required_eth_fee.normal_fee.total_fee
-                && self
-                    .can_subsidize(required_eth_fee.subsidy_size_usd.clone())
-                    .await
-                    .map_err(SubmitError::Internal)?
+            let required_fee = if self
+                .should_subsidize_cpk(
+                    &required_eth_fee.normal_fee.total_fee,
+                    &required_eth_fee.subsidized_fee.total_fee,
+                    &required_eth_fee.subsidy_size_usd,
+                    meta,
+                )
+                .await?
             {
                 fee_data_for_subsidy = Some(required_eth_fee.clone());
                 required_eth_fee.subsidized_fee.total_fee
@@ -845,9 +877,9 @@ impl TxSender {
                 token_fees_ids[0]
             } else {
                 // When there are more than token to pay the fee with,
-                // We get the price of the batch in ETH and then convert it to USD.
+                // we get the price of the batch in ETH and then convert it to USD.
                 // Since the `subsidies` table contains the token_id field and the only fee which is fetched from the fee_ticker is
-                // in ETH, then we can consider ETH as the token_id of the subsidy. Even though formally this is not the case.
+                // in ETH, then we can consider ETH as the token_id of the subsidy. Even though formally this may not be the case.
                 TokenId(0)
             };
 

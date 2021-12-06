@@ -57,7 +57,7 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
         .total
         .unwrap_or_else(|| BigDecimal::from(0));
 
-        metrics::histogram!("sql.token.load_tokens_asc", start.elapsed());
+        metrics::histogram!("sql.token.get_total_used_subsidy_for_type", start.elapsed());
         Ok(sum)
     }
 }

@@ -3,7 +3,6 @@ use std::time::Instant;
 // External uses
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
-use num::{rational::Ratio, BigUint};
 // Workspace uses
 use zksync_api_types::{
     v02::{
@@ -29,14 +28,6 @@ use crate::{
 use super::{types::*, RpcApp};
 
 impl RpcApp {
-    fn should_subsidie_ip(&self, meta: Option<RequestMetadata>) -> bool {
-        if let Some(meta) = meta {
-            self.subsidized_ips.contains(&meta.ip)
-        } else {
-            false
-        }
-    }
-
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
 
@@ -137,11 +128,10 @@ impl RpcApp {
         meta: Option<RequestMetadata>,
     ) -> Result<TxHash> {
         let start = Instant::now();
-        let should_subsidie_cpk = self.should_subsidie_ip(meta);
 
         let result = self
             .tx_sender
-            .submit_tx_with_separate_fp(*tx, *signature, fast_processing, should_subsidie_cpk)
+            .submit_tx_with_separate_fp(*tx, *signature, fast_processing, meta)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.tx_submit", start.elapsed());
@@ -156,11 +146,9 @@ impl RpcApp {
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
 
-        let should_subsidize_ip = self.should_subsidie_ip(meta);
-
         let result: Result<Vec<TxHash>> = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signatures, should_subsidize_ip)
+            .submit_txs_batch(txs, eth_signatures, meta)
             .await
             .map_err(Error::from)
             .map(|response| {
@@ -260,8 +248,9 @@ impl RpcApp {
         let result =
             Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
-        let should_subsidie_cpk = self
-            .should_subsidie_cpk(
+        let should_subsidize_cpk = self
+            .tx_sender
+            .should_subsidize_cpk(
                 &result.normal_fee.total_fee,
                 &result.subsidized_fee.total_fee,
                 &result.subsidy_size_usd,
@@ -269,7 +258,7 @@ impl RpcApp {
             )
             .await?;
 
-        let fee = if should_subsidie_cpk {
+        let fee = if should_subsidize_cpk {
             result.subsidized_fee
         } else {
             result.normal_fee
@@ -277,26 +266,6 @@ impl RpcApp {
 
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
         Ok(fee)
-    }
-
-    async fn should_subsidie_cpk(
-        &self,
-        normal_fee: &BigUint,
-        subsidized_fee: &BigUint,
-        subsidy_size_usd: &Ratio<BigUint>,
-        meta: Option<RequestMetadata>,
-    ) -> Result<bool> {
-        let should_subsidize_ip = self.should_subsidie_ip(meta);
-
-        let result = should_subsidize_ip
-            && subsidized_fee < normal_fee
-            && self
-                .tx_sender
-                .can_subsidize(subsidy_size_usd.clone())
-                .await
-                .map_err(SubmitError::Internal)?;
-
-        Ok(result)
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -330,8 +299,9 @@ impl RpcApp {
 
         let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
-        let should_subsidie_cpk = self
-            .should_subsidie_cpk(
+        let should_subsidize_cpk = self
+            .tx_sender
+            .should_subsidize_cpk(
                 &result.normal_fee.total_fee,
                 &result.subsidized_fee.total_fee,
                 &result.subsidy_size_usd,
@@ -339,7 +309,7 @@ impl RpcApp {
             )
             .await?;
 
-        let fee = if should_subsidie_cpk {
+        let fee = if should_subsidize_cpk {
             result.subsidized_fee
         } else {
             result.normal_fee
