@@ -14,6 +14,7 @@ use tokio::task::JoinHandle;
 use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Address};
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{
