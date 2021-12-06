@@ -30,7 +30,7 @@ pub trait StateRestoreDb {
     ) -> Option<AccountUpdates>;
 
     /// Returns the state of the blockchain at a certain block.
-    async fn load_committed_state(&mut self, block: BlockNumber) -> (BlockNumber, AccountMap);
+    async fn load_committed_state(&mut self, block: BlockNumber) -> AccountMap;
 
     /// Returns the last state of the blockchain that was verified by prover.
     async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap);

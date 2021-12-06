@@ -81,7 +81,7 @@ where
     }
 
     async fn init_tree_with_cache(&mut self, cache_block: BlockNumber) {
-        let (_, committed_state) = self.storage.load_committed_state(cache_block).await;
+        let committed_state = self.storage.load_committed_state(cache_block).await;
         let cache = self.storage.load_account_tree_cache(cache_block).await;
 
         for (id, account) in committed_state {
@@ -93,8 +93,7 @@ where
     async fn init_tree_without_cache(&mut self, last_block_number: BlockNumber) {
         // If we don't have cache we have no other choice rather than load the latest state and recalculate the tree
         // from scratch.
-
-        let (_, committed_state) = self.storage.load_committed_state(last_block_number).await;
+        let committed_state = self.storage.load_committed_state(last_block_number).await;
 
         for (id, account) in committed_state {
             self.insert_account(id, account);
@@ -148,7 +147,7 @@ where
         //
         // Instead, we are looking at the accounts that *actually* changed at least once and insert them to the tree only.
         // This way, we obtain the most recent state in a efficient way.
-        let (_, committed_state) = self.storage.load_committed_state(current_block).await;
+        let committed_state = self.storage.load_committed_state(current_block).await;
 
         // List of account IDs that were changed at least once between the currently observed state and the committed state.
         // `sort_unstable` and `dedup` is needed to list each account exactly once.

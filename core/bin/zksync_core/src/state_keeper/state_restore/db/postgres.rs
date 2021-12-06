@@ -63,13 +63,14 @@ impl<'a, 'b> StateRestoreDb for StateRestorePostgresImpl<'a, 'b> {
             .map(|(_block, updates)| updates)
     }
 
-    async fn load_committed_state(&mut self, block: BlockNumber) -> (BlockNumber, AccountMap) {
+    async fn load_committed_state(&mut self, block: BlockNumber) -> AccountMap {
         self.storage
             .chain()
             .state_schema()
             .load_committed_state(Some(block))
             .await
             .expect("Can't load committed state")
+            .1
     }
 
     async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {

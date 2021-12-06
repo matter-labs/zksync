@@ -87,13 +87,14 @@ impl StateRestoreDb for StateRestoreMockImpl {
         Some(updates)
     }
 
-    async fn load_committed_state(&mut self, block: BlockNumber) -> (BlockNumber, AccountMap) {
-        (block, self.get_block(block).accounts.clone())
+    async fn load_committed_state(&mut self, block: BlockNumber) -> AccountMap {
+        self.get_block(block).accounts.clone()
     }
 
     async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
         if self.verified_at == BlockNumber(0) {
-            return self.load_committed_state(BlockNumber(1)).await;
+            let committed_state = self.load_committed_state(BlockNumber(1)).await;
+            return (BlockNumber(1), committed_state);
         }
 
         (
