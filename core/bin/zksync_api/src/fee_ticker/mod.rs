@@ -557,8 +557,24 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
             .await?;
         let token_price = big_decimal_to_ratio(&token_price).unwrap();
-        let subsidized_gas_amount = &self.config.subsidy_cpk_price_usd
-            / (&wei_price_usd * &scale_gas_price * &token_usd_risk * &token_price);
+
+        let denom_part = &wei_price_usd * &scale_gas_price * &token_usd_risk * &token_price;
+
+        let subsidized_gas_amount = if token_price.is_zero() {
+            // If the price of the token is zero, than it is not possible to calculate the fee in this token
+            // Actually we should never get into this clause, since we divive by the token's price in the calculation of token_usd_risk
+
+            return Err(anyhow::Error::msg("The token is not acceptable for fee"));
+        } else if denom_part.is_zero() {
+            // If the denom_part is zero, it means that either of wei_price_usd, scale_gas_price, token_usd_risk are equal to 0
+            // The total_gas_fee is multiplied by all of these multiples in the final calculation of the fee, so it is safe to return 0 here,
+            // since the gas cost would be zero anyway.
+
+            // This would mean that the final subsidized fee is zero. However, this is a very rare ocasion
+            Ratio::from(BigUint::zero())
+        } else {
+            &self.config.subsidy_cpk_price_usd / denom_part
+        };
 
         for (tx_type, recipient) in txs {
             let (output_fee_type, gas_tx_amount, op_chunks) =
