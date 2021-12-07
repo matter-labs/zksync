@@ -24,6 +24,8 @@ const ETH_TOKEN_ID: TokenId = TokenId(0x00);
 const ACCOUNTS_AMOUNT: AccountId = AccountId(10);
 const CURRENT_BLOCK: BlockNumber = BlockNumber(1_000);
 
+const DEFAULT_TIMESTAMP: u64 = 0;
+
 /// Creates a random ZKSync account.
 fn generate_account() -> (H256, PrivateKey, Account) {
     let default_balance = 1_000_000u32.into();
@@ -88,7 +90,7 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
         setup,
         |(mut state, transfer_tx)| {
             state
-                .execute_tx(black_box(transfer_tx))
+                .execute_tx(black_box(transfer_tx), DEFAULT_TIMESTAMP)
                 .expect("Failed to execute tx");
         },
         BatchSize::SmallInput,
@@ -128,7 +130,7 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
         setup,
         |(mut state, transfer_tx)| {
             state
-                .execute_tx(black_box(transfer_tx))
+                .execute_tx(black_box(transfer_tx), DEFAULT_TIMESTAMP)
                 .expect("Failed to execute tx");
         },
         BatchSize::SmallInput,
@@ -220,7 +222,7 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
     b.iter_batched(
         setup,
         |(mut state, withdraw_tx)| {
-            let _ = state.execute_tx(black_box(withdraw_tx));
+            let _ = state.execute_tx(black_box(withdraw_tx), DEFAULT_TIMESTAMP);
         },
         BatchSize::SmallInput,
     );
@@ -273,7 +275,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     b.iter_batched(
         setup,
         |(mut state, change_pubkey_tx)| {
-            let _ = state.execute_tx(black_box(change_pubkey_tx));
+            let _ = state.execute_tx(black_box(change_pubkey_tx), DEFAULT_TIMESTAMP);
         },
         BatchSize::SmallInput,
     );
