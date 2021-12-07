@@ -54,13 +54,6 @@ pub struct ZkSyncStateKeeper {
     max_miniblock_iterations: usize,
     fast_miniblock_iterations: usize,
 
-    // Two fields below are for optimization: we don't want to overwrite all the block contents over and over.
-    // With these fields we'll be able save the diff between two pending block states only.
-    /// Amount of succeeded transactions in the pending block at the last pending block synchronization step.
-    success_txs_pending_len: usize,
-    /// Amount of failed transactions in the pending block at the last pending block synchronization step.
-    failed_txs_pending_len: usize,
-
     /// Channel used for sending queued transaction events. Required since state keeper
     /// has no access to the database.
     processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
@@ -121,8 +114,6 @@ impl ZkSyncStateKeeper {
             max_miniblock_iterations,
             fast_miniblock_iterations,
 
-            success_txs_pending_len: 0,
-            failed_txs_pending_len: 0,
             processed_tx_events_sender,
         };
 
@@ -146,9 +137,7 @@ impl ZkSyncStateKeeper {
             // and account IDs will change.
 
             // Sanity check: ensure that we start from a "clean" state.
-            if !self.pending_block.failed_txs.is_empty()
-                || !self.pending_block.success_operations.is_empty()
-            {
+            if !self.pending_block.is_empty() {
                 panic!("State keeper was initialized from a dirty state. Pending block was expected to \
                        be empty, but got this instead: \n \
                        Block number: {} \n \
@@ -313,9 +302,8 @@ impl ZkSyncStateKeeper {
                 .await;
         }
 
-        if !self.pending_block.success_operations.is_empty() {
-            self.pending_block.pending_block_iteration += 1;
-        }
+        // Iteration is complete, increment it in the pending block.
+        self.pending_block.increment_iteration();
 
         // If pending block contains withdrawals we seal it faster
         let max_miniblock_iterations = if self.pending_block.fast_processing_required {
@@ -323,9 +311,7 @@ impl ZkSyncStateKeeper {
         } else {
             self.max_miniblock_iterations
         };
-        if self.pending_block.chunks_left == 0
-            || self.pending_block.pending_block_iteration > max_miniblock_iterations
-        {
+        if self.pending_block.should_seal(max_miniblock_iterations) {
             self.seal_pending_block().await;
         } else {
             // We've already incremented the pending block iteration, so this iteration will count towards
@@ -368,17 +354,10 @@ impl ZkSyncStateKeeper {
 
         let OpSuccess {
             fee,
-            mut updates,
+            updates,
             executed_op,
         } = self.state.execute_priority_op(priority_op.data.clone());
-
-        self.pending_block.chunks_left -= chunks_needed;
-        self.pending_block.account_updates.append(&mut updates);
-        if let Some(fee) = fee {
-            self.pending_block.collected_fees.push(fee);
-        }
         let block_index = self.pending_block.pending_op_block_index;
-        self.pending_block.pending_op_block_index += 1;
 
         let exec_result = ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
             op: executed_op,
@@ -386,9 +365,14 @@ impl ZkSyncStateKeeper {
             block_index,
             created_at: chrono::Utc::now(),
         }));
-        self.pending_block
-            .success_operations
-            .push(exec_result.clone());
+
+        self.pending_block.add_successful_execution(
+            chunks_needed,
+            updates,
+            fee,
+            exec_result.clone(),
+        );
+
         self.current_unprocessed_priority_op += 1;
 
         metrics::histogram!("state_keeper.apply_priority_op", start.elapsed());
@@ -454,22 +438,16 @@ impl ZkSyncStateKeeper {
             match tx_updates {
                 Ok(OpSuccess {
                     fee,
-                    mut updates,
+                    updates,
                     executed_op,
                 }) => {
                     self.pending_block
                         .gas_counter
                         .add_op(&executed_op)
                         .expect("We have already checked that we can include this tx");
+                    let chunks_used = executed_op.chunks();
 
-                    self.pending_block.chunks_left -= executed_op.chunks();
-                    self.pending_block.account_updates.append(&mut updates);
-                    if let Some(fee) = fee {
-                        self.pending_block.collected_fees.push(fee);
-                    }
                     let block_index = self.pending_block.pending_op_block_index;
-                    self.pending_block.pending_op_block_index += 1;
-
                     let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
                         signed_tx: tx.clone(),
                         success: true,
@@ -479,9 +457,14 @@ impl ZkSyncStateKeeper {
                         created_at: chrono::Utc::now(),
                         batch_id: Some(batch_id),
                     }));
-                    self.pending_block
-                        .success_operations
-                        .push(exec_result.clone());
+
+                    self.pending_block.add_successful_execution(
+                        chunks_used,
+                        updates,
+                        fee,
+                        exec_result.clone(),
+                    );
+
                     executed_operations.push(exec_result);
                 }
                 Err(e) => {
@@ -547,7 +530,7 @@ impl ZkSyncStateKeeper {
         let exec_result = match tx_updates {
             Ok(OpSuccess {
                 fee,
-                mut updates,
+                updates,
                 executed_op,
             }) => {
                 self.pending_block
@@ -555,14 +538,7 @@ impl ZkSyncStateKeeper {
                     .add_op(&executed_op)
                     .expect("We have already checked that we can include this tx");
 
-                self.pending_block.chunks_left -= chunks_needed;
-                self.pending_block.account_updates.append(&mut updates);
-                if let Some(fee) = fee {
-                    self.pending_block.collected_fees.push(fee);
-                }
                 let block_index = self.pending_block.pending_op_block_index;
-                self.pending_block.pending_op_block_index += 1;
-
                 let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
                     signed_tx: tx.clone(),
                     success: true,
@@ -572,9 +548,14 @@ impl ZkSyncStateKeeper {
                     created_at: chrono::Utc::now(),
                     batch_id: None,
                 }));
-                self.pending_block
-                    .success_operations
-                    .push(exec_result.clone());
+
+                self.pending_block.add_successful_execution(
+                    chunks_needed,
+                    updates,
+                    fee,
+                    exec_result.clone(),
+                );
+
                 exec_result
             }
             Err(e) => {
@@ -618,9 +599,6 @@ impl ZkSyncStateKeeper {
                 system_time_timestamp(),
             ),
         );
-        // Once block is sealed, we refresh the counters for the next block.
-        self.success_txs_pending_len = 0;
-        self.failed_txs_pending_len = 0;
 
         let mut block_transactions = pending_block.success_operations;
         block_transactions.extend(
@@ -691,39 +669,9 @@ impl ZkSyncStateKeeper {
     async fn store_pending_block(&mut self) {
         let start = Instant::now();
 
-        // We want include only the newly appeared transactions, since the older ones are already persisted in the
-        // database.
-        // This is a required optimization, since otherwise time to process the pending block may grow without any
-        // limits if we'll be spammed by incorrect transactions (we don't have a limit for an amount of rejected
-        // transactions in the block).
-        let new_success_operations =
-            self.pending_block.success_operations[self.success_txs_pending_len..].to_vec();
-        let new_failed_operations =
-            self.pending_block.failed_txs[self.failed_txs_pending_len..].to_vec();
-
-        self.success_txs_pending_len = self.pending_block.success_operations.len();
-        self.failed_txs_pending_len = self.pending_block.failed_txs.len();
-
-        // Create a pending block object to send.
-        // Note that failed operations are not included, as per any operation failure
-        // the full block is created immediately.
-        let pending_block = SendablePendingBlock {
-            number: self.state.block_number,
-            chunks_left: self.pending_block.chunks_left,
-            unprocessed_priority_op_before: self.pending_block.unprocessed_priority_op_before,
-            pending_block_iteration: self.pending_block.pending_block_iteration,
-            success_operations: new_success_operations,
-            failed_txs: new_failed_operations,
-            previous_block_root_hash: self.pending_block.previous_block_root_hash,
-            timestamp: self.pending_block.timestamp,
-        };
-        let first_update_order_id = self.pending_block.stored_account_updates;
-        let account_updates = self.pending_block.account_updates[first_update_order_id..].to_vec();
-        let applied_updates_request = AppliedUpdatesRequest {
-            account_updates,
-            first_update_order_id,
-        };
-        self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
+        let (pending_block, applied_updates_request) = self
+            .pending_block
+            .prepare_storing_block(self.state.block_number);
 
         vlog::debug!(
             "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",

@@ -2,10 +2,12 @@
 // Workspace uses
 use zksync_state::state::CollectedFee;
 use zksync_types::{
-    block::{ExecutedOperations, ExecutedTx},
+    block::{ExecutedOperations, ExecutedTx, PendingBlock as SendablePendingBlock},
     gas_counter::GasCounter,
-    AccountUpdates, H256,
+    AccountUpdates, BlockNumber, H256,
 };
+
+use crate::committer::AppliedUpdatesRequest;
 // Local uses
 
 #[derive(Debug, Clone)]
@@ -26,6 +28,13 @@ pub(super) struct PendingBlock {
     pub(super) stored_account_updates: usize,
     pub(super) previous_block_root_hash: H256,
     pub(super) timestamp: u64,
+
+    // Two fields below are for optimization: we don't want to overwrite all the block contents over and over.
+    // With these fields we'll be able save the diff between two pending block states only.
+    /// Amount of succeeded transactions in the pending block at the last pending block synchronization step.
+    success_txs_pending_len: usize,
+    /// Amount of failed transactions in the pending block at the last pending block synchronization step.
+    failed_txs_pending_len: usize,
 }
 
 impl PendingBlock {
@@ -54,6 +63,79 @@ impl PendingBlock {
             stored_account_updates: 0,
             previous_block_root_hash,
             timestamp,
+
+            success_txs_pending_len: 0,
+            failed_txs_pending_len: 0,
         }
+    }
+
+    pub(super) fn increment_iteration(&mut self) {
+        if !self.success_operations.is_empty() {
+            self.pending_block_iteration += 1;
+        }
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.failed_txs.is_empty() && self.success_operations.is_empty()
+    }
+
+    pub(super) fn should_seal(&self, miniblock_iterations: usize) -> bool {
+        self.chunks_left == 0 || self.pending_block_iteration > miniblock_iterations
+    }
+
+    pub(super) fn add_successful_execution(
+        &mut self,
+        chunks_used: usize,
+        mut updates: AccountUpdates,
+        fee: Option<CollectedFee>,
+        exec_result: ExecutedOperations,
+    ) {
+        self.chunks_left -= chunks_used; // TODO: Use checked sub.
+        self.account_updates.append(&mut updates);
+        if let Some(fee) = fee {
+            self.collected_fees.push(fee);
+        }
+        self.pending_op_block_index += 1;
+        self.success_operations.push(exec_result);
+    }
+
+    pub(super) fn prepare_storing_block(
+        &mut self,
+        current_block: BlockNumber,
+    ) -> (SendablePendingBlock, AppliedUpdatesRequest) {
+        // We want include only the newly appeared transactions, since the older ones are already persisted in the
+        // database.
+        // This is a required optimization, since otherwise time to process the pending block may grow without any
+        // limits if we'll be spammed by incorrect transactions (we don't have a limit for an amount of rejected
+        // transactions in the block).
+        let new_success_operations =
+            self.success_operations[self.success_txs_pending_len..].to_vec();
+        let new_failed_operations = self.failed_txs[self.failed_txs_pending_len..].to_vec();
+
+        self.success_txs_pending_len = self.success_operations.len();
+        self.failed_txs_pending_len = self.failed_txs.len();
+
+        // Create a pending block object to send.
+        // Note that failed operations are not included, as per any operation failure
+        // the full block is created immediately.
+        let pending_block = SendablePendingBlock {
+            number: current_block,
+            chunks_left: self.chunks_left,
+            unprocessed_priority_op_before: self.unprocessed_priority_op_before,
+            pending_block_iteration: self.pending_block_iteration,
+            success_operations: new_success_operations,
+            failed_txs: new_failed_operations,
+            previous_block_root_hash: self.previous_block_root_hash,
+            timestamp: self.timestamp,
+        };
+        let first_update_order_id = self.stored_account_updates;
+        let account_updates = self.account_updates[first_update_order_id..].to_vec();
+        let applied_updates_request = AppliedUpdatesRequest {
+            account_updates,
+            first_update_order_id,
+        };
+        self.stored_account_updates = self.account_updates.len();
+
+        (pending_block, applied_updates_request)
     }
 }
