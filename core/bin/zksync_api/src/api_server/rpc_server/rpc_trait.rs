@@ -125,6 +125,7 @@ impl Rpc for RpcApp {
         spawn!(self._impl_tx_info(hash))
     }
 
+    // Important: the last parameter should have name `meta` and be of type `RequestMetadata`
     fn tx_submit(
         &self,
         tx: Box<ZkSyncTx>,
@@ -135,6 +136,7 @@ impl Rpc for RpcApp {
         spawn!(self._impl_tx_submit(tx, signature, fast_processing, meta))
     }
 
+    // Important: the last parameter should have name `meta` and be of type `RequestMetadata`
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
@@ -152,6 +154,7 @@ impl Rpc for RpcApp {
         spawn!(self._impl_tokens())
     }
 
+    // Important: the last parameter should have name `meta` and be of type `RequestMetadata`
     fn get_tx_fee(
         &self,
         tx_type: ApiTxFeeTypes,
@@ -162,6 +165,7 @@ impl Rpc for RpcApp {
         spawn!(self._impl_get_tx_fee(tx_type, address, token_like, meta))
     }
 
+    // Important: the last parameter should have name `meta` and be of type `RequestMetadata`
     fn get_txs_batch_fee_in_wei(
         &self,
         tx_types: Vec<ApiTxFeeTypes>,

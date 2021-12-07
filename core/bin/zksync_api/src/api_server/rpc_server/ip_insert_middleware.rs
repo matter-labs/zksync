@@ -9,6 +9,7 @@ use jsonrpc_http_server::{RequestMiddleware, RequestMiddlewareAction};
 use super::types::RequestMetadata;
 
 const CLOUDFLARE_CONNECTING_IP_HEADER: &str = "CF-Connecting-IP";
+const METADATA_PARAM_NAME: &str = "meta";
 
 ///
 /// Unfortunately, the JSON-RPC library does not natively support retrieving any information about the HTTP request,
@@ -42,74 +43,86 @@ impl MethodWithIpDescription {
 /// which is identical to the supplied one, but with the IP appended.
 fn get_call_with_ip_if_needed(
     call: jsonrpc_core::MethodCall,
-    ip: String,
+    ip: Option<String>,
 ) -> jsonrpc_core::MethodCall {
     // Methods, which should have the information about the ip appended to them
-    let mut methods_with_ip: HashMap<String, MethodWithIpDescription> = HashMap::new();
+    let mut methods_with_ip: HashMap<&'static str, MethodWithIpDescription> = HashMap::new();
 
     // Unfortunately at this moment the compiler from the CI does not support creating HashMap from iterator/array
-    methods_with_ip.insert("tx_submit".to_owned(), MethodWithIpDescription::new(1, 4));
+    methods_with_ip.insert("tx_submit", MethodWithIpDescription::new(1, 4));
+    methods_with_ip.insert("submit_txs_batch", MethodWithIpDescription::new(1, 3));
+    methods_with_ip.insert("get_tx_fee", MethodWithIpDescription::new(3, 4));
     methods_with_ip.insert(
-        "submit_txs_batch".to_owned(),
-        MethodWithIpDescription::new(1, 3),
-    );
-    methods_with_ip.insert("get_tx_fee".to_owned(), MethodWithIpDescription::new(3, 4));
-    methods_with_ip.insert(
-        "get_txs_batch_fee_in_wei".to_owned(),
+        "get_txs_batch_fee_in_wei",
         MethodWithIpDescription::new(3, 4),
     );
 
-    let description = methods_with_ip.get(&call.method);
+    let description = methods_with_ip.get(call.method.as_str());
     let description = if let Some(desc) = description {
         desc
     } else {
         return call;
     };
 
+    let metadata = ip.map(|ip| {
+        let metadata = RequestMetadata { ip };
+        serde_json::to_value(metadata).unwrap()
+    });
+
     let mut new_call = call.clone();
 
-    // We add ip only to array of parameters
-    if let Params::Array(mut params) = call.params {
-        // The query is definitely wrong. We may proceed and the server will handle it normally
-        if params.len() > description.maximum_params || params.len() < description.minimum_params {
-            return new_call;
+    match call.params {
+        Params::Array(mut params) => {
+            // The query is definitely wrong. We may proceed and the server will handle it normally
+            if params.len() > description.maximum_params
+                || params.len() < description.minimum_params
+            {
+                return new_call;
+            }
+
+            // If the length is equsl to the maximum amount of the
+            // maximum_params, then the user tried to override the metadata
+            if params.len() == description.maximum_params {
+                params.pop();
+            }
+
+            // Fill optional params with null
+            while params.len() < description.maximum_params - 1 {
+                params.push(serde_json::Value::Null);
+            }
+
+            if let Some(metadata) = metadata {
+                params.push(metadata);
+                new_call.params = Params::Array(params);
+            }
+
+            new_call
         }
+        Params::Map(mut params_map) => {
+            if let Some(metadata) = metadata {
+                params_map.insert(METADATA_PARAM_NAME.to_owned(), metadata);
+            } else {
+                // Just in case the user tried to override the value in the map
+                params_map.remove(METADATA_PARAM_NAME);
+            }
+            new_call.params = Params::Map(params_map);
 
-        // If the length is equsl to the maximum amount of the
-        // maximum_params, then the user tried to override ip
-        if params.len() == description.maximum_params {
-            params.pop();
+            new_call
         }
-
-        // Fill optional params with null
-        while params.len() < description.maximum_params - 1 {
-            params.push(serde_json::Value::Null);
-        }
-
-        let metadata = RequestMetadata { ip };
-        let metadata = serde_json::to_value(metadata).unwrap();
-
-        params.push(metadata);
-
-        new_call.params = Params::Array(params);
-        new_call
-    } else {
-        call
+        _ => call,
     }
 }
 
 /// Given the HTTP body of the JSON-RPC request and the IP of the user, inserts the information about it
-/// in the call (if needed) and returns the bytes of the new body
-async fn insert_ip(body: hyper::Body, ip: String) -> hyper::Result<Vec<u8>> {
+/// in the call (if needed) and returns the bytes of the new body.
+/// If the IP supplied is None, the method makes sure that the user could not pass the IP
+async fn insert_ip_if_needed(body: hyper::Body, ip: Option<String>) -> hyper::Result<Vec<u8>> {
     let body_stream: Vec<_> = body.collect().await;
-    let body_bytes: hyper::Result<Vec<_>> = body_stream.into_iter().collect();
 
-    // The `?` is here to let Rust resolve body_bytes as a vector of Bytes structs
-    let mut body_bytes: Vec<u8> = body_bytes?
-        .into_iter()
-        .map(|b| b.into_iter().collect::<Vec<u8>>())
-        .flatten()
-        .collect();
+    let mut body_bytes = vec![];
+    for bytes in body_stream {
+        body_bytes.extend(bytes?.into_iter());
+    }
 
     let body_str = String::from_utf8(body_bytes.clone());
 
@@ -131,31 +144,31 @@ impl RequestMiddleware for IpInsertMiddleWare {
     fn on_request(&self, request: hyper::Request<hyper::Body>) -> RequestMiddlewareAction {
         let (parts, body) = request.into_parts();
 
-        let remote_ip = match parts.headers.get(CLOUDFLARE_CONNECTING_IP_HEADER) {
-            Some(ip) => ip.to_str(),
-            None => {
-                return RequestMiddlewareAction::Proceed {
-                    should_continue_on_invalid_cors: false,
-                    request: hyper::Request::from_parts(parts, body),
-                }
-            }
-        };
-        let remote_ip = if let Err(e) = remote_ip {
-            vlog::warn!("Failed to parse CF-Connecting-IP header. Reason: {}", e);
-            return RequestMiddlewareAction::Proceed {
+        let cloudflare_ip = parts
+            .headers
+            .get(CLOUDFLARE_CONNECTING_IP_HEADER)
+            .map(|ip| ip.to_str().map(|s| s.to_owned()));
+
+        let proceed = move |ip: Option<String>| {
+            let body_bytes = insert_ip_if_needed(body, ip).into_stream();
+            let body = hyper::Body::wrap_stream(body_bytes);
+            RequestMiddlewareAction::Proceed {
                 should_continue_on_invalid_cors: false,
                 request: hyper::Request::from_parts(parts, body),
-            };
-        } else {
-            remote_ip.unwrap()
+            }
         };
 
-        let body_bytes = insert_ip(body, remote_ip.to_owned()).into_stream();
-        let body = hyper::Body::wrap_stream(body_bytes);
-
-        RequestMiddlewareAction::Proceed {
-            should_continue_on_invalid_cors: false,
-            request: hyper::Request::from_parts(parts, body),
+        match cloudflare_ip {
+            None => {
+                // We still need to check that the user didn't try to pass the metadata
+                proceed(None)
+            }
+            Some(Err(e)) => {
+                vlog::warn!("Failed to parse CF-Connecting-IP header. Reason: {}", e);
+                // We still need to check that the user didn't try to pass the metadata
+                proceed(None)
+            }
+            Some(Ok(ip)) => proceed(Some(ip)),
         }
     }
 }
