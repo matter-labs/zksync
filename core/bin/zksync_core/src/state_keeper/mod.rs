@@ -655,6 +655,14 @@ impl ZkSyncStateKeeper {
             fast_processing: pending_block.fast_processing_required,
         };
 
+        for tx in &block.block_transactions {
+            let labels = vec![
+                ("stage", "seal_block".to_string()),
+                ("name", tx.variance_name()),
+                ("token", tx.token_id().to_string()),
+            ];
+            metrics::increment_counter!("process_tx", &labels);
+        }
         let block_commit_request = BlockCommitRequest {
             block,
             block_metadata,

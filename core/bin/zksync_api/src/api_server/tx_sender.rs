@@ -381,6 +381,13 @@ impl TxSender {
         tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
     ) -> Result<TxHash, SubmitError> {
+        let labels = vec![
+            ("stage", "api".to_string()),
+            ("name", tx.variance_name()),
+            ("token", tx.token_id().to_string()),
+        ];
+        metrics::increment_counter!("process_tx", &labels);
+
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
         }
@@ -494,6 +501,16 @@ impl TxSender {
         if txs.len() > self.max_number_of_transactions_per_batch {
             return Err(SubmitError::TxAdd(TxAddError::BatchTooBig));
         }
+
+        for tx in &txs {
+            let labels = vec![
+                ("stage", "api".to_string()),
+                ("name", tx.tx.variance_name()),
+                ("token", tx.tx.token_id().to_string()),
+            ];
+            metrics::increment_counter!("process_tx", &labels);
+        }
+
         // Same check but in terms of signatures.
         if eth_signatures.len() > self.max_number_of_authors_per_batch {
             return Err(SubmitError::TxAdd(TxAddError::EthSignaturesLimitExceeded));

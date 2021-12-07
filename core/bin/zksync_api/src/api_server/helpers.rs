@@ -88,9 +88,9 @@ async fn get_pending_ops(
 
     metrics::histogram!(
         "api",
-        "type" = "rpc",
         start.elapsed(),
-        "endpoint" = "get_ongoing_deposits"
+        "type" => "rpc",
+        "endpoint" => "get_ongoing_deposits"
     );
     Ok(OngoingDepositsResp { deposits })
 }

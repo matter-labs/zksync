@@ -10,6 +10,7 @@ use zksync_types::ethereum::{ETHOperation, EthOpId, InsertedOperationResponse};
 // Local uses
 use super::transactions::ETHStats;
 use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use zksync_types::block::Block;
 
 /// Abstract database access trait, optimized for the needs of `ETHSender`.
 #[async_trait::async_trait]
@@ -261,6 +262,8 @@ impl DatabaseInterface for Database {
         match &op.op {
             Some((_, AggregatedOperation::CommitBlocks(op))) => {
                 let (first_block, last_block) = op.block_range();
+
+                self.set_metrics(&op.blocks, "L1_commit".to_string()).await;
                 transaction
                     .chain()
                     .operations_schema()
@@ -273,6 +276,8 @@ impl DatabaseInterface for Database {
             }
             Some((_, AggregatedOperation::PublishProofBlocksOnchain(op))) => {
                 let (first_block, last_block) = op.block_range();
+                self.set_metrics(&op.blocks, "L1_publish_proof".to_string())
+                    .await;
                 transaction
                     .chain()
                     .operations_schema()
@@ -285,6 +290,7 @@ impl DatabaseInterface for Database {
             }
             Some((_, AggregatedOperation::ExecuteBlocks(op))) => {
                 let (first_block, last_block) = op.block_range();
+                self.set_metrics(&op.blocks, "L1_execute".to_string()).await;
                 for block in &op.blocks {
                     transaction
                         .chain()
@@ -336,5 +342,19 @@ impl DatabaseInterface for Database {
             .update_gas_price(gas_price_limit, average_gas_price)
             .await?;
         Ok(())
+    }
+}
+impl Database {
+    async fn set_metrics(&self, blocks: &[Block], stage: String) {
+        for block in blocks {
+            for tx in &block.block_transactions {
+                let labels = vec![
+                    ("stage", stage.clone()),
+                    ("name", tx.variance_name()),
+                    ("token", tx.token_id().to_string()),
+                ];
+                metrics::increment_counter!("process_tx", &labels);
+            }
+        }
     }
 }

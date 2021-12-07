@@ -1,7 +1,7 @@
 //! zkSync network block definition.
 
 use super::{AccountId, BlockNumber, Fr, PriorityOp, ZkSyncOp};
-use crate::{tx::error::CloseOperationsDisabled, SignedZkSyncTx};
+use crate::{tx::error::CloseOperationsDisabled, SignedZkSyncTx, TokenId};
 use chrono::Utc;
 use chrono::{DateTime, TimeZone};
 use parity_crypto::digest::sha256;
@@ -86,6 +86,21 @@ pub enum ExecutedOperations {
 
 impl ExecutedOperations {
     /// Returns Id of the account affected by the operation.
+
+    pub fn token_id(&self) -> TokenId {
+        match self {
+            ExecutedOperations::Tx(tx) => tx.signed_tx.tx.token_id(),
+            ExecutedOperations::PriorityOp(op) => op.priority_op.data.token_id(),
+        }
+    }
+
+    pub fn variance_name(&self) -> String {
+        match self {
+            ExecutedOperations::Tx(tx) => tx.signed_tx.tx.variance_name(),
+            ExecutedOperations::PriorityOp(op) => op.priority_op.data.variance_name(),
+        }
+    }
+
     pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ExecutedOperations::Tx(tx) => tx.signed_tx.account_id(),

@@ -358,19 +358,21 @@ impl MempoolBlocksHandler {
 
         for pr_op in &priority_ops {
             let labels = vec![
+                ("stage", "propose_block".to_string()),
                 ("name", pr_op.data.variance_name()),
                 ("token", pr_op.data.token_id().to_string()),
             ];
-            metrics::increment_counter!("mempool.transactions_count", &labels)
+            metrics::increment_counter!("process_tx", &labels)
         }
 
         for tx_variant in &txs {
             for tx in tx_variant.get_transactions() {
                 let labels = vec![
+                    ("stage", "propose_block".to_string()),
                     ("name", tx.tx.variance_name()),
                     ("token", tx.tx.token_id().to_string()),
                 ];
-                metrics::increment_counter!("mempool.transactions_count", &labels)
+                metrics::increment_counter!("process_tx", &labels);
             }
         }
         ProposedBlock { priority_ops, txs }
@@ -565,6 +567,13 @@ impl MempoolTransactionsHandler {
                 TxAddError::DbError
             })?;
 
+        let labels = vec![
+            ("stage", "mempool".to_string()),
+            ("name", tx.tx.variance_name()),
+            ("token", tx.tx.token_id().to_string()),
+        ];
+        metrics::increment_counter!("process_tx", &labels);
+
         self.mempool_state.write().await.add_tx(tx);
         Ok(())
     }
@@ -596,6 +605,15 @@ impl MempoolTransactionsHandler {
             vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
+
+        for tx in &batch.txs {
+            let labels = vec![
+                ("stage", "mempool".to_string()),
+                ("name", tx.tx.variance_name()),
+                ("token", tx.tx.token_id().to_string()),
+            ];
+            metrics::increment_counter!("process_tx", &labels);
+        }
 
         let batch_id = storage
             .chain()
