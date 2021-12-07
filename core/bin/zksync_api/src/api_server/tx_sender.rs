@@ -605,6 +605,7 @@ impl TxSender {
             )
             .await
             .map_err(|e| {
+                metrics::increment_counter!("tx_sender.submit_tx.store_subsidy_data_fail");
                 SubmitError::Other(format!(
                     "Failed to store the subsidy to database. Reason: {}",
                     e
@@ -897,6 +898,8 @@ impl TxSender {
             )
             .await
             .map_err(|e| {
+                metrics::increment_counter!("tx_sender.submit_txs_batch.store_subsidy_data_fail");
+
                 SubmitError::Other(format!(
                     "Failed to store the subsidy to database. Reason: {}",
                     e
