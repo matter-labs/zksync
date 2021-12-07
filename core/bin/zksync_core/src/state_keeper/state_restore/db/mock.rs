@@ -14,14 +14,15 @@ pub(crate) struct MockBlock {
     pub(crate) hash: Fr,
 }
 
+/// Mock implementation of storage for unit-tests.
 #[derive(Debug, Default, Clone)]
-pub(crate) struct StateRestoreMockImpl {
+pub(crate) struct MockStateRestoreStorage {
     tree_caches: HashMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>,
     blocks: Vec<MockBlock>,
     verified_at: BlockNumber,
 }
 
-impl StateRestoreMockImpl {
+impl MockStateRestoreStorage {
     pub(crate) fn new() -> Self {
         Self::default()
     }
@@ -61,7 +62,7 @@ impl StateRestoreMockImpl {
 }
 
 #[async_trait::async_trait]
-impl StateRestoreDb for StateRestoreMockImpl {
+impl StateRestoreDb for MockStateRestoreStorage {
     async fn load_last_committed_block(&mut self) -> BlockNumber {
         self.current_block()
     }

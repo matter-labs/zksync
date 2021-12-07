@@ -6,9 +6,9 @@ use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
 
 #[cfg(test)]
 pub(crate) mod mock;
-pub(crate) mod postgres;
+pub(crate) mod storage;
 
-pub(crate) use self::postgres::StateRestorePostgresImpl;
+pub(crate) use self::storage::StateRestoreStorage;
 
 /// Database abstraction for the state keeper state restoring.
 /// Mock implementation allows us to write tests for the state restoring logic

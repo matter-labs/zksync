@@ -5,27 +5,26 @@ use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
 // Local uses
 use super::StateRestoreDb;
 
+/// Real implementation of the storage interface atop of the `zksync_storage` crate.
 #[derive(Debug)]
-pub(crate) struct StateRestorePostgresImpl<'a, 'b> {
+pub(crate) struct StateRestoreStorage<'a, 'b> {
     storage: &'a mut zksync_storage::StorageProcessor<'b>,
 }
 
-impl<'a, 'b> From<&'a mut zksync_storage::StorageProcessor<'b>>
-    for StateRestorePostgresImpl<'a, 'b>
-{
+impl<'a, 'b> From<&'a mut zksync_storage::StorageProcessor<'b>> for StateRestoreStorage<'a, 'b> {
     fn from(storage: &'a mut zksync_storage::StorageProcessor<'b>) -> Self {
         Self::new(storage)
     }
 }
 
-impl<'a, 'b> StateRestorePostgresImpl<'a, 'b> {
+impl<'a, 'b> StateRestoreStorage<'a, 'b> {
     pub(crate) fn new(storage: &'a mut zksync_storage::StorageProcessor<'b>) -> Self {
         Self { storage }
     }
 }
 
 #[async_trait::async_trait]
-impl<'a, 'b> StateRestoreDb for StateRestorePostgresImpl<'a, 'b> {
+impl<'a, 'b> StateRestoreDb for StateRestoreStorage<'a, 'b> {
     async fn load_last_committed_block(&mut self) -> BlockNumber {
         self.storage
             .chain()
