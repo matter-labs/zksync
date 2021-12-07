@@ -514,6 +514,8 @@ mod tests {
         })))
     }
 
+    // While the values of the PendingOpsFlattenRequest's fields are never directly
+    // used in the tests, we still need them to specify the JSON format of the `unconfirmed_ops` endpoint input in tests.
     #[derive(Debug, Deserialize)]
     #[allow(dead_code)]
     struct PendingOpsFlattenRequest {

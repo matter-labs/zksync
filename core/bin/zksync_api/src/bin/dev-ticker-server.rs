@@ -91,6 +91,8 @@ async fn handle_coinmarketcap_token_price_query(
 #[derive(Debug, Deserialize)]
 struct Token {
     pub address: Address,
+    // While never used directly, it is better to keep this field here so that it is easy to know what fields are
+    // available for the test tokens.
     #[allow(dead_code)]
     pub decimals: u8,
     pub symbol: String,
