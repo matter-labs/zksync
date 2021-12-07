@@ -7,6 +7,7 @@ use zksync_types::{AccountMap, AccountUpdates, BlockNumber};
 // Local uses
 use super::StateRestoreDb;
 
+/// Minimal implementation of block that has all the information required for the state restore.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct MockBlock {
     pub(crate) updates: AccountUpdates,
@@ -76,8 +77,14 @@ impl StateRestoreDb for MockStateRestoreStorage {
         from_block: BlockNumber,
         to_block: BlockNumber,
     ) -> Option<AccountUpdates> {
-        if from_block > self.load_last_committed_block().await {
-            return None;
+        let last_existing_block = self.load_last_committed_block().await;
+        if from_block > last_existing_block || to_block > last_existing_block {
+            // Tree restore procedure is expected to check all the ranges and should not operate
+            // outside of the actual blocks range.
+            panic!(
+                "Requested range beyond the last block. Last block in mock state: {}; requested range for {}:{}",
+                last_existing_block, from_block, to_block
+            );
         }
 
         let mut updates = Vec::new();
@@ -94,6 +101,7 @@ impl StateRestoreDb for MockStateRestoreStorage {
 
     async fn load_verified_state(&mut self) -> (BlockNumber, AccountMap) {
         if self.verified_at == BlockNumber(0) {
+            // There is no verified state, use the very first block insteat.
             let committed_state = self.load_committed_state(BlockNumber(1)).await;
             return (BlockNumber(1), committed_state);
         }
