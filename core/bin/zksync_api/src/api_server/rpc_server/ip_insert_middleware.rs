@@ -11,7 +11,6 @@ use super::types::RequestMetadata;
 const CLOUDFLARE_CONNECTING_IP_HEADER: &str = "CF-Connecting-IP";
 const METADATA_PARAM_NAME: &str = "meta";
 
-///
 /// Unfortunately, the JSON-RPC library does not natively support retrieving any information about the HTTP request,
 ///
 /// But since the logic of subsidies relies on IP of the sender, we need to somehow extract the ip of the user from `CF-Connecting-IP`
@@ -21,10 +20,11 @@ const METADATA_PARAM_NAME: &str = "meta";
 /// parameter of the JSON-RPC call.  
 pub struct IpInsertMiddleWare {}
 
-/// Struct which is used to describe the minimum number of parameters and the maximum number of parameters for a single JSON-RPC method
+/// Structure that is used to describe the minimum and the maximum number
+/// of parameters for a single JSON-RPC method.
 struct MethodWithIpDescription {
     minimum_params: usize,
-    // the last one is always the ip parameter
+    // The last one is always the IP parameter.
     maximum_params: usize,
 }
 
@@ -37,7 +37,7 @@ impl MethodWithIpDescription {
     }
 }
 
-/// Get the original JSON-RPC MethodCall object and the IP of the user.
+/// Gets the original JSON-RPC `MethodCall` object and the IP of the user.
 /// If the method does not need the information about the IP of the user, simply returns the supplied call.
 /// If the method should have information about the IP appended to its parameters, it returns the new call
 /// which is identical to the supplied one, but with the IP appended.
@@ -80,8 +80,8 @@ fn get_call_with_ip_if_needed(
                 return new_call;
             }
 
-            // If the length is equsl to the maximum amount of the
-            // maximum_params, then the user tried to override the metadata
+            // If the length is equal to the maximum amount of the
+            // maximum_params, then the user tried to override the ip
             if params.len() == description.maximum_params {
                 params.pop();
             }
