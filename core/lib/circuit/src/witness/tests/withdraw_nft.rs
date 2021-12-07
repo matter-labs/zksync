@@ -97,7 +97,7 @@ fn apply_nft_mint_and_withdraw_operations() -> ZkSyncCircuit<'static, Bn256> {
         .unwrap();
     fees.push(fee);
 
-    let witness = MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft_op);
+    let witness = MintNFTWitness::apply_tx(witness_accum.account_tree, &mint_nft_op);
     let circuit_operations = witness.calculate_operations(mint_nft_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -116,7 +116,7 @@ fn apply_nft_mint_and_withdraw_operations() -> ZkSyncCircuit<'static, Bn256> {
             .unwrap();
     fees.push(fee);
 
-    let witness = WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft_op);
+    let witness = WithdrawNFTWitness::apply_tx(witness_accum.account_tree, &withdraw_nft_op);
     let circuit_operations = witness.calculate_operations(withdraw_nft_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -283,7 +283,7 @@ fn test_withdraw_nft_with_zero_balance() {
     let mut witness_accum =
         WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1), 0);
 
-    let witness = MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft_op);
+    let witness = MintNFTWitness::apply_tx(witness_accum.account_tree, &mint_nft_op);
     let circuit_operations = witness.calculate_operations(mint_nft_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -294,7 +294,7 @@ fn test_withdraw_nft_with_zero_balance() {
         offset_commitment,
     );
 
-    let witness = WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft_op);
+    let witness = WithdrawNFTWitness::apply_tx(witness_accum.account_tree, &withdraw_nft_op);
     let circuit_operations = witness.calculate_operations(withdraw_nft_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -398,7 +398,7 @@ fn test_withdraw_nft_corrupted_ops_input() {
         let mut witness_accum =
             WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1), 0);
 
-        let witness = MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft_op);
+        let witness = MintNFTWitness::apply_tx(witness_accum.account_tree, &mint_nft_op);
         let circuit_operations = witness.calculate_operations(mint_nft_input.clone());
         let pub_data_from_witness = witness.get_pubdata();
         let offset_commitment = witness.get_offset_commitment_data();
@@ -409,8 +409,7 @@ fn test_withdraw_nft_corrupted_ops_input() {
             offset_commitment,
         );
 
-        let witness =
-            WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft_op);
+        let witness = WithdrawNFTWitness::apply_tx(witness_accum.account_tree, &withdraw_nft_op);
         let circuit_operations = witness.calculate_operations(withdraw_nft_corrupted_input);
         let pub_data_from_witness = witness.get_pubdata();
         let offset_commitment = witness.get_offset_commitment_data();

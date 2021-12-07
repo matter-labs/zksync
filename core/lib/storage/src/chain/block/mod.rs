@@ -939,7 +939,28 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Gets stored account tree cache for a block
+    /// Gets the number of the latest block that has a stored cache.
+    /// Returns `None` if there are no caches in the database.
+    pub async fn get_last_block_with_account_tree_cache(
+        &mut self,
+    ) -> QueryResult<Option<BlockNumber>> {
+        let start = Instant::now();
+
+        let last_block_with_cache = sqlx::query!("SELECT MAX(block) FROM account_tree_cache")
+            .fetch_one(self.0.conn())
+            .await?
+            .max;
+
+        metrics::histogram!(
+            "sql.chain.block.get_last_block_with_account_tree_cache",
+            start.elapsed()
+        );
+        Ok(last_block_with_cache.map(|block| BlockNumber(block as u32)))
+    }
+
+    /// Gets the latest stored account tree cache.
+    /// Returns `None` if there are no caches in the database.
+    /// Returns the block number and associated cache otherwise.
     pub async fn get_account_tree_cache(
         &mut self,
     ) -> QueryResult<Option<(BlockNumber, serde_json::Value)>> {
@@ -965,7 +986,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         }))
     }
 
-    /// Gets stored account tree cache for a block
+    /// Gets stored account tree cache for a certain block.
+    /// Returns `None` if there is no cache for requested block.
     pub async fn get_account_tree_cache_block(
         &mut self,
         block: BlockNumber,

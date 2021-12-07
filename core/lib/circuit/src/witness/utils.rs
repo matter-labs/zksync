@@ -173,10 +173,10 @@ impl<'a> WitnessBuilder<'a> {
                 .to_vec(),
         );
         let (mut root_after_fee, mut fee_account_witness) =
-            crate::witness::utils::apply_fee(&mut self.account_tree, *self.fee_account_id, 0, 0);
+            crate::witness::utils::apply_fee(self.account_tree, *self.fee_account_id, 0, 0);
         for CollectedFee { token, amount } in fees {
             let (root, acc_witness) = crate::witness::utils::apply_fee(
-                &mut self.account_tree,
+                self.account_tree,
                 *self.fee_account_id,
                 **token as u32,
                 amount.to_u128().unwrap(),
@@ -765,7 +765,7 @@ pub fn build_block_witness<'a>(
         match op {
             ZkSyncOp::Deposit(deposit) => {
                 let deposit_witness =
-                    DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit);
+                    DepositWitness::apply_tx(witness_accum.account_tree, &deposit);
 
                 let deposit_operations = deposit_witness.calculate_operations(());
                 operations.extend(deposit_operations);
@@ -774,7 +774,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::Transfer(transfer) => {
                 let transfer_witness =
-                    TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer);
+                    TransferWitness::apply_tx(witness_accum.account_tree, &transfer);
 
                 let input = SigDataInput::from_transfer_op(&transfer)?;
                 let transfer_operations = transfer_witness.calculate_operations(input);
@@ -788,10 +788,8 @@ pub fn build_block_witness<'a>(
                 offset_commitment.extend(transfer_witness.get_offset_commitment_data())
             }
             ZkSyncOp::TransferToNew(transfer_to_new) => {
-                let transfer_to_new_witness = TransferToNewWitness::apply_tx(
-                    &mut witness_accum.account_tree,
-                    &transfer_to_new,
-                );
+                let transfer_to_new_witness =
+                    TransferToNewWitness::apply_tx(witness_accum.account_tree, &transfer_to_new);
 
                 let input = SigDataInput::from_transfer_to_new_op(&transfer_to_new)?;
                 let transfer_to_new_operations =
@@ -807,7 +805,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::Withdraw(withdraw) => {
                 let withdraw_witness =
-                    WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw);
+                    WithdrawWitness::apply_tx(witness_accum.account_tree, &withdraw);
 
                 let input = SigDataInput::from_withdraw_op(&withdraw)?;
                 let withdraw_operations = withdraw_witness.calculate_operations(input);
@@ -822,7 +820,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::Close(close) => {
                 let close_account_witness =
-                    CloseAccountWitness::apply_tx(&mut witness_accum.account_tree, &close);
+                    CloseAccountWitness::apply_tx(witness_accum.account_tree, &close);
 
                 let input = SigDataInput::from_close_op(&close)?;
                 let close_account_operations = close_account_witness.calculate_operations(input);
@@ -835,7 +833,7 @@ pub fn build_block_witness<'a>(
                 let success = full_exit_op.withdraw_amount.is_some();
 
                 let full_exit_witness = FullExitWitness::apply_tx(
-                    &mut witness_accum.account_tree,
+                    witness_accum.account_tree,
                     &(*full_exit_op, success),
                 );
 
@@ -847,7 +845,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::ChangePubKeyOffchain(change_pkhash_op) => {
                 let change_pkhash_witness = ChangePubkeyOffChainWitness::apply_tx(
-                    &mut witness_accum.account_tree,
+                    witness_accum.account_tree,
                     &change_pkhash_op,
                 );
 
@@ -864,7 +862,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::ForcedExit(forced_exit) => {
                 let forced_exit_witness =
-                    ForcedExitWitness::apply_tx(&mut witness_accum.account_tree, &forced_exit);
+                    ForcedExitWitness::apply_tx(witness_accum.account_tree, &forced_exit);
 
                 let input = SigDataInput::from_forced_exit_op(&forced_exit)?;
                 let forced_exit_operations = forced_exit_witness.calculate_operations(input);
@@ -878,7 +876,7 @@ pub fn build_block_witness<'a>(
                 offset_commitment.extend(forced_exit_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Swap(swap) => {
-                let swap_witness = SwapWitness::apply_tx(&mut witness_accum.account_tree, &swap);
+                let swap_witness = SwapWitness::apply_tx(witness_accum.account_tree, &swap);
 
                 let input = (
                     SigDataInput::from_order(&swap.tx.orders.0)?,
@@ -899,7 +897,7 @@ pub fn build_block_witness<'a>(
             ZkSyncOp::Noop(_) => {} // Noops are handled below
             ZkSyncOp::MintNFTOp(mint_nft) => {
                 let mint_nft_witness =
-                    MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft);
+                    MintNFTWitness::apply_tx(witness_accum.account_tree, &mint_nft);
 
                 let input = SigDataInput::from_mint_nft_op(&mint_nft)?;
                 let mint_nft_operations = mint_nft_witness.calculate_operations(input);
@@ -914,7 +912,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::WithdrawNFT(withdraw_nft) => {
                 let withdraw_nft_witness =
-                    WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft);
+                    WithdrawNFTWitness::apply_tx(witness_accum.account_tree, &withdraw_nft);
 
                 let input = SigDataInput::from_withdraw_nft_op(&withdraw_nft)?;
                 let withdraw_nft_operations = withdraw_nft_witness.calculate_operations(input);

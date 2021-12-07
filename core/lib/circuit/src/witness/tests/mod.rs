@@ -233,7 +233,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         <ZkSyncState as TxHandler<Deposit>>::apply_op(&mut plasma_state, &deposit_op)
             .expect("Deposit failed");
 
-        let witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+        let witness = DepositWitness::apply_tx(witness_accum.account_tree, &deposit_op);
         let circuit_operations = witness.calculate_operations(());
         let pub_data_from_witness = witness.get_pubdata();
         let offset_commitment = witness.get_offset_commitment_data();
@@ -253,7 +253,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         .unwrap();
     fees.push(fee);
 
-    let witness = TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer_op);
+    let witness = TransferWitness::apply_tx(witness_accum.account_tree, &transfer_op);
     let circuit_operations = witness.calculate_operations(transfer_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -272,8 +272,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         .unwrap();
     fees.push(fee);
 
-    let witness =
-        TransferToNewWitness::apply_tx(&mut witness_accum.account_tree, &transfer_to_new_op);
+    let witness = TransferToNewWitness::apply_tx(witness_accum.account_tree, &transfer_to_new_op);
     let circuit_operations = witness.calculate_operations(transfer_to_new_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -291,7 +290,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         .unwrap();
     fees.push(fee);
 
-    let witness = WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_op);
+    let witness = WithdrawWitness::apply_tx(witness_accum.account_tree, &withdraw_op);
     let circuit_operations = witness.calculate_operations(withdraw_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -308,7 +307,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         .expect("Operation failed");
 
     let witness = FullExitWitness::apply_tx(
-        &mut witness_accum.account_tree,
+        witness_accum.account_tree,
         &(full_exit_op, full_exit_success),
     );
     let circuit_operations = witness.calculate_operations(());
@@ -328,7 +327,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         .unwrap();
     fees.push(fee);
 
-    let witness = MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft_op);
+    let witness = MintNFTWitness::apply_tx(witness_accum.account_tree, &mint_nft_op);
     let circuit_operations = witness.calculate_operations(mint_nft_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -347,7 +346,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
             .unwrap();
     fees.push(fee);
 
-    let witness = WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft_op);
+    let witness = WithdrawNFTWitness::apply_tx(witness_accum.account_tree, &withdraw_nft_op);
     let circuit_operations = witness.calculate_operations(withdraw_nft_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();

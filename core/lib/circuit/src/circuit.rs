@@ -772,7 +772,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
     fn execute_op<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
-        mut cur: &mut AllocatedOperationBranch<E>,
+        cur: &mut AllocatedOperationBranch<E>,
         lhs: &AllocatedOperationBranch<E>,
         rhs: &AllocatedOperationBranch<E>,
         op: &Operation<E>,
@@ -1026,7 +1026,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let op_flags = vec![
             self.deposit(
                 cs.namespace(|| "deposit"),
-                &mut cur,
+                cur,
                 global_variables,
                 is_account_empty,
                 &op_data,
@@ -1035,7 +1035,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
             self.transfer(
                 cs.namespace(|| "transfer"),
-                &mut cur,
+                cur,
                 lhs,
                 rhs,
                 global_variables,
@@ -1053,7 +1053,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
             self.transfer_to_new(
                 cs.namespace(|| "transfer_to_new"),
-                &mut cur,
+                cur,
                 lhs,
                 rhs,
                 global_variables,
@@ -1071,7 +1071,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
             self.withdraw(
                 cs.namespace(|| "withdraw"),
-                &mut cur,
+                cur,
                 global_variables,
                 &is_a_geq_b,
                 &op_data,
@@ -1087,7 +1087,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             // Close disable.
             // self.close_account(
             //      cs.namespace(|| "close_account"),
-            //      &mut cur,
+            //      cur,
             //      &chunk_data,
             //      &ext_pubdata_chunk,
             //      &op_data,
@@ -1098,7 +1098,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             // )?,
             self.full_exit(
                 cs.namespace(|| "full_exit"),
-                &mut cur,
+                cur,
                 global_variables,
                 &op_data,
                 ext_pubdata_chunk,
@@ -1111,7 +1111,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             self.change_pubkey_offchain(
                 cs.namespace(|| "change_pubkey_offchain"),
                 lhs,
-                &mut cur,
+                cur,
                 global_variables,
                 &op_data,
                 ext_pubdata_chunk,
@@ -1133,7 +1133,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
             self.forced_exit(
                 cs.namespace(|| "forced_exit"),
-                &mut cur,
+                cur,
                 lhs,
                 rhs,
                 global_variables,
@@ -1151,7 +1151,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
             self.mint_nft(
                 cs.namespace(|| "mint_nft"),
-                &mut cur,
+                cur,
                 global_variables,
                 &is_a_geq_b,
                 is_account_empty,
@@ -1166,7 +1166,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
             self.withdraw_nft(
                 cs.namespace(|| "withdraw_nft"),
-                &mut cur,
+                cur,
                 global_variables,
                 &is_a_geq_b,
                 &op_data,
@@ -1181,7 +1181,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
             self.swap(
                 cs.namespace(|| "swap"),
-                &mut cur,
+                cur,
                 global_variables,
                 &is_a_geq_b,
                 is_account_empty,

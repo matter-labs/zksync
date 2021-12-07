@@ -43,8 +43,6 @@ use ip_insert_middleware::IpInsertMiddleWare;
 
 #[derive(Clone)]
 pub struct RpcApp {
-    runtime_handle: tokio::runtime::Handle,
-
     cache_of_executed_priority_operations: AsyncLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_transaction_receipts: AsyncLruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_complete_withdrawal_tx_hashes: AsyncLruCache<TxHash, String>,
@@ -63,9 +61,6 @@ impl RpcApp {
         private_url: String,
         confirmations_for_eth_event: u64,
     ) -> Self {
-        let runtime_handle = tokio::runtime::Handle::try_current()
-            .expect("RpcApp must be created from the context of Tokio Runtime");
-
         let api_requests_caches_size = config.caches_size;
 
         let tx_sender = TxSender::new(
@@ -77,8 +72,6 @@ impl RpcApp {
         );
 
         RpcApp {
-            runtime_handle,
-
             cache_of_executed_priority_operations: AsyncLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: AsyncLruCache::new(api_requests_caches_size),
             cache_of_complete_withdrawal_tx_hashes: AsyncLruCache::new(api_requests_caches_size),

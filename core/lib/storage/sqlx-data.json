@@ -6030,6 +6030,24 @@
       ]
     }
   },
+  "cc97b33cc2f24fa09f02c16c048e12060daf39c91845cb35847daa229065560e": {
+    "query": "SELECT MAX(block) FROM account_tree_cache",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "cd0e1f11fb56662010b4ec2e0eb9a0e877f1eab4157f8ac57db9b18cca666cbe": {
     "query": "\n            SELECT max(id) as \"id!\" FROM tokens WHERE kind != 'NFT'::token_kind\n            ",
     "describe": {

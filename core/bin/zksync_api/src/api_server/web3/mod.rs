@@ -27,7 +27,6 @@ pub const NFT_FACTORY_ADDRESS: &str = "2000000000000000000000000000000000000000"
 
 #[derive(Clone)]
 pub struct Web3RpcApp {
-    runtime_handle: tokio::runtime::Handle,
     connection_pool: ConnectionPool,
     logs_helper: LogsHelper,
     calls_helper: CallsHelper,
@@ -37,10 +36,7 @@ pub struct Web3RpcApp {
 
 impl Web3RpcApp {
     pub fn new(connection_pool: ConnectionPool, config: &Web3Config) -> Self {
-        let runtime_handle = tokio::runtime::Handle::try_current()
-            .expect("Web3RpcApp must be created from the context of Tokio Runtime");
         Web3RpcApp {
-            runtime_handle,
             connection_pool,
             logs_helper: LogsHelper::new(),
             calls_helper: CallsHelper::new(),
