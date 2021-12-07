@@ -55,7 +55,7 @@ impl RpcApp {
             None
         };
 
-        metrics::histogram!("api.rpc.account_info", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "account_info");
         Ok(AccountInfoResp {
             address,
             id: account_state.account_id,
@@ -86,7 +86,7 @@ impl RpcApp {
             }
         };
 
-        metrics::histogram!("api.rpc.ethop_info", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "ethop_info");
         Ok(result)
     }
 
@@ -97,7 +97,7 @@ impl RpcApp {
     pub async fn _impl_tx_info(self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
         let start = Instant::now();
         let stored_receipt = self.get_tx_receipt(tx_hash).await?;
-        metrics::histogram!("api.rpc.tx_info", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "tx_info");
         Ok(if let Some(stored_receipt) = stored_receipt {
             TransactionInfoResp {
                 executed: true,
@@ -132,7 +132,7 @@ impl RpcApp {
             .submit_tx_with_separate_fp(*tx, *signature, fast_processing)
             .await
             .map_err(Error::from);
-        metrics::histogram!("api.rpc.tx_submit", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "tx_submit");
         result
     }
 
@@ -154,7 +154,7 @@ impl RpcApp {
                     .map(|tx_hash| tx_hash.0)
                     .collect()
             });
-        metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "submit_txs_batch");
         result
     }
 
@@ -181,7 +181,7 @@ impl RpcApp {
             .gov_contract_addr
             .expect("Server config doesn't contain the gov contract address");
 
-        metrics::histogram!("api.rpc.contract_address", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "contract_address");
         Ok(ContractAddressResp {
             main_contract,
             gov_contract,
@@ -200,7 +200,7 @@ impl RpcApp {
                 Error::internal_error()
             })?;
 
-        metrics::histogram!("api.rpc.get_nft", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_nft");
         Ok(nft)
     }
 
@@ -223,7 +223,7 @@ impl RpcApp {
             })
             .collect();
 
-        metrics::histogram!("api.rpc.tokens", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "tokens");
         Ok(result)
     }
 
@@ -242,7 +242,7 @@ impl RpcApp {
         let result =
             Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
-        metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_tx_fee");
         Ok(result.normal_fee)
     }
 
@@ -275,7 +275,7 @@ impl RpcApp {
         .collect();
         let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
-        metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_txs_batch_fee_in_wei");
         Ok(TotalFee {
             total_fee: result.normal_fee.total_fee,
         })
@@ -289,7 +289,7 @@ impl RpcApp {
             TokenPriceRequestType::USDForOneToken,
         )
         .await;
-        metrics::histogram!("api.rpc.get_token_price", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_token_price");
         result
     }
 
@@ -299,7 +299,7 @@ impl RpcApp {
     ) -> Result<Option<String>> {
         let start = Instant::now();
         let result = self.eth_tx_for_withdrawal(withdrawal_hash).await;
-        metrics::histogram!("api.rpc.get_eth_tx_for_withdrawal", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_eth_tx_for_withdrawal");
         result
     }
 
@@ -320,7 +320,7 @@ impl RpcApp {
                 })?
         };
 
-        metrics::histogram!("api.rpc.get_nft_owner", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_nft_owner");
         Ok(owner_id)
     }
 
@@ -332,7 +332,7 @@ impl RpcApp {
             .await
             .map_err(Error::from);
 
-        metrics::histogram!("api.rpc.toggle_2fa", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "toggle_2fa");
         response
     }
 
@@ -350,7 +350,7 @@ impl RpcApp {
                 Error::internal_error()
             })?;
 
-        metrics::histogram!("api.rpc.get_nft_id_by_tx_hash", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_nft_id_by_tx_hash");
         Ok(response)
     }
 }

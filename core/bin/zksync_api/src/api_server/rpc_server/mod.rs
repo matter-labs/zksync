@@ -134,7 +134,7 @@ impl RpcApp {
             executed_op
         };
 
-        metrics::histogram!("api.rpc.get_executed_priority_operation", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_executed_priority_operation");
         Ok(res)
     }
 
@@ -146,7 +146,7 @@ impl RpcApp {
             .get(&self.tx_sender.pool, BlockNumber(block_number as u32))
             .await
             .map_err(|_| Error::internal_error())?;
-        metrics::histogram!("api.rpc.get_block_info", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_block_info");
         Ok(res)
     }
 
@@ -185,7 +185,7 @@ impl RpcApp {
             tx_receipt
         };
 
-        metrics::histogram!("api.rpc.get_tx_receipt", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_tx_receipt");
         Ok(res)
     }
 
@@ -318,7 +318,7 @@ impl RpcApp {
             .await?;
         };
 
-        metrics::histogram!("api.rpc.get_account_state", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint" => "get_account_state");
         Ok(result)
     }
 

@@ -30,14 +30,14 @@ impl ApiV01 {
     pub async fn testnet_config(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let contract_address = self_.contract_address.clone();
-        metrics::histogram!("api.v01.testnet_config", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "testnet_config");
         ok_json!(TestnetConfigResponse { contract_address })
     }
 
     pub async fn status(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let result = ok_json!(self_.network_status.read().await);
-        metrics::histogram!("api.v01.status", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "status");
         result
     }
 
@@ -53,7 +53,7 @@ impl ApiV01 {
         let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
         vec_tokens.sort_by_key(|t| t.id);
 
-        metrics::histogram!("api.v01.tokens", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "tokens");
         ok_json!(vec_tokens)
     }
 
@@ -85,7 +85,7 @@ impl ApiV01 {
 
         tokens.sort_by_key(|t| t.id);
 
-        metrics::histogram!("api.v01.tokens_acceptable_for_fees", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "tokens_acceptable_for_fees");
         ok_json!(tokens)
     }
 
@@ -182,7 +182,7 @@ impl ApiV01 {
         // goes from oldest tx to the newest tx.
         transactions_history.append(&mut ongoing_transactions_history);
 
-        metrics::histogram!("api.v01.tx_history", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "tx_history");
         ok_json!(transactions_history)
     }
 
@@ -223,7 +223,7 @@ impl ApiV01 {
 
         transaction.commit().await.map_err(Self::db_error)?;
 
-        metrics::histogram!("api.v01.tx_history_older_than", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "tx_history_older_than");
         ok_json!(transactions_history)
     }
 
@@ -317,7 +317,7 @@ impl ApiV01 {
             transactions_history.append(&mut txs);
         }
 
-        metrics::histogram!("api.v01.tx_history_newer_than", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "tx_history_newer_than");
         ok_json!(transactions_history)
     }
 
@@ -334,7 +334,7 @@ impl ApiV01 {
 
         let tx_receipt = self_.get_tx_receipt(transaction_hash).await?;
 
-        metrics::histogram!("api.v01.executed_tx_by_hash", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "executed_tx_by_hash");
         ok_json!(tx_receipt)
     }
 
@@ -397,7 +397,7 @@ impl ApiV01 {
             res = deposit_op_to_tx_by_hash(&tokens, &priority_op);
         }
 
-        metrics::histogram!("api.v01.tx_by_hash", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "tx_by_hash");
         ok_json!(res)
     }
 
@@ -407,7 +407,7 @@ impl ApiV01 {
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let receipt = self_.get_priority_op_receipt(*pq_id).await?;
-        metrics::histogram!("api.v01.priority_op", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "priority_op");
         ok_json!(receipt)
     }
 
@@ -425,7 +425,7 @@ impl ApiV01 {
             Ok(HttpResponse::NotFound().finish())
         };
 
-        metrics::histogram!("api.v01.block_tx", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "block_tx");
         result
     }
 
@@ -457,7 +457,7 @@ impl ApiV01 {
                 InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
-        metrics::histogram!("api.v01.blocks", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "blocks");
         ok_json!(resp)
     }
 
@@ -472,7 +472,7 @@ impl ApiV01 {
         } else {
             Ok(HttpResponse::NotFound().finish())
         };
-        metrics::histogram!("api.v01.block_by_id", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "block_by_id");
         result
     }
 
@@ -493,7 +493,7 @@ impl ApiV01 {
                 InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
-        metrics::histogram!("api.v01.block_transactions", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "block_transactions");
         ok_json!(txs)
     }
 
@@ -510,7 +510,7 @@ impl ApiV01 {
             Ok(HttpResponse::NotFound().finish())
         };
 
-        metrics::histogram!("api.v01.explorer_search", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "explorer_search");
         result
     }
 
@@ -541,7 +541,7 @@ impl ApiV01 {
             fast: fast.timestamp() as u64,
         };
 
-        metrics::histogram!("api.v01.withdrawal_processing_time", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint" => "withdrawal_processing_time");
         ok_json!(processing_time)
     }
 }
