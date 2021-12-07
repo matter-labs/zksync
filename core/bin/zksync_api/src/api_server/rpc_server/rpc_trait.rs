@@ -48,7 +48,7 @@ pub trait Rpc {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> BoxFutureResult<TxHash>;
 
     #[rpc(name = "submit_txs_batch", returns = "Vec<TxHash>")]
@@ -56,7 +56,7 @@ pub trait Rpc {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> BoxFutureResult<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
@@ -73,7 +73,7 @@ pub trait Rpc {
         tx_type: ApiTxFeeTypes,
         _address: Address,
         token_like: TokenLike,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> BoxFutureResult<Fee>;
 
     // _addresses argument is left for the backward compatibility.
@@ -83,7 +83,7 @@ pub trait Rpc {
         tx_types: Vec<ApiTxFeeTypes>,
         _addresses: Vec<Address>,
         token_like: TokenLike,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> BoxFutureResult<TotalFee>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]

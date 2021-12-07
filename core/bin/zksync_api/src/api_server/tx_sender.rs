@@ -369,7 +369,7 @@ impl TxSender {
         mut tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
         let fast_processing = fast_processing.unwrap_or(false);
         if fast_processing && !tx.is_withdraw() {
@@ -387,7 +387,8 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        self.submit_tx(tx, signature, request_metadata).await
+        self.submit_tx(tx, signature, extracted_request_metadata)
+            .await
     }
 
     pub async fn can_subsidize(
@@ -417,9 +418,9 @@ impl TxSender {
         normal_fee: &BigUint,
         subsidized_fee: &BigUint,
         subsidy_size_usd: &Ratio<BigUint>,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<bool, SubmitError> {
-        let should_subsidize_ip = if let Some(meta) = request_metadata {
+        let should_subsidize_ip = if let Some(meta) = extracted_request_metadata {
             self.subsidized_ips.contains(&meta.ip)
         } else {
             false
@@ -482,7 +483,7 @@ impl TxSender {
         &self,
         tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
-        meta: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
@@ -534,7 +535,7 @@ impl TxSender {
                     &required_fee_data.normal_fee.total_fee,
                     &required_fee_data.subsidized_fee.total_fee,
                     &required_fee_data.subsidy_size_usd,
-                    meta,
+                    extracted_request_metadata,
                 )
                 .await?
             {
@@ -621,7 +622,7 @@ impl TxSender {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<SubmitBatchResponse, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
@@ -719,7 +720,7 @@ impl TxSender {
                     &batch_token_fee.normal_fee.total_fee,
                     &batch_token_fee.subsidized_fee.total_fee,
                     &batch_token_fee.subsidy_size_usd,
-                    request_metadata,
+                    extracted_request_metadata,
                 )
                 .await?
             {
@@ -756,7 +757,7 @@ impl TxSender {
                     &required_eth_fee.normal_fee.total_fee,
                     &required_eth_fee.subsidized_fee.total_fee,
                     &required_eth_fee.subsidy_size_usd,
-                    request_metadata,
+                    extracted_request_metadata,
                 )
                 .await?
             {

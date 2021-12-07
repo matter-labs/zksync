@@ -125,13 +125,18 @@ impl RpcApp {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash> {
         let start = Instant::now();
 
         let result = self
             .tx_sender
-            .submit_tx_with_separate_fp(*tx, *signature, fast_processing, request_metadata)
+            .submit_tx_with_separate_fp(
+                *tx,
+                *signature,
+                fast_processing,
+                extracted_request_metadata,
+            )
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.tx_submit", start.elapsed());
@@ -142,13 +147,13 @@ impl RpcApp {
         self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
 
         let result: Result<Vec<TxHash>> = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signatures, request_metadata)
+            .submit_txs_batch(txs, eth_signatures, extracted_request_metadata)
             .await
             .map_err(Error::from)
             .map(|response| {
@@ -236,7 +241,7 @@ impl RpcApp {
         tx_type: ApiTxFeeTypes,
         address: Address,
         token: TokenLike,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<Fee> {
         let start = Instant::now();
         let ticker = self.tx_sender.ticker_requests.clone();
@@ -254,7 +259,7 @@ impl RpcApp {
                 &result.normal_fee.total_fee,
                 &result.subsidized_fee.total_fee,
                 &result.subsidy_size_usd,
-                request_metadata,
+                extracted_request_metadata,
             )
             .await?;
 
@@ -273,7 +278,7 @@ impl RpcApp {
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
-        request_metadata: Option<RequestMetadata>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TotalFee> {
         let start = Instant::now();
         if tx_types.len() != addresses.len() {
@@ -305,7 +310,7 @@ impl RpcApp {
                 &result.normal_fee.total_fee,
                 &result.subsidized_fee.total_fee,
                 &result.subsidy_size_usd,
-                request_metadata,
+                extracted_request_metadata,
             )
             .await?;
 

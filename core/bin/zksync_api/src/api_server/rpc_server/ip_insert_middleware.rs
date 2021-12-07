@@ -9,7 +9,7 @@ use jsonrpc_http_server::{RequestMiddleware, RequestMiddlewareAction};
 use super::types::RequestMetadata;
 
 const CLOUDFLARE_CONNECTING_IP_HEADER: &str = "CF-Connecting-IP";
-const METADATA_PARAM_NAME: &str = "request_metadata";
+const METADATA_PARAM_NAME: &str = "extracted_request_metadata";
 
 /// Unfortunately, the JSON-RPC library does not natively support retrieving any information about the HTTP request,
 ///
