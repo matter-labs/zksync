@@ -18,7 +18,7 @@ const METADATA_PARAM_NAME: &str = "meta";
 ///
 /// IpInsertMiddleWare is the middleware that gets the value of the `CF-Connecting-IP` header of the HTTP request and appends it as the last
 /// parameter of the JSON-RPC call.  
-pub struct IpInsertMiddleWare {}
+pub struct IpInsertMiddleWare;
 
 /// Structure that is used to describe the minimum and the maximum number
 /// of parameters for a single JSON-RPC method.

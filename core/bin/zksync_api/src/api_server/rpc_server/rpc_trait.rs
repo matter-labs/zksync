@@ -48,7 +48,7 @@ pub trait Rpc {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
-        ip: Option<RequestMetadata>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<TxHash>;
 
     #[rpc(name = "submit_txs_batch", returns = "Vec<TxHash>")]
