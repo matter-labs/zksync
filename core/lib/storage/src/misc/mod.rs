@@ -9,8 +9,8 @@ use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
 
-/// Tokens schema handles the `tokens` table, providing methods to
-/// get and store new tokens.
+/// MiscSchema should be used for various features not directly related to the main zkSync functionality
+/// Please, use this schema if your functionality needs 1-3 methods. Otherwise, it should have a dedicated schema
 #[derive(Debug)]
 pub struct MiscSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 

@@ -1,5 +1,5 @@
 // Built-in uses
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::FromIterator};
 
 // External uses
 use futures::{FutureExt, StreamExt};
@@ -46,16 +46,15 @@ fn get_call_with_ip_if_needed(
     ip: Option<String>,
 ) -> jsonrpc_core::MethodCall {
     // Methods, which should have the information about the ip appended to them
-    let mut methods_with_ip: HashMap<&'static str, MethodWithIpDescription> = HashMap::new();
-
-    // Unfortunately at this moment the compiler from the CI does not support creating HashMap from iterator/array
-    methods_with_ip.insert("tx_submit", MethodWithIpDescription::new(1, 4));
-    methods_with_ip.insert("submit_txs_batch", MethodWithIpDescription::new(1, 3));
-    methods_with_ip.insert("get_tx_fee", MethodWithIpDescription::new(3, 4));
-    methods_with_ip.insert(
-        "get_txs_batch_fee_in_wei",
-        MethodWithIpDescription::new(3, 4),
-    );
+    let methods_with_ip: HashMap<&'static str, MethodWithIpDescription> = HashMap::from_iter([
+        ("tx_submit", MethodWithIpDescription::new(1, 4)),
+        ("submit_txs_batch", MethodWithIpDescription::new(1, 3)),
+        ("get_tx_fee", MethodWithIpDescription::new(3, 4)),
+        (
+            "get_txs_batch_fee_in_wei",
+            MethodWithIpDescription::new(3, 4),
+        ),
+    ]);
 
     let description = methods_with_ip.get(call.method.as_str());
     let description = if let Some(desc) = description {
