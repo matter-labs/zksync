@@ -165,3 +165,170 @@ impl RequestMiddleware for IpInsertMiddleWare {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jsonrpc_core::MethodCall;
+    use serde_json::{json, Value};
+
+    const IP: &str = "100.100.100.100";
+
+    fn get_method_call(method: String, params: jsonrpc_core::Params) -> MethodCall {
+        MethodCall {
+            method: method,
+            params,
+            id: jsonrpc_core::Id::Num(1),
+            jsonrpc: None,
+        }
+    }
+
+    fn test_call_ip_insertion(
+        method: String,
+        params: Params,
+        expected_result_params: Params,
+        ip: Option<String>,
+    ) {
+        let call = get_method_call(method, params);
+        let processed_call = get_call_with_ip_if_needed(call, ip);
+
+        assert_eq!(processed_call.params, expected_result_params);
+    }
+
+    // Checks that the params of the method did not change
+    fn assert_no_change(method: String, params: Params, ip: Option<String>) {
+        test_call_ip_insertion(method, params.clone(), params, ip);
+    }
+
+    #[test]
+    fn insert_ip_test() {
+        let params = Params::Array(vec![
+            // In these tests, the correctness of the data does not matter.
+            // The only thing that matters is how the function handles calls with different
+            // number of params / different methods.
+            Value::String("serialized_transfer".to_owned()),
+            Value::String("some_signature".to_owned()),
+        ]);
+        let expected_result_params = Params::Array(vec![
+            Value::String("serialized_transfer".to_owned()),
+            Value::String("some_signature".to_owned()).to_owned(),
+            Value::Null,
+            json!({ "ip": IP }),
+        ]);
+        test_call_ip_insertion(
+            "tx_submit".to_string(),
+            params,
+            expected_result_params,
+            Some(IP.to_owned()),
+        );
+    }
+
+    #[test]
+    fn prevent_user_from_overriding_metadata() {
+        let params = Params::Array(vec![
+            Value::String("serialized_transfer".to_owned()),
+            Value::String("some_signature".to_owned()),
+            Value::Bool(true),
+            Value::String("override_ip".to_owned()),
+        ]);
+        let expected_result_params = Params::Array(vec![
+            Value::String("serialized_transfer".to_owned()),
+            Value::String("some_signature".to_owned()),
+            Value::Bool(true),
+            json!({ "ip": IP }),
+        ]);
+        test_call_ip_insertion(
+            "tx_submit".to_string(),
+            params,
+            expected_result_params,
+            Some(IP.to_owned()),
+        );
+
+        let params = Params::Array(vec![
+            Value::String("serialized_transfer".to_owned()),
+            Value::String("some_signature".to_owned()),
+            Value::Bool(true),
+            Value::String("override_ip".to_owned()),
+        ]);
+        let expected_result_params = Params::Array(vec![
+            Value::String("serialized_transfer".to_owned()),
+            Value::String("some_signature".to_owned()),
+            Value::Bool(true),
+        ]);
+        test_call_ip_insertion(
+            "tx_submit".to_string(),
+            params,
+            expected_result_params,
+            None,
+        );
+
+        let params = Params::Map(serde_json::Map::from_iter([
+            ("some_field".to_owned(), json!("some_value")),
+            (
+                METADATA_PARAM_NAME.to_owned(),
+                json!({ "ip": "override_ip" }),
+            ),
+        ]));
+        let expected_result_params = Params::Map(serde_json::Map::from_iter([
+            ("some_field".to_owned(), json!("some_value")),
+            (METADATA_PARAM_NAME.to_owned(), json!({ "ip": IP })),
+        ]));
+        test_call_ip_insertion(
+            "tx_submit".to_string(),
+            params,
+            expected_result_params,
+            Some(IP.to_owned()),
+        );
+
+        let params = Params::Map(serde_json::Map::from_iter([
+            ("some_field".to_owned(), json!("some_value")),
+            (
+                METADATA_PARAM_NAME.to_owned(),
+                json!({ "ip": "override_ip" }),
+            ),
+        ]));
+        let expected_result_params = Params::Map(serde_json::Map::from_iter([(
+            "some_field".to_owned(),
+            json!("some_value"),
+        )]));
+        test_call_ip_insertion(
+            "tx_submit".to_string(),
+            params,
+            expected_result_params,
+            None,
+        );
+    }
+
+    #[test]
+    fn insert_ip_incorrect_call_test() {
+        // We do not attempt to add the IP to the methods which don't need metadata
+        assert_no_change(
+            "some_different_method".to_owned(),
+            Params::Array(vec![
+                Value::String("serialized_transfer".to_owned()),
+                Value::String("some_signature".to_owned()),
+            ]),
+            Some(IP.to_owned()),
+        );
+
+        // If the user supplies more params, then allowed, the same call is returned
+        assert_no_change(
+            "tx_submit".to_owned(),
+            Params::Array(vec![
+                Value::String("serialized_transfer".to_owned()),
+                Value::String("some_signature".to_owned()),
+                Value::String("param2".to_owned()),
+                Value::String("param4".to_owned()),
+                Value::String("param5".to_owned()),
+            ]),
+            Some(IP.to_owned()),
+        );
+
+        // If the user supplies less params, then allowed, the same call is returned
+        assert_no_change(
+            "get_tx_fee".to_owned(),
+            Params::Array(vec![Value::String("some_fee_request_data".to_owned())]),
+            Some(IP.to_owned()),
+        );
+    }
+}
