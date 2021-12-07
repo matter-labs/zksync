@@ -99,10 +99,12 @@ impl PendingBlock {
         self.success_operations.push(exec_result);
     }
 
-    pub(super) fn prepare_storing_block(
+    /// Creates `SendablePendingBlock needed to store pending block.
+    /// Updates internal counters for already stored operations.
+    pub(super) fn prepare_for_storing(
         &mut self,
         current_block: BlockNumber,
-    ) -> (SendablePendingBlock, AppliedUpdatesRequest) {
+    ) -> SendablePendingBlock {
         // We want include only the newly appeared transactions, since the older ones are already persisted in the
         // database.
         // This is a required optimization, since otherwise time to process the pending block may grow without any
@@ -118,7 +120,7 @@ impl PendingBlock {
         // Create a pending block object to send.
         // Note that failed operations are not included, as per any operation failure
         // the full block is created immediately.
-        let pending_block = SendablePendingBlock {
+        SendablePendingBlock {
             number: current_block,
             chunks_left: self.chunks_left,
             unprocessed_priority_op_before: self.unprocessed_priority_op_before,
@@ -127,7 +129,12 @@ impl PendingBlock {
             failed_txs: new_failed_operations,
             previous_block_root_hash: self.previous_block_root_hash,
             timestamp: self.timestamp,
-        };
+        }
+    }
+
+    /// Creates `AppliedUpdatesRequest` needed to store pending or full block.
+    /// Updates internal counters for already stored operations.
+    pub(super) fn prepare_applied_updates_request(&mut self) -> AppliedUpdatesRequest {
         let first_update_order_id = self.stored_account_updates;
         let account_updates = self.account_updates[first_update_order_id..].to_vec();
         let applied_updates_request = AppliedUpdatesRequest {
@@ -136,6 +143,6 @@ impl PendingBlock {
         };
         self.stored_account_updates = self.account_updates.len();
 
-        (pending_block, applied_updates_request)
+        applied_updates_request
     }
 }

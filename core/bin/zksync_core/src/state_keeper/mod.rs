@@ -21,7 +21,7 @@ use zksync_types::{
 // Local uses
 use self::{pending_block::PendingBlock, utils::system_time_timestamp};
 use crate::{
-    committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
+    committer::{BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
     tx_event_emitter::ProcessedOperations,
 };
@@ -150,6 +150,7 @@ impl ZkSyncStateKeeper {
             // transactions may fail because of invalid `valid_from` timestamp.
             self.pending_block.timestamp = pending_block.timestamp;
             self.pending_block.failed_txs = pending_block.failed_txs.clone();
+            self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
             let mut txs_count = 0;
             let mut priority_op_count = 0;
@@ -168,7 +169,6 @@ impl ZkSyncStateKeeper {
                     }
                 }
             }
-            self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
             // Sanity check: every transaction we applied should succeed, since we already stored it in the database
             // as successfully executed.
@@ -600,11 +600,12 @@ impl ZkSyncStateKeeper {
             ),
         );
 
-        let mut block_transactions = pending_block.success_operations;
+        let mut block_transactions = pending_block.success_operations.clone(); // TODO (in this PR): Avoid cloning.
         block_transactions.extend(
             pending_block
                 .failed_txs
-                .into_iter()
+                .iter()
+                .cloned() // TODO (in this PR): Avoid cloning.
                 .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
         );
 
@@ -638,13 +639,7 @@ impl ZkSyncStateKeeper {
             block_metadata,
             accounts_updated: pending_block.account_updates.clone(),
         };
-        let first_update_order_id = pending_block.stored_account_updates;
-        let account_updates = pending_block.account_updates[first_update_order_id..].to_vec();
-        let applied_updates_request = AppliedUpdatesRequest {
-            account_updates,
-            first_update_order_id,
-        };
-        pending_block.stored_account_updates = pending_block.account_updates.len();
+        let applied_updates_request = pending_block.prepare_applied_updates_request();
         *self.state.block_number += 1;
 
         vlog::info!(
@@ -669,9 +664,10 @@ impl ZkSyncStateKeeper {
     async fn store_pending_block(&mut self) {
         let start = Instant::now();
 
-        let (pending_block, applied_updates_request) = self
+        let pending_block = self
             .pending_block
-            .prepare_storing_block(self.state.block_number);
+            .prepare_for_storing(self.state.block_number);
+        let applied_updates_request = self.pending_block.prepare_applied_updates_request();
 
         vlog::debug!(
             "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",
