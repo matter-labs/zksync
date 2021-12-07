@@ -503,7 +503,7 @@ impl TestServerConfig {
             if *block_number <= VERIFIED_BLOCKS_COUNT {
                 // Add jobs to `job_prover_queue`.
                 let job_data = serde_json::Value::default();
-                ProverSchema(storage)
+                ProverSchema(&mut storage)
                     .add_prover_job_to_job_queue(
                         block_number,
                         block_number,
@@ -512,7 +512,7 @@ impl TestServerConfig {
                         ProverJobType::SingleProof,
                     )
                     .await?;
-                ProverSchema(storage)
+                ProverSchema(&mut storage)
                     .add_prover_job_to_job_queue(
                         block_number,
                         block_number,
@@ -523,12 +523,12 @@ impl TestServerConfig {
                     .await?;
 
                 // Get job id.
-                let stored_job_id = ProverSchema(storage)
+                let stored_job_id = ProverSchema(&mut storage)
                     .get_idle_prover_job_from_job_queue()
                     .await?
                     .unwrap()
                     .job_id;
-                let stored_aggregated_job_id = ProverSchema(storage)
+                let stored_aggregated_job_id = ProverSchema(&mut storage)
                     .get_idle_prover_job_from_job_queue()
                     .await?
                     .unwrap()
@@ -537,10 +537,10 @@ impl TestServerConfig {
                 // Store proofs.
                 let proof = get_sample_single_proof();
                 let aggregated_proof = get_sample_aggregated_proof();
-                ProverSchema(storage)
+                ProverSchema(&mut storage)
                     .store_proof(stored_job_id, block_number, &proof)
                     .await?;
-                ProverSchema(storage)
+                ProverSchema(&mut storage)
                     .store_aggregated_proof(
                         stored_aggregated_job_id,
                         block_number,

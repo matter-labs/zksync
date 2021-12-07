@@ -91,6 +91,7 @@ async fn handle_coinmarketcap_token_price_query(
 #[derive(Debug, Deserialize)]
 struct Token {
     pub address: Address,
+    #[allow(dead_code)]
     pub decimals: u8,
     pub symbol: String,
 }

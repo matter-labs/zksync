@@ -14,7 +14,7 @@ use crate::{prover::ProverSchema, QueryResult, StorageProcessor};
 
 static MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
-async fn get_idle_job_from_queue(mut storage: &mut StorageProcessor<'_>) -> QueryResult<ProverJob> {
+async fn get_idle_job_from_queue(storage: &mut StorageProcessor<'_>) -> QueryResult<ProverJob> {
     let job = ProverSchema(storage)
         .get_idle_prover_job_from_job_queue()
         .await?;
@@ -36,7 +36,7 @@ async fn test_prover_job_queue(mut storage: StorageProcessor<'_>) -> QueryResult
 }
 
 /// Checks that the single and aggregated proof can be stored and loaded.
-async fn test_store_proof(mut storage: &mut StorageProcessor<'_>) -> QueryResult<()> {
+async fn test_store_proof(storage: &mut StorageProcessor<'_>) -> QueryResult<()> {
     // Attempt to load the proof that was not stored should result in None.
     let loaded_proof = ProverSchema(storage)
         .load_proof(BlockNumber(1))
@@ -97,8 +97,8 @@ async fn test_store_proof(mut storage: &mut StorageProcessor<'_>) -> QueryResult
     assert!(stored_aggregated_job.is_ok());
 
     // Get job id.
-    let stored_job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
-    let stored_aggregated_job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
+    let stored_job_id = get_idle_job_from_queue(storage).await?.job_id;
+    let stored_aggregated_job_id = get_idle_job_from_queue(storage).await?.job_id;
 
     // Store proofs.
     let stored_proof = ProverSchema(storage)
@@ -130,7 +130,7 @@ async fn test_store_proof(mut storage: &mut StorageProcessor<'_>) -> QueryResult
 
 /// Checks that `pending_jobs_count` method of schema returns the amount
 /// of jobs for which proof is not generating (or generated) yet.
-async fn pending_jobs_count(mut storage: &mut StorageProcessor<'_>) -> QueryResult<()> {
+async fn pending_jobs_count(storage: &mut StorageProcessor<'_>) -> QueryResult<()> {
     // Initially there are no jobs.
     let jobs_count = ProverSchema(storage).pending_jobs_count().await?;
     assert_eq!(jobs_count, 0);
@@ -168,16 +168,16 @@ async fn pending_jobs_count(mut storage: &mut StorageProcessor<'_>) -> QueryResu
     let jobs_count = ProverSchema(storage).pending_jobs_count().await?;
     assert_eq!(jobs_count, 3);
 
-    let first_job = get_idle_job_from_queue(&mut storage).await?;
+    let first_job = get_idle_job_from_queue(storage).await?;
     let jobs_count = ProverSchema(storage).pending_jobs_count().await?;
     assert_eq!(jobs_count, 3);
 
     // Create next run & repeat checks.
-    let second_job = get_idle_job_from_queue(&mut storage).await?;
+    let second_job = get_idle_job_from_queue(storage).await?;
     let jobs_count = ProverSchema(storage).pending_jobs_count().await?;
     assert_eq!(jobs_count, 3);
 
-    let third_job = get_idle_job_from_queue(&mut storage).await?;
+    let third_job = get_idle_job_from_queue(storage).await?;
     let jobs_count = ProverSchema(storage).pending_jobs_count().await?;
     assert_eq!(jobs_count, 3);
 
