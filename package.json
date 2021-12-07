@@ -9,7 +9,6 @@
       "sdk/zksync-crypto",
       "contracts",
       "infrastructure/zcli",
-      "infrastructure/explorer",
       "infrastructure/zk",
       "infrastructure/reading-tool",
       "infrastructure/token-lists-manager",
@@ -31,7 +30,6 @@
     "contracts": "yarn workspace franklin-contracts",
     "zcli": "yarn workspace zcli",
     "ts-tests": "yarn workspace ts-tests",
-    "explorer": "yarn workspace sync-explorer",
     "zk": "yarn workspace zk",
     "reading-tool": "yarn workspace reading-tool",
     "api-docs": "yarn workspace api-docs"
