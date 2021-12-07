@@ -82,7 +82,7 @@ pub struct BlocksProofOperation {
 
 impl BlocksProofOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
-        let blocks_arg = Token::Array(self.blocks.iter().map(|b| stored_block_info(b)).collect());
+        let blocks_arg = Token::Array(self.blocks.iter().map(stored_block_info).collect());
 
         let proof = self.proof.get_eth_tx_args();
 

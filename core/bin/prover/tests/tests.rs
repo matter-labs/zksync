@@ -102,7 +102,7 @@ fn test_data_for_prover() -> JobRequestData {
         account_id: empty_account_id,
     };
 
-    let deposit_witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+    let deposit_witness = DepositWitness::apply_tx(witness_accum.account_tree, &deposit_op);
     let deposit_operations = deposit_witness.calculate_operations(());
     let pub_data_from_witness = deposit_witness.get_pubdata();
     let offset_commitment = deposit_witness.get_offset_commitment_data();

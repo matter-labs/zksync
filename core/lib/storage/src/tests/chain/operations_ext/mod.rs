@@ -130,7 +130,7 @@ pub async fn commit_block(
 ) -> QueryResult<()> {
     // Required since we use `EthereumSchema` in this test.
     storage.ethereum_schema().initialize_eth_data().await?;
-    BlockSchema(&mut storage)
+    BlockSchema(storage)
         .save_block(gen_sample_block(
             block_number,
             BLOCK_SIZE_CHUNKS,

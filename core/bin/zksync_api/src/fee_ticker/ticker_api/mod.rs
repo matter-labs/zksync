@@ -45,15 +45,11 @@ pub trait FeeTickerAPI {
 #[derive(Debug, Clone)]
 pub(crate) struct TokenCacheEntry {
     price: TokenPrice,
-    creation_time: Instant,
 }
 
 impl TokenCacheEntry {
-    fn new(price: TokenPrice, creation_time: Instant) -> Self {
-        Self {
-            price,
-            creation_time,
-        }
+    fn new(price: TokenPrice) -> Self {
+        Self { price }
     }
 
     fn is_cache_entry_expired(&self) -> bool {
@@ -135,10 +131,10 @@ impl<T: TokenPriceAPI> TickerApi<T> {
     }
 
     async fn update_stored_value(&self, token_id: TokenId, price: TokenPrice) {
-        self.price_cache.lock().await.insert(
-            token_id,
-            TokenCacheEntry::new(price.clone(), Instant::now()),
-        );
+        self.price_cache
+            .lock()
+            .await
+            .insert(token_id, TokenCacheEntry::new(price.clone()));
         self._update_stored_value(token_id, price)
             .await
             .map_err(|e| vlog::warn!("Failed to update historical ticker price: {}", e))
