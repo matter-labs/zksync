@@ -9,7 +9,7 @@ use jsonrpc_http_server::{RequestMiddleware, RequestMiddlewareAction};
 use super::types::RequestMetadata;
 
 const CLOUDFLARE_CONNECTING_IP_HEADER: &str = "CF-Connecting-IP";
-const METADATA_PARAM_NAME: &str = "meta";
+const METADATA_PARAM_NAME: &str = "request_metadata";
 
 /// Unfortunately, the JSON-RPC library does not natively support retrieving any information about the HTTP request,
 ///
@@ -42,7 +42,7 @@ impl MethodWithIpDescription {
 /// If the method should have information about the IP appended to its parameters, it returns the new call
 /// which is identical to the supplied one, but with the IP appended.
 fn get_call_with_ip_if_needed(
-    call: jsonrpc_core::MethodCall,
+    mut call: jsonrpc_core::MethodCall,
     ip: Option<String>,
 ) -> jsonrpc_core::MethodCall {
     // Methods, which should have the information about the ip appended to them
@@ -68,15 +68,13 @@ fn get_call_with_ip_if_needed(
         serde_json::to_value(metadata).unwrap()
     });
 
-    let mut new_call = call.clone();
-
     match call.params {
-        Params::Array(mut params) => {
+        Params::Array(ref mut params) => {
             // The query is definitely wrong. We may proceed and the server will handle it normally
             if params.len() > description.maximum_params
                 || params.len() < description.minimum_params
             {
-                return new_call;
+                return call;
             }
 
             // If the length is equal to the maximum amount of the
@@ -92,21 +90,19 @@ fn get_call_with_ip_if_needed(
 
             if let Some(metadata) = metadata {
                 params.push(metadata);
-                new_call.params = Params::Array(params);
             }
 
-            new_call
+            call
         }
-        Params::Map(mut params_map) => {
+        Params::Map(ref mut params_map) => {
             if let Some(metadata) = metadata {
                 params_map.insert(METADATA_PARAM_NAME.to_owned(), metadata);
             } else {
                 // Just in case the user tried to override the value in the map
                 params_map.remove(METADATA_PARAM_NAME);
             }
-            new_call.params = Params::Map(params_map);
 
-            new_call
+            call
         }
         _ => call,
     }
@@ -123,18 +119,16 @@ async fn insert_ip_if_needed(body: hyper::Body, ip: Option<String>) -> hyper::Re
         body_bytes.extend(bytes?.into_iter());
     }
 
-    let body_str = String::from_utf8(body_bytes.clone());
+    let call: std::result::Result<jsonrpc_core::MethodCall, _> =
+        serde_json::from_slice(&body_bytes);
 
-    if let Ok(s) = body_str {
-        let call: std::result::Result<jsonrpc_core::MethodCall, _> = serde_json::from_str(&s);
-        if let Ok(call) = call {
-            let new_call = get_call_with_ip_if_needed(call, ip);
-            let new_body_bytes = serde_json::to_string(&new_call);
-            if let Ok(s) = new_body_bytes {
-                body_bytes = s.as_bytes().to_owned();
-            }
-        };
-    }
+    if let Ok(call) = call {
+        let new_call = get_call_with_ip_if_needed(call, ip);
+        let new_body_bytes = serde_json::to_vec(&new_call);
+        if let Ok(s) = new_body_bytes {
+            body_bytes = s;
+        }
+    };
 
     Ok(body_bytes)
 }

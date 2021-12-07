@@ -484,7 +484,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         );
 
         if fee_type == CPK_CREATE2_FEE_TYPE {
-            let subsidized_fee_usd = self.config.subsidy_cpk_price_usd.clone();
             let token_price = self
                 .get_token_price(TokenLike::Id(token.id), TokenPriceRequestType::USDForOneWei)
                 .await?;
@@ -492,7 +491,11 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             // It is safe to do unwrap in the next two lines, because token being acceptable for fees
             // assumes that the token's price is > 0
             let token_price = big_decimal_to_ratio(&token_price).unwrap();
-            let full_amount = subsidized_fee_usd.checked_div(&token_price).unwrap();
+            let full_amount = self
+                .config
+                .subsidy_cpk_price_usd
+                .checked_div(&token_price)
+                .unwrap();
 
             let subsidized_fee = Fee::new(
                 fee_type,
@@ -606,15 +609,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         }
 
         let normal_fee = {
-            let total_zkp_fee = (&zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
+            let total_zkp_fee = (&zkp_cost_chunk * total_op_chunks) * &token_usd_risk;
             let total_gas_fee =
                 (&wei_price_usd * total_normal_gas_tx_amount * &scale_gas_price) * &token_usd_risk;
             BatchFee::new(total_zkp_fee, total_gas_fee)
         };
 
         let subsidized_fee = {
-            let total_zkp_fee =
-                (zkp_cost_chunk * total_subsidized_op_chunks) * token_usd_risk.clone();
+            let total_zkp_fee = (zkp_cost_chunk * total_subsidized_op_chunks) * &token_usd_risk;
             let total_gas_fee =
                 (&wei_price_usd * total_subsidized_gas_tx_amount * &scale_gas_price)
                     * &token_usd_risk;

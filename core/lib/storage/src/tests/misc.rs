@@ -30,25 +30,25 @@ async fn stored_subsidy(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let subsidy_3 = get_subsidy(subsidy_name.clone(), 15);
 
     let get_total_subsidy = MiscSchema(&mut storage)
-        .get_total_used_subsidy_for_type(subsidy_name.clone())
+        .get_total_used_subsidy_for_type(&subsidy_name)
         .await?;
     assert_eq!(get_total_subsidy, BigDecimal::from(0));
 
     MiscSchema(&mut storage).store_subsidy(subsidy_1).await?;
     let get_total_subsidy = MiscSchema(&mut storage)
-        .get_total_used_subsidy_for_type(subsidy_name.clone())
+        .get_total_used_subsidy_for_type(&subsidy_name)
         .await?;
     assert_eq!(get_total_subsidy, BigDecimal::from(10));
 
     MiscSchema(&mut storage).store_subsidy(subsidy_2).await?;
     let get_total_subsidy = MiscSchema(&mut storage)
-        .get_total_used_subsidy_for_type(subsidy_name.clone())
+        .get_total_used_subsidy_for_type(&subsidy_name)
         .await?;
     assert_eq!(get_total_subsidy, BigDecimal::from(10));
 
     MiscSchema(&mut storage).store_subsidy(subsidy_3).await?;
     let get_total_subsidy = MiscSchema(&mut storage)
-        .get_total_used_subsidy_for_type(subsidy_name.clone())
+        .get_total_used_subsidy_for_type(&subsidy_name)
         .await?;
     assert_eq!(get_total_subsidy, BigDecimal::from(25));
 

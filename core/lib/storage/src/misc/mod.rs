@@ -42,7 +42,7 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
     /// Loads tokens from the database starting from the given id with the given limit in the ascending order.
     pub async fn get_total_used_subsidy_for_type(
         &mut self,
-        subsidy_type: String,
+        subsidy_type: &str,
     ) -> QueryResult<BigDecimal> {
         let start = Instant::now();
         let sum = sqlx::query!(

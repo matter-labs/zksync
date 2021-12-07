@@ -361,7 +361,7 @@ fn get_subsidy_token_fee_in_usd(
         * fee_in_token
 }
 
-fn convert_to_usd(amount: Ratio<BigUint>, token: TokenLike) -> Ratio<BigUint> {
+fn convert_to_usd(amount: &Ratio<BigUint>, token: TokenLike) -> Ratio<BigUint> {
     let token_precision = block_on(MockApiProvider.get_token(token.clone()))
         .unwrap()
         .decimals;
@@ -410,7 +410,7 @@ fn test_ticker_subsidy() {
         None,
     );
     let create2_subsidy_price_usd =
-        convert_to_usd(create2_subsidy_price.clone(), TokenLike::Id(TokenId(0)));
+        convert_to_usd(&create2_subsidy_price, TokenLike::Id(TokenId(0)));
 
     // Due to precision-rounding, the price might differ, but it shouldn't by more than 1 cent
     assert!(
@@ -453,7 +453,7 @@ fn test_ticker_subsidy() {
     );
     assert_eq!(normal_transfer_price, subsidy_transfer_price);
     let normal_transfer_price_usd =
-        convert_to_usd(normal_transfer_price, TokenLike::Id(TokenId(0)));
+        convert_to_usd(&normal_transfer_price, TokenLike::Id(TokenId(0)));
 
     // Subsidy also works for batches
     let batch_price_token = block_on(ticker.get_batch_from_ticker_in_wei(
@@ -466,7 +466,7 @@ fn test_ticker_subsidy() {
     ))
     .unwrap();
     let subsidy_batch_price_usd = convert_to_usd(
-        Ratio::from(batch_price_token.subsidized_fee.total_fee),
+        &Ratio::from(batch_price_token.subsidized_fee.total_fee),
         TokenLike::Id(TokenId(0)),
     );
 

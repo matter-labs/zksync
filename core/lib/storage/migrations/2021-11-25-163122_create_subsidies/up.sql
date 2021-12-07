@@ -1,4 +1,4 @@
-CREATE TABLE subsidies (
+CREATE TABLE IF NOT EXISTS subsidies (
     id SERIAL PRIMARY KEY,
     tx_hash bytea NOT NULL,
     --- USD amounts are stored scaled by 10^6
