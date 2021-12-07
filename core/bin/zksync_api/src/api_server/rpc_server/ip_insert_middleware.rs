@@ -176,7 +176,7 @@ mod tests {
 
     fn get_method_call(method: String, params: jsonrpc_core::Params) -> MethodCall {
         MethodCall {
-            method: method,
+            method,
             params,
             id: jsonrpc_core::Id::Num(1),
             jsonrpc: None,
@@ -211,7 +211,7 @@ mod tests {
         ]);
         let expected_result_params = Params::Array(vec![
             Value::String("serialized_transfer".to_owned()),
-            Value::String("some_signature".to_owned()).to_owned(),
+            Value::String("some_signature".to_owned()),
             Value::Null,
             json!({ "ip": IP }),
         ]);
