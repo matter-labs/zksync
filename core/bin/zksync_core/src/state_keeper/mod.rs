@@ -19,7 +19,7 @@ use zksync_types::{
     AccountId, Address, PriorityOp, SignedZkSyncTx, H256,
 };
 // Local uses
-use self::{pending_block::PendingBlock, utils::system_time_timestamp};
+use self::{pending_block::PendingBlock, types::ApplyOutcome, utils::system_time_timestamp};
 use crate::{
     committer::{BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
@@ -159,12 +159,13 @@ impl ZkSyncStateKeeper {
                 match operation {
                     ExecutedOperations::Tx(tx) => {
                         self.apply_tx(&tx.signed_tx)
-                            .expect("Tx from the restored pending block was not executed");
+                            .assert_included("Tx from the restored pending block was not executed");
                         txs_count += 1;
                     }
                     ExecutedOperations::PriorityOp(op) => {
-                        self.apply_priority_op(op.priority_op)
-                            .expect("Priority op from the restored pending block was not executed");
+                        self.apply_priority_op(&op.priority_op).assert_included(
+                            "Priority op from the restored pending block was not executed",
+                        );
                         priority_op_count += 1;
                     }
                 }
@@ -244,11 +245,11 @@ impl ZkSyncStateKeeper {
             .into_iter()
             .collect::<VecDeque<_>>();
         while let Some(priority_op) = priority_op_queue.pop_front() {
-            match self.apply_priority_op(priority_op) {
-                Ok(exec_op) => {
+            match self.apply_priority_op(&priority_op) {
+                ApplyOutcome::Included(exec_op) => {
                     executed_ops.push(exec_op);
                 }
-                Err(priority_op) => {
+                ApplyOutcome::NotIncluded => {
                     self.seal_pending_block().await;
 
                     priority_op_queue.push_front(priority_op);
@@ -261,10 +262,10 @@ impl ZkSyncStateKeeper {
             match &variant {
                 SignedTxVariant::Tx(tx) => {
                     match self.apply_tx(tx) {
-                        Ok(exec_op) => {
+                        ApplyOutcome::Included(exec_op) => {
                             executed_ops.push(exec_op);
                         }
-                        Err(_) => {
+                        ApplyOutcome::NotIncluded => {
                             // We could not execute the tx due to either of block size limit
                             // or the withdraw operations limit, so we seal this block and
                             // the last transaction will go to the next block instead.
@@ -276,10 +277,10 @@ impl ZkSyncStateKeeper {
                 }
                 SignedTxVariant::Batch(batch) => {
                     match self.apply_batch(&batch.txs, batch.batch_id) {
-                        Ok(mut ops) => {
+                        ApplyOutcome::Included(mut ops) => {
                             executed_ops.append(&mut ops);
                         }
-                        Err(_) => {
+                        ApplyOutcome::NotIncluded => {
                             // We could not execute the batch tx due to either of block size limit
                             // or the withdraw operations limit, so we seal this block and
                             // the last transaction will go to the next block instead.
@@ -326,14 +327,11 @@ impl ZkSyncStateKeeper {
     }
 
     // Err if there is no space in current block
-    fn apply_priority_op(
-        &mut self,
-        priority_op: PriorityOp,
-    ) -> Result<ExecutedOperations, PriorityOp> {
+    fn apply_priority_op(&mut self, priority_op: &PriorityOp) -> ApplyOutcome<ExecutedOperations> {
         let start = Instant::now();
         let chunks_needed = priority_op.data.chunks();
         if self.pending_block.chunks_left < chunks_needed {
-            return Err(priority_op);
+            return ApplyOutcome::NotIncluded;
         }
 
         // Check if adding this transaction to the block won't make the contract operations
@@ -349,7 +347,7 @@ impl ZkSyncStateKeeper {
         {
             // We've reached the gas limit, seal the block.
             // This transaction will go into the next one.
-            return Err(priority_op);
+            return ApplyOutcome::NotIncluded;
         }
 
         let OpSuccess {
@@ -361,7 +359,7 @@ impl ZkSyncStateKeeper {
 
         let exec_result = ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
             op: executed_op,
-            priority_op,
+            priority_op: priority_op.clone(),
             block_index,
             created_at: chrono::Utc::now(),
         }));
@@ -376,14 +374,14 @@ impl ZkSyncStateKeeper {
         self.current_unprocessed_priority_op += 1;
 
         metrics::histogram!("state_keeper.apply_priority_op", start.elapsed());
-        Ok(exec_result)
+        ApplyOutcome::Included(exec_result)
     }
 
     fn apply_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
         batch_id: i64,
-    ) -> Result<Vec<ExecutedOperations>, ()> {
+    ) -> ApplyOutcome<Vec<ExecutedOperations>> {
         metrics::gauge!("tx_batch_size", txs.len() as f64);
         let start = Instant::now();
 
@@ -392,7 +390,7 @@ impl ZkSyncStateKeeper {
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
-            return Err(());
+            return ApplyOutcome::NotIncluded;
         }
 
         let ops: Vec<_> = txs
@@ -421,13 +419,13 @@ impl ZkSyncStateKeeper {
                 executed_operations.push(exec_result);
             }
             metrics::histogram!("state_keeper.apply_batch", start.elapsed());
-            return Ok(executed_operations);
+            return ApplyOutcome::Included(executed_operations);
         }
 
         // If we can't add the tx to the block due to the gas limit, we return this tx,
         // seal the block and execute it again.
         if !self.pending_block.gas_counter.can_include(&ops) {
-            return Err(());
+            return ApplyOutcome::NotIncluded;
         }
 
         let all_updates = self
@@ -486,17 +484,17 @@ impl ZkSyncStateKeeper {
         }
 
         metrics::histogram!("state_keeper.apply_batch", start.elapsed());
-        Ok(executed_operations)
+        ApplyOutcome::Included(executed_operations)
     }
 
-    fn apply_tx(&mut self, tx: &SignedZkSyncTx) -> Result<ExecutedOperations, ()> {
+    fn apply_tx(&mut self, tx: &SignedZkSyncTx) -> ApplyOutcome<ExecutedOperations> {
         let start = Instant::now();
         let chunks_needed = self.state.chunks_for_tx(tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
-            return Err(());
+            return ApplyOutcome::NotIncluded;
         }
 
         // Check if adding this transaction to the block won't make the contract operations
@@ -512,7 +510,7 @@ impl ZkSyncStateKeeper {
             {
                 // We've reached the gas limit, seal the block.
                 // This transaction will go into the next one.
-                return Err(());
+                return ApplyOutcome::NotIncluded;
             }
         }
 
@@ -575,7 +573,7 @@ impl ZkSyncStateKeeper {
         };
 
         metrics::histogram!("state_keeper.apply_tx", start.elapsed());
-        Ok(exec_result)
+        ApplyOutcome::Included(exec_result)
     }
 
     /// Finalizes the pending block, transforming it into a full block.

@@ -269,9 +269,9 @@ mod apply_priority_op {
         let mut tester = StateKeeperTester::new(8, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
         let deposit = create_deposit(TokenId(0), 145u32);
-        let result = tester.state_keeper.apply_priority_op(deposit);
+        let result = tester.state_keeper.apply_priority_op(&deposit);
         let pending_block = tester.state_keeper.pending_block;
-        assert!(result.is_ok());
+        assert!(result.included());
         assert!(pending_block.chunks_left < old_pending_block.chunks_left);
         assert_eq!(
             pending_block.pending_op_block_index,
@@ -288,8 +288,8 @@ mod apply_priority_op {
     fn not_enough_chunks() {
         let mut tester = StateKeeperTester::new(1, 1, 1);
         let deposit = create_deposit(TokenId(0), 1u32);
-        let result = tester.state_keeper.apply_priority_op(deposit);
-        assert!(result.is_err());
+        let result = tester.state_keeper.apply_priority_op(&deposit);
+        assert!(result.not_included());
     }
 }
 
@@ -313,7 +313,7 @@ mod apply_tx {
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
-        assert!(result.is_ok());
+        assert!(result.included());
         assert!(pending_block.chunks_left < old_pending_block.chunks_left);
         assert_eq!(
             pending_block.pending_op_block_index,
@@ -340,7 +340,7 @@ mod apply_tx {
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
-        assert!(result.is_ok());
+        assert!(result.included());
         assert!(!old_pending_block.fast_processing_required);
         assert!(pending_block.fast_processing_required);
     }
@@ -361,7 +361,7 @@ mod apply_tx {
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
-        assert!(result.is_ok());
+        assert!(result.included());
         assert_eq!(pending_block.chunks_left, old_pending_block.chunks_left);
         assert_eq!(
             pending_block.pending_op_block_index,
@@ -386,7 +386,7 @@ mod apply_tx {
             Default::default(),
         );
         let result = tester.state_keeper.apply_tx(&withdraw);
-        assert!(result.is_err());
+        assert!(result.not_included());
     }
 
     /// Checks if processing withdrawal fails because the gas limit is reached.
@@ -409,14 +409,14 @@ mod apply_tx {
             let result = tester.state_keeper.apply_tx(&withdrawal);
             if i <= withdrawals_number {
                 assert!(
-                    result.is_ok(),
+                    result.included(),
                     "i: {}, withdrawals: {}",
                     i,
                     withdrawals_number
                 )
             } else {
                 assert!(
-                    result.is_err(),
+                    result.not_included(),
                     "i: {}, withdrawals: {}",
                     i,
                     withdrawals_number
@@ -449,9 +449,9 @@ async fn seal_pending_block() {
     );
     let deposit = create_deposit(TokenId(0), 12u32);
 
-    assert!(tester.state_keeper.apply_tx(&good_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_tx(&bad_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_priority_op(deposit).is_ok());
+    assert!(tester.state_keeper.apply_tx(&good_withdraw).included());
+    assert!(tester.state_keeper.apply_tx(&bad_withdraw).included());
+    assert!(tester.state_keeper.apply_priority_op(&deposit).included());
 
     let old_updates_len = tester.state_keeper.pending_block.account_updates.len();
     tester.state_keeper.seal_pending_block().await;
@@ -513,9 +513,9 @@ async fn store_pending_block() {
     );
     let deposit = create_deposit(TokenId(0), 12u32);
 
-    assert!(tester.state_keeper.apply_tx(&good_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_tx(&bad_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_priority_op(deposit).is_ok());
+    assert!(tester.state_keeper.apply_tx(&good_withdraw).included());
+    assert!(tester.state_keeper.apply_tx(&bad_withdraw).included());
+    assert!(tester.state_keeper.apply_priority_op(&deposit).included());
 
     tester.state_keeper.store_pending_block().await;
 
@@ -1177,7 +1177,7 @@ mod execute_proposed_block {
         );
         let result = tester.state_keeper.apply_tx(&withdraw);
 
-        assert!(result.is_ok());
+        assert!(result.included());
         // Check that gas count shouldn't change
         assert_eq!(
             initial_gas_count,
@@ -1221,7 +1221,7 @@ mod execute_proposed_block {
 
         let result = tester.state_keeper.apply_tx(&third_transfer);
 
-        assert!(result.is_ok());
+        assert!(result.included());
         // Check that gas count should increase
         assert!(
             initial_gas_count
@@ -1403,7 +1403,7 @@ async fn correctly_restore_pending_block_timestamp() {
             eth_sign_data: None,
         }
     };
-    assert!(tester.state_keeper.apply_tx(&good_transfer).is_ok());
+    assert!(tester.state_keeper.apply_tx(&good_transfer).included());
 
     tester.state_keeper.store_pending_block().await;
 
@@ -1469,7 +1469,7 @@ async fn correctly_restore_pending_block_timestamp() {
     tester
         .state_keeper
         .apply_tx(&withdraw_with_same_valid_until)
-        .expect("Tx was not applied");
+        .assert_included("Tx was not applied");
 
     assert_eq!(
         tester.state_keeper.pending_block.success_operations.len(),
