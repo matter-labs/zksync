@@ -43,21 +43,16 @@ impl PendingBlock {
     pub(super) fn new(
         number: BlockNumber,
         unprocessed_priority_op_before: u64,
-        available_chunks_sizes: &[usize],
+        max_block_size: usize,
         previous_block_root_hash: H256,
         timestamp: u64,
     ) -> Self {
-        // TransferOp chunks are subtracted to reserve space for last transfer.
-        let chunks_left = *available_chunks_sizes
-            .iter()
-            .max()
-            .expect("Expected at least one block chunks size");
         Self {
             number,
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
             account_updates: Vec::new(),
-            chunks_left,
+            chunks_left: max_block_size,
             pending_op_block_index: 0,
             unprocessed_priority_op_before,
             pending_block_iteration: 0,

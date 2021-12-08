@@ -3,7 +3,6 @@ use std::time::Instant;
 
 // External uses
 use futures::{channel::mpsc, stream::StreamExt, SinkExt};
-use itertools::Itertools;
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
@@ -16,10 +15,14 @@ use zksync_types::{
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
     tx::ZkSyncTx,
-    AccountId, Address, PriorityOp, SignedZkSyncTx, H256,
+    Address, PriorityOp, SignedZkSyncTx, H256,
 };
 // Local uses
-use self::{pending_block::PendingBlock, types::ApplyOutcome, utils::system_time_timestamp};
+use self::{
+    pending_block::PendingBlock,
+    types::{ApplyOutcome, StateKeeperConfig},
+    utils::system_time_timestamp,
+};
 use crate::{
     committer::{BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
@@ -41,19 +44,12 @@ mod tests;
 pub struct ZkSyncStateKeeper {
     /// Current plasma state
     state: ZkSyncState,
-
-    fee_account_id: AccountId,
     current_unprocessed_priority_op: u64,
-
     pending_block: PendingBlock,
+    config: StateKeeperConfig,
 
     rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
-
-    available_block_chunk_sizes: Vec<usize>,
-    max_miniblock_iterations: usize,
-    fast_miniblock_iterations: usize,
-
     /// Channel used for sending queued transaction events. Required since state keeper
     /// has no access to the database.
     processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
@@ -71,14 +67,6 @@ impl ZkSyncStateKeeper {
         fast_miniblock_iterations: usize,
         processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
     ) -> Self {
-        assert!(!available_block_chunk_sizes.is_empty());
-
-        let is_sorted = available_block_chunk_sizes
-            .iter()
-            .tuple_windows()
-            .all(|(a, b)| a < b);
-        assert!(is_sorted);
-
         let current_block = initial_state.last_block_number + 1;
         let state = ZkSyncState::new(
             initial_state.tree,
@@ -98,23 +86,28 @@ impl ZkSyncStateKeeper {
             .write_be(be_bytes.as_mut())
             .expect("Write commit bytes");
         let previous_root_hash = H256::from(be_bytes);
-        let keeper = ZkSyncStateKeeper {
-            state,
+
+        let config = StateKeeperConfig::new(
             fee_account_id,
-            current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
-            rx_for_blocks,
-            tx_for_commitments,
-            pending_block: PendingBlock::new(
-                current_block,
-                initial_state.unprocessed_priority_op,
-                &available_block_chunk_sizes,
-                previous_root_hash,
-                system_time_timestamp(),
-            ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
+        );
 
+        let keeper = ZkSyncStateKeeper {
+            state,
+            current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
+            pending_block: PendingBlock::new(
+                current_block,
+                initial_state.unprocessed_priority_op,
+                config.max_block_size(),
+                previous_root_hash,
+                system_time_timestamp(),
+            ),
+            config,
+
+            rx_for_blocks,
+            tx_for_commitments,
             processed_tx_events_sender,
         };
 
@@ -309,9 +302,9 @@ impl ZkSyncStateKeeper {
 
         // If pending block contains withdrawals we seal it faster
         let max_miniblock_iterations = if self.pending_block.fast_processing_required {
-            self.fast_miniblock_iterations
+            self.config.fast_miniblock_iterations
         } else {
-            self.max_miniblock_iterations
+            self.config.max_miniblock_iterations
         };
         if self.pending_block.should_seal(max_miniblock_iterations) {
             self.seal_pending_block().await;
@@ -582,9 +575,10 @@ impl ZkSyncStateKeeper {
         let start = Instant::now();
 
         // Apply fees of pending block
-        let fee_updates = self
-            .state
-            .collect_fee(&self.pending_block.collected_fees, self.fee_account_id);
+        let fee_updates = self.state.collect_fee(
+            &self.pending_block.collected_fees,
+            self.config.fee_account_id,
+        );
         self.pending_block
             .account_updates
             .extend(fee_updates.into_iter());
@@ -595,7 +589,7 @@ impl ZkSyncStateKeeper {
             PendingBlock::new(
                 next_block,
                 self.current_unprocessed_priority_op,
-                &self.available_block_chunk_sizes,
+                self.config.max_block_size(),
                 H256::default(),
                 system_time_timestamp(),
             ),
@@ -616,13 +610,13 @@ impl ZkSyncStateKeeper {
         let block = Block::new_from_available_block_sizes(
             self.pending_block.number,
             self.state.root_hash(),
-            self.fee_account_id,
+            self.config.fee_account_id,
             block_transactions,
             (
                 pending_block.unprocessed_priority_op_before,
                 self.current_unprocessed_priority_op,
             ),
-            &self.available_block_chunk_sizes,
+            &self.config.available_block_chunk_sizes,
             commit_gas_limit,
             verify_gas_limit,
             pending_block.previous_block_root_hash,
