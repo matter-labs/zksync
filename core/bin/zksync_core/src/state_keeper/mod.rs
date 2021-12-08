@@ -79,10 +79,10 @@ impl ZkSyncStateKeeper {
             .all(|(a, b)| a < b);
         assert!(is_sorted);
 
+        let current_block = initial_state.last_block_number + 1;
         let state = ZkSyncState::new(
             initial_state.tree,
             initial_state.acc_id_by_addr,
-            initial_state.last_block_number + 1,
             initial_state.nfts,
         );
 
@@ -105,6 +105,7 @@ impl ZkSyncStateKeeper {
             rx_for_blocks,
             tx_for_commitments,
             pending_block: PendingBlock::new(
+                current_block,
                 initial_state.unprocessed_priority_op,
                 &available_block_chunk_sizes,
                 previous_root_hash,
@@ -142,7 +143,7 @@ impl ZkSyncStateKeeper {
                        be empty, but got this instead: \n \
                        Block number: {} \n \
                        Pending block state: {:?}",
-                    self.state.block_number, self.pending_block
+                    self.pending_block.number, self.pending_block
                 );
             }
 
@@ -179,7 +180,7 @@ impl ZkSyncStateKeeper {
                     Block number: {} \n \
                     Initial pending block state: {:?}\n \
                     Pending block state: {:?}",
-                    self.state.block_number, pending_block, self.pending_block
+                    self.pending_block.number, pending_block, self.pending_block
                 );
             }
 
@@ -297,7 +298,7 @@ impl ZkSyncStateKeeper {
             let _ = self
                 .processed_tx_events_sender
                 .send(ProcessedOperations {
-                    block_number: self.state.block_number,
+                    block_number: self.pending_block.number,
                     executed_ops,
                 })
                 .await;
@@ -587,10 +588,12 @@ impl ZkSyncStateKeeper {
         self.pending_block
             .account_updates
             .extend(fee_updates.into_iter());
+        let next_block = self.pending_block.number + 1;
 
         let mut pending_block = std::mem::replace(
             &mut self.pending_block,
             PendingBlock::new(
+                next_block,
                 self.current_unprocessed_priority_op,
                 &self.available_block_chunk_sizes,
                 H256::default(),
@@ -611,7 +614,7 @@ impl ZkSyncStateKeeper {
         let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
 
         let block = Block::new_from_available_block_sizes(
-            self.state.block_number,
+            self.pending_block.number,
             self.state.root_hash(),
             self.fee_account_id,
             block_transactions,
@@ -638,7 +641,7 @@ impl ZkSyncStateKeeper {
             accounts_updated: pending_block.account_updates.clone(),
         };
         let applied_updates_request = pending_block.prepare_applied_updates_request();
-        *self.state.block_number += 1;
+        *self.pending_block.number += 1;
 
         vlog::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
@@ -662,9 +665,7 @@ impl ZkSyncStateKeeper {
     async fn store_pending_block(&mut self) {
         let start = Instant::now();
 
-        let pending_block = self
-            .pending_block
-            .prepare_for_storing(self.state.block_number);
+        let pending_block = self.pending_block.prepare_for_storing();
         let applied_updates_request = self.pending_block.prepare_applied_updates_request();
 
         vlog::debug!(
@@ -689,7 +690,7 @@ impl ZkSyncStateKeeper {
             tree: self.state.get_balance_tree(),
             acc_id_by_addr: self.state.get_account_addresses(),
             nfts: self.state.nfts.clone(),
-            last_block_number: self.state.block_number - 1,
+            last_block_number: self.pending_block.number - 1,
             unprocessed_priority_op: self.current_unprocessed_priority_op,
         }
     }

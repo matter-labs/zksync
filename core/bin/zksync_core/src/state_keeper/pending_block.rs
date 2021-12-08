@@ -12,6 +12,8 @@ use crate::committer::AppliedUpdatesRequest;
 
 #[derive(Debug, Clone)]
 pub(super) struct PendingBlock {
+    pub(super) number: BlockNumber,
+
     pub(super) success_operations: Vec<ExecutedOperations>,
     pub(super) failed_txs: Vec<ExecutedTx>,
     pub(super) account_updates: AccountUpdates,
@@ -39,6 +41,7 @@ pub(super) struct PendingBlock {
 
 impl PendingBlock {
     pub(super) fn new(
+        number: BlockNumber,
         unprocessed_priority_op_before: u64,
         available_chunks_sizes: &[usize],
         previous_block_root_hash: H256,
@@ -50,6 +53,7 @@ impl PendingBlock {
             .max()
             .expect("Expected at least one block chunks size");
         Self {
+            number,
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
             account_updates: Vec::new(),
@@ -101,10 +105,7 @@ impl PendingBlock {
 
     /// Creates `SendablePendingBlock needed to store pending block.
     /// Updates internal counters for already stored operations.
-    pub(super) fn prepare_for_storing(
-        &mut self,
-        current_block: BlockNumber,
-    ) -> SendablePendingBlock {
+    pub(super) fn prepare_for_storing(&mut self) -> SendablePendingBlock {
         // We want include only the newly appeared transactions, since the older ones are already persisted in the
         // database.
         // This is a required optimization, since otherwise time to process the pending block may grow without any
@@ -121,7 +122,7 @@ impl PendingBlock {
         // Note that failed operations are not included, as per any operation failure
         // the full block is created immediately.
         SendablePendingBlock {
-            number: current_block,
+            number: self.number,
             chunks_left: self.chunks_left,
             unprocessed_priority_op_before: self.unprocessed_priority_op_before,
             pending_block_iteration: self.pending_block_iteration,

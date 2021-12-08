@@ -477,7 +477,7 @@ async fn seal_pending_block() {
         assert_eq!(collected_fees, BigUint::from(1u32));
         assert_eq!(block.block.processed_priority_ops, (0, 1));
         assert_eq!(
-            tester.state_keeper.state.block_number,
+            tester.state_keeper.pending_block.number,
             block.block.block_number + 1
         );
         assert_eq!(
@@ -520,7 +520,7 @@ async fn store_pending_block() {
     tester.state_keeper.store_pending_block().await;
 
     if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-        assert_eq!(block.number, tester.state_keeper.state.block_number);
+        assert_eq!(block.number, tester.state_keeper.pending_block.number);
         assert_eq!(
             block.chunks_left,
             tester.state_keeper.pending_block.chunks_left
@@ -1409,7 +1409,7 @@ async fn correctly_restore_pending_block_timestamp() {
 
     let pending_block =
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.number, tester.state_keeper.state.block_number);
+            assert_eq!(block.number, tester.state_keeper.pending_block.number);
             assert_eq!(block.success_operations.len(), 1);
             assert_eq!(block.failed_txs.len(), 0);
 
@@ -1441,7 +1441,7 @@ async fn correctly_restore_pending_block_timestamp() {
         .await;
 
     assert_eq!(
-        tester.state_keeper.state.block_number, pending_block.number,
+        tester.state_keeper.pending_block.number, pending_block.number,
         "Incorrect block number in state keeper"
     );
 

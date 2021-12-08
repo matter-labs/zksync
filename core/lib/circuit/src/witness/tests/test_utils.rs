@@ -54,7 +54,7 @@ pub struct ZkSyncStateGenerator;
 
 impl ZkSyncStateGenerator {
     fn create_state(accounts: AccountMap) -> (ZkSyncState, CircuitAccountTree) {
-        let plasma_state = ZkSyncState::from_acc_map(accounts, BlockNumber(1));
+        let plasma_state = ZkSyncState::from_acc_map(accounts);
 
         let mut circuit_account_tree =
             CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
