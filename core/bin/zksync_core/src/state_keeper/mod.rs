@@ -117,6 +117,9 @@ impl ZkSyncStateKeeper {
         keeper
     }
 
+    // TODO (ZKS-821): We should get rid of this function and create state keeper in a ready-to-go state.
+    // Currently we partially initialize state keeper, and then finalize initialization when it's actually started
+    // which is not a good practice.
     async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
         let start = Instant::now();
 
@@ -204,6 +207,7 @@ impl ZkSyncStateKeeper {
                         .send(self.pending_block.timestamp)
                         .unwrap_or_default();
                 }
+                // TODO (ZKS-821): Only used by block proposer, can be removed.
                 StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
                         .send(self.current_unprocessed_priority_op)
@@ -212,9 +216,11 @@ impl ZkSyncStateKeeper {
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_proposed_block(proposed_block).await;
                 }
+                // TODO (ZKS-821): Only used by testkit, should be removed.
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
                 }
+                // TODO (ZKS-821): Only used by testkit, should be removed.
                 StateKeeperRequest::GetCurrentState(sender) => {
                     sender.send(self.get_current_state()).unwrap_or_default();
                 }
@@ -287,6 +293,8 @@ impl ZkSyncStateKeeper {
             }
         }
 
+        // TODO (ZKS-821): We can store events in `committer` (as it's already responsible for applying results of
+        // the block execution), there is no need in additional actor for that.
         if !executed_ops.is_empty() {
             let _ = self
                 .processed_tx_events_sender
