@@ -89,7 +89,18 @@ impl PendingBlock {
         fee: Option<CollectedFee>,
         exec_result: ExecutedOperations,
     ) {
-        self.chunks_left -= chunks_used; // TODO: Use checked sub.
+        // If case of underflow we have to provide more context to ease the debugging.
+        self.chunks_left = self
+            .chunks_left
+            .checked_sub(chunks_used)
+            .unwrap_or_else(|| {
+                panic!(
+                    "Attempt to subract chunks with underflow. \n \
+                 chunks_used: {}, executed op: {:?} \n \
+                 current pending block state: {:?}",
+                    chunks_used, exec_result, self,
+                );
+            });
         self.account_updates.append(&mut updates);
         if let Some(fee) = fee {
             self.collected_fees.push(fee);
