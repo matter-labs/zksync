@@ -24,6 +24,7 @@ pub struct ProverInputResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum JobRequestData {
     BlockProof(
         ProverData,

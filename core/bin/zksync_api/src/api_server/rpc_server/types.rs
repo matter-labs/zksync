@@ -127,3 +127,10 @@ pub struct ContractAddressResp {
     pub main_contract: String,
     pub gov_contract: String,
 }
+
+/// The metadata of the JSON-RPC call retrieved from the HTTP request of the call
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RequestMetadata {
+    /// The ip of the call origin
+    pub ip: String,
+}

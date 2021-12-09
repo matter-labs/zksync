@@ -7,8 +7,8 @@ use zksync_basic_types::{AccountId, Address};
 use crate::{
     operations::{ChangePubKeyOp, MintNFTOp},
     tx::{
-        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, MintNFT, Swap, Transfer,
-        TxEthSignature, TxHash, TxSignature, Withdraw, WithdrawNFT,
+        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, MintNFT, Swap, TimeRange,
+        Transfer, TxEthSignature, TxHash, TxSignature, Withdraw, WithdrawNFT,
     },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
@@ -452,6 +452,20 @@ impl ZkSyncTx {
                     withdraw.fee.clone(),
                 ))
             }
+        }
+    }
+
+    /// Returns the time range of this transaction.
+    pub fn time_range(&self) -> TimeRange {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::ForcedExit(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Close(tx) => tx.time_range,
+            ZkSyncTx::MintNFT(_) => Default::default(),
+            ZkSyncTx::Swap(tx) => tx.time_range(),
+            ZkSyncTx::WithdrawNFT(tx) => tx.time_range,
         }
     }
 

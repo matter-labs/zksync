@@ -2726,6 +2726,26 @@
       "nullable": []
     }
   },
+  "5c7fddda5592e9d84648e4e52e8e6cbb8c98d390e00ca7298a4cd6e5ef9367f2": {
+    "query": "\n            SELECT SUM(usd_amount_scale6) as total FROM subsidies \n            WHERE subsidy_type = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "total",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
     "query": "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
     "describe": {
@@ -5835,6 +5855,24 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "cc97b33cc2f24fa09f02c16c048e12060daf39c91845cb35847daa229065560e": {
+    "query": "SELECT MAX(block) FROM account_tree_cache",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
       ]
     }
   },

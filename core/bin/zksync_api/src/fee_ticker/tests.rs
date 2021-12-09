@@ -9,7 +9,10 @@ use std::str::FromStr;
 use std::thread::sleep;
 use tokio::time::Duration;
 use zksync_types::{Address, Token, TokenId, TokenKind, TokenPrice};
-use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
+use zksync_utils::{
+    big_decimal_to_ratio, ratio_to_big_decimal, ratio_to_scaled_u64, scaled_u64_to_ratio,
+    UnsignedRatioSerializeAsDecimal,
+};
 
 use crate::fee_ticker::{
     ticker_api::{
@@ -101,6 +104,8 @@ impl TestToken {
     }
 }
 
+const SUBSIDY_CPK_PRICE_USD_SCALED: u64 = 10000000; // 10 dollars
+
 fn get_test_ticker_config() -> TickerConfig {
     TickerConfig {
         zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot("0.001")
@@ -115,6 +120,7 @@ fn get_test_ticker_config() -> TickerConfig {
             .collect(),
         scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
         max_blocks_to_aggregate: 5,
+        subsidy_cpk_price_usd: scaled_u64_to_ratio(SUBSIDY_CPK_PRICE_USD_SCALED),
     }
 }
 
@@ -260,6 +266,244 @@ fn run_server(token_address: Address) -> (String, AbortHandle) {
     (address, abort_handle)
 }
 
+type TestFeeTicker = FeeTicker<MockApiProvider, MockTickerInfo, FakeTokenWatcher>;
+
+fn get_normal_and_subsidy_fee(
+    ticker: &mut TestFeeTicker,
+    tx_type: TxFeeTypes,
+    token: TokenLike,
+    address: Address,
+    future_blocks: Option<BlocksInFutureAggregatedOperations>,
+    remaining_chunks: Option<usize>,
+) -> (Ratio<BigUint>, Ratio<BigUint>) {
+    if let Some(blocks) = future_blocks {
+        ticker.info.future_blocks = blocks;
+    }
+    ticker.info.remaining_chunks = remaining_chunks;
+    let fee_in_token = block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
+        .expect("failed to get fee in token");
+
+    let batched_fee_in_token =
+        block_on(ticker.get_batch_from_ticker_in_wei(token, vec![(tx_type, address)]))
+            .expect("failed to get batched fee for token");
+
+    assert_eq!(
+        fee_in_token.normal_fee.total_fee,
+        batched_fee_in_token.normal_fee.total_fee
+    );
+    assert_eq!(
+        fee_in_token.subsidized_fee.total_fee,
+        batched_fee_in_token.subsidized_fee.total_fee
+    );
+
+    (
+        Ratio::from(fee_in_token.normal_fee.total_fee),
+        Ratio::from(fee_in_token.subsidized_fee.total_fee),
+    )
+}
+
+fn get_token_fee_in_usd(
+    ticker: &mut TestFeeTicker,
+    tx_type: TxFeeTypes,
+    token: TokenLike,
+    address: Address,
+    future_blocks: Option<BlocksInFutureAggregatedOperations>,
+    remaining_chunks: Option<usize>,
+) -> Ratio<BigUint> {
+    let fee_in_token = get_normal_and_subsidy_fee(
+        ticker,
+        tx_type,
+        token.clone(),
+        address,
+        future_blocks,
+        remaining_chunks,
+    )
+    .0;
+
+    let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+        .unwrap()
+        .decimals;
+
+    // Fee in usd
+    (block_on(MockApiProvider.get_last_quote(token))
+        .expect("failed to get fee in usd")
+        .usd_price
+        / BigUint::from(10u32).pow(u32::from(token_precision)))
+        * fee_in_token
+}
+
+fn get_subsidy_token_fee_in_usd(
+    ticker: &mut TestFeeTicker,
+    tx_type: TxFeeTypes,
+    token: TokenLike,
+    address: Address,
+    future_blocks: Option<BlocksInFutureAggregatedOperations>,
+    remaining_chunks: Option<usize>,
+) -> Ratio<BigUint> {
+    let fee_in_token = get_normal_and_subsidy_fee(
+        ticker,
+        tx_type,
+        token.clone(),
+        address,
+        future_blocks,
+        remaining_chunks,
+    )
+    .1;
+    let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+        .unwrap()
+        .decimals;
+
+    // Fee in usd
+    (block_on(MockApiProvider.get_last_quote(token))
+        .expect("failed to get fee in usd")
+        .usd_price
+        / BigUint::from(10u32).pow(u32::from(token_precision)))
+        * fee_in_token
+}
+
+fn convert_to_usd(amount: &Ratio<BigUint>, token: TokenLike) -> Ratio<BigUint> {
+    let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+        .unwrap()
+        .decimals;
+
+    // Fee in usd
+    (block_on(MockApiProvider.get_last_quote(token))
+        .expect("failed to get fee in usd")
+        .usd_price
+        / BigUint::from(10u32).pow(u32::from(token_precision)))
+        * amount
+}
+
+// Because of various precision errors, the USD price may differ, but no more than by 3 cents
+const TOLERARED_PRICE_DIFFERENCE_SCALED: i64 = 3000000;
+
+#[test]
+fn test_ticker_subsidy() {
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+        FakeTokenWatcher,
+    );
+
+    let config = get_test_ticker_config();
+    let mut ticker = FeeTicker::new(
+        MockApiProvider,
+        MockTickerInfo::default(),
+        mpsc::channel(1).1,
+        config,
+        validator,
+    );
+
+    // Only CREATE2 is subsidized
+    let cpk = |cpk_type: ChangePubKeyType| {
+        TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(cpk_type))
+    };
+
+    let (create2_normal_price, create2_subsidy_price) = get_normal_and_subsidy_fee(
+        &mut ticker,
+        cpk(ChangePubKeyType::CREATE2),
+        TokenId(0).into(),
+        Address::default(),
+        None,
+        None,
+    );
+    let create2_subsidy_price_usd =
+        convert_to_usd(&create2_subsidy_price, TokenLike::Id(TokenId(0)));
+
+    // Due to precision-rounding, the price might differ, but it shouldn't by more than 1 cent
+    assert!(
+        SUBSIDY_CPK_PRICE_USD_SCALED - ratio_to_scaled_u64(create2_subsidy_price_usd.clone())
+            <= TOLERARED_PRICE_DIFFERENCE_SCALED as u64
+    );
+    // Just to check that subsidy fee does not coincide with normal fee
+    assert_ne!(create2_normal_price, create2_subsidy_price);
+
+    // ChangePubKey (Onchain) is not subsidized
+    let (normal_cpk_onchain_price, subsidy_cpk_onchain_price) = get_normal_and_subsidy_fee(
+        &mut ticker,
+        cpk(ChangePubKeyType::ECDSA),
+        TokenId(0).into(),
+        Address::default(),
+        None,
+        None,
+    );
+    assert_eq!(normal_cpk_onchain_price, subsidy_cpk_onchain_price);
+
+    // ChangePubKey (ECDSA) is not subsidized
+    let (normal_cpk_ecdsa_price, subsidy_cpk_ecdsa_price) = get_normal_and_subsidy_fee(
+        &mut ticker,
+        cpk(ChangePubKeyType::Onchain),
+        TokenId(0).into(),
+        Address::default(),
+        None,
+        None,
+    );
+    assert_eq!(normal_cpk_ecdsa_price, subsidy_cpk_ecdsa_price);
+
+    // Transfer is not subsidized
+    let (normal_transfer_price, subsidy_transfer_price) = get_normal_and_subsidy_fee(
+        &mut ticker,
+        TxFeeTypes::Transfer,
+        TokenId(0).into(),
+        Address::default(),
+        None,
+        None,
+    );
+    assert_eq!(normal_transfer_price, subsidy_transfer_price);
+    let normal_transfer_price_usd =
+        convert_to_usd(&normal_transfer_price, TokenLike::Id(TokenId(0)));
+
+    // Subsidy also works for batches
+    let batch_price_token = block_on(ticker.get_batch_from_ticker_in_wei(
+        TokenId(0).into(),
+        vec![
+            (TxFeeTypes::Transfer, Address::default()),
+            (cpk(ChangePubKeyType::CREATE2), Address::default()),
+            (cpk(ChangePubKeyType::CREATE2), Address::default()),
+        ],
+    ))
+    .unwrap();
+    let subsidy_batch_price_usd = convert_to_usd(
+        &Ratio::from(batch_price_token.subsidized_fee.total_fee),
+        TokenLike::Id(TokenId(0)),
+    );
+
+    let separate_tx_price =
+        normal_transfer_price_usd + &create2_subsidy_price_usd + &create2_subsidy_price_usd;
+
+    let diff_usd = if subsidy_batch_price_usd > separate_tx_price {
+        subsidy_batch_price_usd - separate_tx_price
+    } else {
+        separate_tx_price - subsidy_batch_price_usd
+    };
+    let diff_cents = ratio_to_scaled_u64(diff_usd);
+    // The batch price and the actual price may differ, but no more than by a few cents
+    assert!(diff_cents < TOLERARED_PRICE_DIFFERENCE_SCALED as u64);
+
+    // The subsidy price is more-or-less same in all tokens
+    let mut scaled_prices: Vec<i64> = vec![];
+
+    for token in TestToken::all_tokens().into_iter().take(3) {
+        let price_usd = get_subsidy_token_fee_in_usd(
+            &mut ticker,
+            cpk(ChangePubKeyType::CREATE2),
+            token.id.into(),
+            Address::default(),
+            None,
+            None,
+        );
+        let scaled_price = ratio_to_scaled_u64(price_usd * BigUint::from(100u64)) as i64; // Converting to i64 to easier find differences
+        scaled_prices.push(scaled_price);
+    }
+    for i in 0..=1 {
+        assert!(
+            (scaled_prices[i] - scaled_prices[i + 1]).abs() <= TOLERARED_PRICE_DIFFERENCE_SCALED
+        );
+    }
+}
+
 #[test]
 fn test_ticker_formula() {
     let validator = FeeTokenValidator::new(
@@ -279,38 +523,6 @@ fn test_ticker_formula() {
         validator,
     );
 
-    let mut get_token_fee_in_usd = |tx_type: TxFeeTypes,
-                                    token: TokenLike,
-                                    address: Address,
-                                    future_blocks: Option<BlocksInFutureAggregatedOperations>,
-                                    remaining_chunks: Option<usize>|
-     -> Ratio<BigUint> {
-        if let Some(blocks) = future_blocks {
-            ticker.info.future_blocks = blocks;
-        }
-        ticker.info.remaining_chunks = remaining_chunks;
-        let fee_in_token =
-            block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
-                .expect("failed to get fee in token");
-        let token_precision = block_on(MockApiProvider.get_token(token.clone()))
-            .unwrap()
-            .decimals;
-        let batched_fee_in_token =
-            block_on(ticker.get_batch_from_ticker_in_wei(token.clone(), vec![(tx_type, address)]))
-                .expect("failed to get batched fee for token");
-        assert_eq!(
-            fee_in_token.normal_fee.total_fee,
-            batched_fee_in_token.normal_fee.total_fee
-        );
-
-        // Fee in usd
-        (block_on(MockApiProvider.get_last_quote(token))
-            .expect("failed to get fee in usd")
-            .usd_price
-            / BigUint::from(10u32).pow(u32::from(token_precision)))
-            * fee_in_token.normal_fee.total_fee
-    };
-
     let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
         let max = std::cmp::max(a.clone(), b.clone());
         let min = std::cmp::min(a.clone(), b.clone());
@@ -318,13 +530,16 @@ fn test_ticker_formula() {
     };
 
     let expected_price_of_eth_token_transfer_usd = get_token_fee_in_usd(
+        &mut ticker,
         TxFeeTypes::Transfer,
         TokenId(0).into(),
         Address::default(),
         None,
         None,
     );
+
     let expected_price_of_eth_token_withdraw_usd = get_token_fee_in_usd(
+        &mut ticker,
         TxFeeTypes::Withdraw,
         TokenId(0).into(),
         Address::default(),
@@ -337,6 +552,7 @@ fn test_ticker_formula() {
     let threshold = BigDecimal::from_str("0.01").unwrap();
     for token in &[TestToken::eth(), TestToken::expensive()] {
         let transfer_fee = get_token_fee_in_usd(
+            &mut ticker,
             TxFeeTypes::Transfer,
             token.id.into(),
             Address::default(),
@@ -355,6 +571,7 @@ fn test_ticker_formula() {
             );
 
         let withdraw_fee = get_token_fee_in_usd(
+            &mut ticker,
             TxFeeTypes::Withdraw,
             token.id.into(),
             Address::default(),
@@ -373,6 +590,7 @@ fn test_ticker_formula() {
             );
 
         let mut last_fast_withdraw_fee = get_token_fee_in_usd(
+            &mut ticker,
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
@@ -391,6 +609,7 @@ fn test_ticker_formula() {
                 blocks_to_execute: i,
             };
             let fast_withdraw_fee = get_token_fee_in_usd(
+                &mut ticker,
                 TxFeeTypes::FastWithdraw,
                 token.id.into(),
                 Address::default(),
@@ -399,6 +618,7 @@ fn test_ticker_formula() {
             );
 
             let expected_price_of_eth_token_fast_withdraw_usd = get_token_fee_in_usd(
+                &mut ticker,
                 TxFeeTypes::FastWithdraw,
                 TokenId(0).into(),
                 Address::default(),
@@ -430,6 +650,7 @@ fn test_ticker_formula() {
         }
 
         let fast_withdraw_fee_for_6_block = get_token_fee_in_usd(
+            &mut ticker,
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
@@ -442,6 +663,7 @@ fn test_ticker_formula() {
         );
 
         let fast_withdraw_fee_for_1_block = get_token_fee_in_usd(
+            &mut ticker,
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
@@ -459,6 +681,7 @@ fn test_ticker_formula() {
         );
 
         let mut last_fast_withdraw_fee = get_token_fee_in_usd(
+            &mut ticker,
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
@@ -471,6 +694,7 @@ fn test_ticker_formula() {
         );
         for i in 2..=4 {
             let fast_withdraw_fee = get_token_fee_in_usd(
+                &mut ticker,
                 TxFeeTypes::FastWithdraw,
                 token.id.into(),
                 Address::default(),
@@ -488,6 +712,7 @@ fn test_ticker_formula() {
             last_fast_withdraw_fee = fast_withdraw_fee;
         }
         let not_enough_chunks_fee = get_token_fee_in_usd(
+            &mut ticker,
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),
@@ -500,6 +725,7 @@ fn test_ticker_formula() {
         );
 
         let no_pending_block_fee = get_token_fee_in_usd(
+            &mut ticker,
             TxFeeTypes::FastWithdraw,
             token.id.into(),
             Address::default(),

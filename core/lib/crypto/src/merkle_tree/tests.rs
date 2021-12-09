@@ -159,7 +159,7 @@ struct InputData {
 #[test]
 fn big_test() {
     let input_str = include_str!("big_test.json");
-    let input: InputData = serde_json::from_str(&input_str).unwrap();
+    let input: InputData = serde_json::from_str(input_str).unwrap();
     let mut tree =
         parallel_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(input.depth);
 

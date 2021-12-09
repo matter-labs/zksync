@@ -152,7 +152,7 @@ async fn submit_tx(
 ) -> ApiResult<TxHashSerializeWrapper> {
     let tx_hash = data
         .tx_sender
-        .submit_tx(body.tx, body.signature)
+        .submit_tx(body.tx, body.signature, None)
         .await
         .map_err(Error::from);
 
@@ -165,7 +165,7 @@ async fn submit_batch(
 ) -> ApiResult<SubmitBatchResponse> {
     let response = data
         .tx_sender
-        .submit_txs_batch(body.txs, body.signature)
+        .submit_txs_batch(body.txs, body.signature, None)
         .await
         .map_err(Error::from);
     response.into()
@@ -281,7 +281,7 @@ mod tests {
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
                     dummy_fee_ticker(&[]),
-                    &cfg.config,
+                    &cfg.config.api.common,
                 ))
             },
             Some(shared_data),

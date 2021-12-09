@@ -89,6 +89,20 @@ describe(`Extended tests`, () => {
         await tester.testChangePubKey(alice, token, true);
     });
 
+    step('Should test subsidy', async () => {
+        if (transport != 'HTTP') {
+            return;
+        }
+
+        const wallet1 = await tester.create2Wallet();
+        await tester.testTransfer(alice, wallet1, token, TX_AMOUNT);
+        await tester.testSubsidyForCREATE2ChangePubKey(wallet1, token);
+
+        const wallet2 = await tester.create2Wallet();
+        await tester.testTransfer(alice, wallet2, token, TX_AMOUNT);
+        await tester.testSubsidyForBatch(wallet2, token);
+    });
+
     step('should execute a mintNFT', async () => {
         // Recipient account must exist, so create it by performing a transfer.
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);

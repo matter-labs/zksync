@@ -125,26 +125,26 @@ async fn confirm_eth_op(
 }
 
 pub async fn commit_block(
-    mut storage: &mut StorageProcessor<'_>,
+    storage: &mut StorageProcessor<'_>,
     block_number: BlockNumber,
 ) -> QueryResult<()> {
     // Required since we use `EthereumSchema` in this test.
     storage.ethereum_schema().initialize_eth_data().await?;
-    BlockSchema(&mut storage)
+    BlockSchema(storage)
         .save_block(gen_sample_block(
             block_number,
             BLOCK_SIZE_CHUNKS,
             Default::default(),
         ))
         .await?;
-    OperationsSchema(&mut storage)
+    OperationsSchema(storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
             AggregatedActionType::CommitBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
-    let (id, aggregated_op) = OperationsSchema(&mut storage)
+    let (id, aggregated_op) = OperationsSchema(storage)
         .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
         .await?
         .unwrap();
@@ -164,17 +164,17 @@ pub async fn commit_block(
 }
 
 pub async fn verify_block(
-    mut storage: &mut StorageProcessor<'_>,
+    storage: &mut StorageProcessor<'_>,
     block_number: BlockNumber,
 ) -> QueryResult<()> {
-    OperationsSchema(&mut storage)
+    OperationsSchema(storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
             AggregatedActionType::ExecuteBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
-    let (id, op) = OperationsSchema(&mut storage)
+    let (id, op) = OperationsSchema(storage)
         .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, block_number)
         .await?
         .unwrap();

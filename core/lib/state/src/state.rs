@@ -12,6 +12,7 @@ use zksync_types::{
 use crate::{
     error::{OpError, TxBatchError},
     handler::{error::CloseOpError, TxHandler},
+    tx_ext::TxCheck,
 };
 
 #[derive(Debug)]
@@ -300,11 +301,12 @@ impl ZkSyncState {
     pub fn execute_txs_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
+        block_timestamp: u64,
     ) -> Vec<Result<OpSuccess, TxBatchError>> {
         let mut successes = Vec::new();
 
         for (id, tx) in txs.iter().enumerate() {
-            match self.execute_tx(tx.tx.clone()) {
+            match self.execute_tx(tx.tx.clone(), block_timestamp) {
                 Ok(success) => {
                     successes.push(Ok(success));
                 }
@@ -338,7 +340,9 @@ impl ZkSyncState {
         successes
     }
 
-    pub fn execute_tx(&mut self, tx: ZkSyncTx) -> Result<OpSuccess, OpError> {
+    pub fn execute_tx(&mut self, tx: ZkSyncTx, block_timestamp: u64) -> Result<OpSuccess, OpError> {
+        tx.check_timestamp(block_timestamp)?;
+
         match tx {
             ZkSyncTx::Transfer(tx) => Ok(self.apply_tx(*tx)?),
             ZkSyncTx::Withdraw(tx) => Ok(self.apply_tx(*tx)?),

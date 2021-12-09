@@ -21,14 +21,14 @@ impl AccountLifespan {
         command: &TxCommand,
     ) -> Result<ReportLabel, ClientError> {
         match command.command_type {
-            TxType::ChangePubKey => self.execute_change_pubkey(&command).await,
+            TxType::ChangePubKey => self.execute_change_pubkey(command).await,
             TxType::TransferToExisting | TxType::TransferToNew => {
-                self.execute_transfer(&command).await
+                self.execute_transfer(command).await
             }
             TxType::WithdrawToOther | TxType::WithdrawToSelf => {
-                self.execute_withdraw(&command).await
+                self.execute_withdraw(command).await
             }
-            TxType::Deposit => self.execute_deposit(&command).await,
+            TxType::Deposit => self.execute_deposit(command).await,
             TxType::FullExit => self.execute_full_exit().await,
         }
     }

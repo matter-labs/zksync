@@ -98,7 +98,7 @@ impl PubKeyHash {
 
     /// Creates a `PubKeyHash` from the private key.
     pub fn from_privkey(private_key: &PrivateKey) -> Self {
-        let pub_key = public_key_from_private(&private_key);
+        let pub_key = public_key_from_private(private_key);
         Self::from_pubkey(&pub_key)
     }
 }

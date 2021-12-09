@@ -492,14 +492,14 @@ where
     test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
     println!("Transfer ok, Token: {}", token.symbol);
 
-    test_transfer_to_self(&alice, &token.symbol, transfer_amount).await?;
+    test_transfer_to_self(alice, &token.symbol, transfer_amount).await?;
     println!("Transfer to self ok, Token: {}", token.symbol);
 
     test_withdraw(
-        &eth_provider,
-        &main_contract,
-        &alice,
-        &bob,
+        eth_provider,
+        main_contract,
+        alice,
+        bob,
         &token,
         withdraw_amount,
     )

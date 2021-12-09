@@ -200,8 +200,8 @@ pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
                 &msg,
                 &signature,
                 FixedGenerators::SpendingKeyGenerator,
-                &rescue_params,
-                &jubjub_params,
+                rescue_params,
+                jubjub_params,
             )
         })
     });

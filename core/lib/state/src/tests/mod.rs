@@ -1,5 +1,6 @@
 mod collect_fee;
 mod operations;
+mod timestamp;
 
 use crate::state::ZkSyncState;
 use num::BigUint;
@@ -24,6 +25,7 @@ pub enum AccountState {
 pub struct PlasmaTestBuilder {
     rng: XorShiftRng,
     state: ZkSyncState,
+    block_timestamp: u64,
 }
 
 impl Default for PlasmaTestBuilder {
@@ -37,7 +39,12 @@ impl PlasmaTestBuilder {
         Self {
             rng: XorShiftRng::from_seed([1, 2, 3, 4]),
             state: ZkSyncState::empty(),
+            block_timestamp: 0,
         }
+    }
+
+    pub fn set_timestamp(&mut self, block_timestamp: u64) {
+        self.block_timestamp = block_timestamp;
     }
 
     pub fn mint_nft(
@@ -98,7 +105,10 @@ impl PlasmaTestBuilder {
 
     pub fn test_tx_success(&mut self, tx: ZkSyncTx, expected_updates: &BoundAccountUpdates) {
         let mut state_clone = self.state.clone();
-        let op_success = self.state.execute_tx(tx).expect("transaction failed");
+        let op_success = self
+            .state
+            .execute_tx(tx, self.block_timestamp)
+            .expect("transaction failed");
         self.compare_updates(
             expected_updates,
             op_success.updates.as_slice(),
@@ -109,7 +119,7 @@ impl PlasmaTestBuilder {
     pub fn test_tx_fail(&mut self, tx: ZkSyncTx, expected_error_message: &str) {
         let error = self
             .state
-            .execute_tx(tx)
+            .execute_tx(tx, self.block_timestamp)
             .expect_err("transaction didn't fail");
 
         assert_eq!(
@@ -125,7 +135,7 @@ impl PlasmaTestBuilder {
         expected_updates: &BoundAccountUpdates,
     ) {
         let mut state_clone = self.state.clone();
-        let op_successes = self.state.execute_txs_batch(txs);
+        let op_successes = self.state.execute_txs_batch(txs, self.block_timestamp);
         let mut updates: Vec<(AccountId, AccountUpdate)> = Vec::new();
         for result in op_successes {
             updates.append(&mut result.unwrap().updates);
@@ -135,7 +145,7 @@ impl PlasmaTestBuilder {
 
     pub fn test_txs_batch_fail(&mut self, txs: &[SignedZkSyncTx], expected_error_message: &str) {
         let state_clone = self.state.clone();
-        let op_errors = self.state.execute_txs_batch(txs);
+        let op_errors = self.state.execute_txs_batch(txs, self.block_timestamp);
         for error in op_errors {
             assert_eq!(
                 error.unwrap_err().to_string().as_str(),

@@ -12,6 +12,17 @@ forced_exit_minimum_account_age_secs=0
 # List of account IDs that do not have to pay fees for operations.
 fee_free_accounts=[]
 
+# Whitelisted IPs for subsisdies
+subsidized_ips=["SUBSIDY_IP"]
+
+# Please note, that the prices are scaled by 10^6
+# The scaled maximum number of dollars to be subsidized is $250000
+max_subsidy_usd_scaled=250000000000
+
+# The type of the currently applied subsidy
+# At this moment, the server can support only one type of subsidy at a time
+subsidy_name="PartnerName"
+
 # Ability to perform change pub key with zero fee
 enforce_pubkey_change_fee=true
 
@@ -43,6 +54,7 @@ ws_url="ws://127.0.0.1:3031"
 port=3002
 url="http://127.0.0.1:3002"
 max_block_range=10
+chain_id=240
 
 # Configuration for the core private server.
 [api.private]

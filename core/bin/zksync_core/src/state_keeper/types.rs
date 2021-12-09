@@ -1,7 +1,6 @@
 // External uses
 use futures::channel::oneshot;
 // Workspace uses
-
 use zksync_types::{Account, AccountId, Address};
 // Local uses
 use crate::{mempool::ProposedBlock, state_keeper::init_params::ZkSyncStateInitParams};

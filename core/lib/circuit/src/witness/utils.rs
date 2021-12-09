@@ -133,7 +133,7 @@ impl<'a> WitnessBuilder<'a> {
             .expect("failed to get number of noops");
         for _ in 0..chunks_remaining {
             self.operations.push(crate::witness::noop::noop_operation(
-                &self.account_tree,
+                self.account_tree,
                 *self.fee_account_id,
             ));
             self.pubdata.extend(vec![false; CHUNK_BIT_WIDTH]);
@@ -173,10 +173,10 @@ impl<'a> WitnessBuilder<'a> {
                 .to_vec(),
         );
         let (mut root_after_fee, mut fee_account_witness) =
-            crate::witness::utils::apply_fee(&mut self.account_tree, *self.fee_account_id, 0, 0);
+            crate::witness::utils::apply_fee(self.account_tree, *self.fee_account_id, 0, 0);
         for CollectedFee { token, amount } in fees {
             let (root, acc_witness) = crate::witness::utils::apply_fee(
-                &mut self.account_tree,
+                self.account_tree,
                 *self.fee_account_id,
                 **token as u32,
                 amount.to_u128().unwrap(),
@@ -204,7 +204,7 @@ impl<'a> WitnessBuilder<'a> {
     /// After fees collected creates public data commitment
     pub fn calculate_pubdata_commitment(&mut self) {
         let (fee_account_audit_path, _) =
-            crate::witness::utils::get_audits(&self.account_tree, *self.fee_account_id, 0);
+            crate::witness::utils::get_audits(self.account_tree, *self.fee_account_id, 0);
         self.fee_account_audit_path = Some(fee_account_audit_path);
 
         let public_data_commitment = crate::witness::utils::public_data_commitment::<Engine>(
@@ -265,7 +265,7 @@ pub fn generate_dummy_sig_data(
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let private_key = PrivateKey::<Bn256>(rng.gen());
-    let sender_pk = PublicKey::from_private(&private_key, p_g, &jubjub_params);
+    let sender_pk = PublicKey::from_private(&private_key, p_g, jubjub_params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
     assert!(sig_bits_to_hash.len() < MAX_CIRCUIT_MSG_HASH_BITS);
@@ -274,9 +274,9 @@ pub fn generate_dummy_sig_data(
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
-    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
-    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
-    let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(first_sig_part_bits);
+    let second_sig_part: Fr = le_bit_vector_into_field_element(second_sig_part_bits);
+    let third_sig_part: Fr = le_bit_vector_into_field_element(third_sig_part_bits);
     let sig_msg = rescue_hasher.hash_bits(sig_bits_to_hash.clone());
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
@@ -301,9 +301,9 @@ pub fn generate_sig_witness(bits: &[bool]) -> (Fr, Fr, Fr) {
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
-    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
-    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
-    let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(first_sig_part_bits);
+    let second_sig_part: Fr = le_bit_vector_into_field_element(second_sig_part_bits);
+    let third_sig_part: Fr = le_bit_vector_into_field_element(third_sig_part_bits);
     (first_sig_part, second_sig_part, third_sig_part)
 }
 
@@ -526,11 +526,11 @@ impl SigDataInput {
         pub_key: &PackedPublicKey,
     ) -> Result<SigDataInput, anyhow::Error> {
         let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-        let r_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(&r_bytes)
+        let r_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(r_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
-        let s_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(&s_bytes)
+        let s_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(s_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
@@ -538,7 +538,7 @@ impl SigDataInput {
             r_packed: r_bits,
             s: s_bits,
         };
-        let sig_bits: Vec<bool> = zksync_crypto::primitives::BitConvert::from_be_bytes(&tx_bytes);
+        let sig_bits: Vec<bool> = zksync_crypto::primitives::BitConvert::from_be_bytes(tx_bytes);
 
         let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(&sig_bits);
 
@@ -723,10 +723,7 @@ pub fn get_used_subtree_root_hash(account_tree: &CircuitAccountTree) -> Fr {
     // We take account 0, and hash it with it's Merkle proof.
     let account_index = 0;
     let account_merkle_path = account_tree.merkle_path(account_index);
-    let account = account_tree
-        .get(account_index)
-        .cloned()
-        .unwrap_or_else(CircuitAccount::default);
+    let account = account_tree.get(account_index).cloned().unwrap_or_default();
     let mut current_hash = account_tree.hasher.hash_bits(account.get_bits_le());
     for merkle_path_item in account_merkle_path
         .iter()
@@ -768,7 +765,7 @@ pub fn build_block_witness<'a>(
         match op {
             ZkSyncOp::Deposit(deposit) => {
                 let deposit_witness =
-                    DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit);
+                    DepositWitness::apply_tx(witness_accum.account_tree, &deposit);
 
                 let deposit_operations = deposit_witness.calculate_operations(());
                 operations.extend(deposit_operations);
@@ -777,7 +774,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::Transfer(transfer) => {
                 let transfer_witness =
-                    TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer);
+                    TransferWitness::apply_tx(witness_accum.account_tree, &transfer);
 
                 let input = SigDataInput::from_transfer_op(&transfer)?;
                 let transfer_operations = transfer_witness.calculate_operations(input);
@@ -791,10 +788,8 @@ pub fn build_block_witness<'a>(
                 offset_commitment.extend(transfer_witness.get_offset_commitment_data())
             }
             ZkSyncOp::TransferToNew(transfer_to_new) => {
-                let transfer_to_new_witness = TransferToNewWitness::apply_tx(
-                    &mut witness_accum.account_tree,
-                    &transfer_to_new,
-                );
+                let transfer_to_new_witness =
+                    TransferToNewWitness::apply_tx(witness_accum.account_tree, &transfer_to_new);
 
                 let input = SigDataInput::from_transfer_to_new_op(&transfer_to_new)?;
                 let transfer_to_new_operations =
@@ -810,7 +805,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::Withdraw(withdraw) => {
                 let withdraw_witness =
-                    WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw);
+                    WithdrawWitness::apply_tx(witness_accum.account_tree, &withdraw);
 
                 let input = SigDataInput::from_withdraw_op(&withdraw)?;
                 let withdraw_operations = withdraw_witness.calculate_operations(input);
@@ -825,7 +820,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::Close(close) => {
                 let close_account_witness =
-                    CloseAccountWitness::apply_tx(&mut witness_accum.account_tree, &close);
+                    CloseAccountWitness::apply_tx(witness_accum.account_tree, &close);
 
                 let input = SigDataInput::from_close_op(&close)?;
                 let close_account_operations = close_account_witness.calculate_operations(input);
@@ -838,7 +833,7 @@ pub fn build_block_witness<'a>(
                 let success = full_exit_op.withdraw_amount.is_some();
 
                 let full_exit_witness = FullExitWitness::apply_tx(
-                    &mut witness_accum.account_tree,
+                    witness_accum.account_tree,
                     &(*full_exit_op, success),
                 );
 
@@ -850,7 +845,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::ChangePubKeyOffchain(change_pkhash_op) => {
                 let change_pkhash_witness = ChangePubkeyOffChainWitness::apply_tx(
-                    &mut witness_accum.account_tree,
+                    witness_accum.account_tree,
                     &change_pkhash_op,
                 );
 
@@ -867,7 +862,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::ForcedExit(forced_exit) => {
                 let forced_exit_witness =
-                    ForcedExitWitness::apply_tx(&mut witness_accum.account_tree, &forced_exit);
+                    ForcedExitWitness::apply_tx(witness_accum.account_tree, &forced_exit);
 
                 let input = SigDataInput::from_forced_exit_op(&forced_exit)?;
                 let forced_exit_operations = forced_exit_witness.calculate_operations(input);
@@ -881,7 +876,7 @@ pub fn build_block_witness<'a>(
                 offset_commitment.extend(forced_exit_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Swap(swap) => {
-                let swap_witness = SwapWitness::apply_tx(&mut witness_accum.account_tree, &swap);
+                let swap_witness = SwapWitness::apply_tx(witness_accum.account_tree, &swap);
 
                 let input = (
                     SigDataInput::from_order(&swap.tx.orders.0)?,
@@ -902,7 +897,7 @@ pub fn build_block_witness<'a>(
             ZkSyncOp::Noop(_) => {} // Noops are handled below
             ZkSyncOp::MintNFTOp(mint_nft) => {
                 let mint_nft_witness =
-                    MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft);
+                    MintNFTWitness::apply_tx(witness_accum.account_tree, &mint_nft);
 
                 let input = SigDataInput::from_mint_nft_op(&mint_nft)?;
                 let mint_nft_operations = mint_nft_witness.calculate_operations(input);
@@ -917,7 +912,7 @@ pub fn build_block_witness<'a>(
             }
             ZkSyncOp::WithdrawNFT(withdraw_nft) => {
                 let withdraw_nft_witness =
-                    WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft);
+                    WithdrawNFTWitness::apply_tx(witness_accum.account_tree, &withdraw_nft);
 
                 let input = SigDataInput::from_withdraw_nft_op(&withdraw_nft)?;
                 let withdraw_nft_operations = withdraw_nft_witness.calculate_operations(input);

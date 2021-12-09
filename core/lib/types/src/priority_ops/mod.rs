@@ -360,7 +360,7 @@ impl ZkSyncPriorityOp {
                 data.extend_from_slice(&[0u8; 4]);
                 data.extend_from_slice(&deposit.token.to_be_bytes());
                 data.extend_from_slice(&deposit.amount.to_u128().unwrap().to_be_bytes());
-                data.extend_from_slice(&deposit.to.as_bytes());
+                data.extend_from_slice(deposit.to.as_bytes());
                 deposits_data.push(data);
             }
         }

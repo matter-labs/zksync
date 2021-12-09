@@ -202,7 +202,7 @@ impl ApiV01 {
         let mut storage = self_.access_storage().await?;
         let mut transaction = storage.start_transaction().await.map_err(Self::db_error)?;
 
-        let tx_id = parse_tx_id(&tx_id, &mut transaction).await?;
+        let tx_id = parse_tx_id(tx_id, &mut transaction).await?;
 
         let direction = SearchDirection::Older;
         let transactions_history = transaction
@@ -244,7 +244,7 @@ impl ApiV01 {
         let direction = SearchDirection::Newer;
         let mut transactions_history = {
             let mut storage = self_.access_storage().await?;
-            let tx_id = parse_tx_id(&tx_id, &mut storage).await?;
+            let tx_id = parse_tx_id(tx_id, &mut storage).await?;
             storage
                 .chain()
                 .operations_ext_schema()

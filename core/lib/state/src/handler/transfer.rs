@@ -77,9 +77,9 @@ impl TxHandler<Transfer> for ZkSyncState {
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), TransferOpError> {
         match op {
-            TransferOutcome::Transfer(transfer_op) => self.apply_transfer_op(&transfer_op),
+            TransferOutcome::Transfer(transfer_op) => self.apply_transfer_op(transfer_op),
             TransferOutcome::TransferToNew(transfer_to_new_op) => {
-                self.apply_transfer_to_new_op(&transfer_to_new_op)
+                self.apply_transfer_to_new_op(transfer_to_new_op)
             }
         }
     }

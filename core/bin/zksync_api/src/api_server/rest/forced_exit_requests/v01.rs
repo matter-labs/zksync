@@ -19,7 +19,7 @@ pub use zksync_api_client::rest::forced_exit_requests::{
 };
 
 use zksync_api_client::rest::forced_exit_requests::ConfigInfo;
-use zksync_config::ZkSyncConfig;
+use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     forced_exit_requests::{
@@ -51,21 +51,22 @@ pub struct ApiForcedExitRequestsData {
 impl ApiForcedExitRequestsData {
     fn new(
         connection_pool: ConnectionPool,
-        config: &ZkSyncConfig,
+        config: &ForcedExitRequestsConfig,
+        contract: Address,
         forced_exit_checker: Box<dyn ForcedExitAccountAgeChecker>,
     ) -> Self {
         Self {
             connection_pool,
             forced_exit_checker,
 
-            is_enabled: config.forced_exit_requests.enabled,
-            price_per_token: config.forced_exit_requests.price_per_token,
-            max_tokens_per_request: config.forced_exit_requests.max_tokens_per_request,
-            recomended_tx_interval_millisecs: config.forced_exit_requests.recomended_tx_interval,
-            max_tx_interval_millisecs: config.forced_exit_requests.max_tx_interval,
-            forced_exit_contract_address: config.contracts.forced_exit_addr,
-            digits_in_id: config.forced_exit_requests.digits_in_id,
-            wait_confirmations: config.forced_exit_requests.wait_confirmations,
+            is_enabled: config.enabled,
+            price_per_token: config.price_per_token,
+            max_tokens_per_request: config.max_tokens_per_request,
+            recomended_tx_interval_millisecs: config.recomended_tx_interval,
+            max_tx_interval_millisecs: config.max_tx_interval,
+            forced_exit_contract_address: contract,
+            digits_in_id: config.digits_in_id,
+            wait_confirmations: config.wait_confirmations,
         }
     }
 }
@@ -221,17 +222,18 @@ pub async fn check_account_eligibility(
 
 pub fn api_scope(
     connection_pool: ConnectionPool,
-    config: &ZkSyncConfig,
+    config: &ForcedExitRequestsConfig,
+    contract: Address,
     fe_checker: Box<dyn ForcedExitAccountAgeChecker>,
 ) -> Scope {
-    let data = ApiForcedExitRequestsData::new(connection_pool, config, fe_checker);
+    let data = ApiForcedExitRequestsData::new(connection_pool, config, contract, fe_checker);
 
     // `enabled` endpoint should always be there
     let scope = web::scope("v0.1")
         .app_data(web::Data::new(data))
         .route("status", web::get().to(get_status));
 
-    if config.forced_exit_requests.enabled {
+    if config.enabled {
         scope
             .route("/submit", web::post().to(submit_request))
             .route("/requests/{id}", web::get().to(get_request_by_id))
@@ -252,7 +254,7 @@ mod tests {
     use num::BigUint;
 
     use zksync_api_client::rest::client::Client;
-    use zksync_config::ForcedExitRequestsConfig;
+    use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
     use zksync_storage::ConnectionPool;
     use zksync_types::{Address, TokenId};
 
@@ -277,7 +279,8 @@ mod tests {
                 move |cfg| {
                     api_scope(
                         cfg.pool.clone(),
-                        &cfg.config,
+                        &cfg.config.forced_exit_requests,
+                        cfg.config.contracts.forced_exit_addr,
                         Box::new(DummyForcedExitChecker {}),
                     )
                 },

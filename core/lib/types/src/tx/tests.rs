@@ -477,7 +477,7 @@ fn test_ethereum_signature_verify_with_serialization() {
 
     let recovered_address = deserialized_signature
         .signature
-        .signature_recover_signer(&message.as_bytes())
+        .signature_recover_signer(message.as_bytes())
         .expect("signature verification");
 
     assert_eq!(address, recovered_address, "recovered address mismatch");

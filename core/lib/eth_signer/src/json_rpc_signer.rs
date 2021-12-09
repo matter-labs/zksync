@@ -203,11 +203,11 @@ impl JsonRpcSigner {
                 .map_err(|err| SignerError::SigningFailed(err.to_string()))?
         };
 
-        if is_signature_from_address(&signature, &msg.as_bytes(), self.address()?)? {
+        if is_signature_from_address(&signature, msg.as_bytes(), self.address()?)? {
             self.signer_type = Some(SignerType::NotNeedPrefix);
         }
 
-        if is_signature_from_address(&signature, &msg_with_prefix.as_bytes(), self.address()?)? {
+        if is_signature_from_address(&signature, msg_with_prefix.as_bytes(), self.address()?)? {
             self.signer_type = Some(SignerType::NotNeedPrefix);
         }
 

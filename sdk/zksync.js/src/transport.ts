@@ -43,7 +43,7 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
     }
 
     // JSON RPC request
-    async request(method: string, params = null): Promise<any> {
+    async request(method: string, params = null, config?: any): Promise<any> {
         const request = {
             id: 1,
             jsonrpc: '2.0',
@@ -51,7 +51,7 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
             params
         };
 
-        const response = await Axios.post(this.address, request).then((resp) => {
+        const response = await Axios.post(this.address, request, config).then((resp) => {
             return resp.data;
         });
 

@@ -76,7 +76,7 @@ impl TestSwap {
             ),
             amount_0,
             Default::default(),
-            &&account_0_sk,
+            account_0_sk,
         )
         .expect("order creation failed");
 
@@ -92,7 +92,7 @@ impl TestSwap {
             ),
             amount_1,
             Default::default(),
-            &account_1_sk,
+            account_1_sk,
         )
         .expect("order creation failed");
 
@@ -104,7 +104,7 @@ impl TestSwap {
             (BigUint::from(self.amounts.0), BigUint::from(self.amounts.1)),
             fee,
             fee_token,
-            &submitter_sk,
+            submitter_sk,
         )
         .expect("swap creation failed");
 

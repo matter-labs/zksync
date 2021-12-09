@@ -2,15 +2,17 @@
 use std::time::Instant;
 
 // External uses
+use bigdecimal::BigDecimal;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
+use tokio::task::JoinHandle;
 
 // Workspace uses
-use zksync_config::ZkSyncConfig;
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 use zksync_storage::{
     chain::{
         block::records::StorageBlockDetails, operations::records::StoredExecutedPriorityOperation,
@@ -19,6 +21,7 @@ use zksync_storage::{
     ConnectionPool, StorageProcessor,
 };
 use zksync_types::{tx::TxHash, Address, BlockNumber, TokenLike, TxFeeTypes};
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 // Local uses
 use crate::{
@@ -26,10 +29,9 @@ use crate::{
     signature_checker::VerifySignatureRequest,
     utils::shared_lru_cache::AsyncLruCache,
 };
-use bigdecimal::BigDecimal;
-use zksync_utils::panic_notify::ThreadPanicNotify;
 
 pub mod error;
+mod ip_insert_middleware;
 mod rpc_impl;
 mod rpc_trait;
 pub mod types;
@@ -37,11 +39,10 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use ip_insert_middleware::IpInsertMiddleWare;
 
 #[derive(Clone)]
 pub struct RpcApp {
-    runtime_handle: tokio::runtime::Handle,
-
     cache_of_executed_priority_operations: AsyncLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_transaction_receipts: AsyncLruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_complete_withdrawal_tx_hashes: AsyncLruCache<TxHash, String>,
@@ -56,24 +57,21 @@ impl RpcApp {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config: &ZkSyncConfig,
+        config: &CommonApiConfig,
+        private_url: String,
+        confirmations_for_eth_event: u64,
     ) -> Self {
-        let runtime_handle = tokio::runtime::Handle::try_current()
-            .expect("RpcApp must be created from the context of Tokio Runtime");
-
-        let api_requests_caches_size = config.api.common.caches_size;
-        let confirmations_for_eth_event = config.eth_watch.confirmations_for_eth_event;
+        let api_requests_caches_size = config.caches_size;
 
         let tx_sender = TxSender::new(
             connection_pool,
             sign_verify_request_sender,
             ticker_request_sender,
             config,
+            private_url,
         );
 
         RpcApp {
-            runtime_handle,
-
             cache_of_executed_priority_operations: AsyncLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: AsyncLruCache::new(api_requests_caches_size),
             cache_of_complete_withdrawal_tx_hashes: AsyncLruCache::new(api_requests_caches_size),
@@ -360,28 +358,35 @@ pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
-    panic_notify: mpsc::Sender<bool>,
-    config: &ZkSyncConfig,
-) {
-    let addr = config.api.json_rpc.http_bind_addr();
-
+    config: &JsonRpcConfig,
+    common_api_config: &CommonApiConfig,
+    private_url: String,
+    confirmations_for_eth_event: u64,
+) -> JoinHandle<()> {
+    let addr = config.http_bind_addr();
     let rpc_app = RpcApp::new(
         connection_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        &config,
+        common_api_config,
+        private_url,
+        confirmations_for_eth_event,
     );
+
+    let (handler, panic_sender) = spawn_panic_handler();
     std::thread::spawn(move || {
-        let _panic_sentinel = ThreadPanicNotify(panic_notify);
+        let _panic_sentinel = ThreadPanicNotify(panic_sender);
         let mut io = IoHandler::new();
         rpc_app.extend(&mut io);
 
         let server = ServerBuilder::new(io)
             .threads(super::THREADS_PER_SERVER)
+            .request_middleware(IpInsertMiddleWare {})
             .start_http(&addr)
             .unwrap();
         server.wait();
     });
+    handler
 }
 
 #[cfg(test)]

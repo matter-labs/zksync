@@ -6,12 +6,8 @@ use futures::{channel::mpsc, stream::StreamExt, SinkExt};
 use itertools::Itertools;
 use tokio::task::JoinHandle;
 // Workspace uses
-use zksync_crypto::{
-    ff::{self, PrimeField, PrimeFieldRepr},
-    params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
-};
+use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
 use zksync_state::state::{OpSuccess, ZkSyncState};
-use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{
         Block, BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
@@ -20,8 +16,7 @@ use zksync_types::{
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
     tx::ZkSyncTx,
-    Account, AccountId, AccountUpdate, Address, BlockNumber, PriorityOp, SignedZkSyncTx, Token,
-    TokenKind, H256,
+    AccountId, Address, PriorityOp, SignedZkSyncTx, H256,
 };
 // Local uses
 use self::{pending_block::PendingBlock, utils::system_time_timestamp};
@@ -30,12 +25,12 @@ use crate::{
     mempool::ProposedBlock,
     tx_event_emitter::ProcessedOperations,
 };
-use zksync_state::error::{OpError, TxBatchError};
 
 pub use self::{init_params::ZkSyncStateInitParams, types::StateKeeperRequest};
 
 mod init_params;
 mod pending_block;
+mod state_restore;
 mod types;
 mod utils;
 
@@ -137,7 +132,7 @@ impl ZkSyncStateKeeper {
         keeper
     }
 
-    pub async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
+    async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
         let start = Instant::now();
 
         if let Some(pending_block) = pending_block {
@@ -211,111 +206,14 @@ impl ZkSyncStateKeeper {
         metrics::histogram!("state_keeper.initialize", start.elapsed());
     }
 
-    pub async fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
-        let start = Instant::now();
-        let mut storage = pool
-            .access_storage()
-            .await
-            .expect("db connection failed for statekeeper");
-        let mut transaction = storage
-            .start_transaction()
-            .await
-            .expect("unable to create db transaction in statekeeper");
-
-        let (last_committed, mut accounts) = transaction
-            .chain()
-            .state_schema()
-            .load_committed_state(None)
-            .await
-            .expect("db failed");
-
-        assert!(
-            *last_committed == 0 && accounts.is_empty(),
-            "db should be empty"
-        );
-
-        vlog::info!("Adding special token");
-        transaction
-            .tokens_schema()
-            .store_token(Token::new(
-                NFT_TOKEN_ID,
-                *NFT_STORAGE_ACCOUNT_ADDRESS,
-                "SPECIAL",
-                18,
-                TokenKind::NFT,
-            ))
-            .await
-            .expect("failed to store special token");
-        vlog::info!("Special token added");
-
-        let fee_account = Account::default_with_address(fee_account_address);
-        let db_create_fee_account = AccountUpdate::Create {
-            address: *fee_account_address,
-            nonce: fee_account.nonce,
-        };
-        accounts.insert(AccountId(0), fee_account);
-
-        let (mut special_account, db_create_special_account) =
-            Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
-        special_account.set_balance(NFT_TOKEN_ID, num::BigUint::from(MIN_NFT_TOKEN_ID));
-        let db_set_special_account_balance = AccountUpdate::UpdateBalance {
-            old_nonce: special_account.nonce,
-            new_nonce: special_account.nonce,
-            balance_update: (
-                NFT_TOKEN_ID,
-                num::BigUint::from(0u64),
-                num::BigUint::from(MIN_NFT_TOKEN_ID),
-            ),
-        };
-        accounts.insert(NFT_STORAGE_ACCOUNT_ID, special_account);
-
-        transaction
-            .chain()
-            .state_schema()
-            .commit_state_update(
-                BlockNumber(0),
-                &[
-                    (AccountId(0), db_create_fee_account),
-                    db_create_special_account[0].clone(),
-                    (NFT_STORAGE_ACCOUNT_ID, db_set_special_account_balance),
-                ],
-                0,
-            )
-            .await
-            .expect("db fail");
-        transaction
-            .chain()
-            .state_schema()
-            .apply_state_update(BlockNumber(0))
-            .await
-            .expect("db fail");
-
-        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
-        let root_hash = state.root_hash();
-        transaction
-            .chain()
-            .block_schema()
-            .save_genesis_block(root_hash)
-            .await
-            .expect("db fail");
-
-        transaction
-            .commit()
-            .await
-            .expect("Unable to commit transaction in statekeeper");
-        vlog::info!("Genesis block created, state: {}", state.root_hash());
-        let genesis_root = format!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
-        println!("{}", &genesis_root);
-        metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
-    }
-
     async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
         self.initialize(pending_block).await;
 
         while let Some(req) = self.rx_for_blocks.next().await {
             match req {
-                StateKeeperRequest::GetAccount(addr, sender) => {
-                    sender.send(self.account(&addr)).unwrap_or_default();
+                StateKeeperRequest::GetAccount(address, sender) => {
+                    let account = self.state.get_account_by_address(&address);
+                    sender.send(account).unwrap_or_default();
                 }
                 StateKeeperRequest::GetPendingBlockTimestamp(sender) => {
                     sender
@@ -497,60 +395,6 @@ impl ZkSyncStateKeeper {
         Ok(exec_result)
     }
 
-    /// Checks that block timestamp is valid for the execution of the transaction.
-    /// Returns a corresponding error if the transaction can't be executed in the block because of an invalid timestamp.
-    fn check_transaction_timestamps(
-        &mut self,
-        tx: ZkSyncTx,
-        block_timestamp: u64,
-    ) -> Result<(), OpError> {
-        let time_range = match tx {
-            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::ForcedExit(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::Close(tx) => tx.time_range,
-            ZkSyncTx::MintNFT(_) => Default::default(),
-            ZkSyncTx::Swap(tx) => tx.time_range(),
-            ZkSyncTx::WithdrawNFT(tx) => tx.time_range,
-        };
-        if !time_range.is_valid(block_timestamp) {
-            return Err(OpError::TimestampError);
-        }
-        Ok(())
-    }
-
-    fn execute_txs_batch(
-        &mut self,
-        txs: &[SignedZkSyncTx],
-        block_timestamp: u64,
-    ) -> Vec<Result<OpSuccess, TxBatchError>> {
-        for (id, tx) in txs.iter().enumerate() {
-            if let Err(error) = self.check_transaction_timestamps(tx.tx.clone(), block_timestamp) {
-                // Create the same error for each transaction.
-                let errors = (0..txs.len())
-                    .map(|_| {
-                        Err(TxBatchError {
-                            failed_tx_index: id + 1,
-                            reason: error.clone(),
-                        })
-                    })
-                    .collect();
-
-                // Stop execution and return an error.
-                return errors;
-            }
-        }
-
-        self.state.execute_txs_batch(txs)
-    }
-
-    fn execute_tx(&mut self, tx: ZkSyncTx, block_timestamp: u64) -> Result<OpSuccess, OpError> {
-        self.check_transaction_timestamps(tx.clone(), block_timestamp)?;
-
-        self.state.execute_tx(tx)
-    }
-
     fn apply_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
@@ -602,7 +446,9 @@ impl ZkSyncStateKeeper {
             return Err(());
         }
 
-        let all_updates = self.execute_txs_batch(txs, self.pending_block.timestamp);
+        let all_updates = self
+            .state
+            .execute_txs_batch(txs, self.pending_block.timestamp);
 
         for (tx, tx_updates) in txs.iter().zip(all_updates) {
             match tx_updates {
@@ -662,7 +508,7 @@ impl ZkSyncStateKeeper {
 
     fn apply_tx(&mut self, tx: &SignedZkSyncTx) -> Result<ExecutedOperations, ()> {
         let start = Instant::now();
-        let chunks_needed = self.state.chunks_for_tx(&tx);
+        let chunks_needed = self.state.chunks_for_tx(tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
@@ -694,7 +540,9 @@ impl ZkSyncStateKeeper {
             }
         }
 
-        let tx_updates = self.execute_tx(tx.tx.clone(), self.pending_block.timestamp);
+        let tx_updates = self
+            .state
+            .execute_tx(tx.tx.clone(), self.pending_block.timestamp);
 
         let exec_result = match tx_updates {
             Ok(OpSuccess {
@@ -894,9 +742,6 @@ impl ZkSyncStateKeeper {
         metrics::histogram!("state_keeper.store_pending_block", start.elapsed());
     }
 
-    fn account(&self, address: &Address) -> Option<(AccountId, Account)> {
-        self.state.get_account_by_address(address)
-    }
     pub fn get_current_state(&self) -> ZkSyncStateInitParams {
         ZkSyncStateInitParams {
             tree: self.state.get_balance_tree(),
@@ -907,6 +752,7 @@ impl ZkSyncStateKeeper {
         }
     }
 }
+
 #[must_use]
 pub fn start_state_keeper(
     sk: ZkSyncStateKeeper,
