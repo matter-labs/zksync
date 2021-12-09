@@ -590,12 +590,16 @@ impl ZkSyncStateKeeper {
         self.pending_block
             .account_updates
             .extend(fee_updates.into_iter());
-        let next_block = self.pending_block.number + 1;
 
+        // TODO (ZKS-821): Currently the logic of this procedure is obscure and error-prone.
+        // I've met multiple bugs trying to adapt it because it works at the same time with the "old"
+        // pending block and "new" pending block. Actions "create block to be sealed" and "update pending block"
+        // should be spearated.
+        let current_block = self.pending_block.number;
         let mut pending_block = std::mem::replace(
             &mut self.pending_block,
             PendingBlock::new(
-                next_block,
+                current_block,
                 self.current_unprocessed_priority_op,
                 self.config.max_block_size(),
                 H256::default(),
@@ -616,7 +620,7 @@ impl ZkSyncStateKeeper {
         let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
 
         let block = Block::new_from_available_block_sizes(
-            self.pending_block.number,
+            pending_block.number,
             self.state.root_hash(),
             self.config.fee_account_id,
             block_transactions,
@@ -631,6 +635,8 @@ impl ZkSyncStateKeeper {
             pending_block.timestamp,
         );
 
+        // Update the fields of the new pending block.
+        *self.pending_block.number += 1;
         self.pending_block.previous_block_root_hash = block.get_eth_encoded_root();
 
         let block_metadata = BlockMetadata {
@@ -643,7 +649,6 @@ impl ZkSyncStateKeeper {
             accounts_updated: pending_block.account_updates.clone(),
         };
         let applied_updates_request = pending_block.prepare_applied_updates_request();
-        *self.pending_block.number += 1;
 
         vlog::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
