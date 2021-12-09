@@ -79,7 +79,8 @@ impl PendingBlock {
     }
 
     pub(super) fn should_seal(&self, miniblock_iterations: usize) -> bool {
-        self.chunks_left == 0 || self.pending_block_iteration > miniblock_iterations
+        // `>=` in condition since iterations start with 0.
+        self.chunks_left == 0 || self.pending_block_iteration >= miniblock_iterations
     }
 
     pub(super) fn add_successful_execution(
@@ -151,5 +152,232 @@ impl PendingBlock {
         self.stored_account_updates = self.account_updates.len();
 
         applied_updates_request
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::prelude::*;
+    use zksync_types::{
+        AccountId, AccountUpdate, Address, Nonce, SignedZkSyncTx, TokenId, Transfer, ZkSyncTx,
+    };
+
+    use super::*;
+
+    const STARTING_BLOCK: BlockNumber = BlockNumber(1);
+    const CHUNKS_PER_BLOCK: usize = 100;
+    const MAX_ITERATIONS: usize = 2;
+
+    fn pending_block() -> PendingBlock {
+        // Fields that aren't interesting in the testing context.
+        let unprocessed_priority_op_before = 0;
+        let prev_root_hash = H256::repeat_byte(0x1a);
+        let timestamp = 0;
+
+        PendingBlock::new(
+            STARTING_BLOCK,
+            unprocessed_priority_op_before,
+            CHUNKS_PER_BLOCK,
+            prev_root_hash,
+            timestamp,
+        )
+    }
+
+    /// Creates a mock `ExecutedOperations` object.
+    /// Actual operation doesn't matter since pending block does not interact with operations, it just stores it.
+    fn mock_executed_op() -> ExecutedOperations {
+        let tx = ZkSyncTx::Transfer(Box::new(Transfer::new(
+            AccountId(0),
+            Address::default(),
+            Address::default(),
+            TokenId(0),
+            100u64.into(),
+            100u64.into(),
+            Nonce(0),
+            Default::default(),
+            None,
+        )));
+        let signed_tx = SignedZkSyncTx {
+            tx,
+            eth_sign_data: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(ExecutedTx {
+            signed_tx,
+            success: false,
+            op: None,
+            fail_reason: Some("Mock".to_string()),
+            block_index: None,
+            created_at: Utc.ymd(2021, 12, 9).and_hms(12, 26, 11),
+            batch_id: None,
+        }))
+    }
+
+    /// Creates all the fields to call `add_successfull_execution`.
+    fn prepare_successful_execution() -> (
+        usize,
+        AccountUpdates,
+        Option<CollectedFee>,
+        ExecutedOperations,
+    ) {
+        let chunks = 2;
+        let updates = vec![(
+            AccountId(0),
+            AccountUpdate::Create {
+                address: Address::repeat_byte(0x7a),
+                nonce: Nonce(0),
+            },
+        )];
+        let fee = Some(CollectedFee {
+            token: TokenId(0),
+            amount: 100u64.into(),
+        });
+        let exec_result = mock_executed_op();
+        (chunks, updates, fee, exec_result)
+    }
+
+    #[test]
+    fn basic_properties() {
+        let mut pending_block = pending_block();
+
+        // Checks for empty block.
+        assert_eq!(
+            pending_block.pending_block_iteration, 0,
+            "Should start on 0 iteration"
+        );
+        assert_eq!(
+            pending_block.chunks_left, CHUNKS_PER_BLOCK,
+            "No chunks should be used at start"
+        );
+
+        // Methods testing on the empty block.
+        assert!(pending_block.is_empty(), "Block should be empty");
+        assert!(
+            !pending_block.should_seal(MAX_ITERATIONS),
+            "Should no seal empty block with no enough iterations"
+        );
+
+        pending_block.increment_iteration();
+        assert_eq!(
+            pending_block.pending_block_iteration, 0,
+            "Iteration should not be incremented for an empty block"
+        );
+
+        // Add some operation to the pending block.
+        let (chunks, updates, fee, exec_result) = prepare_successful_execution();
+        pending_block.add_successful_execution(chunks, updates, fee, exec_result);
+
+        // Check pending block state after execution.
+        assert_eq!(
+            pending_block.chunks_left,
+            CHUNKS_PER_BLOCK - chunks,
+            "Chunks were not subtracted"
+        );
+        assert!(!pending_block.is_empty(), "Block is not empty anymore");
+
+        pending_block.increment_iteration();
+        assert_eq!(
+            pending_block.pending_block_iteration, 1,
+            "Iteration should be incremented"
+        );
+
+        assert!(
+            !pending_block.should_seal(MAX_ITERATIONS),
+            "Block should not be sealed after 1 iteration"
+        );
+
+        pending_block.increment_iteration();
+        assert_eq!(
+            pending_block.pending_block_iteration, 2,
+            "Iteration should be incremented"
+        );
+
+        assert!(
+            pending_block.should_seal(MAX_ITERATIONS),
+            "Block should be sealed after 2 iteration"
+        );
+
+        // Call for "preparing" methods which should update internal state.
+        let sendable = pending_block.prepare_for_storing();
+        assert_eq!(sendable.number, STARTING_BLOCK);
+        assert_eq!(
+            sendable.success_operations.len(),
+            pending_block.success_operations.len(),
+            "Success operations should be included into sendable pending block"
+        );
+        assert_eq!(
+            pending_block.success_txs_pending_len,
+            pending_block.success_operations.len(),
+            "Pending block should offset stored success txs counter"
+        );
+
+        let applied_updates = pending_block.prepare_applied_updates_request();
+        assert_eq!(applied_updates.first_update_order_id, 0);
+        assert_eq!(
+            applied_updates.account_updates.len(),
+            pending_block.account_updates.len(),
+            "Account updates should be included into applied updates request"
+        );
+        assert_eq!(
+            pending_block.stored_account_updates,
+            pending_block.account_updates.len(),
+            "Pending block should offset stored applied updates counter"
+        );
+
+        // Calling these method again with no changes to the pending block should contain no updates.
+        let sendable = pending_block.prepare_for_storing();
+        assert_eq!(sendable.number, STARTING_BLOCK);
+        assert_eq!(
+            sendable.success_operations.len(),
+            0,
+            "There were no new operations"
+        );
+
+        let applied_updates = pending_block.prepare_applied_updates_request();
+        assert_eq!(
+            applied_updates.first_update_order_id, pending_block.stored_account_updates,
+            "Updates should start from the point where we stopped last time"
+        );
+        assert_eq!(
+            applied_updates.account_updates.len(),
+            0,
+            "There were no new updates"
+        );
+
+        // Now apply one more success operation and it should be included into the next sendable block
+        // and applied updates request.
+        let chunks_before = pending_block.chunks_left;
+        let (chunks, updates, fee, exec_result) = prepare_successful_execution();
+        pending_block.add_successful_execution(chunks, updates.clone(), fee, exec_result);
+
+        assert_eq!(
+            pending_block.chunks_left,
+            chunks_before - chunks,
+            "Chunks were not subtracted for 2nd operation"
+        );
+
+        let sendable = pending_block.prepare_for_storing();
+        assert_eq!(sendable.number, STARTING_BLOCK);
+        assert_eq!(
+            sendable.success_operations.len(),
+            1,
+            "There was 1 new operation"
+        );
+
+        let next_update_before = pending_block.stored_account_updates;
+        let applied_updates = pending_block.prepare_applied_updates_request();
+        assert_eq!(
+            applied_updates.first_update_order_id, next_update_before,
+            "Updates should start from the point where we stopped last time"
+        );
+        assert_eq!(
+            applied_updates.account_updates.len(),
+            updates.len(),
+            "There were new updates"
+        );
+        assert_eq!(
+            pending_block.stored_account_updates,
+            pending_block.account_updates.len(),
+        )
     }
 }
