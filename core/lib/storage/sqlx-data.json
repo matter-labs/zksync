@@ -2196,6 +2196,26 @@
       ]
     }
   },
+  "4868140cb6b644efc751687b9a8dcd04324072bffbcc69ec29306b8a9793645e": {
+    "query": "\n            SELECT SUM(usd_amount_scale6) as total FROM subsidies\n            WHERE subsidy_type = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "total",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "4a0bc713a57201aa894b96acdb462c03d3ad63cf4fbc8a14b9ac5e2e02121207": {
     "query": "\n            SELECT * FROM ticker_market_volume\n            WHERE token_id = $1\n            LIMIT 1\n            ",
     "describe": {
@@ -2724,26 +2744,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "5c7fddda5592e9d84648e4e52e8e6cbb8c98d390e00ca7298a4cd6e5ef9367f2": {
-    "query": "\n            SELECT SUM(usd_amount_scale6) as total FROM subsidies \n            WHERE subsidy_type = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "total",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
@@ -4690,6 +4690,24 @@
       "parameters": {
         "Left": [
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a665923ec57382f357f6bb65f6e35876fbfedbf1661b3ce34f2458b63eebc68e": {
+    "query": "\n            INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )\n            VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Int4",
+          "Numeric",
+          "Numeric",
+          "Varchar"
         ]
       },
       "nullable": []

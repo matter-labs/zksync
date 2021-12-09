@@ -511,7 +511,7 @@ impl<T: Transport> DataRestoreDriver<T> {
                 }
             }
 
-            let block = RollupOpsBlock::get_rollup_ops_blocks(&self.web3, &event)
+            let block = RollupOpsBlock::get_rollup_ops_blocks(&self.web3, event)
                 .await
                 .expect("Cant get new operation blocks from events");
             blocks.extend(block);
