@@ -30,13 +30,13 @@ impl<T> ApplyOutcome<T> {
     }
 
     #[cfg(test)]
-    pub fn included(&self) -> bool {
+    pub fn is_included(&self) -> bool {
         matches!(self, Self::Included(_))
     }
 
     #[cfg(test)]
-    pub fn not_included(&self) -> bool {
-        !self.included()
+    pub fn is_not_included(&self) -> bool {
+        !self.is_included()
     }
 }
 
