@@ -2,15 +2,19 @@
 
 // Built-in deps
 use std::sync::Arc;
+use std::time::Duration;
 // External uses
 use futures::channel::mpsc;
 use jsonrpc_core::{MetaIoHandler, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
+use tokio::task::JoinHandle;
 // Workspace uses
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Address};
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{
@@ -18,8 +22,6 @@ use crate::{
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
     signature_checker::VerifySignatureRequest,
 };
-use zksync_config::ZkSyncConfig;
-use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[rpc]
 pub trait RpcPubSub {
@@ -178,30 +180,36 @@ pub fn start_ws_server(
     db_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
-    panic_notify: mpsc::Sender<bool>,
-    config: &ZkSyncConfig,
-) {
-    let addr = config.api.json_rpc.ws_bind_addr();
+    common_config: &CommonApiConfig,
+    config: &JsonRpcConfig,
+    miniblock_iteration_interval: Duration,
+    private_url: String,
+    confirmations_for_eth_event: u64,
+) -> JoinHandle<()> {
+    let addr = config.ws_bind_addr();
 
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
     start_sub_notifier(
         db_pool.clone(),
         event_sub_receiver,
-        config.api.common.caches_size,
-        config.chain.state_keeper.miniblock_iteration_interval(),
+        common_config.caches_size,
+        miniblock_iteration_interval,
     );
 
     let req_rpc_app = super::rpc_server::RpcApp::new(
         db_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        config,
+        common_config,
+        private_url,
+        confirmations_for_eth_event,
     );
 
-    std::thread::spawn(move || {
-        let _panic_sentinel = ThreadPanicNotify(panic_notify);
+    let (handler, panic_sender) = spawn_panic_handler();
 
+    std::thread::spawn(move || {
+        let _panic_sentinel = ThreadPanicNotify(panic_sender);
         let mut io = PubSubHandler::new(MetaIoHandler::default());
 
         req_rpc_app.extend(&mut io);
@@ -220,4 +228,5 @@ pub fn start_ws_server(
 
         server.wait().expect("rpc ws server start");
     });
+    handler
 }

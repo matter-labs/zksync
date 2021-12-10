@@ -49,7 +49,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
     }
 
     async fn update_token(&mut self, token: &Token) -> anyhow::Result<TokenMarketVolume> {
-        let amount = self.watcher.get_token_market_volume(&token).await?;
+        let amount = self.watcher.get_token_market_volume(token).await?;
         let market = TokenMarketVolume {
             market_volume: big_decimal_to_ratio(&amount).unwrap(),
             last_updated: Utc::now(),

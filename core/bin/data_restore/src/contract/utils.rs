@@ -15,7 +15,7 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
     const ENCODED_INIT_PARAMETERS_WIDTH: usize =
         6 * INPUT_DATA_ADDRESS_BYTES_WIDTH + INPUT_DATA_ROOT_HASH_BYTES_WIDTH;
 
-    let input_data = get_input_data_from_ethereum_transaction(&genesis_transaction)?;
+    let input_data = get_input_data_from_ethereum_transaction(genesis_transaction)?;
 
     // Input for contract constructor contains the bytecode of the contract and
     // encoded arguments after it.
@@ -55,7 +55,7 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
     })?;
     match &decoded_init_parameters[fee_account_address_argument_id] {
         ethabi::Token::Address(genesis_operator_address) => {
-            Some(Account::default_with_address(&genesis_operator_address))
+            Some(Account::default_with_address(genesis_operator_address))
         }
         _ => None,
     }

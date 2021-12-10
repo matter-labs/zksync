@@ -297,10 +297,9 @@ impl TestSetup {
         let mut gas_fee = BigUint::from(0u32);
 
         for r in &receipts {
-            let current_fee =
-                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
-                    .await
-                    .expect("Failed to get transaction fee");
+            let current_fee = get_executed_tx_fee(&self.commit_account.main_contract_eth_client, r)
+                .await
+                .expect("Failed to get transaction fee");
 
             gas_fee += current_fee;
         }
@@ -380,10 +379,9 @@ impl TestSetup {
         let mut gas_fee = BigUint::from(0u32);
 
         for r in &receipts {
-            let current_fee =
-                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
-                    .await
-                    .expect("Failed to get transaction fee");
+            let current_fee = get_executed_tx_fee(&self.commit_account.main_contract_eth_client, r)
+                .await
+                .expect("Failed to get transaction fee");
 
             gas_fee += current_fee;
         }

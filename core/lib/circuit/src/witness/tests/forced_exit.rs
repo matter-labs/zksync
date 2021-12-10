@@ -57,7 +57,7 @@ fn test_forced_exit_success() {
             forced_exit_op,
             input,
             |plasma_state, op| {
-                let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, &op)
+                let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, op)
                     .expect("ForcedExit failed")
                     .0
                     .unwrap();
@@ -124,7 +124,7 @@ fn test_forced_exit_old_signature_success() {
             forced_exit_op,
             input,
             |plasma_state, op| {
-                let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, &op)
+                let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, op)
                     .expect("ForcedExit failed")
                     .0
                     .unwrap();
@@ -181,7 +181,7 @@ fn corrupted_ops_input() {
             input,
             EXPECTED_PANIC_MSG,
             |plasma_state, op| {
-                let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, &op)
+                let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, op)
                     .expect("Operation failed")
                     .0
                     .unwrap();

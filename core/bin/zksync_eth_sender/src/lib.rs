@@ -14,7 +14,7 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use zksync_config::{ETHSenderConfig, ZkSyncConfig};
+use zksync_config::ETHSenderConfig;
 use zksync_eth_client::{EthereumGateway, SignedCallResult};
 use zksync_storage::ConnectionPool;
 use zksync_types::ethereum::ETHOperation;
@@ -494,7 +494,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
                     // operations out of order.
                     if !self
                         .db
-                        .is_previous_operation_confirmed(&mut transaction, &op)
+                        .is_previous_operation_confirmed(&mut transaction, op)
                         .await?
                     {
                         vlog::info!("ETH Operation <id: {}> is confirmed ahead of time, considering it pending for now", op.id);
@@ -798,12 +798,12 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 pub fn run_eth_sender(
     pool: ConnectionPool,
     eth_gateway: EthereumGateway,
-    options: ZkSyncConfig,
+    options: ETHSenderConfig,
 ) -> JoinHandle<()> {
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(options.eth_sender, db, eth_gateway).await;
+        let eth_sender = ETHSender::new(options, db, eth_gateway).await;
 
         eth_sender.run().await
     })

@@ -941,7 +941,7 @@ async fn concurrent_operations_order() {
             let current_tx_hash = tx.used_tx_hashes[0];
 
             // Check that current expected tx is stored.
-            eth_sender.db.assert_stored(&tx).await;
+            eth_sender.db.assert_stored(tx).await;
             eth_sender
                 .ethereum
                 .get_mock()

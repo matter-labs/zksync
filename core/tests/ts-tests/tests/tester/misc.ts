@@ -1,10 +1,11 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types } from 'zksync';
+import { Wallet, types, Create2WalletSigner } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
 import { MAX_TIMESTAMP } from 'zksync/build/utils';
+import { Transaction } from 'zksync';
 import { Transfer, Withdraw } from 'zksync/build/types';
 import {
     serializeAccountId,
@@ -16,6 +17,7 @@ import {
     serializeTimestamp,
     numberToBytesBE
 } from 'zksync/build/utils';
+import { HTTPTransport } from 'zksync/build/transport';
 
 type TokenLike = types.TokenLike;
 
@@ -37,6 +39,8 @@ declare module './tester' {
             providerType: 'REST' | 'RPC'
         ): Promise<void>;
         testBackwardCompatibleEthMessages(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testSubsidyForCREATE2ChangePubKey(create2Wallet: Wallet, token: TokenLike): Promise<void>;
+        testSubsidyForBatch(create2Wallet: Wallet, token: TokenLike): Promise<void>;
     }
 }
 
@@ -65,7 +69,7 @@ Tester.prototype.testWrongSignature = async function (
     try {
         await from.provider.submitTx(signedTransfer.tx, fakeEthSignature);
         thrown = false; // this line should be unreachable
-    } catch (e) {
+    } catch (e: any) {
         if (providerType === 'REST') {
             expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
         } else {
@@ -87,7 +91,7 @@ Tester.prototype.testWrongSignature = async function (
     try {
         await from.provider.submitTx(signedWithdraw.tx, fakeEthSignature);
         thrown = false; // this line should be unreachable
-    } catch (e) {
+    } catch (e: any) {
         if (providerType === 'REST') {
             expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
         } else {
@@ -142,7 +146,7 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
 
     const senderBefore = await batchSender.getBalance(token);
     const handles = await submitSignedTransactionsBatch(batchSender.provider, batch, ethSignatures);
-    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(handles.map((handle: any) => handle.awaitReceipt()));
     const senderAfter = await batchSender.getBalance(token);
     // Sender paid totalFee for this cycle.
     expect(senderBefore.sub(senderAfter).eq(totalFee), 'Batched transfer failed').to.be.true;
@@ -194,7 +198,7 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
     try {
         await submitSignedTransactionsBatch(from.provider, batch, [ethSignature]);
         thrown = false; // this line should be unreachable
-    } catch (e) {
+    } catch (e: any) {
         if (providerType === 'REST') {
             expect(e.restError.message).to.equal('Transaction adding error: Eth signature is incorrect.');
         } else {
@@ -278,8 +282,167 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
 
     const handles = await submitSignedTransactionsBatch(to.provider, batch, ethSignatures);
     // We only expect that API doesn't reject this batch due to Eth signature error.
-    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(handles.map((handle: any) => handle.awaitReceipt()));
     this.runningFee = this.runningFee.add(totalFee);
+};
+
+// Unfortunately due to different rounds and precix sion lost
+// the price might differ from the expected one
+const SUBSIDY_ACCEPTED_SCALED_DIFFERENCE = 100; // 0.0001 USD
+const SUBSIDY_SCALE = 1000000;
+
+// This function is needed to emulate the CF-Connecting-IP header being set by the
+// Cloudflare Proxy. In production, this header is set by Cloudflare Proxy and can not be manually
+// set by the client.
+const subsidyAxiosConfig = () => {
+    const subsidizedIps = process.env.API_COMMON_SUBSIDIZED_IPS?.split(',')!;
+
+    const config = {
+        headers: {
+            'CF-Connecting-IP': subsidizedIps[0]
+        }
+    };
+    return config;
+};
+
+Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wallet: Wallet, token: TokenLike) {
+    const subsidizedCpkPriceScaled = BigNumber.from(process.env.FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED)!;
+
+    const transport = new HTTPTransport('http://127.0.0.1:3030');
+    const unitsInOneToken = BigNumber.from(10).pow(this.syncProvider.tokenSet.resolveTokenDecimals(token));
+    const scaledTokenPrice = BigNumber.from(Math.round(SUBSIDY_SCALE * (await this.syncProvider.getTokenPrice(token))));
+
+    // Check that the subsidized fee is returned when requested with appropriate headers
+    const transactionFee = await transport.request(
+        'get_tx_fee',
+        [{ ChangePubKey: 'CREATE2' }, ethers.constants.AddressZero, token],
+        subsidyAxiosConfig()
+    );
+    const subsidyYotalFee = BigNumber.from(transactionFee.totalFee);
+    const subsidyTotalFeeUSDScaled = subsidyYotalFee.mul(scaledTokenPrice).div(unitsInOneToken);
+    expect(subsidyTotalFeeUSDScaled.sub(subsidizedCpkPriceScaled).abs().lte(SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)).to.be
+        .true;
+
+    // However, without the necessary headers, the API should return the normal fee
+    const normaltransactionFee = await transport.request('get_tx_fee', [
+        { ChangePubKey: 'CREATE2' },
+        ethers.constants.AddressZero,
+        token
+    ]);
+    const normalTotalFeeUSDScaled = BigNumber.from(normaltransactionFee.totalFee)
+        .mul(scaledTokenPrice)
+        .div(unitsInOneToken);
+
+    // The difference is huge (at least 5x times tolerated difference)
+    expect(
+        normalTotalFeeUSDScaled
+            .sub(subsidizedCpkPriceScaled)
+            .abs()
+            .gte(5 * SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)
+    ).to.be.true;
+
+    // Now we submit the CREATE2 ChangePubKey
+    const create2data = (create2Wallet.ethSigner as Create2WalletSigner).create2WalletData;
+    const cpkTx = await create2Wallet.getChangePubKey({
+        feeToken: token,
+        fee: subsidyYotalFee,
+        nonce: 0,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP,
+        ethAuthData: {
+            type: 'CREATE2',
+            ...create2data
+        }
+    });
+    await expect(transport.request('tx_submit', [cpkTx, null])).to.be.rejected;
+
+    // The transaction is submitted successfully
+    const hash = await transport.request('tx_submit', [cpkTx, null], subsidyAxiosConfig());
+    await new Transaction(cpkTx, hash, this.syncProvider).awaitReceipt();
+
+    this.runningFee = this.runningFee.add(subsidyYotalFee);
+};
+
+Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, token: TokenLike) {
+    const subsidizedCpkFeeUsdScaled = BigNumber.from(process.env.FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED)!;
+
+    const transport = new HTTPTransport('http://127.0.0.1:3030');
+    const unitsInOneToken = BigNumber.from(10).pow(this.syncProvider.tokenSet.resolveTokenDecimals(token));
+    const tokenPrice = await this.syncProvider.getTokenPrice(token);
+    const scaledTokenPrice = BigNumber.from(Math.round(SUBSIDY_SCALE * tokenPrice));
+
+    const transferFee = (await this.syncProvider.getTransactionFee('Transfer', create2Wallet.address(), token))
+        .totalFee;
+    const transferFeeUsdScaled = transferFee.mul(scaledTokenPrice).div(unitsInOneToken);
+
+    // Check that the subsidized fee is returned when requested with appropriate headers
+    const subsidyFee = await transport.request(
+        'get_txs_batch_fee_in_wei',
+        [
+            [
+                {
+                    ChangePubKey: 'CREATE2'
+                },
+                'Transfer'
+            ],
+            [create2Wallet.address(), create2Wallet.address()],
+            token
+        ],
+        subsidyAxiosConfig()
+    );
+    const subsidyYotalFee = BigNumber.from(subsidyFee.totalFee);
+    const subsidyTotalFeeUSDScaled = subsidyYotalFee.mul(scaledTokenPrice).div(unitsInOneToken);
+
+    const expectedBatchFeeUsdScaled = subsidizedCpkFeeUsdScaled.add(transferFeeUsdScaled);
+    expect(subsidyTotalFeeUSDScaled.sub(expectedBatchFeeUsdScaled).abs().lte(SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)).to.be
+        .true;
+
+    // However, without the necessary headers, the API should return the normal fee
+    const normalFee = await transport.request('get_txs_batch_fee_in_wei', [
+        [{ ChangePubKey: 'CREATE2' }, 'Transfer'],
+        [create2Wallet.address(), create2Wallet.address()],
+        token
+    ]);
+    const normalTotalFee = BigNumber.from(normalFee.totalFee);
+    const normalTotalFeeUSDScaled = normalTotalFee.mul(scaledTokenPrice).div(unitsInOneToken);
+
+    // The difference is huge (at least 5x times tolerated difference)
+    expect(
+        normalTotalFeeUSDScaled
+            .sub(subsidizedCpkFeeUsdScaled)
+            .abs()
+            .gte(5 * SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)
+    ).to.be.true;
+
+    const create2data = (create2Wallet.ethSigner as Create2WalletSigner).create2WalletData;
+    const cpkTx = await create2Wallet.getChangePubKey({
+        feeToken: token,
+        fee: BigNumber.from(0),
+        nonce: 0,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP,
+        ethAuthData: {
+            type: 'CREATE2',
+            ...create2data
+        }
+    });
+    const transferTx = await create2Wallet.getTransfer({
+        token,
+        fee: subsidyYotalFee,
+        nonce: 1,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP,
+        amount: BigNumber.from('1'),
+        to: create2Wallet.address()
+    });
+    const txs = [{ tx: cpkTx }, { tx: transferTx }];
+
+    await expect(transport.request('submit_txs_batch', [txs, []]), 'Submitted transaction with the wrong fee').to.be
+        .rejected;
+
+    const hashes = await transport.request('submit_txs_batch', [txs, []], subsidyAxiosConfig());
+    await new Transaction(txs[0].tx, hashes[0], this.syncProvider).awaitReceipt();
+    this.runningFee = this.runningFee.add(subsidyYotalFee);
 };
 
 export function serializeOldTransfer(transfer: Transfer): Uint8Array {

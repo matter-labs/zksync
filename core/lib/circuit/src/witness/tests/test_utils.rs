@@ -155,7 +155,7 @@ pub fn generic_test_scenario<W, F>(
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,
@@ -168,7 +168,7 @@ pub fn generic_test_scenario<W, F>(
     plasma_state.collect_fee(&fees, FEE_ACCOUNT_ID);
 
     // Apply op on circuit
-    let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
+    let witness = W::apply_tx(witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -212,7 +212,7 @@ pub fn corrupted_input_test_scenario<W, F, B>(
     B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,
@@ -225,7 +225,7 @@ pub fn corrupted_input_test_scenario<W, F, B>(
     plasma_state.collect_fee(&fees, FEE_ACCOUNT_ID);
 
     // Apply op on circuit
-    let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
+    let witness = W::apply_tx(witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input.clone());
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -280,7 +280,7 @@ pub fn incorrect_op_test_scenario<W, F, B>(
     B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize WitnessBuilder.
-    let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
+    let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(
         &mut circuit_account_tree,
         FEE_ACCOUNT_ID,
@@ -292,7 +292,7 @@ pub fn incorrect_op_test_scenario<W, F, B>(
     let fees = collect_fees();
 
     // Apply op on circuit
-    let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
+    let witness = W::apply_tx(witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input.clone());
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();

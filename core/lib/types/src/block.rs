@@ -428,18 +428,18 @@ impl Block {
         U256::from(*fee_account).to_big_endian(&mut hash_arg[32..]);
         hash_arg = sha256(&hash_arg).to_vec();
 
-        hash_arg.extend_from_slice(&old_state_hash.as_bytes());
+        hash_arg.extend_from_slice(old_state_hash.as_bytes());
         hash_arg = sha256(&hash_arg).to_vec();
 
-        hash_arg.extend_from_slice(&new_state_hash.as_bytes());
+        hash_arg.extend_from_slice(new_state_hash.as_bytes());
         hash_arg = sha256(&hash_arg).to_vec();
 
         hash_arg.resize(64, 0u8);
         U256::from(timestamp).to_big_endian(&mut hash_arg[32..]);
         hash_arg = sha256(&hash_arg).to_vec();
 
-        hash_arg.extend_from_slice(&public_data);
-        hash_arg.extend_from_slice(&onchain_op_commitment);
+        hash_arg.extend_from_slice(public_data);
+        hash_arg.extend_from_slice(onchain_op_commitment);
         H256::from_slice(&sha256(&hash_arg))
     }
 
