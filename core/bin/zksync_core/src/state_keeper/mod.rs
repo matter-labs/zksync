@@ -147,7 +147,6 @@ impl ZkSyncStateKeeper {
             // transactions may fail because of invalid `valid_from` timestamp.
             self.pending_block.timestamp = pending_block.timestamp;
             self.pending_block.failed_txs = pending_block.failed_txs.clone();
-            self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
             let mut txs_count = 0;
             let mut priority_op_count = 0;
@@ -167,6 +166,10 @@ impl ZkSyncStateKeeper {
                     }
                 }
             }
+
+            // After we executed transactions, we may renew counters for already sent operations.
+            // These updates were already processed, as we've loaded the block from the database.
+            self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
             // Sanity check: every transaction we applied should succeed, since we already stored it in the database
             // as successfully executed.
