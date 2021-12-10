@@ -48,6 +48,7 @@ pub trait Rpc {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> BoxFutureResult<TxHash>;
 
     #[rpc(name = "submit_txs_batch", returns = "Vec<TxHash>")]
@@ -55,6 +56,7 @@ pub trait Rpc {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> BoxFutureResult<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
@@ -71,6 +73,7 @@ pub trait Rpc {
         tx_type: ApiTxFeeTypes,
         _address: Address,
         token_like: TokenLike,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> BoxFutureResult<Fee>;
 
     // _addresses argument is left for the backward compatibility.
@@ -80,6 +83,7 @@ pub trait Rpc {
         tx_types: Vec<ApiTxFeeTypes>,
         _addresses: Vec<Address>,
         token_like: TokenLike,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> BoxFutureResult<TotalFee>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
@@ -121,21 +125,25 @@ impl Rpc for RpcApp {
         spawn!(self._impl_tx_info(hash))
     }
 
+    // Important: the last parameter should have name `meta` and be of type `RequestMetadata`
     fn tx_submit(
         &self,
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<TxHash> {
-        spawn!(self._impl_tx_submit(tx, signature, fast_processing))
+        spawn!(self._impl_tx_submit(tx, signature, fast_processing, meta))
     }
 
+    // Important: the last parameter should have name `meta` and be of type `RequestMetadata`
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<Vec<TxHash>> {
-        spawn!(self._impl_submit_txs_batch(txs, eth_signatures))
+        spawn!(self._impl_submit_txs_batch(txs, eth_signatures, meta))
     }
 
     fn contract_address(&self) -> BoxFutureResult<ContractAddressResp> {
@@ -146,22 +154,26 @@ impl Rpc for RpcApp {
         spawn!(self._impl_tokens())
     }
 
+    // Important: the last parameter should have name `meta` and be of type `RequestMetadata`
     fn get_tx_fee(
         &self,
         tx_type: ApiTxFeeTypes,
         address: Address,
         token_like: TokenLike,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<Fee> {
-        spawn!(self._impl_get_tx_fee(tx_type, address, token_like))
+        spawn!(self._impl_get_tx_fee(tx_type, address, token_like, meta))
     }
 
+    // Important: the last parameter should have name `meta` and be of type `RequestMetadata`
     fn get_txs_batch_fee_in_wei(
         &self,
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token_like: TokenLike,
+        meta: Option<RequestMetadata>,
     ) -> BoxFutureResult<TotalFee> {
-        spawn!(self._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like))
+        spawn!(self._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like, meta))
     }
 
     fn get_token_price(&self, token_like: TokenLike) -> BoxFutureResult<BigDecimal> {

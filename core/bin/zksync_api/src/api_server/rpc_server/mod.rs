@@ -31,6 +31,7 @@ use crate::{
 };
 
 pub mod error;
+mod ip_insert_middleware;
 mod rpc_impl;
 mod rpc_trait;
 pub mod types;
@@ -38,6 +39,7 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use ip_insert_middleware::IpInsertMiddleWare;
 
 #[derive(Clone)]
 pub struct RpcApp {
@@ -379,6 +381,7 @@ pub fn start_rpc_server(
 
         let server = ServerBuilder::new(io)
             .threads(super::THREADS_PER_SERVER)
+            .request_middleware(IpInsertMiddleWare {})
             .start_http(&addr)
             .unwrap();
         server.wait();

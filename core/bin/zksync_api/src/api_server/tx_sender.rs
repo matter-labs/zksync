@@ -16,6 +16,7 @@ use futures::{
     prelude::*,
 };
 use itertools::izip;
+use num::rational::Ratio;
 use num::{bigint::ToBigInt, BigUint, Zero};
 use thiserror::Error;
 
@@ -24,7 +25,7 @@ use zksync_api_types::{
     v02::transaction::{SubmitBatchResponse, Toggle2FA, Toggle2FAResponse, TxHashSerializeWrapper},
     TxWithSignature,
 };
-
+use zksync_storage::misc::records::Subsidy;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
     tx::{
@@ -33,6 +34,9 @@ use zksync_types::{
     },
     AccountId, Address, BatchFee, Fee, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
     H160,
+};
+use zksync_utils::{
+    big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, scaled_big_decimal_to_ratio,
 };
 
 // Local uses
@@ -48,6 +52,8 @@ use crate::{
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
 use zksync_config::configs::api::CommonApiConfig;
+
+use super::rpc_server::types::RequestMetadata;
 
 const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
@@ -68,6 +74,10 @@ pub struct TxSender {
     // Limit the number of both transactions and Ethereum signatures per batch.
     pub max_number_of_transactions_per_batch: usize,
     pub max_number_of_authors_per_batch: usize,
+
+    pub current_subsidy_type: String,
+    pub max_subsidy_usd: Ratio<BigUint>,
+    pub subsidized_ips: HashSet<String>,
 }
 
 #[derive(Debug, Error)]
@@ -172,6 +182,9 @@ impl TxSender {
             fee_free_accounts: HashSet::from_iter(config.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
+            current_subsidy_type: config.subsidy_name.clone(),
+            max_subsidy_usd: config.max_subsidy_usd(),
+            subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
         }
     }
 
@@ -356,6 +369,7 @@ impl TxSender {
         mut tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
         let fast_processing = fast_processing.unwrap_or(false);
         if fast_processing && !tx.is_withdraw() {
@@ -373,13 +387,103 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        self.submit_tx(tx, signature).await
+        self.submit_tx(tx, signature, extracted_request_metadata)
+            .await
+    }
+
+    pub async fn can_subsidize(
+        &self,
+        new_subsidy_usd: Ratio<BigUint>,
+    ) -> Result<bool, anyhow::Error> {
+        let subsidized_already = self
+            .pool
+            .access_storage()
+            .await?
+            .misc_schema()
+            .get_total_used_subsidy_for_type(&self.current_subsidy_type)
+            .await?;
+        let subsidized_already_usd = scaled_big_decimal_to_ratio(subsidized_already)?;
+
+        let result = if self.max_subsidy_usd > subsidized_already_usd {
+            &self.max_subsidy_usd - &subsidized_already_usd >= new_subsidy_usd
+        } else {
+            false
+        };
+
+        Ok(result)
+    }
+
+    pub async fn should_subsidize_cpk(
+        &self,
+        normal_fee: &BigUint,
+        subsidized_fee: &BigUint,
+        subsidy_size_usd: &Ratio<BigUint>,
+        extracted_request_metadata: Option<RequestMetadata>,
+    ) -> Result<bool, SubmitError> {
+        let should_subsidize_ip = if let Some(meta) = extracted_request_metadata {
+            self.subsidized_ips.contains(&meta.ip)
+        } else {
+            false
+        };
+
+        let result = should_subsidize_ip
+            && subsidized_fee < normal_fee
+            && self
+                .can_subsidize(subsidy_size_usd.clone())
+                .await
+                .map_err(SubmitError::Internal)?;
+
+        Ok(result)
+    }
+
+    pub async fn store_subsidy_data(
+        &self,
+        hash: TxHash,
+        normal_fee: BigUint,
+        subsidized_fee: BigUint,
+        token_id: TokenId,
+    ) -> Result<(), anyhow::Error> {
+        let token_price_in_usd = Self::ticker_price_request(
+            self.ticker_requests.clone(),
+            TokenLike::Id(token_id),
+            TokenPriceRequestType::USDForOneWei,
+        )
+        .await?;
+
+        let full_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee;
+        let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
+
+        if full_cost_usd < subsidized_cost_usd {
+            return Err(anyhow::Error::msg(
+                "Trying to subsidize transaction which should not be subsidized",
+            ));
+        }
+
+        let subsidy = Subsidy {
+            usd_amount_scaled: ratio_to_scaled_u64(&full_cost_usd - &subsidized_cost_usd),
+            full_cost_usd_scaled: ratio_to_scaled_u64(full_cost_usd),
+            token_id,
+            token_amount: biguint_to_big_decimal(subsidized_fee),
+            full_cost_token: biguint_to_big_decimal(normal_fee),
+            subsidy_type: self.current_subsidy_type.clone(),
+            tx_hash: hash,
+        };
+
+        self.pool
+            .access_storage()
+            .await?
+            .misc_schema()
+            .store_subsidy(subsidy)
+            .await?;
+
+        Ok(())
     }
 
     pub async fn submit_tx(
         &self,
         tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
@@ -409,6 +513,8 @@ impl TxSender {
         let sign_verify_channel = self.sign_verify_requests.clone();
         let ticker_request_sender = self.ticker_requests.clone();
 
+        let mut fee_data_for_subsidy: Option<ResponseFee> = None;
+
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
             let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
                 || self.enforce_pubkey_change_fee;
@@ -424,13 +530,23 @@ impl TxSender {
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
 
+            let required_fee_data = if self
+                .should_subsidize_cpk(
+                    &required_fee_data.normal_fee.total_fee,
+                    &required_fee_data.subsidized_fee.total_fee,
+                    &required_fee_data.subsidy_size_usd,
+                    extracted_request_metadata,
+                )
+                .await?
+            {
+                fee_data_for_subsidy = Some(required_fee_data.clone());
+                required_fee_data.subsidized_fee
+            } else {
+                required_fee_data.normal_fee
+            };
+
             // Converting `BitUint` to `BigInt` is safe.
-            let required_fee: BigDecimal = required_fee_data
-                .normal_fee
-                .total_fee
-                .to_bigint()
-                .unwrap()
-                .into();
+            let required_fee: BigDecimal = required_fee_data.total_fee.to_bigint().unwrap().into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee = scale_user_fee_up(provided_fee);
@@ -473,6 +589,31 @@ impl TxSender {
             .await
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
+
+        // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
+        if let Some(fee_data_for_subsidy) = fee_data_for_subsidy {
+            // The following two bad scenarios are possible when applying subsidy for the tx:
+            // - The subsidy is stored, but the tx is then rejected by the state keeper
+            // - The tx is accepted by the state keeper, but the the `store_subsidy_data` returns an error for some reason
+            //
+            // Trying to omit these scenarios unfortunately leads to large code restructure
+            // which is not worth it for subsidies (we prefer stability here)
+            self.store_subsidy_data(
+                tx.hash(),
+                fee_data_for_subsidy.normal_fee.total_fee,
+                fee_data_for_subsidy.subsidized_fee.total_fee,
+                token.id,
+            )
+            .await
+            .map_err(|e| {
+                metrics::increment_counter!("tx_sender.submit_tx.store_subsidy_data_fail");
+                SubmitError::Other(format!(
+                    "Failed to store the subsidy to database. Reason: {}",
+                    e
+                ))
+            })?;
+        }
+
         // if everything is OK, return the transactions hashes.
         Ok(tx.hash())
     }
@@ -481,6 +622,7 @@ impl TxSender {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<SubmitBatchResponse, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
@@ -510,6 +652,7 @@ impl TxSender {
         let eth_token = TokenLike::Id(TokenId(0));
 
         let mut token_fees = HashMap::<Address, BigUint>::new();
+        let mut token_fees_ids = vec![];
 
         for tx in &txs {
             let tx_fee_info = tx.tx.get_fee_info();
@@ -549,6 +692,7 @@ impl TxSender {
                 .await?;
 
                 let token_data = self.token_info_from_id(token).await?;
+                token_fees_ids.push(token_data.id);
                 let mut token_fee = token_fees.remove(&token_data.address).unwrap_or_default();
                 token_fee += &provided_fee;
                 token_fees.insert(token_data.address, token_fee);
@@ -559,6 +703,8 @@ impl TxSender {
             }
         }
 
+        let mut fee_data_for_subsidy: Option<ResponseBatchFee> = None;
+
         // Only one token in batch
         if token_fees.len() == 1 {
             let (batch_token, fee_paid) = token_fees.into_iter().next().unwrap();
@@ -568,10 +714,25 @@ impl TxSender {
                 batch_token.into(),
             )
             .await?;
+
+            let required_fee = if self
+                .should_subsidize_cpk(
+                    &batch_token_fee.normal_fee.total_fee,
+                    &batch_token_fee.subsidized_fee.total_fee,
+                    &batch_token_fee.subsidy_size_usd,
+                    extracted_request_metadata,
+                )
+                .await?
+            {
+                fee_data_for_subsidy = Some(batch_token_fee.clone());
+                batch_token_fee.subsidized_fee.total_fee
+            } else {
+                batch_token_fee.normal_fee.total_fee
+            };
+
             let user_provided_fee =
                 scale_user_fee_up(BigDecimal::from(fee_paid.to_bigint().unwrap()));
-            let required_normal_fee =
-                BigDecimal::from(batch_token_fee.normal_fee.total_fee.to_bigint().unwrap());
+            let required_normal_fee = BigDecimal::from(required_fee.to_bigint().unwrap());
 
             // Not enough fee
             if required_normal_fee > user_provided_fee {
@@ -589,8 +750,22 @@ impl TxSender {
                 transaction_types,
                 eth_token.clone(),
             )
-            .await?
-            .normal_fee;
+            .await?;
+
+            let required_fee = if self
+                .should_subsidize_cpk(
+                    &required_eth_fee.normal_fee.total_fee,
+                    &required_eth_fee.subsidized_fee.total_fee,
+                    &required_eth_fee.subsidy_size_usd,
+                    extracted_request_metadata,
+                )
+                .await?
+            {
+                fee_data_for_subsidy = Some(required_eth_fee.clone());
+                required_eth_fee.subsidized_fee.total_fee
+            } else {
+                required_eth_fee.normal_fee.total_fee
+            };
 
             let eth_price_in_usd = Self::ticker_price_request(
                 self.ticker_requests.clone(),
@@ -600,8 +775,7 @@ impl TxSender {
             .await?;
 
             let required_total_usd_fee =
-                BigDecimal::from(required_eth_fee.total_fee.to_bigint().unwrap())
-                    * &eth_price_in_usd;
+                BigDecimal::from(required_fee.to_bigint().unwrap()) * &eth_price_in_usd;
 
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
@@ -698,6 +872,42 @@ impl TxSender {
             .map_err(SubmitError::TxAdd)?;
 
         let batch_hash = TxHash::batch_hash(&tx_hashes);
+
+        // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
+        if let Some(fee_data) = fee_data_for_subsidy {
+            let subsidy_token_id = if token_fees_ids.len() == 1 {
+                token_fees_ids[0]
+            } else {
+                // When there are more than token to pay the fee with,
+                // we get the price of the batch in ETH and then convert it to USD.
+                // Since the `subsidies` table contains the token_id field and the only fee which is fetched from the fee_ticker is
+                // in ETH, then we can consider ETH as the token_id of the subsidy. Even though formally this may not be the case.
+                TokenId(0)
+            };
+
+            // The following two bad scenarios are possible when applying subsidy for the tx:
+            // - The subsidy is stored, but the tx is then rejected by the state keeper
+            // - The tx is accepted by the state keeper, but the the `store_subsidy_data` returns an error for some reason
+            //
+            // Trying to omit these scenarios unfortunately leads to large code restructure
+            // which is not worth it for subsidies (we prefer stability here)
+            self.store_subsidy_data(
+                batch_hash,
+                fee_data.normal_fee.total_fee,
+                fee_data.subsidized_fee.total_fee,
+                subsidy_token_id,
+            )
+            .await
+            .map_err(|e| {
+                metrics::increment_counter!("tx_sender.submit_txs_batch.store_subsidy_data_fail");
+
+                SubmitError::Other(format!(
+                    "Failed to store the subsidy to database. Reason: {}",
+                    e
+                ))
+            })?;
+        }
+
         Ok(SubmitBatchResponse {
             transaction_hashes: tx_hashes.into_iter().map(TxHashSerializeWrapper).collect(),
             batch_hash,

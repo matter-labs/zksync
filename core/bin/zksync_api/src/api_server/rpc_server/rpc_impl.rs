@@ -125,11 +125,18 @@ impl RpcApp {
         tx: Box<ZkSyncTx>,
         signature: Box<TxEthSignatureVariant>,
         fast_processing: Option<bool>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash> {
         let start = Instant::now();
+
         let result = self
             .tx_sender
-            .submit_tx_with_separate_fp(*tx, *signature, fast_processing)
+            .submit_tx_with_separate_fp(
+                *tx,
+                *signature,
+                fast_processing,
+                extracted_request_metadata,
+            )
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.tx_submit", start.elapsed());
@@ -140,11 +147,13 @@ impl RpcApp {
         self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
+
         let result: Result<Vec<TxHash>> = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signatures)
+            .submit_txs_batch(txs, eth_signatures, extracted_request_metadata)
             .await
             .map_err(Error::from)
             .map(|response| {
@@ -232,6 +241,7 @@ impl RpcApp {
         tx_type: ApiTxFeeTypes,
         address: Address,
         token: TokenLike,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<Fee> {
         let start = Instant::now();
         let ticker = self.tx_sender.ticker_requests.clone();
@@ -239,11 +249,28 @@ impl RpcApp {
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
+
         let result =
             Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
 
+        let should_subsidize_cpk = self
+            .tx_sender
+            .should_subsidize_cpk(
+                &result.normal_fee.total_fee,
+                &result.subsidized_fee.total_fee,
+                &result.subsidy_size_usd,
+                extracted_request_metadata,
+            )
+            .await?;
+
+        let fee = if should_subsidize_cpk {
+            result.subsidized_fee
+        } else {
+            result.normal_fee
+        };
+
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
-        Ok(result.normal_fee)
+        Ok(fee)
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -251,6 +278,7 @@ impl RpcApp {
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TotalFee> {
         let start = Instant::now();
         if tx_types.len() != addresses.len() {
@@ -273,11 +301,28 @@ impl RpcApp {
             .map(|fee_type| fee_type.into())
             .zip(addresses.iter().cloned()))
         .collect();
+
         let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
+
+        let should_subsidize_cpk = self
+            .tx_sender
+            .should_subsidize_cpk(
+                &result.normal_fee.total_fee,
+                &result.subsidized_fee.total_fee,
+                &result.subsidy_size_usd,
+                extracted_request_metadata,
+            )
+            .await?;
+
+        let fee = if should_subsidize_cpk {
+            result.subsidized_fee
+        } else {
+            result.normal_fee
+        };
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
         Ok(TotalFee {
-            total_fee: result.normal_fee.total_fee,
+            total_fee: fee.total_fee,
         })
     }
 

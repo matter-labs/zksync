@@ -29,6 +29,7 @@ mod data_restore;
 mod ethereum;
 mod event;
 mod forced_exit_requests;
+mod misc;
 mod prover;
 mod tokens;
 

@@ -13,6 +13,10 @@ pub fn ratio_to_big_decimal(num: &Ratio<BigUint>, precision: usize) -> BigDecima
     BigDecimal::new(bigint, precision as i64)
 }
 
+pub fn biguint_to_big_decimal(num: BigUint) -> BigDecimal {
+    ratio_to_big_decimal(&Ratio::from(num), 0)
+}
+
 pub fn big_decimal_to_ratio(num: &BigDecimal) -> Result<Ratio<BigUint>, anyhow::Error> {
     let (big_int, exp) = num.as_bigint_and_exponent();
     anyhow::ensure!(!big_int.is_negative(), "BigDecimal should be unsigned");
@@ -30,6 +34,37 @@ pub fn round_precision(num: &Ratio<BigUint>, precision: usize) -> Ratio<BigUint>
     let ten_pow = BigUint::from(10u32).pow(precision);
     let numerator = (num * &ten_pow).trunc().to_integer();
     Ratio::new(numerator, ten_pow)
+}
+
+pub fn ratio_to_u64(num: Ratio<BigUint>) -> u64 {
+    let digits = num.to_integer().to_u64_digits();
+    if digits.is_empty() {
+        0
+    } else {
+        digits[0]
+    }
+}
+
+/// The number scaled by which the subsidies are stored in the db
+const SUBSIDY_USD_AMOUNTS_SCALE: u64 = 1_000_000;
+
+pub fn ratio_to_scaled_u64(num: Ratio<BigUint>) -> u64 {
+    let scale = BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE);
+    let scaled_num = num * scale;
+
+    ratio_to_u64(scaled_num)
+}
+
+pub fn scaled_u64_to_ratio(num: u64) -> Ratio<BigUint> {
+    Ratio::from(BigUint::from(num)) / BigUint::from(SUBSIDY_USD_AMOUNTS_SCALE)
+}
+
+pub fn scaled_big_decimal_to_ratio(num: BigDecimal) -> Result<Ratio<BigUint>, anyhow::Error> {
+    let scale = BigDecimal::from(SUBSIDY_USD_AMOUNTS_SCALE);
+
+    let unscaled = num / scale;
+
+    big_decimal_to_ratio(&unscaled)
 }
 
 #[cfg(test)]
