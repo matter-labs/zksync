@@ -59,14 +59,6 @@ async fn handle_new_commit_task(
                 .await;
             }
             CommitRequest::PendingBlock((pending_block, applied_updates_req)) => {
-                let mut operations = pending_block.success_operations.clone();
-                operations.extend(
-                    pending_block
-                        .failed_txs
-                        .clone()
-                        .into_iter()
-                        .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
-                );
                 save_pending_block(pending_block, applied_updates_req, &pool).await;
             }
         }

@@ -4,7 +4,7 @@ use num::BigUint;
 use zksync_crypto::circuit::{account::CircuitAccount, CircuitAccountTree};
 use zksync_state::state::ZkSyncState;
 use zksync_test_account::ZkSyncAccount;
-use zksync_types::{Account, AccountId, AccountMap, Address, BlockNumber, TokenId};
+use zksync_types::{Account, AccountId, AccountMap, Address, TokenId};
 
 // Public re-exports
 use std::str::FromStr;
@@ -18,7 +18,7 @@ pub struct ZkSyncStateGenerator;
 
 impl ZkSyncStateGenerator {
     fn create_state(accounts: AccountMap) -> (ZkSyncState, CircuitAccountTree) {
-        let plasma_state = ZkSyncState::from_acc_map(accounts, BlockNumber(1));
+        let plasma_state = ZkSyncState::from_acc_map(accounts);
 
         let mut circuit_account_tree =
             CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());

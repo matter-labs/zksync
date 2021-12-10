@@ -12,7 +12,7 @@ use zksync_types::{
     account::{Account, PubKeyHash},
     priority_ops::{Deposit, FullExit},
     tx::{ChangePubKey, PackedEthSignature, Transfer, Withdraw},
-    AccountId, AccountMap, Address, BlockNumber, Nonce, TokenId, ZkSyncPriorityOp, ZkSyncTx,
+    AccountId, AccountMap, Address, Nonce, TokenId, ZkSyncPriorityOp, ZkSyncTx,
 };
 // Local uses
 use zksync_state::state::ZkSyncState;
@@ -22,7 +22,6 @@ const ETH_TOKEN_ID: TokenId = TokenId(0x00);
 // The amount is not important, since we always work with 1 account.
 // We use some small non-zero value, so the overhead for cloning will not be big.
 const ACCOUNTS_AMOUNT: AccountId = AccountId(10);
-const CURRENT_BLOCK: BlockNumber = BlockNumber(1_000);
 
 const DEFAULT_TIMESTAMP: u64 = 0;
 
@@ -56,7 +55,7 @@ fn generate_state() -> (HashMap<AccountId, (PrivateKey, H256)>, ZkSyncState) {
         keys.insert(AccountId(account_id), (sk, eth_sk));
     }
 
-    let state = ZkSyncState::from_acc_map(accounts, CURRENT_BLOCK);
+    let state = ZkSyncState::from_acc_map(accounts);
 
     (keys, state)
 }
