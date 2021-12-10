@@ -14,7 +14,10 @@ use zksync_crypto::{
 };
 use zksync_types::{
     account::{Account, PubKeyHash},
-    tx::{ChangePubKey, MintNFT, Order, PackedEthSignature, Swap, Transfer, Withdraw, WithdrawNFT},
+    tx::{
+        ChangePubKey, ForcedExit, MintNFT, Order, PackedEthSignature, Swap, Transfer, Withdraw,
+        WithdrawNFT,
+    },
     AccountId, Address, Nonce, TokenId,
 };
 // Local uses
@@ -56,8 +59,8 @@ impl TxBenchSetup {
         }
     }
 
-    pub fn create_transfer(&self) -> Transfer {
-        Transfer::new_signed(
+    pub fn create_transfer(&self, with_cache: bool) -> Transfer {
+        let mut tx = Transfer::new_signed(
             AccountId(0),
             self.account.address,
             Address::random(),
@@ -68,11 +71,17 @@ impl TxBenchSetup {
             Default::default(),
             &self.private_key,
         )
-        .expect("Failed to sign Transfer")
+        .expect("Failed to sign Transfer");
+
+        if !with_cache {
+            tx.wipe_signer_cache();
+        }
+
+        tx
     }
 
-    pub fn create_withdraw(&self) -> Withdraw {
-        Withdraw::new_signed(
+    pub fn create_withdraw(&self, with_cache: bool) -> Withdraw {
+        let mut tx = Withdraw::new_signed(
             AccountId(0),
             self.account.address,
             Address::random(),
@@ -83,14 +92,20 @@ impl TxBenchSetup {
             Default::default(),
             &self.private_key,
         )
-        .expect("Failed to sign Withdraw")
+        .expect("Failed to sign Withdraw");
+
+        if !with_cache {
+            tx.wipe_signer_cache();
+        }
+
+        tx
     }
 
-    pub fn create_change_pubkey(&self) -> ChangePubKey {
+    pub fn create_change_pubkey(&self, with_cache: bool) -> ChangePubKey {
         let rng = &mut thread_rng();
         let new_sk = priv_key_from_fs(rng.gen());
 
-        let mut change_pubkey = ChangePubKey::new(
+        let mut tx = ChangePubKey::new(
             AccountId(0),
             self.account.address,
             PubKeyHash::from_privkey(&new_sk),
@@ -102,8 +117,8 @@ impl TxBenchSetup {
             None,
         );
 
-        change_pubkey.eth_auth_data = {
-            let sign_bytes = change_pubkey
+        tx.eth_auth_data = {
+            let sign_bytes = tx
                 .get_eth_signed_data()
                 .expect("Failed to construct ChangePubKey signed message.");
             let eth_signature =
@@ -114,11 +129,36 @@ impl TxBenchSetup {
             }))
         };
 
-        change_pubkey
+        // We signed transaction manually, so
+
+        if !with_cache {
+            tx.wipe_signer_cache();
+        }
+
+        tx
     }
 
-    pub fn create_mint_nft(&self) -> MintNFT {
-        MintNFT::new_signed(
+    pub fn create_forced_exit(&self, with_cache: bool) -> ForcedExit {
+        let mut tx = ForcedExit::new_signed(
+            AccountId(0),
+            self.account.address,
+            ETH_TOKEN_ID,
+            Default::default(),
+            Nonce(0),
+            Default::default(),
+            &self.private_key,
+        )
+        .expect("Failed to sign ForcedExit");
+
+        if !with_cache {
+            tx.wipe_signer_cache();
+        }
+
+        tx
+    }
+
+    pub fn create_mint_nft(&self, with_cache: bool) -> MintNFT {
+        let mut tx = MintNFT::new_signed(
             AccountId(0),
             self.account.address,
             H256::random(),
@@ -128,11 +168,17 @@ impl TxBenchSetup {
             Nonce(0),
             &self.private_key,
         )
-        .expect("Failed to sign MintNFT")
+        .expect("Failed to sign MintNFT");
+
+        if !with_cache {
+            tx.wipe_signer_cache();
+        }
+
+        tx
     }
 
-    pub fn create_withdraw_nft(&self) -> WithdrawNFT {
-        WithdrawNFT::new_signed(
+    pub fn create_withdraw_nft(&self, with_cache: bool) -> WithdrawNFT {
+        let mut tx = WithdrawNFT::new_signed(
             AccountId(0),
             self.account.address,
             self.account.address,
@@ -143,10 +189,16 @@ impl TxBenchSetup {
             Default::default(),
             &self.private_key,
         )
-        .expect("Failed to sign WithdrawNFT")
+        .expect("Failed to sign WithdrawNFT");
+
+        if !with_cache {
+            tx.wipe_signer_cache();
+        }
+
+        tx
     }
 
-    pub fn create_swap(&self) -> Swap {
+    pub fn create_swap(&self, with_cache: bool) -> Swap {
         let (_, acc_0_sk, acc_0) = generate_account();
         let (_, acc_1_sk, acc_1) = generate_account();
         let token_0 = TokenId(0);
@@ -178,7 +230,7 @@ impl TxBenchSetup {
         )
         .expect("order creation failed");
 
-        Swap::new_signed(
+        let mut tx = Swap::new_signed(
             AccountId(2),
             self.account.address,
             Nonce(0),
@@ -188,7 +240,13 @@ impl TxBenchSetup {
             ETH_TOKEN_ID,
             &self.private_key,
         )
-        .expect("swap creation failed")
+        .expect("swap creation failed");
+
+        if !with_cache {
+            tx.wipe_signer_cache();
+        }
+
+        tx
     }
 }
 
@@ -200,30 +258,42 @@ pub fn bench_txs(c: &mut Criterion) {
     // Setup the input size so the throughput will be reported.
     group.throughput(INPUT_SIZE);
 
-    group.bench_function("Transfer::verify_signature", |b| {
-        let tx = TxBenchSetup::new().create_transfer();
-        b.iter(|| black_box(tx.verify_signature()));
-    });
-    group.bench_function("Withdraw::verify_signature", |b| {
-        let tx = TxBenchSetup::new().create_withdraw();
-        b.iter(|| black_box(tx.verify_signature()));
-    });
-    group.bench_function("ChangePubKey::verify_signature", |b| {
-        let tx = TxBenchSetup::new().create_change_pubkey();
-        b.iter(|| black_box(tx.verify_signature()));
-    });
-    group.bench_function("MintNFT::verify_signature", |b| {
-        let tx = TxBenchSetup::new().create_mint_nft();
-        b.iter(|| black_box(tx.verify_signature()));
-    });
-    group.bench_function("WithdrawNFT::verify_signature", |b| {
-        let tx = TxBenchSetup::new().create_withdraw_nft();
-        b.iter(|| black_box(tx.verify_signature()));
-    });
-    group.bench_function("Swap::verify_signature", |b| {
-        let tx = TxBenchSetup::new().create_swap();
-        b.iter(|| black_box(tx.verify_signature()));
-    });
+    for with_cache in [false, true] {
+        let cache = if with_cache {
+            "(cached)"
+        } else {
+            "(not cached)"
+        };
+
+        group.bench_function(format!("Transfer::verify_signature {}", cache), |b| {
+            let tx = TxBenchSetup::new().create_transfer(with_cache);
+            b.iter(|| black_box(tx.verify_signature()));
+        });
+        group.bench_function(format!("Withdraw::verify_signature {}", cache), |b| {
+            let tx = TxBenchSetup::new().create_withdraw(with_cache);
+            b.iter(|| black_box(tx.verify_signature()));
+        });
+        group.bench_function(format!("ChangePubKey::verify_signature {}", cache), |b| {
+            let tx = TxBenchSetup::new().create_change_pubkey(with_cache);
+            b.iter(|| black_box(tx.verify_signature()));
+        });
+        group.bench_function(format!("ForcedExit::verify_signature {}", cache), |b| {
+            let tx = TxBenchSetup::new().create_forced_exit(with_cache);
+            b.iter(|| black_box(tx.verify_signature()));
+        });
+        group.bench_function(format!("MintNFT::verify_signature {}", cache), |b| {
+            let tx = TxBenchSetup::new().create_mint_nft(with_cache);
+            b.iter(|| black_box(tx.verify_signature()));
+        });
+        group.bench_function(format!("WithdrawNFT::verify_signature {}", cache), |b| {
+            let tx = TxBenchSetup::new().create_withdraw_nft(with_cache);
+            b.iter(|| black_box(tx.verify_signature()));
+        });
+        group.bench_function(format!("Swap::verify_signature {}", cache), |b| {
+            let tx = TxBenchSetup::new().create_swap(with_cache);
+            b.iter(|| black_box(tx.verify_signature()));
+        });
+    }
 
     group.finish();
 }
