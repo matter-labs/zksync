@@ -83,13 +83,13 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
     .expect("failed to sign transfer");
     let transfer_tx = ZkSyncTx::Transfer(Box::new(transfer));
 
-    let setup = || (state.clone(), transfer_tx.clone());
+    let setup = || state.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut state, transfer_tx)| {
+        |state| {
             state
-                .execute_tx(black_box(transfer_tx), DEFAULT_TIMESTAMP)
+                .execute_tx(black_box(transfer_tx.clone()), DEFAULT_TIMESTAMP)
                 .expect("Failed to execute tx");
         },
         BatchSize::SmallInput,
@@ -123,13 +123,13 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
 
     let transfer_tx = ZkSyncTx::Transfer(Box::new(transfer));
 
-    let setup = || (state.clone(), transfer_tx.clone());
+    let setup = || state.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut state, transfer_tx)| {
+        |state| {
             state
-                .execute_tx(black_box(transfer_tx), DEFAULT_TIMESTAMP)
+                .execute_tx(black_box(transfer_tx.clone()), DEFAULT_TIMESTAMP)
                 .expect("Failed to execute tx");
         },
         BatchSize::SmallInput,
@@ -153,12 +153,12 @@ fn apply_full_exit_tx(b: &mut Bencher<'_>) {
 
     let full_exit_op = ZkSyncPriorityOp::FullExit(full_exit);
 
-    let setup = || (state.clone(), full_exit_op.clone());
+    let setup = || state.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut state, full_exit_op)| {
-            let _ = state.execute_priority_op(black_box(full_exit_op));
+        |state| {
+            let _ = state.execute_priority_op(black_box(full_exit_op.clone()));
         },
         BatchSize::SmallInput,
     );
@@ -181,12 +181,12 @@ fn apply_deposit_tx(b: &mut Bencher<'_>) {
 
     let deposit_op = ZkSyncPriorityOp::Deposit(deposit);
 
-    let setup = || (state.clone(), deposit_op.clone());
+    let setup = || state.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut state, deposit_op)| {
-            let _ = state.execute_priority_op(black_box(deposit_op));
+        |state| {
+            let _ = state.execute_priority_op(black_box(deposit_op.clone()));
         },
         BatchSize::SmallInput,
     );
@@ -216,12 +216,12 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
 
     let withdraw_tx = ZkSyncTx::Withdraw(Box::new(withdraw));
 
-    let setup = || (state.clone(), withdraw_tx.clone());
+    let setup = || state.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut state, withdraw_tx)| {
-            let _ = state.execute_tx(black_box(withdraw_tx), DEFAULT_TIMESTAMP);
+        |state| {
+            let _ = state.execute_tx(black_box(withdraw_tx.clone()), DEFAULT_TIMESTAMP);
         },
         BatchSize::SmallInput,
     );
@@ -267,14 +267,17 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
         }))
     };
 
+    // Verify signature out of state, so it'll be cached.
+    change_pubkey.check_correctness();
+
     let change_pubkey_tx = ZkSyncTx::ChangePubKey(Box::new(change_pubkey));
 
-    let setup = || (state.clone(), change_pubkey_tx.clone());
+    let setup = || state.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut state, change_pubkey_tx)| {
-            let _ = state.execute_tx(black_box(change_pubkey_tx), DEFAULT_TIMESTAMP);
+        |state| {
+            let _ = state.execute_tx(black_box(change_pubkey_tx.clone()), DEFAULT_TIMESTAMP);
         },
         BatchSize::SmallInput,
     );
@@ -288,12 +291,12 @@ fn insert_account(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
     let (_, _, to_insert) = generate_account();
-    let setup = || (state.clone(), to_insert.clone());
+    let setup = || state.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut state, to_insert)| {
-            state.insert_account(black_box(ACCOUNTS_AMOUNT), to_insert);
+        |state| {
+            state.insert_account(black_box(ACCOUNTS_AMOUNT), to_insert.clone());
         },
         BatchSize::SmallInput,
     );

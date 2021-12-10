@@ -134,17 +134,12 @@ impl ZkSyncState {
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
-
-        let mut account = self.balance_tree.get(*account_id).cloned();
-        if account == Some(Account::default()) {
-            account = None;
-        }
-
-        vlog::trace!(
-            "Get account (id {}) execution time: {}ms",
-            *account_id,
-            start.elapsed().as_millis()
-        );
+        let account = self
+            .balance_tree
+            .get(*account_id)
+            .filter(|acc| !acc.is_default())
+            .cloned();
+        metrics::histogram!("state.get_account", start.elapsed());
 
         account
     }
