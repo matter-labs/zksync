@@ -267,6 +267,9 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
         }))
     };
 
+    // Verify signature out of state, so it'll be cached.
+    change_pubkey.check_correctness();
+
     let change_pubkey_tx = ZkSyncTx::ChangePubKey(Box::new(change_pubkey));
 
     let setup = || state.clone();
