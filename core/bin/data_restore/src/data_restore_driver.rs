@@ -241,13 +241,13 @@ impl<T: Transport> DataRestoreDriver<T> {
     async fn store_tree_cache(&mut self, interactor: &mut StorageInteractor<'_>) {
         vlog::info!(
             "Storing the tree cache, block number: {}",
-            self.tree_state.state.block_number
+            self.tree_state.block_number
         );
         self.tree_state.state.root_hash();
         let tree_cache = self.tree_state.state.get_balance_tree().get_internals();
         interactor
             .store_tree_cache(
-                self.tree_state.state.block_number,
+                self.tree_state.block_number,
                 serde_json::to_value(tree_cache).expect("failed to serialize tree cache"),
             )
             .await;
@@ -304,7 +304,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         self.last_priority_op_serial_id = transaction.get_max_priority_op_serial_id().await;
         let total_verified_blocks = self.zksync_contract.get_total_verified_blocks().await;
 
-        let last_verified_block = self.tree_state.state.block_number;
+        let last_verified_block = self.tree_state.block_number;
 
         transaction.commit().await;
 
@@ -346,7 +346,7 @@ impl<T: Transport> DataRestoreDriver<T> {
                     let total_verified_blocks =
                         self.zksync_contract.get_total_verified_blocks().await;
 
-                    let last_verified_block = self.tree_state.state.block_number;
+                    let last_verified_block = self.tree_state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state
                     // to keep the `state_keeper` consistent with the `eth_sender`.
@@ -445,7 +445,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         // TODO Fix event state and delete this code (ZKS-722)
         let new_ops_blocks: Vec<RollupOpsBlock> = new_ops_blocks
             .into_iter()
-            .filter(|bl| bl.block_num > self.tree_state.state.block_number)
+            .filter(|bl| bl.block_num > self.tree_state.block_number)
             .collect();
         for op_block in new_ops_blocks {
             // Take the contract version into account when choosing block chunk sizes.

@@ -150,8 +150,8 @@ pub async fn get_test_block() -> Block {
     let (circuit_tree, accounts) = MockDatabase::get_default_tree_and_accounts();
     let validator_account_id = AccountId(0);
     let validator_account = accounts.get(&validator_account_id).unwrap();
-    let mut state =
-        zksync_state::state::ZkSyncState::from_acc_map(accounts.clone(), BlockNumber(1));
+    let block_number = BlockNumber(1);
+    let mut state = zksync_state::state::ZkSyncState::from_acc_map(accounts.clone());
     let deposit_priority_op = zksync_types::ZkSyncPriorityOp::Deposit(zksync_types::Deposit {
         from: validator_account.address,
         token: TokenId(0),
@@ -191,7 +191,7 @@ pub async fn get_test_block() -> Block {
     };
 
     Block::new_from_available_block_sizes(
-        state.block_number,
+        block_number,
         state.root_hash(),
         validator_account_id,
         ops,

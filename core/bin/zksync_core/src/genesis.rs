@@ -90,7 +90,7 @@ pub async fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Ad
         .await
         .expect("db fail");
 
-    let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
+    let state = ZkSyncState::from_acc_map(accounts);
     let root_hash = state.root_hash();
     transaction
         .chain()
