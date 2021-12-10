@@ -24,6 +24,8 @@ pub struct TreeState {
     pub current_unprocessed_priority_op: u64,
     /// The last fee account address
     pub last_fee_account_address: Address,
+    /// Current block number.
+    pub block_number: BlockNumber,
 }
 
 impl Default for TreeState {
@@ -39,6 +41,7 @@ impl TreeState {
             state: ZkSyncState::empty(),
             current_unprocessed_priority_op: 0,
             last_fee_account_address: Address::default(),
+            block_number: BlockNumber(0),
         }
     }
 
@@ -57,7 +60,7 @@ impl TreeState {
         current_unprocessed_priority_op: u64,
         fee_account: AccountId,
     ) -> Self {
-        let state = ZkSyncState::from_acc_map(accounts, current_block);
+        let state = ZkSyncState::from_acc_map(accounts);
         let last_fee_account_address = state
             .get_account(fee_account)
             .expect("Cant get fee account from tree state")
@@ -66,6 +69,7 @@ impl TreeState {
             state,
             current_unprocessed_priority_op,
             last_fee_account_address,
+            block_number: current_block,
         }
     }
 
@@ -96,12 +100,7 @@ impl TreeState {
             balance_tree.items.insert(*account_id as u64, account);
         });
 
-        let state = ZkSyncState::new(
-            balance_tree,
-            account_id_by_address,
-            current_block.block_number,
-            nfts,
-        );
+        let state = ZkSyncState::new(balance_tree, account_id_by_address, nfts);
         let last_fee_account_address = state
             .get_account(current_block.fee_account)
             .expect("Failed to obtain fee account address from the cached tree")
@@ -111,6 +110,7 @@ impl TreeState {
             state,
             current_unprocessed_priority_op,
             last_fee_account_address,
+            block_number: current_block.block_number,
         }
     }
 
@@ -475,7 +475,7 @@ impl TreeState {
             ops_block.timestamp.unwrap_or_default(),
         );
 
-        *self.state.block_number += 1;
+        *self.block_number += 1;
 
         Ok((block, accounts_updated))
     }

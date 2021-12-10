@@ -459,7 +459,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
     assert_eq!(driver.events_state.committed_events.len(), events.len());
-    assert_eq!(*driver.tree_state.state.block_number, 2)
+    assert_eq!(*driver.tree_state.block_number, 2)
 }
 
 // TODO: Find a way to restore this test (ZKS-694)
@@ -682,5 +682,5 @@ async fn test_with_inmemory_storage() {
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
     assert_eq!(driver.events_state.committed_events.len(), events.len());
-    assert_eq!(*driver.tree_state.state.block_number, 4)
+    assert_eq!(*driver.tree_state.block_number, 4)
 }
