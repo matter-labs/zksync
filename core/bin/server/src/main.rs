@@ -11,9 +11,11 @@ use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
 use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
+use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_witness_generator::run_prover_server;
 
 use tokio::task::JoinHandle;
+use zksync_config::configs::api::PrometheusConfig;
 use zksync_config::{
     configs::api::{
         CommonApiConfig, JsonRpcConfig, PrivateApiConfig, ProverApiConfig, RestApiConfig,
@@ -231,6 +233,16 @@ async fn run_server(components: &ComponentsToRun) {
 
     if components.0.contains(&Component::EthSender) {
         tasks.push(run_eth_sender(connection_pool.clone()))
+    }
+
+    if components.0.contains(&Component::Prometheus) {
+        let config = PrometheusConfig::from_env();
+        let (main_task, counter_task) =
+            run_prometheus_exporter(connection_pool.clone(), config.port, true);
+        tasks.push(main_task);
+        if let Some(task) = counter_task {
+            tasks.push(task)
+        }
     }
 
     if components.0.contains(&Component::Core) {
