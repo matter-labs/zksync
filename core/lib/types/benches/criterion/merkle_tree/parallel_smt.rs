@@ -117,12 +117,12 @@ fn smt_insert_filled_middle(b: &mut Bencher<'_>) {
 }
 
 /// Measures the time of obtaining a SMT root hash.
-fn smt_root_hash(b: &mut Bencher<'_>) {
+fn smt_root_hash(b: &mut Bencher<'_>, size: u32) {
     let depth = zksync_crypto::params::account_tree_depth();
 
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
-    for (id, account) in (0..N_ACCOUNTS).map(gen_account).enumerate() {
+    for (id, account) in (0..size).map(gen_account).enumerate() {
         let id = id as u32;
         tree.insert(id, account.clone());
     }
@@ -143,16 +143,16 @@ fn smt_root_hash(b: &mut Bencher<'_>) {
 ///
 /// This bench is expected to get better results than `smt_root_hash` due
 /// to some hashes being cached.
-fn smt_root_hash_cached(b: &mut Bencher<'_>) {
+fn smt_root_hash_cached(b: &mut Bencher<'_>, size: u32) {
     let depth = zksync_crypto::params::account_tree_depth();
 
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
-    for (id, account) in (0..N_ACCOUNTS).map(gen_account).enumerate() {
+    for (id, account) in (0..size).map(gen_account).enumerate() {
         let id = id as u32;
         tree.insert(id, account.clone());
 
-        if id == N_ACCOUNTS / 2 {
+        if id == size / 2 {
             // Calculate the root hash to create cache.
             let _ = tree.root_hash();
         }
@@ -185,6 +185,12 @@ pub fn bench_merkle_tree(c: &mut Criterion) {
     );
 
     // Root hash benchmarks.
-    c.bench_function("Parallel SMT root hash", smt_root_hash);
-    c.bench_function("Parallel SMT root hash (half-cached)", smt_root_hash_cached);
+    for tree_size in &[10, 100, 1000, 10_000] {
+        let bench_name = format!("Parallel SMT root hash / size {}", tree_size);
+        c.bench_function(&bench_name, |b| smt_root_hash(b, *tree_size));
+    }
+    for tree_size in &[10, 100, 1000, 10_000] {
+        let bench_name = format!("Parallel SMT root hash (half-cached) / size {}", tree_size);
+        c.bench_function(&bench_name, |b| smt_root_hash_cached(b, *tree_size));
+    }
 }
