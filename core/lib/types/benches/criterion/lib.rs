@@ -11,8 +11,8 @@ mod signatures;
 mod txs;
 
 criterion_main!(
-    // merkle_tree_benches,
+    merkle_tree_benches,
     // primitives_benches,
     // signature_benches,
-    txs_benches
+    // txs_benches
 );
