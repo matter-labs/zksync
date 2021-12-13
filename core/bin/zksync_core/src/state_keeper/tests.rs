@@ -1413,6 +1413,12 @@ async fn correctly_restore_pending_block_timestamp() {
 
     tester.state_keeper.store_pending_block().await;
 
+    let previous_stored_account_updates = tester.state_keeper.pending_block.stored_account_updates;
+    assert_ne!(
+        previous_stored_account_updates, 0,
+        "There should be more than 0 stored account updates"
+    );
+
     let pending_block =
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.number, tester.state_keeper.pending_block.number);
@@ -1460,6 +1466,12 @@ async fn correctly_restore_pending_block_timestamp() {
         tester.state_keeper.pending_block.failed_txs.len(),
         0,
         "There should be 0 failed txs"
+    );
+
+    // Check that `stored_account_updates` represent actually processed updates.
+    assert_eq!(
+        tester.state_keeper.pending_block.stored_account_updates, previous_stored_account_updates,
+        "Stored account updates were restored incorrectly"
     );
 
     // Just in case try to execute a *new* transaction with the same timestamp.
