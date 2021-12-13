@@ -169,6 +169,29 @@ fn smt_root_hash_cached(b: &mut Bencher<'_>, size: u32) {
     );
 }
 
+/// Measures the time to `drop` a tree with calculated cache.
+fn smt_drop(b: &mut Bencher<'_>, size: u32) {
+    let depth = zksync_crypto::params::account_tree_depth();
+
+    // Create a tree and fill it with some accounts.
+    let mut tree = RealSMT::new(depth);
+    for (id, account) in (0..size).map(gen_account).enumerate() {
+        let id = id as u32;
+        tree.insert(id, account.clone());
+    }
+    tree.root_hash();
+
+    let setup = || (tree.clone());
+
+    b.iter_batched(
+        setup,
+        |tree| {
+            drop(tree);
+        },
+        BatchSize::SmallInput,
+    );
+}
+
 pub fn bench_merkle_tree(c: &mut Criterion) {
     c.bench_function("account.clone()", account_clone);
     c.bench_function("Parallel SMT create", smt_create);
@@ -192,5 +215,11 @@ pub fn bench_merkle_tree(c: &mut Criterion) {
     for tree_size in &[10, 100, 1000, 10_000] {
         let bench_name = format!("Parallel SMT root hash (half-cached) / size {}", tree_size);
         c.bench_function(&bench_name, |b| smt_root_hash_cached(b, *tree_size));
+    }
+
+    // Drop benchmarks.
+    for tree_size in &[10, 100, 1000, 10_000] {
+        let bench_name = format!("Parallel SMT drop / size {}", tree_size);
+        c.bench_function(&bench_name, |b| smt_drop(b, *tree_size));
     }
 }
