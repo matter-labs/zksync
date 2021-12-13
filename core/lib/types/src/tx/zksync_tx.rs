@@ -1,7 +1,9 @@
+use chrono::{DateTime, Utc};
 use num::BigUint;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
-
+use std::time::Duration;
+use thiserror::Error;
 use zksync_basic_types::{AccountId, Address};
 
 use crate::{
@@ -15,6 +17,10 @@ use crate::{
     WithdrawNFTOp, WithdrawOp,
 };
 use zksync_crypto::params::ETH_TOKEN_ID;
+
+#[derive(Error, Debug)]
+#[error("Time out of range")]
+pub struct TimeOutOfRange;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
@@ -32,6 +38,15 @@ pub struct SignedZkSyncTx {
     /// which user should have signed with their private key.
     /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<EthSignData>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl SignedZkSyncTx {
+    pub fn elapsed(&self) -> Result<Duration, TimeOutOfRange> {
+        (Utc::now() - self.created_at)
+            .to_std()
+            .map_err(|_| TimeOutOfRange)
+    }
 }
 
 /// A set of L2 transaction supported by the zkSync network.
@@ -102,6 +117,7 @@ impl From<ZkSyncTx> for SignedZkSyncTx {
         Self {
             tx,
             eth_sign_data: None,
+            created_at: Utc::now(),
         }
     }
 }

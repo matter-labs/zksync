@@ -20,6 +20,7 @@ use tokio::time;
 use zksync_test_account::{ZkSyncAccount, ZkSyncETHAccountData};
 
 use super::utils::{read_signing_key, Engine};
+use chrono::Utc;
 
 pub async fn prepare_forced_exit_sender_account(
     connection_pool: ConnectionPool,
@@ -204,6 +205,7 @@ pub async fn register_signing_key(
         .send_tx(SignedZkSyncTx {
             tx,
             eth_sign_data: None,
+            created_at: Utc::now(),
         })
         .await
         .expect("Failed to send CPK transaction")

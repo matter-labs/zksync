@@ -7,6 +7,7 @@ use chrono::{DateTime, TimeZone};
 use parity_crypto::digest::sha256;
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use zksync_crypto::params::{CHUNK_BIT_WIDTH, CHUNK_BYTES};
@@ -152,6 +153,14 @@ impl ExecutedOperations {
             ExecutedOperations::Tx(exec_tx) => exec_tx.success,
             ExecutedOperations::PriorityOp(_) => true,
         }
+    }
+
+    pub fn elapsed(&self) -> Result<Duration, ()> {
+        let created_at = match self {
+            ExecutedOperations::Tx(tx) => tx.created_at,
+            ExecutedOperations::PriorityOp(op) => op.created_at,
+        };
+        (Utc::now() - created_at).to_std().map_err(|_| ())
     }
 }
 
@@ -474,6 +483,9 @@ impl Block {
 
     pub fn timestamp_utc(&self) -> DateTime<Utc> {
         Utc.timestamp(self.timestamp as i64, 0)
+    }
+    pub fn elapsed(&self) -> Result<Duration, ()> {
+        (Utc::now() - self.timestamp_utc()).to_std().map_err(|_| ())
     }
 }
 

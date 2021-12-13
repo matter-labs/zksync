@@ -480,7 +480,6 @@ mod tests {
         SharedData,
     };
     use actix_web::{web::Json, App};
-    use chrono::Utc;
     use num::BigUint;
     use serde::Deserialize;
     use serde_json::json;

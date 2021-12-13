@@ -808,6 +808,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns the number of rejected_txs in executed_txs
+    pub async fn count_rejected_txs(&mut self) -> QueryResult<i64> {
+        let start = Instant::now();
+        let count = sqlx::query!(
+            r#"SELECT count(*) as "count!" FROM executed_transactions WHERE success = false"#,
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .count;
+
+        metrics::histogram!("sql.chain.block.count_rejected_txs", start.elapsed());
+        Ok(count)
+    }
     /// Returns the number of aggregated operations with the given `action_type` and `is_confirmed` status.
     pub async fn count_aggregated_operations(
         &mut self,

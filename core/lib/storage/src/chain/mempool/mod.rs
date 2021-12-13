@@ -245,7 +245,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             VALUES ($1, $2, $3, $4, $5)",
             tx_hash,
             tx,
-            chrono::Utc::now(),
+            tx_data.created_at,
             eth_sign_data,
             batch_id,
         )
@@ -517,7 +517,9 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 batch_id,
                 ..
             } = *reverted_tx;
-            let SignedZkSyncTx { tx, eth_sign_data } = signed_tx;
+            let SignedZkSyncTx {
+                tx, eth_sign_data, ..
+            } = signed_tx;
 
             let tx_hash_bytes = tx.hash().as_ref().to_vec();
             let tx_hash = hex::encode(&tx_hash_bytes);

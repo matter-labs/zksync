@@ -353,8 +353,19 @@ impl Database {
                     ("name", tx.variance_name()),
                     ("token", tx.token_id().to_string()),
                 ];
-                metrics::increment_counter!("process_tx", &labels);
+
+                metrics::histogram!(
+                    "process_tx",
+                    tx.elapsed().expect("Should be positive"),
+                    &labels
+                );
             }
+            let labels = vec![("stage", stage.clone())];
+            metrics::histogram!(
+                "process_block",
+                block.elapsed().expect("Should be positive"),
+                &labels
+            )
         }
     }
 }

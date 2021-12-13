@@ -1,5 +1,5 @@
 // Built-in deps
-use std::time::Instant;
+use std::time::{Duration, Instant};
 // External imports
 use anyhow::format_err;
 // Workspace imports
@@ -9,6 +9,7 @@ use self::records::{StorageProverJobQueue, StoredAggregatedProof, StoredProof};
 use crate::chain::operations::OperationsSchema;
 use crate::prover::records::StorageBlockWitness;
 use crate::{QueryResult, StorageProcessor};
+use chrono::{TimeZone, Utc};
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::prover::{ProverJob, ProverJobStatus, ProverJobType};
@@ -196,12 +197,42 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
-        transaction.commit().await?;
 
+        transaction
+            .prover_schema()
+            .set_block_metrics(&[block_number], "single_proof".to_string())
+            .await?;
+        transaction.commit().await?;
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_proof");
         Ok(())
     }
 
+    pub async fn set_block_metrics(
+        &mut self,
+        blocks: &[BlockNumber],
+        stage: String,
+    ) -> QueryResult<()> {
+        for block_number in blocks {
+            let block = self
+                .0
+                .chain()
+                .block_schema()
+                .get_storage_block(*block_number)
+                .await?
+                .expect("Must exist");
+
+            let time = Utc.timestamp(block.timestamp.unwrap_or_default(), 0);
+            let duration = Utc::now() - time;
+
+            let labels = vec![("stage", stage.clone())];
+            metrics::histogram!(
+                "process_block",
+                duration.to_std().expect("Must be positive"),
+                &labels
+            );
+        }
+        Ok(())
+    }
     /// Stores the aggregated proof for blocks.
     pub async fn store_aggregated_proof(
         &mut self,
@@ -237,6 +268,13 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
+        let blocks: Vec<BlockNumber> = (first_block.0..last_block.0)
+            .map(|e| BlockNumber(e))
+            .collect();
+        transaction
+            .prover_schema()
+            .set_block_metrics(&blocks, "aggregated_proof".to_string())
+            .await?;
         transaction.commit().await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_aggregated_proof");

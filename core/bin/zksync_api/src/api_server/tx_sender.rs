@@ -503,7 +503,8 @@ impl TxSender {
             ("name", tx.variance_name()),
             ("token", tx.token_id().to_string()),
         ];
-        metrics::increment_counter!("process_tx", &labels);
+        // The initial state of processing tx
+        metrics::histogram!("process_tx", 0.0, &labels);
 
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
@@ -663,7 +664,7 @@ impl TxSender {
                 ("name", tx.tx.variance_name()),
                 ("token", tx.tx.token_id().to_string()),
             ];
-            metrics::increment_counter!("process_tx", &labels);
+            metrics::histogram!("process_tx", 0.0, &labels);
         }
 
         // Same check but in terms of signatures.
@@ -1192,6 +1193,7 @@ async fn verify_tx_info_message_signature(
             tx: SignedZkSyncTx {
                 tx: tx.clone(),
                 eth_sign_data,
+                created_at: Utc::now(),
             },
             sender: tx_sender,
             token,
@@ -1278,6 +1280,7 @@ async fn verify_txs_batch_signature(
         txs.push(SignedZkSyncTx {
             tx: tx.tx,
             eth_sign_data,
+            created_at: Utc::now(),
         });
     }
 

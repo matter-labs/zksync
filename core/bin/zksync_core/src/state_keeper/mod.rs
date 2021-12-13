@@ -30,6 +30,7 @@ use crate::{
 };
 
 pub use self::{init_params::ZkSyncStateInitParams, types::StateKeeperRequest};
+use chrono::Utc;
 
 mod init_params;
 mod pending_block;
@@ -661,8 +662,18 @@ impl ZkSyncStateKeeper {
                 ("name", tx.variance_name()),
                 ("token", tx.token_id().to_string()),
             ];
-            metrics::increment_counter!("process_tx", &labels);
+            metrics::histogram!(
+                "process_tx",
+                tx.elapsed().expect("Should be more than zero"),
+                &labels
+            );
         }
+        metrics::histogram!(
+            "process_block",
+            block.elapsed().expect("Should be more than zero"),
+            "stage" => "seal"
+        );
+
         let block_commit_request = BlockCommitRequest {
             block,
             block_metadata,

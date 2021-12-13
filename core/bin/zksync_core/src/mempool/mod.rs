@@ -44,6 +44,7 @@ use zksync_types::{
 // Local uses
 use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
 use crate::{eth_watch::EthWatchRequest, wait_for_tasks};
+use chrono::Utc;
 
 mod mempool_transactions_queue;
 
@@ -362,7 +363,8 @@ impl MempoolBlocksHandler {
                 ("name", pr_op.data.variance_name()),
                 ("token", pr_op.data.token_id().to_string()),
             ];
-            metrics::increment_counter!("process_tx", &labels)
+
+            metrics::histogram!("process_tx", 0.0, &labels)
         }
 
         for tx_variant in &txs {
@@ -372,7 +374,11 @@ impl MempoolBlocksHandler {
                     ("name", tx.tx.variance_name()),
                     ("token", tx.tx.token_id().to_string()),
                 ];
-                metrics::increment_counter!("process_tx", &labels);
+                metrics::histogram!(
+                    "process_tx",
+                    tx.elapsed().expect("Should be positive"),
+                    &labels
+                );
             }
         }
         ProposedBlock { priority_ops, txs }
@@ -572,7 +578,11 @@ impl MempoolTransactionsHandler {
             ("name", tx.tx.variance_name()),
             ("token", tx.tx.token_id().to_string()),
         ];
-        metrics::increment_counter!("process_tx", &labels);
+        metrics::histogram!(
+            "process_tx",
+            tx.elapsed().expect("Should be positive"),
+            &labels
+        );
 
         self.mempool_state.write().await.add_tx(tx);
         Ok(())
@@ -612,7 +622,12 @@ impl MempoolTransactionsHandler {
                 ("name", tx.tx.variance_name()),
                 ("token", tx.tx.token_id().to_string()),
             ];
-            metrics::increment_counter!("process_tx", &labels);
+
+            metrics::histogram!(
+                "process_tx",
+                tx.elapsed().expect("Should be positive"),
+                &labels
+            );
         }
 
         let batch_id = storage

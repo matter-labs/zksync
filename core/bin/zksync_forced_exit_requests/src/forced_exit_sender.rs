@@ -99,6 +99,7 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
         SignedZkSyncTx {
             tx: ZkSyncTx::ForcedExit(Box::new(tx)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         }
     }
 

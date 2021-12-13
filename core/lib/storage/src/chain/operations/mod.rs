@@ -258,6 +258,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
         transaction.commit().await?;
         metrics::histogram!("sql.chain.operations.store_executed_tx", start.elapsed());
+        let tx_duration = (Utc::now() - operation.created_at)
+            .to_std()
+            .expect("Transaction time should be more then zero");
+        metrics::histogram!("transaction_process_time", tx_duration);
         Ok(())
     }
 
