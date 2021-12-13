@@ -2,7 +2,7 @@
 
 // Built-in deps
 // External uses
-use criterion::{black_box, criterion_group, Criterion, Throughput};
+use criterion::{black_box, criterion_group, BatchSize, Criterion, Throughput};
 use num::BigUint;
 use web3::types::H256;
 // Workspace uses
@@ -129,10 +129,10 @@ impl TxBenchSetup {
             }))
         };
 
-        // We signed transaction manually, so
-
-        if !with_cache {
-            tx.wipe_signer_cache();
+        // We signed transaction manually, so it doesn't have a signature cache by default.
+        // So unlike in other functions, we call `check_correctness` if needed to create such a cache.
+        if with_cache {
+            tx.check_correctness();
         }
 
         tx
@@ -253,11 +253,7 @@ impl TxBenchSetup {
 pub fn bench_txs(c: &mut Criterion) {
     const INPUT_SIZE: Throughput = Throughput::Elements(1);
 
-    let mut group = c.benchmark_group("zkSync operations");
-
-    // Setup the input size so the throughput will be reported.
-    group.throughput(INPUT_SIZE);
-
+    // Verify signature benches (cached / uncached).
     for with_cache in [false, true] {
         let cache = if with_cache {
             "(cached)"
@@ -265,37 +261,115 @@ pub fn bench_txs(c: &mut Criterion) {
             "(not cached)"
         };
 
-        group.bench_function(format!("Transfer::verify_signature {}", cache), |b| {
+        let group_name = format!("Verify signature {}", cache);
+        let mut group = c.benchmark_group(&group_name);
+        // Setup the input size so the throughput will be reported.
+        group.throughput(INPUT_SIZE);
+
+        group.bench_function("Transfer::verify_signature", |b| {
             let tx = TxBenchSetup::new().create_transfer(with_cache);
             b.iter(|| black_box(tx.verify_signature()));
         });
-        group.bench_function(format!("Withdraw::verify_signature {}", cache), |b| {
+        group.bench_function("Withdraw::verify_signature", |b| {
             let tx = TxBenchSetup::new().create_withdraw(with_cache);
             b.iter(|| black_box(tx.verify_signature()));
         });
-        group.bench_function(format!("ChangePubKey::verify_signature {}", cache), |b| {
+        group.bench_function("ChangePubKey::verify_signature", |b| {
             let tx = TxBenchSetup::new().create_change_pubkey(with_cache);
             b.iter(|| black_box(tx.verify_signature()));
         });
-        group.bench_function(format!("ForcedExit::verify_signature {}", cache), |b| {
+        group.bench_function("ForcedExit::verify_signature", |b| {
             let tx = TxBenchSetup::new().create_forced_exit(with_cache);
             b.iter(|| black_box(tx.verify_signature()));
         });
-        group.bench_function(format!("MintNFT::verify_signature {}", cache), |b| {
+        group.bench_function("MintNFT::verify_signature", |b| {
             let tx = TxBenchSetup::new().create_mint_nft(with_cache);
             b.iter(|| black_box(tx.verify_signature()));
         });
-        group.bench_function(format!("WithdrawNFT::verify_signature {}", cache), |b| {
+        group.bench_function("WithdrawNFT::verify_signature", |b| {
             let tx = TxBenchSetup::new().create_withdraw_nft(with_cache);
             b.iter(|| black_box(tx.verify_signature()));
         });
-        group.bench_function(format!("Swap::verify_signature {}", cache), |b| {
+        group.bench_function("Swap::verify_signature", |b| {
             let tx = TxBenchSetup::new().create_swap(with_cache);
             b.iter(|| black_box(tx.verify_signature()));
         });
+
+        group.finish();
     }
 
-    group.finish();
+    // Check correctness benches (cached / uncached).
+    for with_cache in [false, true] {
+        let cache = if with_cache {
+            "(cached)"
+        } else {
+            "(not cached)"
+        };
+
+        let group_name = format!("Check correctness {}", cache);
+        let mut group = c.benchmark_group(&group_name);
+        // Setup the input size so the throughput will be reported.
+        group.throughput(INPUT_SIZE);
+
+        group.bench_function("Transfer::check_correctness", |b| {
+            let tx = TxBenchSetup::new().create_transfer(with_cache);
+            b.iter_batched(
+                || tx.clone(),
+                |mut tx| black_box(tx.check_correctness()),
+                BatchSize::SmallInput,
+            );
+        });
+        group.bench_function("Withdraw::check_correctness", |b| {
+            let tx = TxBenchSetup::new().create_withdraw(with_cache);
+            b.iter_batched(
+                || tx.clone(),
+                |mut tx| black_box(tx.check_correctness()),
+                BatchSize::SmallInput,
+            );
+        });
+        group.bench_function("ChangePubKey::check_correctness", |b| {
+            let tx = TxBenchSetup::new().create_change_pubkey(with_cache);
+            b.iter_batched(
+                || tx.clone(),
+                |mut tx| black_box(tx.check_correctness()),
+                BatchSize::SmallInput,
+            );
+        });
+        group.bench_function("ForcedExit::check_correctness", |b| {
+            let tx = TxBenchSetup::new().create_forced_exit(with_cache);
+            b.iter_batched(
+                || tx.clone(),
+                |mut tx| black_box(tx.check_correctness()),
+                BatchSize::SmallInput,
+            );
+        });
+        group.bench_function("MintNFT::check_correctness", |b| {
+            let tx = TxBenchSetup::new().create_mint_nft(with_cache);
+            b.iter_batched(
+                || tx.clone(),
+                |mut tx| black_box(tx.check_correctness()),
+                BatchSize::SmallInput,
+            );
+        });
+        group.bench_function("WithdrawNFT::check_correctness", |b| {
+            let tx = TxBenchSetup::new().create_withdraw_nft(with_cache);
+            b.iter_batched(
+                || tx.clone(),
+                |mut tx| black_box(tx.check_correctness()),
+                BatchSize::SmallInput,
+            );
+        });
+        group.bench_function("Swap::check_correctness", |b| {
+            let tx = TxBenchSetup::new().create_swap(with_cache);
+            b.iter_batched(
+                || tx.clone(),
+                |mut tx| black_box(tx.check_correctness()),
+                BatchSize::SmallInput,
+            );
+        });
+
+        group.finish();
+    }
 }
 
 criterion_group!(txs_benches, bench_txs);
