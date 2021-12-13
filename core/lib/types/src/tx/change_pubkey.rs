@@ -469,4 +469,10 @@ impl ChangePubKey {
     pub fn get_fee_type(&self) -> TxFeeTypes {
         TxFeeTypes::ChangePubKey(self.get_change_pubkey_fee_type())
     }
+
+    /// Helper method to remove cache and test transaction behavior without the signature cache.
+    #[doc(hidden)]
+    pub fn wipe_signer_cache(&mut self) {
+        self.cached_signer = VerifiedSignatureCache::NotCached;
+    }
 }
