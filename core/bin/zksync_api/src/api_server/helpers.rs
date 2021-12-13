@@ -90,7 +90,7 @@ async fn get_pending_ops(
         "api",
         start.elapsed(),
         "type" => "rpc",
-        "endpoint" => "get_ongoing_deposits"
+        "exported_endpoint" => "get_ongoing_deposits"
     );
     Ok(OngoingDepositsResp { deposits })
 }

@@ -387,8 +387,21 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        self.submit_tx(tx, signature, extracted_request_metadata)
-            .await
+        let result = self
+            .submit_tx(tx, signature, extracted_request_metadata)
+            .await;
+
+        if let Err(err) = &result {
+            let err_label = match err {
+                SubmitError::IncorrectTx(err) => err.clone(),
+                SubmitError::TxAdd(err) => err.to_string(),
+                _ => err.to_string(),
+            };
+            let labels = vec![("stage", "api".to_string()), ("error", err_label)];
+            metrics::increment_counter!("rejected_txs", &labels);
+        }
+
+        result
     }
 
     pub async fn can_subsidize(

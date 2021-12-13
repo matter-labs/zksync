@@ -472,6 +472,13 @@ impl ZkSyncStateKeeper {
                 }
                 Err(e) => {
                     vlog::warn!("Failed to execute transaction: {:?}, {}", tx, e);
+
+                    let labels = vec![
+                        ("stage", "state".to_string()),
+                        ("error", e.reason.to_string()),
+                    ];
+                    metrics::increment_counter!("rejected_txs", &labels);
+
                     let failed_tx = ExecutedTx {
                         signed_tx: tx.clone(),
                         success: false,
@@ -572,6 +579,8 @@ impl ZkSyncStateKeeper {
                     created_at: chrono::Utc::now(),
                     batch_id: None,
                 };
+                let labels = vec![("stage", "state".to_string()), ("error", e.to_string())];
+                metrics::increment_counter!("rejected_txs", &labels);
                 self.pending_block.failed_txs.push(failed_tx.clone());
                 ExecutedOperations::Tx(Box::new(failed_tx))
             }
