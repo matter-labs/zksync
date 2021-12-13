@@ -8,6 +8,7 @@ use zksync_basic_types::Log;
 use crate::Address;
 
 #[derive(Debug, Error)]
+#[allow(clippy::large_enum_variant)]
 pub enum RegisterNFTFactoryEventParseError {
     #[error("Cannot parse log for Register Factory Event {0:?}")]
     ParseLogError(Log),

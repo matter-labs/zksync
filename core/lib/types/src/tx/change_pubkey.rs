@@ -394,7 +394,7 @@ impl ChangePubKey {
     /// - `account_id` field must be within supported range.
     /// - `fee_token` field must be within supported range.
     /// - `fee` field must represent a packable value.
-    pub fn check_correctness(&self) -> bool {
+    pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.is_eth_auth_data_valid()
             && self.account_id <= max_account_id()
             && self.fee_token <= max_processable_token()
@@ -404,11 +404,13 @@ impl ChangePubKey {
                 .map(|t| t.check_correctness())
                 .unwrap_or(true);
         if valid {
-            if let Some((pub_key_hash, _)) = self.verify_signature() {
-                valid = pub_key_hash == self.new_pk_hash;
+            let signer = self.verify_signature();
+            if let Some((pub_key_hash, _)) = &signer {
+                valid = *pub_key_hash == self.new_pk_hash;
             } else {
                 valid = false;
             }
+            self.cached_signer = VerifiedSignatureCache::Cached(signer);
         }
         valid
     }

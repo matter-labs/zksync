@@ -5629,6 +5629,7 @@ dependencies = [
  "ethabi",
  "futures 0.3.17",
  "hex",
+ "hyper 0.14.14",
  "itertools 0.9.0",
  "jsonrpc-core 18.0.0",
  "jsonrpc-core-client",

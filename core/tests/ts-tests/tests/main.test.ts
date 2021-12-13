@@ -11,3 +11,4 @@ import './suits/full-exit';
 import './suits/create2';
 import './suits/no2fa';
 import './suits/token-listing';
+import './suits/subsidy';
