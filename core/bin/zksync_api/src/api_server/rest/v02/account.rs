@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 // External uses
 use actix_web::{web, Scope};
+use chrono::Utc;
 
 // Workspace uses
 use zksync_api_types::v02::{

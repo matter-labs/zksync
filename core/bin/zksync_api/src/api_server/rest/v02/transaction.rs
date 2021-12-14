@@ -239,6 +239,7 @@ mod tests {
         core_api_client::CoreApiClient,
     };
     use actix_web::App;
+    use chrono::Utc;
     use std::str::FromStr;
     use zksync_api_types::v02::{
         transaction::{L2Receipt, TxHashSerializeWrapper},
@@ -368,6 +369,7 @@ mod tests {
                 .map(|tx| SignedZkSyncTx {
                     tx: tx.tx,
                     eth_sign_data: None,
+                    created_at: Utc::now(),
                 })
                 .collect();
             storage
@@ -422,6 +424,7 @@ mod tests {
                 .insert_tx(&SignedZkSyncTx {
                     tx,
                     eth_sign_data: None,
+                    created_at: Utc::now(),
                 })
                 .await?;
 

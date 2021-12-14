@@ -1,5 +1,6 @@
 use super::{CommitRequest, ZkSyncStateInitParams, ZkSyncStateKeeper};
 use crate::{mempool::ProposedBlock, state_keeper::utils::system_time_timestamp};
+use chrono::Utc;
 use futures::{channel::mpsc, stream::StreamExt};
 use num::BigUint;
 use zksync_crypto::{
@@ -106,6 +107,7 @@ fn create_account_and_transfer<B: Into<BigUint>>(
     SignedZkSyncTx {
         tx: ZkSyncTx::Transfer(Box::new(transfer)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     }
 }
 
@@ -178,6 +180,7 @@ fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
     SignedZkSyncTx {
         tx: ZkSyncTx::Withdraw(Box::new(withdraw)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     }
 }
 
@@ -1113,14 +1116,17 @@ mod execute_proposed_block {
         let correct_transfer = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(correct_transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let premature_transfer = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(premature_transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let belated_transfer = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(belated_transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let proposed_block = ProposedBlock {
             txs: vec![
@@ -1407,6 +1413,7 @@ async fn correctly_restore_pending_block_timestamp() {
         SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         }
     };
     assert!(tester.state_keeper.apply_tx(&good_transfer).is_included());

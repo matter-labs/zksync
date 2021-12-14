@@ -1,5 +1,5 @@
 // Built-in deps
-use std::time::{Duration, Instant};
+use std::time::Instant;
 // External imports
 use anyhow::format_err;
 // Workspace imports
@@ -218,18 +218,20 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                 .chain()
                 .block_schema()
                 .get_storage_block(*block_number)
-                .await?
-                .expect("Must exist");
+                .await?;
+            if let Some(block) = block {
+                let time = Utc.timestamp(block.timestamp.unwrap_or_default(), 0);
+                let duration = Utc::now() - time;
 
-            let time = Utc.timestamp(block.timestamp.unwrap_or_default(), 0);
-            let duration = Utc::now() - time;
-
-            let labels = vec![("stage", stage.clone())];
-            metrics::histogram!(
-                "process_block",
-                duration.to_std().expect("Must be positive"),
-                &labels
-            );
+                let labels = vec![("stage", stage.clone())];
+                metrics::histogram!(
+                    "process_block",
+                    duration.to_std().expect("Must be positive"),
+                    &labels
+                );
+            } else {
+                vlog::error!("Block for proof doesn't exist")
+            }
         }
         Ok(())
     }

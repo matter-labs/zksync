@@ -525,6 +525,7 @@ impl ZkSyncState {
 mod tests {
     use super::*;
     use crate::tests::{AccountState::*, PlasmaTestBuilder};
+    use vlog::sentry::types::Utc;
     use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
     use zksync_types::{
         tx::{Transfer, Withdraw},
@@ -567,10 +568,12 @@ mod tests {
         let signed_zk_sync_tx1 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw1)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let signed_zk_sync_tx2 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         tb.test_txs_batch_fail(
             &[signed_zk_sync_tx1, signed_zk_sync_tx2],
@@ -621,10 +624,12 @@ mod tests {
         let signed_zk_sync_tx1 = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(transfer_1)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let signed_zk_sync_tx2 = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(transfer_2)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         tb.test_txs_batch_fail(
             &[signed_zk_sync_tx1, signed_zk_sync_tx2],
@@ -668,10 +673,12 @@ mod tests {
         let signed_zk_sync_tx1 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw1)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let signed_zk_sync_tx2 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let expected_updates = vec![
             (
