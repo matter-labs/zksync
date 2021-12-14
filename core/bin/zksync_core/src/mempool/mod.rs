@@ -44,7 +44,6 @@ use zksync_types::{
 // Local uses
 use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
 use crate::{eth_watch::EthWatchRequest, wait_for_tasks};
-use chrono::Utc;
 
 mod mempool_transactions_queue;
 

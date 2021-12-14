@@ -159,7 +159,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 VALUES ($1, $2, $3, $4)",
                 tx_hash,
                 tx,
-                chrono::Utc::now(),
+                first_tx_data.created_at,
                 eth_sign_data,
             )
             .execute(transaction.conn())
@@ -193,7 +193,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 VALUES ($1, $2, $3, $4, $5)",
                 tx_hash,
                 tx,
-                chrono::Utc::now(),
+                tx_data.created_at,
                 eth_sign_data,
                 batch_id
             )

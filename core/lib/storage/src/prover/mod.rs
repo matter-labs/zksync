@@ -221,14 +221,11 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                 .await?;
             if let Some(block) = block {
                 let time = Utc.timestamp(block.timestamp.unwrap_or_default(), 0);
-                let duration = Utc::now() - time;
-
-                let labels = vec![("stage", stage.clone())];
-                metrics::histogram!(
-                    "process_block",
-                    duration.to_std().expect("Must be positive"),
-                    &labels
-                );
+                // It's almost impossible situation, but it could be triggered in tests
+                if let Ok(duration) = (Utc::now() - time).to_std() {
+                    let labels = vec![("stage", stage.clone())];
+                    metrics::histogram!("process_block", duration, &labels);
+                }
             } else {
                 vlog::error!("Block for proof doesn't exist")
             }

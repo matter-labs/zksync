@@ -30,7 +30,6 @@ use crate::{
 };
 
 pub use self::{init_params::ZkSyncStateInitParams, types::StateKeeperRequest};
-use chrono::Utc;
 
 mod init_params;
 mod pending_block;
