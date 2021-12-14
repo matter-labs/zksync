@@ -331,7 +331,7 @@ impl ZkSyncState {
     pub fn execute_tx(&mut self, tx: ZkSyncTx, block_timestamp: u64) -> Result<OpSuccess, OpError> {
         tx.check_timestamp(block_timestamp)?;
 
-        let result = match tx {
+        match tx {
             ZkSyncTx::Transfer(tx) => Ok(self.apply_tx(*tx)?),
             ZkSyncTx::Withdraw(tx) => Ok(self.apply_tx(*tx)?),
             ZkSyncTx::Close(tx) => Ok(self.apply_tx(*tx)?),
@@ -340,9 +340,7 @@ impl ZkSyncState {
             ZkSyncTx::Swap(tx) => Ok(self.apply_tx(*tx)?),
             ZkSyncTx::MintNFT(tx) => Ok(self.apply_tx(*tx)?),
             ZkSyncTx::WithdrawNFT(tx) => Ok(self.apply_tx(*tx)?),
-        };
-
-        result
+        }
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {

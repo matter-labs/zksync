@@ -507,7 +507,7 @@ impl TxSender {
             ("token", tx.token_id().to_string()),
         ];
         // The initial state of processing tx
-        metrics::histogram!("process_tx", 0.0, &labels);
+        metrics::increment_counter!("process_tx_count", &labels);
 
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
@@ -667,7 +667,7 @@ impl TxSender {
                 ("name", tx.tx.variance_name()),
                 ("token", tx.tx.token_id().to_string()),
             ];
-            metrics::histogram!("process_tx", 0.0, &labels);
+            metrics::increment_counter!("process_tx_count", &labels);
         }
 
         // Same check but in terms of signatures.

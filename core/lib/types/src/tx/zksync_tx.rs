@@ -3,7 +3,6 @@ use num::BigUint;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use thiserror::Error;
 use zksync_basic_types::{AccountId, Address};
 
 use crate::{
@@ -13,14 +12,10 @@ use crate::{
         Transfer, TxEthSignature, TxHash, TxSignature, Withdraw, WithdrawNFT,
     },
     utils::deserialize_eth_message,
-    CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
-    WithdrawNFTOp, WithdrawOp,
+    CloseOp, ForcedExitOp, Nonce, SwapOp, TimeOutOfRange, Token, TokenId, TokenLike, TransferOp,
+    TxFeeTypes, WithdrawNFTOp, WithdrawOp,
 };
 use zksync_crypto::params::ETH_TOKEN_ID;
-
-#[derive(Error, Debug)]
-#[error("Time out of range")]
-pub struct TimeOutOfRange;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {

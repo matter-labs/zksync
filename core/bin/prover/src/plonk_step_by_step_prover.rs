@@ -11,6 +11,7 @@ use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_utils::parse_env;
 // Local deps
 use crate::{ProverConfig, ProverImpl};
+use tokio::time::Instant;
 use zksync_crypto::franklin_crypto::circuit::test::TestConstraintSystem;
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
 
@@ -57,6 +58,7 @@ impl PlonkStepByStepProver {
         witness: zksync_circuit::circuit::ZkSyncCircuit<'_, Engine>,
         block_size: usize,
     ) -> anyhow::Result<SingleProof> {
+        let start = Instant::now();
         // we do this way here so old precomp is dropped
         let mut cs = TestConstraintSystem::<Engine>::new();
         witness.clone().synthesize(&mut cs).unwrap();
@@ -66,6 +68,7 @@ impl PlonkStepByStepProver {
             println!("number of constraints {}", cs.num_constraints());
             println!("Unsatisfied {:?}", err);
         }
+        metrics::histogram!("prover", start.elapsed(), "stage" => "test_constraint_system", "type" => "single_proof");
         let valid_cached_precomp = {
             self.prepared_computations
                 .lock()
@@ -73,6 +76,7 @@ impl PlonkStepByStepProver {
                 .take()
                 .filter(|p| p.block_size == block_size)
         };
+
         let precomp = if let Some(precomp) = valid_cached_precomp {
             precomp
         } else {
@@ -97,6 +101,7 @@ impl PlonkStepByStepProver {
         &self,
         proofs: Vec<(SingleProof, usize)>,
     ) -> anyhow::Result<AggregatedProof> {
+        let start = Instant::now();
         // drop setup cache
         {
             self.prepared_computations.lock().unwrap().take();
@@ -133,6 +138,7 @@ impl PlonkStepByStepProver {
             .collect();
 
         let (vks, proof_data) = prepare_proof_data(&self.config.all_block_sizes, padded_proofs);
+        metrics::histogram!("prover", start.elapsed(), "stage" => "prepare_proof", "type" => "aggregated_proof");
         gen_aggregate_proof(
             vks,
             proof_data,
@@ -160,7 +166,9 @@ impl ProverImpl for PlonkStepByStepProver {
                 JobResultData::AggregatedBlockProof(aggregate_proof)
             }
             JobRequestData::BlockProof(zksync_circuit, block_size) => {
+                let start = Instant::now();
                 let zksync_circuit = zksync_circuit.into_circuit();
+                metrics::histogram!("prover", start.elapsed(), "stage" => "prepare_proof", "type" => "single_proof");
                 let proof = self
                     .create_single_block_proof(zksync_circuit, block_size)
                     .map_err(|e| {

@@ -267,9 +267,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
-        let blocks: Vec<BlockNumber> = (first_block.0..last_block.0)
-            .map(|e| BlockNumber(e))
-            .collect();
+        let blocks: Vec<BlockNumber> = (first_block.0..last_block.0).map(BlockNumber).collect();
         transaction
             .prover_schema()
             .set_block_metrics(&blocks, "aggregated_proof".to_string())

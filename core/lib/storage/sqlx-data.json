@@ -6554,6 +6554,26 @@
       "nullable": []
     }
   },
+  "e188272dd4fd0e228f4fcd7182eff49db1316e061b6d9940da543981f8a179d6": {
+    "query": "SELECT created_at FROM eth_operations WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
   "e19061f374f28705d805f4f7eb05fe05f4adafeb80a9ac37a91cc6557f2b470a": {
     "query": "\n                    SELECT serial_id FROM mint_nft_updates\n                    WHERE creator_address = $1\n                    ORDER BY serial_id\n                ",
     "describe": {

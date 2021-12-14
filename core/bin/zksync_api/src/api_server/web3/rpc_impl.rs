@@ -30,7 +30,7 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "block_number");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "block_number");
         Ok(U64::from(block_number.0))
     }
 
@@ -55,7 +55,7 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
         let result = u256_from_biguint(balance);
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "get_balance");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "get_balance");
         Ok(result)
     }
 
@@ -87,7 +87,7 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "get_block_transaction_count_by_hash");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "get_block_transaction_count_by_hash");
         Ok(result)
     }
 
@@ -114,7 +114,7 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "get_block_transaction_count_by_number");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "get_block_transaction_count_by_number");
         Ok(result)
     }
 
@@ -130,7 +130,7 @@ impl Web3RpcApp {
             .map_err(|_| Error::internal_error())?;
         let result = tx.map(|tx| transaction_from_tx_data(tx.into()));
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "get_transaction_by_hash");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "get_transaction_by_hash");
         Ok(result)
     }
 
@@ -158,7 +158,7 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "get_block_by_number");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "get_block_by_number");
         Ok(result)
     }
 
@@ -191,7 +191,7 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "get_block_by_hash");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "get_block_by_hash");
         Ok(result)
     }
 
@@ -214,7 +214,7 @@ impl Web3RpcApp {
             None
         };
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "get_transaction_receipt");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "get_transaction_receipt");
         Ok(result)
     }
 
@@ -296,7 +296,7 @@ impl Web3RpcApp {
             .await
             .map_err(|_| Error::internal_error())?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "get_logs");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "get_logs");
         Ok(result)
     }
 
@@ -309,7 +309,7 @@ impl Web3RpcApp {
             .execute(&mut storage, req.to, req.data.unwrap_or_default().0)
             .await;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "web3", "exported_endpoint" => "call");
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "call");
         result.map(Bytes)
     }
 

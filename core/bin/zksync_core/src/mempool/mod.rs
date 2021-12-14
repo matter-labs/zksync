@@ -363,7 +363,7 @@ impl MempoolBlocksHandler {
                 ("token", pr_op.data.token_id().to_string()),
             ];
 
-            metrics::histogram!("process_tx", 0.0, &labels)
+            metrics::increment_counter!("process_tx_count", &labels)
         }
 
         for tx_variant in &txs {

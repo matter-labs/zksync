@@ -1,6 +1,7 @@
 use crate::fs_utils::get_recursive_verification_key_path;
 use crate::{get_universal_setup_monomial_form, PlonkVerificationKey};
 use std::fs::File;
+use std::time::Instant;
 use zksync_crypto::bellman::pairing::{CurveAffine, Engine as EngineTrait};
 use zksync_crypto::bellman::plonk::better_better_cs::{
     setup::VerificationKey as VkAggregate, verifier::verify,
@@ -15,6 +16,7 @@ use zksync_crypto::recursive_aggregation_circuit::circuit::{
     proof_recursive_aggregate_for_zksync,
 };
 use zksync_crypto::Engine;
+
 #[derive(Clone)]
 pub struct SingleProofData {
     pub proof: SingleProof,
@@ -83,6 +85,7 @@ pub fn gen_aggregate_proof(
             .ok_or_else(|| anyhow::anyhow!("Recursive proof size not found"))?;
         get_universal_setup_monomial_form(setup_power, download_setup_network)?
     };
+    let start = Instant::now();
     let mut g2_bases = [<<Engine as EngineTrait>::G2Affine as CurveAffine>::zero(); 2];
     g2_bases.copy_from_slice(&universal_setup.g2_monomial_bases.as_ref()[..]);
     let (proofs, vk_indexes) = proofs.into_iter().fold(
@@ -130,13 +133,16 @@ pub fn gen_aggregate_proof(
     )
     .expect("must create aggregate");
     // save_to_cache_universal_setup_monomial_form(setup_power, universal_setup);
+    metrics::histogram!("prover", start.elapsed(), "stage" => "create_proof", "type" => "aggregated_proof");
 
+    let start = Instant::now();
     let is_valid = verify::<_, _, RollingKeccakTranscript<<Engine as ScalarEngine>::Fr>>(
         &vk_for_recursive_circuit,
         &rec_aggr_proof,
         None,
     )
     .expect("must perform verification");
+    metrics::histogram!("prover", start.elapsed(), "stage" => "verify_proof", "type" => "aggregated_proof");
     if !is_valid {
         return Err(anyhow::anyhow!("Recursive proof is invalid"));
     };

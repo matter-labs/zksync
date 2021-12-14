@@ -30,14 +30,14 @@ impl ApiV01 {
     pub async fn testnet_config(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let contract_address = self_.contract_address.clone();
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "testnet_config");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "testnet_config");
         ok_json!(TestnetConfigResponse { contract_address })
     }
 
     pub async fn status(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let result = ok_json!(self_.network_status.read().await);
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "status");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "status");
         result
     }
 
@@ -53,7 +53,7 @@ impl ApiV01 {
         let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
         vec_tokens.sort_by_key(|t| t.id);
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "tokens");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tokens");
         ok_json!(vec_tokens)
     }
 
@@ -85,7 +85,7 @@ impl ApiV01 {
 
         tokens.sort_by_key(|t| t.id);
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "tokens_acceptable_for_fees");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tokens_acceptable_for_fees");
         ok_json!(tokens)
     }
 
@@ -182,7 +182,7 @@ impl ApiV01 {
         // goes from oldest tx to the newest tx.
         transactions_history.append(&mut ongoing_transactions_history);
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "tx_history");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tx_history");
         ok_json!(transactions_history)
     }
 
@@ -223,7 +223,7 @@ impl ApiV01 {
 
         transaction.commit().await.map_err(Self::db_error)?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "tx_history_older_than");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tx_history_older_than");
         ok_json!(transactions_history)
     }
 
@@ -317,7 +317,7 @@ impl ApiV01 {
             transactions_history.append(&mut txs);
         }
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "tx_history_newer_than");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tx_history_newer_than");
         ok_json!(transactions_history)
     }
 
@@ -334,7 +334,7 @@ impl ApiV01 {
 
         let tx_receipt = self_.get_tx_receipt(transaction_hash).await?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "executed_tx_by_hash");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "executed_tx_by_hash");
         ok_json!(tx_receipt)
     }
 
@@ -397,7 +397,7 @@ impl ApiV01 {
             res = deposit_op_to_tx_by_hash(&tokens, &priority_op);
         }
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "tx_by_hash");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tx_by_hash");
         ok_json!(res)
     }
 
@@ -407,7 +407,7 @@ impl ApiV01 {
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let receipt = self_.get_priority_op_receipt(*pq_id).await?;
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "priority_op");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "priority_op");
         ok_json!(receipt)
     }
 
@@ -425,7 +425,7 @@ impl ApiV01 {
             Ok(HttpResponse::NotFound().finish())
         };
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "block_tx");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "block_tx");
         result
     }
 
@@ -457,7 +457,7 @@ impl ApiV01 {
                 InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "blocks");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "blocks");
         ok_json!(resp)
     }
 
@@ -472,7 +472,7 @@ impl ApiV01 {
         } else {
             Ok(HttpResponse::NotFound().finish())
         };
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "block_by_id");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "block_by_id");
         result
     }
 
@@ -493,7 +493,7 @@ impl ApiV01 {
                 InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "block_transactions");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "block_transactions");
         ok_json!(txs)
     }
 
@@ -510,7 +510,7 @@ impl ApiV01 {
             Ok(HttpResponse::NotFound().finish())
         };
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "explorer_search");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "explorer_search");
         result
     }
 
@@ -541,7 +541,7 @@ impl ApiV01 {
             fast: fast.timestamp() as u64,
         };
 
-        metrics::histogram!("api", start.elapsed(), "type" => "v01", "exported_endpoint" => "withdrawal_processing_time");
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "withdrawal_processing_time");
         ok_json!(processing_time)
     }
 }

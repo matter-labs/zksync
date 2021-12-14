@@ -93,7 +93,12 @@ pub use zksync_crypto::{
 };
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use zksync_crypto::proof::SingleProof;
+
+#[derive(Error, Debug)]
+#[error("Time out of range")]
+pub struct TimeOutOfRange;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]

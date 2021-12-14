@@ -1,7 +1,7 @@
 //! zkSync network block definition.
 
 use super::{AccountId, BlockNumber, Fr, PriorityOp, ZkSyncOp};
-use crate::{tx::error::CloseOperationsDisabled, SignedZkSyncTx, TokenId};
+use crate::{tx::error::CloseOperationsDisabled, SignedZkSyncTx, TimeOutOfRange, TokenId};
 use chrono::Utc;
 use chrono::{DateTime, TimeZone};
 use parity_crypto::digest::sha256;
@@ -155,12 +155,14 @@ impl ExecutedOperations {
         }
     }
 
-    pub fn elapsed(&self) -> Result<Duration, ()> {
+    pub fn elapsed(&self) -> Result<Duration, TimeOutOfRange> {
         let created_at = match self {
             ExecutedOperations::Tx(tx) => tx.created_at,
             ExecutedOperations::PriorityOp(op) => op.created_at,
         };
-        (Utc::now() - created_at).to_std().map_err(|_| ())
+        (Utc::now() - created_at)
+            .to_std()
+            .map_err(|_| TimeOutOfRange)
     }
 }
 
@@ -484,8 +486,11 @@ impl Block {
     pub fn timestamp_utc(&self) -> DateTime<Utc> {
         Utc.timestamp(self.timestamp as i64, 0)
     }
-    pub fn elapsed(&self) -> Result<Duration, ()> {
-        (Utc::now() - self.timestamp_utc()).to_std().map_err(|_| ())
+
+    pub fn elapsed(&self) -> Result<Duration, TimeOutOfRange> {
+        (Utc::now() - self.timestamp_utc())
+            .to_std()
+            .map_err(|_| TimeOutOfRange)
     }
 }
 
