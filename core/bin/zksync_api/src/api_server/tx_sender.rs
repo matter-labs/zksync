@@ -452,7 +452,6 @@ impl TxSender {
 
         let full_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee;
         let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
-
         if full_cost_usd < subsidized_cost_usd {
             return Err(anyhow::Error::msg(
                 "Trying to subsidize transaction which should not be subsidized",
@@ -468,6 +467,10 @@ impl TxSender {
             subsidy_type: self.current_subsidy_type.clone(),
             tx_hash: hash,
         };
+        metrics::counter!(
+            "tx_sender.store_subsidy_data.total_subsidy",
+            subsidy.usd_amount_scaled
+        );
 
         self.pool
             .access_storage()
