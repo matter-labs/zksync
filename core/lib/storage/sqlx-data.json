@@ -983,11 +983,16 @@
         },
         {
           "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
           "name": "agg_op_id?",
           "type_info": "Int8"
         },
         {
-          "ordinal": 9,
+          "ordinal": 10,
           "name": "arguments?",
           "type_info": "Jsonb"
         }
@@ -1004,6 +1009,7 @@
         true,
         false,
         false,
+        true,
         false,
         false
       ]
@@ -1454,6 +1460,11 @@
           "ordinal": 7,
           "name": "last_used_gas_price",
           "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -1469,7 +1480,8 @@
         false,
         true,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -5313,6 +5325,11 @@
           "ordinal": 7,
           "name": "last_used_gas_price",
           "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -5329,7 +5346,8 @@
         false,
         true,
         false,
-        false
+        false,
+        true
       ]
     }
   },
