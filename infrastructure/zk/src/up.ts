@@ -4,7 +4,7 @@ import * as utils from './utils';
 export async function up() {
     //    await utils.spawn('docker-compose up -d postgres rskj dev-ticker dev-liquidity-token-watcher');
 
-    await utils.spawn('docker-compose up -d postgres dev-ticker dev-liquidity-token-watcher');
+    await utils.spawn('docker-compose up -d postgres rskj dev-ticker dev-liquidity-token-watcher');
     await utils.spawn('docker-compose up -d tesseracts');
 }
 

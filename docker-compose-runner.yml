@@ -5,8 +5,8 @@ services:
     environment:
         - POSTGRES_HOST_AUTH_METHOD=trust
 
-  #rskj:
-    #image: rskj:latest
+  rskj:
+    image: "optimalbrew/iris:raul1"
 
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"

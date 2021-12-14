@@ -33,6 +33,7 @@ export async function init() {
 }
 
 async function createVolumes() {
+    await utils.exec('mkdir -p $ZKSYNC_HOME/volumes/rskj');
     await utils.exec('mkdir -p $ZKSYNC_HOME/volumes/postgres');
     await utils.exec('mkdir -p $ZKSYNC_HOME/volumes/tesseracts');
 }
