@@ -6038,6 +6038,7 @@ dependencies = [
  "zksync_circuit",
  "zksync_config",
  "zksync_crypto",
+ "zksync_prometheus_exporter",
  "zksync_prover_utils",
  "zksync_state",
  "zksync_types",

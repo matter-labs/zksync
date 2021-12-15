@@ -7,6 +7,8 @@ use zksync_config::configs::ProverConfig as EnvProverConfig;
 use zksync_utils::{get_env, parse_env};
 // Local deps
 use crate::{client, prover_work_cycle, ProverConfig, ProverImpl, ShutdownRequest};
+use zksync_config::configs::api::PrometheusConfig;
+use zksync_prometheus_exporter::run_prometheus_exporter;
 
 fn api_client_from_env() -> client::ApiClient {
     let server_api_url = parse_env("API_PROVER_URL");
@@ -27,7 +29,7 @@ struct Opt {
     worker_name: String,
 }
 
-pub async fn main_for_prover_impl<PROVER>()
+pub async fn main_for_prover_impl<PROVER>(run_prometheus: bool)
 where
     PROVER: ProverImpl + Send + Sync + 'static,
 {
@@ -64,6 +66,11 @@ where
             shutdown_request.set();
         })
         .expect("Failed to register ctrlc handler");
+    }
+
+    if run_prometheus {
+        let prom_config = PrometheusConfig::from_env();
+        run_prometheus_exporter(prom_config.port);
     }
 
     prover_work_cycle(
