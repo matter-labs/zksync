@@ -159,7 +159,7 @@ async fn submit_tx(
         let err_label = match err {
             SubmitError::IncorrectTx(err) => err.clone(),
             SubmitError::TxAdd(err) => err.to_string(),
-            _ => err.to_string(),
+            _ => "other".to_string(),
         };
         let labels = vec![("stage", "api".to_string()), ("error", err_label)];
         metrics::increment_counter!("rejected_txs", &labels);
@@ -182,7 +182,7 @@ async fn submit_batch(
         let err_label = match err {
             SubmitError::IncorrectTx(err) => err.clone(),
             SubmitError::TxAdd(err) => err.to_string(),
-            _ => err.to_string(),
+            _ => "other".to_string(),
         };
         let labels = vec![("stage", "api".to_string()), ("error", err_label)];
         metrics::increment_counter!("rejected_txs", &labels);

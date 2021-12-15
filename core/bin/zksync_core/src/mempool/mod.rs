@@ -373,11 +373,7 @@ impl MempoolBlocksHandler {
                     ("name", tx.tx.variance_name()),
                     ("token", tx.tx.token_id().to_string()),
                 ];
-                metrics::histogram!(
-                    "process_tx",
-                    tx.elapsed().expect("Should be positive"),
-                    &labels
-                );
+                metrics::histogram!("process_tx", tx.elapsed(), &labels);
             }
         }
         ProposedBlock { priority_ops, txs }
@@ -577,11 +573,7 @@ impl MempoolTransactionsHandler {
             ("name", tx.tx.variance_name()),
             ("token", tx.tx.token_id().to_string()),
         ];
-        metrics::histogram!(
-            "process_tx",
-            tx.elapsed().expect("Should be positive"),
-            &labels
-        );
+        metrics::histogram!("process_tx", tx.elapsed(), &labels);
 
         self.mempool_state.write().await.add_tx(tx);
         Ok(())
@@ -622,11 +614,7 @@ impl MempoolTransactionsHandler {
                 ("token", tx.tx.token_id().to_string()),
             ];
 
-            metrics::histogram!(
-                "process_tx",
-                tx.elapsed().expect("Should be positive"),
-                &labels
-            );
+            metrics::histogram!("process_tx", tx.elapsed(), &labels);
         }
 
         let batch_id = storage

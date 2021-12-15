@@ -1,4 +1,4 @@
-// External impoSSELECT * FROM prover_job_queueELECT * FROM prover_job_queuerts
+// External imports
 use anyhow::format_err;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;

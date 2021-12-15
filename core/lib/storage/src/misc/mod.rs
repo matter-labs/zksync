@@ -6,6 +6,7 @@ use sqlx::types::BigDecimal;
 
 use self::records::Subsidy;
 use crate::{QueryResult, StorageProcessor};
+use num::ToPrimitive;
 
 pub mod records;
 
@@ -56,6 +57,9 @@ impl<'a, 'c> MiscSchema<'a, 'c> {
         .await?
         .total
         .unwrap_or_else(|| BigDecimal::from(0));
+
+        // It's better move this param to actor and check it periodically
+        metrics::gauge!("tx_sender.store_subsidy_data.total_subsidy", sum.to_f64().unwrap_or_default(), "type" => subsidy_type.to_string());
 
         metrics::histogram!("sql.token.get_total_used_subsidy_for_type", start.elapsed());
         Ok(sum)

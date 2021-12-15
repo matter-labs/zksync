@@ -570,9 +570,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             .await?;
         if let Some(time) = created_at_time {
             // It's almost impossible situation, but it could be triggered in tests
-            if let Ok(duration) = (Utc::now() - time).to_std() {
-                metrics::histogram!("eth_operation_confirmation", duration);
-            }
+            let duration = (Utc::now() - time).to_std().unwrap_or_default();
+            metrics::histogram!("eth_operation_confirmation", duration);
         }
 
         transaction.commit().await?;
@@ -655,17 +654,23 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn get_eth_operation_creation_time(
+    async fn get_eth_operation_creation_time(
         &mut self,
         op_id: i64,
     ) -> QueryResult<Option<DateTime<Utc>>> {
-        Ok(sqlx::query!(
+        let start = Instant::now();
+        let created_at = sqlx::query!(
             "SELECT created_at FROM eth_operations WHERE id = $1",
             op_id as i64
         )
         .fetch_one(self.0.conn())
         .await?
-        .created_at)
+        .created_at;
+        metrics::histogram!(
+            "sql.ethereum.get_eth_operation_creation_time",
+            start.elapsed()
+        );
+        Ok(created_at)
     }
 
     pub async fn aggregated_op_final_hash(

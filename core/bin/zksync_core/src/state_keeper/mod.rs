@@ -661,15 +661,11 @@ impl ZkSyncStateKeeper {
                 ("name", tx.variance_name()),
                 ("token", tx.token_id().to_string()),
             ];
-            metrics::histogram!(
-                "process_tx",
-                tx.elapsed().expect("Should be more than zero"),
-                &labels
-            );
+            metrics::histogram!("process_tx", tx.elapsed(), &labels);
         }
         metrics::histogram!(
             "process_block",
-            block.elapsed().expect("Should be more than zero"),
+            block.elapsed(),
             "stage" => "seal"
         );
 

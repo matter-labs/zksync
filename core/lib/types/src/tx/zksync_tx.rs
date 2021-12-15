@@ -12,8 +12,8 @@ use crate::{
         Transfer, TxEthSignature, TxHash, TxSignature, Withdraw, WithdrawNFT,
     },
     utils::deserialize_eth_message,
-    CloseOp, ForcedExitOp, Nonce, SwapOp, TimeOutOfRange, Token, TokenId, TokenLike, TransferOp,
-    TxFeeTypes, WithdrawNFTOp, WithdrawOp,
+    CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
+    WithdrawNFTOp, WithdrawOp,
 };
 use zksync_crypto::params::ETH_TOKEN_ID;
 
@@ -37,10 +37,8 @@ pub struct SignedZkSyncTx {
 }
 
 impl SignedZkSyncTx {
-    pub fn elapsed(&self) -> Result<Duration, TimeOutOfRange> {
-        (Utc::now() - self.created_at)
-            .to_std()
-            .map_err(|_| TimeOutOfRange)
+    pub fn elapsed(&self) -> Duration {
+        (Utc::now() - self.created_at).to_std().unwrap_or_default()
     }
 }
 

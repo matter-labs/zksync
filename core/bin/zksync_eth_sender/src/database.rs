@@ -354,18 +354,10 @@ impl Database {
                     ("token", tx.token_id().to_string()),
                 ];
 
-                metrics::histogram!(
-                    "process_tx",
-                    tx.elapsed().expect("Should be positive"),
-                    &labels
-                );
+                metrics::histogram!("process_tx", tx.elapsed(), &labels);
             }
             let labels = vec![("stage", stage.clone())];
-            metrics::histogram!(
-                "process_block",
-                block.elapsed().expect("Should be positive"),
-                &labels
-            )
+            metrics::histogram!("process_block", block.elapsed(), &labels)
         }
     }
 }
