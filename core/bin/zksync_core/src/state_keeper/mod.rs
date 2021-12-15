@@ -32,6 +32,7 @@ use crate::{
 pub use self::{init_params::ZkSyncStateInitParams, types::StateKeeperRequest};
 
 mod init_params;
+mod metadata_calculator;
 mod pending_block;
 mod state_restore;
 mod types;
