@@ -3,6 +3,7 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fs::File;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
 use zksync_crypto::bellman::plonk::better_cs::{
     adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::SetupPolynomials,
@@ -75,6 +76,8 @@ impl SetupForStepByStepProver {
         circuit: C,
         download_setup_file: bool,
     ) -> Result<Self, anyhow::Error> {
+        let start = Instant::now();
+
         let hints = transpile(circuit.clone())?;
         let setup_polynomials = setup(circuit, &hints)?;
         let size = setup_polynomials.n.next_power_of_two().trailing_zeros();
@@ -83,6 +86,7 @@ impl SetupForStepByStepProver {
             setup_power_of_two,
             download_setup_file,
         )?);
+        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup");
         Ok(SetupForStepByStepProver {
             setup_polynomials,
             hints,
@@ -96,6 +100,7 @@ impl SetupForStepByStepProver {
         circuit: C,
         vk: &PlonkVerificationKey,
     ) -> Result<SingleProof, anyhow::Error> {
+        let start = Instant::now();
         let rns_params =
             RnsParameters::<Engine, <Engine as EngineTrait>::Fq>::new_for_field(68, 110, 4);
         let rescue_params = Bn256RescueParams::new_checked_2_into_1();
@@ -111,9 +116,12 @@ impl SetupForStepByStepProver {
                 .expect("Setup should have universal setup struct"),
             Some(transcript_params),
         )?;
+        metrics::histogram!("prover", start.elapsed(), "stage" => "create_proof", "type" => "single_proof");
 
+        let start = Instant::now();
         let valid =
             verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
+        metrics::histogram!("prover", start.elapsed(), "stage" => "verify_proof", "type" => "single_proof");
         anyhow::ensure!(valid, "proof for block is invalid");
         Ok(proof.into())
     }
@@ -168,7 +176,10 @@ pub fn get_universal_setup_monomial_form(
     if let Some(cached_setup) = UNIVERSAL_SETUP_CACHE.take_setup_struct(power_of_two) {
         Ok(cached_setup)
     } else if download_from_network {
-        network_utils::get_universal_setup_monomial_form(power_of_two)
+        let start = Instant::now();
+        let res = network_utils::get_universal_setup_monomial_form(power_of_two);
+        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup", "type" => "aggregated_proof");
+        res
     } else {
         fs_utils::get_universal_setup_monomial_form(power_of_two)
     }

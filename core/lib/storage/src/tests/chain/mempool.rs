@@ -91,6 +91,7 @@ fn franklin_txs() -> Vec<SignedZkSyncTx> {
             SignedZkSyncTx {
                 tx: tx.clone(),
                 eth_sign_data: Some(gen_eth_sign_data(test_message)),
+                created_at: Utc::now(),
             }
         })
         .collect()
@@ -119,6 +120,7 @@ fn gen_transfers(n: usize) -> Vec<SignedZkSyncTx> {
             SignedZkSyncTx {
                 tx: ZkSyncTx::Transfer(Box::new(transfer)),
                 eth_sign_data: Some(gen_eth_sign_data(test_message)),
+                created_at: Utc::now(),
             }
         })
         .collect()
@@ -210,11 +212,11 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     // Try to load the batches with the signature.
     match &txs_from_db[2] {
         SignedTxVariant::Batch(batch) => assert_eq!(batch.eth_signatures, batch_1_signature),
-        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions"),
+        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions 1"),
     };
     match &txs_from_db[3] {
         SignedTxVariant::Batch(batch) => assert_eq!(batch.eth_signatures, batch_2_signatures),
-        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions"),
+        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions 2"),
     };
     assert!(matches!(txs_from_db[4], SignedTxVariant::Tx(_)));
     assert!(matches!(txs_from_db[5], SignedTxVariant::Tx(_)));

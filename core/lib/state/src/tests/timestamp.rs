@@ -1,5 +1,6 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use num::BigUint;
+use vlog::sentry::types::Utc;
 use zksync_types::{
     account::PubKeyHash,
     tx::{ChangePubKey, TimeRange, Withdraw},
@@ -118,10 +119,12 @@ fn batch_invalid_timestamp() {
     let signed_zk_sync_tx1 = SignedZkSyncTx {
         tx: ZkSyncTx::ChangePubKey(Box::new(change_pub_key)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     };
     let signed_zk_sync_tx2 = SignedZkSyncTx {
         tx: ZkSyncTx::Withdraw(Box::new(withdraw)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     };
     tb.test_txs_batch_fail(
         &[signed_zk_sync_tx1.clone(), signed_zk_sync_tx2.clone()],

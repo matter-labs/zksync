@@ -387,8 +387,21 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        self.submit_tx(tx, signature, extracted_request_metadata)
-            .await
+        let result = self
+            .submit_tx(tx, signature, extracted_request_metadata)
+            .await;
+
+        if let Err(err) = &result {
+            let err_label = match err {
+                SubmitError::IncorrectTx(err) => err.clone(),
+                SubmitError::TxAdd(err) => err.to_string(),
+                _ => "other".to_string(),
+            };
+            let labels = vec![("stage", "api".to_string()), ("error", err_label)];
+            metrics::increment_counter!("rejected_txs", &labels);
+        }
+
+        result
     }
 
     pub async fn can_subsidize(
@@ -452,7 +465,6 @@ impl TxSender {
 
         let full_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee;
         let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
-
         if full_cost_usd < subsidized_cost_usd {
             return Err(anyhow::Error::msg(
                 "Trying to subsidize transaction which should not be subsidized",
@@ -485,6 +497,14 @@ impl TxSender {
         signature: TxEthSignatureVariant,
         extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
+        let labels = vec![
+            ("stage", "api".to_string()),
+            ("name", tx.variance_name()),
+            ("token", tx.token_id().to_string()),
+        ];
+        // The initial state of processing tx
+        metrics::increment_counter!("process_tx_count", &labels);
+
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
         }
@@ -636,6 +656,16 @@ impl TxSender {
         if txs.len() > self.max_number_of_transactions_per_batch {
             return Err(SubmitError::TxAdd(TxAddError::BatchTooBig));
         }
+
+        for tx in &txs {
+            let labels = vec![
+                ("stage", "api".to_string()),
+                ("name", tx.tx.variance_name()),
+                ("token", tx.tx.token_id().to_string()),
+            ];
+            metrics::increment_counter!("process_tx_count", &labels);
+        }
+
         // Same check but in terms of signatures.
         if eth_signatures.len() > self.max_number_of_authors_per_batch {
             return Err(SubmitError::TxAdd(TxAddError::EthSignaturesLimitExceeded));
@@ -1162,6 +1192,7 @@ async fn verify_tx_info_message_signature(
             tx: SignedZkSyncTx {
                 tx: tx.clone(),
                 eth_sign_data,
+                created_at: Utc::now(),
             },
             sender: tx_sender,
             token,
@@ -1248,6 +1279,7 @@ async fn verify_txs_batch_signature(
         txs.push(SignedZkSyncTx {
             tx: tx.tx,
             eth_sign_data,
+            created_at: Utc::now(),
         });
     }
 

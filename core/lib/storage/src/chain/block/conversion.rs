@@ -65,7 +65,11 @@ impl StoredExecutedTransaction {
             .eth_sign_data
             .map(|value| serde_json::from_value(value).expect("Unparsable EthSignData"));
         Ok(ExecutedTx {
-            signed_tx: SignedZkSyncTx { tx, eth_sign_data },
+            signed_tx: SignedZkSyncTx {
+                tx,
+                eth_sign_data,
+                created_at: self.created_at,
+            },
             success: self.success,
             op: franklin_op,
             fail_reason: self.fail_reason,

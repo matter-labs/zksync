@@ -472,6 +472,13 @@ impl ZkSyncStateKeeper {
                 }
                 Err(e) => {
                     vlog::warn!("Failed to execute transaction: {:?}, {}", tx, e);
+
+                    let labels = vec![
+                        ("stage", "state".to_string()),
+                        ("error", e.reason.to_string()),
+                    ];
+                    metrics::increment_counter!("rejected_txs", &labels);
+
                     let failed_tx = ExecutedTx {
                         signed_tx: tx.clone(),
                         success: false,
@@ -572,6 +579,8 @@ impl ZkSyncStateKeeper {
                     created_at: chrono::Utc::now(),
                     batch_id: None,
                 };
+                let labels = vec![("stage", "state".to_string()), ("error", e.to_string())];
+                metrics::increment_counter!("rejected_txs", &labels);
                 self.pending_block.failed_txs.push(failed_tx.clone());
                 ExecutedOperations::Tx(Box::new(failed_tx))
             }
@@ -645,6 +654,20 @@ impl ZkSyncStateKeeper {
         let block_metadata = BlockMetadata {
             fast_processing: pending_block.fast_processing_required,
         };
+
+        for tx in &block.block_transactions {
+            let labels = vec![
+                ("stage", "seal_block".to_string()),
+                ("name", tx.variance_name()),
+                ("token", tx.token_id().to_string()),
+            ];
+            metrics::histogram!("process_tx", tx.elapsed(), &labels);
+        }
+        metrics::histogram!(
+            "process_block",
+            block.elapsed(),
+            "stage" => "seal"
+        );
 
         let block_commit_request = BlockCommitRequest {
             block,

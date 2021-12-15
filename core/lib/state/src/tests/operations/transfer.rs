@@ -1,5 +1,6 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use num::{BigUint, Zero};
+use vlog::sentry::types::Utc;
 use web3::types::H160;
 use zksync_types::{AccountId, AccountUpdate, Nonce, SignedZkSyncTx, TokenId, Transfer, ZkSyncTx};
 
@@ -332,14 +333,17 @@ fn execute_txs_batch_success_transfers() {
     let signed_zk_sync_tx1 = SignedZkSyncTx {
         tx: ZkSyncTx::Transfer(Box::new(transfer_1)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     };
     let signed_zk_sync_tx2 = SignedZkSyncTx {
         tx: ZkSyncTx::Transfer(Box::new(transfer_2)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     };
     let signed_zk_sync_tx_bad = SignedZkSyncTx {
         tx: ZkSyncTx::Transfer(Box::new(transfer_bad)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     };
 
     tb.test_txs_batch_fail(

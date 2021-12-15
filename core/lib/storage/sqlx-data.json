@@ -983,11 +983,16 @@
         },
         {
           "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
           "name": "agg_op_id?",
           "type_info": "Int8"
         },
         {
-          "ordinal": 9,
+          "ordinal": 10,
           "name": "arguments?",
           "type_info": "Jsonb"
         }
@@ -1004,6 +1009,7 @@
         true,
         false,
         false,
+        true,
         false,
         false
       ]
@@ -1454,6 +1460,11 @@
           "ordinal": 7,
           "name": "last_used_gas_price",
           "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -1469,7 +1480,8 @@
         false,
         true,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -2904,6 +2916,24 @@
         "Left": []
       },
       "nullable": []
+    }
+  },
+  "6419de705f4419e12e7ea79d9fb10622c6e79c72bc7858e3d4d21aec74b49574": {
+    "query": "SELECT count(*) as \"count!\" FROM executed_transactions WHERE success = false",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
@@ -5295,6 +5325,11 @@
           "ordinal": 7,
           "name": "last_used_gas_price",
           "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -5311,7 +5346,8 @@
         false,
         true,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -6516,6 +6552,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "e188272dd4fd0e228f4fcd7182eff49db1316e061b6d9940da543981f8a179d6": {
+    "query": "SELECT created_at FROM eth_operations WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true
+      ]
     }
   },
   "e19061f374f28705d805f4f7eb05fe05f4adafeb80a9ac37a91cc6557f2b470a": {

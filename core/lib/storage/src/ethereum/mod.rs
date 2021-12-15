@@ -16,6 +16,7 @@ use zksync_types::{
 // Local imports
 use self::records::{ETHOperationData, ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
+use chrono::{DateTime, Utc};
 
 pub mod records;
 
@@ -564,6 +565,14 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                     .await?;
             }
         }
+        let created_at_time = EthereumSchema(&mut transaction)
+            .get_eth_operation_creation_time(eth_op_id)
+            .await?;
+        if let Some(time) = created_at_time {
+            // It's almost impossible situation, but it could be triggered in tests
+            let duration = (Utc::now() - time).to_std().unwrap_or_default();
+            metrics::histogram!("eth_operation_confirmation", duration);
+        }
 
         transaction.commit().await?;
 
@@ -643,6 +652,25 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         metrics::histogram!("sql.ethereum.initialize_eth_data", start.elapsed());
         Ok(())
+    }
+
+    async fn get_eth_operation_creation_time(
+        &mut self,
+        op_id: i64,
+    ) -> QueryResult<Option<DateTime<Utc>>> {
+        let start = Instant::now();
+        let created_at = sqlx::query!(
+            "SELECT created_at FROM eth_operations WHERE id = $1",
+            op_id as i64
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .created_at;
+        metrics::histogram!(
+            "sql.ethereum.get_eth_operation_creation_time",
+            start.elapsed()
+        );
+        Ok(created_at)
     }
 
     pub async fn aggregated_op_final_hash(

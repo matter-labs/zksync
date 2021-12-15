@@ -200,6 +200,7 @@ mod tests {
         let signed_tx = SignedZkSyncTx {
             tx,
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(ExecutedTx {
