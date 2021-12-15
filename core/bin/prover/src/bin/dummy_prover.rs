@@ -3,5 +3,5 @@ use zksync_prover::dummy_prover::DummyProver;
 
 #[tokio::main]
 async fn main() {
-    main_for_prover_impl::<DummyProver>().await;
+    main_for_prover_impl::<DummyProver>(false).await;
 }

@@ -29,7 +29,7 @@ struct Opt {
     worker_name: String,
 }
 
-pub async fn main_for_prover_impl<PROVER>()
+pub async fn main_for_prover_impl<PROVER>(run_prometheus: bool)
 where
     PROVER: ProverImpl + Send + Sync + 'static,
 {
@@ -68,8 +68,10 @@ where
         .expect("Failed to register ctrlc handler");
     }
 
-    let prom_config = PrometheusConfig::from_env();
-    run_prometheus_exporter(prom_config.port, false, None);
+    if run_prometheus {
+        let prom_config = PrometheusConfig::from_env();
+        run_prometheus_exporter(prom_config.port, false, None);
+    }
 
     prover_work_cycle(
         prover,
