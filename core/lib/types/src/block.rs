@@ -304,14 +304,18 @@ impl Block {
         block
     }
 
-    /// Returns the new state root hash encoded for the Ethereum smart contract.
-    pub fn get_eth_encoded_root(&self) -> H256 {
+    /// Encodes any `Fr` hash to `H256`.
+    pub fn encode_fr_for_eth(fr: Fr) -> H256 {
         let mut be_bytes = [0u8; 32];
-        self.new_root_hash
-            .into_repr()
+        fr.into_repr()
             .write_be(be_bytes.as_mut())
             .expect("Write commit bytes");
         H256::from(be_bytes)
+    }
+
+    /// Returns the new state root hash encoded for the Ethereum smart contract.
+    pub fn get_eth_encoded_root(&self) -> H256 {
+        Self::encode_fr_for_eth(self.new_root_hash)
     }
 
     /// Returns the public data for the Ethereum Commit operation.
