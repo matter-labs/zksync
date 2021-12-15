@@ -162,7 +162,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         let mut transaction = interactor.start_transaction().await;
 
         transaction
-            .save_events_state(&[], &[], genesis_eth_block_number)
+            .save_events_state(&[], &[], &[], genesis_eth_block_number)
             .await;
 
         let genesis_fee_account =
@@ -331,10 +331,8 @@ impl<T: Transport> DataRestoreDriver<T> {
 
             // Update events
             if self.update_events_state(interactor).await {
-                vlog::debug!("Events state");
                 // Update operations
                 let new_ops_blocks = self.update_operations_state(interactor).await;
-                vlog::debug!("Operations state");
 
                 if !new_ops_blocks.is_empty() {
                     let mut transaction = interactor.start_transaction().await;
@@ -403,7 +401,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
     /// Returns bool flag, true if there are new block events
     async fn update_events_state(&mut self, interactor: &mut StorageInteractor<'_>) -> bool {
-        let (block_events, token_events, last_watched_eth_block_number) = self
+        let (block_events, token_events, priority_op_data, last_watched_eth_block_number) = self
             .events_state
             .update_events_state(
                 &self.web3,
@@ -419,7 +417,8 @@ impl<T: Transport> DataRestoreDriver<T> {
         interactor
             .save_events_state(
                 &block_events,
-                token_events.as_slice(),
+                &token_events,
+                &priority_op_data,
                 last_watched_eth_block_number,
             )
             .await;
@@ -442,11 +441,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         let mut updates = vec![];
         let mut count = 0;
 
-        // TODO Fix event state and delete this code (ZKS-722)
-        let new_ops_blocks: Vec<RollupOpsBlock> = new_ops_blocks
-            .into_iter()
-            .filter(|bl| bl.block_num > self.tree_state.block_number)
-            .collect();
         for op_block in new_ops_blocks {
             // Take the contract version into account when choosing block chunk sizes.
             let available_block_chunk_sizes = op_block
@@ -472,6 +466,25 @@ impl<T: Transport> DataRestoreDriver<T> {
                 .update_tree_state(blocks[i].clone(), updates[i].clone())
                 .await;
         }
+
+        // Store priority operations Ethereum metadata in the database.
+        // It may both happen that there's no priority operation for the given
+        // `NewPriorityRequest` log and vice versa.
+        // For this reason `apply_priority_op_data` returns serial ids for logs
+        // with no updates, we keep them in the events state removing the rest.
+        let priority_op_data = self.events_state.priority_op_data.values();
+        let serial_ids = transaction.apply_priority_op_data(priority_op_data).await;
+        if !serial_ids.is_empty() {
+            vlog::debug!(
+                "Serial ids of operations with no corresponding blocks in storage: {:?}",
+                serial_ids
+            );
+        }
+        // This has a drawback that we're not updating events state in the database,
+        // but even if the data restore is restarted, applying the same log twice has
+        // no consequences.
+        self.events_state.sift_priority_ops(&serial_ids);
+
         transaction.commit().await;
 
         vlog::debug!("Updated state");
@@ -492,15 +505,19 @@ impl<T: Transport> DataRestoreDriver<T> {
         new_blocks
     }
 
-    /// Returns verified comitted operations blocks from verified op blocks events
+    /// Returns operations blocks from verified op blocks events.
     pub async fn get_new_operation_blocks_from_events(&mut self) -> Vec<RollupOpsBlock> {
         let mut blocks = Vec::new();
 
         let mut last_event_tx_hash = None;
+        // TODO (ZKS-722): either due to Ethereum node lag or unknown
+        // bug in the events state, we have to additionally filter out
+        // already processed rollup blocks.
         for event in self
             .events_state
             .get_only_verified_committed_events()
             .iter()
+            .filter(|bl| bl.block_num > self.tree_state.block_number)
         {
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.

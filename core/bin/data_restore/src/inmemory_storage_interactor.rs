@@ -8,7 +8,7 @@ use web3::types::Address;
 use zksync_types::block::Block;
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
-    NewTokenEvent, Operation, SerialId, Token, TokenId, TokenInfo, TokenKind,
+    NewTokenEvent, Operation, PriorityOp, SerialId, Token, TokenId, TokenInfo, TokenKind,
 };
 
 use crate::{
@@ -211,6 +211,13 @@ impl InMemoryStorageInteractor {
         // TODO save operations
     }
 
+    pub async fn apply_priority_op_data(
+        &mut self,
+        _priority_op_data: impl Iterator<Item = &PriorityOp>,
+    ) -> Vec<SerialId> {
+        Vec::new()
+    }
+
     pub async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         let mut inner = self.inner.borrow_mut();
         let token = Token::new(
@@ -227,6 +234,7 @@ impl InMemoryStorageInteractor {
         &mut self,
         block_events: &[BlockEvent],
         tokens: &[NewTokenEvent],
+        _priority_op_data: &[PriorityOp],
         last_watched_eth_block_number: u64,
     ) {
         let mut inner = self.inner.borrow_mut();
@@ -277,6 +285,7 @@ impl InMemoryStorageInteractor {
             committed_events,
             verified_events,
             last_watched_eth_block_number: inner.last_watched_block,
+            priority_op_data: Default::default(),
         }
     }
 

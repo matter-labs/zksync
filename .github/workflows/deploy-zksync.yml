@@ -17,6 +17,15 @@ on:
       scaleup:
         description: 'Force scaling the server deployment up to 1 replica'
         required: false
+      server_release:
+        description: 'Name of helm release for server'
+        required: false
+        default: 'server'
+      prover_release:
+        description: 'Name of helm release for prover'
+        required: false
+        default: 'prover'
+
 
 defaults:
   run:
@@ -104,7 +113,7 @@ jobs:
       image: dysnix/kubectl:v1.20-gcloud
 
     env:
-      DEPLOY_APPS: -l name=server -l name=prover
+      DEPLOY_APPS: -l name=${{ github.event.inputs.server_release }} -l name=${{ github.event.inputs.prover_release }}
       KUBECONF: ${{ secrets[needs.setup.outputs.kubeConf] }}
       # Helmfile environment name
       HFENV: ${{ needs.setup.outputs.hfEnv }}

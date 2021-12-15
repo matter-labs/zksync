@@ -7,7 +7,7 @@ use tokio::time::sleep;
 use zksync_storage::ConnectionPool;
 use zksync_types::aggregated_operations::AggregatedActionType::*;
 
-const QUERY_INTERVAL: Duration = Duration::from_secs(60);
+const QUERY_INTERVAL: Duration = Duration::from_secs(30);
 
 pub fn run_prometheus_exporter(
     connection_pool: ConnectionPool,
@@ -48,15 +48,31 @@ pub fn run_prometheus_exporter(
                     for &is_confirmed in &[false, true] {
                         let result = block_schema
                             .count_aggregated_operations(action, is_confirmed)
-                            .await
-                            .expect("");
-                        metrics::gauge!(
-                            "count_operations",
-                            result as f64,
-                            "action" => action.to_string(),
-                            "confirmed" => is_confirmed.to_string()
-                        );
+                            .await;
+                        if let Ok(result) = result {
+                            metrics::gauge!(
+                                "count_operations",
+                                result as f64,
+                                "action" => action.to_string(),
+                                "confirmed" => is_confirmed.to_string()
+                            );
+                        }
                     }
+                }
+
+                let rejected_txs = block_schema.count_rejected_txs().await;
+
+                if let Ok(result) = rejected_txs {
+                    metrics::gauge!("stored_rejected_txs", result as f64);
+                }
+
+                let mempool_size = transaction
+                    .chain()
+                    .mempool_schema()
+                    .get_mempool_size()
+                    .await;
+                if let Ok(result) = mempool_size {
+                    metrics::gauge!("mempool_size", result as f64);
                 }
 
                 transaction

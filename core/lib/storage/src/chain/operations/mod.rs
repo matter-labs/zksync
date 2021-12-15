@@ -258,6 +258,11 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
         transaction.commit().await?;
         metrics::histogram!("sql.chain.operations.store_executed_tx", start.elapsed());
+        // It's almost impossible situation, but it could be triggered in tests
+        let tx_duration = (Utc::now() - operation.created_at)
+            .to_std()
+            .unwrap_or_default();
+        metrics::histogram!("process_tx", tx_duration, "stage" => "execute");
         Ok(())
     }
 

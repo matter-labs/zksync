@@ -31,6 +31,7 @@ impl TryFrom<MempoolTx> for SignedZkSyncTx {
                 .eth_sign_data
                 .map(serde_json::from_value)
                 .transpose()?,
+            created_at: value.created_at,
         })
     }
 }

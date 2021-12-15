@@ -124,6 +124,7 @@ impl MempoolTransactionsQueue {
 mod tests {
     use super::*;
     use crate::mempool::Address;
+    use chrono::Utc;
     use zksync_types::tx::{TimeRange, Transfer, Withdraw};
     use zksync_types::{AccountId, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx};
 
@@ -143,6 +144,7 @@ mod tests {
         SignedTxVariant::Tx(SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         })
     }
 
@@ -162,6 +164,7 @@ mod tests {
         SignedTxVariant::Tx(SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         })
     }
 

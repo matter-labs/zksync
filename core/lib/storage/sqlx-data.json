@@ -174,6 +174,19 @@
       "nullable": []
     }
   },
+  "09deba6b7a86cd2aa28246ea54e3f2c1f08e58ac627abf1864058f7134273042": {
+    "query": "INSERT INTO data_restore_priority_op_data VALUES ($1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0bdd32081fc9c8fbfb63787696884617129c30915c400e5647d2a81f882c6d4d": {
     "query": "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
     "describe": {
@@ -946,11 +959,16 @@
         },
         {
           "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
           "name": "agg_op_id?",
           "type_info": "Int8"
         },
         {
-          "ordinal": 9,
+          "ordinal": 10,
           "name": "arguments?",
           "type_info": "Jsonb"
         }
@@ -967,6 +985,7 @@
         true,
         false,
         false,
+        true,
         false,
         false
       ]
@@ -1417,6 +1436,11 @@
           "ordinal": 7,
           "name": "last_used_gas_price",
           "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -1432,7 +1456,8 @@
         false,
         true,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -1599,6 +1624,30 @@
         false,
         false,
         true,
+        false
+      ]
+    }
+  },
+  "2f260906b05f4d37fcc1396ded15aee2ea2f8298682e4b19bb8c234e0a66ad66": {
+    "query": "SELECT * FROM data_restore_priority_op_data",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "op",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
         false
       ]
     }
@@ -2746,6 +2795,26 @@
       "nullable": []
     }
   },
+  "5c7fddda5592e9d84648e4e52e8e6cbb8c98d390e00ca7298a4cd6e5ef9367f2": {
+    "query": "\n            SELECT SUM(usd_amount_scale6) as total FROM subsidies \n            WHERE subsidy_type = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "total",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
     "query": "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
     "describe": {
@@ -2908,6 +2977,24 @@
         "Left": []
       },
       "nullable": []
+    }
+  },
+  "6419de705f4419e12e7ea79d9fb10622c6e79c72bc7858e3d4d21aec74b49574": {
+    "query": "SELECT count(*) as \"count!\" FROM executed_transactions WHERE success = false",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
@@ -4220,6 +4307,16 @@
       ]
     }
   },
+  "93415047b37d0a042a64fead136d30821f952cf9360831429edc74c41861d12d": {
+    "query": "DELETE FROM data_restore_priority_op_data",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
   "93fe4dceacf4e052ad807068272dc768eab33513e6c1e1ac62d2f989b1a26eee": {
     "query": "\n                INSERT INTO eth_operations (op_type, nonce, last_deadline_block, last_used_gas_price, raw_tx)\n                VALUES ($1, $2, $3, $4, $5)\n                RETURNING id\n            ",
     "describe": {
@@ -4713,6 +4810,24 @@
       "nullable": []
     }
   },
+  "a665923ec57382f357f6bb65f6e35876fbfedbf1661b3ce34f2458b63eebc68e": {
+    "query": "\n            INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )\n            VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Int4",
+          "Numeric",
+          "Numeric",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "a77668a3dce7f7cd1f45816f932eea685d429c3d75b40ea8e1a1bb9fc29f11c6": {
     "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
     "describe": {
@@ -5141,6 +5256,11 @@
           "ordinal": 7,
           "name": "last_used_gas_price",
           "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -5157,7 +5277,8 @@
         false,
         true,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -6364,6 +6485,26 @@
       "nullable": []
     }
   },
+  "e188272dd4fd0e228f4fcd7182eff49db1316e061b6d9940da543981f8a179d6": {
+    "query": "SELECT created_at FROM eth_operations WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
   "e19061f374f28705d805f4f7eb05fe05f4adafeb80a9ac37a91cc6557f2b470a": {
     "query": "\n                    SELECT serial_id FROM mint_nft_updates\n                    WHERE creator_address = $1\n                    ORDER BY serial_id\n                ",
     "describe": {
@@ -6676,6 +6817,22 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "e7331aed7f3cf1f2b35399065520e7d2f9cbd890ecff973d3c3809b70eb88376": {
+    "query": "UPDATE executed_priority_operations \n                SET tx_hash = $1, eth_hash = $2, eth_block = $3, eth_block_index = $4\n                WHERE priority_op_serialid = $5",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {

@@ -11,7 +11,6 @@ use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
 use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
-use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_witness_generator::run_prover_server;
 
 use tokio::task::JoinHandle;
@@ -25,6 +24,7 @@ use zksync_config::{
     ForcedExitRequestsConfig, GatewayWatcherConfig, ProverConfig, TickerConfig, ZkSyncConfig,
 };
 use zksync_core::rejected_tx_cleaner::run_rejected_tx_cleaner;
+use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
 
 #[derive(Debug, Clone, Copy)]
@@ -235,16 +235,6 @@ async fn run_server(components: &ComponentsToRun) {
         tasks.push(run_eth_sender(connection_pool.clone()))
     }
 
-    if components.0.contains(&Component::Prometheus) {
-        let config = PrometheusConfig::from_env();
-        let (main_task, counter_task) =
-            run_prometheus_exporter(connection_pool.clone(), config.port, true);
-        tasks.push(main_task);
-        if let Some(task) = counter_task {
-            tasks.push(task)
-        }
-    }
-
     if components.0.contains(&Component::Core) {
         let eth_gateway = create_eth_gateway();
 
@@ -261,6 +251,17 @@ async fn run_server(components: &ComponentsToRun) {
 
     if components.0.contains(&Component::WitnessGenerator) {
         tasks.push(run_witness_generator(connection_pool.clone()))
+    }
+
+    if components.0.contains(&Component::Prometheus) {
+        // Run prometheus data exporter.
+        let config = PrometheusConfig::from_env();
+        let (prometheus_task_handle, counter_task_handle) =
+            run_prometheus_exporter(connection_pool.clone(), config.port, true);
+        tasks.push(prometheus_task_handle);
+        if let Some(task) = counter_task_handle {
+            tasks.push(task);
+        }
     }
 
     if components.0.contains(&Component::ForcedExit) {

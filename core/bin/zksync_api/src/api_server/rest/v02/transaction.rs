@@ -21,7 +21,7 @@ use zksync_types::{tx::TxHash, EthBlockId};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
-use crate::api_server::tx_sender::TxSender;
+use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 /// Shared data between `api/v0.2/transactions` endpoints.
 #[derive(Clone)]
@@ -153,9 +153,19 @@ async fn submit_tx(
     let tx_hash = data
         .tx_sender
         .submit_tx(body.tx, body.signature, None)
-        .await
-        .map_err(Error::from);
+        .await;
 
+    if let Err(err) = &tx_hash {
+        let err_label = match err {
+            SubmitError::IncorrectTx(err) => err.clone(),
+            SubmitError::TxAdd(err) => err.to_string(),
+            _ => "other".to_string(),
+        };
+        let labels = vec![("stage", "api".to_string()), ("error", err_label)];
+        metrics::increment_counter!("rejected_txs", &labels);
+    }
+
+    let tx_hash = tx_hash.map_err(Error::from);
     tx_hash.map(TxHashSerializeWrapper).into()
 }
 
@@ -166,8 +176,19 @@ async fn submit_batch(
     let response = data
         .tx_sender
         .submit_txs_batch(body.txs, body.signature, None)
-        .await
-        .map_err(Error::from);
+        .await;
+
+    if let Err(err) = &response {
+        let err_label = match err {
+            SubmitError::IncorrectTx(err) => err.clone(),
+            SubmitError::TxAdd(err) => err.to_string(),
+            _ => "other".to_string(),
+        };
+        let labels = vec![("stage", "api".to_string()), ("error", err_label)];
+        metrics::increment_counter!("rejected_txs", &labels);
+    }
+
+    let response = response.map_err(Error::from);
     response.into()
 }
 
@@ -218,6 +239,7 @@ mod tests {
         core_api_client::CoreApiClient,
     };
     use actix_web::App;
+    use chrono::Utc;
     use std::str::FromStr;
     use zksync_api_types::v02::{
         transaction::{L2Receipt, TxHashSerializeWrapper},
@@ -347,6 +369,7 @@ mod tests {
                 .map(|tx| SignedZkSyncTx {
                     tx: tx.tx,
                     eth_sign_data: None,
+                    created_at: Utc::now(),
                 })
                 .collect();
             storage
@@ -401,6 +424,7 @@ mod tests {
                 .insert_tx(&SignedZkSyncTx {
                     tx,
                     eth_sign_data: None,
+                    created_at: Utc::now(),
                 })
                 .await?;
 

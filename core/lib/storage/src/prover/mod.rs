@@ -9,6 +9,7 @@ use self::records::{StorageProverJobQueue, StoredAggregatedProof, StoredProof};
 use crate::chain::operations::OperationsSchema;
 use crate::prover::records::StorageBlockWitness;
 use crate::{QueryResult, StorageProcessor};
+use chrono::{TimeZone, Utc};
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::prover::{ProverJob, ProverJobStatus, ProverJobType};
@@ -196,12 +197,42 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
-        transaction.commit().await?;
 
+        transaction
+            .prover_schema()
+            .set_block_processing_metrics(block_number, block_number, "single_proof".to_string())
+            .await?;
+        transaction.commit().await?;
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_proof");
         Ok(())
     }
 
+    // Set metrics about stages in block processing
+    async fn set_block_processing_metrics(
+        &mut self,
+        first_block: BlockNumber,
+        last_block: BlockNumber,
+        stage: String,
+    ) -> QueryResult<()> {
+        for block_number in first_block.0..=last_block.0 {
+            let block = self
+                .0
+                .chain()
+                .block_schema()
+                .get_storage_block(block_number.into())
+                .await?;
+            if let Some(block) = block {
+                let time = Utc.timestamp(block.timestamp.unwrap_or_default(), 0);
+                // It's almost impossible situation, but it could be triggered in tests
+                let duration = (Utc::now() - time).to_std().unwrap_or_default();
+                let labels = vec![("stage", stage.clone())];
+                metrics::histogram!("process_block", duration, &labels);
+            } else {
+                vlog::error!("Block for proof doesn't exist")
+            }
+        }
+        Ok(())
+    }
     /// Stores the aggregated proof for blocks.
     pub async fn store_aggregated_proof(
         &mut self,
@@ -237,6 +268,10 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
+        transaction
+            .prover_schema()
+            .set_block_processing_metrics(first_block, last_block, "aggregated_proof".to_string())
+            .await?;
         transaction.commit().await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_aggregated_proof");
