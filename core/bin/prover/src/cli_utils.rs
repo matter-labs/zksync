@@ -70,7 +70,7 @@ where
 
     if run_prometheus {
         let prom_config = PrometheusConfig::from_env();
-        run_prometheus_exporter(prom_config.port, false, None);
+        run_prometheus_exporter(prom_config.port);
     }
 
     prover_work_cycle(

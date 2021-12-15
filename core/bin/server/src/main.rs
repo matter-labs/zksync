@@ -24,7 +24,7 @@ use zksync_config::{
     ForcedExitRequestsConfig, GatewayWatcherConfig, ProverConfig, TickerConfig, ZkSyncConfig,
 };
 use zksync_core::rejected_tx_cleaner::run_rejected_tx_cleaner;
-use zksync_prometheus_exporter::run_prometheus_exporter;
+use zksync_prometheus_exporter::{run_operation_counter, run_prometheus_exporter};
 use zksync_storage::ConnectionPool;
 
 #[derive(Debug, Clone, Copy)]
@@ -256,12 +256,10 @@ async fn run_server(components: &ComponentsToRun) {
     if components.0.contains(&Component::Prometheus) {
         // Run prometheus data exporter.
         let config = PrometheusConfig::from_env();
-        let (prometheus_task_handle, counter_task_handle) =
-            run_prometheus_exporter(config.port, true, Some(connection_pool.clone()));
+        let prometheus_task_handle = run_prometheus_exporter(config.port);
+        let counter_task_handle = run_operation_counter(connection_pool.clone());
         tasks.push(prometheus_task_handle);
-        if let Some(task) = counter_task_handle {
-            tasks.push(task);
-        }
+        tasks.push(counter_task_handle);
     }
 
     if components.0.contains(&Component::ForcedExit) {
