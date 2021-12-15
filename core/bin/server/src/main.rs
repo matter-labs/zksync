@@ -257,7 +257,7 @@ async fn run_server(components: &ComponentsToRun) {
         // Run prometheus data exporter.
         let config = PrometheusConfig::from_env();
         let (prometheus_task_handle, counter_task_handle) =
-            run_prometheus_exporter(connection_pool.clone(), config.port, true);
+            run_prometheus_exporter(config.port, true, Some(connection_pool.clone()));
         tasks.push(prometheus_task_handle);
         if let Some(task) = counter_task_handle {
             tasks.push(task);

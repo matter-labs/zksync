@@ -46,6 +46,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         job_priority: i32,
         job_type: ProverJobType,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
         "
           WITH job_values as (
@@ -62,10 +63,13 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             i64::from(*last_block),
             job_data,
         ).execute(self.0.conn()).await?;
+
+        metrics::histogram!("sql", start.elapsed(), "prover" => "add_prover_job_to_job_queue");
         Ok(())
     }
 
     pub async fn mark_stale_jobs_as_idle(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')
             WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
@@ -74,6 +78,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
+        metrics::histogram!("sql", start.elapsed(), "prover" => "mark_stale_jobs_as_idle");
         Ok(())
     }
 
@@ -364,6 +369,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         &mut self,
         action_type: ProverJobType,
     ) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
         let last_block = sqlx::query!(
             "SELECT max(last_block) from prover_job_queue
             WHERE job_type = $1",
@@ -397,6 +403,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             }
         };
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "get_last_block_prover_job_queue");
         Ok(result)
     }
 

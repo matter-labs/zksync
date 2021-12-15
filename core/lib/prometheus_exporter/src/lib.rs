@@ -10,9 +10,9 @@ use zksync_types::aggregated_operations::AggregatedActionType::*;
 const QUERY_INTERVAL: Duration = Duration::from_secs(30);
 
 pub fn run_prometheus_exporter(
-    connection_pool: ConnectionPool,
     port: u16,
     is_operation_counter_needed: bool,
+    connection_pool: Option<ConnectionPool>,
 ) -> (JoinHandle<()>, Option<JoinHandle<()>>) {
     let addr = ([0, 0, 0, 0], port);
     let (recorder, exporter) = PrometheusBuilder::new()
@@ -32,6 +32,7 @@ pub fn run_prometheus_exporter(
 
     let operation_counter_handle = if is_operation_counter_needed {
         Some(tokio::spawn(async move {
+            let connection_pool = connection_pool.expect("Must be provided for operation counter");
             let mut storage = connection_pool
                 .access_storage()
                 .await
