@@ -33,6 +33,8 @@ pub struct SignedZkSyncTx {
     /// which user should have signed with their private key.
     /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<EthSignData>,
+
+    #[serde(default = "Utc::now")]
     pub created_at: DateTime<Utc>,
 }
 
