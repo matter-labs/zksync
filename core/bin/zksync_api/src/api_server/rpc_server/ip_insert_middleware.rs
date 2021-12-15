@@ -17,7 +17,7 @@ const METADATA_PARAM_NAME: &str = "extracted_request_metadata";
 /// header of HTTP request. This header IP inserted by Cloudflare and users can never set it by themselves.
 ///
 /// IpInsertMiddleWare is the middleware that gets the value of the `CF-Connecting-IP` header of the HTTP request and appends it as the last
-/// parameter of the JSON-RPC call.  
+/// parameter of the JSON-RPC call.
 pub struct IpInsertMiddleWare;
 
 /// Structure that is used to describe the minimum and the maximum number
