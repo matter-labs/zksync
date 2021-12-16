@@ -5,6 +5,7 @@ use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
+use zksync_crypto::Fr;
 // Workspace uses
 use crate::mempool::MempoolBlocksRequest;
 use zksync_config::ChainConfig;
@@ -20,6 +21,7 @@ mod aggregated_committer;
 pub enum CommitRequest {
     PendingBlock((PendingBlock, AppliedUpdatesRequest)),
     Block((BlockCommitRequest, AppliedUpdatesRequest)),
+    FinishBlock((BlockNumber, Fr)), // TODO: Use a dedicated structure.
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,6 +62,9 @@ async fn handle_new_commit_task(
             }
             CommitRequest::PendingBlock((pending_block, applied_updates_req)) => {
                 save_pending_block(pending_block, applied_updates_req, &pool).await;
+            }
+            CommitRequest::FinishBlock((block_number, root_hash)) => {
+                todo!()
             }
         }
     }
