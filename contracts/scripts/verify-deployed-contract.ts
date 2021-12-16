@@ -1,7 +1,6 @@
 import { ArgumentParser } from 'argparse';
 import { Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
-import { formatUnits, parseUnits } from 'ethers/lib/utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { web3CustomProvider, web3Provider } from './utils';
@@ -34,7 +33,6 @@ async function main() {
     ).connect(localProvider);
 
     const gasPrice = await localProvider.getGasPrice();
-    console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
 
     const governorAddress = wallet.address;
     console.log(`Deploying for governor: ${governorAddress}`);
@@ -44,39 +42,43 @@ async function main() {
     let localContractAddress;
 
     if (args.contract === 'RegenesisMultisig') {
-        localContractAddress = await deployer.deployRegenesisMultisig({ gasPrice });
+        await deployer.deployRegenesisMultisig({ gasPrice });
+        localContractAddress = deployer.addresses.RegenesisMultisig;
     }
 
     if (args.contract === 'AdditionalZkSync') {
-        localContractAddress = await deployer.deployAdditionalZkSync({ gasPrice });
+        await deployer.deployAdditionalZkSync({ gasPrice });
+        localContractAddress = deployer.addresses.AdditionalZkSync;
     }
 
     if (args.contract === 'ZkSync') {
-        localContractAddress = await deployer.deployZkSyncTarget({ gasPrice });
+        await deployer.deployZkSyncTarget({ gasPrice });
+        localContractAddress = deployer.addresses.ZkSync;
     }
 
     if (args.contract === 'Verifier') {
-        localContractAddress = await deployer.deployVerifierTarget({ gasPrice });
+        await deployer.deployVerifierTarget({ gasPrice });
+        localContractAddress = deployer.addresses.Verifier;
     }
 
     if (args.contract === 'Governance') {
-        localContractAddress = await deployer.deployGovernanceTarget({ gasPrice });
-    }
-
-    if (args.contract === 'Proxies') {
-        localContractAddress = await deployer.deployProxiesAndGatekeeper({ gasPrice });
+        await deployer.deployGovernanceTarget({ gasPrice });
+        localContractAddress = deployer.addresses.Governance;
     }
 
     if (args.contract === 'TokenGovernance') {
-        localContractAddress = await deployer.deployTokenGovernance({ gasPrice });
+        await deployer.deployTokenGovernance({ gasPrice });
+        localContractAddress = deployer.addresses.TokenGovernance;
     }
 
     if (args.contract === 'ZkSyncNFTFactory') {
-        localContractAddress = await deployer.deployNFTFactory({ gasPrice });
+        await deployer.deployNFTFactory({ gasPrice });
+        localContractAddress = deployer.addresses.NFTFactory;
     }
 
     if (args.contract === 'ForcedExit') {
-        localContractAddress = await deployer.deployForcedExit({ gasPrice });
+        await deployer.deployForcedExit({ gasPrice });
+        localContractAddress = deployer.addresses.ForcedExit;
     }
     const localBytecode = await localProvider.getCode(localContractAddress);
     const remoteBytecode = await mainProvider.getCode(args.contractAddress);

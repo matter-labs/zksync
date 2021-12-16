@@ -135,7 +135,6 @@ export class Deployer {
             );
         }
         this.addresses.GovernanceTarget = govContract.address;
-        return govContract.address;
     }
 
     public async deployVerifierTarget(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -161,7 +160,6 @@ export class Deployer {
             );
         }
         this.addresses.VerifierTarget = verifierContract.address;
-        return verifierContract.address;
     }
 
     public async deployZkSyncTarget(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -187,7 +185,6 @@ export class Deployer {
             );
         }
         this.addresses.ZkSyncTarget = zksContract.address;
-        return zksContract.address;
     }
 
     public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -271,7 +268,6 @@ export class Deployer {
         }
         this.addresses.NFTFactory = nftFactoryContarct.address;
         await this.governanceContract(this.deployWallet).setDefaultNFTFactory(nftFactoryContarct.address);
-        return nftFactoryContarct.address;
     }
 
     public async deployTokenGovernance(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -310,7 +306,6 @@ export class Deployer {
         }
         this.addresses.TokenGovernance = tokenGovernanceContract.address;
         await this.governanceContract(this.deployWallet).changeTokenGovernance(tokenGovernanceContract.address);
-        return tokenGovernanceContract.address;
     }
 
     public async deployForcedExit(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -346,7 +341,6 @@ export class Deployer {
             );
         }
         this.addresses.ForcedExit = forcedExitContract.address;
-        return forcedExitContract.address;
     }
 
     public async deployAdditionalZkSync(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -373,7 +367,6 @@ export class Deployer {
             );
         }
         this.addresses.AdditionalZkSync = additionalZkSyncContract.address;
-        return additionalZkSyncContract.address;
     }
 
     public async deployRegenesisMultisig(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -405,7 +398,6 @@ export class Deployer {
             );
         }
         this.addresses.RegenesisMultisig = regenesisMultisigContract.address;
-        return regenesisMultisigContract.address;
     }
 
     public async publishSourcesToEtherscan() {
