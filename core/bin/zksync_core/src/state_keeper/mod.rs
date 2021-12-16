@@ -45,7 +45,6 @@ mod tests;
 pub struct ZkSyncStateKeeper {
     /// Current plasma state
     state: ZkSyncState,
-    current_unprocessed_priority_op: u64,
     pending_block: PendingBlock,
     config: StateKeeperConfig,
 
@@ -97,7 +96,6 @@ impl ZkSyncStateKeeper {
 
         let keeper = ZkSyncStateKeeper {
             state,
-            current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
             pending_block: PendingBlock::new(
                 current_block,
                 initial_state.unprocessed_priority_op,
@@ -214,7 +212,7 @@ impl ZkSyncStateKeeper {
                 // TODO (ZKS-821): Only used by block proposer, can be removed.
                 StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
-                        .send(self.current_unprocessed_priority_op)
+                        .send(self.pending_block.unprocessed_priority_op_current)
                         .unwrap_or_default();
                 }
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
@@ -376,8 +374,6 @@ impl ZkSyncStateKeeper {
             fee,
             exec_result.clone(),
         );
-
-        self.current_unprocessed_priority_op += 1;
 
         metrics::histogram!("state_keeper.apply_priority_op", start.elapsed());
         ApplyOutcome::Included(exec_result)
@@ -609,11 +605,12 @@ impl ZkSyncStateKeeper {
         // pending block and "new" pending block. Actions "create block to be sealed" and "update pending block"
         // should be spearated.
         let current_block = self.pending_block.number;
+        let next_unprocessed_priority_op = self.pending_block.unprocessed_priority_op_current;
         let mut pending_block = std::mem::replace(
             &mut self.pending_block,
             PendingBlock::new(
                 current_block,
-                self.current_unprocessed_priority_op,
+                next_unprocessed_priority_op,
                 self.config.max_block_size(),
                 H256::default(),
                 system_time_timestamp(),
@@ -639,7 +636,7 @@ impl ZkSyncStateKeeper {
             block_transactions,
             (
                 pending_block.unprocessed_priority_op_before,
-                self.current_unprocessed_priority_op,
+                pending_block.unprocessed_priority_op_current,
             ),
             &self.config.available_block_chunk_sizes,
             commit_gas_limit,
@@ -725,7 +722,7 @@ impl ZkSyncStateKeeper {
             acc_id_by_addr: self.state.get_account_addresses(),
             nfts: self.state.nfts.clone(),
             last_block_number: self.pending_block.number - 1,
-            unprocessed_priority_op: self.current_unprocessed_priority_op,
+            unprocessed_priority_op: self.pending_block.unprocessed_priority_op_current,
         }
     }
 }

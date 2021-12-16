@@ -20,6 +20,7 @@ pub(super) struct PendingBlock {
     pub(super) chunks_left: usize,
     pub(super) pending_op_block_index: u32,
     pub(super) unprocessed_priority_op_before: u64,
+    pub(super) unprocessed_priority_op_current: u64,
     pub(super) pending_block_iteration: usize,
     pub(super) gas_counter: GasCounter,
     /// Option denoting if this block should be generated faster than usual.
@@ -55,6 +56,7 @@ impl PendingBlock {
             chunks_left: max_block_size,
             pending_op_block_index: 0,
             unprocessed_priority_op_before,
+            unprocessed_priority_op_current: unprocessed_priority_op_before,
             pending_block_iteration: 0,
             gas_counter: GasCounter::new(),
             fast_processing_required: false,
@@ -107,6 +109,11 @@ impl PendingBlock {
             self.collected_fees.push(fee);
         }
         self.pending_op_block_index += 1;
+
+        if exec_result.is_priority() {
+            self.unprocessed_priority_op_current += 1;
+        }
+
         self.success_operations.push(exec_result);
     }
 

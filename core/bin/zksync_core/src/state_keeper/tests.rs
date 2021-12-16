@@ -282,7 +282,7 @@ mod apply_priority_op {
         );
         assert!(!pending_block.account_updates.is_empty());
         assert!(!pending_block.success_operations.is_empty());
-        assert_eq!(tester.state_keeper.current_unprocessed_priority_op, 1);
+        assert_eq!(pending_block.unprocessed_priority_op_current, 1);
     }
 
     /// Checks if processing deposit fails because of

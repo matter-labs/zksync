@@ -9,7 +9,6 @@ use std::{
 use futures::{channel::mpsc, SinkExt};
 use tokio::sync::Mutex;
 
-use zksync_crypto::Fr;
 use zksync_state::state::ZkSyncState;
 use zksync_types::{
     block::{Block, BlockMetadata},
@@ -105,7 +104,7 @@ impl MetadataCalculator {
         }
     }
 
-    async fn process_job(&mut self, pending_block: PendingBlock) {
+    async fn process_job(&mut self, mut pending_block: PendingBlock) {
         // Ensure that the new block has expected number.
         assert_eq!(
             pending_block.number,
@@ -119,7 +118,7 @@ impl MetadataCalculator {
 
         // Update the state stored in self.
         self.state
-            .apply_account_updates(pending_block.account_updates);
+            .apply_account_updates(pending_block.account_updates.clone());
 
         // Form the block and send it.
         let mut block_transactions = pending_block.success_operations.clone(); // TODO (in this PR): Avoid cloning.
@@ -141,7 +140,7 @@ impl MetadataCalculator {
             block_transactions,
             (
                 pending_block.unprocessed_priority_op_before,
-                self.current_unprocessed_priority_op,
+                pending_block.unprocessed_priority_op_current,
             ),
             &self.config.available_block_chunk_sizes,
             commit_gas_limit,

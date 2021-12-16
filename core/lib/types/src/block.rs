@@ -162,6 +162,10 @@ impl ExecutedOperations {
         };
         (Utc::now() - created_at).to_std().unwrap_or_default()
     }
+
+    pub fn is_priority(&self) -> bool {
+        matches!(self, Self::PriorityOp(_))
+    }
 }
 
 /// zkSync network block.
