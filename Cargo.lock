@@ -389,6 +389,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aggregation_deleted"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "ethabi",
+ "structopt",
+ "tokio",
+ "web3",
+ "zksync_config",
+ "zksync_eth_client",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
