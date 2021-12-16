@@ -14,6 +14,7 @@ use zksync_crypto::bellman::plonk::{
     transpile,
 };
 use zksync_crypto::franklin_crypto::bellman::Circuit;
+use zksync_crypto::franklin_crypto::circuit::test::TestConstraintSystem;
 use zksync_crypto::franklin_crypto::plonk::circuit::bigint::field::RnsParameters;
 use zksync_crypto::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use zksync_crypto::franklin_crypto::rescue::rescue_transcript::RescueTranscriptForRNS;
@@ -107,7 +108,7 @@ impl SetupForStepByStepProver {
 
         let transcript_params = (&rescue_params, &rns_params);
         let proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
-            circuit,
+            circuit.clone(),
             &self.hints,
             &self.setup_polynomials,
             None,
@@ -122,6 +123,19 @@ impl SetupForStepByStepProver {
         let valid =
             verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
         metrics::histogram!("prover", start.elapsed(), "stage" => "verify_proof", "type" => "single_proof");
+        if !valid {
+            let start = Instant::now();
+            // we do this way here so old precomp is dropped
+            let mut cs = TestConstraintSystem::<Engine>::new();
+            circuit.synthesize(&mut cs).unwrap();
+
+            if let Some(err) = cs.which_is_unsatisfied() {
+                println!("unconstrained: {}", cs.find_unconstrained());
+                println!("number of constraints {}", cs.num_constraints());
+                println!("Unsatisfied {:?}", err);
+            }
+            metrics::histogram!("prover", start.elapsed(), "stage" => "test_constraint_system", "type" => "single_proof");
+        }
         anyhow::ensure!(valid, "proof for block is invalid");
         Ok(proof.into())
     }
