@@ -9,7 +9,7 @@ use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
 use zksync_state::state::{OpSuccess, ZkSyncState};
 use zksync_types::{
     block::{
-        Block, BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
+        BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx, IncompleteBlock,
         PendingBlock as SendablePendingBlock,
     },
     gas_counter::GasCounter,
@@ -20,6 +20,7 @@ use zksync_types::{
 // Local uses
 use self::{
     pending_block::PendingBlock,
+    root_hash_calculator::{BlockRootHashJob, BlockRootHashJobQueue, RootHashCalculator},
     types::{ApplyOutcome, StateKeeperConfig},
     utils::system_time_timestamp,
 };
@@ -53,6 +54,10 @@ pub struct ZkSyncStateKeeper {
     /// Channel used for sending queued transaction events. Required since state keeper
     /// has no access to the database.
     processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
+
+    /// Queue for root hash calculator.
+    /// Contains blocks that were sealed but for which root hash has not been calculated yet.
+    root_hash_queue: BlockRootHashJobQueue,
 }
 
 impl ZkSyncStateKeeper {
@@ -108,10 +113,11 @@ impl ZkSyncStateKeeper {
             rx_for_blocks,
             tx_for_commitments,
             processed_tx_events_sender,
+
+            root_hash_queue: BlockRootHashJobQueue::new(),
         };
 
-        let root = keeper.state.root_hash();
-        vlog::info!("created state keeper, root hash = {}", root);
+        todo!("Put all the incomplete jobs into queue");
 
         keeper
     }
@@ -629,9 +635,8 @@ impl ZkSyncStateKeeper {
         let commit_gas_limit = pending_block.gas_counter.commit_gas_limit();
         let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
 
-        let block = Block::new_from_available_block_sizes(
+        let block = IncompleteBlock::new_from_available_block_sizes(
             pending_block.number,
-            self.state.root_hash(),
             self.config.fee_account_id,
             block_transactions,
             (
@@ -641,13 +646,11 @@ impl ZkSyncStateKeeper {
             &self.config.available_block_chunk_sizes,
             commit_gas_limit,
             verify_gas_limit,
-            pending_block.previous_block_root_hash,
             pending_block.timestamp,
         );
 
         // Update the fields of the new pending block.
         *self.pending_block.number += 1;
-        self.pending_block.previous_block_root_hash = block.get_eth_encoded_root();
 
         let block_metadata = BlockMetadata {
             fast_processing: pending_block.fast_processing_required,
@@ -673,6 +676,10 @@ impl ZkSyncStateKeeper {
             accounts_updated: pending_block.account_updates.clone(),
         };
         let applied_updates_request = pending_block.prepare_applied_updates_request();
+        let root_hash_job = BlockRootHashJob {
+            block: current_block,
+            updates: pending_block.account_updates.clone(),
+        };
 
         vlog::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
@@ -687,6 +694,7 @@ impl ZkSyncStateKeeper {
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
+        self.root_hash_queue.push(root_hash_job).await;
 
         metrics::histogram!("state_keeper.seal_pending_block", start.elapsed());
     }

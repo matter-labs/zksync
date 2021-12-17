@@ -6,6 +6,7 @@ use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 use zksync_crypto::Fr;
+use zksync_types::block::IncompleteBlock;
 // Workspace uses
 use crate::mempool::MempoolBlocksRequest;
 use zksync_config::ChainConfig;
@@ -26,7 +27,7 @@ pub enum CommitRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlockCommitRequest {
-    pub block: Block,
+    pub block: IncompleteBlock,
     pub block_metadata: BlockMetadata,
     pub accounts_updated: AccountUpdates,
 }
@@ -169,7 +170,7 @@ async fn commit_block(
     transaction
         .chain()
         .block_schema()
-        .save_block(block)
+        .save_incomplete_block(block)
         .await
         .expect("committer must commit the op into db");
 
