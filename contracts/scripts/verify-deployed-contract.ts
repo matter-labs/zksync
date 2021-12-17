@@ -4,28 +4,14 @@ import { Deployer } from '../src.ts/deploy';
 import * as fs from 'fs';
 import * as path from 'path';
 import { web3CustomProvider, web3Provider } from './utils';
+import { Command } from 'commander';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
-async function main() {
-    const parser = new ArgumentParser({
-        version: '0.1.0',
-        addHelp: true,
-        description: 'Deploy contracts and publish them on Etherscan'
-    });
-
-    parser.addArgument('--localGeth', { required: true, help: 'Localhost geth for deploying contract' });
-    parser.addArgument('--contractAddress', { required: true, help: 'Already deployed contract onchain' });
-    parser.addArgument('--contract', {
-        required: false,
-        help: 'Contract name: Governance, ZkSync, Verifier or all by default.'
-    });
-
-    const args = parser.parseArgs(process.argv.slice(2));
-
+async function verify(localGeth: string, contractAddress: string, contract: string) {
     const mainProvider = web3Provider();
-    const localProvider = web3CustomProvider(args.localGeth);
+    const localProvider = web3CustomProvider(localGeth);
 
     const wallet = Wallet.fromMnemonic(
         process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
@@ -41,49 +27,66 @@ async function main() {
 
     let localContractAddress;
 
-    if (args.contract === 'RegenesisMultisig') {
+    if (contract === 'RegenesisMultisig') {
         await deployer.deployRegenesisMultisig({ gasPrice });
         localContractAddress = deployer.addresses.RegenesisMultisig;
     }
 
-    if (args.contract === 'AdditionalZkSync') {
+    if (contract === 'AdditionalZkSync') {
         await deployer.deployAdditionalZkSync({ gasPrice });
         localContractAddress = deployer.addresses.AdditionalZkSync;
     }
 
-    if (args.contract === 'ZkSync') {
+    if (contract === 'ZkSync') {
         await deployer.deployZkSyncTarget({ gasPrice });
-        localContractAddress = deployer.addresses.ZkSync;
+        localContractAddress = deployer.addresses.ZkSyncTarget;
     }
 
-    if (args.contract === 'Verifier') {
+    if (contract === 'Verifier') {
         await deployer.deployVerifierTarget({ gasPrice });
-        localContractAddress = deployer.addresses.Verifier;
+        localContractAddress = deployer.addresses.VerifierTarget;
     }
 
-    if (args.contract === 'Governance') {
+    if (contract === 'Governance') {
         await deployer.deployGovernanceTarget({ gasPrice });
-        localContractAddress = deployer.addresses.Governance;
+        localContractAddress = deployer.addresses.GovernanceTarget;
     }
 
-    if (args.contract === 'TokenGovernance') {
+    if (contract === 'TokenGovernance') {
         await deployer.deployTokenGovernance({ gasPrice });
         localContractAddress = deployer.addresses.TokenGovernance;
     }
 
-    if (args.contract === 'ZkSyncNFTFactory') {
+    if (contract === 'ZkSyncNFTFactory') {
         await deployer.deployNFTFactory({ gasPrice });
         localContractAddress = deployer.addresses.NFTFactory;
     }
 
-    if (args.contract === 'ForcedExit') {
+    if (contract === 'ForcedExit') {
         await deployer.deployForcedExit({ gasPrice });
         localContractAddress = deployer.addresses.ForcedExit;
     }
     const localBytecode = await localProvider.getCode(localContractAddress);
-    const remoteBytecode = await mainProvider.getCode(args.contractAddress);
+    const remoteBytecode = await mainProvider.getCode(contractAddress);
 
     console.log('Result of comparing bytecode', localBytecode === remoteBytecode);
+}
+
+async function main() {
+    const program = new Command();
+
+    program.version('0.1.0').name('verify-contract').description('deploy testnet erc20 token');
+
+    program
+        .option('-g, --localGeth <localGeth>')
+        .option('-c, --contract <contract>')
+        .option('-a, --contractAddress <contractAddress>')
+        .description('Adds a new token with a given fields')
+        .action(async (cmd: Command) => {
+            await verify(cmd.localGeth, cmd.contractAddress, cmd.contract);
+        });
+
+    await program.parseAsync(process.argv);
 }
 
 main()
