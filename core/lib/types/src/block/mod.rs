@@ -231,7 +231,6 @@ impl Block {
     }
 
     /// Creates a new block from an incomplete one.
-    #[allow(clippy::too_many_arguments)]
     pub fn from_incomplete(
         incomplete: IncompleteBlock,
         previous_block_root_hash: H256,
@@ -255,44 +254,6 @@ impl Block {
         block.block_commitment = Block::get_commitment(
             block.block_number,
             block.fee_account,
-            previous_block_root_hash,
-            block.get_eth_encoded_root(),
-            block.timestamp,
-            &block.get_onchain_op_commitment(),
-            &block.get_eth_public_data(),
-        );
-        block
-    }
-
-    /// Creates a new block, choosing block chunk size
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_with_current_chunk_size(
-        block_number: BlockNumber,
-        new_root_hash: Fr,
-        fee_account: AccountId,
-        block_transactions: Vec<ExecutedOperations>,
-        processed_priority_ops: (u64, u64),
-        commit_gas_limit: U256,
-        verify_gas_limit: U256,
-        previous_block_root_hash: H256,
-        timestamp: u64,
-    ) -> Self {
-        let mut block = Self {
-            block_number,
-            new_root_hash,
-            fee_account,
-            block_transactions,
-            processed_priority_ops,
-            block_chunks_size: 0,
-            commit_gas_limit,
-            verify_gas_limit,
-            block_commitment: H256::default(),
-            timestamp,
-        };
-        block.block_chunks_size = block.chunks_used();
-        block.block_commitment = Block::get_commitment(
-            block_number,
-            fee_account,
             previous_block_root_hash,
             block.get_eth_encoded_root(),
             block.timestamp,

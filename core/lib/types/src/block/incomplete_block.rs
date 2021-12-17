@@ -102,20 +102,6 @@ impl IncompleteBlock {
         smallest_block_size_for_chunks(chunks_used, available_block_sizes)
     }
 
-    /// Returns the number of Withdrawal and ForcedExit in a block.
-    pub fn get_withdrawals_count(&self) -> usize {
-        let mut withdrawals_count = 0;
-
-        for block_tx in &self.block_transactions {
-            if let Some(sync_op) = block_tx.get_executed_op() {
-                if sync_op.withdrawal_data().is_some() {
-                    withdrawals_count += 1;
-                }
-            }
-        }
-
-        withdrawals_count
-    }
     pub fn timestamp_utc(&self) -> DateTime<Utc> {
         Utc.timestamp(self.timestamp as i64, 0)
     }
