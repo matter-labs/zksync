@@ -14,32 +14,45 @@ use zksync_types::{block::Block, AccountUpdates, BlockNumber, H256};
 
 use crate::committer::CommitRequest;
 
-use super::types::StateKeeperConfig;
-
+/// Description of a single block root hash job.
+///
+/// Contains data required to calculate the root hash of a block, given that root hashes
+/// are calculated sequentially and calculator maintains the copy of the blockchain state.
 #[derive(Debug)]
-pub(super) struct Job {
+pub(super) struct BlockRootHashJob {
+    /// Number of the block. While not required to calculate the root hash,
+    /// it is used to ensure that no block was missed.
     pub(super) block: BlockNumber,
+    /// Account updates that happened in the block.
     pub(super) updates: AccountUpdates,
 }
 
+/// Queue of jobs for calculating block root hashes.
+///
+/// Unlike channel, it provides a way to see the queue size, which can be used
+/// to throttle transaction execution if blocks are being created faster than it is
+/// possible to process them.
 #[derive(Debug, Default, Clone)]
-pub(super) struct JobQueue {
-    queue: Arc<Mutex<VecDeque<Job>>>,
+pub(super) struct BlockRootHashJobQueue {
+    queue: Arc<Mutex<VecDeque<BlockRootHashJob>>>,
     size: Arc<AtomicUsize>,
 }
 
-impl JobQueue {
+impl BlockRootHashJobQueue {
+    /// Creates a new empty queue.
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub(super) async fn push(&mut self, job: Job) {
+    /// Adds an element to the queue.
+    pub(super) async fn push(&mut self, job: BlockRootHashJob) {
         self.queue.lock().await.push_back(job);
         // Here and below: `Relaxed` is enough as don't rely on the value for any critical sections.
         self.size.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub(super) async fn pop(&mut self) -> Option<Job> {
+    /// Pops an element from the queue.
+    pub(super) async fn pop(&mut self) -> Option<BlockRootHashJob> {
         let result = self.queue.lock().await.pop_front();
         if result.is_some() {
             let old_value = self.size.fetch_sub(1, Ordering::Relaxed);
@@ -53,17 +66,30 @@ impl JobQueue {
         result
     }
 
+    /// Returns the current size of the queue.
     pub(super) fn size(&self) -> usize {
         self.size.load(Ordering::Relaxed)
     }
 }
 
+/// Entity capable of calculating the root hashes and sending information
+/// to the committer in order to complete the incomplete blocks.
+///
+/// It is supposed to run in parallel with the state keeper, so the state keeper
+/// can keep creating blocks without having to wait for the root hash to be calculated.
+///
+/// Approach of `RootHashCalculator` will work as long as we time to create a new block
+/// is bigger than time required to calculate the root hash of said block. Otherwise, we
+/// will create blocks on a faster pace than we can process them.
+///
+/// It is important that if we use this entity, we should have a throttling mechanism which
+/// will stop transaction execution if blocks are being created too fast.
 #[derive(Debug)]
-pub(super) struct MetadataCalculator {
+pub(super) struct RootHashCalculator {
     state: ZkSyncState,
     // We use job queue to be able to observe amount of not-yet-calculated jobs
     // so we can throttle performance if needed.
-    job_queue: JobQueue,
+    job_queue: BlockRootHashJobQueue,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
 
     // We process block sequentially, so we can store the previous root hash needed
@@ -72,17 +98,14 @@ pub(super) struct MetadataCalculator {
     // While we don't really need the number for calculations, it's useful for safety
     // to ensure that every block is processed in order.
     last_block_number: BlockNumber,
-
-    config: StateKeeperConfig,
 }
 
-impl MetadataCalculator {
+impl RootHashCalculator {
     pub(super) fn new(
         state: ZkSyncState,
-        job_queue: JobQueue,
+        job_queue: BlockRootHashJobQueue,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         last_block_number: BlockNumber,
-        config: StateKeeperConfig,
     ) -> Self {
         let last_root_hash = Block::encode_fr_for_eth(state.root_hash());
 
@@ -92,7 +115,6 @@ impl MetadataCalculator {
             tx_for_commitments,
             last_root_hash,
             last_block_number,
-            config,
         }
     }
 
@@ -107,7 +129,7 @@ impl MetadataCalculator {
         }
     }
 
-    async fn process_job(&mut self, job: Job) {
+    async fn process_job(&mut self, job: BlockRootHashJob) {
         // Ensure that the new block has expected number.
         assert_eq!(
             job.block,
