@@ -12,7 +12,7 @@ use zksync_api_types::{
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
-    block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
+    block::{Block, BlockMetadata, ExecutedOperations, IncompleteBlock, PendingBlock},
     event::block::BlockStatus,
     AccountId, BlockNumber, Fr, ZkSyncOp, H256, U256,
 };
@@ -22,7 +22,6 @@ use self::records::{
     StorageBlockMetadata, StoragePendingBlock, TransactionItem,
 };
 use crate::{
-    chain::account::records::EthAccountType,
     chain::operations::{
         records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
@@ -30,6 +29,7 @@ use crate::{
         },
         OperationsSchema,
     },
+    chain::{account::records::EthAccountType, block::records::StorageIncompleteBlock},
     QueryResult, StorageProcessor,
 };
 
@@ -897,6 +897,58 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.save_block", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn save_incomplete_block(&mut self, block: IncompleteBlock) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let number = i64::from(*block.block_number);
+        let fee_account_id = i64::from(*block.fee_account);
+        let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
+        let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
+        let block_size = block.block_chunks_size as i64;
+        let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
+        let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
+        let timestamp = Some(block.timestamp as i64);
+
+        let new_block = StorageIncompleteBlock {
+            number,
+            fee_account_id,
+            unprocessed_prior_op_before,
+            unprocessed_prior_op_after,
+            block_size,
+            commit_gas_limit,
+            verify_gas_limit,
+            timestamp,
+        };
+
+        // Remove pending block, as it's now sealed.
+        // Note that the block is NOT completed yet: root hash calculation should still happen.
+        sqlx::query!(
+            "
+            DELETE FROM pending_block WHERE number = $1
+            ",
+            new_block.number
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        // Save this block.
+        sqlx::query!("
+            INSERT INTO blocks (number, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit,  timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ",
+            new_block.number, new_block.fee_account_id, new_block.unprocessed_prior_op_before,
+            new_block.unprocessed_prior_op_after, new_block.block_size, new_block.commit_gas_limit, new_block.verify_gas_limit,
+            new_block.timestamp,
+        ).execute(transaction.conn())
+        .await?;
+
+        transaction.commit().await?;
+
+        metrics::histogram!("sql.chain.block.save_incomplete_block", start.elapsed());
         Ok(())
     }
 

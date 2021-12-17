@@ -13,6 +13,10 @@ use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFiel
 use zksync_crypto::params::{CHUNK_BIT_WIDTH, CHUNK_BYTES};
 use zksync_crypto::serialization::FrSerde;
 
+mod incomplete_block;
+
+pub use incomplete_block::IncompleteBlock;
+
 /// An intermediate state of the block in the zkSync network.
 /// Contains the information about (so far) executed transactions and
 /// meta-information related to the block creating process.
@@ -224,6 +228,40 @@ impl Block {
             block_commitment,
             timestamp,
         }
+    }
+
+    /// Creates a new block from an incomplete one.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_incomplete(
+        incomplete: IncompleteBlock,
+        previous_block_root_hash: H256,
+        new_root_hash: Fr,
+    ) -> Self {
+        let mut block = Self {
+            // Copied fields.
+            block_number: incomplete.block_number,
+            fee_account: incomplete.fee_account,
+            block_transactions: incomplete.block_transactions,
+            processed_priority_ops: incomplete.processed_priority_ops,
+            block_chunks_size: incomplete.block_chunks_size,
+            commit_gas_limit: incomplete.commit_gas_limit,
+            verify_gas_limit: incomplete.verify_gas_limit,
+            timestamp: incomplete.timestamp,
+
+            // Fields *not* from the incomplete block.
+            new_root_hash,
+            block_commitment: H256::default(),
+        };
+        block.block_commitment = Block::get_commitment(
+            block.block_number,
+            block.fee_account,
+            previous_block_root_hash,
+            block.get_eth_encoded_root(),
+            block.timestamp,
+            &block.get_onchain_op_commitment(),
+            &block.get_eth_public_data(),
+        );
+        block
     }
 
     /// Creates a new block, choosing block chunk size
