@@ -1,0 +1,61 @@
+name: ri-aggregation CI
+on:
+  push:
+    branches:
+    - master
+  
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: master
+        
+      - name: start-services
+        run: |
+          docker-compose -f docker-compose-runner.yml down
+          docker-compose -f docker-compose-runner.yml pull
+          docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk 
+          ci_run sccache --start-server &
+          docker-compose -f docker-compose-runner.yml ps -a
+          #curl http://localhost:4444 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+              
+      - name: setup-env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+      
+      - name: init
+        run: |
+          ci_run ln -s /usr/src/keys/setup keys/setup
+          ci_run zk
+          ci_run zk run verify-keys unpack
+          ci_run zk contract build
+          ci_run zk db basic-setup
+          ci_run zk run yarn
+                
+      - name: shift to host network
+        run: |
+          #remove containers (host will retain build)
+          docker-compose -f docker-compose-runner.yml down
+          #start containers with ports binded and zk on host network
+          docker-compose -f docker-compose-runner2.yml up -d rskj postgres zk
+
+      - name: deploy contracts
+        run: |
+          ci_run zk run deploy-erc20 dev
+          ci_run zk run deploy-eip1271
+
+      - name: restart dev-liquidity-token-watcher and dev-ticker
+        run: docker-compose -f docker-compose-runner2.yml restart dev-liquidity-token-watcher dev-ticker
+
+      - name: contracts-unit-tests
+        run: ci_run zk test contracts
+
+      - name: js-unit-tests
+        run: ci_run zk test js
+
+      #- name: rust-unit-tests
+      #  run: ci_run zk test server-rust
+        

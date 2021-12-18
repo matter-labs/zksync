@@ -10,9 +10,9 @@ services:
       target: /var/lib/postgresql/data
     environment:
         - POSTGRES_HOST_AUTH_METHOD=trust
-  
   rskj:
-    image: "optimalbrew/iris:raul1"
+     build:
+      context: ./docker/rskj
     ports:
       - "4444:4444"
       - "4445:4445"

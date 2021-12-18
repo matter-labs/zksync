@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="false" scan="true" scanPeriod="3600 seconds">
+    <appender name="stdout-json-rpc" class="ch.qos.logback.core.ConsoleAppender">
+        <Target>System.out</Target>
+        <encoder>
+            <pattern>%date{yyyy-MM-dd-HH:mm:ss.SSSS} %p [%c{1}] %.-128msg%n</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>OFF</level>
+        </filter>
+    </appender>
+    <appender name="FILE-AUDIT-json-rpc" class="ch.qos.log-back.core.rolling.RollingFileAppender">
+        <file>./logs/rsk.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>
+                %date{yyyy-MM-dd-HH:mm:ss.SSS} %p [%c{1}] %.-128msg%n
+            </Pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>./logs/rskj-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+    <appender name="stdout" class="ch.qos.logback.core.ConsoleAppender">
+        <Target>System.out</Target>
+        <encoder>
+            <pattern>%date{yyyy-MM-dd-HH:mm:ss.SSSS} %p [%c{1}]  %m%n</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>OFF</level>
+        </filter>
+    </appender>
+    <appender name="FILE-AUDIT"
+              class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>/var/log/rsk/rsk.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>
+                %date{yyyy-MM-dd-HH:mm:ss.SSS} %p [%c{1}]  %m%n
+            </Pattern>
+        </encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>/var/log/rsk/rskj-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+        <maxFileSize>100MB</maxFileSize>    
+        <maxHistory>7</maxHistory>
+        <totalSizeCap>1GB</totalSizeCap>
+    </rollingPolicy>
+    </appender>
+    <logger name="execute" level="TRACE"/>
+    <logger name="co.rsk.federate" level="TRACE"/>
+    <logger name="blockvalidator" level="TRACE"/>
+    <logger name="blockexecutor" level="TRACE"/>
+    <logger name="general" level="TRACE"/>
+    <logger name="gaspricetracker" level="TRACE"/>
+    <logger name="web3" level="INFO"/>
+    <logger name="repository" level="ERROR"/>
+    <logger name="VM" level="ERROR"/>
+    <logger name="blockqueue" level="TRACE"/>
+    <logger name="io.netty" level="ERROR"/>
+    <logger name="block" level="ERROR"/>
+    <logger name="minerserver" level="TRACE"/>
+    <logger name="txbuilderex" level="TRACE"/>
+    <logger name="pendingstate" level="TRACE"/>
+    <logger name="txpendingvalidator" level="ERROR"/>
+    <logger name="hsqldb.db" level="ERROR"/>
+    <logger name="TCK-Test" level="TRACE"/>
+    <logger name="db" level="ERROR"/>
+    <logger name="net" level="DEBUG"/>
+    <logger name="start" level="TRACE"/>
+    <logger name="cli" level="ERROR"/>
+    <logger name="txs" level="ERROR"/>
+    <logger name="gas" level="ERROR"/>
+    <logger name="main" level="ERROR"/>
+    <logger name="trie" level="ERROR"/>
+    <logger name="org.hibernate" level="ERROR"/>
+    <logger name="peermonitor" level="ERROR"/>
+    <logger name="bridge" level="TRACE"/>
+    <logger name="org.springframework" level="ERROR"/>
+    <logger name="rlp" level="ERROR"/>
+    <logger name="messagehandler" level="TRACE"/>
+    <logger name="syncprocessor" level="TRACE"/>
+    <logger name="sync" level="TRACE"/>
+    <logger name="BtcToRskClient" level="TRACE"/>
+    <logger name="ui" level="ERROR"/>
+    <logger name="java.nio" level="ERROR"/>
+    <logger name="org.eclipse.jetty" level="ERROR"/>
+    <logger name="wire" level="ERROR"/>
+    <logger name="BridgeSupport" level="TRACE"/>
+    <logger name="jsonrpc" level="INFO"/>
+    <logger name="wallet" level="TRACE"/>
+    <logger name="blockchain" level="TRACE"/>
+    <logger name="blockprocessor" level="TRACE"/>
+    <logger name="state" level="TRACE"/>
+    <logger name="co.rsk.net.discovery.PeerExplorer" level="INFO"/>
+    <logger name="discover" level="INFO"/>
+    <logger name="JsonRpcBasicServer" level="INFO"/>
+    <logger name="com.googlecode.jsonrpc4j.JsonRpcBasicServer" level="INFO" additivity="false">
+    <appender-ref ref="stdout-json-rpc"/>
+    <appender-ref ref="FILE-AUDIT-json-rpc"/>
+    </logger>
+    <root level="DEBUG">
+        <appender-ref ref="stdout"/>
+        <appender-ref ref="FILE-AUDIT"/>
+    </root>
+</configuration>
+

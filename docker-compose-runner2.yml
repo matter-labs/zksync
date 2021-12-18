@@ -2,10 +2,11 @@ version: '3.2'
 services:
   postgres:
     image: "postgres:12"
+    ports:
+        - "5432:5432"
     environment:
         - POSTGRES_HOST_AUTH_METHOD=trust
 
-  #ports will not be visible to zk container so this is just to build the image
   rskj:
     build:
       context: ./docker/rskj
@@ -15,11 +16,15 @@ services:
   
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
+    ports:
+      - "9876:9876"
     volumes:
       - ./etc/tokens/:/etc/tokens
 
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
+    ports:
+      - "9975:9975"
     env_file:
       - ./etc/env/docker.env
     volumes:
@@ -38,9 +43,9 @@ services:
       - .:/usr/src/zksync
       - /usr/src/cache:/usr/src/cache
       - /usr/src/keys:/usr/src/keys
-    environment:
-      - IN_DOCKER=true
-      - CACHE_DIR=/usr/src/cache
-      - SCCACHE_CACHE_SIZE=50g
-      - CI=1
-    #network_mode : "host" #container uses docker env for network
+    #environment:
+    #  - IN_DOCKER=true
+    #  - CACHE_DIR=/usr/src/cache
+    #  - SCCACHE_CACHE_SIZE=50g
+    #  - CI=1
+    network_mode : "host"
