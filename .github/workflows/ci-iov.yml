@@ -2,7 +2,8 @@ name: ri-aggregation CI
 on:
   push:
     branches:
-    - master
+    - rsk_merge_master_Dec2021
+    #- rsk_port_initial
   
 jobs:
   unit-tests:
@@ -56,6 +57,13 @@ jobs:
       - name: js-unit-tests
         run: ci_run zk test js
 
-      #- name: rust-unit-tests
-      #  run: ci_run zk test server-rust
-        
+      - name: server-rust-unit-tests
+        run: ci_run zk test server-rust
+      
+      - name: db-unit-tests
+        run: ci_run zk test db
+      
+      - name: rust-api-unit-tests
+        run: ci_run zk test rust-api
+
+
