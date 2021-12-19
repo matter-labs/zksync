@@ -11,15 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          ref: master
+          ref: rsk_merge_master_Dec2021
         
       - name: start-services
         run: |
-          docker-compose -f docker-compose-runner.yml down
-          docker-compose -f docker-compose-runner.yml pull
-          docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk 
+          docker-compose -f docker-compose-runner2.yml down
+          docker-compose -f docker-compose-runner2.yml pull
+          docker-compose -f docker-compose-runner2.yml up --build -d rskj postgres zk 
           ci_run sccache --start-server &
-          docker-compose -f docker-compose-runner.yml ps -a
+          docker-compose -f docker-compose-runner2.yml ps -a
           #curl http://localhost:4444 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
               
       - name: setup-env
@@ -35,13 +35,6 @@ jobs:
           ci_run zk contract build
           ci_run zk db basic-setup
           ci_run zk run yarn
-                
-      - name: shift to host network
-        run: |
-          #remove containers (host will retain build)
-          docker-compose -f docker-compose-runner.yml down
-          #start containers with ports binded and zk on host network
-          docker-compose -f docker-compose-runner2.yml up -d rskj postgres zk
 
       - name: deploy contracts
         run: |

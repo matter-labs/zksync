@@ -1,5 +1,6 @@
 #!/bin/bash
 
 # Runs the command from within CI docker-compose environment.
-cd $ZKSYNC_HOME
+export ZKSYNC_HOME=$(pwd) && \
+cd $ZKSYNC_HOME || exit 1 && \
 docker-compose -f docker-compose-runner.yml exec -T zk $@

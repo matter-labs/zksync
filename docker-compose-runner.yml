@@ -9,9 +9,9 @@ services:
   rskj:
     build:
       context: ./docker/rskj
-    ports:
-      - "4444:4444"
-      - "4445:4445"
+    #ports:
+    #  - "4444:4444"
+    #  - "4445:4445"
   
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"

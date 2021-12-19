@@ -43,9 +43,8 @@ services:
       - .:/usr/src/zksync
       - /usr/src/cache:/usr/src/cache
       - /usr/src/keys:/usr/src/keys
-    #environment:
-    #  - IN_DOCKER=true
-    #  - CACHE_DIR=/usr/src/cache
-    #  - SCCACHE_CACHE_SIZE=50g
-    #  - CI=1
-    network_mode : "host"
+    environment:
+      - IN_DOCKER=true
+      - CACHE_DIR=/usr/src/cache
+      - SCCACHE_CACHE_SIZE=50g
+      - CI=1

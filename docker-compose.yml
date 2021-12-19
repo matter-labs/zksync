@@ -10,8 +10,9 @@ services:
       target: /var/lib/postgresql/data
     environment:
         - POSTGRES_HOST_AUTH_METHOD=trust
+
   rskj:
-     build:
+    build:
       context: ./docker/rskj
     ports:
       - "4444:4444"
