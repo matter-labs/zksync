@@ -1,7 +1,7 @@
 use super::{SETUP_MAX_POW2, SETUP_MIN_POW2};
 use anyhow::format_err;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{copy, BufReader, Read, Write};
 use std::path::PathBuf;
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
 use zksync_crypto::params::{account_tree_depth, balance_tree_depth};
@@ -30,6 +30,26 @@ fn base_universal_setup_dir() -> Result<PathBuf, anyhow::Error> {
     Ok(dir)
 }
 
+fn get_universal_setup_monomial_file_name(power_of_two: u32) -> Result<String, anyhow::Error> {
+    anyhow::ensure!(
+        (SETUP_MIN_POW2..=SETUP_MAX_POW2).contains(&power_of_two),
+        "setup power of two is not in the correct range"
+    );
+    Ok(format!("setup_2^{}.key", power_of_two))
+}
+
+pub fn save_universal_setup_monomial_file<R: Read>(
+    power_of_two: u32,
+    mut reader: R,
+) -> Result<(), anyhow::Error> {
+    let setup_file_name = get_universal_setup_monomial_file_name(power_of_two)?;
+    let mut path = base_universal_setup_dir()?;
+    path.push(&setup_file_name);
+    let mut file = File::create(path)?;
+    copy(&mut reader, &mut file)?;
+    Ok(())
+}
+
 fn get_universal_setup_file_buff_reader(
     setup_file_name: &str,
 ) -> Result<BufReader<File>, anyhow::Error> {
@@ -51,11 +71,7 @@ fn get_universal_setup_file_buff_reader(
 pub fn get_universal_setup_monomial_form(
     power_of_two: u32,
 ) -> Result<Crs<Engine, CrsForMonomialForm>, anyhow::Error> {
-    anyhow::ensure!(
-        (SETUP_MIN_POW2..=SETUP_MAX_POW2).contains(&power_of_two),
-        "setup power of two is not in the correct range"
-    );
-    let setup_file_name = format!("setup_2^{}.key", power_of_two);
+    let setup_file_name = get_universal_setup_monomial_file_name(power_of_two)?;
     let mut buf_reader = get_universal_setup_file_buff_reader(&setup_file_name)?;
     Crs::<Engine, CrsForMonomialForm>::read(&mut buf_reader)
         .map_err(|e| format_err!("Failed to read Crs from setup file: {}", e))

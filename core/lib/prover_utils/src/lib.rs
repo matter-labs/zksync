@@ -1,4 +1,5 @@
 use crate::fs_utils::{get_block_verification_key_path, get_exodus_verification_key_path};
+use anyhow::Error;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fs::File;
@@ -87,7 +88,7 @@ impl SetupForStepByStepProver {
             setup_power_of_two,
             download_setup_file,
         )?);
-        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup");
+        metrics::histogram!("prover", start.elapsed(), "stage" => "prepare_setup");
         Ok(SetupForStepByStepProver {
             setup_polynomials,
             hints,
@@ -189,13 +190,19 @@ pub fn get_universal_setup_monomial_form(
 ) -> Result<Crs<Engine, CrsForMonomialForm>, anyhow::Error> {
     if let Some(cached_setup) = UNIVERSAL_SETUP_CACHE.take_setup_struct(power_of_two) {
         Ok(cached_setup)
-    } else if download_from_network {
-        let start = Instant::now();
-        let res = network_utils::get_universal_setup_monomial_form(power_of_two);
-        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup", "type" => "aggregated_proof");
-        res
-    } else {
+    } else if !download_from_network {
         fs_utils::get_universal_setup_monomial_form(power_of_two)
+    } else {
+        let start = Instant::now();
+        // try to find cache on disk
+        let res = if Ok(res) = fs_utils::get_universal_setup_monomial_form(power_of_two) {
+            res
+        } else {
+            network_utils::download_universal_setup_monomial_form(power_of_two)?;
+            fs_utils::get_universal_setup_monomial_form(power_of_two)?
+        };
+        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup");
+        Ok(res)
     }
 }
 
