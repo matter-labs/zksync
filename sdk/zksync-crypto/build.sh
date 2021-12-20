@@ -10,10 +10,14 @@ which wasm-pack || cargo install wasm-pack
 # pack for bundler (!note this verion is used in the pkg.browser field)
 wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
 # pack for browser
-wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist
+wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=web-dist
 # pack for node.js
-wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist
+wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=node-dist
 
+# merge dist folders, wasm-pack delete out-dir folder before the new build
+mv web-dist/* dist/
+mv node-dist/* dist/
+rm -rf web-dist node-dist
 rm dist/package.json dist/.gitignore
 
 if [ "$CI" == "1" ]; then
