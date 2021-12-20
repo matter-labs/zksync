@@ -35,6 +35,11 @@ pub struct StorageIncompleteBlock {
 }
 
 #[derive(Debug, FromRow)]
+pub struct StorageRootHash {
+    pub root_hash: Vec<u8>,
+}
+
+#[derive(Debug, FromRow)]
 pub struct StoragePendingBlock {
     pub number: i64,
     pub chunks_left: i64,

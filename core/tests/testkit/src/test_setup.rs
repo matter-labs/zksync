@@ -910,7 +910,7 @@ impl TestSetup {
     async fn await_for_block_commit_request(&mut self) -> BlockCommitRequest {
         while let Some(new_block_event) = self.proposed_blocks_receiver.next().await {
             match new_block_event {
-                CommitRequest::Block((new_block, _)) => {
+                CommitRequest::SealIncompleteBlock((new_block, _)) => {
                     return new_block;
                 }
                 CommitRequest::PendingBlock(_) => {
@@ -930,7 +930,7 @@ impl TestSetup {
             .await
             .expect("StateKeeper sender dropped");
         match new_block_event {
-            CommitRequest::Block((new_block, _)) => {
+            CommitRequest::SealIncompleteBlock((new_block, _)) => {
                 panic!(
                     "Expected pending block, got full block proposed. Block: {:?}",
                     new_block

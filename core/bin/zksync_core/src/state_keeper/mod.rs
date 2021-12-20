@@ -689,7 +689,8 @@ impl ZkSyncStateKeeper {
             pending_block.pending_block_iteration
         );
 
-        let commit_request = CommitRequest::Block((block_commit_request, applied_updates_request));
+        let commit_request =
+            CommitRequest::SealIncompleteBlock((block_commit_request, applied_updates_request));
         self.tx_for_commitments
             .send(commit_request)
             .await

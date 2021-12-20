@@ -21,8 +21,8 @@ mod aggregated_committer;
 #[derive(Debug)]
 pub enum CommitRequest {
     PendingBlock((PendingBlock, AppliedUpdatesRequest)),
-    Block((BlockCommitRequest, AppliedUpdatesRequest)),
-    FinishBlock((BlockNumber, Fr)), // TODO: Use a dedicated structure.
+    SealIncompleteBlock((BlockCommitRequest, AppliedUpdatesRequest)),
+    FinishBlock(BlockFinishRequest), // TODO: Use a dedicated structure.
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -30,6 +30,12 @@ pub struct BlockCommitRequest {
     pub block: IncompleteBlock,
     pub block_metadata: BlockMetadata,
     pub accounts_updated: AccountUpdates,
+}
+
+#[derive(Clone, Debug)]
+pub struct BlockFinishRequest {
+    pub block_number: BlockNumber,
+    pub root_hash: Fr,
 }
 
 #[derive(Clone, Debug)]
@@ -52,8 +58,8 @@ async fn handle_new_commit_task(
 ) {
     while let Some(request) = rx_for_ops.next().await {
         match request {
-            CommitRequest::Block((block_commit_request, applied_updates_req)) => {
-                commit_block(
+            CommitRequest::SealIncompleteBlock((block_commit_request, applied_updates_req)) => {
+                seal_incomplete_block(
                     block_commit_request,
                     applied_updates_req,
                     &pool,
@@ -64,8 +70,8 @@ async fn handle_new_commit_task(
             CommitRequest::PendingBlock((pending_block, applied_updates_req)) => {
                 save_pending_block(pending_block, applied_updates_req, &pool).await;
             }
-            CommitRequest::FinishBlock((block_number, root_hash)) => {
-                todo!()
+            CommitRequest::FinishBlock(request) => {
+                finish_block(request, &pool).await;
             }
         }
     }
@@ -117,7 +123,7 @@ async fn save_pending_block(
     metrics::histogram!("committer.save_pending_block", start.elapsed());
 }
 
-async fn commit_block(
+async fn seal_incomplete_block(
     block_commit_request: BlockCommitRequest,
     applied_updates_request: AppliedUpdatesRequest,
     pool: &ConnectionPool,
@@ -163,7 +169,7 @@ async fn commit_block(
         .await
         .expect("committer must commit the pending block into db");
 
-    vlog::info!("commit block #{}", block.block_number);
+    vlog::info!("seal incomplete block #{}", block.block_number);
 
     let block_number = block.block_number;
 
@@ -192,7 +198,63 @@ async fn commit_block(
         .await
         .expect("Unable to commit DB transaction");
 
-    metrics::histogram!("committer.commit_block", start.elapsed());
+    metrics::histogram!("committer.seal_incomplete_block", start.elapsed());
+}
+
+async fn finish_block(request: BlockFinishRequest, pool: &ConnectionPool) {
+    let start = Instant::now();
+    let BlockFinishRequest {
+        block_number,
+        root_hash,
+    } = request;
+
+    let mut storage = pool
+        .access_storage()
+        .await
+        .expect("db connection fail for committer");
+
+    let mut transaction = storage
+        .start_transaction()
+        .await
+        .expect("Failed initializing a DB transaction");
+
+    vlog::info!("finish block #{}", block_number);
+
+    let (incomplete_block, prev_root_hash) = transaction
+        .chain()
+        .block_schema()
+        .get_data_to_complete_block(block_number)
+        .await
+        .expect("committer: unable to get incomplete block data from db");
+
+    let incomplete_block = incomplete_block.unwrap_or_else(|| {
+        panic!(
+            "Received a request to finish block #{} which is not saved to the database",
+            block_number
+        );
+    });
+    let prev_root_hash = prev_root_hash.unwrap_or_else(|| {
+        // Invariant: we calculate root hashes for blocks sequentially.
+        // It means that if we want to finish block `X`, then root hash for block `X-1` is already calculated and saved to the database.
+        // If there is no root hash data in the database, it means that there is a bug in application logic.
+        panic!("Received a request to finish block ${}, but there is no root hash for previous block in the database", block_number);
+    });
+
+    let block = Block::from_incomplete(incomplete_block, prev_root_hash, root_hash);
+
+    transaction
+        .chain()
+        .block_schema()
+        .save_block(block)
+        .await
+        .expect("committer must commit the op into db");
+
+    transaction
+        .commit()
+        .await
+        .expect("Unable to commit DB transaction");
+
+    metrics::histogram!("committer.finish_block", start.elapsed());
 }
 
 async fn poll_for_new_proofs_task(pool: ConnectionPool, config: ChainConfig) {

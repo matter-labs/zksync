@@ -19,7 +19,7 @@ use zksync_types::{
 // Local imports
 use self::records::{
     AccountTreeCache, BlockTransactionItem, StorageBlock, StorageBlockDetails,
-    StorageBlockMetadata, StoragePendingBlock, TransactionItem,
+    StorageBlockMetadata, StoragePendingBlock, StorageRootHash, TransactionItem,
 };
 use crate::{
     chain::operations::{
@@ -937,7 +937,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         // Save this block.
         sqlx::query!("
-            INSERT INTO blocks (number, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit,  timestamp)
+            INSERT INTO incomplete_blocks (number, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit,  timestamp)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ",
             new_block.number, new_block.fee_account_id, new_block.unprocessed_prior_op_before,
@@ -950,6 +950,81 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.block.save_incomplete_block", start.elapsed());
         Ok(())
+    }
+
+    // Helper method for retrieving incomplete blocks from the database.
+    async fn get_storage_incomplete_block(
+        &mut self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<StorageIncompleteBlock>> {
+        let start = Instant::now();
+        let block = sqlx::query_as!(
+            StorageIncompleteBlock,
+            "SELECT * FROM incomplete_blocks WHERE number = $1",
+            i64::from(*block)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.block.get_storage_incomplete_block",
+            start.elapsed()
+        );
+
+        Ok(block)
+    }
+
+    /// Given the block number, attempts to retrieve data to complete it from the database.
+    /// Returns `None` if the block with provided number does not exist yet.
+    ///
+    /// Data to complete consists of `IncompleteBlock` object and the root hash of the previous block.
+    pub async fn get_data_to_complete_block(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<(Option<IncompleteBlock>, Option<Fr>)> {
+        let start = Instant::now();
+        // Load block header.
+        let stored_block =
+            if let Some(block) = self.get_storage_incomplete_block(block_number).await? {
+                block
+            } else {
+                return Ok((None, None));
+            };
+
+        // Load transactions for this block.
+        let block_transactions = self.get_block_executed_ops(block_number).await?;
+
+        // Return the obtained block in the expected format.
+        let block = Some(IncompleteBlock::new(
+            block_number,
+            AccountId(stored_block.fee_account_id as u32),
+            block_transactions,
+            (
+                stored_block.unprocessed_prior_op_before as u64,
+                stored_block.unprocessed_prior_op_after as u64,
+            ),
+            stored_block.block_size as usize,
+            U256::from(stored_block.commit_gas_limit as u64),
+            U256::from(stored_block.verify_gas_limit as u64),
+            stored_block.timestamp.unwrap_or_default() as u64,
+        ));
+
+        // Load previous block root hash.
+        let previous_root_hash = sqlx::query_as!(
+            StorageRootHash,
+            "SELECT root_hash FROM blocks WHERE number = $1",
+            i64::from(*block_number)
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|entry| FeConvert::from_bytes(&entry.root_hash).expect("Unparsable root hash"));
+
+        metrics::histogram!(
+            "sql.chain.block.get_data_to_complete_block",
+            start.elapsed()
+        );
+
+        Ok((block, previous_root_hash))
     }
 
     pub async fn save_block_metadata(

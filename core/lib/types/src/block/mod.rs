@@ -233,9 +233,12 @@ impl Block {
     /// Creates a new block from an incomplete one.
     pub fn from_incomplete(
         incomplete: IncompleteBlock,
-        previous_block_root_hash: H256,
+        previous_block_root_hash: Fr,
         new_root_hash: Fr,
     ) -> Self {
+        // Encode previous block root to the Ethereum format.
+        let previous_block_root_hash = Self::encode_fr_for_eth(previous_block_root_hash);
+
         let mut block = Self {
             // Copied fields.
             block_number: incomplete.block_number,

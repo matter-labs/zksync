@@ -472,7 +472,9 @@ async fn seal_pending_block() {
     assert!(tester.state_keeper.pending_block.account_updates.is_empty());
     assert_eq!(tester.state_keeper.pending_block.chunks_left, 20);
 
-    if let Some(CommitRequest::Block((block, updates))) = tester.response_rx.next().await {
+    if let Some(CommitRequest::SealIncompleteBlock((block, updates))) =
+        tester.response_rx.next().await
+    {
         let collected_fees = tester
             .state_keeper
             .state
@@ -581,7 +583,9 @@ mod execute_proposed_block {
         apply_batch_with_two_transfers(&mut tester).await;
 
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 4);
         } else {
             panic!("Block is not received!");
@@ -605,7 +609,9 @@ mod execute_proposed_block {
 
         // Second batch
         apply_batch_with_two_transfers(&mut tester).await;
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 2);
         } else {
             panic!("Block is not received!");
@@ -620,7 +626,9 @@ mod execute_proposed_block {
         apply_single_transfer(&mut tester).await;
 
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 3);
         } else {
             panic!("Block is not received!");
@@ -652,7 +660,9 @@ mod execute_proposed_block {
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 2);
         } else {
             panic!("Block is not received!");
@@ -667,7 +677,9 @@ mod execute_proposed_block {
         apply_single_transfer(&mut tester).await;
 
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 3);
         } else {
             panic!("Block is not received!");
@@ -753,7 +765,7 @@ mod execute_proposed_block {
             .await;
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
         assert!(matches!(
             tester.response_rx.next().await,
@@ -796,7 +808,7 @@ mod execute_proposed_block {
             .await;
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
     }
 
@@ -829,7 +841,7 @@ mod execute_proposed_block {
         // We should receive the next block, since it must be sealed right after.
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
     }
 
@@ -1308,7 +1320,7 @@ mod execute_proposed_block {
         // Checks that one block is sealed and pending block has only the last withdrawal.
         if !matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block((_, _)))
+            Some(CommitRequest::SealIncompleteBlock((_, _)))
         ) {
             panic!("Sealed block is not received");
         }

@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use zksync_state::state::ZkSyncState;
 use zksync_types::{block::Block, AccountUpdates, BlockNumber, H256};
 
-use crate::committer::CommitRequest;
+use crate::committer::{BlockFinishRequest, CommitRequest};
 
 /// Description of a single block root hash job.
 ///
@@ -142,7 +142,10 @@ impl RootHashCalculator {
 
         let root_hash = self.state.root_hash();
 
-        let finalize_request = CommitRequest::FinishBlock((job.block, root_hash));
+        let finalize_request = CommitRequest::FinishBlock(BlockFinishRequest {
+            block_number: job.block,
+            root_hash,
+        });
         self.tx_for_commitments
             .send(finalize_request)
             .await
