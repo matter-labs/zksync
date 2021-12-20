@@ -1,7 +1,7 @@
 use super::{SETUP_MAX_POW2, SETUP_MIN_POW2};
 use anyhow::format_err;
 use std::fs::File;
-use std::io::{copy, BufReader, Read, Write};
+use std::io::{copy, BufReader, Read};
 use std::path::PathBuf;
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
 use zksync_crypto::params::{account_tree_depth, balance_tree_depth};

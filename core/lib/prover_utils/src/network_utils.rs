@@ -4,8 +4,6 @@ use anyhow::format_err;
 use backoff::Operation;
 use reqwest::blocking::Response;
 use std::time::Duration;
-use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
-use zksync_crypto::Engine;
 
 /// Downloads universal setup in the monomial form of the given power of two (range: SETUP_MIN_POW2..=SETUP_MAX_POW2)
 pub fn download_universal_setup_monomial_form(power_of_two: u32) -> Result<(), anyhow::Error> {

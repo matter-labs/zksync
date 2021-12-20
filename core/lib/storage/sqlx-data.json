@@ -2245,26 +2245,6 @@
       ]
     }
   },
-  "4868140cb6b644efc751687b9a8dcd04324072bffbcc69ec29306b8a9793645e": {
-    "query": "\n            SELECT SUM(usd_amount_scale6) as total FROM subsidies\n            WHERE subsidy_type = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "total",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "4a0bc713a57201aa894b96acdb462c03d3ad63cf4fbc8a14b9ac5e2e02121207": {
     "query": "\n            SELECT * FROM ticker_market_volume\n            WHERE token_id = $1\n            LIMIT 1\n            ",
     "describe": {
@@ -4805,37 +4785,6 @@
           "Numeric",
           "Numeric",
           "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "a665923ec57382f357f6bb65f6e35876fbfedbf1661b3ce34f2458b63eebc68e": {
-    "query": "\n            INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )\n            VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Int8",
-          "Int4",
-          "Numeric",
-          "Numeric",
-          "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "a77668a3dce7f7cd1f45816f932eea685d429c3d75b40ea8e1a1bb9fc29f11c6": {
-    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4"
         ]
       },
       "nullable": []
@@ -7619,6 +7568,27 @@
       ]
     }
   },
+  "faefd7d582000800f48eddcc1e933a876f5b0cd556f0dc45c6241eb72da97894": {
+    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds' RETURNING id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "fd16aadbd04d4a48332d59c77290a588f1a33922418b55a08c656a44ff75b8e8": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number = $1",
     "describe": {
@@ -7685,6 +7655,18 @@
         false,
         false
       ]
+    }
+  },
+  "fd18b441397834df097a6b1a62a773fbbb482a42a6c8f698277be4d2f219ae79": {
+    "query": "DELETE FROM aggregate_operations WHERE from_block > $1 and confirmed=false",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "fe0256b27116eafc9a83d0f9eff341751c6022a13d0bc3625c8c8f8b9001309e": {

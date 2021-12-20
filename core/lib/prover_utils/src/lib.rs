@@ -1,5 +1,3 @@
-use crate::fs_utils::{get_block_verification_key_path, get_exodus_verification_key_path};
-use anyhow::Error;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fs::File;
@@ -24,6 +22,8 @@ use zksync_crypto::params::RECURSIVE_CIRCUIT_VK_TREE_DEPTH;
 use zksync_crypto::proof::SingleProof;
 use zksync_crypto::recursive_aggregation_circuit::circuit::create_vks_tree;
 use zksync_crypto::{Engine, Fr};
+
+use crate::fs_utils::{get_block_verification_key_path, get_exodus_verification_key_path};
 
 pub mod aggregated_proofs;
 pub mod api;
@@ -126,7 +126,6 @@ impl SetupForStepByStepProver {
         metrics::histogram!("prover", start.elapsed(), "stage" => "verify_proof", "type" => "single_proof");
         if !valid {
             let start = Instant::now();
-            // we do this way here so old precomp is dropped
             let mut cs = TestConstraintSystem::<Engine>::new();
             circuit.synthesize(&mut cs).unwrap();
 
@@ -195,7 +194,7 @@ pub fn get_universal_setup_monomial_form(
     } else {
         let start = Instant::now();
         // try to find cache on disk
-        let res = if Ok(res) = fs_utils::get_universal_setup_monomial_form(power_of_two) {
+        let res = if let Ok(res) = fs_utils::get_universal_setup_monomial_form(power_of_two) {
             res
         } else {
             network_utils::download_universal_setup_monomial_form(power_of_two)?;

@@ -1,5 +1,5 @@
 [package]
-name = "aggregation_deleted"
+name = "remove_proofs"
 version = "1.0.0"
 edition = "2018"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
