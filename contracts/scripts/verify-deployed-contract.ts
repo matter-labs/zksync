@@ -75,13 +75,16 @@ async function verify(localGeth: string, contractAddress: string, contract: stri
 async function main() {
     const program = new Command();
 
-    program.version('0.1.0').name('verify-contract').description('deploy testnet erc20 token');
+    program
+        .version('0.1.0')
+        .name('verify-contract')
+        .description('Checking deployed Ethereum contract with locally deployed version');
 
     program
         .option('-g, --localGeth <localGeth>')
         .option('-c, --contract <contract>')
         .option('-a, --contractAddress <contractAddress>')
-        .description('Adds a new token with a given fields')
+        .description('Checking deployed Ethereum contract with locally deployed version')
         .action(async (cmd: Command) => {
             await verify(cmd.localGeth, cmd.contractAddress, cmd.contract);
         });
