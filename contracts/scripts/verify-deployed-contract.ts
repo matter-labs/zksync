@@ -1,4 +1,3 @@
-import { ArgumentParser } from 'argparse';
 import { Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import * as fs from 'fs';
