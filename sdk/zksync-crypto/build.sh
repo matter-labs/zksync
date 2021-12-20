@@ -14,7 +14,7 @@ wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=we
 # pack for node.js
 wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=node-dist
 
-# merge dist folders, wasm-pack delete out-dir folder before the new build
+# Merge dist folders. wasm-pack removes out-dir before it starts a new build
 mv web-dist/* dist/
 mv node-dist/* dist/
 rm -rf web-dist node-dist
