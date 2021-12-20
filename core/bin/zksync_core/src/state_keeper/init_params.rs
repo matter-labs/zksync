@@ -6,15 +6,21 @@ use zksync_types::{
     BlockNumber, TokenId, NFT,
 };
 
-use super::state_restore::{db::StateRestoreStorage, RestoredTree};
+use super::{
+    root_hash_calculator::BlockRootHashJob,
+    state_restore::{db::StateRestoreStorage, RestoredTree},
+};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ZkSyncStateInitParams {
     pub tree: AccountTree,
     pub acc_id_by_addr: HashMap<Address, AccountId>,
     pub nfts: HashMap<TokenId, NFT>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
+
+    pub pending_block: Option<SendablePendingBlock>,
+    pub root_hash_jobs: Vec<BlockRootHashJob>,
 }
 
 impl Default for ZkSyncStateInitParams {
@@ -31,19 +37,24 @@ impl ZkSyncStateInitParams {
             nfts: HashMap::new(),
             last_block_number: BlockNumber(0),
             unprocessed_priority_op: 0,
+
+            pending_block: None,
+            root_hash_jobs: Vec::new(),
         }
     }
 
-    pub async fn get_pending_block(
-        &self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Option<SendablePendingBlock> {
-        let pending_block = storage
+    async fn load_pending_block(&mut self, storage: &mut zksync_storage::StorageProcessor<'_>) {
+        let pending_block = if let Some(pending_block) = storage
             .chain()
             .block_schema()
             .load_pending_block()
             .await
-            .unwrap_or_default()?;
+            .unwrap_or_default()
+        {
+            pending_block
+        } else {
+            return;
+        };
 
         if pending_block.number <= self.last_block_number {
             // If after generating several pending block node generated
@@ -51,14 +62,14 @@ impl ZkSyncStateInitParams {
             // and stored pending block will be outdated.
             // Thus, if the stored pending block has the lower number than
             // last committed one, we just ignore it.
-            return None;
+            return;
         }
 
         // We've checked that pending block is greater than the last committed block,
         // but it must be greater exactly by 1.
         assert_eq!(*pending_block.number, *self.last_block_number + 1);
 
-        Some(pending_block)
+        self.pending_block = Some(pending_block);
     }
 
     pub async fn restore_from_db(
@@ -91,6 +102,8 @@ impl ZkSyncStateInitParams {
         self.unprocessed_priority_op =
             Self::unprocessed_priority_op_id(storage, block_number).await?;
         self.nfts = Self::load_nft_tokens(storage, block_number).await?;
+
+        self.load_pending_block(storage).await;
 
         vlog::info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",

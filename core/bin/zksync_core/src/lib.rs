@@ -123,9 +123,6 @@ pub async fn run_core(
 
     // Start State Keeper.
     let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await?;
-    let pending_block = state_keeper_init
-        .get_pending_block(&mut storage_processor)
-        .await;
 
     let state_keeper = ZkSyncStateKeeper::new(
         state_keeper_init,
@@ -137,7 +134,7 @@ pub async fn run_core(
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
         processed_tx_events_sender,
     );
-    let state_keeper_task = start_state_keeper(state_keeper, pending_block);
+    let state_keeper_task = start_state_keeper(state_keeper);
 
     // Start committer.
     let committer_task = run_committer(

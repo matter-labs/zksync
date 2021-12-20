@@ -18,8 +18,8 @@ use crate::committer::{BlockFinishRequest, CommitRequest};
 ///
 /// Contains data required to calculate the root hash of a block, given that root hashes
 /// are calculated sequentially and calculator maintains the copy of the blockchain state.
-#[derive(Debug)]
-pub(super) struct BlockRootHashJob {
+#[derive(Debug, Clone)]
+pub struct BlockRootHashJob {
     /// Number of the block. While not required to calculate the root hash,
     /// it is used to ensure that no block was missed.
     pub(super) block: BlockNumber,

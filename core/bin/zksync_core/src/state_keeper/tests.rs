@@ -1466,10 +1466,7 @@ async fn correctly_restore_pending_block_timestamp() {
 
     // Run initialize function and process the pending block.
     // This operation should successfully execute the transfer even though now it's past the time it's valid.
-    tester
-        .state_keeper
-        .initialize(Some(pending_block.clone()))
-        .await;
+    tester.state_keeper.initialize(Some(pending_block.clone()));
 
     assert_eq!(
         tester.state_keeper.pending_block.number, pending_block.number,

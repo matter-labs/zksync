@@ -99,7 +99,7 @@ impl ZkSyncStateKeeper {
             fast_miniblock_iterations,
         );
 
-        let keeper = ZkSyncStateKeeper {
+        let mut keeper = ZkSyncStateKeeper {
             state,
             pending_block: PendingBlock::new(
                 current_block,
@@ -117,6 +117,8 @@ impl ZkSyncStateKeeper {
             root_hash_queue: BlockRootHashJobQueue::new(),
         };
 
+        keeper.initialize(initial_state.pending_block);
+
         todo!("Put all the incomplete jobs into queue");
 
         keeper
@@ -125,7 +127,7 @@ impl ZkSyncStateKeeper {
     // TODO (ZKS-821): We should get rid of this function and create state keeper in a ready-to-go state.
     // Currently we partially initialize state keeper, and then finalize initialization when it's actually started
     // which is not a good practice.
-    async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
+    fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
         let start = Instant::now();
 
         if let Some(pending_block) = pending_block {
@@ -201,9 +203,7 @@ impl ZkSyncStateKeeper {
         metrics::histogram!("state_keeper.initialize", start.elapsed());
     }
 
-    async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
-        self.initialize(pending_block).await;
-
+    async fn run(mut self) {
         while let Some(req) = self.rx_for_blocks.next().await {
             match req {
                 StateKeeperRequest::GetAccount(address, sender) => {
@@ -732,14 +732,14 @@ impl ZkSyncStateKeeper {
             nfts: self.state.nfts.clone(),
             last_block_number: self.pending_block.number - 1,
             unprocessed_priority_op: self.pending_block.unprocessed_priority_op_current,
+
+            pending_block: None,
+            root_hash_jobs: Vec::new(),
         }
     }
 }
 
 #[must_use]
-pub fn start_state_keeper(
-    sk: ZkSyncStateKeeper,
-    pending_block: Option<SendablePendingBlock>,
-) -> JoinHandle<()> {
-    tokio::spawn(sk.run(pending_block))
+pub fn start_state_keeper(sk: ZkSyncStateKeeper) -> JoinHandle<()> {
+    tokio::spawn(sk.run())
 }
