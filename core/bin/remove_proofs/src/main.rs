@@ -53,12 +53,11 @@ async fn remove_operations(
 #[structopt(name = "zkSync proof delete tool", author = "Matter Labs")]
 #[structopt(about = "Tool for deleting proofs from database")]
 struct Opt {
-    /// Last correct block, tool reverts blocks with numbers greater than this field.
+    /// Last correct block, tool remove proofs for blocks with numbers greater than this field.
     #[structopt(long)]
     last_correct_block: u32,
 }
 
-// TODO: don't use anyhow (ZKS-588)
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
