@@ -5,7 +5,6 @@ use std::time::Instant;
 use futures::{channel::mpsc, stream::StreamExt, SinkExt};
 use tokio::task::JoinHandle;
 // Workspace uses
-use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
 use zksync_state::state::{OpSuccess, ZkSyncState};
 use zksync_types::{
     block::{
@@ -15,7 +14,7 @@ use zksync_types::{
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
     tx::ZkSyncTx,
-    Address, PriorityOp, SignedZkSyncTx, H256,
+    Address, PriorityOp, SignedZkSyncTx,
 };
 // Local uses
 use self::{
@@ -72,7 +71,6 @@ impl ZkSyncStateKeeper {
         fast_miniblock_iterations: usize,
         processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
     ) -> Self {
-        let current_block = initial_state.last_block_number + 1;
         let state = ZkSyncState::new(
             initial_state.tree,
             initial_state.acc_id_by_addr,
@@ -82,15 +80,6 @@ impl ZkSyncStateKeeper {
         let (fee_account_id, _) = state
             .get_account_by_address(&fee_account_address)
             .expect("Fee account should be present in the account tree");
-        // Keeper starts with the NEXT block
-        // we leave space for last tx
-        let mut be_bytes = [0u8; 32];
-        state
-            .root_hash()
-            .into_repr()
-            .write_be(be_bytes.as_mut())
-            .expect("Write commit bytes");
-        let previous_root_hash = H256::from(be_bytes);
 
         let config = StateKeeperConfig::new(
             fee_account_id,
@@ -99,15 +88,21 @@ impl ZkSyncStateKeeper {
             fast_miniblock_iterations,
         );
 
-        let mut keeper = ZkSyncStateKeeper {
-            state,
-            pending_block: PendingBlock::new(
+        let pending_block = {
+            // Keeper starts with the NEXT block
+            let current_block = initial_state.last_block_number + 1;
+
+            PendingBlock::new(
                 current_block,
                 initial_state.unprocessed_priority_op,
                 config.max_block_size(),
-                previous_root_hash,
                 system_time_timestamp(),
-            ),
+            )
+        };
+
+        let mut keeper = ZkSyncStateKeeper {
+            state,
+            pending_block,
             config,
 
             rx_for_blocks,
@@ -116,7 +111,6 @@ impl ZkSyncStateKeeper {
 
             root_hash_queue: BlockRootHashJobQueue::new(),
         };
-
         keeper.initialize(initial_state.pending_block);
 
         todo!("Put all the incomplete jobs into queue");
@@ -618,7 +612,6 @@ impl ZkSyncStateKeeper {
                 current_block,
                 next_unprocessed_priority_op,
                 self.config.max_block_size(),
-                H256::default(),
                 system_time_timestamp(),
             ),
         );

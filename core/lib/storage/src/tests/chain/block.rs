@@ -8,7 +8,7 @@ use zksync_types::{
     aggregated_operations::AggregatedActionType,
     helpers::apply_updates,
     tx::{ChangePubKeyType, TxHash},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId,
 };
 // Local imports
 use super::operations_ext::{
@@ -775,7 +775,6 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         pending_block_iteration: 1,
         success_operations: txs_1,
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
     let pending_block_2 = PendingBlock {
@@ -785,7 +784,6 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         pending_block_iteration: 2,
         success_operations: txs_2,
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
 
@@ -1086,7 +1084,6 @@ async fn test_remove_pending_block(mut storage: StorageProcessor<'_>) -> QueryRe
         pending_block_iteration: 1,
         success_operations: Vec::new(),
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
 

@@ -37,8 +37,6 @@ pub struct PendingBlock {
     pub success_operations: Vec<ExecutedOperations>,
     /// List of failed operations.
     pub failed_txs: Vec<ExecutedTx>,
-    /// Previous block root hash
-    pub previous_block_root_hash: H256,
     /// Timestamp
     pub timestamp: u64,
 }

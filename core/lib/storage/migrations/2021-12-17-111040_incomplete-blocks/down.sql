@@ -1,1 +1,4 @@
 DROP TABLE IF EXISTS incomplete_blocks;
+ALTER TABLE pending_block
+    ADD timestamp bigint,
+    ADD previous_root_hash BYTEA NOT NULL default '\x0000000000000000000000000000000000000000000000000000000000000000';

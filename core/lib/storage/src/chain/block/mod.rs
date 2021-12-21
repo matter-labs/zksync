@@ -727,8 +727,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             }
         }
 
-        let previous_block_root_hash = H256::from_slice(&block.previous_root_hash);
-
         let result = PendingBlock {
             number: BlockNumber(block.number as u32),
             chunks_left: block.chunks_left as usize,
@@ -736,7 +734,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             pending_block_iteration: block.pending_block_iteration as usize,
             success_operations,
             failed_txs,
-            previous_block_root_hash,
             timestamp: block.timestamp.unwrap_or_else(|| {
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -770,19 +767,18 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             chunks_left: pending_block.chunks_left as i64,
             unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
             pending_block_iteration: pending_block.pending_block_iteration as i64,
-            previous_root_hash: pending_block.previous_block_root_hash.as_bytes().to_vec(),
             timestamp: Some(pending_block.timestamp as i64),
         };
 
         // Store the pending block header.
         sqlx::query!("
-            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, timestamp)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (number)
             DO UPDATE
-              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5, timestamp = $6
+              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, timestamp = $5
             ",
-            storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration, storage_block.previous_root_hash,
+            storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration,
             storage_block.timestamp
         ).execute(transaction.conn())
         .await?;

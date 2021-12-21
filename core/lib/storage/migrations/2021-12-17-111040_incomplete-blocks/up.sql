@@ -11,3 +11,4 @@ CREATE TABLE IF NOT EXISTS incomplete_blocks (
     verify_gas_limit BIGINT NOT NULL,
     timestamp bigint
 );
+ALTER TABLE pending_block DROP COLUMN IF EXISTS previous_root_hash;

@@ -45,7 +45,6 @@ pub struct StoragePendingBlock {
     pub chunks_left: i64,
     pub unprocessed_priority_op_before: i64,
     pub pending_block_iteration: i64,
-    pub previous_root_hash: Vec<u8>,
     pub timestamp: Option<i64>,
 }
 
