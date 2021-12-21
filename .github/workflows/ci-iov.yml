@@ -19,8 +19,9 @@ jobs:
           docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk 
           ci_run sccache --start-server &
-          docker-compose -f docker-compose-runner.yml ps -a
-          curl http://rskj:4444 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+          #docker-compose -f docker-compose-runner.yml ps -a
+          #this won't work without port binding to host
+          #curl http://localhost:4444 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
               
       - name: setup-env
         run: |
