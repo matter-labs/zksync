@@ -46,43 +46,43 @@ impl ZkSyncStateInitParams {
     pub async fn restore_from_db(
         storage: &mut zksync_storage::StorageProcessor<'_>,
     ) -> Result<Self, anyhow::Error> {
-        let mut init_params = Self::new();
-        init_params.load_from_db(storage).await?;
+        let (last_block_number, tree, acc_id_by_addr) = Self::load_account_tree(storage).await;
 
+        let unprocessed_priority_op =
+            Self::unprocessed_priority_op_id(storage, last_block_number).await?;
+        let nfts = Self::load_nft_tokens(storage, last_block_number).await?;
+
+        let pending_block = Self::load_pending_block(storage, last_block_number).await;
+        let root_hash_jobs = Self::load_root_hash_jobs(storage).await;
+
+        let init_params = Self {
+            tree,
+            acc_id_by_addr,
+            nfts,
+            last_block_number,
+            unprocessed_priority_op,
+            pending_block,
+            root_hash_jobs,
+        };
+
+        vlog::info!(
+            "Loaded committed state: last block number: {}, unprocessed priority op: {}",
+            *init_params.last_block_number,
+            init_params.unprocessed_priority_op
+        );
         Ok(init_params)
     }
 
     async fn load_account_tree(
-        &mut self,
         storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> BlockNumber {
+    ) -> (BlockNumber, AccountTree, HashMap<Address, AccountId>) {
         let mut restored_tree = RestoredTree::new(StateRestoreStorage::new(storage));
         let last_block_number = restored_tree.restore().await;
-        self.tree = restored_tree.tree;
-        self.acc_id_by_addr = restored_tree.acc_id_by_addr;
-        last_block_number
-    }
-
-    async fn load_from_db(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), anyhow::Error> {
-        let block_number = self.load_account_tree(storage).await;
-        self.last_block_number = block_number;
-
-        self.unprocessed_priority_op =
-            Self::unprocessed_priority_op_id(storage, block_number).await?;
-        self.nfts = Self::load_nft_tokens(storage, block_number).await?;
-
-        self.pending_block = Self::load_pending_block(storage, block_number).await;
-        self.root_hash_jobs = Self::load_root_hash_jobs(storage).await;
-
-        vlog::info!(
-            "Loaded committed state: last block number: {}, unprocessed priority op: {}",
-            *self.last_block_number,
-            self.unprocessed_priority_op
-        );
-        Ok(())
+        (
+            last_block_number,
+            restored_tree.tree,
+            restored_tree.acc_id_by_addr,
+        )
     }
 
     async fn load_pending_block(
