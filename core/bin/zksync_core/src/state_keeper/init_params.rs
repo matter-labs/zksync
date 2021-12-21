@@ -43,14 +43,12 @@ impl ZkSyncStateInitParams {
         }
     }
 
-    pub async fn restore_from_db(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<Self, anyhow::Error> {
+    pub async fn restore_from_db(storage: &mut zksync_storage::StorageProcessor<'_>) -> Self {
         let (last_block_number, tree, acc_id_by_addr) = Self::load_account_tree(storage).await;
 
         let unprocessed_priority_op =
-            Self::unprocessed_priority_op_id(storage, last_block_number).await?;
-        let nfts = Self::load_nft_tokens(storage, last_block_number).await?;
+            Self::unprocessed_priority_op_id(storage, last_block_number).await;
+        let nfts = Self::load_nft_tokens(storage, last_block_number).await;
 
         let pending_block = Self::load_pending_block(storage, last_block_number).await;
         let root_hash_jobs = Self::load_root_hash_jobs(storage).await;
@@ -70,7 +68,7 @@ impl ZkSyncStateInitParams {
             *init_params.last_block_number,
             init_params.unprocessed_priority_op
         );
-        Ok(init_params)
+        init_params
     }
 
     async fn load_account_tree(
@@ -151,35 +149,32 @@ impl ZkSyncStateInitParams {
     async fn load_nft_tokens(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
-    ) -> anyhow::Result<HashMap<TokenId, NFT>> {
-        let nfts = storage
+    ) -> HashMap<TokenId, NFT> {
+        storage
             .chain()
             .state_schema()
             .load_committed_nft_tokens(Some(block_number))
-            .await?
+            .await
+            .expect("Unable to load committed NFT tokens")
             .into_iter()
             .map(|nft| {
                 let token: NFT = nft.into();
                 (token.id, token)
             })
-            .collect();
-        Ok(nfts)
+            .collect()
     }
 
     async fn unprocessed_priority_op_id(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
-    ) -> Result<u64, anyhow::Error> {
-        let block = storage
+    ) -> u64 {
+        storage
             .chain()
             .block_schema()
             .get_block(block_number)
-            .await?;
-
-        if let Some(block) = block {
-            Ok(block.processed_priority_ops.1)
-        } else {
-            Ok(0)
-        }
+            .await
+            .expect("Unable to load the last block to get unprocessed priority operation")
+            .map(|block| block.processed_priority_ops.1)
+            .unwrap_or(0)
     }
 }

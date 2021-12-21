@@ -122,7 +122,7 @@ pub async fn run_core(
     let mut storage_processor = connection_pool.access_storage().await?;
 
     // Start State Keeper.
-    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await?;
+    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await;
 
     let state_keeper = ZkSyncStateKeeper::new(
         state_keeper_init,
