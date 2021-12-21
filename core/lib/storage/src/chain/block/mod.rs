@@ -667,7 +667,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             )
             .await;
         metrics::histogram!(
-            "sql.chain.block.get_last_verified_confirmed_block",
+            "sql.chain.block.get_last_proven_confirmed_block",
             start.elapsed()
         );
         result

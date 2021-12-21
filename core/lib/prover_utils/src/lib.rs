@@ -130,9 +130,12 @@ impl SetupForStepByStepProver {
             circuit.synthesize(&mut cs).unwrap();
 
             if let Some(err) = cs.which_is_unsatisfied() {
-                println!("unconstrained: {}", cs.find_unconstrained());
-                println!("number of constraints {}", cs.num_constraints());
-                println!("Unsatisfied {:?}", err);
+                vlog::error!(
+                    "Unsatisfied {:?} \n unconstrained: {} \n number of constraints {}",
+                    err,
+                    cs.find_unconstrained(),
+                    cs.num_constraints()
+                );
             }
             metrics::histogram!("prover", start.elapsed(), "stage" => "test_constraint_system", "type" => "single_proof");
         }
@@ -194,13 +197,16 @@ pub fn get_universal_setup_monomial_form(
     } else {
         let start = Instant::now();
         // try to find cache on disk
+        let place_for_key;
         let res = if let Ok(res) = fs_utils::get_universal_setup_monomial_form(power_of_two) {
+            place_for_key = "disk";
             res
         } else {
+            place_for_key = "remote";
             network_utils::download_universal_setup_monomial_form(power_of_two)?;
             fs_utils::get_universal_setup_monomial_form(power_of_two)?
         };
-        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup");
+        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup", "place" => place_for_key);
         Ok(res)
     }
 }

@@ -633,7 +633,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!(
-            "sql.chain.operations.remove_aggregate_operations_and_bindings",
+            "sql.chain.operations.remove_aggregate_operations",
             start.elapsed()
         );
         Ok(())
