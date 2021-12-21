@@ -6,7 +6,7 @@ use structopt::StructOpt;
 
 use serde::{Deserialize, Serialize};
 
-use zksync_api::fee_ticker::{run_ticker_task, TickerRequest};
+use zksync_api::fee_ticker::{run_updaters, TickerRequest};
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
@@ -42,6 +42,7 @@ pub enum Component {
     RpcWebSocketApi,
 
     // Core components
+    Updaters,
     EthSender,
     Core,
     WitnessGenerator,
@@ -159,6 +160,12 @@ async fn run_server(components: &ComponentsToRun) {
         ));
     }
 
+    if components.0.contains(&Component::Updaters) {
+        // Run price updaters
+        let mut price_tasks = run_price_updaters(connection_pool.clone());
+        tasks.append(&mut price_tasks);
+    }
+
     if components.0.iter().any(|c| {
         matches!(
             c,
@@ -177,10 +184,6 @@ async fn run_server(components: &ComponentsToRun) {
         {
             tasks.push(task);
         }
-
-        // Run ticker
-        let (task, ticker_request_sender) = run_ticker(connection_pool.clone(), channel_size);
-        tasks.push(task);
 
         // Run signer
         let (sign_check_sender, sign_check_receiver) = mpsc::channel(channel_size);
@@ -330,21 +333,9 @@ pub fn run_eth_sender(connection_pool: ConnectionPool) -> JoinHandle<()> {
     zksync_eth_sender::run_eth_sender(connection_pool, eth_gateway, eth_sender_config)
 }
 
-pub fn run_ticker(
-    connection_pool: ConnectionPool,
-    channel_size: usize,
-) -> (JoinHandle<()>, mpsc::Sender<TickerRequest>) {
-    vlog::info!("Starting Ticker actors");
-    let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(channel_size);
-    let chain_config = ChainConfig::from_env();
+pub fn run_price_updaters(connection_pool: ConnectionPool) -> Vec<JoinHandle<()>> {
     let ticker_config = TickerConfig::from_env();
-    let task = run_ticker_task(
-        connection_pool,
-        ticker_request_receiver,
-        &ticker_config,
-        chain_config.max_blocks_to_aggregate(),
-    );
-    (task, ticker_request_sender)
+    run_updaters(connection_pool, &ticker_config)
 }
 
 pub fn create_eth_gateway() -> EthereumGateway {

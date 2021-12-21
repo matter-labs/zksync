@@ -38,12 +38,12 @@ use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 
 // Local deps
 use crate::fee_ticker::constants::AMORTIZED_COST_PER_CHUNK;
+pub use crate::fee_ticker::ticker_info::{FeeTickerInfo, TickerInfo};
 use crate::fee_ticker::{
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
         CONNECTION_TIMEOUT,
     },
-    ticker_info::{FeeTickerInfo, TickerInfo},
     validator::{
         watcher::{TokenWatcher, UniswapTokenWatcher},
         FeeTokenValidator, MarketUpdater,
@@ -173,30 +173,6 @@ pub struct ResponseBatchFee {
     pub subsidy_size_usd: Ratio<BigUint>,
 }
 
-#[derive(Debug)]
-pub enum TickerRequest {
-    GetTxFee {
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-        response: oneshot::Sender<Result<ResponseFee, anyhow::Error>>,
-    },
-    GetBatchTxFee {
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-        response: oneshot::Sender<Result<ResponseBatchFee, anyhow::Error>>,
-    },
-    GetTokenPrice {
-        token: TokenLike,
-        response: oneshot::Sender<Result<BigDecimal, PriceError>>,
-        req_type: TokenPriceRequestType,
-    },
-    IsTokenAllowed {
-        token: TokenLike,
-        response: oneshot::Sender<Result<bool, anyhow::Error>>,
-    },
-}
-
 #[derive(Debug, Error)]
 pub enum PriceError {
     #[error("Token not found: {0}")]
@@ -221,37 +197,9 @@ impl PriceError {
     }
 }
 
-struct FeeTicker<API, INFO, WATCHER> {
-    api: API,
-    info: INFO,
-    requests: Receiver<TickerRequest>,
-    config: TickerConfig,
-    validator: FeeTokenValidator<WATCHER>,
-}
-
-struct FeeTickerBuilder<API, INFO, WATCHER> {
-    api: API,
+pub struct FeeTicker<INFO> {
     info: INFO,
     config: TickerConfig,
-    validator: FeeTokenValidator<WATCHER>,
-}
-
-impl<API: Clone, INFO: Clone, WATCHER: Clone>
-    BuildBalancedItem<TickerRequest, FeeTicker<API, INFO, WATCHER>>
-    for FeeTickerBuilder<API, INFO, WATCHER>
-{
-    fn build_with_receiver(
-        &self,
-        receiver: Receiver<TickerRequest>,
-    ) -> FeeTicker<API, INFO, WATCHER> {
-        FeeTicker {
-            api: self.api.clone(),
-            info: self.info.clone(),
-            requests: receiver,
-            config: self.config.clone(),
-            validator: self.validator.clone(),
-        }
-    }
 }
 
 const CPK_CREATE2_FEE_TYPE: OutputFeeType = OutputFeeType::ChangePubKey(
@@ -259,115 +207,50 @@ const CPK_CREATE2_FEE_TYPE: OutputFeeType = OutputFeeType::ChangePubKey(
 );
 
 #[must_use]
-pub fn run_ticker_task(
+pub fn run_updaters(
     db_pool: ConnectionPool,
-    tricker_requests: Receiver<TickerRequest>,
     config: &zksync_config::TickerConfig,
-    max_blocks_to_aggregate: u32,
-) -> JoinHandle<()> {
-    let ticker_config = TickerConfig {
-        zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
-        gas_cost_tx: GasOperationsCost::from_constants(config.fast_processing_coeff),
-        tokens_risk_factors: HashMap::new(),
-        scale_fee_coefficient: Ratio::new(
-            BigUint::from(config.scale_fee_percent),
-            BigUint::from(100u32),
-        ),
-        max_blocks_to_aggregate,
-        subsidy_cpk_price_usd: config.subsidy_cpk_price_usd(),
-    };
-
+) -> Vec<JoinHandle<()>> {
     let cache = (db_pool.clone(), TokenDBCache::new());
+
     let watcher = UniswapTokenWatcher::new(config.uniswap_url.clone());
-    let validator = FeeTokenValidator::new(
-        cache.clone(),
-        chrono::Duration::seconds(config.available_liquidity_seconds as i64),
-        BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
-        HashSet::from_iter(config.unconditionally_valid_tokens.clone()),
-        watcher.clone(),
-    );
 
     let updater = MarketUpdater::new(cache, watcher);
-    tokio::spawn(updater.keep_updated(config.token_market_update_time));
+    let mut tasks = vec![tokio::spawn(
+        updater.keep_updated(config.token_market_update_time),
+    )];
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
         .build()
         .expect("Failed to build reqwest::Client");
     let (price_source, base_url) = config.price_source();
-    match price_source {
+    let price_updater = match price_source {
         TokenPriceSource::CoinMarketCap => {
             let token_price_api =
                 CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
             let token_price_updater = ticker_api.clone();
-            tokio::spawn(token_price_updater.keep_price_updated());
-            let ticker_info = TickerInfo::new(db_pool);
-            let fee_ticker = FeeTicker::new(
-                ticker_api,
-                ticker_info,
-                tricker_requests,
-                ticker_config,
-                validator,
-            );
-
-            tokio::spawn(fee_ticker.run())
+            tokio::spawn(token_price_updater.keep_price_updated())
         }
 
         TokenPriceSource::CoinGecko => {
             let token_price_api =
                 CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
                     .expect("failed to init CoinGecko client");
-            let ticker_info = TickerInfo::new(db_pool.clone());
-
-            let token_db_cache = TokenDBCache::new();
-            let price_cache = Arc::new(Mutex::new(HashMap::new()));
-            let gas_price_cache = Arc::new(Mutex::new(None));
-            let ticker_api = TickerApi::new(db_pool, token_price_api)
-                .with_token_db_cache(token_db_cache)
-                .with_price_cache(price_cache)
-                .with_gas_price_cache(gas_price_cache);
-
+            let ticker_api = TickerApi::new(db_pool, token_price_api);
             let token_price_updater = ticker_api.clone();
-            tokio::spawn(token_price_updater.keep_price_updated());
-
-            let (ticker_balancer, tickers) = Balancer::new(
-                FeeTickerBuilder {
-                    api: ticker_api,
-                    info: ticker_info,
-                    config: ticker_config,
-                    validator,
-                },
-                tricker_requests,
-                config.number_of_ticker_actors,
-                TICKER_CHANNEL_SIZE,
-            );
-
-            for ticker in tickers.into_iter() {
-                tokio::spawn(ticker.run());
-            }
-
-            tokio::spawn(ticker_balancer.run())
+            tokio::spawn(token_price_updater.keep_price_updated())
         }
-    }
+    };
+    tasks.push(price_updater);
+    tasks
 }
 
-impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<API, INFO, WATCHER> {
-    fn new(
-        api: API,
-        info: INFO,
-        requests: Receiver<TickerRequest>,
-        config: TickerConfig,
-        validator: FeeTokenValidator<WATCHER>,
-    ) -> Self {
-        Self {
-            api,
-            info,
-            requests,
-            config,
-            validator,
-        }
+impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
+    fn new(info: INFO, config: TickerConfig) -> Self {
+        Self { info, config }
     }
 
     /// Increases the gas price by a constant coefficient.
@@ -377,50 +260,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         gas_price * BigUint::from(130u32) / BigUint::from(100u32)
     }
 
-    async fn run(mut self) {
-        while let Some(request) = self.requests.next().await {
-            let start = Instant::now();
-            match request {
-                TickerRequest::GetTxFee {
-                    tx_type,
-                    token,
-                    response,
-                    address,
-                } => {
-                    let fee = self
-                        .get_fee_from_ticker_in_wei(tx_type, token, address)
-                        .await;
-                    metrics::histogram!("ticker.get_tx_fee", start.elapsed());
-                    response.send(fee).unwrap_or_default()
-                }
-                TickerRequest::GetTokenPrice {
-                    token,
-                    response,
-                    req_type,
-                } => {
-                    let price = self.get_token_price(token, req_type).await;
-                    metrics::histogram!("ticker.get_token_price", start.elapsed());
-                    response.send(price).unwrap_or_default();
-                }
-                TickerRequest::IsTokenAllowed { token, response } => {
-                    let allowed = self.validator.token_allowed(token).await;
-                    metrics::histogram!("ticker.is_token_allowed", start.elapsed());
-                    response.send(allowed).unwrap_or_default();
-                }
-                TickerRequest::GetBatchTxFee {
-                    transactions,
-                    token,
-                    response,
-                } => {
-                    let fee = self.get_batch_from_ticker_in_wei(token, transactions).await;
-                    metrics::histogram!("ticker.get_tx_fee", start.elapsed());
-                    response.send(fee).unwrap_or_default()
-                }
-            }
-        }
-    }
-
-    async fn get_token_price(
+    pub async fn get_token_price(
         &self,
         token: TokenLike,
         request_type: TokenPriceRequestType,
@@ -428,7 +268,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let factor = match request_type {
             TokenPriceRequestType::USDForOneWei => {
                 let token_decimals = self
-                    .api
+                    .info
                     .get_token(token.clone())
                     .await
                     .map_err(PriceError::db_error)?
@@ -438,27 +278,27 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             TokenPriceRequestType::USDForOneToken => BigUint::from(1u32),
         };
 
-        self.api
+        self.info
             .get_last_quote(token)
             .await
             .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
 
-    async fn get_fee_from_ticker_in_wei(
+    pub async fn get_fee_from_ticker_in_wei(
         &mut self,
         tx_type: TxFeeTypes,
         token: TokenLike,
         recipient: Address,
     ) -> Result<ResponseFee, anyhow::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
-        let token = self.api.get_token(token).await?;
+        let token = self.info.get_token(token).await?;
 
-        let gas_price_wei = self.api.get_gas_price_wei().await?;
+        let gas_price_wei = self.info.get_gas_price_wei().await?;
         let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
         let wei_price_usd = self.wei_price_usd().await?;
         let token_usd_risk = self.token_usd_risk(&token).await?;
 
-        let (fee_type, gas_tx_amount, op_chunks) = self.gas_tx_amount(tx_type, recipient).await;
+        let (fee_type, gas_tx_amount, op_chunks) = self.gas_tx_amount(tx_type, recipient).await?;
 
         let zkp_fee = (zkp_cost_chunk * op_chunks) * &token_usd_risk;
         let mut normal_gas_fee =
@@ -525,16 +365,16 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         })
     }
 
-    async fn get_batch_from_ticker_in_wei(
+    pub async fn get_batch_from_ticker_in_wei(
         &mut self,
         token: TokenLike,
         txs: Vec<(TxFeeTypes, Address)>,
     ) -> anyhow::Result<ResponseBatchFee> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
 
-        let token = self.api.get_token(token).await?;
+        let token = self.info.get_token(token).await?;
 
-        let gas_price_wei = self.api.get_gas_price_wei().await?;
+        let gas_price_wei = self.info.get_gas_price_wei().await?;
         let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
         let wei_price_usd = self.wei_price_usd().await?;
         let token_usd_risk = self.token_usd_risk(&token).await?;
@@ -581,7 +421,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
 
         for (tx_type, recipient) in txs {
             let (output_fee_type, gas_tx_amount, op_chunks) =
-                self.gas_tx_amount(tx_type, recipient).await;
+                self.gas_tx_amount(tx_type, recipient).await?;
             // Increase fee only for L2 operations
             let gas_tx_amount: Ratio<BigUint> = if matches!(
                 output_fee_type,
@@ -636,16 +476,16 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         })
     }
 
-    async fn wei_price_usd(&mut self) -> anyhow::Result<Ratio<BigUint>> {
+    pub async fn wei_price_usd(&mut self) -> anyhow::Result<Ratio<BigUint>> {
         Ok(self
-            .api
+            .info
             .get_last_quote(TokenLike::Id(TokenId(0)))
             .await?
             .usd_price
             / BigUint::from(10u32).pow(18u32))
     }
 
-    async fn token_usd_risk(&mut self, token: &Token) -> anyhow::Result<Ratio<BigUint>> {
+    pub async fn token_usd_risk(&mut self, token: &Token) -> anyhow::Result<Ratio<BigUint>> {
         let token_risk_factor = self
             .config
             .tokens_risk_factors
@@ -654,7 +494,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .unwrap_or_else(|| Ratio::from_integer(1u32.into()));
 
         let token_price_usd = self
-            .api
+            .info
             .get_last_quote(TokenLike::Id(token.id))
             .await?
             .usd_price
@@ -666,7 +506,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
     }
 
     /// Returns `true` if account does not yet exist in the zkSync network.
-    async fn is_account_new(&mut self, address: Address) -> bool {
+    pub async fn is_account_new(&mut self, address: Address) -> anyhow::Result<bool> {
         self.info.is_account_new(address).await
     }
 
@@ -674,14 +514,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         &mut self,
         tx_type: TxFeeTypes,
         recipient: Address,
-    ) -> (OutputFeeType, BigUint, BigUint) {
+    ) -> anyhow::Result<(OutputFeeType, BigUint, BigUint)> {
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::WithdrawNFT => (OutputFeeType::WithdrawNFT, WithdrawNFTOp::CHUNKS),
             TxFeeTypes::FastWithdrawNFT => (OutputFeeType::FastWithdrawNFT, WithdrawNFTOp::CHUNKS),
             TxFeeTypes::Transfer => {
-                if self.is_account_new(recipient).await {
+                if self.is_account_new(recipient).await? {
                     (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)
                 } else {
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
@@ -711,7 +551,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
 
-        (fee_type, gas_tx_amount, op_chunks)
+        Ok((fee_type, gas_tx_amount, op_chunks))
     }
     async fn calculate_fast_withdrawal_gas_cost(&mut self, chunk_size: usize) -> BigUint {
         let future_blocks = self.info.blocks_in_future_aggregated_operations().await;

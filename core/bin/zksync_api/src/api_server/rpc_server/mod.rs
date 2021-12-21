@@ -39,6 +39,7 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use crate::fee_ticker::{FeeTicker, TickerInfo};
 use ip_insert_middleware::IpInsertMiddleWare;
 
 #[derive(Clone)]
@@ -56,7 +57,7 @@ impl RpcApp {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: FeeTicker<TickerInfo>,
         config: &CommonApiConfig,
         private_url: String,
         confirmations_for_eth_event: u64,
@@ -66,7 +67,7 @@ impl RpcApp {
         let tx_sender = TxSender::new(
             connection_pool,
             sign_verify_request_sender,
-            ticker_request_sender,
+            ticker,
             config,
             private_url,
         );

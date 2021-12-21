@@ -54,6 +54,7 @@ use crate::{
 use zksync_config::configs::api::CommonApiConfig;
 
 use super::rpc_server::types::RequestMetadata;
+use crate::fee_ticker::{FeeTicker, TickerInfo};
 
 const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
@@ -61,7 +62,7 @@ const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 pub struct TxSender {
     pub core_api_client: CoreApiClient,
     pub sign_verify_requests: mpsc::Sender<VerifySignatureRequest>,
-    pub ticker_requests: mpsc::Sender<TickerRequest>,
+    pub ticker: FeeTicker<TickerInfo>,
 
     pub pool: ConnectionPool,
     pub tokens: TokenDBCache,
@@ -141,7 +142,7 @@ impl TxSender {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: FeeTicker<TickerInfo>,
         config: &CommonApiConfig,
         private_url: String,
     ) -> Self {
@@ -151,7 +152,7 @@ impl TxSender {
             core_api_client,
             connection_pool,
             sign_verify_request_sender,
-            ticker_request_sender,
+            ticker,
             config,
         )
     }
@@ -160,7 +161,7 @@ impl TxSender {
         core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: FeeTicker<TickerInfo>,
         config: &CommonApiConfig,
     ) -> Self {
         let max_number_of_transactions_per_batch =
@@ -171,7 +172,7 @@ impl TxSender {
             core_api_client,
             pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
-            ticker_requests: ticker_request_sender,
+            ticker,
             tokens: TokenDBCache::new(),
             forced_exit_checker: ForcedExitChecker::new(
                 config.forced_exit_minimum_account_age_secs,
@@ -1049,21 +1050,22 @@ impl TxSender {
     }
 
     async fn ticker_batch_fee_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: &mut FeeTicker<TickerInfo>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
     ) -> Result<ResponseBatchFee, SubmitError> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetBatchTxFee {
-                transactions,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .map_err(SubmitError::internal)?;
-        let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(|err| internal_error!(err))
+        todo!()
+        // let fee = ticker.get_batch
+        // ticker_request_sender
+        //     .send(TickerRequest::GetBatchTxFee {
+        //         transactions,
+        //         token: token.clone(),
+        //         response: req.0,
+        //     })
+        //     .await
+        //     .map_err(SubmitError::internal)?;
+        // let resp = req.1.await.map_err(SubmitError::internal)?;
+        // resp.map_err(|err| internal_error!(err))
     }
 
     async fn ticker_request(
