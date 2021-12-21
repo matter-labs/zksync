@@ -15,12 +15,12 @@ jobs:
         
       - name: start-services
         run: |
-          docker-compose -f docker-compose-runner2.yml down
-          docker-compose -f docker-compose-runner2.yml pull
-          docker-compose -f docker-compose-runner2.yml up --build -d rskj postgres zk 
+          docker-compose -f docker-compose-runner.yml down
+          docker-compose -f docker-compose-runner.yml pull
+          docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk 
           ci_run sccache --start-server &
-          docker-compose -f docker-compose-runner2.yml ps -a
-          #curl http://localhost:4444 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+          docker-compose -f docker-compose-runner.yml ps -a
+          curl http://rskj:4444 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
               
       - name: setup-env
         run: |
@@ -42,7 +42,7 @@ jobs:
           ci_run zk run deploy-eip1271
 
       - name: restart dev-liquidity-token-watcher and dev-ticker
-        run: docker-compose -f docker-compose-runner2.yml restart dev-liquidity-token-watcher dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
       - name: contracts-unit-tests
         run: ci_run zk test contracts

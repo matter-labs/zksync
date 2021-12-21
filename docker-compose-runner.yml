@@ -5,13 +5,10 @@ services:
     environment:
         - POSTGRES_HOST_AUTH_METHOD=trust
 
-  #ports will not be visible to zk container so this is just to build the image
   rskj:
     build:
       context: ./docker/rskj
-    #ports:
-    #  - "4444:4444"
-    #  - "4445:4445"
+  
   
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
@@ -43,4 +40,3 @@ services:
       - CACHE_DIR=/usr/src/cache
       - SCCACHE_CACHE_SIZE=50g
       - CI=1
-    #network_mode : "host" #container uses docker env for network

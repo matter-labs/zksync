@@ -5,7 +5,7 @@ set -e
 BG_ASM=dist/zksync-crypto-bundler_bg_asm.js
 ASM=dist/zksync-crypto-bundler_asm.js
 
-which wasm-pack || cargo install --version 0.10.1 wasm-pack
+which wasm-pack || cargo install --version 0.10.1 wasm-pack #version 0.10.2 leads to errors
 
 # pack for bundler (!note this verion is used in the pkg.browser field)
 wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
