@@ -1,4 +1,3 @@
-use crate::fs_utils::{get_block_verification_key_path, get_exodus_verification_key_path};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fs::File;
@@ -14,6 +13,7 @@ use zksync_crypto::bellman::plonk::{
     transpile,
 };
 use zksync_crypto::franklin_crypto::bellman::Circuit;
+use zksync_crypto::franklin_crypto::circuit::test::TestConstraintSystem;
 use zksync_crypto::franklin_crypto::plonk::circuit::bigint::field::RnsParameters;
 use zksync_crypto::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use zksync_crypto::franklin_crypto::rescue::rescue_transcript::RescueTranscriptForRNS;
@@ -22,6 +22,8 @@ use zksync_crypto::params::RECURSIVE_CIRCUIT_VK_TREE_DEPTH;
 use zksync_crypto::proof::SingleProof;
 use zksync_crypto::recursive_aggregation_circuit::circuit::create_vks_tree;
 use zksync_crypto::{Engine, Fr};
+
+use crate::fs_utils::{get_block_verification_key_path, get_exodus_verification_key_path};
 
 pub mod aggregated_proofs;
 pub mod api;
@@ -86,7 +88,7 @@ impl SetupForStepByStepProver {
             setup_power_of_two,
             download_setup_file,
         )?);
-        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup");
+        metrics::histogram!("prover", start.elapsed(), "stage" => "prepare_setup");
         Ok(SetupForStepByStepProver {
             setup_polynomials,
             hints,
@@ -107,7 +109,7 @@ impl SetupForStepByStepProver {
 
         let transcript_params = (&rescue_params, &rns_params);
         let proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
-            circuit,
+            circuit.clone(),
             &self.hints,
             &self.setup_polynomials,
             None,
@@ -122,6 +124,21 @@ impl SetupForStepByStepProver {
         let valid =
             verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
         metrics::histogram!("prover", start.elapsed(), "stage" => "verify_proof", "type" => "single_proof");
+        if !valid {
+            let start = Instant::now();
+            let mut cs = TestConstraintSystem::<Engine>::new();
+            circuit.synthesize(&mut cs).unwrap();
+
+            if let Some(err) = cs.which_is_unsatisfied() {
+                vlog::error!(
+                    "Unsatisfied {:?} \n unconstrained: {} \n number of constraints {}",
+                    err,
+                    cs.find_unconstrained(),
+                    cs.num_constraints()
+                );
+            }
+            metrics::histogram!("prover", start.elapsed(), "stage" => "test_constraint_system", "type" => "single_proof");
+        }
         anyhow::ensure!(valid, "proof for block is invalid");
         Ok(proof.into())
     }
@@ -175,13 +192,22 @@ pub fn get_universal_setup_monomial_form(
 ) -> Result<Crs<Engine, CrsForMonomialForm>, anyhow::Error> {
     if let Some(cached_setup) = UNIVERSAL_SETUP_CACHE.take_setup_struct(power_of_two) {
         Ok(cached_setup)
-    } else if download_from_network {
-        let start = Instant::now();
-        let res = network_utils::get_universal_setup_monomial_form(power_of_two);
-        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup", "type" => "aggregated_proof");
-        res
-    } else {
+    } else if !download_from_network {
         fs_utils::get_universal_setup_monomial_form(power_of_two)
+    } else {
+        let start = Instant::now();
+        // try to find cache on disk
+        let place_for_key;
+        let res = if let Ok(res) = fs_utils::get_universal_setup_monomial_form(power_of_two) {
+            place_for_key = "disk";
+            res
+        } else {
+            place_for_key = "remote";
+            network_utils::download_universal_setup_monomial_form(power_of_two)?;
+            fs_utils::get_universal_setup_monomial_form(power_of_two)?
+        };
+        metrics::histogram!("prover", start.elapsed(), "stage" => "download_setup", "place" => place_for_key);
+        Ok(res)
     }
 }
 

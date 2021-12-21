@@ -4790,19 +4790,6 @@
       "nullable": []
     }
   },
-  "a77668a3dce7f7cd1f45816f932eea685d429c3d75b40ea8e1a1bb9fc29f11c6": {
-    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "a7c77ca1eaea92f29494328c6652246732e50e2c989ed87676e333c295e0c251": {
     "query": "UPDATE eth_parameters\n            SET last_committed_block = $1, last_verified_block = $2, last_executed_block = $3\n            WHERE id = true",
     "describe": {
@@ -7581,6 +7568,27 @@
       ]
     }
   },
+  "faefd7d582000800f48eddcc1e933a876f5b0cd556f0dc45c6241eb72da97894": {
+    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds' RETURNING id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "fd16aadbd04d4a48332d59c77290a588f1a33922418b55a08c656a44ff75b8e8": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number = $1",
     "describe": {
@@ -7647,6 +7655,18 @@
         false,
         false
       ]
+    }
+  },
+  "fd18b441397834df097a6b1a62a773fbbb482a42a6c8f698277be4d2f219ae79": {
+    "query": "DELETE FROM aggregate_operations WHERE from_block > $1 and confirmed=false",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "fe0256b27116eafc9a83d0f9eff341751c6022a13d0bc3625c8c8f8b9001309e": {

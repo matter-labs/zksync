@@ -619,6 +619,27 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     }
 
     // Removes aggregate operations and bindings for blocks with number greater than `last_block`
+    pub async fn remove_aggregate_operations(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            "DELETE FROM aggregate_operations WHERE from_block > $1 and confirmed=false",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.operations.remove_aggregate_operations",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    // Removes aggregate operations and bindings for blocks with number greater than `last_block`
     pub async fn remove_aggregate_operations_and_bindings(
         &mut self,
         last_block: BlockNumber,

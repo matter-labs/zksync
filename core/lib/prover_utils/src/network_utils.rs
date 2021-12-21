@@ -1,14 +1,12 @@
 use super::{SETUP_MAX_POW2, SETUP_MIN_POW2};
+use crate::fs_utils;
 use anyhow::format_err;
 use backoff::Operation;
+use reqwest::blocking::Response;
 use std::time::Duration;
-use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
-use zksync_crypto::Engine;
 
 /// Downloads universal setup in the monomial form of the given power of two (range: SETUP_MIN_POW2..=SETUP_MAX_POW2)
-pub fn get_universal_setup_monomial_form(
-    power_of_two: u32,
-) -> Result<Crs<Engine, CrsForMonomialForm>, anyhow::Error> {
+pub fn download_universal_setup_monomial_form(power_of_two: u32) -> Result<(), anyhow::Error> {
     anyhow::ensure!(
         (SETUP_MIN_POW2..=SETUP_MAX_POW2).contains(&power_of_two),
         "setup power of two is not in the correct range"
@@ -16,7 +14,7 @@ pub fn get_universal_setup_monomial_form(
 
     let mut retry_op = move || try_to_download_setup(power_of_two);
 
-    retry_op
+    let mut response = retry_op
         .retry_notify(&mut get_backoff(), |err, next_after: Duration| {
             let duration_secs = next_after.as_millis() as f32 / 1000.0f32;
 
@@ -31,12 +29,13 @@ pub fn get_universal_setup_monomial_form(
                 "Can't download setup, max elapsed time of the backoff reached: {}",
                 e
             )
-        })
+        })?;
+
+    fs_utils::save_universal_setup_monomial_file(power_of_two, &mut response)?;
+    Ok(())
 }
 
-fn try_to_download_setup(
-    power_of_two: u32,
-) -> Result<Crs<Engine, CrsForMonomialForm>, backoff::Error<anyhow::Error>> {
+fn try_to_download_setup(power_of_two: u32) -> Result<Response, backoff::Error<anyhow::Error>> {
     let setup_network_dir = std::env::var("MISC_PROVER_SETUP_NETWORK_DIR")
         .map_err(|e| backoff::Error::Permanent(e.into()))?;
 
@@ -44,12 +43,7 @@ fn try_to_download_setup(
 
     vlog::info!("Downloading universal setup from {}", &setup_dl_path);
 
-    let mut response_reader =
-        reqwest::blocking::get(&setup_dl_path).map_err(|e| backoff::Error::Transient(e.into()))?;
-
-    Crs::<Engine, CrsForMonomialForm>::read(&mut response_reader)
-        .map_err(|e| format_err!("Failed to read Crs from remote setup file: {}", e))
-        .map_err(backoff::Error::Transient)
+    reqwest::blocking::get(&setup_dl_path).map_err(|e| backoff::Error::Transient(e.into()))
 }
 
 fn get_backoff() -> backoff::ExponentialBackoff {

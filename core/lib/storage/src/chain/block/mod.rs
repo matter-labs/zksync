@@ -658,6 +658,22 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     /// Returns the number of last block for which proof has been confirmed on Ethereum.
+    pub async fn get_last_proven_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
+            .get_last_block_by_aggregated_action(
+                AggregatedActionType::PublishProofBlocksOnchain,
+                Some(true),
+            )
+            .await;
+        metrics::histogram!(
+            "sql.chain.block.get_last_proven_confirmed_block",
+            start.elapsed()
+        );
+        result
+    }
+
+    /// Returns the number of last block for which executed operations has been confirmed on Ethereum .
     /// Essentially, it's number of last block for which updates were applied to the chain state.
     pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
