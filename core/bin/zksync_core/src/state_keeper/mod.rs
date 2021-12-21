@@ -316,15 +316,20 @@ impl ZkSyncStateKeeper {
         } else {
             self.config.max_miniblock_iterations
         };
+
+        // State keeper may process empty blocks (or blocks containing rejected transactions only), and it's an
+        // important part of its logic: timeout for sealing the block is expressed in the amount of processing
+        // iterations. If enough iterations pases, block should be sealed even if it's not full. However, we don't
+        // want to notify any external actor and write to the database if this iteration was "empty".
+        if !empty_proposed_block {
+            self.store_pending_block().await;
+        }
+
+        // Check whether we should seal this block and start processing the next one.
+        // It is important that we do that *after* we stored the pending block, since we only store new transactions
+        // to the database during pending block processing.
         if self.pending_block.should_seal(max_miniblock_iterations) {
             self.seal_pending_block().await;
-        } else {
-            // We've already incremented the pending block iteration, so this iteration will count towards
-            // reaching the block commitment timeout.
-            // However, we don't want to pointlessly save the same block again and again.
-            if !empty_proposed_block {
-                self.store_pending_block().await;
-            }
         }
 
         metrics::histogram!("state_keeper.execute_proposed_block", start.elapsed());
@@ -616,12 +621,12 @@ impl ZkSyncStateKeeper {
             ),
         );
 
-        let mut block_transactions = pending_block.success_operations.clone(); // TODO (in this PR): Avoid cloning.
+        let mut block_transactions = pending_block.success_operations.clone(); // TODO (ZKS-821): Avoid cloning.
         block_transactions.extend(
             pending_block
                 .failed_txs
                 .iter()
-                .cloned() // TODO (in this PR): Avoid cloning.
+                .cloned() // TODO (ZKS-821): Avoid cloning.
                 .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
         );
 

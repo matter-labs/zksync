@@ -837,6 +837,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(count)
     }
 
+    /// Stores completed block into the database.
     pub async fn save_block(&mut self, block: Block) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -852,10 +853,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let commitment = block.block_commitment.as_bytes().to_vec();
         let timestamp = Some(block.timestamp as i64);
 
-        BlockSchema(&mut transaction)
-            .save_block_transactions(block.block_number, block.block_transactions)
-            .await?;
-
         let new_block = StorageBlock {
             number,
             root_hash,
@@ -868,16 +865,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             commitment,
             timestamp,
         };
-
-        // Remove pending block (as it's now completed).
-        sqlx::query!(
-            "
-            DELETE FROM pending_block WHERE number = $1
-            ",
-            new_block.number
-        )
-        .execute(transaction.conn())
-        .await?;
 
         // Save new completed block.
         sqlx::query!("
@@ -896,6 +883,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Saves incomplete block to the database.
+    ///
+    /// This method **does not** save block transactions.
+    /// They are expected to be saved prior, during processing of previous pending blocks.
     pub async fn save_incomplete_block(&mut self, block: IncompleteBlock) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;

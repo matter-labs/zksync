@@ -75,7 +75,7 @@ pub fn spawn_state_keeper(
     let sk_thread_handle = std::thread::spawn(move || {
         let main_runtime = Runtime::new().expect("main runtime start");
         main_runtime.block_on(async move {
-            let state_keeper_task = start_state_keeper(state_keeper, None);
+            let state_keeper_task = start_state_keeper(state_keeper);
             tokio::select! {
                 _ = stop_state_keeper_receiver => {},
                 _ = state_keeper_task => {},
