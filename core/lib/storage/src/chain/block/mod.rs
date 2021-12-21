@@ -952,6 +952,36 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns the range of existing incomplete blocks.
+    ///
+    /// Returned range is *inclusive*, meaning that both returned blocks (if they were returned)
+    /// exist in the database, and represent minimum and maximum existing blocks correspondingly.
+    pub async fn incomplete_blocks_range(
+        &mut self,
+    ) -> QueryResult<Option<(BlockNumber, BlockNumber)>> {
+        let start = Instant::now();
+
+        let raw_numbers = sqlx::query!(
+            "
+                SELECT min(number), max(number)
+                FROM incomplete_blocks
+            ",
+        )
+        .fetch_one(self.0.conn())
+        .await?;
+
+        let block_numbers = match (raw_numbers.min, raw_numbers.max) {
+            (Some(min), Some(max)) => Some((BlockNumber(min as u32), BlockNumber(max as u32))),
+            (None, None) => None,
+            _ => {
+                panic!("Inconsistent results for min/max query: {:?}", raw_numbers);
+            }
+        };
+
+        metrics::histogram!("sql.chain.block.incomplete_blocks_range", start.elapsed());
+        Ok(block_numbers)
+    }
+
     // Helper method for retrieving incomplete blocks from the database.
     async fn get_storage_incomplete_block(
         &mut self,
