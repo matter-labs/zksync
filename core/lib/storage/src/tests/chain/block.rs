@@ -61,7 +61,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Execute and commit these blocks.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(1),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -71,7 +71,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .commit_state_update(BlockNumber(1), &updates_block_1, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(2),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -81,7 +81,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .commit_state_update(BlockNumber(2), &updates_block_2, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(3),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -235,7 +235,9 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
 
         // Store the block in the block schema.
         let block = gen_sample_block(block_number, BLOCK_SIZE_CHUNKS, Default::default());
-        BlockSchema(&mut storage).save_block(block.clone()).await?;
+        BlockSchema(&mut storage)
+            .save_full_block(block.clone())
+            .await?;
         OperationsSchema(&mut storage)
             .store_aggregated_action(gen_unique_aggregated_operation(
                 block_number,
@@ -440,7 +442,7 @@ async fn test_block_page(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
         // Store the operation in the block schema.
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -575,7 +577,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
 
         // Store the block in the block schema.
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -828,7 +830,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     );
 
     // Finalize the block.
-    BlockSchema(&mut storage).save_block(block_1).await?;
+    BlockSchema(&mut storage).save_full_block(block_1).await?;
 
     // Ensure that pending block is no more available.
     assert!(
@@ -878,7 +880,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     );
 
     // Finalize the block.
-    BlockSchema(&mut storage).save_block(block_2).await?;
+    BlockSchema(&mut storage).save_full_block(block_2).await?;
 
     // Ensure that pending block is no more available.
     assert!(
@@ -1040,7 +1042,7 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Insert 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -1234,7 +1236,7 @@ async fn test_remove_new_account_tree_cache(mut storage: StorageProcessor<'_>) -
     // Insert account tree cache for 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -1271,7 +1273,7 @@ async fn test_get_block_number_by_hash(mut storage: StorageProcessor<'_>) -> Que
     storage
         .chain()
         .block_schema()
-        .save_block(block.clone())
+        .save_full_block(block.clone())
         .await?;
 
     let actual_number = storage
@@ -1320,7 +1322,7 @@ async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -
     // Insert account tree cache for 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),

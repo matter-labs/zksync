@@ -120,7 +120,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         transaction
             .chain()
             .block_schema()
-            .save_block(block)
+            .save_full_block(block)
             .await
             .expect("Unable to save block");
 

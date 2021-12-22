@@ -838,32 +838,24 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     /// Stores completed block into the database.
-    pub async fn save_block(&mut self, block: Block) -> QueryResult<()> {
+    ///
+    /// This method assumes that `Block` was created from the corresponding `IncompleteBlock`
+    /// object from the DB, and doesn't do any checks regarding that.
+    pub async fn finish_incomplete_block(&mut self, block: Block) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
-        let number = i64::from(*block.block_number);
-        let root_hash = block.new_root_hash.to_bytes();
-        let fee_account_id = i64::from(*block.fee_account);
-        let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
-        let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
-        let block_size = block.block_chunks_size as i64;
-        let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
-        let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
-        let commitment = block.block_commitment.as_bytes().to_vec();
-        let timestamp = Some(block.timestamp as i64);
-
         let new_block = StorageBlock {
-            number,
-            root_hash,
-            fee_account_id,
-            unprocessed_prior_op_before,
-            unprocessed_prior_op_after,
-            block_size,
-            commit_gas_limit,
-            verify_gas_limit,
-            commitment,
-            timestamp,
+            number: i64::from(*block.block_number),
+            root_hash: block.new_root_hash.to_bytes(),
+            fee_account_id: i64::from(*block.fee_account),
+            unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
+            unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
+            block_size: block.block_chunks_size as i64,
+            commit_gas_limit: block.commit_gas_limit.as_u64() as i64,
+            verify_gas_limit: block.verify_gas_limit.as_u64() as i64,
+            commitment: block.block_commitment.as_bytes().to_vec(),
+            timestamp: Some(block.timestamp as i64),
         };
 
         // Save new completed block.
@@ -875,6 +867,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             new_block.unprocessed_prior_op_after, new_block.block_size, new_block.commit_gas_limit, new_block.verify_gas_limit,
             new_block.commitment, new_block.timestamp,
         ).execute(transaction.conn())
+        .await?;
+
+        // Remove incomplete block from which this block was created.
+        sqlx::query!(
+            "DELETE FROM incomplete_blocks WHERE number = $1",
+            new_block.number
+        )
+        .execute(transaction.conn())
         .await?;
 
         transaction.commit().await?;
@@ -936,6 +936,36 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.save_incomplete_block", start.elapsed());
+        Ok(())
+    }
+
+    /// This method does both `save_incomplete_block` and `save_block` for a `Block` object.
+    ///
+    /// It is an alternative for calling two mentioned methods separately that has several use cases:
+    /// - In some contexts, root hash for the block is known immediately (e.g. data restore).
+    /// - In most DB tests, the process of block sealing doesn't really matter: these tests check the behavior
+    ///   of blocks that are already stored in the DB, not *how* they are stored.
+    pub async fn save_full_block(&mut self, block: Block) -> anyhow::Result<()> {
+        let full_block = block.clone();
+        let incomplete_block = IncompleteBlock::new(
+            block.block_number,
+            block.fee_account,
+            block.block_transactions,
+            block.processed_priority_ops,
+            block.block_chunks_size,
+            block.commit_gas_limit,
+            block.verify_gas_limit,
+            block.timestamp,
+        );
+        let mut transaction = self.0.start_transaction().await?;
+        BlockSchema(&mut transaction)
+            .save_incomplete_block(incomplete_block)
+            .await?;
+        BlockSchema(&mut transaction)
+            .finish_incomplete_block(full_block)
+            .await?;
+        transaction.commit().await?;
+
         Ok(())
     }
 
@@ -1171,20 +1201,27 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub async fn save_genesis_block(&mut self, root_hash: Fr) -> QueryResult<()> {
-        let block = Block {
+        let mut transaction = self.0.start_transaction().await?;
+
+        let full_block = Block {
             block_number: BlockNumber(0),
-            new_root_hash: root_hash,
             fee_account: AccountId(0),
             block_transactions: Vec::new(),
             processed_priority_ops: (0, 0),
             block_chunks_size: 0,
             commit_gas_limit: 0u32.into(),
             verify_gas_limit: 0u32.into(),
-            block_commitment: H256::zero(),
             timestamp: 0,
+            new_root_hash: root_hash,
+            block_commitment: H256::zero(),
         };
 
-        Ok(self.save_block(block).await?)
+        BlockSchema(&mut transaction)
+            .save_full_block(full_block)
+            .await?;
+        transaction.commit().await?;
+
+        Ok(())
     }
 
     /// Retrieves both L1 and L2 operations stored in the block for the given pagination query

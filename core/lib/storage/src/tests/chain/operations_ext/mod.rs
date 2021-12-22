@@ -131,7 +131,7 @@ pub async fn commit_block(
     // Required since we use `EthereumSchema` in this test.
     storage.ethereum_schema().initialize_eth_data().await?;
     BlockSchema(storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             block_number,
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -1013,7 +1013,7 @@ async fn tx_data_for_web3(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     storage
         .chain()
         .block_schema()
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(1),
             BLOCK_SIZE_CHUNKS,
             Default::default(),

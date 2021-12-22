@@ -245,7 +245,7 @@ async fn finish_block(request: BlockFinishRequest, pool: &ConnectionPool) {
     transaction
         .chain()
         .block_schema()
-        .save_block(block)
+        .finish_incomplete_block(block)
         .await
         .expect("committer must commit the op into db");
 
