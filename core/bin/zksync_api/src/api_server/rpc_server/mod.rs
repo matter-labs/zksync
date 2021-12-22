@@ -25,7 +25,7 @@ use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 // Local uses
 use crate::{
-    fee_ticker::{PriceError, ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
+    fee_ticker::{PriceError, ResponseBatchFee, ResponseFee, TokenPriceRequestType},
     signature_checker::VerifySignatureRequest,
     utils::shared_lru_cache::AsyncLruCache,
 };
@@ -186,97 +186,76 @@ impl RpcApp {
     }
 
     async fn token_allowed_for_fees(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: &FeeTicker<TickerInfo>,
         token: TokenLike,
     ) -> Result<bool> {
-        let (sender, receiver) = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::IsTokenAllowed {
-                token: token.clone(),
-                response: sender,
-            })
+        todo!()
+        // let (sender, receiver) = oneshot::channel();
+        // ticker_request_sender
+        //     .send(TickerRequest::IsTokenAllowed {
+        //         token: token.clone(),
+        //         response: sender,
+        //     })
+        //     .await
+        //     .expect("ticker receiver dropped");
+        // receiver
+        //     .await
+        //     .expect("ticker answer sender dropped")
+        //     .map_err(|err| {
+        //         vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+        //         Error::internal_error()
+        //     })
+    }
+
+    async fn ticker_batch_fee_request(
+        ticker: &FeeTicker<TickerInfo>,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<ResponseBatchFee> {
+        ticker
+            .get_batch_from_ticker_in_wei(token.clone(), transactions)
             .await
-            .expect("ticker receiver dropped");
-        receiver
-            .await
-            .expect("ticker answer sender dropped")
             .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
                 Error::internal_error()
             })
     }
 
-    async fn ticker_batch_fee_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<ResponseBatchFee> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetBatchTxFee {
-                transactions,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
-            Error::internal_error()
-        })
-    }
-
     async fn ticker_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: &FeeTicker<TickerInfo>,
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
     ) -> Result<ResponseFee> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTxFee {
-                tx_type,
-                address,
-                token: token.clone(),
-                response: req.0,
-            })
+        ticker
+            .get_fee_from_ticker_in_wei(tx_type, token.clone(), address)
             .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            vlog::warn!(
-                "Internal Server Error: '{}'; input: {:?}, {:?}",
-                err,
-                tx_type,
-                token,
-            );
-            Error::internal_error()
-        })
+            .map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: {:?}, {:?}",
+                    err,
+                    tx_type,
+                    token,
+                );
+                Error::internal_error()
+            })
     }
 
     async fn ticker_price_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: &FeeTicker<TickerInfo>,
         token: TokenLike,
         req_type: TokenPriceRequestType,
     ) -> Result<BigDecimal> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTokenPrice {
-                token: token.clone(),
-                response: req.0,
-                req_type,
-            })
+        ticker
+            .get_token_price(token.clone(), req_type)
             .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| match err {
-            PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
-            _ => {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-                Error::internal_error()
-            }
-        })
+            .map_err(|err| match err {
+                PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
+                _ => {
+                    vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                    Error::internal_error()
+                }
+            })
     }
 
     async fn get_account_state(&self, address: Address) -> Result<AccountStateInfo> {
@@ -358,7 +337,7 @@ impl RpcApp {
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-    ticker_request_sender: mpsc::Sender<TickerRequest>,
+    ticker: FeeTicker<TickerInfo>,
     config: &JsonRpcConfig,
     common_api_config: &CommonApiConfig,
     private_url: String,
@@ -368,7 +347,7 @@ pub fn start_rpc_server(
     let rpc_app = RpcApp::new(
         connection_pool,
         sign_verify_request_sender,
-        ticker_request_sender,
+        ticker,
         common_api_config,
         private_url,
         confirmations_for_eth_event,

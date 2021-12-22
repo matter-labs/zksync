@@ -263,14 +263,19 @@ impl RpcApp {
         extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<Fee> {
         let start = Instant::now();
-        let ticker = self.tx_sender.ticker_requests.clone();
-        let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
+        let token_allowed =
+            Self::token_allowed_for_fees(&self.tx_sender.ticker, token.clone()).await?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let result =
-            Self::ticker_request(ticker.clone(), tx_type.into(), address, token.clone()).await?;
+        let result = Self::ticker_request(
+            &self.tx_sender.ticker,
+            tx_type.into(),
+            address,
+            token.clone(),
+        )
+        .await?;
 
         let should_subsidize_cpk = self
             .tx_sender
@@ -308,8 +313,8 @@ impl RpcApp {
             });
         }
 
-        let ticker = self.tx_sender.ticker_requests.clone();
-        let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
+        let token_allowed =
+            Self::token_allowed_for_fees(&self.tx_sender.ticker, token.clone()).await?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
@@ -321,7 +326,9 @@ impl RpcApp {
             .zip(addresses.iter().cloned()))
         .collect();
 
-        let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
+        let result =
+            Self::ticker_batch_fee_request(&self.tx_sender.ticker, transactions, token.clone())
+                .await?;
 
         let should_subsidize_cpk = self
             .tx_sender
@@ -348,7 +355,7 @@ impl RpcApp {
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {
         let start = Instant::now();
         let result = Self::ticker_price_request(
-            self.tx_sender.ticker_requests.clone(),
+            &self.tx_sender.ticker,
             token,
             TokenPriceRequestType::USDForOneToken,
         )

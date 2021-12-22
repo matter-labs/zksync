@@ -197,7 +197,8 @@ impl PriceError {
     }
 }
 
-pub struct FeeTicker<INFO> {
+#[derive(Clone)]
+pub struct FeeTicker<INFO: Clone> {
     info: INFO,
     config: TickerConfig,
 }
@@ -249,8 +250,27 @@ pub fn run_updaters(
 }
 
 impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
-    fn new(info: INFO, config: TickerConfig) -> Self {
-        Self { info, config }
+    pub fn new(
+        info: INFO,
+        config: zksync_config::TickerConfig,
+        max_blocks_to_aggregate: u32,
+    ) -> Self {
+        let ticker_config = TickerConfig {
+            zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
+            gas_cost_tx: GasOperationsCost::from_constants(config.fast_processing_coeff),
+            tokens_risk_factors: HashMap::new(),
+            scale_fee_coefficient: Ratio::new(
+                BigUint::from(config.scale_fee_percent),
+                BigUint::from(100u32),
+            ),
+            max_blocks_to_aggregate,
+            subsidy_cpk_price_usd: config.subsidy_cpk_price_usd(),
+        };
+
+        Self {
+            info,
+            config: ticker_config,
+        }
     }
 
     /// Increases the gas price by a constant coefficient.
@@ -285,7 +305,7 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
     }
 
     pub async fn get_fee_from_ticker_in_wei(
-        &mut self,
+        &self,
         tx_type: TxFeeTypes,
         token: TokenLike,
         recipient: Address,
@@ -366,7 +386,7 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
     }
 
     pub async fn get_batch_from_ticker_in_wei(
-        &mut self,
+        &self,
         token: TokenLike,
         txs: Vec<(TxFeeTypes, Address)>,
     ) -> anyhow::Result<ResponseBatchFee> {
@@ -476,7 +496,7 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
         })
     }
 
-    pub async fn wei_price_usd(&mut self) -> anyhow::Result<Ratio<BigUint>> {
+    pub async fn wei_price_usd(&self) -> anyhow::Result<Ratio<BigUint>> {
         Ok(self
             .info
             .get_last_quote(TokenLike::Id(TokenId(0)))
@@ -485,7 +505,7 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
             / BigUint::from(10u32).pow(18u32))
     }
 
-    pub async fn token_usd_risk(&mut self, token: &Token) -> anyhow::Result<Ratio<BigUint>> {
+    pub async fn token_usd_risk(&self, token: &Token) -> anyhow::Result<Ratio<BigUint>> {
         let token_risk_factor = self
             .config
             .tokens_risk_factors
@@ -506,12 +526,12 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
     }
 
     /// Returns `true` if account does not yet exist in the zkSync network.
-    pub async fn is_account_new(&mut self, address: Address) -> anyhow::Result<bool> {
+    pub async fn is_account_new(&self, address: Address) -> anyhow::Result<bool> {
         self.info.is_account_new(address).await
     }
 
     async fn gas_tx_amount(
-        &mut self,
+        &self,
         tx_type: TxFeeTypes,
         recipient: Address,
     ) -> anyhow::Result<(OutputFeeType, BigUint, BigUint)> {
@@ -553,7 +573,7 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
 
         Ok((fee_type, gas_tx_amount, op_chunks))
     }
-    async fn calculate_fast_withdrawal_gas_cost(&mut self, chunk_size: usize) -> BigUint {
+    async fn calculate_fast_withdrawal_gas_cost(&self, chunk_size: usize) -> BigUint {
         let future_blocks = self.info.blocks_in_future_aggregated_operations().await;
         let remaining_pending_chunks = self.info.remaining_chunks_in_pending_block().await;
         let additional_cost = remaining_pending_chunks.map_or(0, |chunks| {

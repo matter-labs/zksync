@@ -8,10 +8,11 @@ use zksync_types::H160;
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 use self::v01::api_decl::ApiV01;
-use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest};
+use crate::signature_checker::VerifySignatureRequest;
 
 use super::tx_sender::TxSender;
 
+use crate::fee_ticker::{FeeTicker, TickerInfo};
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
 
@@ -22,7 +23,7 @@ pub mod v02;
 
 async fn start_server(
     api_v01: ApiV01,
-    fee_ticker: mpsc::Sender<TickerRequest>,
+    fee_ticker: FeeTicker<TickerInfo>,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     bind_to: SocketAddr,
 ) {
@@ -83,7 +84,7 @@ pub fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
-    fee_ticker: mpsc::Sender<TickerRequest>,
+    fee_ticker: FeeTicker<TickerInfo>,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     private_url: String,
 ) -> JoinHandle<()> {

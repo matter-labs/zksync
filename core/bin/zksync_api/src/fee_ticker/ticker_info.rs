@@ -40,16 +40,14 @@ impl TokenCacheEntry {
 }
 /// Api responsible for querying for TokenPrices
 #[async_trait]
-pub trait FeeTickerInfo {
+pub trait FeeTickerInfo: Clone {
     /// Check whether account exists in the zkSync network or not.
     /// Returns `true` if account does not yet exist in the zkSync network.
-    async fn is_account_new(&mut self, address: Address) -> anyhow::Result<bool>;
+    async fn is_account_new(&self, address: Address) -> anyhow::Result<bool>;
 
-    async fn blocks_in_future_aggregated_operations(
-        &mut self,
-    ) -> BlocksInFutureAggregatedOperations;
+    async fn blocks_in_future_aggregated_operations(&self) -> BlocksInFutureAggregatedOperations;
 
-    async fn remaining_chunks_in_pending_block(&mut self) -> Option<usize>;
+    async fn remaining_chunks_in_pending_block(&self) -> Option<usize>;
 
     /// Get last price from ticker
     async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError>;
@@ -88,7 +86,7 @@ pub struct BlocksInFutureAggregatedOperations {
 
 #[async_trait]
 impl FeeTickerInfo for TickerInfo {
-    async fn is_account_new(&mut self, address: Address) -> anyhow::Result<bool> {
+    async fn is_account_new(&self, address: Address) -> anyhow::Result<bool> {
         let mut storage = self.db.access_storage().await?;
 
         let is_account_exist = storage
@@ -100,9 +98,7 @@ impl FeeTickerInfo for TickerInfo {
         Ok(!is_account_exist)
     }
 
-    async fn blocks_in_future_aggregated_operations(
-        &mut self,
-    ) -> BlocksInFutureAggregatedOperations {
+    async fn blocks_in_future_aggregated_operations(&self) -> BlocksInFutureAggregatedOperations {
         let mut storage = self
             .db
             .access_storage()
@@ -143,7 +139,7 @@ impl FeeTickerInfo for TickerInfo {
         }
     }
 
-    async fn remaining_chunks_in_pending_block(&mut self) -> Option<usize> {
+    async fn remaining_chunks_in_pending_block(&self) -> Option<usize> {
         let mut storage = self
             .db
             .access_storage()

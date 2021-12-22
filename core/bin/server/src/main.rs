@@ -6,7 +6,7 @@ use structopt::StructOpt;
 
 use serde::{Deserialize, Serialize};
 
-use zksync_api::fee_ticker::{run_updaters, TickerRequest};
+use zksync_api::fee_ticker::{run_updaters, FeeTicker, TickerInfo};
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
@@ -196,12 +196,18 @@ async fn run_server(components: &ComponentsToRun) {
         let contracts_config = ContractsConfig::from_env();
         let common_config = CommonApiConfig::from_env();
         let chain_config = ChainConfig::from_env();
-
+        let ticker_info = TickerInfo::new(connection_pool.clone());
+        let fee_ticker_config = TickerConfig::from_env();
+        let ticker = FeeTicker::new(
+            ticker_info,
+            fee_ticker_config,
+            chain_config.max_blocks_to_aggregate(),
+        );
         if components.0.contains(&Component::RpcWebSocketApi) {
             tasks.push(zksync_api::api_server::rpc_subscriptions::start_ws_server(
                 connection_pool.clone(),
                 sign_check_sender.clone(),
-                ticker_request_sender.clone(),
+                ticker.clone(),
                 &common_config,
                 &JsonRpcConfig::from_env(),
                 chain_config.state_keeper.miniblock_iteration_interval(),
@@ -214,7 +220,7 @@ async fn run_server(components: &ComponentsToRun) {
             tasks.push(zksync_api::api_server::rpc_server::start_rpc_server(
                 connection_pool.clone(),
                 sign_check_sender.clone(),
-                ticker_request_sender.clone(),
+                ticker.clone(),
                 &JsonRpcConfig::from_env(),
                 &common_config,
                 private_config.url.clone(),
@@ -227,7 +233,7 @@ async fn run_server(components: &ComponentsToRun) {
                 connection_pool.clone(),
                 RestApiConfig::from_env().bind_addr(),
                 contracts_config.contract_addr,
-                ticker_request_sender,
+                ticker,
                 sign_check_sender,
                 private_config.url,
             );

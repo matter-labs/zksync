@@ -24,6 +24,7 @@ use crate::fee_ticker::{
 
 use super::*;
 use crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations;
+use anyhow::Error;
 
 const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
 
@@ -127,44 +128,45 @@ fn get_test_ticker_config() -> TickerConfig {
 struct MockApiProvider;
 #[async_trait]
 impl FeeTickerAPI for MockApiProvider {
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
-        for test_token in TestToken::all_tokens() {
-            if TokenLike::Id(test_token.id) == token {
-                let token_price = TokenPrice {
-                    usd_price: test_token.price_usd,
-                    last_updated: Utc::now(),
-                };
-                return Ok(token_price);
-            }
-        }
-        unreachable!("incorrect token input")
-    }
-
-    /// Get current gas price in ETH
-    async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
-        Ok(BigUint::from(10u32).pow(7u32)) // 10 GWei
-    }
-
-    async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
-        for test_token in TestToken::all_tokens() {
-            if TokenLike::Id(test_token.id) == token {
-                return Ok(Token::new(
-                    test_token.id,
-                    test_token.address,
-                    "",
-                    test_token.precision,
-                    TokenKind::ERC20,
-                ));
-            }
-        }
-        unreachable!("incorrect token input")
-    }
+    // async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+    //     for test_token in TestToken::all_tokens() {
+    //         if TokenLike::Id(test_token.id) == token {
+    //             let token_price = TokenPrice {
+    //                 usd_price: test_token.price_usd,
+    //                 last_updated: Utc::now(),
+    //             };
+    //             return Ok(token_price);
+    //         }
+    //     }
+    //     unreachable!("incorrect token input")
+    // }
+    //
+    // /// Get current gas price in ETH
+    // async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
+    //     Ok(BigUint::from(10u32).pow(7u32)) // 10 GWei
+    // }
+    //
+    // async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
+    //     for test_token in TestToken::all_tokens() {
+    //         if TokenLike::Id(test_token.id) == token {
+    //             return Ok(Token::new(
+    //                 test_token.id,
+    //                 test_token.address,
+    //                 "",
+    //                 test_token.precision,
+    //                 TokenKind::ERC20,
+    //             ));
+    //         }
+    //     }
+    //     unreachable!("incorrect token input")
+    // }
 
     async fn keep_price_updated(self) {
         // Just do nothing
     }
 }
 
+#[derive(Clone)]
 struct MockTickerInfo {
     pub future_blocks: BlocksInFutureAggregatedOperations,
     pub remaining_chunks: Option<usize>,
@@ -185,19 +187,29 @@ impl Default for MockTickerInfo {
 
 #[async_trait]
 impl FeeTickerInfo for MockTickerInfo {
-    async fn is_account_new(&mut self, _address: Address) -> bool {
+    async fn is_account_new(&self, _address: Address) -> bool {
         // Always false for simplicity.
         false
     }
 
-    async fn blocks_in_future_aggregated_operations(
-        &mut self,
-    ) -> BlocksInFutureAggregatedOperations {
+    async fn blocks_in_future_aggregated_operations(&self) -> BlocksInFutureAggregatedOperations {
         self.future_blocks.clone()
     }
 
-    async fn remaining_chunks_in_pending_block(&mut self) -> Option<usize> {
+    async fn remaining_chunks_in_pending_block(&self) -> Option<usize> {
         self.remaining_chunks
+    }
+
+    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+        todo!()
+    }
+
+    async fn get_gas_price_wei(&self) -> Result<BigUint, Error> {
+        todo!()
+    }
+
+    async fn get_token(&self, token: TokenLike) -> Result<Token, Error> {
+        todo!()
     }
 }
 
