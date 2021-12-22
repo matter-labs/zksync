@@ -6,7 +6,7 @@ use crate::{
     eth_watch::start_eth_watch,
     mempool::run_mempool_tasks,
     private_api::start_private_core_api,
-    state_keeper::{start_state_keeper, ZkSyncStateKeeper},
+    state_keeper::{start_root_hash_calculator, start_state_keeper, ZkSyncStateKeeper},
     token_handler::run_token_handler,
 };
 use futures::{channel::mpsc, future};
@@ -121,10 +121,10 @@ pub async fn run_core(
     // Insert pending withdrawals into database (if required)
     let mut storage_processor = connection_pool.access_storage().await?;
 
-    // Start State Keeper.
+    // Start state keeper and root hash calculator.
     let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await;
 
-    let state_keeper = ZkSyncStateKeeper::new(
+    let (state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
         state_keeper_init,
         config.chain.state_keeper.fee_account_addr,
         state_keeper_req_receiver,
@@ -135,6 +135,7 @@ pub async fn run_core(
         processed_tx_events_sender,
     );
     let state_keeper_task = start_state_keeper(state_keeper);
+    let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
 
     // Start committer.
     let committer_task = run_committer(
@@ -191,6 +192,7 @@ pub async fn run_core(
     let task_futures = vec![
         eth_watch_task,
         state_keeper_task,
+        root_hash_calculator_task,
         committer_task,
         mempool_task,
         proposer_task,

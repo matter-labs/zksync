@@ -29,7 +29,10 @@ use crate::{
     tx_event_emitter::ProcessedOperations,
 };
 
-pub use self::{init_params::ZkSyncStateInitParams, types::StateKeeperRequest};
+pub use self::{
+    init_params::ZkSyncStateInitParams, root_hash_calculator::start_root_hash_calculator,
+    types::StateKeeperRequest,
+};
 
 mod init_params;
 mod pending_block;
@@ -70,14 +73,44 @@ impl ZkSyncStateKeeper {
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
         processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
-    ) -> Self {
-        let state = ZkSyncState::new(
+    ) -> (Self, RootHashCalculator) {
+        // We need two copies of state:
+        // 1. For state keeper itself. We will apply all the updates from incomplete blocks on it in order to
+        //    get the state right before the pending block. Transactions from the pending block will be executed
+        //    separately below.
+        // 2. For root hash calculator. It will require the state at *last finished block*, so it can keep working
+        //    on calculating root hashes for incomplete blocks that we had before the restart.
+        let mut sk_state = ZkSyncState::new(
             initial_state.tree,
             initial_state.acc_id_by_addr,
             initial_state.nfts,
         );
+        let rhc_state = sk_state.clone();
 
-        let (fee_account_id, _) = state
+        // Update the state keeper copy of state.
+        let mut last_block = initial_state.last_block_number;
+        for job in &initial_state.root_hash_jobs {
+            // Ensure that all jobs are sequential and there are no gaps.
+            assert_eq!(
+                job.block, last_block + 1,
+                "Unexpected incomplete block number. Started from block {}, got unexpected block {} instead of expected {}, root hash jobs queue: {:?}",
+                initial_state.last_block_number, job.block, last_block + 1, &initial_state.root_hash_jobs
+            );
+            last_block = job.block;
+
+            sk_state.apply_account_updates(job.updates.clone());
+        }
+
+        // Create and fill the queue for root hash calculator.
+        let root_hash_queue = BlockRootHashJobQueue::new_filled(initial_state.root_hash_jobs);
+        let root_hash_calculator = RootHashCalculator::new(
+            rhc_state,
+            root_hash_queue.clone(),
+            tx_for_commitments.clone(),
+            initial_state.last_block_number,
+        );
+
+        let (fee_account_id, _) = sk_state
             .get_account_by_address(&fee_account_address)
             .expect("Fee account should be present in the account tree");
 
@@ -90,7 +123,7 @@ impl ZkSyncStateKeeper {
 
         let pending_block = {
             // Keeper starts with the NEXT block
-            let current_block = initial_state.last_block_number + 1;
+            let current_block = last_block + 1;
 
             PendingBlock::new(
                 current_block,
@@ -101,7 +134,7 @@ impl ZkSyncStateKeeper {
         };
 
         let mut keeper = ZkSyncStateKeeper {
-            state,
+            state: sk_state,
             pending_block,
             config,
 
@@ -109,13 +142,11 @@ impl ZkSyncStateKeeper {
             tx_for_commitments,
             processed_tx_events_sender,
 
-            root_hash_queue: BlockRootHashJobQueue::new(),
+            root_hash_queue,
         };
         keeper.initialize(initial_state.pending_block);
 
-        todo!("Put all the incomplete jobs into queue");
-
-        keeper
+        (keeper, root_hash_calculator)
     }
 
     // TODO (ZKS-821): We should get rid of this function and create state keeper in a ready-to-go state.

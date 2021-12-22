@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::{channel::mpsc, SinkExt};
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::JoinHandle};
 
 use zksync_state::state::ZkSyncState;
 use zksync_types::{block::Block, AccountUpdates, BlockNumber, H256};
@@ -42,6 +42,16 @@ impl BlockRootHashJobQueue {
     /// Creates a new empty queue.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Creates a filled queue.
+    pub fn new_filled(jobs: impl IntoIterator<Item = BlockRootHashJob>) -> Self {
+        let queue: VecDeque<_> = jobs.into_iter().collect();
+        let size = queue.len();
+        Self {
+            queue: Arc::new(Mutex::new(queue)),
+            size: Arc::new(AtomicUsize::from(size)),
+        }
     }
 
     /// Adds an element to the queue.
@@ -85,7 +95,7 @@ impl BlockRootHashJobQueue {
 /// It is important that if we use this entity, we should have a throttling mechanism which
 /// will stop transaction execution if blocks are being created too fast.
 #[derive(Debug)]
-pub(super) struct RootHashCalculator {
+pub struct RootHashCalculator {
     state: ZkSyncState,
     // We use job queue to be able to observe amount of not-yet-calculated jobs
     // so we can throttle performance if needed.
@@ -118,7 +128,7 @@ impl RootHashCalculator {
         }
     }
 
-    pub(super) async fn run(mut self) {
+    pub async fn run(mut self) {
         loop {
             // TODO: using `sleep` is inefficient. We need `job_queue.pop()` to resolve *only* when we have
             // a new job available.
@@ -151,4 +161,9 @@ impl RootHashCalculator {
             .await
             .expect("committer receiver dropped");
     }
+}
+
+#[must_use]
+pub fn start_root_hash_calculator(rhc: RootHashCalculator) -> JoinHandle<()> {
+    tokio::spawn(rhc.run())
 }

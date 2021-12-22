@@ -31,7 +31,7 @@ impl StateKeeperTester {
         let mut init_params = ZkSyncStateInitParams::default();
         init_params.insert_account(AccountId(0), fee_collector.clone());
 
-        let state_keeper = ZkSyncStateKeeper::new(
+        let (state_keeper, _root_hash_calculator) = ZkSyncStateKeeper::new(
             init_params,
             fee_collector.address,
             request_rx,
