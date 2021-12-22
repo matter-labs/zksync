@@ -9,10 +9,6 @@ use actix_web::{
     Scope,
 };
 use bigdecimal::{BigDecimal, Zero};
-use futures::{
-    channel::{mpsc, oneshot},
-    prelude::*,
-};
 use num::{rational::Ratio, BigUint, FromPrimitive};
 
 // Workspace uses
@@ -31,7 +27,7 @@ use super::{
     paginate_trait::Paginate,
     response::ApiResult,
 };
-use crate::fee_ticker::{FeeTicker, TickerInfo};
+use crate::fee_ticker::{FeeTicker, FeeTickerInfo};
 use crate::{
     api_try,
     fee_ticker::{PriceError, TokenPriceRequestType},
@@ -40,19 +36,19 @@ use crate::{
 
 /// Shared data between `api/v0.2/tokens` endpoints.
 #[derive(Clone)]
-struct ApiTokenData {
+struct ApiTokenData<INFO> {
     min_market_volume: Ratio<BigUint>,
-    fee_ticker: FeeTicker<TickerInfo>,
+    fee_ticker: FeeTicker<INFO>,
     tokens: TokenDBCache,
     pool: ConnectionPool,
 }
 
-impl ApiTokenData {
+impl<INFO> ApiTokenData<INFO> {
     fn new(
         config: &ZkSyncConfig,
         pool: ConnectionPool,
         tokens: TokenDBCache,
-        fee_ticker: FeeTicker<TickerInfo>,
+        fee_ticker: FeeTicker<INFO>,
     ) -> Self {
         Self {
             min_market_volume: Ratio::from(
@@ -64,7 +60,18 @@ impl ApiTokenData {
             fee_ticker,
         }
     }
+}
 
+impl<INFO: FeeTickerInfo> ApiTokenData<INFO> {
+    async fn token_price_usd(&self, token: TokenLike) -> Result<BigDecimal, Error> {
+        self.fee_ticker
+            .get_token_price(token, TokenPriceRequestType::USDForOneToken)
+            .await
+            .map_err(Error::storage)
+    }
+}
+
+impl<INFO> ApiTokenData<INFO> {
     async fn is_token_enabled_for_fees(
         &self,
         storage: &mut StorageProcessor<'_>,
@@ -143,19 +150,15 @@ impl ApiTokenData {
         ))
     }
 
-    async fn token_price_usd(&self, token: TokenLike) -> Result<BigDecimal, Error> {
-        self.fee_ticker
-            .get_token_price(token, TokenPriceRequestType::USDForOneToken)
-            .await
-            .map_err(Error::storage)
-    }
-
     // TODO: take `currency` as enum. (ZKS-628)
     async fn token_price_in(
         &self,
         first_token: TokenLike,
         currency: &str,
-    ) -> Result<BigDecimal, Error> {
+    ) -> Result<BigDecimal, Error>
+    where
+        INFO: FeeTickerInfo,
+    {
         if let Ok(second_token_id) = u32::from_str(currency) {
             let second_token = TokenLike::from(TokenId(second_token_id));
             let first_usd_price = self.token_price_usd(first_token).await;
@@ -182,16 +185,16 @@ impl ApiTokenData {
 
 // Server implementation
 
-async fn token_pagination(
-    data: web::Data<ApiTokenData>,
+async fn token_pagination<INFO>(
+    data: web::Data<ApiTokenData<INFO>>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<ApiToken, TokenId>> {
     let query = api_try!(parse_query(query).map_err(Error::from));
     data.token_page(query).await.into()
 }
 
-async fn token_info(
-    data: web::Data<ApiTokenData>,
+async fn token_info<INFO>(
+    data: web::Data<ApiTokenData<INFO>>,
     token_like_string: web::Path<String>,
 ) -> ApiResult<ApiToken> {
     let token_like = TokenLike::parse(&token_like_string);
@@ -200,8 +203,8 @@ async fn token_info(
 
 // TODO: take `currency` as enum.
 // Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318 (ZKS-628)
-async fn token_price(
-    data: web::Data<ApiTokenData>,
+async fn token_price<INFO: FeeTickerInfo>(
+    data: web::Data<ApiTokenData<INFO>>,
     path: web::Path<(String, String)>,
 ) -> ApiResult<TokenPrice> {
     let (token_like_string, currency) = path.into_inner();
@@ -219,8 +222,8 @@ async fn token_price(
     })
 }
 
-async fn get_nft(
-    data: web::Data<ApiTokenData>,
+async fn get_nft<INFO>(
+    data: web::Data<ApiTokenData<INFO>>,
     id: web::Path<TokenId>,
 ) -> ApiResult<Option<ApiNFT>> {
     if id.0 < MIN_NFT_TOKEN_ID {
@@ -235,8 +238,8 @@ async fn get_nft(
     ApiResult::Ok(nft)
 }
 
-async fn get_nft_owner(
-    data: web::Data<ApiTokenData>,
+async fn get_nft_owner<INFO>(
+    data: web::Data<ApiTokenData<INFO>>,
     id: web::Path<TokenId>,
 ) -> ApiResult<Option<AccountId>> {
     if id.0 < MIN_NFT_TOKEN_ID {
@@ -252,8 +255,8 @@ async fn get_nft_owner(
     ApiResult::Ok(owner_id)
 }
 
-async fn get_nft_id_by_tx_hash(
-    data: web::Data<ApiTokenData>,
+async fn get_nft_id_by_tx_hash<INFO>(
+    data: web::Data<ApiTokenData<INFO>>,
     tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TokenId>> {
     let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
@@ -266,27 +269,27 @@ async fn get_nft_id_by_tx_hash(
     ApiResult::Ok(nft_id)
 }
 
-pub fn api_scope(
+pub fn api_scope<INFO: 'static + FeeTickerInfo + Send + Sync>(
     config: &ZkSyncConfig,
     pool: ConnectionPool,
     tokens_db: TokenDBCache,
-    fee_ticker: FeeTicker<TickerInfo>,
+    fee_ticker: FeeTicker<INFO>,
 ) -> Scope {
     let data = ApiTokenData::new(config, pool, tokens_db, fee_ticker);
 
     web::scope("tokens")
         .app_data(web::Data::new(data))
-        .route("", web::get().to(token_pagination))
-        .route("{token_like}", web::get().to(token_info))
+        .route("", web::get().to(token_pagination::<INFO>))
+        .route("{token_like}", web::get().to(token_info::<INFO>))
         .route(
             "{token_like}/priceIn/{currency}",
-            web::get().to(token_price),
+            web::get().to(token_price::<INFO>),
         )
-        .route("nft/{id}", web::get().to(get_nft))
-        .route("nft/{id}/owner", web::get().to(get_nft_owner))
+        .route("nft/{id}", web::get().to(get_nft::<INFO>))
+        .route("nft/{id}/owner", web::get().to(get_nft_owner::<INFO>))
         .route(
             "nft_id_by_tx_hash/{tx_hash}",
-            web::get().to(get_nft_id_by_tx_hash),
+            web::get().to(get_nft_id_by_tx_hash::<INFO>),
         )
 }
 

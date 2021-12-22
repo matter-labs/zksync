@@ -13,6 +13,7 @@ use zksync_api_types::v02::fee::{ApiFee, BatchFeeRequest, TxFeeRequest};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
+use crate::fee_ticker::FeeTickerInfo;
 use crate::{
     api_server::tx_sender::{SubmitError, TxSender},
     api_try,
@@ -20,18 +21,18 @@ use crate::{
 
 /// Shared data between `api/v0.2/fee` endpoints.
 #[derive(Clone)]
-struct ApiFeeData {
-    tx_sender: TxSender,
+struct ApiFeeData<INFO> {
+    tx_sender: TxSender<INFO>,
 }
 
-impl ApiFeeData {
-    fn new(tx_sender: TxSender) -> Self {
+impl<INFO: Clone> ApiFeeData<INFO> {
+    fn new(tx_sender: TxSender<INFO>) -> Self {
         Self { tx_sender }
     }
 }
 
-async fn get_tx_fee(
-    data: web::Data<ApiFeeData>,
+async fn get_tx_fee<INFO: FeeTickerInfo>(
+    data: web::Data<ApiFeeData<INFO>>,
     Json(body): Json<TxFeeRequest>,
 ) -> ApiResult<ApiFee> {
     let token_allowed = api_try!(TxSender::token_allowed_for_fees(
@@ -51,8 +52,8 @@ async fn get_tx_fee(
         .into()
 }
 
-async fn get_batch_fee(
-    data: web::Data<ApiFeeData>,
+async fn get_batch_fee<INFO: FeeTickerInfo>(
+    data: web::Data<ApiFeeData<INFO>>,
     Json(body): Json<BatchFeeRequest>,
 ) -> ApiResult<ApiFee> {
     let token_allowed = api_try!(TxSender::token_allowed_for_fees(
@@ -77,13 +78,15 @@ async fn get_batch_fee(
         .into()
 }
 
-pub fn api_scope(tx_sender: TxSender) -> Scope {
+pub fn api_scope<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
+    tx_sender: TxSender<INFO>,
+) -> Scope {
     let data = ApiFeeData::new(tx_sender);
 
     web::scope("fee")
         .app_data(web::Data::new(data))
-        .route("", web::post().to(get_tx_fee))
-        .route("/batch", web::post().to(get_batch_fee))
+        .route("", web::post().to(get_tx_fee::<INFO>))
+        .route("/batch", web::post().to(get_batch_fee::<INFO>))
 }
 
 #[cfg(test)]

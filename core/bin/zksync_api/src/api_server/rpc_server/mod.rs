@@ -3,10 +3,7 @@ use std::time::Instant;
 
 // External uses
 use bigdecimal::BigDecimal;
-use futures::{
-    channel::{mpsc, oneshot},
-    SinkExt,
-};
+use futures::channel::mpsc;
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 use tokio::task::JoinHandle;
@@ -39,25 +36,25 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
-use crate::fee_ticker::{FeeTicker, TickerInfo};
+use crate::fee_ticker::{FeeTicker, FeeTickerInfo};
 use ip_insert_middleware::IpInsertMiddleWare;
 
 #[derive(Clone)]
-pub struct RpcApp {
+pub struct RpcApp<INFO> {
     cache_of_executed_priority_operations: AsyncLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_transaction_receipts: AsyncLruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_complete_withdrawal_tx_hashes: AsyncLruCache<TxHash, String>,
 
     pub confirmations_for_eth_event: u64,
 
-    tx_sender: TxSender,
+    tx_sender: TxSender<INFO>,
 }
 
-impl RpcApp {
+impl<INFO: Clone + Send + Sync> RpcApp<INFO> {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker: FeeTicker<TickerInfo>,
+        ticker: FeeTicker<INFO>,
         config: &CommonApiConfig,
         private_url: String,
         confirmations_for_eth_event: u64,
@@ -82,13 +79,15 @@ impl RpcApp {
             tx_sender,
         }
     }
+}
 
+impl<INFO: 'static + FeeTickerInfo + Clone + Send + Sync> RpcApp<INFO> {
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
     }
 }
 
-impl RpcApp {
+impl<INFO: FeeTickerInfo> RpcApp<INFO> {
     async fn access_storage(&self) -> Result<StorageProcessor<'_>> {
         self.tx_sender
             .pool
@@ -186,29 +185,20 @@ impl RpcApp {
     }
 
     async fn token_allowed_for_fees(
-        ticker: &FeeTicker<TickerInfo>,
+        ticker: &mut FeeTicker<INFO>,
         token: TokenLike,
     ) -> Result<bool> {
-        todo!()
-        // let (sender, receiver) = oneshot::channel();
-        // ticker_request_sender
-        //     .send(TickerRequest::IsTokenAllowed {
-        //         token: token.clone(),
-        //         response: sender,
-        //     })
-        //     .await
-        //     .expect("ticker receiver dropped");
-        // receiver
-        //     .await
-        //     .expect("ticker answer sender dropped")
-        //     .map_err(|err| {
-        //         vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-        //         Error::internal_error()
-        //     })
+        ticker
+            .token_allowed_for_fees(token.clone())
+            .await
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                Error::internal_error()
+            })
     }
 
     async fn ticker_batch_fee_request(
-        ticker: &FeeTicker<TickerInfo>,
+        ticker: &FeeTicker<INFO>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
     ) -> Result<ResponseBatchFee> {
@@ -222,7 +212,7 @@ impl RpcApp {
     }
 
     async fn ticker_request(
-        ticker: &FeeTicker<TickerInfo>,
+        ticker: &FeeTicker<INFO>,
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
@@ -242,7 +232,7 @@ impl RpcApp {
     }
 
     async fn ticker_price_request(
-        ticker: &FeeTicker<TickerInfo>,
+        ticker: &FeeTicker<INFO>,
         token: TokenLike,
         req_type: TokenPriceRequestType,
     ) -> Result<BigDecimal> {
@@ -334,10 +324,10 @@ impl RpcApp {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn start_rpc_server(
+pub fn start_rpc_server<INFO: 'static + Clone + Send + Sync + FeeTickerInfo>(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-    ticker: FeeTicker<TickerInfo>,
+    ticker: FeeTicker<INFO>,
     config: &JsonRpcConfig,
     common_api_config: &CommonApiConfig,
     private_url: String,

@@ -100,7 +100,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
 
 /// Fee token validator decides whether certain ERC20 token is suitable for paying fees.
 #[derive(Debug, Clone)]
-pub struct FeeTokenValidator<W> {
+pub struct FeeTokenValidator {
     // Storage for unconditionally valid tokens, such as ETH
     unconditionally_valid: HashSet<Address>,
     tokens_cache: TokenCacheWrapper,
@@ -109,16 +109,14 @@ pub struct FeeTokenValidator<W> {
     tokens: HashMap<Address, AcceptanceData>,
     available_time: chrono::Duration,
     liquidity_volume: BigDecimal,
-    watcher: W,
 }
 
-impl<W: TokenWatcher> FeeTokenValidator<W> {
+impl FeeTokenValidator {
     pub(crate) fn new(
         cache: impl Into<TokenCacheWrapper>,
         available_time: chrono::Duration,
         liquidity_volume: BigDecimal,
         unconditionally_valid: HashSet<Address>,
-        watcher: W,
     ) -> Self {
         Self {
             unconditionally_valid,
@@ -126,7 +124,6 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
             tokens: Default::default(),
             available_time,
             liquidity_volume,
-            watcher,
         }
     }
 
@@ -161,7 +158,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
 
         let volume = match self.get_token_market_volume(&token).await? {
             Some(volume) => volume,
-            None => self.get_remote_token_market(&token).await?,
+            None => return Ok(false),
         };
 
         if Utc::now() - volume.last_updated > self.available_time {
@@ -177,17 +174,6 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         );
         metrics::histogram!("ticker.validator.check_token", start.elapsed());
         Ok(allowed)
-    }
-    // I think, it's redundant method and we could remove watcher from validator and store it only in updater
-    async fn get_remote_token_market(
-        &mut self,
-        token: &Token,
-    ) -> anyhow::Result<TokenMarketVolume> {
-        let volume = self.watcher.get_token_market_volume(token).await?;
-        Ok(TokenMarketVolume {
-            market_volume: big_decimal_to_ratio(&volume).unwrap(),
-            last_updated: Utc::now(),
-        })
     }
 
     async fn get_token_market_volume(
@@ -296,7 +282,6 @@ mod tests {
             chrono::Duration::seconds(100),
             BigDecimal::from(100),
             unconditionally_valid,
-            watcher.clone(),
         );
 
         let mut updater = MarketUpdater::new(cache, watcher);

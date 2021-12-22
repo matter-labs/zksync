@@ -39,15 +39,22 @@ use zksync_types::{
     tx::ChangePubKeyType,
     AccountId, AccountMap, AccountUpdate, Address, BatchFee, BlockNumber, Deposit, DepositOp,
     ExecutedOperations, ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp,
-    Nonce, OutputFeeType, PriorityOp, Token, TokenId, TokenKind, TokenLike, Transfer, TransferOp,
-    ZkSyncOp, ZkSyncTx, H256, NFT,
+    Nonce, OutputFeeType, PriorityOp, Token, TokenId, TokenKind, TokenLike, TokenPrice, Transfer,
+    TransferOp, ZkSyncOp, ZkSyncTx, H256, NFT,
 };
 
 // Local uses
+use crate::fee_ticker::tests::TestToken;
+use crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations;
+use crate::fee_ticker::validator::cache::TokenInMemoryCache;
+use crate::fee_ticker::validator::FeeTokenValidator;
+use crate::fee_ticker::{FeeTicker, FeeTickerInfo, GasOperationsCost, PriceError, TickerConfig};
 use crate::{
-    fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
+    fee_ticker::{ResponseBatchFee, ResponseFee},
     signature_checker::{VerifiedTx, VerifySignatureRequest},
 };
+use anyhow::Error;
+use zksync_utils::{big_decimal_to_ratio, scaled_u64_to_ratio, UnsignedRatioSerializeAsDecimal};
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -817,71 +824,147 @@ pub fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
     sender
 }
 
-pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
-    let (sender, mut receiver) = mpsc::channel(10);
+#[derive(Clone)]
+pub struct DummyFeeTickerInfo {
+    prices: HashMap<TokenLike, BigDecimal>,
+}
 
-    let prices: HashMap<_, _> = prices.iter().cloned().collect();
-    actix_rt::spawn(async move {
-        while let Some(item) = receiver.next().await {
-            match item {
-                TickerRequest::GetTxFee { response, .. } => {
-                    let normal_fee = Fee::new(
-                        OutputFeeType::Withdraw,
-                        BigUint::from(1_u64).into(),
-                        BigUint::from(1_u64).into(),
-                        1_u64.into(),
-                        1_u64.into(),
-                    );
+#[async_trait::async_trait]
+impl FeeTickerInfo for DummyFeeTickerInfo {
+    async fn is_account_new(&self, address: Address) -> anyhow::Result<bool> {
+        Ok(false)
+    }
 
-                    let res = Ok(ResponseFee {
-                        normal_fee: normal_fee.clone(),
-                        subsidized_fee: normal_fee,
-                        subsidy_size_usd: Ratio::from(BigUint::zero()),
-                    });
-
-                    response.send(res).expect("Unable to send response");
-                }
-                TickerRequest::GetTokenPrice {
-                    token, response, ..
-                } => {
-                    let msg = if let Some(price) = prices.get(&token) {
-                        Ok(price.clone())
-                    } else {
-                        Ok(BigDecimal::from(0u64))
-                    };
-
-                    response.send(msg).expect("Unable to send response");
-                }
-                TickerRequest::IsTokenAllowed { token, response } => {
-                    // For test purposes, PHNX token is not allowed.
-                    let is_phnx = match token {
-                        TokenLike::Id(id) => *id == 1,
-                        TokenLike::Symbol(sym) => sym == "PHNX",
-                        TokenLike::Address(_) => unreachable!(),
-                    };
-                    response.send(Ok(!is_phnx)).unwrap_or_default();
-                }
-                TickerRequest::GetBatchTxFee {
-                    response,
-                    transactions,
-                    ..
-                } => {
-                    let normal_fee = BatchFee::new(
-                        BigUint::from(transactions.len()).into(),
-                        BigUint::from(transactions.len()).into(),
-                    );
-
-                    let res = Ok(ResponseBatchFee {
-                        normal_fee: normal_fee.clone(),
-                        subsidized_fee: normal_fee,
-                        subsidy_size_usd: Ratio::from(BigUint::zero()),
-                    });
-
-                    response.send(res).expect("Unable to send response");
-                }
-            }
+    async fn blocks_in_future_aggregated_operations(
+        &self,
+    ) -> crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations {
+        BlocksInFutureAggregatedOperations {
+            blocks_to_commit: 1,
+            blocks_to_prove: 1,
+            blocks_to_execute: 1,
         }
-    });
+    }
 
-    sender
+    async fn remaining_chunks_in_pending_block(&self) -> Option<usize> {
+        None
+    }
+
+    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+        if let Some(price) = self.prices.get(&token) {
+            Ok(TokenPrice {
+                usd_price: big_decimal_to_ratio(price).unwrap(),
+                last_updated: Utc::now(),
+            })
+        } else {
+            Ok(TokenPrice {
+                usd_price: Ratio::zero(),
+                last_updated: Utc::now(),
+            })
+        }
+    }
+
+    async fn get_gas_price_wei(&self) -> Result<BigUint, Error> {
+        Ok(BigUint::from(1u64))
+    }
+
+    async fn get_token(&self, token: TokenLike) -> Result<Token, Error> {
+        Ok(Token {
+            id: Default::default(),
+            address: Default::default(),
+            symbol: token.to_string(),
+            decimals: 0,
+            kind: TokenKind::ERC20,
+            is_nft: false,
+        })
+    }
+}
+
+const SUBSIDY_CPK_PRICE_USD_SCALED: u64 = 10000000; // 10 dollars
+const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
+
+pub fn get_test_ticker_config() -> TickerConfig {
+    TickerConfig {
+        zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot("0.001")
+            .unwrap(),
+        gas_cost_tx: GasOperationsCost::from_constants(TEST_FAST_WITHDRAW_COEFF),
+        tokens_risk_factors: TestToken::all_tokens()
+            .into_iter()
+            .filter_map(|t| {
+                let id = t.id;
+                t.risk_factor.map(|risk| (id, risk))
+            })
+            .collect(),
+        scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
+        max_blocks_to_aggregate: 5,
+        subsidy_cpk_price_usd: scaled_u64_to_ratio(SUBSIDY_CPK_PRICE_USD_SCALED),
+    }
+}
+pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> FeeTicker<DummyFeeTickerInfo> {
+    let prices: HashMap<_, _> = prices.iter().cloned().collect();
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+    );
+
+    FeeTicker::new(
+        DummyFeeTickerInfo { prices },
+        get_test_ticker_config(),
+        validator,
+    )
+    // actix_rt::spawn(async move {
+    //     while let Some(item) = receiver.next().await {
+    //         match item {
+    //             TickerRequest::GetTxFee { response, .. } => {
+    //                 let normal_fee = Fee::new(
+    //                     OutputFeeType::Withdraw,
+    //                     BigUint::from(1_u64).into(),
+    //                     BigUint::from(1_u64).into(),
+    //                     1_u64.into(),
+    //                     1_u64.into(),
+    //                 );
+    //
+    //                 let res = Ok(ResponseFee {
+    //                     normal_fee: normal_fee.clone(),
+    //                     subsidized_fee: normal_fee,
+    //                     subsidy_size_usd: Ratio::from(BigUint::zero()),
+    //                 });
+    //
+    //                 response.send(res).expect("Unable to send response");
+    //             }
+    //             TickerRequest::GetTokenPrice {
+    //                 token, response, ..
+    //             } => {
+    //             }
+    //             TickerRequest::IsTokenAllowed { token, response } => {
+    //                 // For test purposes, PHNX token is not allowed.
+    //                 let is_phnx = match token {
+    //                     TokenLike::Id(id) => *id == 1,
+    //                     TokenLike::Symbol(sym) => sym == "PHNX",
+    //                     TokenLike::Address(_) => unreachable!(),
+    //                 };
+    //                 response.send(Ok(!is_phnx)).unwrap_or_default();
+    //             }
+    //             TickerRequest::GetBatchTxFee {
+    //                 response,
+    //                 transactions,
+    //                 ..
+    //             } => {
+    //                 let normal_fee = BatchFee::new(
+    //                     BigUint::from(transactions.len()).into(),
+    //                     BigUint::from(transactions.len()).into(),
+    //                 );
+    //
+    //                 let res = Ok(ResponseBatchFee {
+    //                     normal_fee: normal_fee.clone(),
+    //                     subsidized_fee: normal_fee,
+    //                     subsidy_size_usd: Ratio::from(BigUint::zero()),
+    //                 });
+    //
+    //                 response.send(res).expect("Unable to send response");
+    //             }
+    //         }
+    //     }
+    // });
 }

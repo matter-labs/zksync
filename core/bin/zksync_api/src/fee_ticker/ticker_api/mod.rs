@@ -1,16 +1,14 @@
 use super::PriceError;
-use crate::utils::token_db_cache::TokenDBCache;
+
 use anyhow::format_err;
 use async_trait::async_trait;
 use chrono::Utc;
 use num::rational::Ratio;
-use num::BigUint;
-use std::collections::HashMap;
-use std::sync::Arc;
+
 use std::time::{Duration, Instant};
-use tokio::sync::Mutex;
+
 use zksync_storage::ConnectionPool;
-use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
+use zksync_types::{Token, TokenId, TokenPrice};
 
 pub mod coingecko;
 pub mod coinmarkercap;

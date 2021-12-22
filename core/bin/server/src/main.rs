@@ -198,11 +198,14 @@ async fn run_server(components: &ComponentsToRun) {
         let chain_config = ChainConfig::from_env();
         let ticker_info = TickerInfo::new(connection_pool.clone());
         let fee_ticker_config = TickerConfig::from_env();
-        let ticker = FeeTicker::new(
+
+        let ticker = FeeTicker::new_with_default_validator(
             ticker_info,
             fee_ticker_config,
             chain_config.max_blocks_to_aggregate(),
+            connection_pool.clone(),
         );
+
         if components.0.contains(&Component::RpcWebSocketApi) {
             tasks.push(zksync_api::api_server::rpc_subscriptions::start_ws_server(
                 connection_pool.clone(),

@@ -5,16 +5,11 @@
 
 // Built-in deps
 use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
+
 use std::fmt::Display;
-use std::iter::FromIterator;
-use std::sync::Arc;
+
 // External deps
 use bigdecimal::BigDecimal;
-use futures::{
-    channel::{mpsc::Receiver, oneshot},
-    StreamExt,
-};
 use num::{
     rational::Ratio,
     traits::{Inv, Pow},
@@ -22,11 +17,11 @@ use num::{
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::sync::Mutex;
+
 use tokio::task::JoinHandle;
-use tokio::time::Instant;
+
 // Workspace deps
-use zksync_balancer::{Balancer, BuildBalancedItem};
+
 use zksync_config::configs::ticker::TokenPriceSource;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -39,28 +34,26 @@ use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 // Local deps
 use crate::fee_ticker::constants::AMORTIZED_COST_PER_CHUNK;
 pub use crate::fee_ticker::ticker_info::{FeeTickerInfo, TickerInfo};
+use crate::fee_ticker::validator::FeeTokenValidator;
 use crate::fee_ticker::{
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
         CONNECTION_TIMEOUT,
     },
-    validator::{
-        watcher::{TokenWatcher, UniswapTokenWatcher},
-        FeeTokenValidator, MarketUpdater,
-    },
+    validator::{watcher::UniswapTokenWatcher, MarketUpdater},
 };
 use crate::utils::token_db_cache::TokenDBCache;
+use std::convert::TryFrom;
+use std::iter::FromIterator;
 use zksync_types::gas_counter::GasCounter;
 
 mod constants;
 mod ticker_api;
-mod ticker_info;
+pub(crate) mod ticker_info;
 pub mod validator;
 
 #[cfg(test)]
-mod tests;
-
-static TICKER_CHANNEL_SIZE: usize = 32000;
+pub(crate) mod tests;
 
 /// Contains cost of zkSync operations in Wei.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -145,12 +138,12 @@ impl GasOperationsCost {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TickerConfig {
-    zkp_cost_chunk_usd: Ratio<BigUint>,
-    gas_cost_tx: GasOperationsCost,
-    tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
-    scale_fee_coefficient: Ratio<BigUint>,
-    max_blocks_to_aggregate: u32,
-    subsidy_cpk_price_usd: Ratio<BigUint>,
+    pub zkp_cost_chunk_usd: Ratio<BigUint>,
+    pub gas_cost_tx: GasOperationsCost,
+    pub tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
+    pub scale_fee_coefficient: Ratio<BigUint>,
+    pub max_blocks_to_aggregate: u32,
+    pub subsidy_cpk_price_usd: Ratio<BigUint>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -197,10 +190,20 @@ impl PriceError {
     }
 }
 
-#[derive(Clone)]
-pub struct FeeTicker<INFO: Clone> {
+pub struct FeeTicker<INFO> {
     info: INFO,
     config: TickerConfig,
+    validator: FeeTokenValidator,
+}
+
+impl<INFO: Clone> Clone for FeeTicker<INFO> {
+    fn clone(&self) -> Self {
+        Self {
+            info: self.info.clone(),
+            config: self.config.clone(),
+            validator: self.validator.clone(),
+        }
+    }
 }
 
 const CPK_CREATE2_FEE_TYPE: OutputFeeType = OutputFeeType::ChangePubKey(
@@ -249,12 +252,22 @@ pub fn run_updaters(
     tasks
 }
 
-impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
-    pub fn new(
+impl<INFO> FeeTicker<INFO> {
+    pub fn new(info: INFO, config: TickerConfig, validator: FeeTokenValidator) -> Self {
+        Self {
+            info,
+            config,
+            validator,
+        }
+    }
+
+    pub fn new_with_default_validator(
         info: INFO,
         config: zksync_config::TickerConfig,
         max_blocks_to_aggregate: u32,
+        connection_pool: ConnectionPool,
     ) -> Self {
+        let cache = (connection_pool.clone(), TokenDBCache::new());
         let ticker_config = TickerConfig {
             zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
             gas_cost_tx: GasOperationsCost::from_constants(config.fast_processing_coeff),
@@ -266,13 +279,17 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
             max_blocks_to_aggregate,
             subsidy_cpk_price_usd: config.subsidy_cpk_price_usd(),
         };
-
-        Self {
-            info,
-            config: ticker_config,
-        }
+        let validator = FeeTokenValidator::new(
+            cache.clone(),
+            chrono::Duration::seconds(config.available_liquidity_seconds as i64),
+            BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
+            HashSet::from_iter(config.unconditionally_valid_tokens.clone()),
+        );
+        Self::new(info, ticker_config, validator)
     }
+}
 
+impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
     /// Increases the gas price by a constant coefficient.
     /// Due to the high volatility of gas prices, we are include the risk
     /// in the fee in order not to go into negative territory.
@@ -601,6 +618,9 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
             future_blocks.blocks_to_prove,
         );
         BigUint::from(commit_cost + execute_cost + proof_cost + additional_cost)
+    }
+    pub async fn token_allowed_for_fees(&mut self, token: TokenLike) -> anyhow::Result<bool> {
+        self.validator.token_allowed(token).await
     }
 }
 

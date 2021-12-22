@@ -26,8 +26,9 @@ use crate::{
 };
 
 use super::{types::*, RpcApp};
+use crate::fee_ticker::FeeTickerInfo;
 
-impl RpcApp {
+impl<INFO: FeeTickerInfo> RpcApp<INFO> {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
 
@@ -256,7 +257,7 @@ impl RpcApp {
     }
 
     pub async fn _impl_get_tx_fee(
-        self,
+        mut self,
         tx_type: ApiTxFeeTypes,
         address: Address,
         token: TokenLike,
@@ -264,7 +265,7 @@ impl RpcApp {
     ) -> Result<Fee> {
         let start = Instant::now();
         let token_allowed =
-            Self::token_allowed_for_fees(&self.tx_sender.ticker, token.clone()).await?;
+            Self::token_allowed_for_fees(&mut self.tx_sender.ticker, token.clone()).await?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
@@ -298,7 +299,7 @@ impl RpcApp {
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
-        self,
+        mut self,
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
@@ -314,7 +315,7 @@ impl RpcApp {
         }
 
         let token_allowed =
-            Self::token_allowed_for_fees(&self.tx_sender.ticker, token.clone()).await?;
+            Self::token_allowed_for_fees(&mut self.tx_sender.ticker, token.clone()).await?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }

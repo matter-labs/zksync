@@ -54,15 +54,15 @@ use crate::{
 use zksync_config::configs::api::CommonApiConfig;
 
 use super::rpc_server::types::RequestMetadata;
-use crate::fee_ticker::{FeeTicker, TickerInfo};
+use crate::fee_ticker::{FeeTicker, FeeTickerInfo};
 
 const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
 #[derive(Clone)]
-pub struct TxSender {
+pub struct TxSender<INFO> {
     pub core_api_client: CoreApiClient,
     pub sign_verify_requests: mpsc::Sender<VerifySignatureRequest>,
-    pub ticker: FeeTicker<TickerInfo>,
+    pub ticker: FeeTicker<INFO>,
 
     pub pool: ConnectionPool,
     pub tokens: TokenDBCache,
@@ -138,11 +138,11 @@ macro_rules! internal_error {
     }};
 }
 
-impl TxSender {
+impl<INFO: Clone> TxSender<INFO> {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker: FeeTicker<TickerInfo>,
+        ticker: FeeTicker<INFO>,
         config: &CommonApiConfig,
         private_url: String,
     ) -> Self {
@@ -161,7 +161,7 @@ impl TxSender {
         core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker: FeeTicker<TickerInfo>,
+        ticker: FeeTicker<INFO>,
         config: &CommonApiConfig,
     ) -> Self {
         let max_number_of_transactions_per_batch =
@@ -188,7 +188,9 @@ impl TxSender {
             subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
         }
     }
+}
 
+impl<INFO: FeeTickerInfo + Clone> TxSender<INFO> {
     /// If `ForcedExit` has Ethereum siganture (e.g. it's a part of a batch), an actual signer
     /// is initiator, not the target, thus, this function will perform a database query to acquire
     /// the corresponding address.
@@ -198,7 +200,6 @@ impl TxSender {
             _ => Ok(tx.account()),
         }
     }
-
     async fn get_address_by_id(&self, id: AccountId) -> Result<Address, anyhow::Error> {
         self.pool
             .access_storage()
@@ -1032,7 +1033,7 @@ impl TxSender {
     }
 
     async fn ticker_batch_fee_request(
-        ticker: &FeeTicker<TickerInfo>,
+        ticker: &FeeTicker<INFO>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
     ) -> Result<ResponseBatchFee, SubmitError> {
@@ -1043,7 +1044,7 @@ impl TxSender {
     }
 
     async fn ticker_request(
-        ticker: &FeeTicker<TickerInfo>,
+        ticker: &FeeTicker<INFO>,
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
@@ -1055,14 +1056,14 @@ impl TxSender {
     }
 
     pub async fn token_allowed_for_fees(
-        ticker: &FeeTicker<TickerInfo>,
-        token: TokenLike,
+        _ticker: &FeeTicker<INFO>,
+        _token: TokenLike,
     ) -> Result<bool, SubmitError> {
         todo!()
     }
 
     pub async fn ticker_price_request(
-        ticker: &FeeTicker<TickerInfo>,
+        ticker: &FeeTicker<INFO>,
         token: TokenLike,
         req_type: TokenPriceRequestType,
     ) -> Result<BigDecimal, SubmitError> {

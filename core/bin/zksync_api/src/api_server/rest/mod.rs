@@ -12,7 +12,7 @@ use crate::signature_checker::VerifySignatureRequest;
 
 use super::tx_sender::TxSender;
 
-use crate::fee_ticker::{FeeTicker, TickerInfo};
+use crate::fee_ticker::{FeeTicker, FeeTickerInfo};
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
 
@@ -21,9 +21,9 @@ mod helpers;
 mod v01;
 pub mod v02;
 
-async fn start_server(
+async fn start_server<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
     api_v01: ApiV01,
-    fee_ticker: FeeTicker<TickerInfo>,
+    fee_ticker: FeeTicker<INFO>,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     bind_to: SocketAddr,
 ) {
@@ -80,11 +80,11 @@ async fn start_server(
 
 /// Start HTTP REST API
 #[allow(clippy::too_many_arguments)]
-pub fn start_server_thread_detached(
+pub fn start_server_thread_detached<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
-    fee_ticker: FeeTicker<TickerInfo>,
+    fee_ticker: FeeTicker<INFO>,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     private_url: String,
 ) -> JoinHandle<()> {
