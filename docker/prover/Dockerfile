@@ -29,10 +29,10 @@ RUN apt-get update && apt-get install -y axel ca-certificates tini && rm -rf /va
 #ENV MISC_DOCKER_DUMMY_PROVER $MISC_DOCKER_DUMMY_PROVER
 COPY --from=builder /usr/src/zksync/target/release/plonk_step_by_step_prover /bin/
 COPY --from=builder /usr/src/zksync/target/release/dummy_prover /bin/
-COPY docker/prover/prover-entry.sh /bin/
+COPY docker/prover/prover-entry.sh docker/prover/graceful-run.sh /bin/
 COPY keys/packed /keys/packed
 COPY contracts/artifacts/ /contracts/artifacts/
 
 ## Mitigate memory leaks when app exists it's restarted
 ENTRYPOINT [ "/usr/bin/tini", "-g", "--" ]
-CMD while :; do /bin/prover-entry.sh || exit $?; done
+CMD ["/bin/graceful-run.sh"]

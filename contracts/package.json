@@ -55,7 +55,8 @@
     "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
     "submit-hash-regenesis": "ts-node scripts/submit-hash-regenesis.ts",
     "submit-regenesis-upgrade": "ts-node scripts/submit-regenesis-upgrade.ts",
-    "read-variable": "ts-node scripts/read-variable.ts"
+    "read-variable": "ts-node scripts/read-variable.ts",
+    "verify-deployed-contract": "ts-node scripts/verify-deployed-contract.ts"
   },
   "dependencies": {
     "@openzeppelin/contracts": "3.4.2"

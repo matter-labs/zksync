@@ -8,8 +8,8 @@ export function web3Url() {
     return process.env.ETH_CLIENT_WEB3_URL.split(',')[0] as string;
 }
 
-export function web3Provider() {
-    const provider = new ethers.providers.JsonRpcProvider(web3Url());
+export function web3CustomProvider(url: string) {
+    const provider = new ethers.providers.JsonRpcProvider(url);
 
     // Check that `CHAIN_ETH_NETWORK` variable is set. If not, it's most likely because
     // the variable was renamed. As this affects the time to deploy contracts in localhost
@@ -25,6 +25,9 @@ export function web3Provider() {
     }
 
     return provider;
+}
+export function web3Provider() {
+    return web3CustomProvider(web3Url());
 }
 
 export function storedBlockInfoParam(): ParamType {
