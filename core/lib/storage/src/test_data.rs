@@ -12,7 +12,7 @@ use zksync_crypto::params::{max_account_id, MIN_NFT_TOKEN_ID};
 use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
 use zksync_crypto::{ff::PrimeField, rand::Rng, Fr};
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
-use zksync_types::block::IncompleteBlock;
+use zksync_types::block::{IncompleteBlock, PendingBlock};
 use zksync_types::{
     account::Account,
     aggregated_operations::{
@@ -201,6 +201,21 @@ pub fn gen_sample_incomplete_block(
         block_chunks_size,
         commit_gas_limit: 1_000_000.into(),
         verify_gas_limit: 1_500_000.into(),
+        timestamp: 0,
+    }
+}
+
+pub fn gen_sample_pending_block(
+    block_number: BlockNumber,
+    txs: Vec<ExecutedOperations>,
+) -> PendingBlock {
+    PendingBlock {
+        number: block_number,
+        chunks_left: 1,
+        unprocessed_priority_op_before: 0,
+        pending_block_iteration: 1,
+        success_operations: txs,
+        failed_txs: Vec::new(),
         timestamp: 0,
     }
 }

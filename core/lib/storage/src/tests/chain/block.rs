@@ -6,6 +6,7 @@ use zksync_api_types::v02::pagination::{
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
+    block::Block,
     helpers::apply_updates,
     tx::{ChangePubKeyType, TxHash},
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId,
@@ -22,7 +23,8 @@ use crate::{
     },
     ethereum::EthereumSchema,
     test_data::{
-        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_sample_block,
+        dummy_ethereum_tx_hash, dummy_root_hash_for_block, gen_acc_random_updates,
+        gen_sample_block, gen_sample_incomplete_block, gen_sample_pending_block,
         gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS,
     },
     tests::{create_rng, db_test},
@@ -1347,6 +1349,57 @@ async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -
         .get_account_tree_cache_block(BlockNumber(1))
         .await?
         .is_none());
+
+    Ok(())
+}
+
+/// Checks the logic behind `save_incomplete_block` / `finish_incomplete_block`.
+#[db_test]
+async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut schema = BlockSchema(&mut storage);
+
+    let block_number = BlockNumber(1);
+
+    let pending_block = gen_sample_pending_block(block_number, Vec::new());
+    let incomplete_block = gen_sample_incomplete_block(block_number, BLOCK_SIZE_CHUNKS, Vec::new());
+    let root_hash = dummy_root_hash_for_block(block_number);
+    let complete_block =
+        Block::from_incomplete(incomplete_block.clone(), root_hash, Default::default());
+
+    schema.save_pending_block(pending_block).await?;
+    assert!(
+        schema.load_pending_block().await?.is_some(),
+        "Pending block should be saved"
+    );
+
+    schema.save_incomplete_block(incomplete_block).await?;
+
+    // Pending block should be removed now.
+    assert!(
+        schema.load_pending_block().await?.is_none(),
+        "Pending block should be removed after saving incomplete block"
+    );
+
+    // Block should not be available yet.
+    assert!(
+        schema.get_block(block_number).await?.is_none(),
+        "Block should not exist"
+    );
+
+    // Finish the block and ensure it's created correctly.
+    schema
+        .finish_incomplete_block(complete_block.clone())
+        .await?;
+    let block_from_storage = schema
+        .get_block(block_number)
+        .await?
+        .expect("Block should exist now");
+
+    assert_eq!(block_from_storage.block_number, block_number);
+    assert_eq!(
+        block_from_storage.new_root_hash,
+        complete_block.new_root_hash
+    );
 
     Ok(())
 }
