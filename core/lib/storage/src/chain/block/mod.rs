@@ -1057,10 +1057,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         ));
 
         // Load previous block root hash.
+        let prev_block_number = block_number - 1;
         let previous_root_hash = sqlx::query_as!(
             StorageRootHash,
             "SELECT root_hash FROM blocks WHERE number = $1",
-            i64::from(*block_number)
+            i64::from(*prev_block_number)
         )
         .fetch_optional(self.0.conn())
         .await?

@@ -140,6 +140,8 @@ impl RootHashCalculator {
     }
 
     async fn process_job(&mut self, job: BlockRootHashJob) {
+        vlog::info!("Received job to process block #{}", job.block);
+
         // Ensure that the new block has expected number.
         assert_eq!(
             job.block,
@@ -152,6 +154,8 @@ impl RootHashCalculator {
 
         let root_hash = self.state.root_hash();
 
+        vlog::info!("Root hash for block #{} is calculated", job.block);
+
         let finalize_request = CommitRequest::FinishBlock(BlockFinishRequest {
             block_number: job.block,
             root_hash,
@@ -160,6 +164,9 @@ impl RootHashCalculator {
             .send(finalize_request)
             .await
             .expect("committer receiver dropped");
+
+        // Increment block number to expect the next one.
+        self.last_block_number = self.last_block_number + 1;
     }
 }
 

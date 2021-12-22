@@ -11,4 +11,10 @@ CREATE TABLE IF NOT EXISTS incomplete_blocks (
     verify_gas_limit BIGINT NOT NULL,
     timestamp bigint
 );
+
+-- Root hash calculation is now detached from state keeper, so no root hashes in pending block are available.
 ALTER TABLE pending_block DROP COLUMN IF EXISTS previous_root_hash;
+
+-- Entry in `block_metadata` is created before corresponding entry in `blocks` table.
+ALTER TABLE block_metadata DROP CONSTRAINT block_metadata_block_number_fkey;
+

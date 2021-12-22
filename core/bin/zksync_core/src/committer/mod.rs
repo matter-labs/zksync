@@ -237,7 +237,7 @@ async fn finish_block(request: BlockFinishRequest, pool: &ConnectionPool) {
         // Invariant: we calculate root hashes for blocks sequentially.
         // It means that if we want to finish block `X`, then root hash for block `X-1` is already calculated and saved to the database.
         // If there is no root hash data in the database, it means that there is a bug in application logic.
-        panic!("Received a request to finish block ${}, but there is no root hash for previous block in the database", block_number);
+        panic!("Received a request to finish block #{}, but there is no root hash for previous block in the database", block_number);
     });
 
     let block = Block::from_incomplete(incomplete_block, prev_root_hash, root_hash);
