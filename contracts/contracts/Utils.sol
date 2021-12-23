@@ -16,6 +16,11 @@ library Utils {
         return a < b ? a : b;
     }
 
+    /// @notice Returns lesser of two values
+    function minU128(uint128 a, uint128 b) internal pure returns (uint128) {
+        return a < b ? a : b;
+    }
+
     /// @notice Recovers signer's address from ethereum signature for given message
     /// @param _signature 65 bytes concatenated. R (32) + S (32) + V (1)
     /// @param _messageHash signed message hash.
