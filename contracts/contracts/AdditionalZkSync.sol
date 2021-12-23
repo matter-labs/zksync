@@ -136,14 +136,12 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     }
 
     function cutUpgradeNoticePeriod() external {
-        requireActive();
         require(upgradeStartTimestamp != 0);
 
         approvedCutUpgradeNoticePeriod(msg.sender);
     }
 
     function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
-        requireActive();
         require(upgradeStartTimestamp != 0);
 
         address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);

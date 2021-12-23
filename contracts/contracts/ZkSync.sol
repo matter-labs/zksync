@@ -18,7 +18,6 @@ import "./Bytes.sol";
 import "./Operations.sol";
 
 import "./UpgradeableMaster.sol";
-import "./RegenesisMultisig.sol";
 import "./AdditionalZkSync.sol";
 
 /// @title zkSync main contract
@@ -115,7 +114,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
     function isReadyForUpgrade() external view override returns (bool) {
-        return !exodusMode;
+        return true;
     }
 
     constructor() {
