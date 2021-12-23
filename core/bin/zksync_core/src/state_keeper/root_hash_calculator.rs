@@ -39,13 +39,8 @@ pub(super) struct BlockRootHashJobQueue {
 }
 
 impl BlockRootHashJobQueue {
-    /// Creates a new empty queue.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Creates a filled queue.
-    pub fn new_filled(jobs: impl IntoIterator<Item = BlockRootHashJob>) -> Self {
+    pub fn new(jobs: impl IntoIterator<Item = BlockRootHashJob>) -> Self {
         let queue: VecDeque<_> = jobs.into_iter().collect();
         let size = queue.len();
         Self {
@@ -173,4 +168,47 @@ impl RootHashCalculator {
 #[must_use]
 pub fn start_root_hash_calculator(rhc: RootHashCalculator) -> JoinHandle<()> {
     tokio::spawn(rhc.run())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Checks basic block jobs queue functionality.
+    #[tokio::test]
+    async fn queue_functionality() {
+        let mut queue = BlockRootHashJobQueue::new(std::iter::empty());
+        assert_eq!(queue.size(), 0);
+
+        queue
+            .push(BlockRootHashJob {
+                block: BlockNumber(1),
+                updates: Vec::new(),
+            })
+            .await;
+        assert_eq!(queue.size(), 1);
+
+        queue
+            .push(BlockRootHashJob {
+                block: BlockNumber(2),
+                updates: Vec::new(),
+            })
+            .await;
+        assert_eq!(queue.size(), 2);
+
+        let first_job = queue.pop().await.expect("Should pop element");
+        assert_eq!(first_job.block, BlockNumber(1));
+        assert_eq!(queue.size(), 1);
+
+        let second_job = queue.pop().await.expect("Should pop element");
+        assert_eq!(second_job.block, BlockNumber(2));
+        assert_eq!(queue.size(), 0);
+
+        assert!(queue.pop().await.is_none(), "No elements left");
+        assert_eq!(
+            queue.size(),
+            0,
+            "Size should not change after popping from empty"
+        );
+    }
 }

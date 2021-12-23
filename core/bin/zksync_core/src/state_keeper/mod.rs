@@ -102,7 +102,7 @@ impl ZkSyncStateKeeper {
         }
 
         // Create and fill the queue for root hash calculator.
-        let root_hash_queue = BlockRootHashJobQueue::new_filled(initial_state.root_hash_jobs);
+        let root_hash_queue = BlockRootHashJobQueue::new(initial_state.root_hash_jobs);
         let root_hash_calculator = RootHashCalculator::new(
             rhc_state,
             root_hash_queue.clone(),
