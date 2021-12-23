@@ -167,6 +167,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         delegateAdditional();
     }
 
+    function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
+        /// All functions delegated to additional contract should NOT be nonReentrant
+        delegateAdditional();
+    }
+
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
     /// @dev This function is used to allow tokens to spend zkSync contract balance up to amount that is requested
@@ -186,7 +191,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         _token.transfer(_to, _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint256 balanceDiff = balanceBefore.sub(balanceAfter);
-        require(balanceDiff <= _maxAmount, "7"); // rollup balance difference (before and after transfer) is bigger than _maxAmount
+        require(balanceDiff > 0 && balanceDiff <= _maxAmount, "7"); // rollup balance difference (before and after transfer) is bigger than _maxAmount
 
         return SafeCast.toUint128(balanceDiff);
     }
@@ -229,7 +234,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         _token.transferFrom(msg.sender, address(this), SafeCast.toUint128(_amount));
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint128 depositAmount = SafeCast.toUint128(balanceAfter.sub(balanceBefore));
-        require(depositAmount <= MAX_DEPOSIT_AMOUNT, "C");
+        require(depositAmount > 0 && depositAmount <= MAX_DEPOSIT_AMOUNT, "C");
 
         registerDeposit(tokenId, depositAmount, _zkSyncAddress);
     }
@@ -283,6 +288,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
         require(op.creatorAddress != address(0), "op"); // No NFT to withdraw
         NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
+        // Save withdrawn nfts for future deposits
+        withdrawnNFTs[_tokenId] = address(_factory);
+        delete pendingWithdrawnNFTs[_tokenId];
         _factory.mintNFTFromZkSync(
             op.creatorAddress,
             op.receiver,
@@ -291,10 +299,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             op.contentHash,
             op.tokenId
         );
-        // Save withdrawn nfts for future deposits
-        withdrawnNFTs[op.tokenId] = address(_factory);
+
         emit WithdrawalNFT(op.tokenId);
-        delete pendingWithdrawnNFTs[_tokenId];
     }
 
     /// @notice Register full exit request - pack pubdata, add priority request
@@ -358,7 +364,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev Process one block commit using previous block StoredBlockInfo,
     /// @dev returns new block StoredBlockInfo
-    /// @dev NOTE: Does not change storage (except events, so we can't mark it view)
+    /// @dev NOTE: does not change storage! (only emit events)
     function commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo memory _newBlock)
         internal
         view
@@ -451,18 +457,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         address _recipient,
         uint128 _amount
     ) internal {
-        bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
-
         bool sent = false;
         if (_tokenId == 0) {
             address payable toPayable = address(uint160(_recipient));
             sent = sendETHNoRevert(toPayable, _amount);
         } else {
             address tokenAddr = governance.tokenAddresses(_tokenId);
-            // We use `_transferERC20` here to check that `ERC20` token indeed transferred `_amount`
+            // We use `transferERC20` here to check that `ERC20` token indeed transferred `_amount`
             // and fail if token subtracted from zkSync balance more then `_amount` that was requested.
             // This can happen if token subtracts fee from sender while transferring `_amount` that was requested to transfer.
-            try this._transferERC20{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
+            try this.transferERC20{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
                 sent = true;
             } catch {
                 sent = false;
@@ -471,6 +475,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         if (sent) {
             emit Withdrawal(_tokenId, _amount);
         } else {
+            bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
             emit WithdrawalPending(_tokenId, _amount);
         }
