@@ -582,6 +582,12 @@ mod execute_proposed_block {
         // Second batch
         apply_batch_with_two_transfers(&mut tester).await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // Check sealed block
         if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
             tester.response_rx.next().await
@@ -624,6 +630,12 @@ mod execute_proposed_block {
 
         // Single tx
         apply_single_transfer(&mut tester).await;
+
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
 
         // Check sealed block
         if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
@@ -675,6 +687,12 @@ mod execute_proposed_block {
 
         // Last single tx
         apply_single_transfer(&mut tester).await;
+
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
 
         // Check sealed block
         if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
@@ -806,6 +824,13 @@ mod execute_proposed_block {
             .state_keeper
             .execute_proposed_block(proposed_block)
             .await;
+
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         assert!(matches!(
             tester.response_rx.next().await,
             Some(CommitRequest::SealIncompleteBlock(_))
@@ -837,6 +862,12 @@ mod execute_proposed_block {
             .state_keeper
             .execute_proposed_block(proposed_block)
             .await;
+
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
 
         // We should receive the next block, since it must be sealed right after.
         assert!(matches!(
