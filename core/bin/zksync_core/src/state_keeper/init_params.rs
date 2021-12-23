@@ -11,7 +11,7 @@ use super::{
     state_restore::{db::StateRestoreStorage, RestoredTree},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ZkSyncStateInitParams {
     pub tree: AccountTree,
     pub acc_id_by_addr: HashMap<Address, AccountId>,
