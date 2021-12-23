@@ -81,10 +81,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Notification that upgrade preparation status is activated
     /// @dev Can be external because Proxy contract intercepts illegal calls of this function
     function upgradePreparationStarted() external override {
+        require(block.timestamp >= upgradeStartTimestamp.add(approvedUpgradeNoticePeriod));
+
         upgradePreparationActive = true;
         upgradePreparationActivationTime = block.timestamp;
-
-        require(block.timestamp >= upgradeStartTimestamp.add(approvedUpgradeNoticePeriod));
     }
 
     /// @dev When upgrade is finished or canceled we must clean upgrade-related state.
@@ -174,19 +174,19 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @param _maxAmount Maximum possible amount of tokens to transfer to this account
-    function _transferERC20(
+    function transferERC20(
         IERC20 _token,
         address _to,
         uint128 _amount,
         uint128 _maxAmount
     ) external returns (uint128 withdrawnAmount) {
-        require(msg.sender == address(this), "5"); // wtg10 - can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
+        require(msg.sender == address(this), "5"); // can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
 
         uint256 balanceBefore = _token.balanceOf(address(this));
-        require(Utils.sendERC20(_token, _to, _amount), "6"); // wtg11 - ERC20 transfer fails
+        _token.transfer(_to, _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint256 balanceDiff = balanceBefore.sub(balanceAfter);
-        require(balanceDiff <= _maxAmount, "7"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
+        require(balanceDiff <= _maxAmount, "7"); // rollup balance difference (before and after transfer) is bigger than _maxAmount
 
         return SafeCast.toUint128(balanceDiff);
     }
@@ -204,8 +204,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _zkSyncAddress The receiver Layer 2 address
     function depositETH(address _zkSyncAddress) external payable {
         require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
+        require(msg.value > 0, "M");
         requireActive();
-        registerDeposit(0, SafeCast.toUint128(msg.value), _zkSyncAddress);
+        registerDeposit(0, uint128(msg.value), _zkSyncAddress);
     }
 
     /// @notice Deposit ERC20 token to Layer 2 - transfer ERC20 tokens from user into contract, validate it, register deposit
@@ -225,7 +226,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(!governance.pausedTokens(tokenId), "b"); // token deposits are paused
 
         uint256 balanceBefore = _token.balanceOf(address(this));
-        require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "c"); // token transfer failed deposit
+        _token.transferFrom(msg.sender, address(this), SafeCast.toUint128(_amount));
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint128 depositAmount = SafeCast.toUint128(balanceAfter.sub(balanceBefore));
         require(depositAmount <= MAX_DEPOSIT_AMOUNT, "C");
@@ -255,20 +256,25 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         address _token,
         uint128 _amount
     ) external nonReentrant {
-        if (_token == address(0)) {
-            registerWithdrawal(0, _amount, _owner);
-            (bool success, ) = _owner.call{value: _amount}("");
+        uint16 tokenId = 0;
+        if (_token != address(0)) {
+            tokenId = governance.validateTokenAddress(_token);
+        }
+
+        bytes22 packedBalanceKey = packAddressAndTokenId(_owner, tokenId);
+        uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
+        uint128 amount = Utils.minU128(balance, _amount);
+
+        if (tokenId == 0) {
+            (bool success, ) = _owner.call{value: amount}("");
             require(success, "d"); // ETH withdraw failed
         } else {
-            uint16 tokenId = governance.validateTokenAddress(_token);
-            bytes22 packedBalanceKey = packAddressAndTokenId(_owner, tokenId);
-            uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
             // We will allow withdrawals of `value` such that:
             // `value` <= user pending balance
-            // `value` can be bigger then `_amount` requested if token takes fee from sender in addition to `_amount` requested
-            uint128 withdrawnAmount = this._transferERC20(IERC20(_token), _owner, _amount, balance);
-            registerWithdrawal(tokenId, withdrawnAmount, _owner);
+            // `value` can be bigger then `amount` requested if token takes fee from sender in addition to `amount` requested
+            amount = this.transferERC20(IERC20(_token), _owner, amount, balance);
         }
+        registerWithdrawal(tokenId, amount, _owner);
     }
 
     /// @notice  Withdraws NFT from zkSync contract to the owner
@@ -587,22 +593,20 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
-    function activateExodusMode() public returns (bool) {
+    function activateExodusMode() external returns (bool) {
+        requireActive();
         // #if EASY_EXODUS
         bool trigger = true;
         // #else
         bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
             priorityRequests[firstPriorityRequestId].expirationBlock != 0;
         // #endif
+
         if (trigger) {
-            if (!exodusMode) {
-                exodusMode = true;
-                emit ExodusMode();
-            }
-            return true;
-        } else {
-            return false;
+            exodusMode = true;
+            emit ExodusMode();
         }
+        return trigger;
     }
 
     /// @notice Withdraws token from ZkSync to root chain in case of exodus mode. User must provide proof that he owns funds

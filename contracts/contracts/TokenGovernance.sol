@@ -14,7 +14,7 @@ contract TokenGovernance {
     event TokenListerUpdate(address indexed tokenLister, bool isActive);
 
     /// @notice Listing fee token set
-    event ListingFeeTokenUpdate(IERC20 indexed newListingFeeToken);
+    event ListingFeeTokenUpdate(ITrustedTransfarableERC20 indexed newListingFeeToken);
 
     /// @notice Listing fee set
     event ListingFeeUpdate(uint256 newListingFee);
@@ -29,7 +29,7 @@ contract TokenGovernance {
     Governance public governance;
 
     /// @notice Token used to collect listing fee for addition of new token to zkSync network
-    IERC20 public listingFeeToken;
+    ITrustedTransfarableERC20 public listingFeeToken;
 
     /// @notice Token listing fee
     uint256 public listingFee;
@@ -45,7 +45,7 @@ contract TokenGovernance {
 
     constructor(
         Governance _governance,
-        IERC20 _listingFeeToken,
+        ITrustedTransfarableERC20 _listingFeeToken,
         uint256 _listingFee,
         uint16 _listingCap,
         address _treasury
@@ -69,7 +69,7 @@ contract TokenGovernance {
         require(governance.totalTokens() < listingCap, "can't add more tokens"); // Impossible to add more tokens using this contract
         if (!tokenLister[msg.sender]) {
             // Collect fees
-            bool feeTransferOk = Utils.transferFromERC20(listingFeeToken, msg.sender, treasury, listingFee);
+            bool feeTransferOk = listingFeeToken.transferFrom(msg.sender, treasury, listingFee);
             require(feeTransferOk, "fee transfer failed"); // Failed to receive payment for token addition.
         }
         governance.addToken(_token);
@@ -79,7 +79,7 @@ contract TokenGovernance {
 
     /// @notice Set new listing token and fee
     /// @notice Can be called only by zkSync governor
-    function setListingFeeToken(IERC20 _newListingFeeToken, uint256 _newListingFee) external {
+    function setListingFeeToken(ITrustedTransfarableERC20 _newListingFeeToken, uint256 _newListingFee) external {
         governance.requireGovernor(msg.sender);
         listingFeeToken = _newListingFeeToken;
         listingFee = _newListingFee;

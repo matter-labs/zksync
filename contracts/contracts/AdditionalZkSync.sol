@@ -96,7 +96,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
         require(toProcess > 0, "9"); // no deposits to process
         uint64 currentDepositIdx = 0;
-        for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
+        for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; ++id) {
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
                 bytes memory depositPubdata = _depositsPubdata[currentDepositIdx];
                 require(Utils.hashBytesToBytes20(depositPubdata) == priorityRequests[id].hashedPubData, "a");
@@ -146,12 +146,16 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         requireActive();
         require(upgradeStartTimestamp != 0);
 
-        address gatekeeper = 0x38A43F4330f24fe920F943409709fc9A6084C939;
-        (, bytes memory newTarget0) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 0));
-        (, bytes memory newTarget1) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 1));
-        (, bytes memory newTarget2) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 2));
+        address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
+        (, bytes memory newTarget0) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 0));
+        (, bytes memory newTarget1) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 1));
+        (, bytes memory newTarget2) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 2));
 
-        bytes32 targetsHash = keccak256(abi.encodePacked(newTarget0, newTarget1, newTarget2));
+        address newTargetAddress0 = abi.decode(newTarget0, (address));
+        address newTargetAddress1 = abi.decode(newTarget1, (address));
+        address newTargetAddress2 = abi.decode(newTarget2, (address));
+
+        bytes32 targetsHash = keccak256(abi.encodePacked(newTargetAddress0, newTargetAddress1, newTargetAddress2));
         bytes32 messageHash = keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n110",
