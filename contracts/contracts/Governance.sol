@@ -209,7 +209,7 @@ contract Governance is Config {
 
     function getNFTFactory(uint32 _creatorAccountId, address _creatorAddress) external view returns (NFTFactory) {
         NFTFactory _factory = nftFactories[_creatorAccountId][_creatorAddress];
-        if (address(_factory) == address(0) && !isContract(address(_factory))) {
+        if (address(_factory) == address(0) || !isContract(address(_factory))) {
             require(address(defaultFactory) != address(0), "fs"); // NFTFactory does not set
             return defaultFactory;
         } else {
