@@ -561,6 +561,7 @@ impl TestSetup {
             .await
             .expect("can't change pubkey, account does not exist")
             .0;
+
         self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
         let tx = self
