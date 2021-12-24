@@ -5,12 +5,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { web3Provider } from './utils';
 import { readProductionContracts } from '../src.ts/deploy';
+import { exec as _exec } from 'child_process';
+import { promisify } from 'util';
 
+const exec = promisify(_exec);
 const { expect } = require('chai');
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
-const testContracts = readProductionContracts();
 
 async function main() {
     const parser = new ArgumentParser({
@@ -26,6 +28,7 @@ async function main() {
         process.exit(1);
     }
 
+    let testContracts = readProductionContracts();
     const provider = web3Provider();
 
     const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
@@ -38,13 +41,19 @@ async function main() {
         wallet
     );
 
-    const newTargetFranklin = await deployContract(wallet, testContracts.zkSync, [], {
+    const newAdditionalZkSync = await deployContract(wallet, testContracts.additionalZkSync, [], {
+        gasLimit: 6500000
+    });
+    process.env.CONTRACTS_ADDITIONAL_ZKSYNC_ADDR = newAdditionalZkSync.address;
+    await exec('hardhat compile');
+    testContracts = readProductionContracts();
+    const newTargetZkSync = await deployContract(wallet, testContracts.zkSync, [], {
         gasLimit: 6500000
     });
 
     console.log('Starting upgrade');
     await (
-        await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetFranklin.address])
+        await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetZkSync.address])
     ).wait();
 
     // wait notice period
@@ -58,7 +67,7 @@ async function main() {
     // finish upgrade
     await (await upgradeGatekeeper.finishUpgrade([[], [], []], { gasLimit: 300000 })).wait();
 
-    await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
+    await expect(await proxyContract.getTarget()).to.equal(newTargetZkSync.address, 'upgrade was unsuccessful');
 }
 
 main()

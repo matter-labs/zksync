@@ -5,7 +5,7 @@ use zksync_data_restore::{
     data_restore_driver::DataRestoreDriver, inmemory_storage_interactor::InMemoryStorageInteractor,
     ETH_BLOCKS_STEP,
 };
-use zksync_types::{AccountId, AccountMap, TokenId};
+use zksync_types::{Account, AccountMap, TokenId};
 
 use crate::{external_commands::Contracts, TestkitConfig};
 
@@ -35,11 +35,13 @@ pub async fn verify_restore(
         contract,
     );
 
-    let mut db = InMemoryStorageInteractor::new();
-
-    db.insert_new_account(AccountId(0), &fee_account_address);
+    let db = InMemoryStorageInteractor::new();
 
     let mut interactor = StorageInteractor::InMemory(db);
+    let fee_account = Account::default_with_address(&fee_account_address);
+    driver
+        .set_genesis_state(&mut interactor, 0, fee_account)
+        .await;
     driver.load_state_from_storage(&mut interactor).await;
     driver.run_state_update(&mut interactor).await;
 
