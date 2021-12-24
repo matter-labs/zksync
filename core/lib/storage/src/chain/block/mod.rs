@@ -630,6 +630,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
+    /// Returns the number of existing incomplete block.
+    /// Returns `None` if there are no incomplte blocks in the database.
+    pub async fn get_last_incomplete_block(&mut self) -> QueryResult<Option<BlockNumber>> {
+        let start = Instant::now();
+        let result = sqlx::query!("SELECT max(number) FROM incomplete_blocks")
+            .fetch_one(self.0.conn())
+            .await?
+            .max
+            .map(|block| BlockNumber(block as u32));
+        metrics::histogram!("sql.chain.block.get_last_incomplete_block", start.elapsed());
+        Ok(result)
+    }
+
     /// Returns the number of last block which commit is confirmed on Ethereum.
     pub async fn get_last_committed_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
@@ -1450,17 +1463,36 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
+        // We should retrieve last committed block for which an aggregated operation was created.
+        // Events for blocks are created by `eth_sender` after sending transaction to L1, so until then there is
+        // no event and no need to create a `revert` one.
+        // If aggregated operation was created, but was not sent to L1, that's also not a problem: event schema
+        // ignores events for non-exist
+        //
+        // TODO (ZKS-856): `get_last_committed_block` returns the last block for which *an aggregated operation*
+        // is created. Currently, it seems that events are created by eth sender after confirming an L1 transaction.
+        // We need to check that if aggregated operation was created, but not sent or not confirmed, this will not
+        // result in extra events being created.
+        // Please, update the comment above after resolving this TODO to match the new logic.
         let last_committed_block = transaction
             .chain()
             .block_schema()
             .get_last_committed_block()
             .await?;
+
         for block_number in *last_block..=*last_committed_block {
             transaction
                 .event_schema()
                 .store_block_event(BlockNumber(block_number), BlockStatus::Reverted)
                 .await?;
         }
+
+        sqlx::query!(
+            "DELETE FROM incomplete_blocks WHERE number > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
 
         sqlx::query!("DELETE FROM blocks WHERE number > $1", *last_block as i64)
             .execute(transaction.conn())

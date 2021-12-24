@@ -1058,6 +1058,22 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
             ))
             .await?;
     }
+    // Insert 1 incomplete block.
+    BlockSchema(&mut storage)
+        .save_incomplete_block(gen_sample_incomplete_block(
+            BlockNumber(6),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
+        .await?;
+
+    assert_eq!(
+        BlockSchema(&mut storage)
+            .get_last_incomplete_block()
+            .await?,
+        Some(BlockNumber(6))
+    );
+
     // Remove blocks with numbers greater than 2.
     BlockSchema(&mut storage)
         .remove_blocks(BlockNumber(2))
@@ -1072,6 +1088,14 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .get_block(BlockNumber(3))
         .await?
         .is_none());
+
+    // Incomplete block should be removed as well.
+    assert_eq!(
+        BlockSchema(&mut storage)
+            .get_last_incomplete_block()
+            .await?,
+        None
+    );
 
     Ok(())
 }
