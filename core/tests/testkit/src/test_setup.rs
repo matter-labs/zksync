@@ -979,7 +979,7 @@ impl TestSetup {
             .expect("sk receiver dropped");
 
         let new_block = self.await_for_block_commit().await;
-        // self.current_state_root = Some(new_block.new_root_hash);
+        self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
@@ -1253,7 +1253,8 @@ impl TestSetup {
     }
 
     pub async fn revert_blocks(&self, blocks: &[Block]) -> Result<(), anyhow::Error> {
-        self.commit_account.revert_blocks(blocks).await?;
+        let result = self.commit_account.revert_blocks(blocks).await?;
+        result.expect_success();
         Ok(())
     }
 
