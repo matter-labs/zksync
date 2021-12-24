@@ -75,13 +75,17 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
             await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount);
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
+        // minimum amount between pending balance and requested amount
+        const withdrawnAmount = amount.lt(contractBalanceBefore) ? amount : contractBalanceBefore;
 
         const expectedBalance =
-            token == constants.AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
+            token == constants.AddressZero
+                ? balanceBefore.add(withdrawnAmount).sub(gasFee)
+                : balanceBefore.add(withdrawnAmount);
         expect(balanceAfter.toString(), 'withdraw account balance mismatch').eq(expectedBalance.toString());
 
         const contractBalanceAfter = BigNumber.from(await zksyncContract.getPendingBalance(ethWallet.address, token));
-        const expectedContractBalance = contractBalanceBefore.sub(amount);
+        const expectedContractBalance = contractBalanceBefore.sub(withdrawnAmount);
         expect(contractBalanceAfter.toString(), 'withdraw contract balance mismatch').eq(
             expectedContractBalance.toString()
         );
@@ -145,13 +149,10 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
         const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
-        const { revertReason } = await getCallRevertReason(
-            async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
-        );
+        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1));
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
 
-        expect(onchainBalAfter).eq(onchainBalBefore);
-        expect(revertReason).to.not.eq(DEFAULT_REVERT_REASON);
+        expect(onchainBalAfter).eq(onchainBalBefore.add(withdrawAmount));
     });
 
     it('Complete pending withdawals', async () => {

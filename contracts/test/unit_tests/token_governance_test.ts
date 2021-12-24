@@ -79,7 +79,7 @@ describe('ZK token governance unit tests', function () {
 
     it('User should pay fee for listing', async () => {
         await expect(tokenGovernance.connect(userWallet).addToken(ERC20_ADDRESS_2)).to.be.revertedWith(
-            'fee transfer failed'
+            'ERC20: transfer amount exceeds balance'
         );
     });
 

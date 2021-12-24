@@ -354,13 +354,17 @@ describe('zkSync withdraw unit tests', function () {
             await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount, { gasLimit: 300000 });
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
+        // minimum amount between pending balance and requested amount
+        const withdrawnAmount = amount.lt(contractBalanceBefore) ? amount : contractBalanceBefore;
 
         const expectedBalance =
-            token == constants.AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
+            token == constants.AddressZero
+                ? balanceBefore.add(withdrawnAmount).sub(gasFee)
+                : balanceBefore.add(withdrawnAmount);
         expect(balanceAfter.toString(), 'withdraw account balance mismatch').eq(expectedBalance.toString());
 
         const contractBalanceAfter = BigNumber.from(await zksyncContract.getPendingBalance(ethWallet.address, token));
-        const expectedContractBalance = contractBalanceBefore.sub(amount);
+        const expectedContractBalance = contractBalanceBefore.sub(withdrawnAmount);
         expect(contractBalanceAfter.toString(), 'withdraw contract balance mismatch').eq(
             expectedContractBalance.toString()
         );
@@ -397,10 +401,8 @@ describe('zkSync withdraw unit tests', function () {
         await sendETH.wait();
 
         await zksyncContract.setBalanceToWithdraw(wallet.address, 0, withdrawAmount);
-        const { revertReason } = await getCallRevertReason(
-            async () => await performWithdraw(wallet, constants.AddressZero, 0, withdrawAmount.add(1))
-        );
-        expect(revertReason, 'wrong revert reason').eq('aa');
+        // shouldn't revert
+        await performWithdraw(wallet, constants.AddressZero, 0, withdrawAmount.add(1));
     });
 
     it('Withdraw ERC20 success', async () => {
@@ -430,15 +432,10 @@ describe('zkSync withdraw unit tests', function () {
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
         const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
-        try {
-            const { revertReason } = await getCallRevertReason(
-                async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
-            );
-            expect(revertReason).to.not.eq(DEFAULT_REVERT_REASON);
-        } catch (err) {}
+        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1));
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
 
-        expect(onchainBalAfter).eq(onchainBalBefore);
+        expect(onchainBalAfter).eq(onchainBalBefore.add(withdrawAmount));
     });
 
     it('Withdraw ERC20 unsupported token', async () => {
