@@ -166,7 +166,7 @@ fn u256_to_bigint(u256: U256) -> BigInt {
 
 fn gen_packable_amount(rng: &mut impl Rng) -> BigUint {
     let mantissa =
-        BigUint::from(rng.gen_range(0u64, 2u64.pow(AMOUNT_MANTISSA_BIT_WIDTH as u32) - 1));
+        BigUint::from(rng.gen_range(1u64, 2u64.pow(AMOUNT_MANTISSA_BIT_WIDTH as u32) - 1));
     let exponent = BigUint::from(10u32).pow(2u32.pow(AMOUNT_EXPONENT_BIT_WIDTH as u32) - 1);
     let truncated_amount = (mantissa * exponent) % BigUint::from(2u128.pow(5 * 8));
 
@@ -373,7 +373,7 @@ async fn commit_cost_of_mint_nft(
             ETHAccountId(2),
             ZKSyncAccountId(2),
             Token(TokenId(0)),
-            BigUint::from(0u32),
+            BigUint::from(1u32),
         )
         .await;
     test_setup
@@ -445,7 +445,7 @@ async fn commit_cost_of_transfers(
             ETHAccountId(2),
             ZKSyncAccountId(2),
             Token(TokenId(0)),
-            BigUint::from(0u32),
+            BigUint::from(1u32),
         )
         .await;
     test_setup
@@ -538,7 +538,7 @@ async fn commit_cost_of_swaps(
             ETHAccountId(1),
             ZKSyncAccountId(4),
             Token(TokenId(0)),
-            0u32.into(),
+            1u32.into(),
         )
         .await;
     test_setup
@@ -546,7 +546,7 @@ async fn commit_cost_of_swaps(
             ETHAccountId(1),
             ZKSyncAccountId(5),
             Token(TokenId(0)),
-            0u32.into(),
+            1u32.into(),
         )
         .await;
     test_setup
