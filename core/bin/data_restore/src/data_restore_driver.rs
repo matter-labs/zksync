@@ -143,7 +143,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     ///
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     ///
-    pub async fn set_genesis_state(
+    pub async fn set_genesis_state_from_eth(
         &mut self,
         interactor: &mut StorageInteractor<'_>,
         genesis_tx_hash: H256,
@@ -158,15 +158,23 @@ impl<T: Transport> DataRestoreDriver<T> {
             .set_genesis_block_number(&genesis_transaction)
             .expect("Cant set genesis block number for events state");
         vlog::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
+        let genesis_fee_account =
+            get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
+        self.set_genesis_state(interactor, genesis_eth_block_number, genesis_fee_account)
+            .await
+    }
 
+    pub async fn set_genesis_state(
+        &mut self,
+        interactor: &mut StorageInteractor<'_>,
+        genesis_eth_block_number: u64,
+        genesis_fee_account: Account,
+    ) {
         let mut transaction = interactor.start_transaction().await;
 
         transaction
             .save_events_state(&[], &[], &[], genesis_eth_block_number)
             .await;
-
-        let genesis_fee_account =
-            get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
 
         vlog::info!(
             "genesis fee account address: 0x{}",
