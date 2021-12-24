@@ -7,7 +7,7 @@ import { Deployer, readContractCode, readProductionContracts } from '../../src.t
 const hardhat = require('hardhat');
 const { simpleEncode } = require('ethereumjs-abi');
 const { expect } = require('chai');
-const { getCallRevertReason, IERC20_INTERFACE, DEFAULT_REVERT_REASON } = require('./common');
+const { getCallRevertReason, IERC20_INTERFACE } = require('./common');
 import * as zksync from 'zksync';
 import {
     ZkSync,
