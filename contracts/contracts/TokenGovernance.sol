@@ -2,6 +2,7 @@
 
 pragma solidity ^0.7.0;
 
+import "./ReentrancyGuard.sol";
 import "./Governance.sol";
 import "./IERC20.sol";
 import "./Utils.sol";
@@ -50,6 +51,8 @@ contract TokenGovernance {
         uint16 _listingCap,
         address _treasury
     ) {
+        initializeReentrancyGuard();
+
         governance = _governance;
         listingFeeToken = _listingFeeToken;
         listingFee = _listingFee;
@@ -65,7 +68,7 @@ contract TokenGovernance {
     /// @notice Adds new ERC20 token to zkSync network.
     /// @notice If caller is not present in the `tokenLister` map payment of `listingFee` in `listingFeeToken` should be made.
     /// @notice NOTE: before calling this function make sure to approve `listingFeeToken` transfer for this contract.
-    function addToken(address _token) external {
+    function addToken(address _token) external nonReentrant {
         require(governance.totalTokens() < listingCap, "can't add more tokens"); // Impossible to add more tokens using this contract
         if (!tokenLister[msg.sender]) {
             // Collect fees
