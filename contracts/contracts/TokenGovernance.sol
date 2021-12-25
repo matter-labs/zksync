@@ -10,7 +10,7 @@ import "./Utils.sol";
 /// @title Token Governance Contract
 /// @author Matter Labs
 /// @notice Contract is used to allow anyone to add new ERC20 tokens to zkSync given sufficient payment
-contract TokenGovernance {
+contract TokenGovernance is ReentrancyGuard {
     /// @notice Token lister added or removed (see `tokenLister`)
     event TokenListerUpdate(address indexed tokenLister, bool isActive);
 
