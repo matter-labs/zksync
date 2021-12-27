@@ -364,7 +364,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev Process one block commit using previous block StoredBlockInfo,
     /// @dev returns new block StoredBlockInfo
-    /// @dev NOTE: does not change storage! (only emit events)
+    /// @dev NOTE: does not change storage (only emit events)!
     function commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo memory _newBlock)
         internal
         view
