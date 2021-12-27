@@ -162,12 +162,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     function cutUpgradeNoticePeriod() external {
-        /// All functions delegated to additional contract should NOT be nonReentrant
+        // All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 
     function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
-        /// All functions delegated to additional contract should NOT be nonReentrant
+        // All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 
@@ -200,7 +200,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Canceling may take several separate transactions to be completed
     /// @param _n number of requests to process
     function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
-        /// All functions delegated to additional contract should NOT be nonReentrant
+        // All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 
@@ -208,8 +208,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _zkSyncAddress The receiver Layer 2 address
     function depositETH(address _zkSyncAddress) external payable {
         require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
-        require(msg.value > 0, "M");
+        require(msg.value > 0, "M"); // Zero-value deposits are forbidden by zkSync rollup logic
         requireActive();
+        // It is safe to convert `msg.value` to `ui128` without additional checks:
+        // - 1 Ether is 10^18 Wei
+        // - Total supply of Ether is 118,019,446 (as of December 27, 2021)
+        // - 2^128 > 10^38 > (Total supply of Ether) * 10^18
         registerDeposit(0, uint128(msg.value), _zkSyncAddress);
     }
 
@@ -282,7 +286,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         // `amount = min(balance, _amount)` and `transferERC20` include check that `amount <= balance` so it's safe.
         pendingBalances[packedBalanceKey].balanceToWithdraw = balance - amount;
-        emit Withdrawal(_token, amount);
+        emit Withdrawal(tokenId, amount);
     }
 
     /// @notice  Withdraws NFT from zkSync contract to the owner
@@ -367,7 +371,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev Process one block commit using previous block StoredBlockInfo,
     /// @dev returns new block StoredBlockInfo
-    /// @dev NOTE: does not change storage! (only emit events)
+    /// @dev NOTE: does not change storage (only emit events)!
     function commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo memory _newBlock)
         internal
         view
@@ -593,7 +597,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Reverts unverified blocks
     function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external {
-        /// All functions delegated to additional contract should NOT be nonReentrant
+        // All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 
@@ -636,7 +640,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes32 _nftContentHash,
         uint256[] memory _proof
     ) external {
-        /// All functions delegated to additional should NOT be nonReentrant
+        // All functions delegated to additional should NOT be nonReentrant
         delegateAdditional();
     }
 
@@ -648,7 +652,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _pubkeyHash New pubkey hash
     /// @param _nonce Nonce of the change pubkey L2 transaction
     function setAuthPubkeyHash(bytes calldata _pubkeyHash, uint32 _nonce) external {
-        /// All functions delegated to additional contract should NOT be nonReentrant
+        // All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
 

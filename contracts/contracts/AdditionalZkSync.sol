@@ -121,7 +121,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
             if (SECURITY_COUNCIL_MEMBERS[id] == addr && !securityCouncilApproves[id]) {
                 securityCouncilApproves[id] = true;
-                numberOfApprovalsFromSecurityCouncil++;
+                numberOfApprovalsFromSecurityCouncil += 1;
 
                 if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_THRESHOLD) {
                     if (approvedUpgradeNoticePeriod > 0) {
@@ -135,15 +135,21 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         }
     }
 
+    /// @notice approve to decrease upgrade notice period time to zero
+    /// NOTE: сan only be called after the start of the upgrade
     function cutUpgradeNoticePeriod() external {
         require(upgradeStartTimestamp != 0);
 
         approvedCutUpgradeNoticePeriod(msg.sender);
     }
 
+    /// @notice approve to decrease upgrade notice period time to zero by signatures
+    /// NOTE: Can accept many signatures at a time, thus it is possible
+    /// to completely cut the upgrade notice period in one transaction
     function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
         require(upgradeStartTimestamp != 0);
 
+        // Get the addresses of contracts that are being prepared for the upgrade.
         address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
         (, bytes memory newTarget0) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 0));
         (, bytes memory newTarget1) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 1));
@@ -154,6 +160,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         address newTargetAddress2 = abi.decode(newTarget2, (address));
 
         bytes32 targetsHash = keccak256(abi.encodePacked(newTargetAddress0, newTargetAddress1, newTargetAddress2));
+        // The Message includes a hash of the addresses of the contracts to which the upgrade will take place to prevent reuse signature.
         bytes32 messageHash = keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n110",
