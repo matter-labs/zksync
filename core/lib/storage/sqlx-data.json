@@ -42,6 +42,18 @@
       ]
     }
   },
+  "022eb06117f5a1ce548b596cd55600e6c2c0b8a07d6daf99794d6c6704182299": {
+    "query": "DELETE FROM incomplete_blocks WHERE number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "052bc740befe43cd3d8d915371cb055187d4ff4ebf019fe12c8dc85b296acc47": {
     "query": "SELECT tx_hash, tx FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
     "describe": {
@@ -1876,6 +1888,24 @@
         "Left": [
           "Bytea"
         ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "38e7464ba17d495fe87cf1412ffe10af8dc4b44f99dc2df1ec580f20f609b650": {
+    "query": "SELECT max(number) FROM incomplete_blocks",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
       },
       "nullable": [
         null

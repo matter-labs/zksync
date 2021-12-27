@@ -968,11 +968,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    /// This method does both `save_incomplete_block` and `save_block` for a `Block` object.
+    /// This method saves block transactions, and then does both `save_incomplete_block`
+    /// and `save_block` for a `Block` object.
     ///
     /// It is an alternative for calling two mentioned methods separately that has several use cases:
     /// - In some contexts, root hash for the block is known immediately (e.g. data restore).
-    /// - In most DB tests, the process of block sealing doesn't really matter: these tests check the behavior
+    /// - In most DB/API tests, the process of block sealing doesn't really matter: these tests check the behavior
     ///   of blocks that are already stored in the DB, not *how* they are stored.
     pub async fn save_full_block(&mut self, block: Block) -> anyhow::Result<()> {
         let full_block = block.clone();
@@ -987,6 +988,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             block.timestamp,
         );
         let mut transaction = self.0.start_transaction().await?;
+
+        BlockSchema(&mut transaction)
+            .save_block_transactions(
+                full_block.block_number,
+                full_block.block_transactions.clone(),
+            )
+            .await?;
         BlockSchema(&mut transaction)
             .save_incomplete_block(incomplete_block)
             .await?;
