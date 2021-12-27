@@ -190,8 +190,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         _token.transfer(_to, _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint256 balanceDiff = balanceBefore.sub(balanceAfter);
-        require(balanceDiff > 0 && balanceDiff <= _maxAmount, "7"); // rollup balance difference (before and after transfer) is bigger than _maxAmount
+        require(balanceDiff > 0, "c1"); // transfer is considered successful only if the balance of the contract increased after transfer
+        require(balanceDiff <= _maxAmount, "7"); // rollup balance difference (before and after transfer) is bigger than `_maxAmount`
 
+        // It is safe to convert `balanceDiff` to `uint128` without additional checks, because `balanceDiff <= _maxAmount`
         return uint128(balanceDiff);
     }
 
@@ -210,7 +212,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
         require(msg.value > 0, "M"); // Zero-value deposits are forbidden by zkSync rollup logic
         requireActive();
-        // It is safe to convert `msg.value` to `ui128` without additional checks:
+        // It is safe to convert `msg.value` to `uint128` without additional checks:
         // - 1 Ether is 10^18 Wei
         // - Total supply of Ether is 118,019,446 (as of December 27, 2021)
         // - 2^128 > 10^38 > (Total supply of Ether) * 10^18
