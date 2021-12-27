@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use futures::{channel::mpsc, SinkExt};
 use tokio::task::JoinHandle;
 
@@ -66,6 +68,7 @@ impl RootHashCalculator {
 
     async fn process_job(&mut self, job: BlockRootHashJob) {
         vlog::info!("Received job to process block #{}", job.block);
+        let start = Instant::now();
 
         // Ensure that the new block has expected number.
         assert_eq!(
@@ -92,6 +95,12 @@ impl RootHashCalculator {
 
         // Increment block number to expect the next one.
         self.last_block_number = self.last_block_number + 1;
+
+        metrics::histogram!("root_hash_calculator.process_job", start.elapsed());
+        metrics::gauge!(
+            "root_hash_calculator.last_processed_block",
+            job.block.0 as f64
+        );
     }
 }
 
