@@ -230,7 +230,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(!governance.pausedTokens(tokenId), "b"); // token deposits are paused
 
         uint256 balanceBefore = _token.balanceOf(address(this));
-        _token.transferFrom(msg.sender, address(this), SafeCast.toUint128(_amount));
+        _token.transferFrom(msg.sender, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint128 depositAmount = SafeCast.toUint128(balanceAfter.sub(balanceBefore));
         require(depositAmount > 0 && depositAmount <= MAX_DEPOSIT_AMOUNT, "C");
@@ -268,6 +268,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes22 packedBalanceKey = packAddressAndTokenId(_owner, tokenId);
         uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
         uint128 amount = Utils.minU128(balance, _amount);
+        require(amount > 0, "f1"); // Nothing to withdraw
 
         if (tokenId == 0) {
             (bool success, ) = _owner.call{value: amount}("");
