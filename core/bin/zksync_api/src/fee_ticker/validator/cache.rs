@@ -20,7 +20,7 @@ pub(crate) struct TokenInDBCache {
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct TokenInMemoryCache {
+pub struct TokenInMemoryCache {
     tokens: Arc<Mutex<HashMap<TokenLike, Token>>>,
     market: Arc<Mutex<HashMap<TokenId, TokenMarketVolume>>>,
 }

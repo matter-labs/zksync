@@ -234,9 +234,8 @@ pub fn run_updaters(
             let token_price_api =
                 CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
 
-            let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
-            let token_price_updater = ticker_api.clone();
-            tokio::spawn(token_price_updater.keep_price_updated())
+            let ticker_api = TickerApi::new(db_pool, token_price_api);
+            tokio::spawn(ticker_api.keep_price_updated())
         }
 
         TokenPriceSource::CoinGecko => {
@@ -244,8 +243,7 @@ pub fn run_updaters(
                 CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
                     .expect("failed to init CoinGecko client");
             let ticker_api = TickerApi::new(db_pool, token_price_api);
-            let token_price_updater = ticker_api.clone();
-            tokio::spawn(token_price_updater.keep_price_updated())
+            tokio::spawn(ticker_api.keep_price_updated())
         }
     };
     tasks.push(price_updater);
@@ -267,7 +265,7 @@ impl<INFO> FeeTicker<INFO> {
         max_blocks_to_aggregate: u32,
         connection_pool: ConnectionPool,
     ) -> Self {
-        let cache = (connection_pool.clone(), TokenDBCache::new());
+        let cache = (connection_pool, TokenDBCache::new());
         let ticker_config = TickerConfig {
             zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
             gas_cost_tx: GasOperationsCost::from_constants(config.fast_processing_coeff),
@@ -280,10 +278,10 @@ impl<INFO> FeeTicker<INFO> {
             subsidy_cpk_price_usd: config.subsidy_cpk_price_usd(),
         };
         let validator = FeeTokenValidator::new(
-            cache.clone(),
+            cache,
             chrono::Duration::seconds(config.available_liquidity_seconds as i64),
             BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
-            HashSet::from_iter(config.unconditionally_valid_tokens.clone()),
+            HashSet::from_iter(config.unconditionally_valid_tokens),
         );
         Self::new(info, ticker_config, validator)
     }
@@ -619,7 +617,8 @@ impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
         );
         BigUint::from(commit_cost + execute_cost + proof_cost + additional_cost)
     }
-    pub async fn token_allowed_for_fees(&mut self, token: TokenLike) -> anyhow::Result<bool> {
+
+    pub async fn token_allowed_for_fees(&self, token: TokenLike) -> anyhow::Result<bool> {
         self.validator.token_allowed(token).await
     }
 }

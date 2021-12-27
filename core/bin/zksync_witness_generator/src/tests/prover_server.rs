@@ -48,6 +48,7 @@ async fn spawn_server(database: MockDatabase) {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_api_client() {
     let database = MockDatabase::new();
     spawn_server(database.clone()).await;

@@ -32,7 +32,7 @@ pub struct SharedData {
     pub api_version: ApiVersion,
 }
 
-pub(crate) fn api_scope<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
+pub(crate) fn api_scope<INFO: 'static + FeeTickerInfo + Send + Sync>(
     tx_sender: TxSender<INFO>,
     zk_config: &ZkSyncConfig,
 ) -> Scope {

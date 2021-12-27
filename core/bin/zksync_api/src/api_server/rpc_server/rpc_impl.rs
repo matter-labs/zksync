@@ -257,7 +257,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
     }
 
     pub async fn _impl_get_tx_fee(
-        mut self,
+        self,
         tx_type: ApiTxFeeTypes,
         address: Address,
         token: TokenLike,
@@ -265,7 +265,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
     ) -> Result<Fee> {
         let start = Instant::now();
         let token_allowed =
-            Self::token_allowed_for_fees(&mut self.tx_sender.ticker, token.clone()).await?;
+            Self::token_allowed_for_fees(&self.tx_sender.ticker, token.clone()).await?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
@@ -299,7 +299,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
-        mut self,
+        self,
         tx_types: Vec<ApiTxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
@@ -315,7 +315,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
         }
 
         let token_allowed =
-            Self::token_allowed_for_fees(&mut self.tx_sender.ticker, token.clone()).await?;
+            Self::token_allowed_for_fees(&self.tx_sender.ticker, token.clone()).await?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }

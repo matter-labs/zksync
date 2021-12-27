@@ -1,23 +1,23 @@
 //! Additional methods gathering the information required
 //! by ticker for operating.
 
-// External deps
-use async_trait::async_trait;
-// Workspace deps
-use crate::fee_ticker::PriceError;
-use crate::utils::token_db_cache::TokenDBCache;
-use anyhow::format_err;
-use chrono::Utc;
-use num::rational::Ratio;
-use num::BigUint;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+// External deps
+use anyhow::format_err;
+use async_trait::async_trait;
+use chrono::Utc;
+use num::rational::Ratio;
+use num::BigUint;
 use tokio::sync::Mutex;
+// Workspace deps
 use zksync_storage::ConnectionPool;
 use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::{Address, Token, TokenId, TokenLike, TokenPrice};
 // Local deps
+use crate::fee_ticker::PriceError;
+use crate::utils::token_db_cache::TokenDBCache;
 
 const API_PRICE_EXPIRATION_TIME_SECS: i64 = 30 * 60;
 

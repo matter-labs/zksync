@@ -21,7 +21,7 @@ mod helpers;
 mod v01;
 pub mod v02;
 
-async fn start_server<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
+async fn start_server<INFO: 'static + FeeTickerInfo + Send + Sync>(
     api_v01: ApiV01,
     fee_ticker: FeeTicker<INFO>,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
@@ -80,7 +80,7 @@ async fn start_server<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
 
 /// Start HTTP REST API
 #[allow(clippy::too_many_arguments)]
-pub fn start_server_thread_detached<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
+pub fn start_server_thread_detached<INFO: 'static + FeeTickerInfo + Send + Sync>(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,

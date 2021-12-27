@@ -27,10 +27,9 @@ use super::{
     paginate_trait::Paginate,
     response::ApiResult,
 };
-use crate::fee_ticker::{FeeTicker, FeeTickerInfo};
 use crate::{
     api_try,
-    fee_ticker::{PriceError, TokenPriceRequestType},
+    fee_ticker::{FeeTicker, FeeTickerInfo, PriceError, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
 };
 
@@ -59,15 +58,6 @@ impl<INFO> ApiTokenData<INFO> {
             tokens,
             fee_ticker,
         }
-    }
-}
-
-impl<INFO: FeeTickerInfo> ApiTokenData<INFO> {
-    async fn token_price_usd(&self, token: TokenLike) -> Result<BigDecimal, Error> {
-        self.fee_ticker
-            .get_token_price(token, TokenPriceRequestType::USDForOneToken)
-            .await
-            .map_err(Error::storage)
     }
 }
 
@@ -150,6 +140,15 @@ impl<INFO> ApiTokenData<INFO> {
         ))
     }
 
+    async fn token_price_usd(&self, token: TokenLike) -> Result<BigDecimal, Error>
+    where
+        INFO: FeeTickerInfo,
+    {
+        self.fee_ticker
+            .get_token_price(token, TokenPriceRequestType::USDForOneToken)
+            .await
+            .map_err(Error::storage)
+    }
     // TODO: take `currency` as enum. (ZKS-628)
     async fn token_price_in(
         &self,
@@ -328,13 +327,14 @@ mod tests {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let prices = [
+        let prices = vec![
             (TokenLike::Id(TokenId(1)), 10_u64.into()),
             (TokenLike::Symbol(String::from("PHNX")), 10_u64.into()),
             (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
             (Address::default().into(), 1_u64.into()),
         ];
-        let fee_ticker = dummy_fee_ticker(&prices);
+
+        let fee_ticker = dummy_fee_ticker(&prices, None);
 
         let shared_data = SharedData {
             net: cfg.config.chain.eth.network,

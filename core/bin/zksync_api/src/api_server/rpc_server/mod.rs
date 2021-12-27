@@ -79,10 +79,11 @@ impl<INFO: Clone + Send + Sync> RpcApp<INFO> {
             tx_sender,
         }
     }
-}
 
-impl<INFO: 'static + FeeTickerInfo + Clone + Send + Sync> RpcApp<INFO> {
-    pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
+    pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>)
+    where
+        INFO: 'static + FeeTickerInfo,
+    {
         io.extend_with(self.to_delegate())
     }
 }
@@ -184,10 +185,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
         Ok(res)
     }
 
-    async fn token_allowed_for_fees(
-        ticker: &mut FeeTicker<INFO>,
-        token: TokenLike,
-    ) -> Result<bool> {
+    async fn token_allowed_for_fees(ticker: &FeeTicker<INFO>, token: TokenLike) -> Result<bool> {
         ticker
             .token_allowed_for_fees(token.clone())
             .await

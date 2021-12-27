@@ -3,8 +3,8 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::Utc;
+use futures::executor::block_on;
 use futures::future::{AbortHandle, Abortable};
-use futures::{channel::mpsc, executor::block_on};
 use std::str::FromStr;
 use std::thread::sleep;
 use tokio::time::Duration;
@@ -24,18 +24,16 @@ use crate::fee_ticker::{
 
 use super::*;
 use crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations;
-use crate::fee_ticker::validator::watcher::TokenWatcher;
-use anyhow::Error;
 
 const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
 
 #[derive(Debug, Clone)]
 pub(crate) struct TestToken {
-    pub(crate) id: TokenId,
-    price_usd: Ratio<BigUint>,
-    pub(crate) risk_factor: Option<Ratio<BigUint>>,
-    precision: u8,
-    address: Address,
+    pub id: TokenId,
+    pub price_usd: Ratio<BigUint>,
+    pub risk_factor: Option<Ratio<BigUint>>,
+    pub precision: u8,
+    pub address: Address,
 }
 
 impl TestToken {
@@ -398,11 +396,8 @@ fn test_ticker_subsidy() {
         None,
         None,
     );
-    let create2_subsidy_price_usd = convert_to_usd(
-        &mut ticker,
-        &create2_subsidy_price,
-        TokenLike::Id(TokenId(0)),
-    );
+    let create2_subsidy_price_usd =
+        convert_to_usd(&ticker, &create2_subsidy_price, TokenLike::Id(TokenId(0)));
 
     // Due to precision-rounding, the price might differ, but it shouldn't by more than 1 cent
     assert!(
@@ -444,11 +439,8 @@ fn test_ticker_subsidy() {
         None,
     );
     assert_eq!(normal_transfer_price, subsidy_transfer_price);
-    let normal_transfer_price_usd = convert_to_usd(
-        &mut ticker,
-        &normal_transfer_price,
-        TokenLike::Id(TokenId(0)),
-    );
+    let normal_transfer_price_usd =
+        convert_to_usd(&ticker, &normal_transfer_price, TokenLike::Id(TokenId(0)));
 
     // Subsidy also works for batches
     let batch_price_token = block_on(ticker.get_batch_from_ticker_in_wei(
@@ -461,7 +453,7 @@ fn test_ticker_subsidy() {
     ))
     .unwrap();
     let subsidy_batch_price_usd = convert_to_usd(
-        &mut ticker,
+        &ticker,
         &Ratio::from(batch_price_token.subsidized_fee.total_fee),
         TokenLike::Id(TokenId(0)),
     );
@@ -744,7 +736,7 @@ fn test_zero_price_token_fee() {
     );
 
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
+    let ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
 
     let token = TestToken::zero_price();
 
@@ -808,10 +800,10 @@ async fn test_error_coingecko_api() {
             .await
             .unwrap();
     }
-    let ticker_api = TickerApi::new(connection_pool, coingecko);
+    let _ticker_api = TickerApi::new(connection_pool, coingecko);
 
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
+    let ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
     for _ in 0..1000 {
         ticker
             .get_fee_from_ticker_in_wei(
@@ -854,7 +846,7 @@ async fn test_error_api() {
         .await
         .unwrap();
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
+    let ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
 
     ticker
         .get_fee_from_ticker_in_wei(

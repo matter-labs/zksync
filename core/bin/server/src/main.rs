@@ -66,6 +66,7 @@ impl FromStr for Component {
             "witness-generator" => Ok(Component::WitnessGenerator),
             "forced-exit" => Ok(Component::ForcedExit),
             "prometheus" => Ok(Component::Prometheus),
+            "updaters" => Ok(Component::Updaters),
             "core" => Ok(Component::Core),
             "rejected-task-cleaner" => Ok(Component::RejectedTaskCleaner),
             other => Err(format!("{} is not a valid component name", other)),
@@ -89,6 +90,7 @@ impl Default for ComponentsToRun {
             Component::Prometheus,
             Component::Core,
             Component::RejectedTaskCleaner,
+            Component::Updaters,
         ])
     }
 }
@@ -114,7 +116,7 @@ struct Opt {
     /// comma-separated list of components to launch
     #[structopt(
         long,
-        default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner"
+        default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner,updaters"
     )]
     components: ComponentsToRun,
 }

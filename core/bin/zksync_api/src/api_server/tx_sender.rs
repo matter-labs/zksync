@@ -190,7 +190,7 @@ impl<INFO: Clone> TxSender<INFO> {
     }
 }
 
-impl<INFO: FeeTickerInfo + Clone> TxSender<INFO> {
+impl<INFO: FeeTickerInfo> TxSender<INFO> {
     /// If `ForcedExit` has Ethereum siganture (e.g. it's a part of a batch), an actual signer
     /// is initiator, not the target, thus, this function will perform a database query to acquire
     /// the corresponding address.
@@ -1056,10 +1056,13 @@ impl<INFO: FeeTickerInfo + Clone> TxSender<INFO> {
     }
 
     pub async fn token_allowed_for_fees(
-        _ticker: &FeeTicker<INFO>,
-        _token: TokenLike,
+        ticker: &FeeTicker<INFO>,
+        token: TokenLike,
     ) -> Result<bool, SubmitError> {
-        todo!()
+        ticker
+            .token_allowed_for_fees(token)
+            .await
+            .map_err(SubmitError::internal)
     }
 
     pub async fn ticker_price_request(

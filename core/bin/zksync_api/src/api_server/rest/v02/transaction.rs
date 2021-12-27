@@ -213,9 +213,7 @@ async fn get_batch<INFO>(
     data.get_batch(*batch_hash).await.into()
 }
 
-pub fn api_scope<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
-    tx_sender: TxSender<INFO>,
-) -> Scope {
+pub fn api_scope<INFO: 'static + FeeTickerInfo + Send + Sync>(tx_sender: TxSender<INFO>) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
     web::scope("transactions")
@@ -231,6 +229,7 @@ pub fn api_scope<INFO: 'static + FeeTickerInfo + Clone + Send + Sync>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fee_ticker::validator::cache::TokenInMemoryCache;
     use crate::{
         api_server::rest::v02::{
             test_utils::{
@@ -243,18 +242,21 @@ mod tests {
     };
     use actix_web::App;
     use chrono::Utc;
+    use num::rational::Ratio;
+    use num::BigUint;
+    use std::collections::HashMap;
     use std::str::FromStr;
     use zksync_api_types::v02::{
         transaction::{L2Receipt, TxHashSerializeWrapper},
         ApiVersion,
     };
     use zksync_types::{
-        tokens::Token,
+        tokens::{Token, TokenMarketVolume},
         tx::{
             EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature,
             TxEthSignatureVariant,
         },
-        BlockNumber, SignedZkSyncTx, TokenId, TokenKind,
+        Address, BlockNumber, SignedZkSyncTx, TokenId, TokenKind, TokenLike,
     };
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_test::TestServer) {
@@ -299,13 +301,41 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
+
+        let mut tokens = HashMap::new();
+        tokens.insert(
+            TokenLike::Id(TokenId(0)),
+            Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20),
+        );
+        let mut market = HashMap::new();
+        market.insert(
+            TokenId(0),
+            TokenMarketVolume {
+                market_volume: Ratio::from_integer(BigUint::from(400u32)),
+                last_updated: Utc::now(),
+            },
+        );
+        let cache = TokenInMemoryCache::new()
+            .with_tokens(tokens)
+            .with_market(market);
+
+        let prices = vec![
+            (TokenLike::Id(TokenId(0)), 10500_u64.into()),
+            (TokenLike::Id(TokenId(1)), 10500_u64.into()),
+            (TokenLike::Id(TokenId(2)), 10500_u64.into()),
+            (TokenLike::Id(TokenId(3)), 10500_u64.into()),
+            (TokenLike::Symbol(String::from("PHNX")), 10_u64.into()),
+            (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
+            (Address::default().into(), 100000_u64.into()),
+        ];
+
         let (client, server) = cfg.start_server(
             move |cfg: &TestServerConfig| {
                 api_scope(TxSender::with_client(
                     core_client.clone(),
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
-                    dummy_fee_ticker(&[]),
+                    dummy_fee_ticker(&prices, Some(cache.clone())),
                     &cfg.config.api.common,
                 ))
             },
