@@ -4,6 +4,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use tokio::sync::Mutex;
@@ -71,6 +72,24 @@ impl BlockRootHashJobQueue {
     pub(crate) fn size(&self) -> usize {
         self.size.load(Ordering::Relaxed)
     }
+
+    /// Returns whether we should stop the miniblock producing until the size of queue is decreased.
+    pub(crate) fn should_throttle(&self) -> bool {
+        // This method is going to be called by the block proposer, which does not know about block creation, so it
+        // can be called in the random moment (e.g. right after the block was sealed and processing started).
+        self.size() >= 2
+    }
+
+    /// Blocks until the job queue is small enough to proceed with the block generation.
+    pub(crate) async fn throttle(&self) {
+        // Duration interval should be small enough compared to the root hash calculation time, so that we
+        // don't "overthrottle".
+        const THROTTLE_ITERATION_INTERVAL: Duration = Duration::from_millis(25);
+
+        while self.should_throttle() {
+            tokio::time::sleep(THROTTLE_ITERATION_INTERVAL).await;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -82,6 +101,7 @@ mod tests {
     async fn queue_functionality() {
         let mut queue = BlockRootHashJobQueue::new(std::iter::empty());
         assert_eq!(queue.size(), 0);
+        assert!(!queue.should_throttle());
 
         queue
             .push(BlockRootHashJob {
@@ -90,6 +110,7 @@ mod tests {
             })
             .await;
         assert_eq!(queue.size(), 1);
+        assert!(!queue.should_throttle());
 
         queue
             .push(BlockRootHashJob {
@@ -98,14 +119,17 @@ mod tests {
             })
             .await;
         assert_eq!(queue.size(), 2);
+        assert!(queue.should_throttle());
 
         let first_job = queue.pop().await.expect("Should pop element");
         assert_eq!(first_job.block, BlockNumber(1));
         assert_eq!(queue.size(), 1);
+        assert!(!queue.should_throttle());
 
         let second_job = queue.pop().await.expect("Should pop element");
         assert_eq!(second_job.block, BlockNumber(2));
         assert_eq!(queue.size(), 0);
+        assert!(!queue.should_throttle());
 
         assert!(queue.pop().await.is_none(), "No elements left");
         assert_eq!(

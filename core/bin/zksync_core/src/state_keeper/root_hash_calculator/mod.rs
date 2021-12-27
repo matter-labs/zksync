@@ -7,7 +7,6 @@ use zksync_types::{block::Block, BlockNumber, H256};
 use crate::committer::{BlockFinishRequest, CommitRequest};
 
 mod queue;
-mod throttler;
 
 pub use self::queue::BlockRootHashJob;
 pub(in crate::state_keeper) use self::queue::BlockRootHashJobQueue;
