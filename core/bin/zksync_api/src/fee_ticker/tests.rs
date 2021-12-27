@@ -201,6 +201,10 @@ impl FeeTickerInfo for MockTickerInfo {
         }
         unreachable!("incorrect token input")
     }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
 }
 
 fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
@@ -266,13 +270,13 @@ fn get_normal_and_subsidy_fee(
     future_blocks: Option<BlocksInFutureAggregatedOperations>,
     remaining_chunks: Option<usize>,
 ) -> (Ratio<BigUint>, Ratio<BigUint>) {
-    let info_any = &mut ticker.info as &mut dyn Any;
-    let info: &mut MockTickerInfo = info_any.downcast_mut::<MockTickerInfo>().unwrap();
+    let mut info: Box<MockTickerInfo> = ticker.info.clone().into_any().downcast().unwrap();
     if let Some(blocks) = future_blocks {
         info.future_blocks = blocks;
     }
     info.remaining_chunks = remaining_chunks;
 
+    ticker.info = info;
     let fee_in_token = block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
         .expect("failed to get fee in token");
 

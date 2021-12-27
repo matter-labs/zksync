@@ -53,6 +53,7 @@ use crate::fee_ticker::{
     {FeeTicker, FeeTickerInfo, GasOperationsCost, PriceError, TickerConfig},
 };
 use crate::signature_checker::{VerifiedTx, VerifySignatureRequest};
+use std::any::Any;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -886,6 +887,10 @@ impl FeeTickerInfo for DummyFeeTickerInfo {
                 ..Default::default()
             },
         })
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
     }
 }
 

@@ -19,6 +19,7 @@ use zksync_types::{Address, Token, TokenId, TokenLike, TokenPrice};
 // Local deps
 use crate::fee_ticker::PriceError;
 use crate::utils::token_db_cache::TokenDBCache;
+use std::any::Any;
 
 const API_PRICE_EXPIRATION_TIME_SECS: i64 = 30 * 60;
 
@@ -77,6 +78,9 @@ pub trait FeeTickerInfo: FeeTickerClone + Send + Sync + 'static {
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error>;
 
     async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error>;
+
+    /// Make boxed value to any. Helpful for downcasting in tests
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
 #[derive(Clone)]
@@ -261,6 +265,10 @@ impl FeeTickerInfo for TickerInfo {
             .ok_or_else(|| format_err!("Token not found: {:?}", token));
         metrics::histogram!("ticker.get_token", start.elapsed());
         result
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
     }
 }
 
