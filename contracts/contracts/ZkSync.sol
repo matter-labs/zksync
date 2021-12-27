@@ -192,7 +192,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint256 balanceDiff = balanceBefore.sub(balanceAfter);
         require(balanceDiff > 0 && balanceDiff <= _maxAmount, "7"); // rollup balance difference (before and after transfer) is bigger than _maxAmount
 
-        return SafeCast.toUint128(balanceDiff);
+        return uint128(balanceDiff);
     }
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
@@ -279,7 +279,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             // `value` can be bigger then `amount` requested if token takes fee from sender in addition to `amount` requested
             amount = this.transferERC20(IERC20(_token), _owner, amount, balance);
         }
-        registerWithdrawal(tokenId, amount, _owner);
+
+        // `amount = min(balance, _amount)` and `transferERC20` include check that `amount <= balance` so it's safe.
+        pendingBalances[packedBalanceKey].balanceToWithdraw = balance - amount;
+        emit Withdrawal(_token, amount);
     }
 
     /// @notice  Withdraws NFT from zkSync contract to the owner
@@ -668,21 +671,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.Deposit, pubData);
         emit Deposit(_tokenId, _amount);
-    }
-
-    /// @notice Register withdrawal - update user balance and emit OnchainWithdrawal event
-    /// @param _token - token by id
-    /// @param _amount - token amount
-    /// @param _to - address to withdraw to
-    function registerWithdrawal(
-        uint16 _token,
-        uint128 _amount,
-        address payable _to
-    ) internal {
-        bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
-        uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
-        pendingBalances[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
-        emit Withdrawal(_token, _amount);
     }
 
     /// @dev Gets operations packed in bytes array. Unpacks it and stores onchain operations.
