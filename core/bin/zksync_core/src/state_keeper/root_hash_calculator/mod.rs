@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use futures::{channel::mpsc, SinkExt};
 use tokio::task::JoinHandle;
@@ -57,9 +57,9 @@ impl RootHashCalculator {
 
     pub async fn run(mut self) {
         loop {
-            // TODO: using `sleep` is inefficient. We need `job_queue.pop()` to resolve *only* when we have
+            // TODO (ZKS-857): using `sleep` is inefficient. We need `job_queue.pop()` to resolve *only* when we have
             // a new job available.
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(Duration::from_millis(25)).await;
             if let Some(job) = self.job_queue.pop().await {
                 self.process_job(job).await;
             }
