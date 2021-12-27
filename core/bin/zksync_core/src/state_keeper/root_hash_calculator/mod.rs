@@ -2,7 +2,7 @@ use futures::{channel::mpsc, SinkExt};
 use tokio::task::JoinHandle;
 
 use zksync_state::state::ZkSyncState;
-use zksync_types::{block::Block, BlockNumber, H256};
+use zksync_types::BlockNumber;
 
 use crate::committer::{BlockFinishRequest, CommitRequest};
 
@@ -30,9 +30,6 @@ pub struct RootHashCalculator {
     job_queue: BlockRootHashJobQueue,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
 
-    // We process block sequentially, so we can store the previous root hash needed
-    // to form the block header.
-    last_root_hash: H256,
     // While we don't really need the number for calculations, it's useful for safety
     // to ensure that every block is processed in order.
     last_block_number: BlockNumber,
@@ -45,13 +42,13 @@ impl RootHashCalculator {
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         last_block_number: BlockNumber,
     ) -> Self {
-        let last_root_hash = Block::encode_fr_for_eth(state.root_hash());
+        // Calculate the root hash, so the tree cache for the current state is calculated.
+        let _last_root_hash = state.root_hash();
 
         Self {
             state,
             job_queue,
             tx_for_commitments,
-            last_root_hash,
             last_block_number,
         }
     }
