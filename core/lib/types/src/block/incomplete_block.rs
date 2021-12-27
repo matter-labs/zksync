@@ -9,7 +9,9 @@ use zksync_basic_types::U256;
 
 use super::ExecutedOperations;
 
-/// zkSync network block.
+/// Sealed, but not yet completed zkSync block data.
+/// This structure contains data available in the state keeper when the block is sealed,
+/// but misses data to calculate the commitment (mainly, the root hash of the block).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IncompleteBlock {
     /// Block ID.
@@ -34,7 +36,7 @@ pub struct IncompleteBlock {
 }
 
 impl IncompleteBlock {
-    /// Creates a new `Block` object.
+    /// Creates a new `IncompleteBlock` object.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         block_number: BlockNumber,
