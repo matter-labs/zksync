@@ -51,6 +51,9 @@ impl BlockProposer {
             timer.tick().await;
 
             let start = Instant::now();
+
+            // `.throttle()` method will postpone the next miniblock iteration if currently we have too
+            // many blocks for which root hash is not yet calculated.
             self.root_hash_queue.throttle().await;
             metrics::histogram!("block_proposer.throttle", start.elapsed());
 

@@ -17,4 +17,3 @@ ALTER TABLE pending_block DROP COLUMN IF EXISTS previous_root_hash;
 
 -- Entry in `block_metadata` is created before corresponding entry in `blocks` table.
 ALTER TABLE block_metadata DROP CONSTRAINT block_metadata_block_number_fkey;
-
