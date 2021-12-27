@@ -134,6 +134,7 @@ pub async fn run_core(
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
         processed_tx_events_sender,
     );
+    let root_hash_queue = state_keeper.root_hash_queue();
     let state_keeper_task = start_state_keeper(state_keeper);
     let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
 
@@ -180,6 +181,7 @@ pub async fn run_core(
         config,
         mempool_block_request_sender.clone(),
         state_keeper_req_sender.clone(),
+        root_hash_queue,
     );
 
     // Start private API.

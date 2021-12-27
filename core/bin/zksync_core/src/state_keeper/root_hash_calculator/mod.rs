@@ -8,8 +8,7 @@ use crate::committer::{BlockFinishRequest, CommitRequest};
 
 mod queue;
 
-pub use self::queue::BlockRootHashJob;
-pub(in crate::state_keeper) use self::queue::BlockRootHashJobQueue;
+pub use self::queue::{BlockRootHashJob, BlockRootHashJobQueue};
 
 /// Entity capable of calculating the root hashes and sending information
 /// to the committer in order to complete the incomplete blocks.

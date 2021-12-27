@@ -5,6 +5,8 @@
 //!
 //! Right now logic of this actor is simple, but in future consensus will replace it using the same API.
 
+use std::time::{Duration, Instant};
+
 // External deps
 use futures::{
     channel::{mpsc, oneshot},
@@ -16,7 +18,7 @@ use zksync_config::ZkSyncConfig;
 // Local deps
 use crate::{
     mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock},
-    state_keeper::StateKeeperRequest,
+    state_keeper::{BlockRootHashJobQueue, StateKeeperRequest},
 };
 
 fn create_mempool_req(
@@ -35,6 +37,7 @@ fn create_mempool_req(
 }
 
 struct BlockProposer {
+    root_hash_queue: BlockRootHashJobQueue,
     current_priority_op_number: u64,
 
     mempool_requests: mpsc::Sender<MempoolBlocksRequest>,
@@ -42,6 +45,19 @@ struct BlockProposer {
 }
 
 impl BlockProposer {
+    async fn run(mut self, miniblock_interval: Duration) {
+        let mut timer = time::interval(miniblock_interval);
+        loop {
+            timer.tick().await;
+
+            let start = Instant::now();
+            self.root_hash_queue.throttle().await;
+            metrics::histogram!("block_proposer.throttle", start.elapsed());
+
+            self.commit_new_tx_mini_batch().await;
+        }
+    }
+
     async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
         let (mempool_req, resp) =
             create_mempool_req(self.current_priority_op_number, block_timestamp);
@@ -81,15 +97,14 @@ impl BlockProposer {
 
 // driving engine of the application
 #[must_use]
-pub fn run_block_proposer_task(
+pub(crate) fn run_block_proposer_task(
     config: &ZkSyncConfig,
     mempool_requests: mpsc::Sender<MempoolBlocksRequest>,
     mut statekeeper_requests: mpsc::Sender<StateKeeperRequest>,
+    root_hash_queue: BlockRootHashJobQueue,
 ) -> JoinHandle<()> {
     let miniblock_interval = config.chain.state_keeper.miniblock_iteration_interval();
     tokio::spawn(async move {
-        let mut timer = time::interval(miniblock_interval);
-
         let last_unprocessed_prior_op_chan = oneshot::channel();
         statekeeper_requests
             .send(StateKeeperRequest::GetLastUnprocessedPriorityOp(
@@ -102,16 +117,13 @@ pub fn run_block_proposer_task(
             .await
             .expect("Unprocessed priority op initialization");
 
-        let mut block_proposer = BlockProposer {
+        let block_proposer = BlockProposer {
             current_priority_op_number,
+            root_hash_queue,
             mempool_requests,
             statekeeper_requests,
         };
 
-        loop {
-            timer.tick().await;
-
-            block_proposer.commit_new_tx_mini_batch().await;
-        }
+        block_proposer.run(miniblock_interval).await;
     })
 }

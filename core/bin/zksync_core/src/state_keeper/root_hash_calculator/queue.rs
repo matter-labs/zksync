@@ -30,7 +30,7 @@ pub struct BlockRootHashJob {
 /// to throttle transaction execution if blocks are being created faster than it is
 /// possible to process them.
 #[derive(Debug, Default, Clone)]
-pub(crate) struct BlockRootHashJobQueue {
+pub struct BlockRootHashJobQueue {
     queue: Arc<Mutex<VecDeque<BlockRootHashJob>>>,
     size: Arc<AtomicUsize>,
 }
@@ -66,6 +66,11 @@ impl BlockRootHashJobQueue {
             );
         }
         result
+    }
+
+    /// Returns `true` if size of the queue is 0.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.size() == 0
     }
 
     /// Returns the current size of the queue.

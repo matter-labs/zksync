@@ -19,7 +19,7 @@ use zksync_types::{
 // Local uses
 use self::{
     pending_block::PendingBlock,
-    root_hash_calculator::{BlockRootHashJob, BlockRootHashJobQueue, RootHashCalculator},
+    root_hash_calculator::{BlockRootHashJob, RootHashCalculator},
     types::{ApplyOutcome, StateKeeperConfig},
     utils::system_time_timestamp,
 };
@@ -30,7 +30,8 @@ use crate::{
 };
 
 pub use self::{
-    init_params::ZkSyncStateInitParams, root_hash_calculator::start_root_hash_calculator,
+    init_params::ZkSyncStateInitParams,
+    root_hash_calculator::{start_root_hash_calculator, BlockRootHashJobQueue},
     types::StateKeeperRequest,
 };
 
@@ -147,6 +148,11 @@ impl ZkSyncStateKeeper {
         keeper.initialize(initial_state.pending_block);
 
         (keeper, root_hash_calculator)
+    }
+
+    /// Returns a copy of block root hash queue.
+    pub(crate) fn root_hash_queue(&self) -> BlockRootHashJobQueue {
+        self.root_hash_queue.clone()
     }
 
     // TODO (ZKS-821): We should get rid of this function and create state keeper in a ready-to-go state.
