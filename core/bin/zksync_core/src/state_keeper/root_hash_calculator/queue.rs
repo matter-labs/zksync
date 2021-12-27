@@ -51,6 +51,7 @@ impl BlockRootHashJobQueue {
         self.queue.lock().await.push_back(job);
         // Here and below: `Relaxed` is enough as don't rely on the value for any critical sections.
         self.size.fetch_add(1, Ordering::Relaxed);
+        metrics::increment_gauge!("block_root_hash_job_queue.size", 1.0);
     }
 
     /// Pops an element from the queue.
@@ -64,13 +65,9 @@ impl BlockRootHashJobQueue {
                 old_value != 0,
                 "Underflow on job queue size in state keeper"
             );
+            metrics::decrement_gauge!("block_root_hash_job_queue.size", 1.0);
         }
         result
-    }
-
-    /// Returns `true` if size of the queue is 0.
-    pub(crate) fn is_empty(&self) -> bool {
-        self.size() == 0
     }
 
     /// Returns the current size of the queue.
