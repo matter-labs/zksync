@@ -912,7 +912,7 @@ pub fn get_test_ticker_config() -> TickerConfig {
 pub fn dummy_fee_ticker(
     prices: &[(TokenLike, BigDecimal)],
     in_memory_cache: Option<TokenInMemoryCache>,
-) -> FeeTicker<DummyFeeTickerInfo> {
+) -> FeeTicker {
     let prices: HashMap<_, _> = prices.iter().cloned().collect();
     let validator = FeeTokenValidator::new(
         in_memory_cache.unwrap_or_default(),
@@ -922,7 +922,7 @@ pub fn dummy_fee_ticker(
     );
 
     FeeTicker::new(
-        DummyFeeTickerInfo { prices },
+        Box::new(DummyFeeTickerInfo { prices }),
         get_test_ticker_config(),
         validator,
     )

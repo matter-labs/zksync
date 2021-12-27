@@ -26,9 +26,8 @@ use crate::{
 };
 
 use super::{types::*, RpcApp};
-use crate::fee_ticker::FeeTickerInfo;
 
-impl<INFO: FeeTickerInfo> RpcApp<INFO> {
+impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
 

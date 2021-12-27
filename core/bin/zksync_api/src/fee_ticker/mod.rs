@@ -190,20 +190,11 @@ impl PriceError {
     }
 }
 
-pub struct FeeTicker<INFO> {
-    info: INFO,
+#[derive(Clone)]
+pub struct FeeTicker {
+    info: Box<dyn FeeTickerInfo>,
     config: TickerConfig,
     validator: FeeTokenValidator,
-}
-
-impl<INFO: Clone> Clone for FeeTicker<INFO> {
-    fn clone(&self) -> Self {
-        Self {
-            info: self.info.clone(),
-            config: self.config.clone(),
-            validator: self.validator.clone(),
-        }
-    }
 }
 
 const CPK_CREATE2_FEE_TYPE: OutputFeeType = OutputFeeType::ChangePubKey(
@@ -250,8 +241,12 @@ pub fn run_updaters(
     tasks
 }
 
-impl<INFO> FeeTicker<INFO> {
-    pub fn new(info: INFO, config: TickerConfig, validator: FeeTokenValidator) -> Self {
+impl FeeTicker {
+    pub fn new(
+        info: Box<dyn FeeTickerInfo>,
+        config: TickerConfig,
+        validator: FeeTokenValidator,
+    ) -> Self {
         Self {
             info,
             config,
@@ -260,7 +255,7 @@ impl<INFO> FeeTicker<INFO> {
     }
 
     pub fn new_with_default_validator(
-        info: INFO,
+        info: Box<dyn FeeTickerInfo>,
         config: zksync_config::TickerConfig,
         max_blocks_to_aggregate: u32,
         connection_pool: ConnectionPool,
@@ -287,7 +282,7 @@ impl<INFO> FeeTicker<INFO> {
     }
 }
 
-impl<INFO: FeeTickerInfo> FeeTicker<INFO> {
+impl FeeTicker {
     /// Increases the gas price by a constant coefficient.
     /// Due to the high volatility of gas prices, we are include the risk
     /// in the fee in order not to go into negative territory.

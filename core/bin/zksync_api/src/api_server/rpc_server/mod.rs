@@ -36,25 +36,25 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
-use crate::fee_ticker::{FeeTicker, FeeTickerInfo};
+use crate::fee_ticker::FeeTicker;
 use ip_insert_middleware::IpInsertMiddleWare;
 
 #[derive(Clone)]
-pub struct RpcApp<INFO> {
+pub struct RpcApp {
     cache_of_executed_priority_operations: AsyncLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_transaction_receipts: AsyncLruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_complete_withdrawal_tx_hashes: AsyncLruCache<TxHash, String>,
 
     pub confirmations_for_eth_event: u64,
 
-    tx_sender: TxSender<INFO>,
+    tx_sender: TxSender,
 }
 
-impl<INFO: Clone + Send + Sync> RpcApp<INFO> {
+impl RpcApp {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker: FeeTicker<INFO>,
+        ticker: FeeTicker,
         config: &CommonApiConfig,
         private_url: String,
         confirmations_for_eth_event: u64,
@@ -80,15 +80,12 @@ impl<INFO: Clone + Send + Sync> RpcApp<INFO> {
         }
     }
 
-    pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>)
-    where
-        INFO: 'static + FeeTickerInfo,
-    {
+    pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
     }
 }
 
-impl<INFO: FeeTickerInfo> RpcApp<INFO> {
+impl RpcApp {
     async fn access_storage(&self) -> Result<StorageProcessor<'_>> {
         self.tx_sender
             .pool
@@ -185,7 +182,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
         Ok(res)
     }
 
-    async fn token_allowed_for_fees(ticker: &FeeTicker<INFO>, token: TokenLike) -> Result<bool> {
+    async fn token_allowed_for_fees(ticker: &FeeTicker, token: TokenLike) -> Result<bool> {
         ticker
             .token_allowed_for_fees(token.clone())
             .await
@@ -196,7 +193,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
     }
 
     async fn ticker_batch_fee_request(
-        ticker: &FeeTicker<INFO>,
+        ticker: &FeeTicker,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
     ) -> Result<ResponseBatchFee> {
@@ -210,7 +207,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
     }
 
     async fn ticker_request(
-        ticker: &FeeTicker<INFO>,
+        ticker: &FeeTicker,
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
@@ -230,7 +227,7 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
     }
 
     async fn ticker_price_request(
-        ticker: &FeeTicker<INFO>,
+        ticker: &FeeTicker,
         token: TokenLike,
         req_type: TokenPriceRequestType,
     ) -> Result<BigDecimal> {
@@ -322,10 +319,10 @@ impl<INFO: FeeTickerInfo> RpcApp<INFO> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn start_rpc_server<INFO: 'static + Clone + Send + Sync + FeeTickerInfo>(
+pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-    ticker: FeeTicker<INFO>,
+    ticker: FeeTicker,
     config: &JsonRpcConfig,
     common_api_config: &CommonApiConfig,
     private_url: String,

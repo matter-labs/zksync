@@ -10,7 +10,6 @@ use zksync_types::network::Network;
 
 // Local uses
 use crate::api_server::tx_sender::TxSender;
-use crate::fee_ticker::FeeTickerInfo;
 
 mod account;
 mod block;
@@ -32,10 +31,7 @@ pub struct SharedData {
     pub api_version: ApiVersion,
 }
 
-pub(crate) fn api_scope<INFO: 'static + FeeTickerInfo + Send + Sync>(
-    tx_sender: TxSender<INFO>,
-    zk_config: &ZkSyncConfig,
-) -> Scope {
+pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope {
     let data = SharedData {
         net: zk_config.chain.eth.network,
         api_version: ApiVersion::V02,

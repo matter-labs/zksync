@@ -22,16 +22,15 @@ use zksync_types::{tx::TxHash, EthBlockId};
 // Local uses
 use super::{error::Error, response::ApiResult};
 use crate::api_server::tx_sender::{SubmitError, TxSender};
-use crate::fee_ticker::FeeTickerInfo;
 
 /// Shared data between `api/v0.2/transactions` endpoints.
 #[derive(Clone)]
-struct ApiTransactionData<INFO> {
-    tx_sender: TxSender<INFO>,
+struct ApiTransactionData {
+    tx_sender: TxSender,
 }
 
-impl<INFO> ApiTransactionData<INFO> {
-    fn new(tx_sender: TxSender<INFO>) -> Self {
+impl ApiTransactionData {
+    fn new(tx_sender: TxSender) -> Self {
         Self { tx_sender }
     }
 
@@ -133,22 +132,22 @@ impl<INFO> ApiTransactionData<INFO> {
 
 // Server implementation
 
-async fn tx_status<INFO>(
-    data: web::Data<ApiTransactionData<INFO>>,
+async fn tx_status(
+    data: web::Data<ApiTransactionData>,
     tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<Receipt>> {
     data.tx_status(*tx_hash).await.into()
 }
 
-async fn tx_data<INFO>(
-    data: web::Data<ApiTransactionData<INFO>>,
+async fn tx_data(
+    data: web::Data<ApiTransactionData>,
     tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TxData>> {
     data.tx_data(*tx_hash).await.into()
 }
 
-async fn submit_tx<INFO: FeeTickerInfo>(
-    data: web::Data<ApiTransactionData<INFO>>,
+async fn submit_tx(
+    data: web::Data<ApiTransactionData>,
     Json(body): Json<TxWithSignature>,
 ) -> ApiResult<TxHashSerializeWrapper> {
     let tx_hash = data
@@ -170,8 +169,8 @@ async fn submit_tx<INFO: FeeTickerInfo>(
     tx_hash.map(TxHashSerializeWrapper).into()
 }
 
-async fn submit_batch<INFO: FeeTickerInfo>(
-    data: web::Data<ApiTransactionData<INFO>>,
+async fn submit_batch(
+    data: web::Data<ApiTransactionData>,
     Json(body): Json<IncomingTxBatch>,
 ) -> ApiResult<SubmitBatchResponse> {
     let response = data
@@ -193,8 +192,8 @@ async fn submit_batch<INFO: FeeTickerInfo>(
     response.into()
 }
 
-async fn toggle_2fa<INFO: FeeTickerInfo>(
-    data: web::Data<ApiTransactionData<INFO>>,
+async fn toggle_2fa(
+    data: web::Data<ApiTransactionData>,
     Json(toggle_2fa): Json<Toggle2FA>,
 ) -> ApiResult<Toggle2FAResponse> {
     let response = data
@@ -206,24 +205,24 @@ async fn toggle_2fa<INFO: FeeTickerInfo>(
     response.into()
 }
 
-async fn get_batch<INFO>(
-    data: web::Data<ApiTransactionData<INFO>>,
+async fn get_batch(
+    data: web::Data<ApiTransactionData>,
     batch_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<ApiTxBatch>> {
     data.get_batch(*batch_hash).await.into()
 }
 
-pub fn api_scope<INFO: 'static + FeeTickerInfo + Send + Sync>(tx_sender: TxSender<INFO>) -> Scope {
+pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
     web::scope("transactions")
         .app_data(web::Data::new(data))
-        .route("", web::post().to(submit_tx::<INFO>))
-        .route("{tx_hash}", web::get().to(tx_status::<INFO>))
-        .route("{tx_hash}/data", web::get().to(tx_data::<INFO>))
-        .route("/batches", web::post().to(submit_batch::<INFO>))
-        .route("/batches/{batch_hash}", web::get().to(get_batch::<INFO>))
-        .route("/toggle2FA", web::post().to(toggle_2fa::<INFO>))
+        .route("", web::post().to(submit_tx))
+        .route("{tx_hash}", web::get().to(tx_status))
+        .route("{tx_hash}/data", web::get().to(tx_data))
+        .route("/batches", web::post().to(submit_batch))
+        .route("/batches/{batch_hash}", web::get().to(get_batch))
+        .route("/toggle2FA", web::post().to(toggle_2fa))
 }
 
 #[cfg(test)]

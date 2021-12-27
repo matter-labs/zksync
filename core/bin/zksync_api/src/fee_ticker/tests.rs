@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use actix_web::{web, App, HttpResponse, HttpServer};
 
 use async_trait::async_trait;
@@ -256,20 +258,21 @@ fn run_server(token_address: Address) -> (String, AbortHandle) {
     (address, abort_handle)
 }
 
-type TestFeeTicker = FeeTicker<MockTickerInfo>;
-
 fn get_normal_and_subsidy_fee(
-    ticker: &mut TestFeeTicker,
+    ticker: &mut FeeTicker,
     tx_type: TxFeeTypes,
     token: TokenLike,
     address: Address,
     future_blocks: Option<BlocksInFutureAggregatedOperations>,
     remaining_chunks: Option<usize>,
 ) -> (Ratio<BigUint>, Ratio<BigUint>) {
+    let info_any = &mut ticker.info as &mut dyn Any;
+    let info: &mut MockTickerInfo = info_any.downcast_mut::<MockTickerInfo>().unwrap();
     if let Some(blocks) = future_blocks {
-        ticker.info.future_blocks = blocks;
+        info.future_blocks = blocks;
     }
-    ticker.info.remaining_chunks = remaining_chunks;
+    info.remaining_chunks = remaining_chunks;
+
     let fee_in_token = block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
         .expect("failed to get fee in token");
 
@@ -293,7 +296,7 @@ fn get_normal_and_subsidy_fee(
 }
 
 fn get_token_fee_in_usd(
-    ticker: &mut TestFeeTicker,
+    ticker: &mut FeeTicker,
     tx_type: TxFeeTypes,
     token: TokenLike,
     address: Address,
@@ -323,7 +326,7 @@ fn get_token_fee_in_usd(
 }
 
 fn get_subsidy_token_fee_in_usd(
-    ticker: &mut TestFeeTicker,
+    ticker: &mut FeeTicker,
     tx_type: TxFeeTypes,
     token: TokenLike,
     address: Address,
@@ -351,11 +354,7 @@ fn get_subsidy_token_fee_in_usd(
         * fee_in_token
 }
 
-fn convert_to_usd(
-    ticker: &TestFeeTicker,
-    amount: &Ratio<BigUint>,
-    token: TokenLike,
-) -> Ratio<BigUint> {
+fn convert_to_usd(ticker: &FeeTicker, amount: &Ratio<BigUint>, token: TokenLike) -> Ratio<BigUint> {
     let token_precision = block_on(ticker.info.get_token(token.clone()))
         .unwrap()
         .decimals;
@@ -381,7 +380,7 @@ fn test_ticker_subsidy() {
     );
 
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
+    let mut ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     // Only CREATE2 is subsidized
     let cpk = |cpk_type: ChangePubKeyType| {
@@ -502,7 +501,7 @@ fn test_ticker_formula() {
     );
 
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
+    let mut ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
         let max = std::cmp::max(a.clone(), b.clone());
@@ -736,7 +735,7 @@ fn test_zero_price_token_fee() {
     );
 
     let config = get_test_ticker_config();
-    let ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
+    let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     let token = TestToken::zero_price();
 
@@ -803,7 +802,7 @@ async fn test_error_coingecko_api() {
     let _ticker_api = TickerApi::new(connection_pool, coingecko);
 
     let config = get_test_ticker_config();
-    let ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
+    let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
     for _ in 0..1000 {
         ticker
             .get_fee_from_ticker_in_wei(
@@ -846,7 +845,7 @@ async fn test_error_api() {
         .await
         .unwrap();
     let config = get_test_ticker_config();
-    let ticker = FeeTicker::new(MockTickerInfo::default(), config, validator);
+    let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     ticker
         .get_fee_from_ticker_in_wei(

@@ -21,7 +21,6 @@ use zksync_types::{
 
 // Local uses
 use super::{types::*, RpcApp};
-use crate::fee_ticker::FeeTickerInfo;
 
 pub type BoxFutureResult<T> = BoxFuture<Result<T>>;
 
@@ -113,7 +112,7 @@ pub trait Rpc {
     fn get_nft_id_by_tx_hash(&self, tx_hash: TxHash) -> BoxFutureResult<Option<TokenId>>;
 }
 
-impl<INFO: 'static + FeeTickerInfo + Send + Sync> Rpc for RpcApp<INFO> {
+impl Rpc for RpcApp {
     fn account_info(&self, addr: Address) -> BoxFutureResult<AccountInfoResp> {
         spawn!(self._impl_account_info(addr))
     }

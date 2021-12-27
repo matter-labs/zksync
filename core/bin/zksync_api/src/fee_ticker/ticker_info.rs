@@ -1,5 +1,6 @@
 //! Additional methods gathering the information required
 //! by ticker for operating.
+//!
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -38,9 +39,29 @@ impl TokenCacheEntry {
             > API_PRICE_EXPIRATION_TIME_SECS
     }
 }
+
+pub trait FeeTickerClone {
+    fn clone_box(&self) -> Box<dyn FeeTickerInfo>;
+}
+
+impl<T> FeeTickerClone for T
+where
+    T: 'static + FeeTickerInfo + Clone,
+{
+    fn clone_box(&self) -> Box<dyn FeeTickerInfo> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn FeeTickerInfo> {
+    fn clone(&self) -> Box<dyn FeeTickerInfo> {
+        self.clone_box()
+    }
+}
+
 /// Api responsible for querying for TokenPrices
 #[async_trait]
-pub trait FeeTickerInfo: Clone {
+pub trait FeeTickerInfo: FeeTickerClone + Send + Sync + 'static {
     /// Check whether account exists in the zkSync network or not.
     /// Returns `true` if account does not yet exist in the zkSync network.
     async fn is_account_new(&self, address: Address) -> anyhow::Result<bool>;

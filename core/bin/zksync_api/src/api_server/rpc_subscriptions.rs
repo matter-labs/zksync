@@ -16,7 +16,7 @@ use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Address};
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 // Local uses
-use crate::fee_ticker::{FeeTicker, FeeTickerInfo};
+use crate::fee_ticker::FeeTicker;
 use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
@@ -176,10 +176,10 @@ struct RpcSubApp {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn start_ws_server<INFO: 'static + Send + Sync + Clone + FeeTickerInfo>(
+pub fn start_ws_server(
     db_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-    ticker: FeeTicker<INFO>,
+    ticker: FeeTicker,
     common_config: &CommonApiConfig,
     config: &JsonRpcConfig,
     miniblock_iteration_interval: Duration,
