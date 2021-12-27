@@ -70,7 +70,7 @@ contract TokenGovernance is ReentrancyGuard {
     /// @notice NOTE: before calling this function make sure to approve `listingFeeToken` transfer for this contract.
     function addToken(address _token) external nonReentrant {
         require(governance.totalTokens() < listingCap, "can't add more tokens"); // Impossible to add more tokens using this contract
-        if (!tokenLister[msg.sender]) {
+        if (!tokenLister[msg.sender] && listingFee > 0) {
             // Collect fees
             bool feeTransferOk = listingFeeToken.transferFrom(msg.sender, treasury, listingFee);
             require(feeTransferOk, "fee transfer failed"); // Failed to receive payment for token addition.
