@@ -197,8 +197,8 @@ contract Governance is Config {
         emit NFTFactoryRegisteredCreator(_creatorAccountId, _creatorAddress, msg.sender);
     }
 
-    //@notice Set default factory for our contract. This factory will be used to mint an NFT token that has no factory
-    //@param _factory Address of NFT factory
+    /// @notice Set default factory for our contract. This factory will be used to mint an NFT token that has no factory
+    /// @param _factory Address of NFT factory
     function setDefaultNFTFactory(address _factory) external {
         requireGovernor(msg.sender);
         require(address(_factory) != address(0), "mb1"); // Factory should be non zero
@@ -217,6 +217,8 @@ contract Governance is Config {
         }
     }
 
+    /// @return whether the address is a contract or not
+    /// NOTE: for smart contracts that called `selfdestruct` will return a negative result
     function isContract(address _address) internal view returns (bool) {
         uint256 contractSize;
         assembly {
