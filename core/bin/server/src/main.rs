@@ -42,7 +42,7 @@ pub enum Component {
     RpcWebSocketApi,
 
     // Core components
-    Updaters,
+    Fetchers,
     EthSender,
     Core,
     WitnessGenerator,
@@ -66,7 +66,7 @@ impl FromStr for Component {
             "witness-generator" => Ok(Component::WitnessGenerator),
             "forced-exit" => Ok(Component::ForcedExit),
             "prometheus" => Ok(Component::Prometheus),
-            "updaters" => Ok(Component::Updaters),
+            "fetchers" => Ok(Component::Fetchers),
             "core" => Ok(Component::Core),
             "rejected-task-cleaner" => Ok(Component::RejectedTaskCleaner),
             other => Err(format!("{} is not a valid component name", other)),
@@ -90,7 +90,7 @@ impl Default for ComponentsToRun {
             Component::Prometheus,
             Component::Core,
             Component::RejectedTaskCleaner,
-            Component::Updaters,
+            Component::Fetchers,
         ])
     }
 }
@@ -116,7 +116,7 @@ struct Opt {
     /// comma-separated list of components to launch
     #[structopt(
         long,
-        default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner,updaters"
+        default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner,fetchers"
     )]
     components: ComponentsToRun,
 }
@@ -162,7 +162,7 @@ async fn run_server(components: &ComponentsToRun) {
         ));
     }
 
-    if components.0.contains(&Component::Updaters) {
+    if components.0.contains(&Component::Fetchers) {
         // Run price updaters
         let mut price_tasks = run_price_updaters(connection_pool.clone());
         tasks.append(&mut price_tasks);
