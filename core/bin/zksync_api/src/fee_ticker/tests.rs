@@ -161,12 +161,14 @@ impl FeeTickerInfo for MockTickerInfo {
         Ok(false)
     }
 
-    async fn blocks_in_future_aggregated_operations(&self) -> BlocksInFutureAggregatedOperations {
-        self.future_blocks.clone()
+    async fn blocks_in_future_aggregated_operations(
+        &self,
+    ) -> anyhow::Result<BlocksInFutureAggregatedOperations> {
+        Ok(self.future_blocks.clone())
     }
 
-    async fn remaining_chunks_in_pending_block(&self) -> Option<usize> {
-        self.remaining_chunks
+    async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>> {
+        Ok(self.remaining_chunks)
     }
 
     async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {

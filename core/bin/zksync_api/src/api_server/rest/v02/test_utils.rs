@@ -842,16 +842,16 @@ impl FeeTickerInfo for DummyFeeTickerInfo {
 
     async fn blocks_in_future_aggregated_operations(
         &self,
-    ) -> crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations {
-        BlocksInFutureAggregatedOperations {
+    ) -> anyhow::Result<crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations> {
+        Ok(BlocksInFutureAggregatedOperations {
             blocks_to_commit: 1,
             blocks_to_prove: 1,
             blocks_to_execute: 1,
-        }
+        })
     }
 
-    async fn remaining_chunks_in_pending_block(&self) -> Option<usize> {
-        None
+    async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>> {
+        Ok(None)
     }
 
     async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {

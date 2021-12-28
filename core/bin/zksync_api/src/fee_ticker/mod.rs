@@ -568,7 +568,7 @@ impl FeeTicker {
             fee_type,
             OutputFeeType::FastWithdraw | OutputFeeType::FastWithdrawNFT
         ) {
-            self.calculate_fast_withdrawal_gas_cost(op_chunks).await
+            self.calculate_fast_withdrawal_gas_cost(op_chunks).await?
         } else {
             self.config
                 .gas_cost_tx
@@ -583,9 +583,12 @@ impl FeeTicker {
 
         Ok((fee_type, gas_tx_amount, op_chunks))
     }
-    async fn calculate_fast_withdrawal_gas_cost(&self, chunk_size: usize) -> BigUint {
-        let future_blocks = self.info.blocks_in_future_aggregated_operations().await;
-        let remaining_pending_chunks = self.info.remaining_chunks_in_pending_block().await;
+    async fn calculate_fast_withdrawal_gas_cost(
+        &self,
+        chunk_size: usize,
+    ) -> anyhow::Result<BigUint> {
+        let future_blocks = self.info.blocks_in_future_aggregated_operations().await?;
+        let remaining_pending_chunks = self.info.remaining_chunks_in_pending_block().await?;
         let additional_cost = remaining_pending_chunks.map_or(0, |chunks| {
             if chunk_size > chunks {
                 0
@@ -610,7 +613,9 @@ impl FeeTicker {
             self.config.max_blocks_to_aggregate,
             future_blocks.blocks_to_prove,
         );
-        BigUint::from(commit_cost + execute_cost + proof_cost + additional_cost)
+        Ok(BigUint::from(
+            commit_cost + execute_cost + proof_cost + additional_cost,
+        ))
     }
 
     pub async fn token_allowed_for_fees(&self, token: TokenLike) -> anyhow::Result<bool> {

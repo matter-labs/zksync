@@ -69,9 +69,11 @@ pub trait FeeTickerInfo: FeeTickerClone + Send + Sync + 'static {
     /// Returns `true` if account does not yet exist in the zkSync network.
     async fn is_account_new(&self, address: Address) -> anyhow::Result<bool>;
 
-    async fn blocks_in_future_aggregated_operations(&self) -> BlocksInFutureAggregatedOperations;
+    async fn blocks_in_future_aggregated_operations(
+        &self,
+    ) -> anyhow::Result<BlocksInFutureAggregatedOperations>;
 
-    async fn remaining_chunks_in_pending_block(&self) -> Option<usize>;
+    async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>>;
 
     /// Get last price for token from ticker info
     async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError>;
@@ -126,25 +128,21 @@ impl FeeTickerInfo for TickerInfo {
         Ok(!is_account_exist)
     }
 
-    async fn blocks_in_future_aggregated_operations(&self) -> BlocksInFutureAggregatedOperations {
-        let mut storage = self
-            .db
-            .access_storage()
-            .await
-            .expect("Unable to establish connection to db");
+    async fn blocks_in_future_aggregated_operations(
+        &self,
+    ) -> anyhow::Result<BlocksInFutureAggregatedOperations> {
+        let mut storage = self.db.access_storage().await?;
 
         let last_block = storage
             .chain()
             .block_schema()
             .get_last_saved_block()
-            .await
-            .expect("Unable to query account state from the database");
+            .await?;
         let last_committed_block = storage
             .chain()
             .operations_schema()
             .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, None)
-            .await
-            .expect("Unable to query block from the database");
+            .await?;
         let last_proven_block = storage
             .chain()
             .operations_schema()
@@ -152,34 +150,24 @@ impl FeeTickerInfo for TickerInfo {
                 AggregatedActionType::PublishProofBlocksOnchain,
                 None,
             )
-            .await
-            .expect("Unable to query block state from the database");
+            .await?;
+
         let last_executed_block = storage
             .chain()
             .operations_schema()
             .get_last_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks, None)
-            .await
-            .expect("Unable to query block from the database");
-        BlocksInFutureAggregatedOperations {
+            .await?;
+        Ok(BlocksInFutureAggregatedOperations {
             blocks_to_commit: *last_block - *last_committed_block,
             blocks_to_prove: *last_block - *last_proven_block,
             blocks_to_execute: *last_block - *last_executed_block,
-        }
+        })
     }
 
-    async fn remaining_chunks_in_pending_block(&self) -> Option<usize> {
-        let mut storage = self
-            .db
-            .access_storage()
-            .await
-            .expect("Unable to establish connection to db");
-        let block = storage
-            .chain()
-            .block_schema()
-            .load_pending_block()
-            .await
-            .expect("Error loading pending block");
-        block.map(|block| block.chunks_left)
+    async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>> {
+        let mut storage = self.db.access_storage().await?;
+        let block = storage.chain().block_schema().load_pending_block().await?;
+        Ok(block.map(|block| block.chunks_left))
     }
 
     /// Get last price from ticker
