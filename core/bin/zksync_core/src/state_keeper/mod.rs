@@ -64,6 +64,9 @@ pub struct ZkSyncStateKeeper {
 }
 
 impl ZkSyncStateKeeper {
+    /// Creates `ZkSyncStateKeeper` and `RootHashCalculator` objects.
+    /// Both objects are logically parts of the same block processing workflow, so it doesn't make much sense
+    /// to create them separately.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         initial_state: ZkSyncStateInitParams,
@@ -76,11 +79,11 @@ impl ZkSyncStateKeeper {
         processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
     ) -> (Self, RootHashCalculator) {
         // We need two copies of state:
-        // 1. For state keeper itself. We will apply all the updates from incomplete blocks on it in order to
-        //    get the state right before the pending block. Transactions from the pending block will be executed
+        // 1. For state keeper itself (`sk_state`). We will apply all the updates from incomplete blocks on it in order
+        //    to get the state right before the pending block. Transactions from the pending block will be executed
         //    separately below.
-        // 2. For root hash calculator. It will require the state at *last finished block*, so it can keep working
-        //    on calculating root hashes for incomplete blocks that we had before the restart.
+        // 2. For root hash calculator (`rhc_state`). It will require the state at *last finished block*, so it can keep
+        //    working on calculating root hashes for incomplete blocks that we had before the restart.
         let mut sk_state = ZkSyncState::new(
             initial_state.tree,
             initial_state.acc_id_by_addr,

@@ -22,7 +22,7 @@ mod aggregated_committer;
 pub enum CommitRequest {
     PendingBlock((PendingBlock, AppliedUpdatesRequest)),
     SealIncompleteBlock((BlockCommitRequest, AppliedUpdatesRequest)),
-    FinishBlock(BlockFinishRequest), // TODO: Use a dedicated structure.
+    FinishBlock(BlockFinishRequest),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
