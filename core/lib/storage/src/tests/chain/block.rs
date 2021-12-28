@@ -1069,7 +1069,7 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
 
     assert_eq!(
         BlockSchema(&mut storage)
-            .get_last_incomplete_block()
+            .get_last_incomplete_block_number()
             .await?,
         Some(BlockNumber(6))
     );
@@ -1092,7 +1092,7 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Incomplete block should be removed as well.
     assert_eq!(
         BlockSchema(&mut storage)
-            .get_last_incomplete_block()
+            .get_last_incomplete_block_number()
             .await?,
         None
     );

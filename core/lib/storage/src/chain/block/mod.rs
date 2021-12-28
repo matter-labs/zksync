@@ -632,7 +632,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     /// Returns the number of existing incomplete block.
     /// Returns `None` if there are no incomplte blocks in the database.
-    pub async fn get_last_incomplete_block(&mut self) -> QueryResult<Option<BlockNumber>> {
+    ///
+    /// Note: Used only for testing.
+    #[cfg(test)]
+    pub(crate) async fn get_last_incomplete_block_number(
+        &mut self,
+    ) -> QueryResult<Option<BlockNumber>> {
         let start = Instant::now();
         let result = sqlx::query!("SELECT max(number) FROM incomplete_blocks")
             .fetch_one(self.0.conn())
