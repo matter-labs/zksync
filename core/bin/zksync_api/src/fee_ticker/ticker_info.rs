@@ -2,6 +2,9 @@
 //! by ticker for operating.
 //!
 
+#[cfg(test)]
+use std::any::Any;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -19,7 +22,6 @@ use zksync_types::{Address, Token, TokenId, TokenLike, TokenPrice};
 // Local deps
 use crate::fee_ticker::PriceError;
 use crate::utils::token_db_cache::TokenDBCache;
-use std::any::Any;
 
 const API_PRICE_EXPIRATION_TIME_SECS: i64 = 30 * 60;
 
@@ -80,6 +82,7 @@ pub trait FeeTickerInfo: FeeTickerClone + Send + Sync + 'static {
     async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error>;
 
     /// Make boxed value to any. Helpful for downcasting in tests
+    #[cfg(test)]
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
@@ -267,6 +270,7 @@ impl FeeTickerInfo for TickerInfo {
         result
     }
 
+    #[cfg(test)]
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }
