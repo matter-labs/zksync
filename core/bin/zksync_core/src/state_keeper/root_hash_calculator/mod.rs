@@ -96,10 +96,11 @@ impl RootHashCalculator {
         // Increment block number to expect the next one.
         self.last_block_number = self.last_block_number + 1;
 
-        metrics::histogram!("root_hash_calculator.process_job", start.elapsed());
+        metrics::histogram!("process_block", start.elapsed(), "stage" => "root_hash_calculator");
         metrics::gauge!(
-            "root_hash_calculator.last_processed_block",
-            job.block.0 as f64
+            "last_process_block",
+            job.block.0 as f64,
+            "stage" => "root_hash_calculator"
         );
     }
 }
