@@ -309,7 +309,7 @@ impl FeeTicker {
         };
 
         self.info
-            .get_last_quote(token)
+            .get_last_token_price(token)
             .await
             .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
@@ -509,7 +509,7 @@ impl FeeTicker {
     pub async fn wei_price_usd(&self) -> anyhow::Result<Ratio<BigUint>> {
         Ok(self
             .info
-            .get_last_quote(TokenLike::Id(TokenId(0)))
+            .get_last_token_price(TokenLike::Id(TokenId(0)))
             .await?
             .usd_price
             / BigUint::from(10u32).pow(18u32))
@@ -525,7 +525,7 @@ impl FeeTicker {
 
         let token_price_usd = self
             .info
-            .get_last_quote(TokenLike::Id(token.id))
+            .get_last_token_price(TokenLike::Id(token.id))
             .await?
             .usd_price
             / BigUint::from(10u32).pow(u32::from(token.decimals));

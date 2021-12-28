@@ -163,7 +163,7 @@ async fn run_server(components: &ComponentsToRun) {
     }
 
     if components.0.contains(&Component::Fetchers) {
-        // Run price updaters
+        // Run price fetchers
         let mut price_tasks = run_price_updaters(connection_pool.clone());
         tasks.append(&mut price_tasks);
     }

@@ -829,7 +829,7 @@ pub fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
     sender
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DummyFeeTickerInfo {
     prices: HashMap<TokenLike, BigDecimal>,
 }
@@ -854,7 +854,7 @@ impl FeeTickerInfo for DummyFeeTickerInfo {
         None
     }
 
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+    async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
         if let Some(price) = self.prices.get(&token) {
             Ok(TokenPrice {
                 usd_price: big_decimal_to_ratio(price).unwrap(),

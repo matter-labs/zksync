@@ -169,7 +169,7 @@ impl FeeTickerInfo for MockTickerInfo {
         self.remaining_chunks
     }
 
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+    async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
         for test_token in TestToken::all_tokens() {
             if TokenLike::Id(test_token.id) == token {
                 let token_price = TokenPrice {
@@ -322,7 +322,7 @@ fn get_token_fee_in_usd(
         .decimals;
 
     // Fee in usd
-    (block_on(ticker.info.get_last_quote(token))
+    (block_on(ticker.info.get_last_token_price(token))
         .expect("failed to get fee in usd")
         .usd_price
         / BigUint::from(10u32).pow(u32::from(token_precision)))
@@ -351,7 +351,7 @@ fn get_subsidy_token_fee_in_usd(
         .decimals;
 
     // Fee in usd
-    (block_on(ticker.info.get_last_quote(token))
+    (block_on(ticker.info.get_last_token_price(token))
         .expect("failed to get fee in usd")
         .usd_price
         / BigUint::from(10u32).pow(u32::from(token_precision)))
@@ -364,7 +364,7 @@ fn convert_to_usd(ticker: &FeeTicker, amount: &Ratio<BigUint>, token: TokenLike)
         .decimals;
 
     // Fee in usd
-    (block_on(ticker.info.get_last_quote(token))
+    (block_on(ticker.info.get_last_token_price(token))
         .expect("failed to get fee in usd")
         .usd_price
         / BigUint::from(10u32).pow(u32::from(token_precision)))

@@ -142,7 +142,9 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         })
     }
 
-    pub async fn is_account_exist(&mut self, address: Address) -> QueryResult<bool> {
+    /// Check the existence of an account by the address on the zksync network,
+    /// will return true if the account exists
+    pub async fn does_account_exist(&mut self, address: Address) -> QueryResult<bool> {
         let start = Instant::now();
 
         let result = sqlx::query!(
@@ -154,7 +156,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         )
         .fetch_optional(self.0.conn())
         .await?;
-        metrics::histogram!("sql.chain.account.is_account_exist", start.elapsed());
+        metrics::histogram!("sql.chain.account.does_account_exist", start.elapsed());
         Ok(result.is_some())
     }
 

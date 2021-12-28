@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use num::rational::Ratio;
 use num::BigUint;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 // Workspace deps
 use zksync_storage::ConnectionPool;
 use zksync_types::aggregated_operations::AggregatedActionType;
@@ -23,7 +23,7 @@ use zksync_types::{Address, Token, TokenId, TokenLike, TokenPrice};
 use crate::fee_ticker::PriceError;
 use crate::utils::token_db_cache::TokenDBCache;
 
-const API_PRICE_EXPIRATION_TIME_SECS: i64 = 30 * 60;
+const API_PRICE_EXPIRATION_TIME_SECS: Duration = Duration::from_secs(30 * 60);
 
 #[derive(Debug, Clone)]
 struct TokenCacheEntry {
@@ -39,7 +39,7 @@ impl TokenCacheEntry {
         Utc::now()
             .signed_duration_since(self.price.last_updated)
             .num_seconds()
-            > API_PRICE_EXPIRATION_TIME_SECS
+            > API_PRICE_EXPIRATION_TIME_SECS.as_secs() as i64
     }
 }
 
@@ -62,7 +62,7 @@ impl Clone for Box<dyn FeeTickerInfo> {
     }
 }
 
-/// Api responsible for querying for TokenPrices
+/// Getters for information required for calculating fee
 #[async_trait]
 pub trait FeeTickerInfo: FeeTickerClone + Send + Sync + 'static {
     /// Check whether account exists in the zkSync network or not.
@@ -73,8 +73,8 @@ pub trait FeeTickerInfo: FeeTickerClone + Send + Sync + 'static {
 
     async fn remaining_chunks_in_pending_block(&self) -> Option<usize>;
 
-    /// Get last price from ticker
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError>;
+    /// Get last price for token from ticker info
+    async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError>;
 
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error>;
@@ -90,8 +90,8 @@ pub trait FeeTickerInfo: FeeTickerClone + Send + Sync + 'static {
 pub struct TickerInfo {
     db: ConnectionPool,
     token_db_cache: TokenDBCache,
-    price_cache: Arc<Mutex<HashMap<TokenId, TokenCacheEntry>>>,
-    gas_price_cache: Arc<Mutex<Option<(BigUint, Instant)>>>,
+    price_cache: Arc<RwLock<HashMap<TokenId, TokenCacheEntry>>>,
+    gas_price_cache: Arc<RwLock<Option<(BigUint, Instant)>>>,
 }
 
 impl TickerInfo {
@@ -120,7 +120,7 @@ impl FeeTickerInfo for TickerInfo {
         let is_account_exist = storage
             .chain()
             .account_schema()
-            .is_account_exist(address)
+            .does_account_exist(address)
             .await?;
 
         Ok(!is_account_exist)
@@ -183,7 +183,7 @@ impl FeeTickerInfo for TickerInfo {
     }
 
     /// Get last price from ticker
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+    async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
         let start = Instant::now();
         let token = self
             .token_db_cache
@@ -231,14 +231,14 @@ impl FeeTickerInfo for TickerInfo {
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
         let start = Instant::now();
-        let mut cached_value = self.gas_price_cache.lock().await;
+        let cached_value = self.gas_price_cache.read().await;
 
-        if let Some((cached_gas_price, cache_time)) = cached_value.take() {
-            if cache_time.elapsed() < Duration::from_secs(API_PRICE_EXPIRATION_TIME_SECS as u64) {
-                *cached_value = Some((cached_gas_price.clone(), cache_time));
-                return Ok(cached_gas_price);
+        if let Some((cached_gas_price, cache_time)) = cached_value.as_ref() {
+            if cache_time.elapsed() < API_PRICE_EXPIRATION_TIME_SECS {
+                return Ok(cached_gas_price.clone());
             }
         }
+
         drop(cached_value);
 
         let mut storage = self
@@ -254,7 +254,7 @@ impl FeeTickerInfo for TickerInfo {
             .as_u64();
         let average_gas_price = BigUint::from(average_gas_price);
 
-        *self.gas_price_cache.lock().await = Some((average_gas_price.clone(), Instant::now()));
+        *self.gas_price_cache.write().await = Some((average_gas_price.clone(), Instant::now()));
         metrics::histogram!("ticker.get_gas_price_wei", start.elapsed());
         Ok(average_gas_price)
     }
@@ -300,7 +300,7 @@ impl TickerInfo {
 
     async fn update_stored_value(&self, token_id: TokenId, price: TokenPrice) {
         self.price_cache
-            .lock()
+            .write()
             .await
             .insert(token_id, TokenCacheEntry::new(price.clone()));
         self._update_stored_value(token_id, price)
@@ -310,12 +310,11 @@ impl TickerInfo {
     }
 
     async fn get_stored_value(&self, token_id: TokenId) -> Option<TokenPrice> {
-        let mut price_cache = self.price_cache.lock().await;
+        let price_cache = self.price_cache.read().await;
 
-        if let Some(cached_entry) = price_cache.remove(&token_id) {
+        if let Some(cached_entry) = price_cache.get(&token_id) {
             if !cached_entry.is_cache_entry_expired() {
-                price_cache.insert(token_id, cached_entry.clone());
-                return Some(cached_entry.price);
+                return Some(cached_entry.price.clone());
             }
         }
         None
