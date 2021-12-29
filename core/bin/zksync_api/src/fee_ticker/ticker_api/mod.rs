@@ -56,7 +56,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
             .load_tokens()
             .await
             .map_err(|err| PriceError::DBError(err.to_string()))?;
-        Ok(tokens.into_iter().map(|(_k, v)| v).collect())
+        Ok(tokens.into_values().collect())
     }
     async fn update_stored_value(
         &self,

@@ -189,9 +189,7 @@ impl TxSender {
             subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
         }
     }
-}
 
-impl TxSender {
     /// If `ForcedExit` has Ethereum siganture (e.g. it's a part of a batch), an actual signer
     /// is initiator, not the target, thus, this function will perform a database query to acquire
     /// the corresponding address.

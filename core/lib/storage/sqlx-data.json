@@ -6612,6 +6612,24 @@
       "nullable": []
     }
   },
+  "e467ed3636ed729ba60433573e822ce940b213f1931a404badb35025231fd87b": {
+    "query": "SELECT chunks_left FROM pending_block\n            LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "chunks_left",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "e515899938d5ced7b83234fcea6ad024184702eca40b1fae1a16467649722a10": {
     "query": "\n                INSERT INTO execute_aggregated_blocks_binding\n                SELECT \n                    aggregate_operations.id, blocks.number\n                FROM aggregate_operations\n                INNER JOIN blocks ON blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block\n                WHERE aggregate_operations.action_type = 'ExecuteBlocks' and aggregate_operations.id = $1\n                ",
     "describe": {

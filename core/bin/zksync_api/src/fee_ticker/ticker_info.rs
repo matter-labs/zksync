@@ -101,8 +101,8 @@ impl TickerInfo {
         Self {
             db,
             token_db_cache: Default::default(),
-            price_cache: Arc::new(Default::default()),
-            gas_price_cache: Arc::new(Default::default()),
+            price_cache: Default::default(),
+            gas_price_cache: Default::default(),
         }
     }
 }
@@ -119,13 +119,13 @@ impl FeeTickerInfo for TickerInfo {
     async fn is_account_new(&self, address: Address) -> anyhow::Result<bool> {
         let mut storage = self.db.access_storage().await?;
 
-        let is_account_exist = storage
+        let is_account_exists = storage
             .chain()
             .account_schema()
             .does_account_exist(address)
             .await?;
 
-        Ok(!is_account_exist)
+        Ok(!is_account_exists)
     }
 
     async fn blocks_in_future_aggregated_operations(
@@ -166,8 +166,12 @@ impl FeeTickerInfo for TickerInfo {
 
     async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>> {
         let mut storage = self.db.access_storage().await?;
-        let block = storage.chain().block_schema().load_pending_block().await?;
-        Ok(block.map(|block| block.chunks_left))
+        let remaining_chunks = storage
+            .chain()
+            .block_schema()
+            .pending_block_chunks_left()
+            .await?;
+        Ok(remaining_chunks)
     }
 
     /// Get last price from ticker
