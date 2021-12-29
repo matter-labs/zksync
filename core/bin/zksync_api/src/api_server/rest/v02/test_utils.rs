@@ -447,7 +447,7 @@ impl TestServerConfig {
             storage
                 .chain()
                 .block_schema()
-                .save_block(gen_sample_block(
+                .save_full_block(gen_sample_block(
                     block_number,
                     BLOCK_SIZE_CHUNKS,
                     txs.clone(),

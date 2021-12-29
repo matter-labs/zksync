@@ -229,7 +229,7 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
     storage
         .chain()
         .block_schema()
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BLOCK_NUMBER,
             BLOCK_SIZE,
             Default::default(),
@@ -279,7 +279,7 @@ async fn test_remove_witnesses(mut storage: StorageProcessor<'_>) -> QueryResult
         storage
             .chain()
             .block_schema()
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 100,
                 Default::default(),
