@@ -79,6 +79,16 @@ impl BlockRootHashJobQueue {
     pub(crate) fn should_throttle(&self) -> bool {
         // This method is going to be called by the block proposer, which does not know about block creation, so it
         // can be called in the random moment (e.g. right after the block was sealed and processing started).
+        //
+        // Note that as long as time to create a block is bigger than time to calculate root hash of the block (currently,
+        // about 3 seconds on the production server), we won't thorttle often. This is a measure for situations when we
+        // are close to the maximum server throughput. Throttling is implemented in a ways that makes us seal blocks with
+        // the same pace as we calculate root hashes. By having `2` here, we ensure that the state keeper don't create
+        // more than 1 block without the calculated root hash.
+        //
+        // We could've used the bigger number here to deal with sudden activity bursts, but it would perform worse if
+        // we are constantly throttled (e.g. root hash calculator will always lag behind the state keeper), so for now
+        // we stick to 2 as more "predictable" option.
         self.size() >= 2
     }
 
@@ -88,6 +98,9 @@ impl BlockRootHashJobQueue {
         // don't "overthrottle".
         const THROTTLE_ITERATION_INTERVAL: Duration = Duration::from_millis(25);
 
+        // Note: since block proposer is already timeout-based, it is more or less OK to sleep here too.
+        // If it will become a bottleneck (which is unlikely), we can implement a `Future` that resolves
+        // when we the queue has enough elements.
         while self.should_throttle() {
             tokio::time::sleep(THROTTLE_ITERATION_INTERVAL).await;
         }
