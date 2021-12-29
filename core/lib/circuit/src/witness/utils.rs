@@ -938,7 +938,9 @@ pub fn build_block_witness<'a>(
         witness_accum
             .root_after_fees
             .expect("root_after_fees not present"),
-        block.new_root_hash
+        block.new_root_hash,
+        "Root hash in witness accumulator doesn't match block root hash. Block: {}",
+        block.block_number
     );
     witness_accum.calculate_pubdata_commitment();
 
@@ -948,7 +950,8 @@ pub fn build_block_witness<'a>(
     assert_eq!(
         witness_accum.pubdata_commitment.unwrap(),
         block_commitment,
-        "witness accumulator and server different commitment"
+        "Witness accumulator and server have different commitment. Block: {}",
+        block.block_number
     );
     Ok(witness_accum)
 }

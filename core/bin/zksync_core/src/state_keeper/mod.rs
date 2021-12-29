@@ -357,19 +357,18 @@ impl ZkSyncStateKeeper {
             self.config.max_miniblock_iterations
         };
 
-        // State keeper may process empty blocks (or blocks containing rejected transactions only), and it's an
-        // important part of its logic: timeout for sealing the block is expressed in the amount of processing
-        // iterations. If enough iterations pases, block should be sealed even if it's not full. However, we don't
-        // want to notify any external actor and write to the database if this iteration was "empty".
-        if !empty_proposed_block {
-            self.store_pending_block().await;
-        }
-
-        // Check whether we should seal this block and start processing the next one.
-        // It is important that we do that *after* we stored the pending block, since we only store new transactions
-        // to the database during pending block processing.
+        // Check whether we should seal this block and start processing the next one, or we just need
+        // to persist the pending block.
         if self.pending_block.should_seal(max_miniblock_iterations) {
             self.seal_pending_block().await;
+        } else {
+            // State keeper may process empty blocks (or blocks containing rejected transactions only), and it's an
+            // important part of its logic: timeout for sealing the block is expressed in the amount of processing
+            // iterations. If enough iterations pases, block should be sealed even if it's not full. However, we don't
+            // want to notify any external actor and write to the database if this iteration was "empty".
+            if !empty_proposed_block {
+                self.store_pending_block().await;
+            }
         }
 
         metrics::histogram!("state_keeper.execute_proposed_block", start.elapsed());
@@ -635,6 +634,14 @@ impl ZkSyncStateKeeper {
     /// Finalizes the pending block, transforming it into a full block.
     async fn seal_pending_block(&mut self) {
         let start = Instant::now();
+
+        // Before sealing the block, we need to store the pending block in order to
+        // save all the new transactions to the database.
+        // Even though it will be removed once the seal request is processed, having a consistent
+        // and predictable flow (before we store the sealed block header, the state is always updated)
+        // is good for stability right now. It can be optimized if it'd be proven inefficient enough
+        // in the future though (we can only save the updates, not the pending block header).
+        self.store_pending_block().await;
 
         // Apply fees of pending block
         let fee_updates = self.state.collect_fee(
