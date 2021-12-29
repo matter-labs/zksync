@@ -276,6 +276,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint128 amount = Utils.minU128(balance, _amount);
         require(amount > 0, "f1"); // Nothing to withdraw
 
+        // Update the value before the external call to reduce the attack surface for malicious contracts trying to hijack control flow.
+        pendingBalances[packedBalanceKey].balanceToWithdraw = balance - amount;
+
         if (tokenId == 0) {
             (bool success, ) = _owner.call{value: amount}("");
             require(success, "d"); // ETH withdraw failed
@@ -283,11 +286,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             // We will allow withdrawals of `value` such that:
             // `value` <= user pending balance
             // `value` can be bigger then `amount` requested if token takes fee from sender in addition to `amount` requested
-            amount = this.transferERC20(IERC20(_token), _owner, amount, balance);
-        }
+            uint128 withdrawnAmount = this.transferERC20(IERC20(_token), _owner, amount, balance);
 
-        // `amount = min(balance, _amount)` and `transferERC20` include check that `amount <= balance` so it's safe.
-        pendingBalances[packedBalanceKey].balanceToWithdraw = balance - amount;
+            if (withdrawnAmount != amount) {
+                // `transferERC20` include check that `withdrawnAmount <= balance` so it's safe.
+                pendingBalances[packedBalanceKey].balanceToWithdraw = balance - withdrawnAmount;
+            }
+        }
         emit Withdrawal(tokenId, amount);
     }
 
