@@ -472,6 +472,10 @@ async fn seal_pending_block() {
     assert!(tester.state_keeper.pending_block.account_updates.is_empty());
     assert_eq!(tester.state_keeper.pending_block.chunks_left, 20);
 
+    assert!(matches!(
+        tester.response_rx.next().await,
+        Some(CommitRequest::PendingBlock(_))
+    ));
     if let Some(CommitRequest::SealIncompleteBlock((block, updates))) =
         tester.response_rx.next().await
     {
@@ -615,6 +619,10 @@ mod execute_proposed_block {
 
         // Second batch
         apply_batch_with_two_transfers(&mut tester).await;
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
         if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
             tester.response_rx.next().await
         {
@@ -672,6 +680,10 @@ mod execute_proposed_block {
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
         if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
             tester.response_rx.next().await
         {
@@ -781,6 +793,10 @@ mod execute_proposed_block {
             .state_keeper
             .execute_proposed_block(proposed_block)
             .await;
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
         assert!(matches!(
             tester.response_rx.next().await,
             Some(CommitRequest::SealIncompleteBlock(_))
@@ -1349,6 +1365,10 @@ mod execute_proposed_block {
             .await;
 
         // Checks that one block is sealed and pending block has only the last withdrawal.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
         if !matches!(
             tester.response_rx.next().await,
             Some(CommitRequest::SealIncompleteBlock((_, _)))
