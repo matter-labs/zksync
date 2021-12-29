@@ -111,7 +111,7 @@ impl Transfer {
             account_id, from, to, token, amount, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
+        if tx.check_correctness().is_err() {
             return Err(TransactionSignatureError);
         }
         Ok(tx)
@@ -162,38 +162,6 @@ impl Transfer {
             out.extend_from_slice(&time_range.as_be_bytes());
         }
         out
-    }
-
-    /// Verifies the transaction correctness:
-    ///
-    /// - `account_id` field must be within supported range.
-    /// - `token` field must be within supported range.
-    /// - `amount` field must represent a packable value.
-    /// - `fee` field must represent a packable value.
-    /// - transfer recipient must not be `Adddress::zero()`.
-    /// - zkSync signature must correspond to the PubKeyHash of the account.
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.amount <= BigUint::from(u128::max_value())
-            && self.fee <= BigUint::from(u128::max_value())
-            && is_token_amount_packable(&self.amount)
-            && is_fee_amount_packable(&self.fee)
-            && self.account_id <= max_account_id()
-            && self.token <= max_token_id()
-            && self.to != Address::zero()
-            && self
-                .time_range
-                .map(|r| r.check_correctness())
-                .unwrap_or(true);
-        if valid {
-            if self.fee != BigUint::zero() {
-                // Fee can only be paid in processable tokens
-                valid = self.token <= max_processable_token();
-            }
-            let signer = self.verify_signature();
-            valid = valid && signer.is_some();
-            self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        };
-        valid
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
@@ -263,4 +231,70 @@ impl Transfer {
     pub fn wipe_signer_cache(&mut self) {
         self.cached_signer = VerifiedSignatureCache::NotCached;
     }
+
+    /// Verifies the transaction correctness:
+    ///
+    /// - `account_id` field must be within supported range.
+    /// - `token` field must be within supported range.
+    /// - `amount` field must represent a packable value.
+    /// - `fee` field must represent a packable value.
+    /// - transfer recipient must not be `Adddress::zero()`.
+    /// - zkSync signature must correspond to the PubKeyHash of the account.
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        if self.amount > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongAmount);
+        }
+        if self.fee > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongFee);
+        }
+        if !is_token_amount_packable(&self.amount) {
+            return Err(TransactionError::AmountNotPackable);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+        if self.account_id > max_account_id() {
+            return Err(TransactionError::WrongAccountId);
+        }
+
+        if self.token > max_token_id() {
+            return Err(TransactionError::WrongToken);
+        }
+        if self.to == Address::zero() {
+            return Err(TransactionError::WrongToAddress);
+        }
+        if !self
+            .time_range
+            .map(|r| r.check_correctness())
+            .unwrap_or(true)
+        {
+            return Err(TransactionError::WrongTimeRange);
+        }
+
+        // Fee can only be paid in processable tokens
+        if self.fee != BigUint::zero() && self.token > max_processable_token() {
+            return Err(TransactionError::WrongTokenForPayingFee);
+        }
+
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if !signer.is_some() {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error)]
+pub enum TransactionError {
+    WrongAmount,
+    WrongFee,
+    AmountNotPackable,
+    FeeNotPackable,
+    WrongAccountId,
+    WrongToken,
+    WrongTimeRange,
+    WrongSignature,
+    WrongToAddress,
+    WrongTokenForPayingFee,
 }

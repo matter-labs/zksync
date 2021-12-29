@@ -521,14 +521,12 @@ impl ApiV01 {
             .chain()
             .block_schema()
             .get_last_saved_block()
-            .await
-            .expect("Database error");
+            .await?;
         let block = storage
             .chain()
             .block_schema()
             .get_block(block_number)
-            .await
-            .expect("Database error")
+            .await?
             .expect("Should exist");
         let state_keeper_config = &self_.config.chain.state_keeper;
         let average_proof_generating_time = Duration::minutes(30);
