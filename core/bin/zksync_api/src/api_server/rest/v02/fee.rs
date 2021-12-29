@@ -34,20 +34,21 @@ async fn get_tx_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<TxFeeRequest>,
 ) -> ApiResult<ApiFee> {
-    let token_allowed = api_try!(TxSender::token_allowed_for_fees(
-        &data.tx_sender.ticker,
-        body.token_like.clone()
-    )
-    .await
-    .map_err(Error::from));
+    let token_allowed = api_try!(data
+        .tx_sender
+        .ticker
+        .token_allowed_for_fees(body.token_like.clone())
+        .await
+        .map_err(Error::from));
     if !token_allowed {
         return Error::from(SubmitError::InappropriateFeeToken).into();
     }
     data.tx_sender
-        .get_txs_fee_in_wei(body.tx_type.into(), body.address, body.token_like)
+        .ticker
+        .get_fee_from_ticker_in_wei(body.tx_type.into(), body.token_like, body.address)
         .await
+        .map(|fee| fee.normal_fee.into())
         .map_err(Error::from)
-        .map(ApiFee::from)
         .into()
 }
 
@@ -55,12 +56,12 @@ async fn get_batch_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<BatchFeeRequest>,
 ) -> ApiResult<ApiFee> {
-    let token_allowed = api_try!(TxSender::token_allowed_for_fees(
-        &data.tx_sender.ticker,
-        body.token_like.clone()
-    )
-    .await
-    .map_err(Error::from));
+    let token_allowed = api_try!(data
+        .tx_sender
+        .ticker
+        .token_allowed_for_fees(body.token_like.clone())
+        .await
+        .map_err(Error::from));
     if !token_allowed {
         return Error::from(SubmitError::InappropriateFeeToken).into();
     }
@@ -70,10 +71,11 @@ async fn get_batch_fee(
         .map(|tx| (tx.tx_type.into(), tx.address))
         .collect();
     data.tx_sender
-        .get_txs_batch_fee_in_wei(txs, body.token_like)
+        .ticker
+        .get_batch_from_ticker_in_wei(body.token_like, txs)
         .await
+        .map(|fee| fee.normal_fee.into())
         .map_err(Error::from)
-        .map(ApiFee::from)
         .into()
 }
 

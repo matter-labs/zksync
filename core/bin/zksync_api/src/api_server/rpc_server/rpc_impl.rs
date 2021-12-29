@@ -263,19 +263,22 @@ impl RpcApp {
         extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<Fee> {
         let start = Instant::now();
-        let token_allowed =
-            Self::token_allowed_for_fees(&self.tx_sender.ticker, token.clone()).await?;
+        let token_allowed = self
+            .tx_sender
+            .ticker
+            .token_allowed_for_fees(token.clone())
+            .await
+            .map_err(SubmitError::Internal)?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let result = Self::ticker_request(
-            &self.tx_sender.ticker,
-            tx_type.into(),
-            address,
-            token.clone(),
-        )
-        .await?;
+        let result = self
+            .tx_sender
+            .ticker
+            .get_fee_from_ticker_in_wei(tx_type.into(), token.clone(), address)
+            .await
+            .map_err(SubmitError::Internal)?;
 
         let should_subsidize_cpk = self
             .tx_sender
@@ -313,8 +316,12 @@ impl RpcApp {
             });
         }
 
-        let token_allowed =
-            Self::token_allowed_for_fees(&self.tx_sender.ticker, token.clone()).await?;
+        let token_allowed = self
+            .tx_sender
+            .ticker
+            .token_allowed_for_fees(token.clone())
+            .await
+            .map_err(|_| Error::internal_error())?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
@@ -326,9 +333,12 @@ impl RpcApp {
             .zip(addresses.iter().cloned()))
         .collect();
 
-        let result =
-            Self::ticker_batch_fee_request(&self.tx_sender.ticker, transactions, token.clone())
-                .await?;
+        let result = self
+            .tx_sender
+            .ticker
+            .get_batch_from_ticker_in_wei(token.clone(), transactions)
+            .await
+            .map_err(SubmitError::Internal)?;
 
         let should_subsidize_cpk = self
             .tx_sender
@@ -354,12 +364,12 @@ impl RpcApp {
 
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {
         let start = Instant::now();
-        let result = Self::ticker_price_request(
-            &self.tx_sender.ticker,
-            token,
-            TokenPriceRequestType::USDForOneToken,
-        )
-        .await;
+        let result = self
+            .tx_sender
+            .ticker
+            .get_token_price(token, TokenPriceRequestType::USDForOneToken)
+            .await
+            .map_err(|_| Error::internal_error());
         metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint_name" => "get_token_price");
         result
     }

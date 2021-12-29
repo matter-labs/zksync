@@ -32,8 +32,7 @@ use zksync_types::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
         TxEthSignatureVariant, TxHash,
     },
-    AccountId, Address, BatchFee, Fee, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
-    H160,
+    AccountId, Address, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
 use zksync_utils::{
     big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, scaled_big_decimal_to_ratio,
@@ -54,7 +53,7 @@ use crate::{
 use zksync_config::configs::api::CommonApiConfig;
 
 use super::rpc_server::types::RequestMetadata;
-use crate::fee_ticker::FeeTicker;
+use crate::fee_ticker::{FeeTicker, PriceError};
 
 const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
@@ -92,18 +91,20 @@ pub enum SubmitError {
     #[error("Incorrect transaction: {0}.")]
     IncorrectTx(String),
     #[error("Transaction adding error: {0}.")]
-    TxAdd(TxAddError),
+    TxAdd(#[from] TxAddError),
     #[error("Chosen token is not suitable for paying fees.")]
     InappropriateFeeToken,
     // Not all TxAddErrors would apply to Toggle2FA, but
     // it is helpful to re-use IncorrectEthSignature and DbError
     #[error("Failed to toggle 2FA: {0}.")]
-    Toggle2FA(Toggle2FAError),
+    Toggle2FA(#[from] Toggle2FAError),
 
     #[error("Communication error with the core server: {0}.")]
     CommunicationCoreServer(String),
+    #[error("Price error {0}")]
+    PriceError(#[from] PriceError),
     #[error("Internal error.")]
-    Internal(anyhow::Error),
+    Internal(#[from] anyhow::Error),
     #[error("{0}")]
     Other(String),
 }
@@ -458,12 +459,10 @@ impl TxSender {
         subsidized_fee: BigUint,
         token_id: TokenId,
     ) -> Result<(), anyhow::Error> {
-        let token_price_in_usd = Self::ticker_price_request(
-            &self.ticker,
-            TokenLike::Id(token_id),
-            TokenPriceRequestType::USDForOneWei,
-        )
-        .await?;
+        let token_price_in_usd = self
+            .ticker
+            .get_token_price(TokenLike::Id(token_id), TokenPriceRequestType::USDForOneWei)
+            .await?;
 
         let full_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee;
         let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
@@ -540,14 +539,16 @@ impl TxSender {
             let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
                 || self.enforce_pubkey_change_fee;
 
-            let fee_allowed = Self::token_allowed_for_fees(&self.ticker, token.clone()).await?;
+            let fee_allowed = self.ticker.token_allowed_for_fees(token.clone()).await?;
 
             if !fee_allowed {
                 return Err(SubmitError::InappropriateFeeToken);
             }
 
-            let required_fee_data =
-                Self::ticker_request(&self.ticker, tx_type, address, token.clone()).await?;
+            let required_fee_data = self
+                .ticker
+                .get_fee_from_ticker_in_wei(tx_type, token.clone(), address)
+                .await?;
 
             let required_fee_data = if self
                 .should_subsidize_cpk(
@@ -694,7 +695,7 @@ impl TxSender {
                 if provided_fee == BigUint::zero() {
                     continue;
                 }
-                let fee_allowed = Self::token_allowed_for_fees(&self.ticker, token.clone()).await?;
+                let fee_allowed = self.ticker.token_allowed_for_fees(token.clone()).await?;
 
                 // In batches, transactions with non-popular token are allowed to be included, but should not
                 // used to pay fees. Fees must be covered by some more common token.
@@ -711,12 +712,10 @@ impl TxSender {
                     eth_token.clone()
                 };
 
-                let token_price_in_usd = Self::ticker_price_request(
-                    &self.ticker,
-                    check_token.clone(),
-                    TokenPriceRequestType::USDForOneWei,
-                )
-                .await?;
+                let token_price_in_usd = self
+                    .ticker
+                    .get_token_price(check_token.clone(), TokenPriceRequestType::USDForOneWei)
+                    .await?;
 
                 let token_data = self.token_info_from_id(token).await?;
                 token_fees_ids.push(token_data.id);
@@ -735,12 +734,10 @@ impl TxSender {
         // Only one token in batch
         if token_fees.len() == 1 {
             let (batch_token, fee_paid) = token_fees.into_iter().next().unwrap();
-            let batch_token_fee = Self::ticker_batch_fee_request(
-                &self.ticker,
-                transaction_types.clone(),
-                batch_token.into(),
-            )
-            .await?;
+            let batch_token_fee = self
+                .ticker
+                .get_batch_from_ticker_in_wei(batch_token.into(), transaction_types.clone())
+                .await?;
 
             let required_fee = if self
                 .should_subsidize_cpk(
@@ -772,9 +769,10 @@ impl TxSender {
             }
         } else {
             // Calculate required fee for ethereum token
-            let required_eth_fee =
-                Self::ticker_batch_fee_request(&self.ticker, transaction_types, eth_token.clone())
-                    .await?;
+            let required_eth_fee = self
+                .ticker
+                .get_batch_from_ticker_in_wei(eth_token.clone(), transaction_types)
+                .await?;
 
             let required_fee = if self
                 .should_subsidize_cpk(
@@ -791,12 +789,10 @@ impl TxSender {
                 required_eth_fee.normal_fee.total_fee
             };
 
-            let eth_price_in_usd = Self::ticker_price_request(
-                &self.ticker,
-                eth_token,
-                TokenPriceRequestType::USDForOneWei,
-            )
-            .await?;
+            let eth_price_in_usd = self
+                .ticker
+                .get_token_price(eth_token, TokenPriceRequestType::USDForOneWei)
+                .await?;
 
             let required_total_usd_fee =
                 BigDecimal::from(required_fee.to_bigint().unwrap()) * &eth_price_in_usd;
@@ -938,26 +934,6 @@ impl TxSender {
         })
     }
 
-    pub async fn get_txs_fee_in_wei(
-        &self,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<Fee, SubmitError> {
-        let resp_fee = Self::ticker_request(&self.ticker, tx_type, address, token.clone()).await?;
-        Ok(resp_fee.normal_fee)
-    }
-
-    pub async fn get_txs_batch_fee_in_wei(
-        &self,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<BatchFee, SubmitError> {
-        let resp_fee =
-            Self::ticker_batch_fee_request(&self.ticker, transactions, token.clone()).await?;
-        Ok(resp_fee.normal_fee)
-    }
-
     /// For forced exits, we must check that target account exists for more
     /// than 24 hours in order to give new account owners give an opportunity
     /// to set the signing key. While `ForcedExit` operation doesn't do anything
@@ -1030,50 +1006,6 @@ impl TxSender {
             .map_err(SubmitError::internal)?
             // TODO Make error more clean
             .ok_or_else(|| SubmitError::other("Token not found in the DB"))
-    }
-
-    async fn ticker_batch_fee_request(
-        ticker: &FeeTicker,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<ResponseBatchFee, SubmitError> {
-        ticker
-            .get_batch_from_ticker_in_wei(token, transactions)
-            .await
-            .map_err(SubmitError::internal)
-    }
-
-    async fn ticker_request(
-        ticker: &FeeTicker,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<ResponseFee, SubmitError> {
-        ticker
-            .get_fee_from_ticker_in_wei(tx_type, token.clone(), address)
-            .await
-            .map_err(SubmitError::internal)
-    }
-
-    pub async fn token_allowed_for_fees(
-        ticker: &FeeTicker,
-        token: TokenLike,
-    ) -> Result<bool, SubmitError> {
-        ticker
-            .token_allowed_for_fees(token)
-            .await
-            .map_err(SubmitError::internal)
-    }
-
-    pub async fn ticker_price_request(
-        ticker: &FeeTicker,
-        token: TokenLike,
-        req_type: TokenPriceRequestType,
-    ) -> Result<BigDecimal, SubmitError> {
-        ticker
-            .get_token_price(token, req_type)
-            .await
-            .map_err(SubmitError::internal)
     }
 }
 

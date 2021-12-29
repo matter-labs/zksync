@@ -2,7 +2,6 @@
 use std::time::Instant;
 
 // External uses
-use bigdecimal::BigDecimal;
 use futures::channel::mpsc;
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
@@ -17,15 +16,11 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, BlockNumber, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BlockNumber};
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 // Local uses
-use crate::{
-    fee_ticker::{PriceError, ResponseBatchFee, ResponseFee, TokenPriceRequestType},
-    signature_checker::VerifySignatureRequest,
-    utils::shared_lru_cache::AsyncLruCache,
-};
+use crate::{signature_checker::VerifySignatureRequest, utils::shared_lru_cache::AsyncLruCache};
 
 pub mod error;
 mod ip_insert_middleware;
@@ -182,67 +177,6 @@ impl RpcApp {
         Ok(res)
     }
 
-    async fn token_allowed_for_fees(ticker: &FeeTicker, token: TokenLike) -> Result<bool> {
-        ticker
-            .token_allowed_for_fees(token.clone())
-            .await
-            .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-                Error::internal_error()
-            })
-    }
-
-    async fn ticker_batch_fee_request(
-        ticker: &FeeTicker,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<ResponseBatchFee> {
-        ticker
-            .get_batch_from_ticker_in_wei(token.clone(), transactions)
-            .await
-            .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
-                Error::internal_error()
-            })
-    }
-
-    async fn ticker_request(
-        ticker: &FeeTicker,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<ResponseFee> {
-        ticker
-            .get_fee_from_ticker_in_wei(tx_type, token.clone(), address)
-            .await
-            .map_err(|err| {
-                vlog::warn!(
-                    "Internal Server Error: '{}'; input: {:?}, {:?}",
-                    err,
-                    tx_type,
-                    token,
-                );
-                Error::internal_error()
-            })
-    }
-
-    async fn ticker_price_request(
-        ticker: &FeeTicker,
-        token: TokenLike,
-        req_type: TokenPriceRequestType,
-    ) -> Result<BigDecimal> {
-        ticker
-            .get_token_price(token.clone(), req_type)
-            .await
-            .map_err(|err| match err {
-                PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
-                _ => {
-                    vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-                    Error::internal_error()
-                }
-            })
-    }
-
     async fn get_account_state(&self, address: Address) -> Result<AccountStateInfo> {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
@@ -356,8 +290,8 @@ pub fn start_rpc_server(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use serde::{Deserialize, Serialize};
+    use zksync_types::TxFeeTypes;
 
     #[test]
     fn tx_fee_type_serialization() {
