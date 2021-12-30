@@ -45,6 +45,8 @@ pub struct StoragePendingBlock {
     pub chunks_left: i64,
     pub unprocessed_priority_op_before: i64,
     pub pending_block_iteration: i64,
+    #[allow(dead_code)] // Not used anywhere; left for the backwards compatibility only.
+    pub(super) previous_root_hash: Vec<u8>,
     pub timestamp: Option<i64>,
 }
 

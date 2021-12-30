@@ -4572,6 +4572,11 @@
           "ordinal": 4,
           "name": "timestamp",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "previous_root_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -4582,7 +4587,8 @@
         false,
         false,
         false,
-        true
+        true,
+        false
       ]
     }
   },
