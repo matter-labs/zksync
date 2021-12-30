@@ -801,6 +801,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             chunks_left: pending_block.chunks_left as i64,
             unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
             pending_block_iteration: pending_block.pending_block_iteration as i64,
+            previous_root_hash: Vec::new(), // Not used anywhere, left here for the backward compatibility.
             timestamp: Some(pending_block.timestamp as i64),
         };
 
