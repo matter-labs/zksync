@@ -2,7 +2,7 @@ import { Contract, ethers, constants, BigNumber } from 'ethers';
 import { keccak256, parseEther } from 'ethers/lib/utils';
 import { ETHProxy } from 'zksync';
 import { Address, TokenAddress } from 'zksync/build/types';
-import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
+import { Deployer, readContractCode, readProductionContracts } from '../src.ts/deploy';
 
 const hardhat = require('hardhat');
 const { simpleEncode } = require('ethereumjs-abi');
@@ -21,7 +21,7 @@ import {
     ZKSyncSignatureUnitTest,
     ZKSyncSignatureUnitTestFactory,
     ZkSyncWithdrawalUnitTestFactory
-} from '../../typechain';
+} from '../typechain';
 
 const TEST_PRIORITY_EXPIRATION = 101;
 const CHUNK_SIZE = 10;

@@ -8,7 +8,7 @@ import {
     Governance,
     TestnetERC20TokenFactory,
     TestnetERC20Token
-} from '../../typechain';
+} from '../typechain';
 
 import { expect, use } from 'chai';
 import { solidity } from 'ethereum-waffle';

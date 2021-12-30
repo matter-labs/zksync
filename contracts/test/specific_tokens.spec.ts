@@ -2,8 +2,8 @@ import { Contract, ethers, constants, BigNumber } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
 import { ETHProxy } from 'zksync';
 import { Address, TokenAddress } from 'zksync/build/types';
-import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
-import { ZkSyncWithdrawalUnitTestFactory } from '../../typechain';
+import { Deployer, readContractCode, readProductionContracts } from '../src.ts/deploy';
+import { ZkSyncWithdrawalUnitTestFactory } from '../typechain';
 
 const hardhat = require('hardhat');
 const { expect } = require('chai');

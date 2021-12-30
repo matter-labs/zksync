@@ -1,4 +1,4 @@
-import { OperationsTest, OperationsTestFactory } from '../../typechain';
+import { OperationsTest, OperationsTestFactory } from '../typechain';
 import { ethers } from 'ethers';
 
 const hardhat = require('hardhat');

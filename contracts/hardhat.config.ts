@@ -103,7 +103,11 @@ export default {
             url: process.env.ETH_CLIENT_WEB3_URL?.split(',')[0]
         },
         hardhat: {
-            allowUnlimitedContractSize: true
+            allowUnlimitedContractSize: true,
+            forking: {
+                url: 'https://eth-mainnet.alchemyapi.io/v2/' + process.env.ALCHEMY_KEY,
+                enabled: process.env.TEST_CONTRACTS_FORK === '1'
+            }
         }
     },
     etherscan: {
