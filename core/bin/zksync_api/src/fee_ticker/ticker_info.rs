@@ -117,6 +117,7 @@ pub struct BlocksInFutureAggregatedOperations {
 #[async_trait]
 impl FeeTickerInfo for TickerInfo {
     async fn is_account_new(&self, address: Address) -> anyhow::Result<bool> {
+        let start = Instant::now();
         let mut storage = self.db.access_storage().await?;
 
         let is_account_exists = storage
@@ -125,12 +126,17 @@ impl FeeTickerInfo for TickerInfo {
             .does_account_exist(address)
             .await?;
 
+        metrics::histogram!(
+            "ticker_info.blocks_in_future_aggregated_operations",
+            start.elapsed()
+        );
         Ok(!is_account_exists)
     }
 
     async fn blocks_in_future_aggregated_operations(
         &self,
     ) -> anyhow::Result<BlocksInFutureAggregatedOperations> {
+        let start = Instant::now();
         let mut storage = self.db.access_storage().await?;
 
         let last_block = storage
@@ -157,6 +163,10 @@ impl FeeTickerInfo for TickerInfo {
             .operations_schema()
             .get_last_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks, None)
             .await?;
+        metrics::histogram!(
+            "ticker_info.blocks_in_future_aggregated_operations",
+            start.elapsed()
+        );
         Ok(BlocksInFutureAggregatedOperations {
             blocks_to_commit: *last_block - *last_committed_block,
             blocks_to_prove: *last_block - *last_proven_block,
@@ -165,12 +175,17 @@ impl FeeTickerInfo for TickerInfo {
     }
 
     async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>> {
+        let start = Instant::now();
         let mut storage = self.db.access_storage().await?;
         let remaining_chunks = storage
             .chain()
             .block_schema()
             .pending_block_chunks_left()
             .await?;
+        metrics::histogram!(
+            "ticker_info.remaining_chunks_in_pending_block",
+            start.elapsed()
+        );
         Ok(remaining_chunks)
     }
 
@@ -193,7 +208,7 @@ impl FeeTickerInfo for TickerInfo {
 
         // TODO: remove hardcode for Matter Labs Trial Token (ZKS-63).
         if token.symbol == "MLTT" {
-            metrics::histogram!("ticker.get_last_quote", start.elapsed());
+            metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "MLTT");
             return Ok(TokenPrice {
                 usd_price: Ratio::from_integer(1u32.into()),
                 last_updated: Utc::now(),
@@ -201,7 +216,7 @@ impl FeeTickerInfo for TickerInfo {
         }
 
         if let Some(cached_value) = self.get_stored_value(token.id).await {
-            metrics::histogram!("ticker.get_last_quote", start.elapsed());
+            metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "cached");
             return Ok(cached_value);
         }
 
@@ -213,10 +228,11 @@ impl FeeTickerInfo for TickerInfo {
         if let Ok(Some(historical_price)) = historical_price {
             self.update_stored_value(token.id, historical_price.clone())
                 .await;
-            metrics::histogram!("ticker.get_last_quote", start.elapsed());
+            metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "historical");
             return Ok(historical_price);
         }
 
+        metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "error");
         Err(PriceError::db_error("No price stored in database"))
     }
 
@@ -247,7 +263,7 @@ impl FeeTickerInfo for TickerInfo {
         let average_gas_price = BigUint::from(average_gas_price);
 
         *self.gas_price_cache.write().await = Some((average_gas_price.clone(), Instant::now()));
-        metrics::histogram!("ticker.get_gas_price_wei", start.elapsed());
+        metrics::histogram!("ticker_info.get_gas_price_wei", start.elapsed());
         Ok(average_gas_price)
     }
 
@@ -258,7 +274,7 @@ impl FeeTickerInfo for TickerInfo {
             .get_token(&mut self.db.access_storage().await?, token.clone())
             .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token));
-        metrics::histogram!("ticker.get_token", start.elapsed());
+        metrics::histogram!("ticker_info.get_token", start.elapsed());
         result
     }
 

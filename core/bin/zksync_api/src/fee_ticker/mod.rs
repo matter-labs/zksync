@@ -45,6 +45,7 @@ use crate::fee_ticker::{
 use crate::utils::token_db_cache::TokenDBCache;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+use tokio::time::Instant;
 use zksync_types::gas_counter::GasCounter;
 
 mod constants;
@@ -295,6 +296,7 @@ impl FeeTicker {
         token: TokenLike,
         request_type: TokenPriceRequestType,
     ) -> Result<BigDecimal, PriceError> {
+        let start = Instant::now();
         let factor = match request_type {
             TokenPriceRequestType::USDForOneWei => {
                 let token_decimals = self
@@ -308,10 +310,13 @@ impl FeeTicker {
             TokenPriceRequestType::USDForOneToken => BigUint::from(1u32),
         };
 
-        self.info
+        let res = self
+            .info
             .get_last_token_price(token)
             .await
-            .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
+            .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100));
+        metrics::histogram!("ticker.get_token_price", start.elapsed());
+        res
     }
 
     pub async fn get_fee_from_ticker_in_wei(
@@ -320,6 +325,7 @@ impl FeeTicker {
         token: TokenLike,
         recipient: Address,
     ) -> Result<ResponseFee, anyhow::Error> {
+        let start = Instant::now();
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.info.get_token(token).await?;
 
@@ -388,6 +394,7 @@ impl FeeTicker {
             });
         }
 
+        metrics::histogram!("ticker.get_fee_from_ticker_in_wei", start.elapsed());
         Ok(ResponseFee {
             normal_fee: normal_fee.clone(),
             subsidized_fee: normal_fee,
@@ -400,6 +407,7 @@ impl FeeTicker {
         token: TokenLike,
         txs: Vec<(TxFeeTypes, Address)>,
     ) -> anyhow::Result<ResponseBatchFee> {
+        let start = Instant::now();
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
 
         let token = self.info.get_token(token).await?;
@@ -498,6 +506,7 @@ impl FeeTicker {
         } else {
             Ratio::from(BigUint::from(0u32))
         };
+        metrics::histogram!("ticker.get_batch_from_ticker_in_wei", start.elapsed());
 
         Ok(ResponseBatchFee {
             normal_fee,
@@ -507,15 +516,19 @@ impl FeeTicker {
     }
 
     pub async fn wei_price_usd(&self) -> anyhow::Result<Ratio<BigUint>> {
-        Ok(self
+        let start = Instant::now();
+        let res = self
             .info
             .get_last_token_price(TokenLike::Id(TokenId(0)))
             .await?
             .usd_price
-            / BigUint::from(10u32).pow(18u32))
+            / BigUint::from(10u32).pow(18u32);
+        metrics::histogram!("ticker.wei_price_usd", start.elapsed());
+        Ok(res)
     }
 
     pub async fn token_usd_risk(&self, token: &Token) -> anyhow::Result<Ratio<BigUint>> {
+        let start = Instant::now();
         let token_risk_factor = self
             .config
             .tokens_risk_factors
@@ -530,6 +543,7 @@ impl FeeTicker {
             .usd_price
             / BigUint::from(10u32).pow(u32::from(token.decimals));
         // TODO Check tokens fee allowance by non-zero price (ZKS-580)
+        metrics::histogram!("ticker.token_usd_risk", start.elapsed());
         token_risk_factor
             .checked_div(&token_price_usd)
             .ok_or_else(|| anyhow::format_err!("Token is not acceptable for fee"))
@@ -545,6 +559,7 @@ impl FeeTicker {
         tx_type: TxFeeTypes,
         recipient: Address,
     ) -> anyhow::Result<(OutputFeeType, BigUint, BigUint)> {
+        let start = Instant::now();
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
@@ -580,13 +595,14 @@ impl FeeTicker {
 
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
-
+        metrics::histogram!("ticker.gas_tx_amount", start.elapsed());
         Ok((fee_type, gas_tx_amount, op_chunks))
     }
     async fn calculate_fast_withdrawal_gas_cost(
         &self,
         chunk_size: usize,
     ) -> anyhow::Result<BigUint> {
+        let start = Instant::now();
         let future_blocks = self.info.blocks_in_future_aggregated_operations().await?;
         let remaining_pending_chunks = self.info.remaining_chunks_in_pending_block().await?;
         let additional_cost = remaining_pending_chunks.map_or(0, |chunks| {
@@ -613,6 +629,7 @@ impl FeeTicker {
             self.config.max_blocks_to_aggregate,
             future_blocks.blocks_to_prove,
         );
+        metrics::histogram!("ticker.calculate_fast_withdrawal_gas_cost", start.elapsed());
         Ok(BigUint::from(
             commit_cost + execute_cost + proof_cost + additional_cost,
         ))
