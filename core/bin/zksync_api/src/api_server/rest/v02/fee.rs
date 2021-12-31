@@ -43,6 +43,7 @@ async fn get_tx_fee(
     if !token_allowed {
         return Error::from(SubmitError::InappropriateFeeToken).into();
     }
+    // TODO implement subsidies for v02 api ZKS-888
     data.tx_sender
         .ticker
         .get_fee_from_ticker_in_wei(body.tx_type.into(), body.token_like, body.address)
