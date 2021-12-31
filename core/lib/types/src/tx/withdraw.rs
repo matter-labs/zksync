@@ -20,7 +20,6 @@ use crate::{
 };
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
-use crate::helpers::is_token_amount_packable;
 use crate::tx::version::TxVersion;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
@@ -116,7 +115,8 @@ impl Withdraw {
             account_id, from, to, token, amount, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if tx.check_correctness().is_err() {
+        if let Err(err) = tx.check_correctness() {
+            println!("Error {:?}", err);
             return Err(TransactionSignatureError);
         }
         Ok(tx)
@@ -249,9 +249,6 @@ impl Withdraw {
         if self.amount > BigUint::from(u128::MAX) {
             return Err(TransactionError::WrongAmount);
         }
-        if !is_token_amount_packable(&self.amount) {
-            return Err(TransactionError::AmountNotPackable);
-        }
         if self.fee > BigUint::from(u128::MAX) {
             return Err(TransactionError::WrongFee);
         }
@@ -283,7 +280,7 @@ impl Withdraw {
 
         let signer = self.verify_signature();
         self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        if !signer.is_some() {
+        if signer.is_none() {
             return Err(TransactionError::WrongSignature);
         }
         Ok(())

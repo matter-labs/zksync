@@ -224,7 +224,7 @@ impl WithdrawNFT {
 
         let signer = self.verify_signature();
         self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        if !signer.is_some() {
+        if signer.is_none() {
             return Err(TransactionError::WrongSignature);
         }
         Ok(())

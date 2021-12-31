@@ -161,7 +161,7 @@ impl Order {
         if self.account_id > max_account_id() {
             return Err(OrderError::WrongSender);
         }
-        if self.recipient_address != Address::zero() {
+        if self.recipient_address == Address::zero() {
             return Err(OrderError::WrongRecipient);
         }
         if self.token_buy > max_token_id() {
@@ -170,7 +170,7 @@ impl Order {
         if self.token_sell > max_token_id() {
             return Err(OrderError::WrongSellToken);
         }
-        if self.time_range.check_correctness() {
+        if !self.time_range.check_correctness() {
             return Err(OrderError::WrongTimeRange);
         }
         Ok(())
@@ -178,6 +178,7 @@ impl Order {
 }
 
 #[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+#[allow(clippy::enum_variant_names)]
 pub enum OrderError {
     #[error("Wrong price")]
     WrongPrice,

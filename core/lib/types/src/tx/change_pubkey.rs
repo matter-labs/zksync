@@ -488,7 +488,7 @@ impl ChangePubKey {
         } else {
             return Err(TransactionError::WrongSignature);
         }
-        return Ok(());
+        Ok(())
     }
 }
 

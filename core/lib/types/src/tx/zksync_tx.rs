@@ -526,16 +526,7 @@ impl ZkSyncTx {
         match self {
             ZkSyncTx::Transfer(_) => "Transfer".to_string(),
             ZkSyncTx::Withdraw(_) => "Withdraw".to_string(),
-            ZkSyncTx::Close(_) => "Closuse crate::account::PubKeyHash;
-use crate::Engine;
-use crate::{
-    helpers::{
-        is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
-    },
-    tx::TimeRange,
-    AccountId, Nonce, TokenId,
-};e"
-            .to_string(),
+            ZkSyncTx::Close(_) => "Close".to_string(),
             ZkSyncTx::ChangePubKey(_) => "ChangePubKey".to_string(),
             ZkSyncTx::ForcedExit(_) => "ForcedExit".to_string(),
             ZkSyncTx::MintNFT(_) => "MintNFT".to_string(),
