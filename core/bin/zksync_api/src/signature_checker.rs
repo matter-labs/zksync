@@ -23,6 +23,7 @@ use zksync_types::{
 };
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
+use zksync_types::tx::TransactionError;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
 /// either a single transaction, or the transaction batch.
@@ -297,20 +298,16 @@ async fn verify_eth_signature_txs_batch(
 fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
     match tx {
         TxVariant::Tx(tx) => {
-            if !tx.tx.check_correctness() {
-                return Err(TxAddError::IncorrectTx);
-            }
+            tx.tx.check_correctness()?;
         }
         TxVariant::Batch(batch, _) => {
-            if batch.iter_mut().any(|tx| !tx.tx.check_correctness()) {
-                return Err(TxAddError::IncorrectTx);
+            for tx in batch.iter_mut() {
+                tx.tx.check_correctness()?;
             }
         }
-        TxVariant::Order(order) => {
-            if !order.check_correctness() {
-                return Err(TxAddError::IncorrectTx);
-            }
-        }
+        TxVariant::Order(order) => order
+            .check_correctness()
+            .map_err(|err| TxAddError::IncorrectTx(TransactionError::OrderError(err)))?,
         TxVariant::Toggle2FA => {} // There is no data to check correctness of
     }
     Ok(())

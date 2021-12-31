@@ -1,5 +1,6 @@
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
@@ -110,7 +111,7 @@ impl WithdrawNFT {
             account_id, from, to, token, fee_token, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
+        if tx.check_correctness().is_err() {
             return Err(TransactionSignatureError);
         }
         Ok(tx)
@@ -134,29 +135,6 @@ impl WithdrawNFT {
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out.extend_from_slice(&self.time_range.as_be_bytes());
         out
-    }
-
-    /// Verifies the transaction correctness:
-    ///
-    /// - `account_id` field must be within supported range.
-    /// - `token` field must be within supported range.
-    /// - `amount` field must represent a packable value.
-    /// - `fee` field must represent a packable value.
-    /// - zkSync signature must correspond to the PubKeyHash of the account.
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = is_fee_amount_packable(&self.fee)
-            && self.account_id <= max_account_id()
-            && self.fee_token <= max_processable_token()
-            && self.token <= max_token_id()
-            && self.token >= TokenId(MIN_NFT_TOKEN_ID)
-            && self.time_range.check_correctness();
-
-        if valid {
-            let signer = self.verify_signature();
-            valid = valid && signer.is_some();
-            self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        }
-        valid
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
@@ -210,4 +188,65 @@ impl WithdrawNFT {
     pub fn wipe_signer_cache(&mut self) {
         self.cached_signer = VerifiedSignatureCache::NotCached;
     }
+
+    /// Verifies the transaction correctness:
+    ///
+    /// - `account_id` field must be within supported range.
+    /// - `token` field must be within supported range.
+    /// - `fee` field must represent a packable value.
+    /// - zkSync signature must correspond to the PubKeyHash of the account.
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        if self.fee > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongFee);
+        }
+
+        if self.token > max_token_id() && self.token < TokenId(MIN_NFT_TOKEN_ID) {
+            return Err(TransactionError::WrongToken);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+        if self.account_id > max_account_id() {
+            return Err(TransactionError::WrongAccountId);
+        }
+
+        if self.to == Address::zero() {
+            return Err(TransactionError::WrongToAddress);
+        }
+        if !self.time_range.check_correctness() {
+            return Err(TransactionError::WrongTimeRange);
+        }
+
+        // Fee can only be paid in processable tokens
+        if self.fee_token > max_processable_token() {
+            return Err(TransactionError::WrongFeeToken);
+        }
+
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if !signer.is_some() {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    #[error("Wrong fee")]
+    WrongFee,
+    #[error("Fee not packable")]
+    FeeNotPackable,
+    #[error("Wrong account id")]
+    WrongAccountId,
+    #[error("Wrong token")]
+    WrongToken,
+    #[error("Wrong time range")]
+    WrongTimeRange,
+    #[error("Wrong signature")]
+    WrongSignature,
+    #[error("Wrong to address")]
+    WrongToAddress,
+    #[error("Wrong fee token")]
+    WrongFeeToken,
 }

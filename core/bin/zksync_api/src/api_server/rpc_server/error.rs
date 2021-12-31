@@ -27,7 +27,7 @@ impl From<TxAddError> for RpcErrorCodes {
     fn from(error: TxAddError) -> Self {
         match error {
             TxAddError::NonceMismatch => Self::NonceMismatch,
-            TxAddError::IncorrectTx => Self::IncorrectTx,
+            TxAddError::IncorrectTx(_) => Self::IncorrectTx,
             TxAddError::TxFeeTooLow => Self::FeeTooLow,
             TxAddError::TxBatchFeeTooLow => Self::FeeTooLow,
             TxAddError::MissingEthSignature => Self::MissingEthSignature,

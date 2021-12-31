@@ -3,8 +3,14 @@ use num::BigUint;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use zksync_basic_types::{AccountId, Address};
+use thiserror::Error;
 
+use zksync_basic_types::{AccountId, Address};
+use zksync_crypto::params::ETH_TOKEN_ID;
+
+use crate::tx::{
+    change_pubkey, close, forced_exit, mint_nft, swap, transfer, withdraw, withdraw_nft,
+};
 use crate::{
     operations::{ChangePubKeyOp, MintNFTOp},
     tx::{
@@ -15,7 +21,28 @@ use crate::{
     CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
     WithdrawNFTOp, WithdrawOp,
 };
-use zksync_crypto::params::ETH_TOKEN_ID;
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    #[error("Withdraw error {0}")]
+    WithdrawError(#[from] withdraw::TransactionError),
+    #[error("Transfer error {0}")]
+    TransferError(#[from] transfer::TransactionError),
+    #[error("Mint NFT error {0}")]
+    MintNFTError(#[from] mint_nft::TransactionError),
+    #[error("Withdraw NFT error {0}")]
+    WithdrawNFTError(#[from] withdraw_nft::TransactionError),
+    #[error("Change pub key error {0}")]
+    ChangePubKeyError(#[from] change_pubkey::TransactionError),
+    #[error("Swap error {0}")]
+    SwapError(#[from] swap::TransactionError),
+    #[error("Order error {0}")]
+    OrderError(#[from] swap::OrderError),
+    #[error("Forced Exit error {0}")]
+    ForcedExitError(#[from] forced_exit::TransactionError),
+    #[error("Close error {0}")]
+    CloseError(#[from] close::TransactionError),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
@@ -254,17 +281,18 @@ impl ZkSyncTx {
     ///
     /// Note that this method doesn't check whether transaction will succeed, so transaction
     /// can fail even if this method returned `true` (i.e., if account didn't have enough balance).
-    pub fn check_correctness(&mut self) -> bool {
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
         match self {
-            ZkSyncTx::Transfer(tx) => tx.check_correctness(),
-            ZkSyncTx::Withdraw(tx) => tx.check_correctness(),
-            ZkSyncTx::Close(tx) => tx.check_correctness(),
-            ZkSyncTx::ChangePubKey(tx) => tx.check_correctness(),
-            ZkSyncTx::ForcedExit(tx) => tx.check_correctness(),
-            ZkSyncTx::MintNFT(tx) => tx.check_correctness(),
-            ZkSyncTx::Swap(tx) => tx.check_correctness(),
-            ZkSyncTx::WithdrawNFT(tx) => tx.check_correctness(),
+            ZkSyncTx::Transfer(tx) => tx.check_correctness()?,
+            ZkSyncTx::Withdraw(tx) => tx.check_correctness()?,
+            ZkSyncTx::Close(tx) => tx.check_correctness()?,
+            ZkSyncTx::ChangePubKey(tx) => tx.check_correctness()?,
+            ZkSyncTx::ForcedExit(tx) => tx.check_correctness()?,
+            ZkSyncTx::MintNFT(tx) => tx.check_correctness()?,
+            ZkSyncTx::Swap(tx) => tx.check_correctness()?,
+            ZkSyncTx::WithdrawNFT(tx) => tx.check_correctness()?,
         }
+        Ok(())
     }
 
     /// Returns a message that user has to sign to send the transaction.
@@ -498,7 +526,16 @@ impl ZkSyncTx {
         match self {
             ZkSyncTx::Transfer(_) => "Transfer".to_string(),
             ZkSyncTx::Withdraw(_) => "Withdraw".to_string(),
-            ZkSyncTx::Close(_) => "Close".to_string(),
+            ZkSyncTx::Close(_) => "Closuse crate::account::PubKeyHash;
+use crate::Engine;
+use crate::{
+    helpers::{
+        is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
+    },
+    tx::TimeRange,
+    AccountId, Nonce, TokenId,
+};e"
+            .to_string(),
             ZkSyncTx::ChangePubKey(_) => "ChangePubKey".to_string(),
             ZkSyncTx::ForcedExit(_) => "ForcedExit".to_string(),
             ZkSyncTx::MintNFT(_) => "MintNFT".to_string(),

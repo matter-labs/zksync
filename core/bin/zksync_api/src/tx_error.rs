@@ -1,13 +1,14 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use zksync_types::tx;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
 pub enum TxAddError {
     #[error("Tx nonce is too low.")]
     NonceMismatch,
 
-    #[error("Tx is incorrect")]
-    IncorrectTx,
+    #[error("Tx is incorrect {0}")]
+    IncorrectTx(#[from] tx::TransactionError),
 
     #[error("Transaction fee is too low")]
     TxFeeTooLow,

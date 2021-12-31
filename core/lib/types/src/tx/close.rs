@@ -1,10 +1,11 @@
-use crate::Nonce;
+use thiserror::Error;
 
-use crate::account::PubKeyHash;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 
 use super::{TimeRange, TxSignature};
+use crate::account::PubKeyHash;
+use crate::Nonce;
 
 /// `Close` transaction was used to remove the account from the network.
 /// Currently unused and left for the backward compatibility reasons.
@@ -35,7 +36,20 @@ impl Close {
             .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
     }
 
-    pub fn check_correctness(&self) -> bool {
-        self.verify_signature().is_some() && self.time_range.check_correctness()
+    pub fn check_correctness(&self) -> Result<(), TransactionError> {
+        if self.verify_signature().is_none() {
+            return Err(TransactionError::WrongSignature);
+        }
+        if !self.time_range.check_correctness() {
+            return Err(TransactionError::WrongTimeRange);
+        }
+        Ok(())
     }
+}
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    #[error("Wrong time range")]
+    WrongTimeRange,
+    #[error("Wrong signature")]
+    WrongSignature,
 }

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use num::{BigUint, Zero};
+use thiserror::Error;
 
 use zksync_crypto::{
     convert::FeConvert,
@@ -105,7 +106,7 @@ impl MintNFT {
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
+        if tx.check_correctness().is_err() {
             return Err(TransactionSignatureError);
         }
         Ok(tx)
@@ -128,24 +129,6 @@ impl MintNFT {
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
-    }
-
-    /// Verifies the transaction correctness:
-    ///
-    /// - `creator_account_id` field must be within supported range.
-    /// - `fee_token` field must be within supported range.
-    /// - `fee` field must represent a packable value.
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.fee <= BigUint::from(u128::MAX)
-            && is_fee_amount_packable(&self.fee)
-            && self.creator_id <= max_account_id()
-            && self.fee_token <= max_processable_token();
-        if valid {
-            let signer = self.verify_signature();
-            valid = valid && signer.is_some();
-            self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        };
-        valid
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
@@ -197,6 +180,49 @@ impl MintNFT {
     pub fn wipe_signer_cache(&mut self) {
         self.cached_signer = VerifiedSignatureCache::NotCached;
     }
+
+    /// Verifies the transaction correctness:
+    ///
+    /// - `creator_account_id` field must be within supported range.
+    /// - `fee_token` field must be within supported range.
+    /// - `fee` field must represent a packable value.
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        if self.fee > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongFee);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+
+        if self.creator_id > max_account_id() {
+            return Err(TransactionError::WrongCreatorId);
+        }
+
+        // Fee can only be paid in processable tokens
+        if self.fee_token > max_processable_token() {
+            return Err(TransactionError::WrongFeeToken);
+        }
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if !signer.is_some() {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    #[error("Wrong fee")]
+    WrongFee,
+    #[error("Fee is not packable")]
+    FeeNotPackable,
+    #[error("Wrong creator id")]
+    WrongCreatorId,
+    #[error("Wrong signature")]
+    WrongSignature,
+    #[error("Wrong fee token")]
+    WrongFeeToken,
 }
 
 pub fn calculate_token_address(data: &[u8]) -> Address {

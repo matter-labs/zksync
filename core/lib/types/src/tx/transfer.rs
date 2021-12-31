@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use zksync_basic_types::Address;
 use zksync_crypto::{
@@ -285,16 +286,26 @@ impl Transfer {
     }
 }
 
-#[derive(Error)]
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TransactionError {
+    #[error("Wrong amount")]
     WrongAmount,
-    WrongFee,
+    #[error("Amount is not packable")]
     AmountNotPackable,
+    #[error("Wrong fee")]
+    WrongFee,
+    #[error("Fee is not packable")]
     FeeNotPackable,
+    #[error("Wrong account id")]
     WrongAccountId,
+    #[error("Wrong token")]
     WrongToken,
+    #[error("Wrong time range")]
     WrongTimeRange,
+    #[error("Wrong signature")]
     WrongSignature,
+    #[error("Wrong to address")]
     WrongToAddress,
+    #[error("Wrong token for paying fees")]
     WrongTokenForPayingFee,
 }

@@ -1,14 +1,7 @@
-use crate::account::PubKeyHash;
-use crate::Engine;
-use crate::{
-    helpers::{
-        is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
-    },
-    tx::TimeRange,
-    AccountId, Nonce, TokenId,
-};
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
@@ -20,8 +13,17 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
+use crate::account::PubKeyHash;
 use crate::tx::error::TransactionSignatureError;
 use crate::tx::version::TxVersion;
+use crate::Engine;
+use crate::{
+    helpers::{
+        is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
+    },
+    tx::TimeRange,
+    AccountId, Nonce, TokenId,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,16 +92,6 @@ impl Order {
             .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
     }
 
-    pub fn check_correctness(&self) -> bool {
-        self.price.0.bits() as usize <= PRICE_BIT_WIDTH
-            && self.price.1.bits() as usize <= PRICE_BIT_WIDTH
-            && self.account_id <= max_account_id()
-            && self.recipient_address != Address::zero()
-            && self.token_buy <= max_token_id()
-            && self.token_sell <= max_token_id()
-            && self.time_range.check_correctness()
-    }
-
     pub fn get_ethereum_sign_message(
         &self,
         token_sell: &str,
@@ -153,11 +145,52 @@ impl Order {
             signature: Default::default(),
         };
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
+        if tx.check_correctness().is_err() {
             return Err(TransactionSignatureError);
         }
         Ok(tx)
     }
+
+    pub fn check_correctness(&self) -> Result<(), OrderError> {
+        if self.price.0.bits() as usize > PRICE_BIT_WIDTH {
+            return Err(OrderError::WrongPrice);
+        }
+        if self.price.1.bits() as usize > PRICE_BIT_WIDTH {
+            return Err(OrderError::WrongPrice);
+        }
+        if self.account_id > max_account_id() {
+            return Err(OrderError::WrongSender);
+        }
+        if self.recipient_address != Address::zero() {
+            return Err(OrderError::WrongRecipient);
+        }
+        if self.token_buy > max_token_id() {
+            return Err(OrderError::WrongBuyToken);
+        }
+        if self.token_sell > max_token_id() {
+            return Err(OrderError::WrongSellToken);
+        }
+        if self.time_range.check_correctness() {
+            return Err(OrderError::WrongTimeRange);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum OrderError {
+    #[error("Wrong price")]
+    WrongPrice,
+    #[error("Wrong sender")]
+    WrongSender,
+    #[error("Wrong recipient")]
+    WrongRecipient,
+    #[error("Wrong buy token")]
+    WrongBuyToken,
+    #[error("Wrong sell token")]
+    WrongSellToken,
+    #[error("Wrong time range")]
+    WrongTimeRange,
 }
 
 impl Swap {
@@ -220,7 +253,7 @@ impl Swap {
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_sign_bytes());
-        if !tx.check_correctness() {
+        if tx.check_correctness().is_err() {
             return Err(TransactionSignatureError);
         }
         Ok(tx)
@@ -273,12 +306,23 @@ impl Swap {
         out
     }
 
-    fn check_amounts(&self) -> bool {
-        self.amounts.0 <= BigUint::from(u128::max_value())
-            && self.amounts.1 <= BigUint::from(u128::max_value())
-            && is_token_amount_packable(&self.amounts.0)
-            && is_token_amount_packable(&self.amounts.1)
-            && is_fee_amount_packable(&self.fee)
+    fn check_amounts(&self) -> Result<(), TransactionError> {
+        if self.amounts.0 > BigUint::from(u128::max_value()) {
+            return Err(TransactionError::WrongAmount);
+        }
+        if self.amounts.1 > BigUint::from(u128::max_value()) {
+            return Err(TransactionError::WrongAmount);
+        }
+        if !is_token_amount_packable(&self.amounts.0) {
+            return Err(TransactionError::AmountNotPackable);
+        }
+        if !is_token_amount_packable(&self.amounts.1) {
+            return Err(TransactionError::AmountNotPackable);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+        Ok(())
     }
 
     pub fn valid_from(&self) -> u64 {
@@ -297,22 +341,6 @@ impl Swap {
 
     pub fn time_range(&self) -> TimeRange {
         TimeRange::new(self.valid_from(), self.valid_until())
-    }
-
-    /// Verifies the transaction correctness:
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.check_amounts()
-            && self.submitter_id <= max_account_id()
-            && self.fee_token <= max_processable_token()
-            && self.orders.0.check_correctness()
-            && self.orders.1.check_correctness()
-            && self.time_range().check_correctness();
-        if valid {
-            let signer = self.verify_signature();
-            valid = valid && signer.is_some();
-            self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        };
-        valid
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
@@ -356,6 +384,52 @@ impl Swap {
     pub fn wipe_signer_cache(&mut self) {
         self.cached_signer = VerifiedSignatureCache::NotCached;
     }
+
+    /// Verifies the transaction correctness:
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        self.check_amounts()?;
+        if self.submitter_id > max_account_id() {
+            return Err(TransactionError::WrongSubmitter);
+        }
+        if self.fee_token > max_processable_token() {
+            return Err(TransactionError::WrongFeeToken);
+        }
+
+        self.orders.0.check_correctness()?;
+        self.orders.1.check_correctness()?;
+        if !self.time_range().check_correctness() {
+            return Err(TransactionError::WrongTimeRange);
+        }
+
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if signer.is_none() {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    #[error("Wrong amount")]
+    WrongAmount,
+    #[error("Wrong fee")]
+    WrongFee,
+    #[error("Wrong submitter")]
+    WrongSubmitter,
+    #[error("Wrong order {0:?}")]
+    WrongOrder(#[from] OrderError),
+    #[error("Wrong fee token")]
+    WrongFeeToken,
+    #[error("Wrong time range")]
+    WrongTimeRange,
+    #[error("Wrong signature")]
+    WrongSignature,
+    #[error("Amount is not packable")]
+    AmountNotPackable,
+    #[error("Fee is not packable")]
+    FeeNotPackable,
 }
 
 fn pad_front(bytes: &[u8], size: usize) -> Vec<u8> {

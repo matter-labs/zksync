@@ -31,7 +31,7 @@ pub use self::{
     version::TxVersion,
     withdraw::Withdraw,
     withdraw_nft::WithdrawNFT,
-    zksync_tx::{EthSignData, SignedZkSyncTx, ZkSyncTx},
+    zksync_tx::{EthSignData, SignedZkSyncTx, TransactionError, ZkSyncTx},
 };
 
 // Re-export primitives associated with transactions.

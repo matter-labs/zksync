@@ -1,5 +1,6 @@
 use num::{BigUint, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use zksync_basic_types::Address;
 use zksync_crypto::{
@@ -19,6 +20,7 @@ use crate::{
 };
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
+use crate::helpers::is_token_amount_packable;
 use crate::tx::version::TxVersion;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
@@ -114,7 +116,7 @@ impl Withdraw {
             account_id, from, to, token, amount, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
+        if tx.check_correctness().is_err() {
             return Err(TransactionSignatureError);
         }
         Ok(tx)
@@ -164,37 +166,6 @@ impl Withdraw {
             out.extend_from_slice(&time_range.as_be_bytes());
         }
         out
-    }
-
-    /// Verifies the transaction correctness:
-    ///
-    /// - `account_id` field must be within supported range.
-    /// - `token` field must be within supported range.
-    /// - `fee` field must represent a packable value.
-    /// - zkSync signature must correspond to the PubKeyHash of the account.
-    ///
-    /// Note that we don't need to check whether token amount is packable, because pubdata for this operation
-    /// contains unpacked value only.
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.amount <= BigUint::from(u128::max_value())
-            && is_fee_amount_packable(&self.fee)
-            && self.account_id <= max_account_id()
-            && self.token <= max_fungible_token_id()
-            && self
-                .time_range
-                .map(|t| t.check_correctness())
-                .unwrap_or(true);
-
-        if valid {
-            if self.fee != BigUint::zero() {
-                // Fee can only be paid in processable tokens
-                valid = self.token <= max_processable_token();
-            }
-            let signer = self.verify_signature();
-            valid = valid && signer.is_some();
-            self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        }
-        valid
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
@@ -264,4 +235,81 @@ impl Withdraw {
     pub fn wipe_signer_cache(&mut self) {
         self.cached_signer = VerifiedSignatureCache::NotCached;
     }
+
+    /// Verifies the transaction correctness:
+    ///
+    /// - `account_id` field must be within supported range.
+    /// - `token` field must be within supported range.
+    /// - `fee` field must represent a packable value.
+    /// - zkSync signature must correspond to the PubKeyHash of the account.
+    ///
+    /// Note that we don't need to check whether token amount is packable, because pubdata for this operation
+    /// contains unpacked value only.
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        if self.amount > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongAmount);
+        }
+        if !is_token_amount_packable(&self.amount) {
+            return Err(TransactionError::AmountNotPackable);
+        }
+        if self.fee > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongFee);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+        if self.account_id > max_account_id() {
+            return Err(TransactionError::WrongAccountId);
+        }
+
+        if self.token > max_fungible_token_id() {
+            return Err(TransactionError::WrongToken);
+        }
+        if self.to == Address::zero() {
+            return Err(TransactionError::WrongToAddress);
+        }
+        if !self
+            .time_range
+            .map(|r| r.check_correctness())
+            .unwrap_or(true)
+        {
+            return Err(TransactionError::WrongTimeRange);
+        }
+
+        // Fee can only be paid in processable tokens
+        if self.fee != BigUint::zero() && self.token > max_processable_token() {
+            return Err(TransactionError::WrongTokenForPayingFee);
+        }
+
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if !signer.is_some() {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    #[error("Wrong amount")]
+    WrongAmount,
+    #[error("Amount is not packable")]
+    AmountNotPackable,
+    #[error("Wrong fee")]
+    WrongFee,
+    #[error("Fee is not packable")]
+    FeeNotPackable,
+    #[error("Wrong account id")]
+    WrongAccountId,
+    #[error("Wrong token")]
+    WrongToken,
+    #[error("Wrong time range")]
+    WrongTimeRange,
+    #[error("Wrong signature")]
+    WrongSignature,
+    #[error("Wrong to address")]
+    WrongToAddress,
+    #[error("Wrong token for paying fees")]
+    WrongTokenForPayingFee,
 }
