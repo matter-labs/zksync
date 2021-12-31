@@ -210,9 +210,6 @@ impl WithdrawNFT {
             return Err(TransactionError::WrongAccountId);
         }
 
-        if self.to == Address::zero() {
-            return Err(TransactionError::WrongToAddress);
-        }
         if !self.time_range.check_correctness() {
             return Err(TransactionError::WrongTimeRange);
         }
@@ -245,8 +242,6 @@ pub enum TransactionError {
     WrongTimeRange,
     #[error("Wrong signature")]
     WrongSignature,
-    #[error("Wrong to address")]
-    WrongToAddress,
     #[error("Wrong fee token")]
     WrongFeeToken,
 }

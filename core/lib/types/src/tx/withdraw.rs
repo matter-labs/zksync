@@ -262,9 +262,6 @@ impl Withdraw {
         if self.token > max_fungible_token_id() {
             return Err(TransactionError::WrongToken);
         }
-        if self.to == Address::zero() {
-            return Err(TransactionError::WrongToAddress);
-        }
         if !self
             .time_range
             .map(|r| r.check_correctness())
@@ -305,8 +302,6 @@ pub enum TransactionError {
     WrongTimeRange,
     #[error("Wrong signature")]
     WrongSignature,
-    #[error("Wrong to address")]
-    WrongToAddress,
     #[error("Wrong token for paying fees")]
     WrongTokenForPayingFee,
 }
