@@ -4,7 +4,13 @@ use std::time::Duration;
 
 use num::BigUint;
 // Workspace deps
-use zksync_config::ZkSyncConfig;
+use zksync_config::{
+    configs::{
+        api::ProverApiConfig,
+        prover::{Core, Prover, WitnessGenerator},
+    },
+    ProverConfig,
+};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use zksync_prover::{client, ApiClient};
 use zksync_prover_utils::api::ProverInputRequest;
@@ -18,33 +24,40 @@ const INCORRECT_PROVER_SECRET_AUTH: &str = "123";
 const SERVER_BIND_PORT: u16 = 8088;
 const SERVER_BIND_TO: &str = "127.0.0.1:8088";
 
-struct MockProverOptions(ZkSyncConfig);
+struct MockProverOptions(ProverApiConfig, ProverConfig);
 
 impl Default for MockProverOptions {
     fn default() -> Self {
-        let mut zksync_config = ZkSyncConfig::from_env();
+        let api = ProverApiConfig {
+            port: SERVER_BIND_PORT,
+            url: SERVER_BIND_TO.to_string(),
+            secret_auth: CORRECT_PROVER_SECRET_AUTH.to_string(),
+        };
+        let prover = ProverConfig {
+            prover: Prover {
+                heartbeat_interval: 2000,
+                cycle_wait: 500,
+                request_timeout: 10,
+                die_after_proof: false,
+            },
+            core: Core {
+                gone_timeout: 60000,
+                idle_provers: 1,
+            },
+            witness_generator: WitnessGenerator {
+                prepare_data_interval: 100,
+                witness_generators: 1,
+            },
+        };
 
-        zksync_config.api.prover.port = SERVER_BIND_PORT;
-        zksync_config.api.prover.url = SERVER_BIND_TO.to_string();
-        zksync_config.api.prover.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
-        zksync_config.prover.prover.heartbeat_interval = 20000;
-        zksync_config.prover.prover.cycle_wait = 500;
-        zksync_config.prover.witness_generator.prepare_data_interval = 100;
-        zksync_config.prover.witness_generator.witness_generators = 1;
-        zksync_config.prover.core.idle_provers = 1;
-
-        MockProverOptions(zksync_config)
+        MockProverOptions(api, prover)
     }
 }
 
 async fn spawn_server(database: MockDatabase) {
     let prover_options = MockProverOptions::default();
 
-    run_prover_server(
-        database,
-        prover_options.0.api.prover,
-        prover_options.0.prover,
-    );
+    run_prover_server(database, prover_options.0, prover_options.1);
 }
 
 #[tokio::test]
