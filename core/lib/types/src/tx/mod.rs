@@ -24,6 +24,7 @@ pub use self::{
         ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
         ChangePubKeyType,
     },
+    error::TransactionError,
     forced_exit::ForcedExit,
     mint_nft::{calculate_token_address, calculate_token_data, calculate_token_hash, MintNFT},
     swap::{Order, Swap},
@@ -31,7 +32,7 @@ pub use self::{
     version::TxVersion,
     withdraw::Withdraw,
     withdraw_nft::WithdrawNFT,
-    zksync_tx::{EthSignData, SignedZkSyncTx, TransactionError, ZkSyncTx},
+    zksync_tx::{EthSignData, SignedZkSyncTx, ZkSyncTx},
 };
 
 // Re-export primitives associated with transactions.

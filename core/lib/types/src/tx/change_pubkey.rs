@@ -15,7 +15,7 @@ use crate::{
     account::PubKeyHash,
     helpers::{is_fee_amount_packable, pack_fee_amount},
     tokens::ChangePubKeyFeeTypeArg,
-    tx::error::{ChangePubkeySignedDataError, TransactionSignatureError},
+    tx::error::ChangePubkeySignedDataError,
     tx::version::TxVersion,
     AccountId, Nonce, TxFeeTypes,
 };
@@ -217,7 +217,7 @@ impl ChangePubKey {
         time_range: TimeRange,
         eth_signature: Option<PackedEthSignature>,
         private_key: &PrivateKey,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             account_id,
             account,
@@ -230,9 +230,7 @@ impl ChangePubKey {
             eth_signature,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if tx.check_correctness().is_err() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 

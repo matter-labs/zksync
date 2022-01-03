@@ -14,7 +14,6 @@ use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRad
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::account::PubKeyHash;
-use crate::tx::error::TransactionSignatureError;
 use crate::tx::version::TxVersion;
 use crate::Engine;
 use crate::{
@@ -132,7 +131,7 @@ impl Order {
         amount: BigUint,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self {
             account_id,
             recipient_address,
@@ -145,9 +144,7 @@ impl Order {
             signature: Default::default(),
         };
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if tx.check_correctness().is_err() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 
@@ -242,7 +239,7 @@ impl Swap {
         fee: BigUint,
         fee_token: TokenId,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             submitter_id,
             submitter_address,
@@ -254,9 +251,7 @@ impl Swap {
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_sign_bytes());
-        if tx.check_correctness().is_err() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 

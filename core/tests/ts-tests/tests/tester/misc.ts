@@ -30,6 +30,13 @@ declare module './tester' {
             amount: BigNumber,
             providerType: 'REST' | 'RPC'
         ): Promise<void>;
+        testApiErrors(
+            from: Wallet,
+            to: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            providerType: 'REST' | 'RPC'
+        ): Promise<void>;
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleWalletsWrongSignature(
             from: Wallet,
@@ -43,6 +50,61 @@ declare module './tester' {
         testSubsidyForBatch(create2Wallet: Wallet, token: TokenLike): Promise<void>;
     }
 }
+
+Tester.prototype.testApiErrors = async function (
+    from: Wallet,
+    to: Wallet,
+    token: TokenLike,
+    amount: BigNumber,
+    providerType: 'REST' | 'RPC'
+) {
+    let signedTransfer1 = await from.signSyncTransfer({
+        to: '0x0000000000000000000000000000000000000000',
+        token,
+        amount,
+        fee: amount.div(2),
+        nonce: await from.getNonce()
+    });
+
+    let thrown = true;
+    try {
+        await from.provider.submitTx(signedTransfer1.tx, signedTransfer1.ethereumSignature);
+        thrown = false; // this line should be unreachable
+    } catch (e: any) {
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal(
+                'Transaction adding error: Tx is incorrect Transfer error Wrong to address.'
+            );
+        } else {
+            expect(e.jrpcError.message).to.equal('Tx is incorrect Transfer error Wrong to address');
+        }
+    }
+    expect(thrown, 'Sending tx with incorrect recipient must throw').to.be.true;
+
+    let signedTransfer2 = await from.signSyncTransfer({
+        to: to.address(),
+        token,
+        amount,
+        fee: amount.div(2),
+        nonce: await from.getNonce()
+    });
+
+    signedTransfer2.tx.signature = signedTransfer1.tx.signature;
+    thrown = true;
+    try {
+        await from.provider.submitTx(signedTransfer2.tx, signedTransfer2.ethereumSignature);
+        thrown = false; // this line should be unreachable
+    } catch (e: any) {
+        if (providerType === 'REST') {
+            expect(e.restError.message).to.equal(
+                'Transaction adding error: Tx is incorrect Transfer error Wrong signature.'
+            );
+        } else {
+            expect(e.jrpcError.message).to.equal('Tx is incorrect Transfer error Wrong signature');
+        }
+    }
+    expect(thrown, 'Sending tx with incorrect L2 signature must throw').to.be.true;
+};
 
 Tester.prototype.testWrongSignature = async function (
     from: Wallet,

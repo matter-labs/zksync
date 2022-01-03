@@ -13,7 +13,6 @@ use zksync_crypto::{
 
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
-use crate::tx::error::TransactionSignatureError;
 use crate::tx::version::TxVersion;
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
@@ -94,7 +93,7 @@ impl MintNFT {
         fee_token: TokenId,
         nonce: Nonce,
         private_key: &PrivateKey,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             creator_id,
             creator_address,
@@ -106,9 +105,7 @@ impl MintNFT {
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if tx.check_correctness().is_err() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 

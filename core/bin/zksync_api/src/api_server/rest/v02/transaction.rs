@@ -240,18 +240,21 @@ mod tests {
     };
     use actix_web::App;
     use chrono::Utc;
+    use num::BigUint;
     use std::str::FromStr;
     use zksync_api_types::v02::{
         transaction::{L2Receipt, TxHashSerializeWrapper},
         ApiVersion,
     };
+    use zksync_crypto::params::MIN_NFT_TOKEN_ID;
+    use zksync_test_account::ZkSyncAccount;
     use zksync_types::{
         tokens::Token,
         tx::{
             EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature,
             TxEthSignatureVariant,
         },
-        BlockNumber, SignedZkSyncTx, TokenId, TokenKind,
+        AccountId, Address, BlockNumber, SignedZkSyncTx, TokenId, TokenKind, Transfer, ZkSyncTx,
     };
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_test::TestServer) {

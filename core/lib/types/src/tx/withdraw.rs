@@ -15,7 +15,6 @@ use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
-    tx::error::TransactionSignatureError,
     AccountId, Nonce, TokenId,
 };
 
@@ -110,15 +109,12 @@ impl Withdraw {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             account_id, from, to, token, amount, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if let Err(err) = tx.check_correctness() {
-            println!("Error {:?}", err);
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 

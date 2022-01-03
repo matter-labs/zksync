@@ -116,14 +116,7 @@ impl crate::ApiClient for ApiClient {
                 .map_err(|e| Transient(format_err!("failed parse json on get job request: {}", e)))
         };
 
-        let res: anyhow::Result<ProverInputResponse> = self.with_retries(operation).await;
-        if let Ok(res) = &res {
-            println!(
-                "result {:?} {:?} {:?}",
-                res.job_id, res.first_block, res.last_block
-            );
-        }
-        res
+        self.with_retries(operation).await
     }
 
     async fn working_on(&self, job_id: i32, prover_name: &str) -> anyhow::Result<()> {

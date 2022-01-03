@@ -22,7 +22,6 @@ use crate::{
     AccountId, Nonce, TokenId,
 };
 
-use crate::tx::error::TransactionSignatureError;
 use crate::tx::version::TxVersion;
 use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
 
@@ -107,14 +106,12 @@ impl Transfer {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             account_id, from, to, token, amount, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if tx.check_correctness().is_err() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 

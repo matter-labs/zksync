@@ -11,7 +11,7 @@ use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::tx::version::TxVersion;
-use crate::tx::{error::TransactionSignatureError, TimeRange};
+use crate::tx::TimeRange;
 use crate::{account::PubKeyHash, Engine};
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
@@ -96,7 +96,7 @@ impl ForcedExit {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             initiator_account_id,
             target,
@@ -107,9 +107,7 @@ impl ForcedExit {
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if tx.check_correctness().is_err() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 
