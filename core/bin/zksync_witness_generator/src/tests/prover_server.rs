@@ -45,7 +45,7 @@ impl Default for MockProverOptions {
                 idle_provers: 1,
             },
             witness_generator: WitnessGenerator {
-                prepare_data_interval: 100,
+                prepare_data_interval: 500,
                 witness_generators: 1,
             },
         };
