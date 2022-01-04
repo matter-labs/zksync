@@ -396,8 +396,14 @@ impl Swap {
             return Err(TransactionError::WrongFeeToken);
         }
 
-        self.orders.0.check_correctness()?;
-        self.orders.1.check_correctness()?;
+        self.orders
+            .0
+            .check_correctness()
+            .map_err(|err| TransactionError::WrongOrder(0, err))?;
+        self.orders
+            .1
+            .check_correctness()
+            .map_err(|err| TransactionError::WrongOrder(1, err))?;
         if !self.time_range().check_correctness() {
             return Err(TransactionError::WrongTimeRange);
         }
@@ -416,7 +422,7 @@ pub enum TransactionError {
     WrongAmount,
     WrongFee,
     WrongSubmitter,
-    WrongOrder(#[from] OrderError),
+    WrongOrder(u64, OrderError),
     WrongFeeToken,
     WrongTimeRange,
     WrongSignature,
@@ -434,7 +440,9 @@ impl Display for TransactionError {
             TransactionError::WrongTimeRange => WRONG_TIME_RANGE,
             TransactionError::WrongSignature => WRONG_SIGNATURE,
             TransactionError::WrongSubmitter => WRONG_ACCOUNT_ID,
-            TransactionError::WrongOrder(err) => return write!(f, "Error in order: {}", err),
+            TransactionError::WrongOrder(num, err) => {
+                return write!(f, "Error in order {}: {}", num, err)
+            }
             TransactionError::WrongFeeToken => WRONG_TOKEN_FOR_PAYING_FEE,
         };
         write!(f, "{}", error)
