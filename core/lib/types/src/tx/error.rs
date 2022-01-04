@@ -16,22 +16,34 @@ pub struct CloseOperationsDisabled();
 
 #[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TransactionError {
-    #[error("Withdraw error {0}")]
+    #[error(transparent)]
     WithdrawError(#[from] withdraw::TransactionError),
-    #[error("Transfer error {0}")]
+    #[error(transparent)]
     TransferError(#[from] transfer::TransactionError),
-    #[error("Mint NFT error {0}")]
+    #[error(transparent)]
     MintNFTError(#[from] mint_nft::TransactionError),
-    #[error("Withdraw NFT error {0}")]
+    #[error(transparent)]
     WithdrawNFTError(#[from] withdraw_nft::TransactionError),
-    #[error("Change pub key error {0}")]
+    #[error(transparent)]
     ChangePubKeyError(#[from] change_pubkey::TransactionError),
-    #[error("Swap error {0}")]
+    #[error(transparent)]
     SwapError(#[from] swap::TransactionError),
-    #[error("Order error {0}")]
+    #[error(transparent)]
     OrderError(#[from] swap::OrderError),
-    #[error("Forced Exit error {0}")]
+    #[error(transparent)]
     ForcedExitError(#[from] forced_exit::TransactionError),
-    #[error("Close error {0}")]
+    #[error(transparent)]
     CloseError(#[from] close::TransactionError),
 }
+
+pub const WRONG_AMOUNT_ERROR: &str = "Specified amount is greater than maximum supported amount";
+pub const WRONG_FEE_ERROR: &str = "Specified fee amount is greater than maximum supported fee";
+pub const FEE_AMOUNT_IS_NOT_PACKABLE: &str = "Specified fee is not packable";
+pub const AMOUNT_IS_NOT_PACKABLE: &str = "Specified amount is not packable";
+pub const WRONG_ACCOUNT_ID: &str = "Specified Account id is greater than maximum supported";
+pub const WRONG_TIME_RANGE: &str = "Specified time interval is not valid for the current time";
+pub const WRONG_TOKEN: &str = "Specified token is not supported";
+pub const WRONG_TOKEN_FOR_PAYING_FEE: &str = "Specified token is not supported for paying fees";
+pub const WRONG_SIGNATURE: &str = "L2 signature is incorrect";
+pub const WRONG_TO_ADDRESS: &str = "Transfer for specified address is not supported";
+pub const INVALID_AUTH_DATA: &str = "Specified auth data is incorrect ";

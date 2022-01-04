@@ -1,5 +1,6 @@
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 use zksync_basic_types::Address;
@@ -10,6 +11,10 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
+use crate::tx::error::{
+    FEE_AMOUNT_IS_NOT_PACKABLE, WRONG_ACCOUNT_ID, WRONG_FEE_ERROR, WRONG_SIGNATURE,
+    WRONG_TIME_RANGE, WRONG_TOKEN, WRONG_TOKEN_FOR_PAYING_FEE,
+};
 use crate::tx::version::TxVersion;
 use crate::tx::TimeRange;
 use crate::{account::PubKeyHash, Engine};
@@ -244,18 +249,26 @@ impl ForcedExit {
 
 #[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TransactionError {
-    #[error("Wrong fee")]
     WrongFee,
-    #[error("Fee is not packable")]
     FeeNotPackable,
-    #[error("Wrong initiator account id")]
     WrongInitiatorAccountId,
-    #[error("Wrong token")]
     WrongToken,
-    #[error("Wrong time range")]
     WrongTimeRange,
-    #[error("Wrong signature")]
     WrongSignature,
-    #[error("Wrong token for paying fees")]
     WrongTokenForPayingFee,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongFee => WRONG_FEE_ERROR,
+            TransactionError::FeeNotPackable => FEE_AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongToken => WRONG_TOKEN,
+            TransactionError::WrongTimeRange => WRONG_TIME_RANGE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+            TransactionError::WrongTokenForPayingFee => WRONG_TOKEN_FOR_PAYING_FEE,
+            TransactionError::WrongInitiatorAccountId => WRONG_ACCOUNT_ID,
+        };
+        write!(f, "{}", error)
+    }
 }

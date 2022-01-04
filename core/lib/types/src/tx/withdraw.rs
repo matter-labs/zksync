@@ -1,5 +1,6 @@
 use num::{BigUint, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 use zksync_basic_types::Address;
@@ -19,6 +20,10 @@ use crate::{
 };
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
+use crate::tx::error::{
+    AMOUNT_IS_NOT_PACKABLE, FEE_AMOUNT_IS_NOT_PACKABLE, WRONG_ACCOUNT_ID, WRONG_AMOUNT_ERROR,
+    WRONG_FEE_ERROR, WRONG_SIGNATURE, WRONG_TIME_RANGE, WRONG_TOKEN, WRONG_TOKEN_FOR_PAYING_FEE,
+};
 use crate::tx::version::TxVersion;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
@@ -282,22 +287,30 @@ impl Withdraw {
 
 #[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TransactionError {
-    #[error("Wrong amount")]
     WrongAmount,
-    #[error("Amount is not packable")]
     AmountNotPackable,
-    #[error("Wrong fee")]
     WrongFee,
-    #[error("Fee is not packable")]
     FeeNotPackable,
-    #[error("Wrong account id")]
     WrongAccountId,
-    #[error("Wrong token")]
     WrongToken,
-    #[error("Wrong time range")]
     WrongTimeRange,
-    #[error("Wrong signature")]
     WrongSignature,
-    #[error("Wrong token for paying fees")]
     WrongTokenForPayingFee,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongAmount => WRONG_AMOUNT_ERROR,
+            TransactionError::AmountNotPackable => AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongFee => WRONG_FEE_ERROR,
+            TransactionError::FeeNotPackable => FEE_AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongAccountId => WRONG_ACCOUNT_ID,
+            TransactionError::WrongToken => WRONG_TOKEN,
+            TransactionError::WrongTimeRange => WRONG_TIME_RANGE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+            TransactionError::WrongTokenForPayingFee => WRONG_TOKEN_FOR_PAYING_FEE,
+        };
+        write!(f, "{}", error)
+    }
 }

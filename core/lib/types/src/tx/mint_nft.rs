@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 use num::{BigUint, Zero};
 use thiserror::Error;
@@ -13,6 +14,10 @@ use zksync_crypto::{
 
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
+use crate::tx::error::{
+    FEE_AMOUNT_IS_NOT_PACKABLE, WRONG_ACCOUNT_ID, WRONG_FEE_ERROR, WRONG_SIGNATURE,
+    WRONG_TOKEN_FOR_PAYING_FEE,
+};
 use crate::tx::version::TxVersion;
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
@@ -210,16 +215,24 @@ impl MintNFT {
 
 #[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TransactionError {
-    #[error("Wrong fee")]
     WrongFee,
-    #[error("Fee is not packable")]
     FeeNotPackable,
-    #[error("Wrong creator id")]
     WrongCreatorId,
-    #[error("Wrong signature")]
     WrongSignature,
-    #[error("Wrong fee token")]
     WrongFeeToken,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongFee => WRONG_FEE_ERROR,
+            TransactionError::FeeNotPackable => FEE_AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+            TransactionError::WrongCreatorId => WRONG_ACCOUNT_ID,
+            TransactionError::WrongFeeToken => WRONG_TOKEN_FOR_PAYING_FEE,
+        };
+        write!(f, "{}", error)
+    }
 }
 
 pub fn calculate_token_address(data: &[u8]) -> Address {

@@ -7,10 +7,10 @@ pub enum TxAddError {
     #[error("Tx nonce is too low.")]
     NonceMismatch,
 
-    #[error("Tx is incorrect {0}")]
+    #[error("Tx is incorrect: {0}")]
     IncorrectTx(#[from] tx::TransactionError),
 
-    #[error("Transaction fee is too low")]
+    #[error("Transaction fee is too low.")]
     TxFeeTooLow,
 
     #[error("Transactions batch summary fee is too low")]

@@ -1,10 +1,12 @@
-use thiserror::Error;
+use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use zksync_basic_types::Address;
 
 use super::{TimeRange, TxSignature};
 use crate::account::PubKeyHash;
+use crate::tx::error::{WRONG_SIGNATURE, WRONG_TIME_RANGE};
 use crate::Nonce;
 
 /// `Close` transaction was used to remove the account from the network.
@@ -48,8 +50,16 @@ impl Close {
 }
 #[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TransactionError {
-    #[error("Wrong time range")]
     WrongTimeRange,
-    #[error("Wrong signature")]
     WrongSignature,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongTimeRange => WRONG_TIME_RANGE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+        };
+        write!(f, "{}", error)
+    }
 }

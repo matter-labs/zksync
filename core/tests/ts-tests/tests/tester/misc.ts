@@ -73,10 +73,10 @@ Tester.prototype.testApiErrors = async function (
     } catch (e: any) {
         if (providerType === 'REST') {
             expect(e.restError.message).to.equal(
-                'Transaction adding error: Tx is incorrect Transfer error Wrong to address.'
+                'Transaction adding error: Tx is incorrect: Transfer for specified address is not supported.'
             );
         } else {
-            expect(e.jrpcError.message).to.equal('Tx is incorrect Transfer error Wrong to address');
+            expect(e.jrpcError.message).to.equal('Tx is incorrect: Transfer for specified address is not supported.');
         }
     }
     expect(thrown, 'Sending tx with incorrect recipient must throw').to.be.true;
@@ -97,10 +97,10 @@ Tester.prototype.testApiErrors = async function (
     } catch (e: any) {
         if (providerType === 'REST') {
             expect(e.restError.message).to.equal(
-                'Transaction adding error: Tx is incorrect Transfer error Wrong signature.'
+                'Transaction adding error: Tx is incorrect: L2 signature is incorrect.'
             );
         } else {
-            expect(e.jrpcError.message).to.equal('Tx is incorrect Transfer error Wrong signature');
+            expect(e.jrpcError.message).to.equal('Tx is incorrect: L2 signature is incorrect.');
         }
     }
     expect(thrown, 'Sending tx with incorrect L2 signature must throw').to.be.true;

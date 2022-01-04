@@ -1,5 +1,6 @@
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 use zksync_basic_types::Address;
@@ -14,6 +15,10 @@ use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRad
 
 use super::{TxSignature, VerifiedSignatureCache};
 use crate::account::PubKeyHash;
+use crate::tx::error::{
+    AMOUNT_IS_NOT_PACKABLE, FEE_AMOUNT_IS_NOT_PACKABLE, WRONG_ACCOUNT_ID, WRONG_AMOUNT_ERROR,
+    WRONG_FEE_ERROR, WRONG_SIGNATURE, WRONG_TIME_RANGE, WRONG_TOKEN_FOR_PAYING_FEE,
+};
 use crate::tx::version::TxVersion;
 use crate::Engine;
 use crate::{
@@ -177,17 +182,17 @@ impl Order {
 #[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
 #[allow(clippy::enum_variant_names)]
 pub enum OrderError {
-    #[error("Wrong price")]
+    #[error("Specified price is greater than supported")]
     WrongPrice,
-    #[error("Wrong sender")]
+    #[error("Specified sender account id is greater than maximum supported")]
     WrongSender,
-    #[error("Wrong recipient")]
+    #[error("Specified recipient address is not supported")]
     WrongRecipient,
-    #[error("Wrong buy token")]
+    #[error("Specified buy token is not supported")]
     WrongBuyToken,
-    #[error("Wrong sell token")]
+    #[error("Specified sell token is not supported")]
     WrongSellToken,
-    #[error("Wrong time range")]
+    #[error("Specified time interval is not valid for the current time")]
     WrongTimeRange,
 }
 
@@ -408,24 +413,32 @@ impl Swap {
 
 #[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TransactionError {
-    #[error("Wrong amount")]
     WrongAmount,
-    #[error("Wrong fee")]
     WrongFee,
-    #[error("Wrong submitter")]
     WrongSubmitter,
-    #[error("Wrong order {0:?}")]
     WrongOrder(#[from] OrderError),
-    #[error("Wrong fee token")]
     WrongFeeToken,
-    #[error("Wrong time range")]
     WrongTimeRange,
-    #[error("Wrong signature")]
     WrongSignature,
-    #[error("Amount is not packable")]
     AmountNotPackable,
-    #[error("Fee is not packable")]
     FeeNotPackable,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongAmount => WRONG_AMOUNT_ERROR,
+            TransactionError::AmountNotPackable => AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongFee => WRONG_FEE_ERROR,
+            TransactionError::FeeNotPackable => FEE_AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongTimeRange => WRONG_TIME_RANGE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+            TransactionError::WrongSubmitter => WRONG_ACCOUNT_ID,
+            TransactionError::WrongOrder(err) => return write!(f, "Error in order: {}", err),
+            TransactionError::WrongFeeToken => WRONG_TOKEN_FOR_PAYING_FEE,
+        };
+        write!(f, "{}", error)
+    }
 }
 
 fn pad_front(bytes: &[u8], size: usize) -> Vec<u8> {
