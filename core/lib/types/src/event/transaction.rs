@@ -55,7 +55,7 @@ impl TransactionEvent {
     ///
     /// Returns [`None`] for [close](crate::tx::Close) operation.
     pub fn from_executed_operation(
-        op: ExecutedOperations,
+        op: &ExecutedOperations,
         block_number: BlockNumber,
         status: TransactionStatus,
     ) -> Option<Self> {
@@ -65,13 +65,13 @@ impl TransactionEvent {
                 account_id: exec_tx.signed_tx.account_id().ok()?, // Close events cannot be emitted.
                 token_id: exec_tx.signed_tx.token_id(),
                 block_number,
-                tx: serde_json::to_value(exec_tx.signed_tx.tx).unwrap(),
+                tx: serde_json::to_value(&exec_tx.signed_tx.tx).unwrap(),
                 status: if exec_tx.success {
                     status
                 } else {
                     TransactionStatus::Rejected
                 },
-                fail_reason: exec_tx.fail_reason,
+                fail_reason: exec_tx.fail_reason.clone(),
                 created_at: exec_tx.created_at,
                 tx_type: OnceCell::default(),
             },

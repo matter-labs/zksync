@@ -6,9 +6,10 @@ use zksync_api_types::v02::pagination::{
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
+    block::Block,
     helpers::apply_updates,
     tx::{ChangePubKeyType, TxHash},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId,
 };
 // Local imports
 use super::operations_ext::{
@@ -22,7 +23,8 @@ use crate::{
     },
     ethereum::EthereumSchema,
     test_data::{
-        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_sample_block,
+        dummy_ethereum_tx_hash, dummy_root_hash_for_block, gen_acc_random_updates,
+        gen_sample_block, gen_sample_incomplete_block, gen_sample_pending_block,
         gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS,
     },
     tests::{create_rng, db_test},
@@ -61,7 +63,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Execute and commit these blocks.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(1),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -71,7 +73,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .commit_state_update(BlockNumber(1), &updates_block_1, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(2),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -81,7 +83,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .commit_state_update(BlockNumber(2), &updates_block_2, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(3),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -235,7 +237,9 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
 
         // Store the block in the block schema.
         let block = gen_sample_block(block_number, BLOCK_SIZE_CHUNKS, Default::default());
-        BlockSchema(&mut storage).save_block(block.clone()).await?;
+        BlockSchema(&mut storage)
+            .save_full_block(block.clone())
+            .await?;
         OperationsSchema(&mut storage)
             .store_aggregated_action(gen_unique_aggregated_operation(
                 block_number,
@@ -440,7 +444,7 @@ async fn test_block_page(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
         // Store the operation in the block schema.
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -575,7 +579,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
 
         // Store the block in the block schema.
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -775,7 +779,6 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         pending_block_iteration: 1,
         success_operations: txs_1,
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
     let pending_block_2 = PendingBlock {
@@ -785,7 +788,6 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         pending_block_iteration: 2,
         success_operations: txs_2,
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
 
@@ -830,7 +832,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     );
 
     // Finalize the block.
-    BlockSchema(&mut storage).save_block(block_1).await?;
+    BlockSchema(&mut storage).save_full_block(block_1).await?;
 
     // Ensure that pending block is no more available.
     assert!(
@@ -880,7 +882,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     );
 
     // Finalize the block.
-    BlockSchema(&mut storage).save_block(block_2).await?;
+    BlockSchema(&mut storage).save_full_block(block_2).await?;
 
     // Ensure that pending block is no more available.
     assert!(
@@ -1042,7 +1044,7 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Insert 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -1056,6 +1058,22 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
             ))
             .await?;
     }
+    // Insert 1 incomplete block.
+    BlockSchema(&mut storage)
+        .save_incomplete_block(gen_sample_incomplete_block(
+            BlockNumber(6),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
+        .await?;
+
+    assert_eq!(
+        BlockSchema(&mut storage)
+            .get_last_incomplete_block_number()
+            .await?,
+        Some(BlockNumber(6))
+    );
+
     // Remove blocks with numbers greater than 2.
     BlockSchema(&mut storage)
         .remove_blocks(BlockNumber(2))
@@ -1070,6 +1088,14 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .get_block(BlockNumber(3))
         .await?
         .is_none());
+
+    // Incomplete block should be removed as well.
+    assert_eq!(
+        BlockSchema(&mut storage)
+            .get_last_incomplete_block_number()
+            .await?,
+        None
+    );
 
     Ok(())
 }
@@ -1086,7 +1112,6 @@ async fn test_remove_pending_block(mut storage: StorageProcessor<'_>) -> QueryRe
         pending_block_iteration: 1,
         success_operations: Vec::new(),
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
 
@@ -1237,7 +1262,7 @@ async fn test_remove_new_account_tree_cache(mut storage: StorageProcessor<'_>) -
     // Insert account tree cache for 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -1274,7 +1299,7 @@ async fn test_get_block_number_by_hash(mut storage: StorageProcessor<'_>) -> Que
     storage
         .chain()
         .block_schema()
-        .save_block(block.clone())
+        .save_full_block(block.clone())
         .await?;
 
     let actual_number = storage
@@ -1323,7 +1348,7 @@ async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -
     // Insert account tree cache for 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -1348,6 +1373,57 @@ async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -
         .get_account_tree_cache_block(BlockNumber(1))
         .await?
         .is_none());
+
+    Ok(())
+}
+
+/// Checks the logic behind `save_incomplete_block` / `finish_incomplete_block`.
+#[db_test]
+async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut schema = BlockSchema(&mut storage);
+
+    let block_number = BlockNumber(1);
+
+    let pending_block = gen_sample_pending_block(block_number, Vec::new());
+    let incomplete_block = gen_sample_incomplete_block(block_number, BLOCK_SIZE_CHUNKS, Vec::new());
+    let root_hash = dummy_root_hash_for_block(block_number);
+    let complete_block =
+        Block::from_incomplete(incomplete_block.clone(), root_hash, Default::default());
+
+    schema.save_pending_block(pending_block).await?;
+    assert!(
+        schema.load_pending_block().await?.is_some(),
+        "Pending block should be saved"
+    );
+
+    schema.save_incomplete_block(incomplete_block).await?;
+
+    // Pending block should be removed now.
+    assert!(
+        schema.load_pending_block().await?.is_none(),
+        "Pending block should be removed after saving incomplete block"
+    );
+
+    // Block should not be available yet.
+    assert!(
+        schema.get_block(block_number).await?.is_none(),
+        "Block should not exist"
+    );
+
+    // Finish the block and ensure it's created correctly.
+    schema
+        .finish_incomplete_block(complete_block.clone())
+        .await?;
+    let block_from_storage = schema
+        .get_block(block_number)
+        .await?
+        .expect("Block should exist now");
+
+    assert_eq!(block_from_storage.block_number, block_number);
+    assert_eq!(
+        block_from_storage.new_root_hash,
+        complete_block.new_root_hash
+    );
 
     Ok(())
 }

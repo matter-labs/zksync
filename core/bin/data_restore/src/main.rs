@@ -129,7 +129,7 @@ async fn main() {
         add_tokens_to_storage(&mut interactor, &config.eth_network.to_string()).await;
 
         driver
-            .set_genesis_state(&mut interactor, config.genesis_tx_hash)
+            .set_genesis_state_from_eth(&mut interactor, config.genesis_tx_hash)
             .await;
     }
 

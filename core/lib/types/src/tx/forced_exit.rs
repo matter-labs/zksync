@@ -221,4 +221,10 @@ impl ForcedExit {
         message.push_str(format!("\nNonce: {}", self.nonce).as_str());
         message
     }
+
+    /// Helper method to remove cache and test transaction behavior without the signature cache.
+    #[doc(hidden)]
+    pub fn wipe_signer_cache(&mut self) {
+        self.cached_signer = VerifiedSignatureCache::NotCached;
+    }
 }

@@ -11,6 +11,7 @@ use zksync_types::{
 };
 
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
+use vlog::sentry::types::Utc;
 
 /// Check MintNFT operation
 #[test]
@@ -258,6 +259,7 @@ fn mint_token_to_new_account() {
     let signed_zk_sync_tx1 = SignedZkSyncTx {
         tx: ZkSyncTx::Transfer(Box::new(transfer_1)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     };
 
     let new_id = tb.state.get_free_account_id();
@@ -293,6 +295,7 @@ fn mint_token_to_new_account() {
     let signed_zk_sync_mint = SignedZkSyncTx {
         tx: ZkSyncTx::MintNFT(Box::new(mint_nft)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     };
 
     tb.test_txs_batch_success(

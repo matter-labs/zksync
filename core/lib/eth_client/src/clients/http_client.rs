@@ -265,21 +265,32 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                     .web3
                     .eth()
                     .call(call_request, receipt.block_number.map(Into::into))
-                    .await?;
-                let revert_code = hex::encode(&encoded_revert_reason.0);
-                let revert_reason = if encoded_revert_reason.0.len() >= 4 {
-                    let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
-
-                    ethabi::decode(
-                        &[ethabi::ParamType::String],
-                        encoded_string_without_function_hash,
-                    )?
-                    .into_iter()
-                    .next()
-                    .unwrap()
-                    .to_string()
+                    .await;
+                let (revert_code, revert_reason) = if let Err(web3::Error::Rpc(e)) =
+                    encoded_revert_reason
+                {
+                    let revert_code = e.message.clone();
+                    let mut revert_reason = e.message;
+                    revert_reason.replace_range(0..20, "");
+                    (revert_code, revert_reason)
                 } else {
-                    "unknown".to_string()
+                    let encoded_revert_reason = encoded_revert_reason?;
+                    let revert_code = hex::encode(&encoded_revert_reason.0);
+                    let revert_reason = if encoded_revert_reason.0.len() >= 4 {
+                        let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
+
+                        ethabi::decode(
+                            &[ethabi::ParamType::String],
+                            encoded_string_without_function_hash,
+                        )?
+                        .into_iter()
+                        .next()
+                        .unwrap()
+                        .to_string()
+                    } else {
+                        "unknown".to_string()
+                    };
+                    (revert_code, revert_reason)
                 };
 
                 metrics::histogram!("eth_client.direct.failure_reason", start.elapsed());

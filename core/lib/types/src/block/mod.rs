@@ -1,16 +1,21 @@
 //! zkSync network block definition.
 
 use super::{AccountId, BlockNumber, Fr, PriorityOp, ZkSyncOp};
-use crate::{tx::error::CloseOperationsDisabled, SignedZkSyncTx};
+use crate::{tx::error::CloseOperationsDisabled, SignedZkSyncTx, TokenId};
 use chrono::Utc;
 use chrono::{DateTime, TimeZone};
 use parity_crypto::digest::sha256;
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use zksync_crypto::params::{CHUNK_BIT_WIDTH, CHUNK_BYTES};
 use zksync_crypto::serialization::FrSerde;
+
+mod incomplete_block;
+
+pub use incomplete_block::IncompleteBlock;
 
 /// An intermediate state of the block in the zkSync network.
 /// Contains the information about (so far) executed transactions and
@@ -32,8 +37,6 @@ pub struct PendingBlock {
     pub success_operations: Vec<ExecutedOperations>,
     /// List of failed operations.
     pub failed_txs: Vec<ExecutedTx>,
-    /// Previous block root hash
-    pub previous_block_root_hash: H256,
     /// Timestamp
     pub timestamp: u64,
 }
@@ -86,6 +89,21 @@ pub enum ExecutedOperations {
 
 impl ExecutedOperations {
     /// Returns Id of the account affected by the operation.
+
+    pub fn token_id(&self) -> TokenId {
+        match self {
+            ExecutedOperations::Tx(tx) => tx.signed_tx.tx.token_id(),
+            ExecutedOperations::PriorityOp(op) => op.priority_op.data.token_id(),
+        }
+    }
+
+    pub fn variance_name(&self) -> String {
+        match self {
+            ExecutedOperations::Tx(tx) => tx.signed_tx.tx.variance_name(),
+            ExecutedOperations::PriorityOp(op) => op.priority_op.data.variance_name(),
+        }
+    }
+
     pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ExecutedOperations::Tx(tx) => tx.signed_tx.account_id(),
@@ -137,6 +155,18 @@ impl ExecutedOperations {
             ExecutedOperations::Tx(exec_tx) => exec_tx.success,
             ExecutedOperations::PriorityOp(_) => true,
         }
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        let created_at = match self {
+            ExecutedOperations::Tx(tx) => tx.created_at,
+            ExecutedOperations::PriorityOp(op) => op.created_at,
+        };
+        (Utc::now() - created_at).to_std().unwrap_or_default()
+    }
+
+    pub fn is_priority(&self) -> bool {
+        matches!(self, Self::PriorityOp(_))
     }
 }
 
@@ -198,35 +228,33 @@ impl Block {
         }
     }
 
-    /// Creates a new block, choosing block chunk size
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_with_current_chunk_size(
-        block_number: BlockNumber,
+    /// Creates a new block from an incomplete one.
+    pub fn from_incomplete(
+        incomplete: IncompleteBlock,
+        previous_block_root_hash: Fr,
         new_root_hash: Fr,
-        fee_account: AccountId,
-        block_transactions: Vec<ExecutedOperations>,
-        processed_priority_ops: (u64, u64),
-        commit_gas_limit: U256,
-        verify_gas_limit: U256,
-        previous_block_root_hash: H256,
-        timestamp: u64,
     ) -> Self {
+        // Encode previous block root to the Ethereum format.
+        let previous_block_root_hash = Self::encode_fr_for_eth(previous_block_root_hash);
+
         let mut block = Self {
-            block_number,
+            // Copied fields.
+            block_number: incomplete.block_number,
+            fee_account: incomplete.fee_account,
+            block_transactions: incomplete.block_transactions,
+            processed_priority_ops: incomplete.processed_priority_ops,
+            block_chunks_size: incomplete.block_chunks_size,
+            commit_gas_limit: incomplete.commit_gas_limit,
+            verify_gas_limit: incomplete.verify_gas_limit,
+            timestamp: incomplete.timestamp,
+
+            // Fields *not* from the incomplete block.
             new_root_hash,
-            fee_account,
-            block_transactions,
-            processed_priority_ops,
-            block_chunks_size: 0,
-            commit_gas_limit,
-            verify_gas_limit,
             block_commitment: H256::default(),
-            timestamp,
         };
-        block.block_chunks_size = block.chunks_used();
         block.block_commitment = Block::get_commitment(
-            block_number,
-            fee_account,
+            block.block_number,
+            block.fee_account,
             previous_block_root_hash,
             block.get_eth_encoded_root(),
             block.timestamp,
@@ -280,14 +308,18 @@ impl Block {
         block
     }
 
-    /// Returns the new state root hash encoded for the Ethereum smart contract.
-    pub fn get_eth_encoded_root(&self) -> H256 {
+    /// Encodes any `Fr` hash to `H256`.
+    pub fn encode_fr_for_eth(fr: Fr) -> H256 {
         let mut be_bytes = [0u8; 32];
-        self.new_root_hash
-            .into_repr()
+        fr.into_repr()
             .write_be(be_bytes.as_mut())
             .expect("Write commit bytes");
         H256::from(be_bytes)
+    }
+
+    /// Returns the new state root hash encoded for the Ethereum smart contract.
+    pub fn get_eth_encoded_root(&self) -> H256 {
+        Self::encode_fr_for_eth(self.new_root_hash)
     }
 
     /// Returns the public data for the Ethereum Commit operation.
@@ -459,6 +491,12 @@ impl Block {
 
     pub fn timestamp_utc(&self) -> DateTime<Utc> {
         Utc.timestamp(self.timestamp as i64, 0)
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        (Utc::now() - self.timestamp_utc())
+            .to_std()
+            .unwrap_or_default()
     }
 }
 

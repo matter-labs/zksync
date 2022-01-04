@@ -82,7 +82,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Execute and commit block with them.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(1),
             block_size,
             Default::default(),

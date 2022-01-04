@@ -732,17 +732,11 @@ where
 mod tests {
     use super::*;
 
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     struct TestHasher;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Default)]
     struct TestLeaf(u64);
-
-    impl Default for TestLeaf {
-        fn default() -> Self {
-            TestLeaf(0)
-        }
-    }
 
     impl GetBits for TestLeaf {
         fn get_bits_le(&self) -> Vec<bool> {
@@ -753,12 +747,6 @@ mod tests {
                 i >>= 1;
             }
             acc
-        }
-    }
-
-    impl Default for TestHasher {
-        fn default() -> Self {
-            Self {}
         }
     }
 

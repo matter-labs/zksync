@@ -3,5 +3,6 @@ use zksync_prover::dummy_prover::DummyProver;
 
 #[tokio::main]
 async fn main() {
-    main_for_prover_impl::<DummyProver>().await;
+    let run_prometheus_exporter = false;
+    main_for_prover_impl::<DummyProver>(run_prometheus_exporter).await;
 }

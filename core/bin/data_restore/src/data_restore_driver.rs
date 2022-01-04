@@ -143,7 +143,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     ///
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     ///
-    pub async fn set_genesis_state(
+    pub async fn set_genesis_state_from_eth(
         &mut self,
         interactor: &mut StorageInteractor<'_>,
         genesis_tx_hash: H256,
@@ -158,15 +158,23 @@ impl<T: Transport> DataRestoreDriver<T> {
             .set_genesis_block_number(&genesis_transaction)
             .expect("Cant set genesis block number for events state");
         vlog::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
+        let genesis_fee_account =
+            get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
+        self.set_genesis_state(interactor, genesis_eth_block_number, genesis_fee_account)
+            .await
+    }
 
+    pub async fn set_genesis_state(
+        &mut self,
+        interactor: &mut StorageInteractor<'_>,
+        genesis_eth_block_number: u64,
+        genesis_fee_account: Account,
+    ) {
         let mut transaction = interactor.start_transaction().await;
 
         transaction
             .save_events_state(&[], &[], &[], genesis_eth_block_number)
             .await;
-
-        let genesis_fee_account =
-            get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
 
         vlog::info!(
             "genesis fee account address: 0x{}",
@@ -241,13 +249,13 @@ impl<T: Transport> DataRestoreDriver<T> {
     async fn store_tree_cache(&mut self, interactor: &mut StorageInteractor<'_>) {
         vlog::info!(
             "Storing the tree cache, block number: {}",
-            self.tree_state.state.block_number
+            self.tree_state.block_number
         );
         self.tree_state.state.root_hash();
         let tree_cache = self.tree_state.state.get_balance_tree().get_internals();
         interactor
             .store_tree_cache(
-                self.tree_state.state.block_number,
+                self.tree_state.block_number,
                 serde_json::to_value(tree_cache).expect("failed to serialize tree cache"),
             )
             .await;
@@ -304,7 +312,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         self.last_priority_op_serial_id = transaction.get_max_priority_op_serial_id().await;
         let total_verified_blocks = self.zksync_contract.get_total_verified_blocks().await;
 
-        let last_verified_block = self.tree_state.state.block_number;
+        let last_verified_block = self.tree_state.block_number;
 
         transaction.commit().await;
 
@@ -344,7 +352,7 @@ impl<T: Transport> DataRestoreDriver<T> {
                     let total_verified_blocks =
                         self.zksync_contract.get_total_verified_blocks().await;
 
-                    let last_verified_block = self.tree_state.state.block_number;
+                    let last_verified_block = self.tree_state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state
                     // to keep the `state_keeper` consistent with the `eth_sender`.
@@ -517,7 +525,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             .events_state
             .get_only_verified_committed_events()
             .iter()
-            .filter(|bl| bl.block_num > self.tree_state.state.block_number)
+            .filter(|bl| bl.block_num > self.tree_state.block_number)
         {
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.

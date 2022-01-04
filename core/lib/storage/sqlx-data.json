@@ -42,6 +42,18 @@
       ]
     }
   },
+  "022eb06117f5a1ce548b596cd55600e6c2c0b8a07d6daf99794d6c6704182299": {
+    "query": "DELETE FROM incomplete_blocks WHERE number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "052bc740befe43cd3d8d915371cb055187d4ff4ebf019fe12c8dc85b296acc47": {
     "query": "SELECT tx_hash, tx FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
     "describe": {
@@ -66,30 +78,6 @@
       "nullable": [
         false,
         false
-      ]
-    }
-  },
-  "065f83bfa5ed2f2dff30ce38b9d2dd4518ec00f81a98bc378f30a07db5f7b678": {
-    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                    INTERSECT\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE $4::boolean OR (address = $5 AND ($2::boolean OR token = $3))\n                )\n                SELECT COUNT(*) as \"count!\" FROM tx_hashes\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Bool",
-          "Int4",
-          "Bool",
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
@@ -983,11 +971,16 @@
         },
         {
           "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
           "name": "agg_op_id?",
           "type_info": "Int8"
         },
         {
-          "ordinal": 9,
+          "ordinal": 10,
           "name": "arguments?",
           "type_info": "Jsonb"
         }
@@ -1004,6 +997,7 @@
         true,
         false,
         false,
+        true,
         false,
         false
       ]
@@ -1454,6 +1448,11 @@
           "ordinal": 7,
           "name": "last_used_gas_price",
           "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -1469,7 +1468,8 @@
         false,
         true,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -1720,6 +1720,25 @@
       ]
     }
   },
+  "30ef0469f0125289ac955a30e1fab1cc8f06511ba9d4907ae8a3678482f8a0a2": {
+    "query": "\n            INSERT INTO incomplete_blocks (number, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit,  timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "311eb879affeff3c877d978d0a7ac443d904edbc606a213ecc5959dbedc16b3e": {
     "query": "SELECT created_at, block_number FROM executed_priority_operations\n                WHERE tx_hash = $1",
     "describe": {
@@ -1771,6 +1790,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "32534621f625f4eb72d416e0a35e01d32b322a7efe0c1b6f477e545a1ce25f9e": {
+    "query": "SELECT root_hash FROM blocks WHERE number = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "root_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "3538961dd16f0eb374b50b33cae9a656426720c7fdf5d26ac406f44f47692e01": {
@@ -1833,6 +1872,44 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "362fd44171d332181078c5b7d2856df3ec60b370adde3b8af2c482abca02445f": {
+    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1\n                ), transactions AS (\n                    SELECT executed_transactions.tx_hash, created_at, block_index\n                    FROM tx_hashes\n                    INNER JOIN executed_transactions\n                        ON tx_hashes.tx_hash = executed_transactions.tx_hash\n                ORDER BY created_at DESC, block_index DESC\n                LIMIT 1\n                ), priority_ops AS (\n                    SELECT executed_priority_operations.tx_hash, created_at, block_index\n                    FROM tx_hashes\n                    INNER JOIN executed_priority_operations\n                        ON tx_hashes.tx_hash = executed_priority_operations.tx_hash\n                ORDER BY created_at DESC, block_index DESC\n                LIMIT 1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\"\n                FROM everything\n                ORDER BY created_at DESC, block_index DESC\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "38e7464ba17d495fe87cf1412ffe10af8dc4b44f99dc2df1ec580f20f609b650": {
+    "query": "SELECT max(number) FROM incomplete_blocks",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
@@ -1968,6 +2045,28 @@
       "nullable": [
         false,
         false
+      ]
+    }
+  },
+  "41658b41160ecd5bc97cf22c82b63448f05bf1f8bd4c0b9dd64f6b16c830c093": {
+    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters \n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                )\n                SELECT COUNT(*) as \"count!\"\n                FROM tx_hashes\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bool",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -2520,6 +2619,29 @@
       ]
     }
   },
+  "51edc4a74becb050ee8727c6fd24e6793254386e3403f36509fffc11ceff40a1": {
+    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                    INTERSECT\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $4 AND ($2::boolean OR token = $3)\n                )\n                SELECT COUNT(*) as \"count!\" FROM tx_hashes\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bool",
+          "Int4",
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "51f7701a34610b1661c5f21b6dd31ddb9fbc3efea4397096eed7ccb42ed21071": {
     "query": "SELECT COUNT(*) FROM executed_priority_operations",
     "describe": {
@@ -2693,23 +2815,6 @@
       ]
     }
   },
-  "5ab853a2edb8a8e2ac1c95f30aa209cb4e06f41fb55872e2d1f28e3a59e38517": {
-    "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5, timestamp = $6\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "5b92ff5c1c97c0d870e75902d4f89b0725075b8a2f3f41cc4a4e443f792d1b5c": {
     "query": "DELETE FROM eth_unprocessed_aggregated_ops WHERE op_id = ANY($1)",
     "describe": {
@@ -2720,6 +2825,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "5c7fddda5592e9d84648e4e52e8e6cbb8c98d390e00ca7298a4cd6e5ef9367f2": {
+    "query": "\n            SELECT SUM(usd_amount_scale6) as total FROM subsidies \n            WHERE subsidy_type = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "total",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
@@ -2884,6 +3009,24 @@
         "Left": []
       },
       "nullable": []
+    }
+  },
+  "6419de705f4419e12e7ea79d9fb10622c6e79c72bc7858e3d4d21aec74b49574": {
+    "query": "SELECT count(*) as \"count!\" FROM executed_transactions WHERE success = false",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
@@ -3765,18 +3908,6 @@
       ]
     }
   },
-  "8542fbcf1f669243a111348851c36ec3b01c4c11ac3391d55546d22a9e714e6b": {
-    "query": "DELETE FROM executed_transactions\n            WHERE success = false AND created_at < $1",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Timestamptz"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "860cebd02464f314a5d2f7f9708beff689cce8891d8727189318732765f60a88": {
     "query": "\n            WITH aggr_comm AS (\n                SELECT \n                    aggregate_operations.created_at, \n                    eth_operations.final_hash, \n                    commit_aggregated_blocks_binding.block_number \n                FROM aggregate_operations\n                    INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id\n                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                WHERE aggregate_operations.confirmed = true \n            ),\n            aggr_exec as (\n                 SELECT \n                    aggregate_operations.created_at, \n                    eth_operations.final_hash, \n                    execute_aggregated_blocks_binding.block_number \n                FROM aggregate_operations\n                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                WHERE aggregate_operations.confirmed = true \n            )\n            SELECT\n                blocks.number AS \"block_number!\",\n                blocks.root_hash AS \"new_state_root!\",\n                blocks.block_size AS \"block_size!\",\n                committed.final_hash AS \"commit_tx_hash?\",\n                verified.final_hash AS \"verify_tx_hash?\",\n                committed.created_at AS \"committed_at!\",\n                verified.created_at AS \"verified_at?\"\n            FROM blocks\n                     INNER JOIN aggr_comm committed ON blocks.number = committed.block_number\n                     LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number\n            WHERE false\n                OR committed.final_hash = $1\n                OR verified.final_hash = $1\n                OR blocks.root_hash = $1\n                OR blocks.number = $2\n            ORDER BY blocks.number DESC\n            LIMIT 1;\n            ",
     "describe": {
@@ -4461,78 +4592,20 @@
       ]
     }
   },
-  "9bbcd5b256d690e11c809d85dbcf886dadf1fefd778d16fcb18b9cd0e4b12c1b": {
-    "query": "\n                            WITH tx_hashes AS (\n                                SELECT DISTINCT tx_hash FROM tx_filters\n                                WHERE address = $1 AND ($2::boolean OR token = $3)\n                                INTERSECT\n                                SELECT DISTINCT tx_hash FROM tx_filters\n                                WHERE $4::boolean OR (address = $5 AND ($2::boolean OR token = $3))\n                            ), transactions AS (\n                                SELECT\n                                    executed_transactions.tx_hash,\n                                    tx as op,\n                                    block_number,\n                                    created_at,\n                                    success,\n                                    fail_reason,\n                                    Null::bytea as eth_hash,\n                                    Null::bigint as priority_op_serialid,\n                                    block_index,\n                                    batch_id\n                                FROM tx_hashes\n                                INNER JOIN executed_transactions\n                                    ON tx_hashes.tx_hash = executed_transactions.tx_hash\n                                WHERE created_at <= $6\n                            ), priority_ops AS (\n                                SELECT\n                                    executed_priority_operations.tx_hash,\n                                    operation as op,\n                                    block_number,\n                                    created_at,\n                                    true as success,\n                                    Null as fail_reason,\n                                    eth_hash,\n                                    priority_op_serialid,\n                                    block_index,\n                                    Null::bigint as batch_id\n                                FROM tx_hashes\n                                INNER JOIN executed_priority_operations\n                                    ON tx_hashes.tx_hash = executed_priority_operations.tx_hash\n                                WHERE created_at <= $6\n                            ), everything AS (\n                                SELECT * FROM transactions\n                                UNION ALL\n                                SELECT * FROM priority_ops\n                            )\n                            SELECT\n                                tx_hash as \"tx_hash!\",\n                                block_number as \"block_number!\",\n                                op as \"op!\",\n                                created_at as \"created_at!\",\n                                success as \"success!\",\n                                fail_reason as \"fail_reason?\",\n                                eth_hash as \"eth_hash?\",\n                                priority_op_serialid as \"priority_op_serialid?\",\n                                batch_id as \"batch_id?\"\n                            FROM everything\n                            ORDER BY created_at DESC, block_index DESC\n                            LIMIT $7\n                        ",
+  "9b56392b97b79d99c83f86e21a4d2f4616c11ff2ff283c31b6a340d2353e7202": {
+    "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, timestamp)\n            VALUES ($1, $2, $3, $4, $5)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, timestamp = $5\n            ",
     "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "op!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "eth_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "priority_op_serialid?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 8,
-          "name": "batch_id?",
-          "type_info": "Int8"
-        }
-      ],
+      "columns": [],
       "parameters": {
         "Left": [
-          "Bytea",
-          "Bool",
-          "Int4",
-          "Bool",
-          "Bytea",
-          "Timestamptz",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
           "Int8"
         ]
       },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
+      "nullable": []
     }
   },
   "9c0a30a24bb6c2481323effc74b01db6163f9e9a368da85ceda727b6e547f087": {
@@ -4755,88 +4828,31 @@
       "nullable": []
     }
   },
-  "a6246ebdd417c6873328b9bce4c892f07ff725bb578646d3c04d5e7406789e47": {
-    "query": "\n                            WITH tx_hashes AS (\n                                SELECT DISTINCT tx_hash FROM tx_filters\n                                WHERE address = $1 AND ($2::boolean OR token = $3)\n                                INTERSECT\n                                SELECT DISTINCT tx_hash FROM tx_filters\n                                WHERE $4::boolean OR (address = $5 AND ($2::boolean OR token = $3))\n                            ), transactions AS (\n                                SELECT\n                                    executed_transactions.tx_hash,\n                                    tx as op,\n                                    block_number,\n                                    created_at,\n                                    success,\n                                    fail_reason,\n                                    Null::bytea as eth_hash,\n                                    Null::bigint as priority_op_serialid,\n                                    block_index,\n                                    batch_id\n                                FROM tx_hashes\n                                INNER JOIN executed_transactions\n                                    ON tx_hashes.tx_hash = executed_transactions.tx_hash\n                                WHERE created_at >= $6\n                            ), priority_ops AS (\n                                SELECT\n                                    executed_priority_operations.tx_hash,\n                                    operation as op,\n                                    block_number,\n                                    created_at,\n                                    true as success,\n                                    Null as fail_reason,\n                                    eth_hash,\n                                    priority_op_serialid,\n                                    block_index,\n                                    Null::bigint as batch_id\n                                FROM tx_hashes\n                                INNER JOIN executed_priority_operations\n                                    ON tx_hashes.tx_hash = executed_priority_operations.tx_hash\n                                WHERE created_at >= $6\n                            ), everything AS (\n                                SELECT * FROM transactions\n                                UNION ALL\n                                SELECT * FROM priority_ops\n                            )\n                            SELECT\n                                tx_hash as \"tx_hash!\",\n                                block_number as \"block_number!\",\n                                op as \"op!\",\n                                created_at as \"created_at!\",\n                                success as \"success!\",\n                                fail_reason as \"fail_reason?\",\n                                eth_hash as \"eth_hash?\",\n                                priority_op_serialid as \"priority_op_serialid?\",\n                                batch_id as \"batch_id?\"\n                            FROM everything\n                            ORDER BY created_at ASC, block_index ASC\n                            LIMIT $7\n                        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "op!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "eth_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 7,
-          "name": "priority_op_serialid?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 8,
-          "name": "batch_id?",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Bool",
-          "Int4",
-          "Bool",
-          "Bytea",
-          "Timestamptz",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
-    }
-  },
-  "a77668a3dce7f7cd1f45816f932eea685d429c3d75b40ea8e1a1bb9fc29f11c6": {
-    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
+  "a545c7251d381afbb2bdcbaef0cc5f1bc322db47ee0db555b83b9e19119bc756": {
+    "query": "DELETE FROM executed_transactions WHERE tx_hash IN (SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000)",
     "describe": {
       "columns": [],
       "parameters": {
         "Left": [
+          "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a665923ec57382f357f6bb65f6e35876fbfedbf1661b3ce34f2458b63eebc68e": {
+    "query": "\n            INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )\n            VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Int8",
           "Int4",
-          "Int4"
+          "Numeric",
+          "Numeric",
+          "Varchar"
         ]
       },
       "nullable": []
@@ -4850,6 +4866,18 @@
         "Left": [
           "Int8",
           "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a80a6fbc454119fbb9532ad3f5f10d62236e62fead0f0ae05357874247c851d1": {
+    "query": "DELETE FROM incomplete_blocks WHERE number = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
           "Int8"
         ]
       },
@@ -5257,6 +5285,11 @@
           "ordinal": 7,
           "name": "last_used_gas_price",
           "type_info": "Numeric"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -5273,7 +5306,8 @@
         false,
         true,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -5992,6 +6026,24 @@
       ]
     }
   },
+  "cc97b33cc2f24fa09f02c16c048e12060daf39c91845cb35847daa229065560e": {
+    "query": "SELECT MAX(block) FROM account_tree_cache",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "cd0e1f11fb56662010b4ec2e0eb9a0e877f1eab4157f8ac57db9b18cca666cbe": {
     "query": "\n            SELECT max(id) as \"id!\" FROM tokens WHERE kind != 'NFT'::token_kind\n            ",
     "describe": {
@@ -6038,6 +6090,30 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "ceddeadf425bad4196cfc489a3ff56a4ea14a1e44872bc3d0e8c1795646ee89a": {
+    "query": "\n                SELECT min(number), max(number)\n                FROM incomplete_blocks\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "min",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null,
+        null
+      ]
     }
   },
   "d106212871e6b0266259fa0f819ab51c1e58ec799a45b618a4ec4d67d00f49be": {
@@ -6462,6 +6538,26 @@
       "nullable": []
     }
   },
+  "e188272dd4fd0e228f4fcd7182eff49db1316e061b6d9940da543981f8a179d6": {
+    "query": "SELECT created_at FROM eth_operations WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
   "e19061f374f28705d805f4f7eb05fe05f4adafeb80a9ac37a91cc6557f2b470a": {
     "query": "\n                    SELECT serial_id FROM mint_nft_updates\n                    WHERE creator_address = $1\n                    ORDER BY serial_id\n                ",
     "describe": {
@@ -6790,6 +6886,68 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "e8810aa7bae2def2bb6863eafa2468a070b37cb4428fe1622a32aca2e646cba0": {
+    "query": "SELECT * FROM incomplete_blocks WHERE number = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "fee_account_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "unprocessed_prior_op_before",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "unprocessed_prior_op_after",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "block_size",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "commit_gas_limit",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "verify_gas_limit",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "timestamp",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
     }
   },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {
@@ -7417,26 +7575,6 @@
       ]
     }
   },
-  "f4cadbc951d4ae3a7937e128408d038ccec534e57aba853e81a9b05d3b1387b5": {
-    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1\n                ), transactions AS (\n                    SELECT executed_transactions.tx_hash, created_at, block_index\n                    FROM tx_hashes\n                    INNER JOIN executed_transactions\n                        ON tx_hashes.tx_hash = executed_transactions.tx_hash\n                ), priority_ops AS (\n                    SELECT executed_priority_operations.tx_hash, created_at, block_index\n                    FROM tx_hashes\n                    INNER JOIN executed_priority_operations\n                        ON tx_hashes.tx_hash = executed_priority_operations.tx_hash\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\"\n                FROM everything\n                ORDER BY created_at DESC, block_index DESC\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "f5a24f01f525ede5d8e61b97e452a82d372c2bececacf693ab654eef0e453d94": {
     "query": "SELECT max(to_block) from aggregate_operations where action_type = $1",
     "describe": {
@@ -7596,6 +7734,27 @@
       ]
     }
   },
+  "faefd7d582000800f48eddcc1e933a876f5b0cd556f0dc45c6241eb72da97894": {
+    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds' RETURNING id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "fd16aadbd04d4a48332d59c77290a588f1a33922418b55a08c656a44ff75b8e8": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number = $1",
     "describe": {
@@ -7662,6 +7821,18 @@
         false,
         false
       ]
+    }
+  },
+  "fd18b441397834df097a6b1a62a773fbbb482a42a6c8f698277be4d2f219ae79": {
+    "query": "DELETE FROM aggregate_operations WHERE from_block > $1 and confirmed=false",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "fe0256b27116eafc9a83d0f9eff341751c6022a13d0bc3625c8c8f8b9001309e": {

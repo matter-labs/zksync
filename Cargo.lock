@@ -3861,6 +3861,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "remove_proofs"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "ethabi",
+ "structopt",
+ "tokio",
+ "web3",
+ "zksync_config",
+ "zksync_eth_client",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "reqwest"
 version = "0.11.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5629,6 +5644,7 @@ dependencies = [
  "ethabi",
  "futures 0.3.17",
  "hex",
+ "hyper 0.14.14",
  "itertools 0.9.0",
  "jsonrpc-core 18.0.0",
  "jsonrpc-core-client",
@@ -6024,6 +6040,7 @@ dependencies = [
  "futures 0.3.17",
  "hex",
  "jsonwebtoken",
+ "metrics",
  "num",
  "reqwest",
  "rust-crypto",
@@ -6036,6 +6053,7 @@ dependencies = [
  "zksync_circuit",
  "zksync_config",
  "zksync_crypto",
+ "zksync_prometheus_exporter",
  "zksync_prover_utils",
  "zksync_state",
  "zksync_types",
@@ -6049,6 +6067,7 @@ dependencies = [
  "anyhow",
  "backoff 0.1.6",
  "lazy_static",
+ "metrics",
  "num",
  "reqwest",
  "serde",

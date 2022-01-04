@@ -18,6 +18,7 @@ zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_prover_utils = { path = "../../lib/prover_utils", version = "1.0" }
+zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 
 hex = "0.4"
 rust-crypto = "0.2"
@@ -39,3 +40,4 @@ anyhow = "1.0"
 backoff = { version = "0.3.0", features = ["tokio"] }
 structopt = "0.3.20"
 ctrlc = { version = "3.1", features = ["termination"] }
+metrics = "0.17"

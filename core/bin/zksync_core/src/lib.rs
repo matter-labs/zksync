@@ -6,7 +6,7 @@ use crate::{
     eth_watch::start_eth_watch,
     mempool::run_mempool_tasks,
     private_api::start_private_core_api,
-    state_keeper::{start_state_keeper, ZkSyncStateKeeper},
+    state_keeper::{start_root_hash_calculator, start_state_keeper, ZkSyncStateKeeper},
     token_handler::run_token_handler,
 };
 use futures::{channel::mpsc, future};
@@ -28,6 +28,8 @@ pub mod rejected_tx_cleaner;
 pub mod state_keeper;
 pub mod token_handler;
 pub mod tx_event_emitter;
+
+mod genesis;
 
 /// Waits for any of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
@@ -53,8 +55,7 @@ pub async fn genesis_init(config: &ChainConfig) {
     let pool = ConnectionPool::new(Some(1));
 
     vlog::info!("Generating genesis block.");
-    ZkSyncStateKeeper::create_genesis_block(pool.clone(), &config.state_keeper.fee_account_addr)
-        .await;
+    genesis::create_genesis_block(pool.clone(), &config.state_keeper.fee_account_addr).await;
     vlog::info!("Adding initial tokens to db");
     let genesis_tokens = get_genesis_token_list(&config.eth.network.to_string())
         .expect("Initial token list not found");
@@ -120,13 +121,10 @@ pub async fn run_core(
     // Insert pending withdrawals into database (if required)
     let mut storage_processor = connection_pool.access_storage().await?;
 
-    // Start State Keeper.
-    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await?;
-    let pending_block = state_keeper_init
-        .get_pending_block(&mut storage_processor)
-        .await;
+    // Start state keeper and root hash calculator.
+    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await;
 
-    let state_keeper = ZkSyncStateKeeper::new(
+    let (state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
         state_keeper_init,
         config.chain.state_keeper.fee_account_addr,
         state_keeper_req_receiver,
@@ -136,7 +134,9 @@ pub async fn run_core(
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
         processed_tx_events_sender,
     );
-    let state_keeper_task = start_state_keeper(state_keeper, pending_block);
+    let root_hash_queue = state_keeper.root_hash_queue();
+    let state_keeper_task = start_state_keeper(state_keeper);
+    let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
 
     // Start committer.
     let committer_task = run_committer(
@@ -182,6 +182,7 @@ pub async fn run_core(
         config,
         mempool_block_request_sender.clone(),
         state_keeper_req_sender.clone(),
+        root_hash_queue,
     );
 
     // Start private API.
@@ -194,6 +195,7 @@ pub async fn run_core(
     let task_futures = vec![
         eth_watch_task,
         state_keeper_task,
+        root_hash_calculator_task,
         committer_task,
         mempool_task,
         proposer_task,

@@ -86,7 +86,12 @@ async fn get_pending_ops(
     // Transform operations into `OngoingDeposit`.
     let deposits: Vec<_> = ongoing_ops.into_iter().map(OngoingDeposit::new).collect();
 
-    metrics::histogram!("api.rpc.get_ongoing_deposits", start.elapsed());
+    metrics::histogram!(
+        "api",
+        start.elapsed(),
+        "type" => "rpc",
+        "endpoint_name" => "get_ongoing_deposits"
+    );
     Ok(OngoingDepositsResp { deposits })
 }
 

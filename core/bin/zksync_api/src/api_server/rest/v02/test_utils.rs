@@ -6,10 +6,10 @@ use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, Zero};
 use chrono::Utc;
 use futures::{channel::mpsc, StreamExt};
-use num::BigUint;
+use num::{rational::Ratio, BigUint};
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
@@ -447,7 +447,7 @@ impl TestServerConfig {
             storage
                 .chain()
                 .block_schema()
-                .save_block(gen_sample_block(
+                .save_full_block(gen_sample_block(
                     block_number,
                     BLOCK_SIZE_CHUNKS,
                     txs.clone(),
@@ -833,7 +833,11 @@ pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<Tick
                         1_u64.into(),
                     );
 
-                    let res = Ok(ResponseFee { normal_fee });
+                    let res = Ok(ResponseFee {
+                        normal_fee: normal_fee.clone(),
+                        subsidized_fee: normal_fee,
+                        subsidy_size_usd: Ratio::from(BigUint::zero()),
+                    });
 
                     response.send(res).expect("Unable to send response");
                 }
@@ -867,7 +871,11 @@ pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<Tick
                         BigUint::from(transactions.len()).into(),
                     );
 
-                    let res = Ok(ResponseBatchFee { normal_fee });
+                    let res = Ok(ResponseBatchFee {
+                        normal_fee: normal_fee.clone(),
+                        subsidized_fee: normal_fee,
+                        subsidy_size_usd: Ratio::from(BigUint::zero()),
+                    });
 
                     response.send(res).expect("Unable to send response");
                 }

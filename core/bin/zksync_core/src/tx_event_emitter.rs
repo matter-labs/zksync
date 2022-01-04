@@ -36,7 +36,7 @@ pub fn run_tx_event_emitter_task(
                 .expect("tx event emitter failed to access the database");
             storage
                 .event_schema()
-                .store_executed_transaction_event(block_number, executed_ops)
+                .store_executed_transaction_event(block_number, &executed_ops)
                 .await
                 .expect("tx event emitter failed to store events in the database");
         }

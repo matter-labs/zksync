@@ -1,14 +1,15 @@
+use chrono::{DateTime, Utc};
 use num::BigUint;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
-
+use std::time::Duration;
 use zksync_basic_types::{AccountId, Address};
 
 use crate::{
     operations::{ChangePubKeyOp, MintNFTOp},
     tx::{
-        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, MintNFT, Swap, Transfer,
-        TxEthSignature, TxHash, TxSignature, Withdraw, WithdrawNFT,
+        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, MintNFT, Swap, TimeRange,
+        Transfer, TxEthSignature, TxHash, TxSignature, Withdraw, WithdrawNFT,
     },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
@@ -32,6 +33,15 @@ pub struct SignedZkSyncTx {
     /// which user should have signed with their private key.
     /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<EthSignData>,
+
+    #[serde(default = "Utc::now")]
+    pub created_at: DateTime<Utc>,
+}
+
+impl SignedZkSyncTx {
+    pub fn elapsed(&self) -> Duration {
+        (Utc::now() - self.created_at).to_std().unwrap_or_default()
+    }
 }
 
 /// A set of L2 transaction supported by the zkSync network.
@@ -102,6 +112,7 @@ impl From<ZkSyncTx> for SignedZkSyncTx {
         Self {
             tx,
             eth_sign_data: None,
+            created_at: Utc::now(),
         }
     }
 }
@@ -452,6 +463,20 @@ impl ZkSyncTx {
                     withdraw.fee.clone(),
                 ))
             }
+        }
+    }
+
+    /// Returns the time range of this transaction.
+    pub fn time_range(&self) -> TimeRange {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::ForcedExit(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Close(tx) => tx.time_range,
+            ZkSyncTx::MintNFT(_) => Default::default(),
+            ZkSyncTx::Swap(tx) => tx.time_range(),
+            ZkSyncTx::WithdrawNFT(tx) => tx.time_range,
         }
     }
 

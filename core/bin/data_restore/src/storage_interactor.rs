@@ -34,6 +34,7 @@ pub struct CachedTreeState {
     pub nfts: HashMap<TokenId, NFT>,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum StorageInteractor<'a> {
     Database(DatabaseStorageInteractor<'a>),
     InMemory(InMemoryStorageInteractor),

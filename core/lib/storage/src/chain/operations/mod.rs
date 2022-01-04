@@ -258,6 +258,11 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
         transaction.commit().await?;
         metrics::histogram!("sql.chain.operations.store_executed_tx", start.elapsed());
+        // It's almost impossible situation, but it could be triggered in tests
+        let tx_duration = (Utc::now() - operation.created_at)
+            .to_std()
+            .unwrap_or_default();
+        metrics::histogram!("process_tx", tx_duration, "stage" => "execute");
         Ok(())
     }
 
@@ -267,8 +272,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
         let offset = Utc::now() - max_age;
         sqlx::query!(
-            "DELETE FROM executed_transactions
-            WHERE success = false AND created_at < $1",
+            "DELETE FROM executed_transactions WHERE tx_hash IN (SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000)",
             offset
         )
         .execute(self.0.conn())
@@ -609,6 +613,27 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
         metrics::histogram!(
             "sql.chain.operations.remove_executed_priority_operations",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    // Removes aggregate operations and bindings for blocks with number greater than `last_block`
+    pub async fn remove_aggregate_operations(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            "DELETE FROM aggregate_operations WHERE from_block > $1 and confirmed=false",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.operations.remove_aggregate_operations",
             start.elapsed()
         );
         Ok(())

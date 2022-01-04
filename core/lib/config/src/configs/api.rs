@@ -1,7 +1,9 @@
+use num::{rational::Ratio, BigUint};
 /// External uses
 use serde::Deserialize;
 /// Built-in uses
 use std::net::SocketAddr;
+use zksync_utils::scaled_u64_to_ratio;
 // Workspace uses
 use zksync_types::AccountId;
 // Local uses
@@ -44,6 +46,10 @@ impl ApiConfig {
 }
 
 impl CommonApiConfig {
+    pub fn max_subsidy_usd(&self) -> Ratio<BigUint> {
+        scaled_u64_to_ratio(self.max_subsidy_usd_scaled)
+    }
+
     pub fn from_env() -> Self {
         envy_load!("common", "API_COMMON_")
     }
@@ -104,6 +110,15 @@ pub struct CommonApiConfig {
 
     pub max_number_of_transactions_per_batch: u64,
     pub max_number_of_authors_per_batch: u64,
+
+    /// The IPs which have their CPK (CREATE2) subsidized
+    pub subsidized_ips: Vec<String>,
+
+    /// Maxiumum subsidized amout for current subsidy type scaled by SUBSIDY_USD_AMOUNTS_SCALE
+    pub max_subsidy_usd_scaled: u64,
+
+    /// The name of current subsidy. It is needed to conveniently fetch historical data regarding subsidies for different partners
+    pub subsidy_name: String,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -226,6 +241,9 @@ mod tests {
                 max_number_of_transactions_per_batch: 200,
                 max_number_of_authors_per_batch: 10,
                 fee_free_accounts: vec![AccountId(4078), AccountId(387)],
+                subsidized_ips: vec!["127.0.0.1".to_owned()],
+                max_subsidy_usd_scaled: 20000,
+                subsidy_name: String::from("PartnerName"),
             },
             admin: AdminApiConfig {
                 port: 8080,
@@ -268,6 +286,9 @@ API_COMMON_CACHES_SIZE="10000"
 API_COMMON_FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS="0"
 API_COMMON_FEE_FREE_ACCOUNTS=4078,387
 API_COMMON_ENFORCE_PUBKEY_CHANGE_FEE=true
+API_COMMON_SUBSIDIZED_IPS="127.0.0.1"
+API_COMMON_MAX_SUBSIDY_USD_SCALED=20000
+API_COMMON_SUBSIDY_NAME=PartnerName
 API_COMMON_MAX_NUMBER_OF_TRANSACTIONS_PER_BATCH=200
 API_COMMON_MAX_NUMBER_OF_AUTHORS_PER_BATCH=10
 API_ADMIN_PORT="8080"

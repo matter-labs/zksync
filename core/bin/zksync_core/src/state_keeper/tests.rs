@@ -1,5 +1,6 @@
 use super::{CommitRequest, ZkSyncStateInitParams, ZkSyncStateKeeper};
 use crate::{mempool::ProposedBlock, state_keeper::utils::system_time_timestamp};
+use chrono::Utc;
 use futures::{channel::mpsc, stream::StreamExt};
 use num::BigUint;
 use zksync_crypto::{
@@ -30,7 +31,7 @@ impl StateKeeperTester {
         let mut init_params = ZkSyncStateInitParams::default();
         init_params.insert_account(AccountId(0), fee_collector.clone());
 
-        let state_keeper = ZkSyncStateKeeper::new(
+        let (state_keeper, _root_hash_calculator) = ZkSyncStateKeeper::new(
             init_params,
             fee_collector.address,
             request_rx,
@@ -106,6 +107,7 @@ fn create_account_and_transfer<B: Into<BigUint>>(
     SignedZkSyncTx {
         tx: ZkSyncTx::Transfer(Box::new(transfer)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     }
 }
 
@@ -178,6 +180,7 @@ fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
     SignedZkSyncTx {
         tx: ZkSyncTx::Withdraw(Box::new(withdraw)),
         eth_sign_data: None,
+        created_at: Utc::now(),
     }
 }
 
@@ -269,9 +272,9 @@ mod apply_priority_op {
         let mut tester = StateKeeperTester::new(8, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
         let deposit = create_deposit(TokenId(0), 145u32);
-        let result = tester.state_keeper.apply_priority_op(deposit);
+        let result = tester.state_keeper.apply_priority_op(&deposit);
         let pending_block = tester.state_keeper.pending_block;
-        assert!(result.is_ok());
+        assert!(result.is_included());
         assert!(pending_block.chunks_left < old_pending_block.chunks_left);
         assert_eq!(
             pending_block.pending_op_block_index,
@@ -279,7 +282,7 @@ mod apply_priority_op {
         );
         assert!(!pending_block.account_updates.is_empty());
         assert!(!pending_block.success_operations.is_empty());
-        assert_eq!(tester.state_keeper.current_unprocessed_priority_op, 1);
+        assert_eq!(pending_block.unprocessed_priority_op_current, 1);
     }
 
     /// Checks if processing deposit fails because of
@@ -288,8 +291,8 @@ mod apply_priority_op {
     fn not_enough_chunks() {
         let mut tester = StateKeeperTester::new(1, 1, 1);
         let deposit = create_deposit(TokenId(0), 1u32);
-        let result = tester.state_keeper.apply_priority_op(deposit);
-        assert!(result.is_err());
+        let result = tester.state_keeper.apply_priority_op(&deposit);
+        assert!(result.is_not_included());
     }
 }
 
@@ -313,7 +316,7 @@ mod apply_tx {
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
-        assert!(result.is_ok());
+        assert!(result.is_included());
         assert!(pending_block.chunks_left < old_pending_block.chunks_left);
         assert_eq!(
             pending_block.pending_op_block_index,
@@ -340,7 +343,7 @@ mod apply_tx {
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
-        assert!(result.is_ok());
+        assert!(result.is_included());
         assert!(!old_pending_block.fast_processing_required);
         assert!(pending_block.fast_processing_required);
     }
@@ -361,7 +364,7 @@ mod apply_tx {
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
-        assert!(result.is_ok());
+        assert!(result.is_included());
         assert_eq!(pending_block.chunks_left, old_pending_block.chunks_left);
         assert_eq!(
             pending_block.pending_op_block_index,
@@ -386,7 +389,7 @@ mod apply_tx {
             Default::default(),
         );
         let result = tester.state_keeper.apply_tx(&withdraw);
-        assert!(result.is_err());
+        assert!(result.is_not_included());
     }
 
     /// Checks if processing withdrawal fails because the gas limit is reached.
@@ -409,14 +412,14 @@ mod apply_tx {
             let result = tester.state_keeper.apply_tx(&withdrawal);
             if i <= withdrawals_number {
                 assert!(
-                    result.is_ok(),
+                    result.is_included(),
                     "i: {}, withdrawals: {}",
                     i,
                     withdrawals_number
                 )
             } else {
                 assert!(
-                    result.is_err(),
+                    result.is_not_included(),
                     "i: {}, withdrawals: {}",
                     i,
                     withdrawals_number
@@ -449,9 +452,12 @@ async fn seal_pending_block() {
     );
     let deposit = create_deposit(TokenId(0), 12u32);
 
-    assert!(tester.state_keeper.apply_tx(&good_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_tx(&bad_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_priority_op(deposit).is_ok());
+    assert!(tester.state_keeper.apply_tx(&good_withdraw).is_included());
+    assert!(tester.state_keeper.apply_tx(&bad_withdraw).is_included());
+    assert!(tester
+        .state_keeper
+        .apply_priority_op(&deposit)
+        .is_included());
 
     let old_updates_len = tester.state_keeper.pending_block.account_updates.len();
     tester.state_keeper.seal_pending_block().await;
@@ -466,7 +472,13 @@ async fn seal_pending_block() {
     assert!(tester.state_keeper.pending_block.account_updates.is_empty());
     assert_eq!(tester.state_keeper.pending_block.chunks_left, 20);
 
-    if let Some(CommitRequest::Block((block, updates))) = tester.response_rx.next().await {
+    assert!(matches!(
+        tester.response_rx.next().await,
+        Some(CommitRequest::PendingBlock(_))
+    ));
+    if let Some(CommitRequest::SealIncompleteBlock((block, updates))) =
+        tester.response_rx.next().await
+    {
         let collected_fees = tester
             .state_keeper
             .state
@@ -477,7 +489,7 @@ async fn seal_pending_block() {
         assert_eq!(collected_fees, BigUint::from(1u32));
         assert_eq!(block.block.processed_priority_ops, (0, 1));
         assert_eq!(
-            tester.state_keeper.state.block_number,
+            tester.state_keeper.pending_block.number,
             block.block.block_number + 1
         );
         assert_eq!(
@@ -513,14 +525,17 @@ async fn store_pending_block() {
     );
     let deposit = create_deposit(TokenId(0), 12u32);
 
-    assert!(tester.state_keeper.apply_tx(&good_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_tx(&bad_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_priority_op(deposit).is_ok());
+    assert!(tester.state_keeper.apply_tx(&good_withdraw).is_included());
+    assert!(tester.state_keeper.apply_tx(&bad_withdraw).is_included());
+    assert!(tester
+        .state_keeper
+        .apply_priority_op(&deposit)
+        .is_included());
 
     tester.state_keeper.store_pending_block().await;
 
     if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-        assert_eq!(block.number, tester.state_keeper.state.block_number);
+        assert_eq!(block.number, tester.state_keeper.pending_block.number);
         assert_eq!(
             block.chunks_left,
             tester.state_keeper.pending_block.chunks_left
@@ -571,8 +586,16 @@ mod execute_proposed_block {
         // Second batch
         apply_batch_with_two_transfers(&mut tester).await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 4);
         } else {
             panic!("Block is not received!");
@@ -596,7 +619,13 @@ mod execute_proposed_block {
 
         // Second batch
         apply_batch_with_two_transfers(&mut tester).await;
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 2);
         } else {
             panic!("Block is not received!");
@@ -610,8 +639,16 @@ mod execute_proposed_block {
         // Single tx
         apply_single_transfer(&mut tester).await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 3);
         } else {
             panic!("Block is not received!");
@@ -643,7 +680,13 @@ mod execute_proposed_block {
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 2);
         } else {
             panic!("Block is not received!");
@@ -657,8 +700,16 @@ mod execute_proposed_block {
         // Last single tx
         apply_single_transfer(&mut tester).await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 3);
         } else {
             panic!("Block is not received!");
@@ -744,7 +795,11 @@ mod execute_proposed_block {
             .await;
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::PendingBlock(_))
+        ));
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
         assert!(matches!(
             tester.response_rx.next().await,
@@ -785,9 +840,16 @@ mod execute_proposed_block {
             .state_keeper
             .execute_proposed_block(proposed_block)
             .await;
+
+        // Proposed block is *always* sent, even if block was sealed.
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
     }
 
@@ -817,10 +879,16 @@ mod execute_proposed_block {
             .execute_proposed_block(proposed_block)
             .await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // We should receive the next block, since it must be sealed right after.
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
     }
 
@@ -1107,14 +1175,17 @@ mod execute_proposed_block {
         let correct_transfer = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(correct_transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let premature_transfer = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(premature_transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let belated_transfer = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(belated_transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let proposed_block = ProposedBlock {
             txs: vec![
@@ -1177,7 +1248,7 @@ mod execute_proposed_block {
         );
         let result = tester.state_keeper.apply_tx(&withdraw);
 
-        assert!(result.is_ok());
+        assert!(result.is_included());
         // Check that gas count shouldn't change
         assert_eq!(
             initial_gas_count,
@@ -1221,7 +1292,7 @@ mod execute_proposed_block {
 
         let result = tester.state_keeper.apply_tx(&third_transfer);
 
-        assert!(result.is_ok());
+        assert!(result.is_included());
         // Check that gas count should increase
         assert!(
             initial_gas_count
@@ -1294,9 +1365,13 @@ mod execute_proposed_block {
             .await;
 
         // Checks that one block is sealed and pending block has only the last withdrawal.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
         if !matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block((_, _)))
+            Some(CommitRequest::SealIncompleteBlock((_, _)))
         ) {
             panic!("Sealed block is not received");
         }
@@ -1401,15 +1476,22 @@ async fn correctly_restore_pending_block_timestamp() {
         SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(transfer)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         }
     };
-    assert!(tester.state_keeper.apply_tx(&good_transfer).is_ok());
+    assert!(tester.state_keeper.apply_tx(&good_transfer).is_included());
 
     tester.state_keeper.store_pending_block().await;
 
+    let previous_stored_account_updates = tester.state_keeper.pending_block.stored_account_updates;
+    assert_ne!(
+        previous_stored_account_updates, 0,
+        "There should be more than 0 stored account updates"
+    );
+
     let pending_block =
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.number, tester.state_keeper.state.block_number);
+            assert_eq!(block.number, tester.state_keeper.pending_block.number);
             assert_eq!(block.success_operations.len(), 1);
             assert_eq!(block.failed_txs.len(), 0);
 
@@ -1435,13 +1517,10 @@ async fn correctly_restore_pending_block_timestamp() {
 
     // Run initialize function and process the pending block.
     // This operation should successfully execute the transfer even though now it's past the time it's valid.
-    tester
-        .state_keeper
-        .initialize(Some(pending_block.clone()))
-        .await;
+    tester.state_keeper.initialize(Some(pending_block.clone()));
 
     assert_eq!(
-        tester.state_keeper.state.block_number, pending_block.number,
+        tester.state_keeper.pending_block.number, pending_block.number,
         "Incorrect block number in state keeper"
     );
 
@@ -1454,6 +1533,12 @@ async fn correctly_restore_pending_block_timestamp() {
         tester.state_keeper.pending_block.failed_txs.len(),
         0,
         "There should be 0 failed txs"
+    );
+
+    // Check that `stored_account_updates` represent actually processed updates.
+    assert_eq!(
+        tester.state_keeper.pending_block.stored_account_updates, previous_stored_account_updates,
+        "Stored account updates were restored incorrectly"
     );
 
     // Just in case try to execute a *new* transaction with the same timestamp.
@@ -1469,7 +1554,7 @@ async fn correctly_restore_pending_block_timestamp() {
     tester
         .state_keeper
         .apply_tx(&withdraw_with_same_valid_until)
-        .expect("Tx was not applied");
+        .assert_included("Tx was not applied");
 
     assert_eq!(
         tester.state_keeper.pending_block.success_operations.len(),

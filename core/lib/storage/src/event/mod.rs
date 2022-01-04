@@ -220,7 +220,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .await?;
 
         let events: Vec<serde_json::Value> = block_operations
-            .into_iter()
+            .iter()
             .filter_map(|executed_operation| {
                 // Rejected transactions are not included into block.
                 let transaction_event = if !executed_operation.is_successful() {
@@ -257,13 +257,13 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     pub async fn store_executed_transaction_event(
         &mut self,
         block_number: BlockNumber,
-        block_operations: Vec<ExecutedOperations>,
+        block_operations: &[ExecutedOperations],
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let events: Vec<serde_json::Value> = block_operations
-            .into_iter()
+            .iter()
             .filter_map(|executed_tx| {
                 let transaction_event = TransactionEvent::from_executed_operation(
                     executed_tx,

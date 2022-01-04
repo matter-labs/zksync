@@ -6,6 +6,11 @@ use zksync_types::{
     BlockNumber, TokenId, NFT,
 };
 
+use super::{
+    root_hash_calculator::BlockRootHashJob,
+    state_restore::{db::StateRestoreStorage, RestoredTree},
+};
+
 #[derive(Debug, Clone)]
 pub struct ZkSyncStateInitParams {
     pub tree: AccountTree,
@@ -13,6 +18,9 @@ pub struct ZkSyncStateInitParams {
     pub nfts: HashMap<TokenId, NFT>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
+
+    pub pending_block: Option<SendablePendingBlock>,
+    pub root_hash_jobs: Vec<BlockRootHashJob>,
 }
 
 impl Default for ZkSyncStateInitParams {
@@ -29,12 +37,55 @@ impl ZkSyncStateInitParams {
             nfts: HashMap::new(),
             last_block_number: BlockNumber(0),
             unprocessed_priority_op: 0,
+
+            pending_block: None,
+            root_hash_jobs: Vec::new(),
         }
     }
 
-    pub async fn get_pending_block(
-        &self,
+    pub async fn restore_from_db(storage: &mut zksync_storage::StorageProcessor<'_>) -> Self {
+        let (last_block_number, tree, acc_id_by_addr) = Self::load_account_tree(storage).await;
+
+        let unprocessed_priority_op =
+            Self::unprocessed_priority_op_id(storage, last_block_number).await;
+        let nfts = Self::load_nft_tokens(storage, last_block_number).await;
+
+        let pending_block = Self::load_pending_block(storage, last_block_number).await;
+        let root_hash_jobs = Self::load_root_hash_jobs(storage).await;
+
+        let init_params = Self {
+            tree,
+            acc_id_by_addr,
+            nfts,
+            last_block_number,
+            unprocessed_priority_op,
+            pending_block,
+            root_hash_jobs,
+        };
+
+        vlog::info!(
+            "Loaded committed state: last block number: {}, unprocessed priority op: {}",
+            *init_params.last_block_number,
+            init_params.unprocessed_priority_op
+        );
+        init_params
+    }
+
+    async fn load_account_tree(
         storage: &mut zksync_storage::StorageProcessor<'_>,
+    ) -> (BlockNumber, AccountTree, HashMap<Address, AccountId>) {
+        let mut restored_tree = RestoredTree::new(StateRestoreStorage::new(storage));
+        let last_block_number = restored_tree.restore().await;
+        (
+            last_block_number,
+            restored_tree.tree,
+            restored_tree.acc_id_by_addr,
+        )
+    }
+
+    async fn load_pending_block(
+        storage: &mut zksync_storage::StorageProcessor<'_>,
+        last_block_number: BlockNumber,
     ) -> Option<SendablePendingBlock> {
         let pending_block = storage
             .chain()
@@ -43,7 +94,7 @@ impl ZkSyncStateInitParams {
             .await
             .unwrap_or_default()?;
 
-        if pending_block.number <= self.last_block_number {
+        if pending_block.number <= last_block_number {
             // If after generating several pending block node generated
             // full blocks, they may be sealed on the first iteration
             // and stored pending block will be outdated.
@@ -54,171 +105,40 @@ impl ZkSyncStateInitParams {
 
         // We've checked that pending block is greater than the last committed block,
         // but it must be greater exactly by 1.
-        assert_eq!(*pending_block.number, *self.last_block_number + 1);
+        assert_eq!(*pending_block.number, *last_block_number + 1);
 
         Some(pending_block)
     }
 
-    pub async fn restore_from_db(
+    async fn load_root_hash_jobs(
         storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<Self, anyhow::Error> {
-        let mut init_params = Self::new();
-        init_params.load_from_db(storage).await?;
-
-        Ok(init_params)
-    }
-
-    async fn load_account_tree(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<BlockNumber, anyhow::Error> {
-        let (last_cached_block_number, accounts) = if let Some((block, _)) = storage
+    ) -> Vec<BlockRootHashJob> {
+        if let Some((block_from, block_to)) = storage
             .chain()
             .block_schema()
-            .get_account_tree_cache()
-            .await?
-        {
-            storage
-                .chain()
-                .state_schema()
-                .load_committed_state(Some(block))
-                .await?
-        } else {
-            storage.chain().state_schema().load_verified_state().await?
-        };
-
-        for (id, account) in accounts {
-            self.insert_account(id, account);
-        }
-
-        if let Some(account_tree_cache) = storage
-            .chain()
-            .block_schema()
-            .get_account_tree_cache_block(last_cached_block_number)
-            .await?
-        {
-            self.tree
-                .set_internals(serde_json::from_value(account_tree_cache)?);
-        } else {
-            self.tree.root_hash();
-            let account_tree_cache = self.tree.get_internals();
-            storage
-                .chain()
-                .block_schema()
-                .store_account_tree_cache(
-                    last_cached_block_number,
-                    serde_json::to_value(account_tree_cache)?,
-                )
-                .await?;
-        }
-
-        let (block_number, accounts) = storage
-            .chain()
-            .state_schema()
-            .load_committed_state(None)
+            .incomplete_blocks_range()
             .await
-            .map_err(|e| anyhow::format_err!("couldn't load committed state: {}", e))?;
+            .expect("Unable to load incomplete blocks range")
+        {
+            let mut state_schema = storage.chain().state_schema();
 
-        if block_number != last_cached_block_number {
-            if let Some((_, account_updates)) = storage
-                .chain()
-                .state_schema()
-                .load_state_diff(last_cached_block_number, Some(block_number))
-                .await?
-            {
-                let mut updated_accounts = account_updates
-                    .into_iter()
-                    .map(|(id, _)| id)
-                    .collect::<Vec<_>>();
-                updated_accounts.sort_unstable();
-                updated_accounts.dedup();
-                for idx in updated_accounts {
-                    if let Some(acc) = accounts.get(&idx).cloned() {
-                        self.insert_account(idx, acc);
-                    } else {
-                        self.remove_account(idx);
-                    }
-                }
+            let mut jobs = Vec::with_capacity((block_to.0 - block_from.0 + 1) as usize);
+
+            for block in (block_from.0..=block_to.0).map(BlockNumber) {
+                let updates = state_schema
+                    .load_state_diff_for_block(block)
+                    .await
+                    .unwrap_or_else(|err| {
+                        panic!("Unable to load state updates for block {}: {}", block, err)
+                    });
+
+                jobs.push(BlockRootHashJob { block, updates })
             }
+
+            jobs
+        } else {
+            Vec::new()
         }
-
-        // We have to load actual number of the last committed block, since above we load the block number from state,
-        // and in case of empty block being sealed (that may happen because of bug).
-        // Note that if this block is greater than the `block_number`, it means that some empty blocks were committed,
-        // so the root hash has not changed and we don't need to update the tree in order to get the right root hash.
-        let last_actually_committed_block_number = storage
-            .chain()
-            .block_schema()
-            .get_last_saved_block()
-            .await?;
-
-        let block_number = std::cmp::max(last_actually_committed_block_number, block_number);
-
-        if *block_number != 0 {
-            let storage_root_hash = storage
-                .chain()
-                .block_schema()
-                .get_block(block_number)
-                .await?
-                .expect("restored block must exist");
-
-            let root_hash_db = storage_root_hash.new_root_hash;
-            let root_hash_calculated = self.tree.root_hash();
-            if root_hash_calculated != root_hash_db {
-                panic!(
-                    "Restored root_hash is different. \n \
-                     Root hash from the database: {:?} \n \
-                     Root hash from that was calculated: {:?} \n
-                     Current block number: {}",
-                    root_hash_db, root_hash_calculated, block_number
-                );
-            }
-        }
-
-        Ok(block_number)
-    }
-
-    async fn load_from_db(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), anyhow::Error> {
-        let block_number = self.load_account_tree(storage).await?;
-        self.last_block_number = block_number;
-        self.unprocessed_priority_op =
-            Self::unprocessed_priority_op_id(storage, block_number).await?;
-        self.nfts = Self::load_nft_tokens(storage, block_number).await?;
-
-        vlog::info!(
-            "Loaded committed state: last block number: {}, unprocessed priority op: {}",
-            *self.last_block_number,
-            self.unprocessed_priority_op
-        );
-        Ok(())
-    }
-
-    pub async fn load_state_diff(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), anyhow::Error> {
-        let state_diff = storage
-            .chain()
-            .state_schema()
-            .load_state_diff(self.last_block_number, None)
-            .await
-            .map_err(|e| anyhow::format_err!("failed to load committed state: {}", e))?;
-
-        if let Some((block_number, updates)) = state_diff {
-            for (id, update) in updates.into_iter() {
-                let updated_account = Account::apply_update(self.remove_account(id), update);
-                if let Some(account) = updated_account {
-                    self.insert_account(id, account);
-                }
-            }
-            self.unprocessed_priority_op =
-                Self::unprocessed_priority_op_id(storage, block_number).await?;
-            self.last_block_number = block_number;
-        }
-        Ok(())
     }
 
     pub fn insert_account(&mut self, id: AccountId, acc: Account) {
@@ -226,47 +146,35 @@ impl ZkSyncStateInitParams {
         self.tree.insert(*id, acc);
     }
 
-    pub fn remove_account(&mut self, id: AccountId) -> Option<Account> {
-        if let Some(acc) = self.tree.remove(*id) {
-            self.acc_id_by_addr.remove(&acc.address);
-            Some(acc)
-        } else {
-            None
-        }
-    }
-
     async fn load_nft_tokens(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
-    ) -> anyhow::Result<HashMap<TokenId, NFT>> {
-        let nfts = storage
+    ) -> HashMap<TokenId, NFT> {
+        storage
             .chain()
             .state_schema()
             .load_committed_nft_tokens(Some(block_number))
-            .await?
+            .await
+            .expect("Unable to load committed NFT tokens")
             .into_iter()
             .map(|nft| {
                 let token: NFT = nft.into();
                 (token.id, token)
             })
-            .collect();
-        Ok(nfts)
+            .collect()
     }
 
     async fn unprocessed_priority_op_id(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
-    ) -> Result<u64, anyhow::Error> {
-        let block = storage
+    ) -> u64 {
+        storage
             .chain()
             .block_schema()
             .get_block(block_number)
-            .await?;
-
-        if let Some(block) = block {
-            Ok(block.processed_priority_ops.1)
-        } else {
-            Ok(0)
-        }
+            .await
+            .expect("Unable to load the last block to get unprocessed priority operation")
+            .map(|block| block.processed_priority_ops.1)
+            .unwrap_or(0)
     }
 }

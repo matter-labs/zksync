@@ -7,49 +7,28 @@ use tokio::time::sleep;
 use zksync_storage::ConnectionPool;
 use zksync_types::aggregated_operations::AggregatedActionType::*;
 
-const QUERY_INTERVAL: Duration = Duration::from_secs(60);
+const QUERY_INTERVAL: Duration = Duration::from_secs(30);
 
-pub fn run_prometheus_exporter(
-    connection_pool: ConnectionPool,
-    port: u16,
-    is_operation_counter_needed: bool,
-) -> (JoinHandle<()>, Option<JoinHandle<()>>) {
-    let addr = ([0, 0, 0, 0], port);
-    let (recorder, exporter) = PrometheusBuilder::new()
-        .listen_address(addr)
-        .build_with_exporter()
-        .expect("failed to install Prometheus recorder");
-    metrics::set_boxed_recorder(Box::new(recorder)).expect("failed to set metrics recorder");
+pub fn run_operation_counter(connection_pool: ConnectionPool) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut storage = connection_pool
+            .access_storage()
+            .await
+            .expect("unable to access storage");
 
-    let prometheus_handle = tokio::spawn(async move {
-        tokio::pin!(exporter);
         loop {
-            tokio::select! {
-                _ = &mut exporter => {}
-            }
-        }
-    });
-
-    let operation_counter_handle = if is_operation_counter_needed {
-        Some(tokio::spawn(async move {
-            let mut storage = connection_pool
-                .access_storage()
+            let mut transaction = storage
+                .start_transaction()
                 .await
-                .expect("unable to access storage");
+                .expect("unable to start db transaction");
+            let mut block_schema = transaction.chain().block_schema();
 
-            loop {
-                let mut transaction = storage
-                    .start_transaction()
-                    .await
-                    .expect("unable to start db transaction");
-                let mut block_schema = transaction.chain().block_schema();
-
-                for &action in &[CommitBlocks, ExecuteBlocks] {
-                    for &is_confirmed in &[false, true] {
-                        let result = block_schema
-                            .count_aggregated_operations(action, is_confirmed)
-                            .await
-                            .expect("");
+            for &action in &[CommitBlocks, ExecuteBlocks] {
+                for &is_confirmed in &[false, true] {
+                    let result = block_schema
+                        .count_aggregated_operations(action, is_confirmed)
+                        .await;
+                    if let Ok(result) = result {
                         metrics::gauge!(
                             "count_operations",
                             result as f64,
@@ -58,18 +37,47 @@ pub fn run_prometheus_exporter(
                         );
                     }
                 }
-
-                transaction
-                    .commit()
-                    .await
-                    .expect("unable to commit db transaction");
-
-                sleep(QUERY_INTERVAL).await;
             }
-        }))
-    } else {
-        None
-    };
 
-    (prometheus_handle, operation_counter_handle)
+            let rejected_txs = block_schema.count_rejected_txs().await;
+
+            if let Ok(result) = rejected_txs {
+                metrics::gauge!("stored_rejected_txs", result as f64);
+            }
+
+            let mempool_size = transaction
+                .chain()
+                .mempool_schema()
+                .get_mempool_size()
+                .await;
+            if let Ok(result) = mempool_size {
+                metrics::gauge!("mempool_size", result as f64);
+            }
+
+            transaction
+                .commit()
+                .await
+                .expect("unable to commit db transaction");
+
+            sleep(QUERY_INTERVAL).await;
+        }
+    })
+}
+
+pub fn run_prometheus_exporter(port: u16) -> JoinHandle<()> {
+    let addr = ([0, 0, 0, 0], port);
+    let (recorder, exporter) = PrometheusBuilder::new()
+        .listen_address(addr)
+        .build_with_exporter()
+        .expect("failed to install Prometheus recorder");
+    metrics::set_boxed_recorder(Box::new(recorder)).expect("failed to set metrics recorder");
+
+    tokio::spawn(async move {
+        tokio::pin!(exporter);
+        loop {
+            tokio::select! {
+                _ = &mut exporter => {}
+            }
+        }
+    })
 }

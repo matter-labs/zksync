@@ -126,7 +126,7 @@ fn apply_nft_mint_and_full_exit_nft_operations() -> ZkSyncCircuit<'static, Bn256
         .unwrap();
     fees.push(fee);
 
-    let witness = MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft_op);
+    let witness = MintNFTWitness::apply_tx(witness_accum.account_tree, &mint_nft_op);
     let circuit_operations = witness.calculate_operations(mint_nft_input);
     let pub_data_from_witness = witness.get_pubdata();
     let offset_commitment = witness.get_offset_commitment_data();
@@ -142,7 +142,7 @@ fn apply_nft_mint_and_full_exit_nft_operations() -> ZkSyncCircuit<'static, Bn256
         .expect("Operation failed");
 
     let witness = FullExitWitness::apply_tx(
-        &mut witness_accum.account_tree,
+        witness_accum.account_tree,
         &(full_exit_op, full_exit_sucess),
     );
     let circuit_operations = witness.calculate_operations(());
