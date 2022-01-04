@@ -10,7 +10,7 @@ pub enum TxAddError {
     #[error("Tx is incorrect: {0}")]
     IncorrectTx(#[from] tx::TransactionError),
 
-    #[error("Transaction fee is too low.")]
+    #[error("Transaction fee is too low")]
     TxFeeTooLow,
 
     #[error("Transactions batch summary fee is too low")]
@@ -55,6 +55,6 @@ pub enum Toggle2FAError {
     #[error("Database unavailable")]
     DbError,
 
-    #[error("Can not change 2FA for a CREATE2 account.")]
+    #[error("Can not change 2FA for a CREATE2 account")]
     CREATE2,
 }

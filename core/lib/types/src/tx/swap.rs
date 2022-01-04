@@ -136,7 +136,7 @@ impl Order {
         amount: BigUint,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, TransactionError> {
+    ) -> Result<Self, OrderError> {
         let mut tx = Self {
             account_id,
             recipient_address,
@@ -441,7 +441,7 @@ impl Display for TransactionError {
             TransactionError::WrongSignature => WRONG_SIGNATURE,
             TransactionError::WrongSubmitter => WRONG_ACCOUNT_ID,
             TransactionError::WrongOrder(num, err) => {
-                return write!(f, "Error in order {}: {}", num, err)
+                return write!(f, "Error in {} order: {}", num, err)
             }
             TransactionError::WrongFeeToken => WRONG_TOKEN_FOR_PAYING_FEE,
         };
