@@ -77,7 +77,7 @@ interface IERC20 {
 
 /// @dev Interface of the ERC20 standard as defined in the EIP.
 /// 1. Implements only `transfer` and `transferFrom` methods
-/// 2. These methods return a boolean which indicates success of the transaction
+/// 2. These methods return a boolean value which indicates success of the transaction
 /// Note: It is assumed that the interface applies to those `ERC20` tokens whose code exactly matches the standard.
 /// Note: Used to perform transfers for tokens that explicitly return a boolean value
 /// (if the token returns any other data or does not return at all, then the function call will reverted)
