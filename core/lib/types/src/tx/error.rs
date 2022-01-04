@@ -46,4 +46,4 @@ pub const WRONG_TOKEN: &str = "Specified token is not supported";
 pub const WRONG_TOKEN_FOR_PAYING_FEE: &str = "Specified token is not supported for paying fees";
 pub const WRONG_SIGNATURE: &str = "L2 signature is incorrect";
 pub const WRONG_TO_ADDRESS: &str = "Transfer for specified address is not supported";
-pub const INVALID_AUTH_DATA: &str = "Specified auth data is incorrect ";
+pub const INVALID_AUTH_DATA: &str = "Specified auth data is incorrect";
