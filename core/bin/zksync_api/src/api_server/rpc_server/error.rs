@@ -101,6 +101,11 @@ impl From<SubmitError> for jsonrpc_core::Error {
                 message,
                 data: None,
             },
+            SubmitError::PriceError(error) => Self {
+                code: ErrorCode::InternalError,
+                message: error.to_string(),
+                data: None,
+            },
         }
     }
 }

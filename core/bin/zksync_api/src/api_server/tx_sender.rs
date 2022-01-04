@@ -32,8 +32,7 @@ use zksync_types::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
         TxEthSignatureVariant, TxHash,
     },
-    AccountId, Address, BatchFee, Fee, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
-    H160,
+    AccountId, Address, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
 use zksync_utils::{
     big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, scaled_big_decimal_to_ratio,
@@ -43,7 +42,7 @@ use zksync_utils::{
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
     core_api_client::CoreApiClient,
-    fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
+    fee_ticker::{ResponseBatchFee, ResponseFee, TokenPriceRequestType},
     signature_checker::{
         BatchRequest, OrderRequest, RequestData, Toggle2FARequest, TxRequest, VerifiedTx,
         VerifySignatureRequest,
@@ -54,6 +53,7 @@ use crate::{
 use zksync_config::configs::api::CommonApiConfig;
 
 use super::rpc_server::types::RequestMetadata;
+use crate::fee_ticker::{FeeTicker, PriceError};
 
 const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
@@ -61,7 +61,7 @@ const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 pub struct TxSender {
     pub core_api_client: CoreApiClient,
     pub sign_verify_requests: mpsc::Sender<VerifySignatureRequest>,
-    pub ticker_requests: mpsc::Sender<TickerRequest>,
+    pub ticker: FeeTicker,
 
     pub pool: ConnectionPool,
     pub tokens: TokenDBCache,
@@ -91,18 +91,20 @@ pub enum SubmitError {
     #[error("Incorrect transaction: {0}.")]
     IncorrectTx(String),
     #[error("Transaction adding error: {0}.")]
-    TxAdd(TxAddError),
+    TxAdd(#[from] TxAddError),
     #[error("Chosen token is not suitable for paying fees.")]
     InappropriateFeeToken,
     // Not all TxAddErrors would apply to Toggle2FA, but
     // it is helpful to re-use IncorrectEthSignature and DbError
     #[error("Failed to toggle 2FA: {0}.")]
-    Toggle2FA(Toggle2FAError),
+    Toggle2FA(#[from] Toggle2FAError),
 
     #[error("Communication error with the core server: {0}.")]
     CommunicationCoreServer(String),
+    #[error("Price error {0}")]
+    PriceError(#[from] PriceError),
     #[error("Internal error.")]
-    Internal(anyhow::Error),
+    Internal(#[from] anyhow::Error),
     #[error("{0}")]
     Other(String),
 }
@@ -141,7 +143,7 @@ impl TxSender {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: FeeTicker,
         config: &CommonApiConfig,
         private_url: String,
     ) -> Self {
@@ -151,7 +153,7 @@ impl TxSender {
             core_api_client,
             connection_pool,
             sign_verify_request_sender,
-            ticker_request_sender,
+            ticker,
             config,
         )
     }
@@ -160,7 +162,7 @@ impl TxSender {
         core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: FeeTicker,
         config: &CommonApiConfig,
     ) -> Self {
         let max_number_of_transactions_per_batch =
@@ -171,7 +173,7 @@ impl TxSender {
             core_api_client,
             pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
-            ticker_requests: ticker_request_sender,
+            ticker,
             tokens: TokenDBCache::new(),
             forced_exit_checker: ForcedExitChecker::new(
                 config.forced_exit_minimum_account_age_secs,
@@ -197,7 +199,6 @@ impl TxSender {
             _ => Ok(tx.account()),
         }
     }
-
     async fn get_address_by_id(&self, id: AccountId) -> Result<Address, anyhow::Error> {
         self.pool
             .access_storage()
@@ -456,12 +457,10 @@ impl TxSender {
         subsidized_fee: BigUint,
         token_id: TokenId,
     ) -> Result<(), anyhow::Error> {
-        let token_price_in_usd = Self::ticker_price_request(
-            self.ticker_requests.clone(),
-            TokenLike::Id(token_id),
-            TokenPriceRequestType::USDForOneWei,
-        )
-        .await?;
+        let token_price_in_usd = self
+            .ticker
+            .get_token_price(TokenLike::Id(token_id), TokenPriceRequestType::USDForOneWei)
+            .await?;
 
         let full_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee;
         let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
@@ -531,7 +530,6 @@ impl TxSender {
         };
 
         let sign_verify_channel = self.sign_verify_requests.clone();
-        let ticker_request_sender = self.ticker_requests.clone();
 
         let mut fee_data_for_subsidy: Option<ResponseFee> = None;
 
@@ -539,16 +537,16 @@ impl TxSender {
             let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
                 || self.enforce_pubkey_change_fee;
 
-            let fee_allowed =
-                Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone()).await?;
+            let fee_allowed = self.ticker.token_allowed_for_fees(token.clone()).await?;
 
             if !fee_allowed {
                 return Err(SubmitError::InappropriateFeeToken);
             }
 
-            let required_fee_data =
-                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
-                    .await?;
+            let required_fee_data = self
+                .ticker
+                .get_fee_from_ticker_in_wei(tx_type, token.clone(), address)
+                .await?;
 
             let required_fee_data = if self
                 .should_subsidize_cpk(
@@ -695,9 +693,7 @@ impl TxSender {
                 if provided_fee == BigUint::zero() {
                     continue;
                 }
-                let fee_allowed =
-                    Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
-                        .await?;
+                let fee_allowed = self.ticker.token_allowed_for_fees(token.clone()).await?;
 
                 // In batches, transactions with non-popular token are allowed to be included, but should not
                 // used to pay fees. Fees must be covered by some more common token.
@@ -714,12 +710,10 @@ impl TxSender {
                     eth_token.clone()
                 };
 
-                let token_price_in_usd = Self::ticker_price_request(
-                    self.ticker_requests.clone(),
-                    check_token.clone(),
-                    TokenPriceRequestType::USDForOneWei,
-                )
-                .await?;
+                let token_price_in_usd = self
+                    .ticker
+                    .get_token_price(check_token.clone(), TokenPriceRequestType::USDForOneWei)
+                    .await?;
 
                 let token_data = self.token_info_from_id(token).await?;
                 token_fees_ids.push(token_data.id);
@@ -738,12 +732,10 @@ impl TxSender {
         // Only one token in batch
         if token_fees.len() == 1 {
             let (batch_token, fee_paid) = token_fees.into_iter().next().unwrap();
-            let batch_token_fee = Self::ticker_batch_fee_request(
-                self.ticker_requests.clone(),
-                transaction_types.clone(),
-                batch_token.into(),
-            )
-            .await?;
+            let batch_token_fee = self
+                .ticker
+                .get_batch_from_ticker_in_wei(batch_token.into(), transaction_types.clone())
+                .await?;
 
             let required_fee = if self
                 .should_subsidize_cpk(
@@ -775,12 +767,10 @@ impl TxSender {
             }
         } else {
             // Calculate required fee for ethereum token
-            let required_eth_fee = Self::ticker_batch_fee_request(
-                self.ticker_requests.clone(),
-                transaction_types,
-                eth_token.clone(),
-            )
-            .await?;
+            let required_eth_fee = self
+                .ticker
+                .get_batch_from_ticker_in_wei(eth_token.clone(), transaction_types)
+                .await?;
 
             let required_fee = if self
                 .should_subsidize_cpk(
@@ -797,12 +787,10 @@ impl TxSender {
                 required_eth_fee.normal_fee.total_fee
             };
 
-            let eth_price_in_usd = Self::ticker_price_request(
-                self.ticker_requests.clone(),
-                eth_token,
-                TokenPriceRequestType::USDForOneWei,
-            )
-            .await?;
+            let eth_price_in_usd = self
+                .ticker
+                .get_token_price(eth_token, TokenPriceRequestType::USDForOneWei)
+                .await?;
 
             let required_total_usd_fee =
                 BigDecimal::from(required_fee.to_bigint().unwrap()) * &eth_price_in_usd;
@@ -944,36 +932,6 @@ impl TxSender {
         })
     }
 
-    pub async fn get_txs_fee_in_wei(
-        &self,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<Fee, SubmitError> {
-        let resp_fee = Self::ticker_request(
-            self.ticker_requests.clone(),
-            tx_type,
-            address,
-            token.clone(),
-        )
-        .await?;
-        Ok(resp_fee.normal_fee)
-    }
-
-    pub async fn get_txs_batch_fee_in_wei(
-        &self,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<BatchFee, SubmitError> {
-        let resp_fee = Self::ticker_batch_fee_request(
-            self.ticker_requests.clone(),
-            transactions,
-            token.clone(),
-        )
-        .await?;
-        Ok(resp_fee.normal_fee)
-    }
-
     /// For forced exits, we must check that target account exists for more
     /// than 24 hours in order to give new account owners give an opportunity
     /// to set the signing key. While `ForcedExit` operation doesn't do anything
@@ -1046,81 +1004,6 @@ impl TxSender {
             .map_err(SubmitError::internal)?
             // TODO Make error more clean
             .ok_or_else(|| SubmitError::other("Token not found in the DB"))
-    }
-
-    async fn ticker_batch_fee_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<ResponseBatchFee, SubmitError> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetBatchTxFee {
-                transactions,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .map_err(SubmitError::internal)?;
-        let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(|err| internal_error!(err))
-    }
-
-    async fn ticker_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<ResponseFee, SubmitError> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTxFee {
-                tx_type,
-                address,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .map_err(SubmitError::internal)?;
-
-        let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(|err| internal_error!(err))
-    }
-
-    pub async fn token_allowed_for_fees(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        token: TokenLike,
-    ) -> Result<bool, SubmitError> {
-        let (sender, receiver) = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::IsTokenAllowed {
-                token: token.clone(),
-                response: sender,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        receiver
-            .await
-            .expect("ticker answer sender dropped")
-            .map_err(SubmitError::internal)
-    }
-
-    pub async fn ticker_price_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        token: TokenLike,
-        req_type: TokenPriceRequestType,
-    ) -> Result<BigDecimal, SubmitError> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTokenPrice {
-                token: token.clone(),
-                response: req.0,
-                req_type,
-            })
-            .await
-            .map_err(SubmitError::internal)?;
-        let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(|err| internal_error!(err))
     }
 }
 
