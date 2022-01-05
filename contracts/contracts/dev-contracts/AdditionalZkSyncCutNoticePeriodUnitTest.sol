@@ -10,7 +10,7 @@ contract AdditionalZkSyncCutNoticePeriodUnitTest is AdditionalZkSync {
     function enableUpgradeFromScratch() external {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
-        approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
+        approvedUpgradeNoticePeriod = 14 days;
         upgradeStartTimestamp = block.timestamp;
         for (uint256 i = 0; i < SECURITY_COUNCIL_MEMBERS_NUMBER; ++i) {
             securityCouncilApproves[i] = false;
