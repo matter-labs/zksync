@@ -47,7 +47,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         address _nftCreatorAddress,
         uint32 _nftSerialId,
         bytes32 _nftContentHash,
-        uint256[] memory _proof
+        uint256[] calldata _proof
     ) external {
         require(_accountId <= MAX_ACCOUNT_ID, "e");
         require(_accountId != SPECIAL_ACCOUNT_ID, "v");
@@ -91,7 +91,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         performedExodus[_accountId][_tokenId] = true;
     }
 
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
+    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] calldata _depositsPubdata) external {
         require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
         require(toProcess > 0, "9"); // no deposits to process
@@ -204,7 +204,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Reverts unverified blocks
-    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external {
+    function revertBlocks(StoredBlockInfo[] calldata _blocksToRevert) external {
         requireActive();
 
         governance.requireActiveValidator(msg.sender);
