@@ -122,6 +122,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             if (SECURITY_COUNCIL_MEMBERS[id] == addr && !securityCouncilApproves[id]) {
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil += 1;
+                emit approveCutUpgradeNoticePeriod(addr);
 
                 if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_THRESHOLD) {
                     if (approvedUpgradeNoticePeriod > 0) {
@@ -138,7 +139,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     /// @notice approve to decrease upgrade notice period time to zero
     /// NOTE: сan only be called after the start of the upgrade
     function cutUpgradeNoticePeriod() external {
-        require(upgradeStartTimestamp != 0);
+        require(upgradeStartTimestamp != 0, "p1");
 
         approvedCutUpgradeNoticePeriod(msg.sender);
     }
@@ -147,7 +148,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     /// NOTE: Can accept many signatures at a time, thus it is possible
     /// to completely cut the upgrade notice period in one transaction
     function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
-        require(upgradeStartTimestamp != 0);
+        require(upgradeStartTimestamp != 0, "p2");
 
         // Get the addresses of contracts that are being prepared for the upgrade.
         address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
