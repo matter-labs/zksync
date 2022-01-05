@@ -41,7 +41,7 @@ impl<'a, 'c> ConfigSchema<'a, 'c> {
         let start = Instant::now();
 
         sqlx::query!(
-            "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3)",
+            "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
             &format!("{:?}", contract_addr),
             &format!("{:?}", gov_contract_addr),
             &format!("{:?}", nft_factory_addr)

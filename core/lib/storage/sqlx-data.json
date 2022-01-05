@@ -3099,20 +3099,6 @@
       "nullable": []
     }
   },
-  "6e99e599875e2567cc2f280fda3dbb0ae6a13fcc065dca1f6e96204bd14c27d1": {
-    "query": "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "7102023319626d8894376477c6681184464f79c2b588bdb227d22cf032f3e8b7": {
     "query": "\n                SELECT account_id FROM balances\n                WHERE coin_id = $1 AND balance = 1 AND account_id != $2\n            ",
     "describe": {
@@ -3132,6 +3118,20 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "712e8cd4000a84a0ac7d518f4ea32fe986fa90224371a3bf86e95548d9936c3f": {
+    "query": "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {

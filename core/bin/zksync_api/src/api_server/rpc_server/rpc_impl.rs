@@ -42,14 +42,32 @@ impl RpcApp {
             self.confirmations_for_eth_event,
         )
         .await
-        .map_err(|_| Error::internal_error())?;
+        .map_err(|err| {
+            vlog::warn!(
+                "[{}:{}:{}] Internal Server Error: '{:?}'; input: N/A",
+                file!(),
+                line!(),
+                column!(),
+                err
+            );
+            Error::internal_error()
+        })?;
         let account_type = if let Some(account_id) = account_state.account_id {
             storage
                 .chain()
                 .account_schema()
                 .account_type_by_id(account_id)
                 .await
-                .map_err(|_| Error::internal_error())?
+                .map_err(|err| {
+                    vlog::warn!(
+                        "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+                        file!(),
+                        line!(),
+                        column!(),
+                        err
+                    );
+                    Error::internal_error()
+                })?
                 .map(|t| t.into())
         } else {
             None

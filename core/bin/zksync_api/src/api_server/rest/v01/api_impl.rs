@@ -522,13 +522,19 @@ impl ApiV01 {
             .block_schema()
             .get_last_saved_block()
             .await
-            .expect("Database error");
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}';", err,);
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+            })?;
         let block = storage
             .chain()
             .block_schema()
             .get_block(block_number)
             .await
-            .expect("Database error")
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}';", err);
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+            })?
             .expect("Should exist");
         let state_keeper_config = &self_.config.chain.state_keeper;
         let average_proof_generating_time = Duration::minutes(30);
