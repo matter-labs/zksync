@@ -31,10 +31,7 @@ describe('Upgrade smart contracts fork test', function () {
 
     before(async () => {
         // Access upgrade gatekeeper master account
-        await hardhat.network.provider.request({
-            method: 'hardhat_impersonateAccount',
-            params: [UPGRADE_GATEKEEPER_MASTER_ADDRESS]
-        });
+        await hardhat.network.provider.send('hardhat_impersonateAccount', [UPGRADE_GATEKEEPER_MASTER_ADDRESS]);
         upgradeGatekeeperOwner = await hardhat.ethers.provider.getSigner(UPGRADE_GATEKEEPER_MASTER_ADDRESS);
         await hardhat.network.provider.send('hardhat_setBalance', [
             UPGRADE_GATEKEEPER_MASTER_ADDRESS,
