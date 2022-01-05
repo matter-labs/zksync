@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
+use anyhow::Error;
 use bigdecimal::{BigDecimal, Zero};
 use chrono::Utc;
 use futures::{channel::mpsc, StreamExt};
@@ -37,17 +38,22 @@ use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     prover::ProverJobType,
     tx::ChangePubKeyType,
-    AccountId, AccountMap, AccountUpdate, Address, BatchFee, BlockNumber, Deposit, DepositOp,
-    ExecutedOperations, ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp,
-    Nonce, OutputFeeType, PriorityOp, Token, TokenId, TokenKind, TokenLike, Transfer, TransferOp,
-    ZkSyncOp, ZkSyncTx, H256, NFT,
+    AccountId, AccountMap, AccountUpdate, Address, BlockNumber, Deposit, DepositOp,
+    ExecutedOperations, ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, MintNFTOp, Nonce,
+    PriorityOp, Token, TokenId, TokenKind, TokenLike, TokenPrice, Transfer, TransferOp, ZkSyncOp,
+    ZkSyncTx, H256, NFT,
 };
+use zksync_utils::{big_decimal_to_ratio, scaled_u64_to_ratio, UnsignedRatioSerializeAsDecimal};
 
 // Local uses
-use crate::{
-    fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
-    signature_checker::{VerifiedTx, VerifySignatureRequest},
+use crate::fee_ticker::{
+    tests::TestToken,
+    ticker_info::BlocksInFutureAggregatedOperations,
+    validator::{cache::TokenInMemoryCache, FeeTokenValidator},
+    {FeeTicker, FeeTickerInfo, GasOperationsCost, PriceError, TickerConfig},
 };
+use crate::signature_checker::{VerifiedTx, VerifySignatureRequest};
+use std::any::Any;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -347,16 +353,22 @@ impl TestServerConfig {
         // Make changes atomic.
         let mut storage = storage.start_transaction().await?;
 
+        let default_factory_address =
+            Address::from_str("1111111111111111111111111111111111111111").unwrap();
+        storage
+            .config_schema()
+            .store_config(
+                Default::default(),
+                Default::default(),
+                default_factory_address,
+            )
+            .await?;
+
         // Below lies the initialization of the data for the test.
         let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
 
         // Required since we use `EthereumSchema` in this test.
         storage.ethereum_schema().initialize_eth_data().await?;
-
-        storage
-            .config_schema()
-            .store_config(Address::default(), Address::default(), Address::default())
-            .await?;
 
         // Insert PHNX token
         storage
@@ -817,71 +829,106 @@ pub fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
     sender
 }
 
-pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
-    let (sender, mut receiver) = mpsc::channel(10);
+#[derive(Debug, Clone)]
+pub struct DummyFeeTickerInfo {
+    prices: HashMap<TokenLike, BigDecimal>,
+}
 
-    let prices: HashMap<_, _> = prices.iter().cloned().collect();
-    actix_rt::spawn(async move {
-        while let Some(item) = receiver.next().await {
-            match item {
-                TickerRequest::GetTxFee { response, .. } => {
-                    let normal_fee = Fee::new(
-                        OutputFeeType::Withdraw,
-                        BigUint::from(1_u64).into(),
-                        BigUint::from(1_u64).into(),
-                        1_u64.into(),
-                        1_u64.into(),
-                    );
+#[async_trait::async_trait]
+impl FeeTickerInfo for DummyFeeTickerInfo {
+    async fn is_account_new(&self, _address: Address) -> anyhow::Result<bool> {
+        Ok(false)
+    }
 
-                    let res = Ok(ResponseFee {
-                        normal_fee: normal_fee.clone(),
-                        subsidized_fee: normal_fee,
-                        subsidy_size_usd: Ratio::from(BigUint::zero()),
-                    });
+    async fn blocks_in_future_aggregated_operations(
+        &self,
+    ) -> anyhow::Result<crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations> {
+        Ok(BlocksInFutureAggregatedOperations {
+            blocks_to_commit: 1,
+            blocks_to_prove: 1,
+            blocks_to_execute: 1,
+        })
+    }
 
-                    response.send(res).expect("Unable to send response");
-                }
-                TickerRequest::GetTokenPrice {
-                    token, response, ..
-                } => {
-                    let msg = if let Some(price) = prices.get(&token) {
-                        Ok(price.clone())
-                    } else {
-                        Ok(BigDecimal::from(0u64))
-                    };
+    async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>> {
+        Ok(None)
+    }
 
-                    response.send(msg).expect("Unable to send response");
-                }
-                TickerRequest::IsTokenAllowed { token, response } => {
-                    // For test purposes, PHNX token is not allowed.
-                    let is_phnx = match token {
-                        TokenLike::Id(id) => *id == 1,
-                        TokenLike::Symbol(sym) => sym == "PHNX",
-                        TokenLike::Address(_) => unreachable!(),
-                    };
-                    response.send(Ok(!is_phnx)).unwrap_or_default();
-                }
-                TickerRequest::GetBatchTxFee {
-                    response,
-                    transactions,
-                    ..
-                } => {
-                    let normal_fee = BatchFee::new(
-                        BigUint::from(transactions.len()).into(),
-                        BigUint::from(transactions.len()).into(),
-                    );
-
-                    let res = Ok(ResponseBatchFee {
-                        normal_fee: normal_fee.clone(),
-                        subsidized_fee: normal_fee,
-                        subsidy_size_usd: Ratio::from(BigUint::zero()),
-                    });
-
-                    response.send(res).expect("Unable to send response");
-                }
-            }
+    async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+        if let Some(price) = self.prices.get(&token) {
+            Ok(TokenPrice {
+                usd_price: big_decimal_to_ratio(price).unwrap(),
+                last_updated: Utc::now(),
+            })
+        } else {
+            Ok(TokenPrice {
+                usd_price: Ratio::zero(),
+                last_updated: Utc::now(),
+            })
         }
-    });
+    }
 
-    sender
+    async fn get_gas_price_wei(&self) -> Result<BigUint, Error> {
+        Ok(BigUint::from(1u64))
+    }
+
+    async fn get_token(&self, token: TokenLike) -> Result<Token, Error> {
+        Ok(match token {
+            TokenLike::Id(id) => Token {
+                id,
+                ..Default::default()
+            },
+            TokenLike::Address(address) => Token {
+                address,
+                ..Default::default()
+            },
+            TokenLike::Symbol(symbol) => Token {
+                symbol,
+                ..Default::default()
+            },
+        })
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+}
+
+const SUBSIDY_CPK_PRICE_USD_SCALED: u64 = 10000000; // 10 dollars
+const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
+
+pub fn get_test_ticker_config() -> TickerConfig {
+    TickerConfig {
+        zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot("0.001")
+            .unwrap(),
+        gas_cost_tx: GasOperationsCost::from_constants(TEST_FAST_WITHDRAW_COEFF),
+        tokens_risk_factors: TestToken::all_tokens()
+            .into_iter()
+            .filter_map(|t| {
+                let id = t.id;
+                t.risk_factor.map(|risk| (id, risk))
+            })
+            .collect(),
+        scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
+        max_blocks_to_aggregate: 5,
+        subsidy_cpk_price_usd: scaled_u64_to_ratio(SUBSIDY_CPK_PRICE_USD_SCALED),
+    }
+}
+pub fn dummy_fee_ticker(
+    prices: &[(TokenLike, BigDecimal)],
+    in_memory_cache: Option<TokenInMemoryCache>,
+) -> FeeTicker {
+    let prices: HashMap<_, _> = prices.iter().cloned().collect();
+    let validator = FeeTokenValidator::new(
+        in_memory_cache.unwrap_or_default(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+    );
+
+    FeeTicker::new(
+        Box::new(DummyFeeTickerInfo { prices }),
+        get_test_ticker_config(),
+        validator,
+    )
 }

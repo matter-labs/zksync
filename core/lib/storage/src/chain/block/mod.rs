@@ -715,6 +715,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(block_number <= last_finalized_block)
     }
 
+    pub async fn pending_block_chunks_left(&mut self) -> QueryResult<Option<usize>> {
+        let start = Instant::now();
+        let maybe_block_chunks = sqlx::query!(
+            "SELECT chunks_left FROM pending_block
+            LIMIT 1"
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.chain.block.pending_block_chunks_left", start.elapsed());
+
+        Ok(maybe_block_chunks.map(|val| val.chunks_left as usize))
+    }
+
     /// Helper method for retrieving pending blocks from the database.
     async fn load_storage_pending_block(&mut self) -> QueryResult<Option<StoragePendingBlock>> {
         let start = Instant::now();

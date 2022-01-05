@@ -5950,6 +5950,26 @@
       "nullable": []
     }
   },
+  "c7d334b71d4b70daf8e2d09c1d938fdcdd22e8800939ef6e58c44a125dc48d37": {
+    "query": "\n                SELECT account_id \n                FROM account_creates WHERE address = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "cb492484bab6e66f89a4d80649d3559566a681db153152a52449acf931a1d039": {
     "query": "SELECT * FROM block_witness WHERE block = $1",
     "describe": {
@@ -6681,6 +6701,24 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "e467ed3636ed729ba60433573e822ce940b213f1931a404badb35025231fd87b": {
+    "query": "SELECT chunks_left FROM pending_block\n            LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "chunks_left",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "e515899938d5ced7b83234fcea6ad024184702eca40b1fae1a16467649722a10": {

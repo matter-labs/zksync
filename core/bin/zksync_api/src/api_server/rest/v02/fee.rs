@@ -34,20 +34,22 @@ async fn get_tx_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<TxFeeRequest>,
 ) -> ApiResult<ApiFee> {
-    let token_allowed = api_try!(TxSender::token_allowed_for_fees(
-        data.tx_sender.ticker_requests.clone(),
-        body.token_like.clone()
-    )
-    .await
-    .map_err(Error::from));
+    let token_allowed = api_try!(data
+        .tx_sender
+        .ticker
+        .token_allowed_for_fees(body.token_like.clone())
+        .await
+        .map_err(Error::from));
     if !token_allowed {
         return Error::from(SubmitError::InappropriateFeeToken).into();
     }
+    // TODO implement subsidies for v02 api ZKS-888
     data.tx_sender
-        .get_txs_fee_in_wei(body.tx_type.into(), body.address, body.token_like)
+        .ticker
+        .get_fee_from_ticker_in_wei(body.tx_type.into(), body.token_like, body.address)
         .await
+        .map(|fee| fee.normal_fee.into())
         .map_err(Error::from)
-        .map(ApiFee::from)
         .into()
 }
 
@@ -55,12 +57,12 @@ async fn get_batch_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<BatchFeeRequest>,
 ) -> ApiResult<ApiFee> {
-    let token_allowed = api_try!(TxSender::token_allowed_for_fees(
-        data.tx_sender.ticker_requests.clone(),
-        body.token_like.clone()
-    )
-    .await
-    .map_err(Error::from));
+    let token_allowed = api_try!(data
+        .tx_sender
+        .ticker
+        .token_allowed_for_fees(body.token_like.clone())
+        .await
+        .map_err(Error::from));
     if !token_allowed {
         return Error::from(SubmitError::InappropriateFeeToken).into();
     }
@@ -70,10 +72,11 @@ async fn get_batch_fee(
         .map(|tx| (tx.tx_type.into(), tx.address))
         .collect();
     data.tx_sender
-        .get_txs_batch_fee_in_wei(txs, body.token_like)
+        .ticker
+        .get_batch_from_ticker_in_wei(body.token_like, txs)
         .await
+        .map(|fee| fee.normal_fee.into())
         .map_err(Error::from)
-        .map(ApiFee::from)
         .into()
 }
 
@@ -95,12 +98,19 @@ mod tests {
         },
         SharedData,
     };
+    use crate::fee_ticker::validator::cache::TokenInMemoryCache;
+    use chrono::Utc;
+    use num::rational::Ratio;
     use num::BigUint;
+    use std::collections::HashMap;
     use zksync_api_types::v02::{
         fee::{ApiTxFeeTypes, TxInBatchFeeRequest},
         ApiVersion,
     };
-    use zksync_types::{tokens::TokenLike, Address, TokenId};
+    use zksync_types::{
+        tokens::{TokenLike, TokenMarketVolume},
+        Address, Token, TokenId, TokenKind,
+    };
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -115,12 +125,38 @@ mod tests {
             api_version: ApiVersion::V02,
         };
 
+        let mut tokens = HashMap::new();
+        tokens.insert(
+            TokenLike::Id(TokenId(1)),
+            Token::new(TokenId(1), Default::default(), "", 18, TokenKind::ERC20),
+        );
+        tokens.insert(
+            TokenLike::Id(TokenId(2)),
+            Token::new(TokenId(2), Default::default(), "", 18, TokenKind::ERC20),
+        );
+        let mut market = HashMap::new();
+        market.insert(
+            TokenId(2),
+            TokenMarketVolume {
+                market_volume: Ratio::from_integer(BigUint::from(400u32)),
+                last_updated: Utc::now(),
+            },
+        );
+        let prices = vec![
+            (TokenLike::Id(TokenId(0)), 10_u64.into()),
+            (TokenLike::Id(TokenId(1)), 10_u64.into()),
+            (TokenLike::Id(TokenId(2)), 10000_u64.into()),
+        ];
+
+        let cache = TokenInMemoryCache::new()
+            .with_tokens(tokens)
+            .with_market(market);
         let (client, server) = cfg.start_server(
             move |cfg: &TestServerConfig| {
                 api_scope(TxSender::new(
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
-                    dummy_fee_ticker(&[]),
+                    dummy_fee_ticker(&prices, Some(cache.clone())),
                     &cfg.config.api.common,
                     cfg.config.api.private.url.clone(),
                 ))
@@ -157,9 +193,9 @@ mod tests {
 
         let response = client.get_batch_fee(txs, allowed_token).await?;
         let api_batch_fee: ApiFee = deserialize_response_result(response)?;
-        assert_eq!(api_batch_fee.gas_fee, BigUint::from(3u32));
-        assert_eq!(api_batch_fee.zkp_fee, BigUint::from(3u32));
-        assert_eq!(api_batch_fee.total_fee, BigUint::from(6u32));
+        assert_eq!(api_batch_fee.gas_fee, BigUint::from(1u32));
+        assert_eq!(api_batch_fee.zkp_fee, BigUint::from(1u32));
+        assert_eq!(api_batch_fee.total_fee, BigUint::from(2u32));
 
         server.stop().await;
         Ok(())
