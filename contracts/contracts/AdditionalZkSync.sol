@@ -114,6 +114,9 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
 
+    /// @notice processing new approval of decrease upgrade notice period time to zero
+    /// @param addr address of the account that approved the reduction of the upgrade notice period to zero
+    /// NOTE: does NOT revert if the address is not a security council member or number of approvals is already sufficient
     function approvedCutUpgradeNoticePeriod(address addr) internal {
         address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS = [
             $(SECURITY_COUNCIL_MEMBERS)
