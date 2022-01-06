@@ -22,6 +22,7 @@ use zksync_types::{tx::TxHash, EthBlockId};
 // Local uses
 use super::{error::Error, response::ApiResult};
 use crate::api_server::tx_sender::{SubmitError, TxSender};
+use web3::types::H256;
 
 /// Shared data between `api/v0.2/transactions` endpoints.
 #[derive(Clone)]
@@ -49,10 +50,10 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(receipt))
-        } else if let Some(op) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
+        } else if let Some(op) = storage
+            .chain()
+            .mempool_schema()
+            .get_pending_operation_by_hash(tx_hash.into())
             .await
             .map_err(Error::core_api)?
         {
@@ -82,10 +83,10 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(data))
-        } else if let Some(op) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
+        } else if let Some(op) = storage
+            .chain()
+            .mempool_schema()
+            .get_pending_operation_by_hash(tx_hash.into())
             .await
             .map_err(Error::core_api)?
         {
@@ -277,7 +278,6 @@ mod tests {
             App::new()
                 .route("new_tx", web::post().to(send_tx))
                 .route("new_txs_batch", web::post().to(send_txs_batch))
-                .route("unconfirmed_op", web::post().to(get_unconfirmed_op))
         });
 
         let url = server.url("").trim_end_matches('/').to_owned();

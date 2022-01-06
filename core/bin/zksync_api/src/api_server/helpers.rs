@@ -35,12 +35,12 @@ pub fn try_parse_hash(query: &str) -> Result<H256, hex::FromHexError> {
 async fn depositing_from_pending_ops(
     storage: &mut StorageProcessor<'_>,
     tokens: &TokenDBCache,
-    pending_ops: OngoingDepositsResp,
+    pending_ops: Vec<OngoingDeposit>,
     confirmations_for_eth_event: u64,
 ) -> Result<DepositingAccountBalances, Error> {
     let mut balances = HashMap::new();
 
-    for op in pending_ops.deposits {
+    for op in pending_ops {
         let token_symbol = if *op.token_id == 0 {
             "ETH".to_string()
         } else {
@@ -72,36 +72,16 @@ async fn depositing_from_pending_ops(
     Ok(DepositingAccountBalances { balances })
 }
 
-async fn get_pending_ops(
-    core_api_client: &CoreApiClient,
-    address: Address,
-) -> Result<OngoingDepositsResp, Error> {
-    let start = Instant::now();
-
-    let ongoing_ops = core_api_client
-        .get_unconfirmed_deposits(address)
-        .await
-        .map_err(Error::core_api)?;
-
-    // Transform operations into `OngoingDeposit`.
-    let deposits: Vec<_> = ongoing_ops.into_iter().map(OngoingDeposit::new).collect();
-
-    metrics::histogram!(
-        "api",
-        start.elapsed(),
-        "type" => "rpc",
-        "endpoint_name" => "get_ongoing_deposits"
-    );
-    Ok(OngoingDepositsResp { deposits })
-}
-
 pub async fn get_depositing(
     storage: &mut StorageProcessor<'_>,
-    core_api_client: &CoreApiClient,
     tokens: &TokenDBCache,
     address: Address,
     confirmations_for_eth_event: u64,
 ) -> Result<DepositingAccountBalances, Error> {
-    let pending_ops = get_pending_ops(core_api_client, address).await?;
+    let pending_ops = storage
+        .chain()
+        .mempool_schema()
+        .get_ongoing_deposits(address)
+        .await?;
     depositing_from_pending_ops(storage, tokens, pending_ops, confirmations_for_eth_event).await
 }

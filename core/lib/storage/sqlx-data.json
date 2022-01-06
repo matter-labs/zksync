@@ -489,6 +489,62 @@
       "nullable": []
     }
   },
+  "1327b9155d0948d418977e0597aa781527646e71dc275d6cdb9c127f31dfaba3": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE eth_hash = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "1401ea10d9e110da48aac1ebfa7aeb855c273adf34f6ee92b0fdaaf7de603049": {
     "query": "\n                SELECT tx_hash, created_at\n                FROM mempool_txs\n                INNER JOIN txs_batches_hashes\n                ON txs_batches_hashes.batch_id = mempool_txs.batch_id\n                WHERE batch_hash = $1\n                ORDER BY id ASC\n            ",
     "describe": {
@@ -850,6 +906,64 @@
       "nullable": []
     }
   },
+  "1a84ba248544924514aab6c1c84247759a80650f057fa23898f9cb2a8ce79eaf": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1 AND serial_id > $2   ORDER BY serial_id LIMIT $3",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "1a8ff6100bfc7521b3728c817a4014355e09d6ca1c251bbcee6f7cf013b6800d": {
     "query": "SELECT * FROM mint_nft_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -1082,6 +1196,62 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "21796531ebd7af29fdd375c8fe536617525cd8762a38baa78b8075f71868df6b": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE type = 'Deposit' AND l2_address = $1  ORDER BY serial_id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "21d959769e02bf5c52b68e69732363716534dbbbf0638a500ef46152136d2cab": {
@@ -2206,6 +2376,26 @@
       ]
     }
   },
+  "45dd90ea59046924cc2b61f077df5c59c3df98538789b8fb105a3290f1cb4b03": {
+    "query": "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at) SELECT u.serial_id, u.data, u.deadline_block, u.eth_hash, u.eth_block, u.eth_block_index, u.l1_address, u.l2_address, u.type, now()\n                FROM UNNEST ($1::bigint[], $2::jsonb[], $3::integer[], $4::bytea[], $5::integer[], $6::integer[], $7::bytea[], $8::bytea[], $9::text[])\n                AS u(serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type)\n            ON CONFLICT DO NOTHING",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "JsonbArray",
+          "Int4Array",
+          "ByteaArray",
+          "Int4Array",
+          "Int4Array",
+          "ByteaArray",
+          "ByteaArray",
+          "TextArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "46f6716e4da5b4ce70ae9dfceb0f35d18908f4d7369da95f209a979e896db269": {
     "query": "\n            WITH aggr_exec AS (\n                SELECT\n                    aggregate_operations.confirmed,\n                    execute_aggregated_blocks_binding.block_number\n                FROM aggregate_operations\n                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                WHERE aggregate_operations.confirmed = true\n            ), tx_hashes AS (\n                SELECT DISTINCT tx_hash FROM tx_filters\n                WHERE address = $1\n            ), transactions AS (\n                SELECT\n                    *\n                FROM (\n                    SELECT\n                        concat_ws(',', block_number, block_index) AS tx_id,\n                        tx,\n                        'sync-tx:' || encode(executed_transactions.tx_hash, 'hex') AS hash,\n                        null as pq_id,\n                        null as eth_block,\n                        success,\n                        fail_reason,\n                        block_number,\n                        created_at,\n                        batch_id\n                    FROM tx_hashes\n                    INNER JOIN executed_transactions\n                        ON tx_hashes.tx_hash = executed_transactions.tx_hash\n                    union all\n                    select\n                        concat_ws(',', block_number, block_index) as tx_id,\n                        operation as tx,\n                        '0x' || encode(eth_hash, 'hex') as hash,\n                        priority_op_serialid as pq_id,\n                        eth_block,\n                        true as success,\n                        null as fail_reason,\n                        block_number,\n                        created_at,\n                        Null::bigint as batch_id\n                    from\n                        executed_priority_operations\n                    where\n                        from_account = $1\n                        or\n                        to_account = $1) t\n                order by\n                    block_number desc, created_at desc\n                offset\n                    $2\n                limit\n                    $3\n            )\n            select\n                tx_id as \"tx_id!\",\n                hash as \"hash?\",\n                eth_block as \"eth_block?\",\n                pq_id as \"pq_id?\",\n                tx as \"tx!\",\n                success as \"success?\",\n                fail_reason as \"fail_reason?\",\n                true as \"commited!\",\n                coalesce(verified.confirmed, false) as \"verified!\",\n                created_at as \"created_at!\",\n                batch_id as \"batch_id?\"\n            from transactions\n            LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number\n            order by transactions.block_number desc, created_at desc\n            ",
     "describe": {
@@ -2713,6 +2903,18 @@
         false,
         false
       ]
+    }
+  },
+  "589c0f457a199cbe519fcdff8ba2d1d688f2a05ac68683b4043e5ca828f01ba2": {
+    "query": "DELETE FROM mempool_priority_operations WHERE serial_id=ANY($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": []
     }
   },
   "58b251c3fbdf9be9b62f669f8cdc2d98940026c831e02a53337474d36a5224f0": {
@@ -3569,6 +3771,60 @@
         ]
       },
       "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "7dd6e695a5f22f477efd7f21a0bd2bdefcbd514e12a6028dbd8851742c7033d2": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations ORDER BY serial_id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
         false,
         false,
         false,
@@ -4614,6 +4870,18 @@
       "columns": [],
       "parameters": {
         "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "9db7145a44000272a06621a150d4c362fea0a960b93597d9d2bfb588b51d0f0a": {
+    "query": "DELETE FROM mempool_priority_operations WHERE serial_id=$1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
       },
       "nullable": []
     }

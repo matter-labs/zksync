@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use zksync_types::mempool::{RevertedTxVariant, SignedTxVariant};
+use zksync_types::{PriorityOp, SerialId};
 
 #[derive(Debug, Clone)]
 struct MempoolPendingTransaction {
@@ -44,14 +45,22 @@ pub struct MempoolTransactionsQueue {
     ready_txs: VecDeque<SignedTxVariant>,
     /// Transactions that are not ready yet because of the `valid_from` field.
     pending_txs: BinaryHeap<MempoolPendingTransaction>,
+
+    last_processed_priority_op: SerialId,
+    priority_ops: VecDeque<PriorityOp>,
 }
 
 impl MempoolTransactionsQueue {
-    pub fn new(reverted_txs: VecDeque<RevertedTxVariant>) -> Self {
+    pub fn new(
+        reverted_txs: VecDeque<RevertedTxVariant>,
+        last_processed_priority_op: SerialId,
+    ) -> Self {
         Self {
             reverted_txs,
             ready_txs: VecDeque::new(),
             pending_txs: BinaryHeap::new(),
+            last_processed_priority_op,
+            priority_ops: VecDeque::new(),
         }
     }
 
@@ -73,6 +82,37 @@ impl MempoolTransactionsQueue {
 
     pub fn push_front(&mut self, tx: SignedTxVariant) {
         self.ready_txs.push_front(tx);
+    }
+    pub fn pop_front_priority_op(&mut self) -> Option<PriorityOp> {
+        let op = self.priority_ops.pop_front();
+        if let Some(op) = &op {
+            self.last_processed_priority_op = op.serial_id;
+        }
+        op
+    }
+
+    pub fn push_front_priority_op(&mut self, tx: PriorityOp) {
+        self.priority_ops.push_front(tx);
+    }
+
+    // TODO make it claner
+    pub fn add_priority_ops(&mut self, mut ops: Vec<PriorityOp>) {
+        ops.sort_by_key(|key| key.serial_id);
+        for op in ops {
+            if op.serial_id < self.last_processed_priority_op {
+                continue;
+            }
+            let mut find = false;
+            for ready_ops in &self.priority_ops {
+                if ready_ops.serial_id == op.serial_id {
+                    find = true;
+                    continue;
+                }
+            }
+            if !find {
+                self.priority_ops.push_front(op);
+            }
+        }
     }
 
     pub fn add_tx_variant(&mut self, tx: SignedTxVariant) {
@@ -174,6 +214,8 @@ mod tests {
             reverted_txs: VecDeque::new(),
             ready_txs: VecDeque::new(),
             pending_txs: BinaryHeap::new(),
+            last_processed_priority_op: 0,
+            priority_ops: Default::default(),
         };
 
         let withdraw0 = get_withdraw();

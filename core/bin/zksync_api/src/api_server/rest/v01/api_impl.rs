@@ -15,6 +15,7 @@ use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use chrono::Duration;
 use num::{rational::Ratio, BigUint, FromPrimitive};
+use std::io::Read;
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
 use zksync_types::{Address, BlockNumber, Token, TokenId, TokenKind};
@@ -119,8 +120,11 @@ impl ApiV01 {
 
         // Fetch ongoing deposits, since they must be reported within the transactions history.
         let mut ongoing_ops = self_
-            .api_client
-            .get_unconfirmed_deposits(address)
+            .access_storage()
+            .await?
+            .chain()
+            .mempool_schema()
+            .get_pending_deposits(address)
             .await
             .map_err(|err| {
                 vlog::warn!(
@@ -267,11 +271,12 @@ impl ApiV01 {
         if limit > 0 {
             // We've got some free space, so load unconfirmed operations to
             // fill the rest of the limit.
-
+            let mut storage = self_.access_storage().await?;
             // Fetch ongoing deposits, since they must be reported within the transactions history.
-            let mut ongoing_ops = self_
-                .api_client
-                .get_unconfirmed_deposits(*address)
+            let mut ongoing_ops = storage
+                .chain()
+                .mempool_schema()
+                .get_pending_deposits(*address)
                 .await
                 .map_err(|err| {
                     vlog::warn!(
@@ -287,22 +292,16 @@ impl ApiV01 {
             // Sort operations by block number from smaller (older) to greater (newer).
             ongoing_ops.sort_by(|lhs, rhs| rhs.eth_block.cmp(&lhs.eth_block));
 
-            let tokens = self_
-                .access_storage()
-                .await?
-                .tokens_schema()
-                .load_tokens()
-                .await
-                .map_err(|err| {
-                    vlog::warn!(
-                        "Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                        err,
-                        address,
-                        tx_id,
-                        limit,
-                    );
-                    InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-                })?;
+            let tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                    err,
+                    address,
+                    tx_id,
+                    limit,
+                );
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+            })?;
             // Collect the unconfirmed priority operations with respect to the
             // `limit` parameters.
             let mut txs: Vec<_> = ongoing_ops

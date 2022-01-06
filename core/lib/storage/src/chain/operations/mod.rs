@@ -297,6 +297,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
+        MempoolSchema(&mut transaction)
+            .remove_priority_op_from_mempool(operation.priority_op_serialid)
+            .await?;
+
         sqlx::query!(
             "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account,
                 priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, eth_block_index, tx_hash)

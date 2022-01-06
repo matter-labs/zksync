@@ -279,8 +279,11 @@ impl ApiV01 {
         &self,
         eth_tx_hash: H256,
     ) -> Result<Option<PriorityOp>, anyhow::Error> {
-        self.api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::ByEthHash(eth_tx_hash))
-            .await
+        let mut storage = self.connection_pool.access_storage().await?;
+        Ok(storage
+            .chain()
+            .mempool_schema()
+            .get_pending_operation_by_hash(eth_tx_hash)
+            .await?)
     }
 }

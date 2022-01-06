@@ -14,11 +14,14 @@ use zksync_api_types::v02::transaction::{
 use zksync_types::{
     mempool::{RevertedTxVariant, SignedTxVariant},
     tx::{TxEthSignature, TxHash},
-    BlockNumber, ExecutedOperations, ExecutedTx, SignedZkSyncTx,
+    Address, BlockNumber, ExecutedOperations, ExecutedTx, PriorityOp, SerialId, SignedZkSyncTx,
+    ZkSyncPriorityOp, H256,
 };
 // Local imports
-use self::records::{MempoolTx, QueuedBatchTx};
+use self::records::{MempoolPriorityOp, MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
+use zksync_api_types::v02::account::OngoingDeposit;
+use zksync_api_types::v02::pagination::ApiEither;
 
 pub mod records;
 
@@ -396,6 +399,149 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         self.remove_txs(&tx_hashes_to_remove).await?;
 
         metrics::histogram!("sql.chain.mempool.collect_garbage", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn insert_priority_ops(&mut self, ops: &[PriorityOp]) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut serial_ids = vec![];
+        let mut data = vec![];
+        let mut deadline_blocks = vec![];
+        let mut eth_hashes = vec![];
+        let mut eth_blocks = vec![];
+        let mut eth_block_indexes = vec![];
+        let mut l1_addresses = vec![];
+        let mut l2_addresses = vec![];
+        let mut types = vec![];
+        for op in ops {
+            serial_ids.push(op.serial_id as i64);
+            data.push(serde_json::to_value(op.data.clone()).expect("Should be encoded"));
+            deadline_blocks.push(op.deadline_block as i32);
+            eth_hashes.push(op.eth_hash.as_bytes().to_vec());
+            eth_blocks.push(op.eth_block as i32);
+            eth_block_indexes.push(op.eth_block_index.map(|v| v as i32).unwrap_or_default());
+            types.push(op.data.variance_name());
+            match &op.data {
+                ZkSyncPriorityOp::Deposit(dep) => {
+                    l1_addresses.push(dep.from.as_bytes().to_vec());
+                    l2_addresses.push(dep.to.as_bytes().to_vec());
+                }
+                ZkSyncPriorityOp::FullExit(fe) => {
+                    l1_addresses.push(fe.eth_address.as_bytes().to_vec());
+                    l2_addresses.push(fe.eth_address.as_bytes().to_vec());
+                }
+            }
+        }
+
+        sqlx::query!(
+            "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at) \
+            SELECT u.serial_id, u.data, u.deadline_block, u.eth_hash, u.eth_block, u.eth_block_index, u.l1_address, u.l2_address, u.type, now()
+                FROM UNNEST ($1::bigint[], $2::jsonb[], $3::integer[], $4::bytea[], $5::integer[], $6::integer[], $7::bytea[], $8::bytea[], $9::text[])
+                AS u(serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type)
+            ON CONFLICT DO NOTHING",
+            &serial_ids,
+            &data,
+            &deadline_blocks,
+            &eth_hashes,
+            &eth_blocks,
+            &eth_block_indexes,
+            &l1_addresses,
+            &l2_addresses,
+            &types
+        )
+        .execute(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "schema" => "mempool", "method" => "insert_priority_ops");
+        Ok(())
+    }
+
+    pub async fn get_priority_ops(&mut self) -> QueryResult<Vec<PriorityOp>> {
+        let ops = sqlx::query_as!(
+            MempoolPriorityOp,
+            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations ORDER BY serial_id"
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+        Ok(ops
+            .into_iter()
+            .map(|op| op.try_into().expect("Should be convertable"))
+            .collect())
+    }
+
+    pub async fn remove_priority_op_from_mempool(&mut self, id: i64) -> QueryResult<()> {
+        println!("Remove priority op {:?}", id);
+        sqlx::query!(
+            "DELETE FROM mempool_priority_operations WHERE serial_id=$1",
+            id
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_pending_deposits_for(
+        &mut self,
+        address: Address,
+        start_serial_id: i64,
+        limit: u32,
+    ) -> QueryResult<Vec<PriorityOp>> {
+        let ops = sqlx::query_as!(
+            MempoolPriorityOp,
+            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1 AND serial_id > $2   ORDER BY serial_id LIMIT $3",
+            address.as_bytes().to_vec(),
+            start_serial_id,
+            limit as i64
+        )
+            .fetch_all(self.0.conn())
+            .await?;
+        Ok(ops
+            .into_iter()
+            .map(|op| op.try_into().expect("Should be convertable"))
+            .collect())
+    }
+
+    pub async fn get_pending_operation_by_hash(
+        &mut self,
+        tx_hash: H256,
+    ) -> QueryResult<Option<PriorityOp>> {
+        let op = sqlx::query_as!(
+            MempoolPriorityOp,
+            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE eth_hash = $1",
+            tx_hash.as_bytes().to_vec()
+        )
+            .fetch_optional(self.0.conn())
+            .await?.map(|op| op.try_into().expect("Should be convertable"));
+        Ok(op)
+    }
+    pub async fn get_pending_deposits(&mut self, address: Address) -> QueryResult<Vec<PriorityOp>> {
+        let ops = sqlx::query_as!(
+            MempoolPriorityOp,
+            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE type = 'Deposit' AND l2_address = $1  ORDER BY serial_id",
+            address.as_bytes().to_vec()
+        )
+            .fetch_all(self.0.conn())
+            .await?;
+        Ok(ops
+            .into_iter()
+            .map(|op| op.try_into().expect("Should be convertable"))
+            .collect())
+    }
+
+    pub async fn get_ongoing_deposits(
+        &mut self,
+        address: Address,
+    ) -> QueryResult<Vec<OngoingDeposit>> {
+        let ops = self.get_pending_deposits(address).await?;
+        Ok(ops.into_iter().map(OngoingDeposit::new).collect())
+    }
+    pub async fn remove_priority_ops_from_mempool(&mut self, ids: &[u64]) -> QueryResult<()> {
+        let ids: Vec<_> = ids.iter().map(|v| *v as i64).collect();
+        sqlx::query!(
+            "DELETE FROM mempool_priority_operations WHERE serial_id=ANY($1)",
+            &ids
+        )
+        .execute(self.0.conn())
+        .await?;
         Ok(())
     }
 

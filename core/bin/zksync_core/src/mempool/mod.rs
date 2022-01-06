@@ -118,6 +118,8 @@ pub enum MempoolTransactionRequest {
     /// for correctness (including its Ethereum and ZKSync signatures).
     /// oneshot is used to receive tx add result.
     NewTx(Box<SignedZkSyncTx>, oneshot::Sender<Result<(), TxAddError>>),
+
+    NewPriorityOps(Vec<PriorityOp>, oneshot::Sender<Result<(), TxAddError>>),
     /// Add a new batch of transactions to the mempool. All transactions in batch must
     /// be either executed successfully, or otherwise fail all together.
     /// Invariants for each individual transaction in the batch are the same as in
@@ -191,6 +193,13 @@ impl MempoolState {
             account_nonces.insert(account.address, account.nonce);
         }
 
+        let priority_ops = transaction
+            .chain()
+            .mempool_schema()
+            .get_priority_ops()
+            .await
+            .expect("Get priority ops failed");
+
         // Remove any possible duplicates of already executed transactions
         // from the database.
         transaction
@@ -211,7 +220,10 @@ impl MempoolState {
         let (mempool_size, reverted_queue_size) = (mempool_txs.len(), reverted_txs.len());
 
         // Initialize the queue with reverted transactions loaded from the database.
-        let mut transactions_queue = MempoolTransactionsQueue::new(reverted_txs);
+        // TODO set actual last processed priority op
+        let mut transactions_queue = MempoolTransactionsQueue::new(reverted_txs, 0);
+
+        transactions_queue.add_priority_ops(priority_ops);
 
         for tx in mempool_txs {
             transactions_queue.add_tx_variant(tx);
@@ -240,6 +252,10 @@ impl MempoolState {
 
     fn add_tx(&mut self, tx: SignedZkSyncTx) {
         self.transactions_queue.add_tx_variant(tx.into());
+    }
+
+    fn add_ops(&mut self, ops: Vec<PriorityOp>) {
+        self.transactions_queue.add_priority_ops(ops)
     }
 
     fn add_batch(&mut self, batch: SignedTxsBatch) {
@@ -274,28 +290,26 @@ impl MempoolBlocksHandler {
         };
         // First, fill the block with missing priority operations.
         // Unlike transactions, they are requested from the Eth watch.
-        while next_serial_id < reverted_tx.next_priority_op_id {
-            todo!()
-            // let (sender, receiver) = oneshot::channel();
-            // self.eth_watch_req
-            //     .send(EthWatchRequest::GetPriorityOpBySerialId {
-            //         serial_id: next_serial_id,
-            //         resp: sender,
-            //     })
-            //     .await
-            //     .expect("Eth watch requests receiver is dropped");
-            // let priority_op = receiver
-            //     .await
-            //     .expect("Failed to receive priority operation from Eth watch")
-            //     .expect("Operation not found in the priority queue");
-            // // If the operation doesn't fit, return the proposed block.
-            // if priority_op.data.chunks() <= chunks_left {
-            //     chunks_left -= priority_op.data.chunks();
-            //     proposed_block.priority_ops.push(priority_op);
-            //     next_serial_id += 1;
-            // } else {
-            //     return (chunks_left, proposed_block);
-            // }
+        let next_op_id = reverted_tx.next_priority_op_id;
+        while next_serial_id < next_op_id {
+            // TODO Fix reverting blocks
+            let mut priority_op = None;
+            while let Some(op) = mempool_state.transactions_queue.pop_front_priority_op() {
+                if next_serial_id == op.serial_id {
+                    priority_op = Some(op);
+                    break;
+                }
+            }
+            if let Some(priority_op) = priority_op {
+                // If the operation doesn't fit, return the proposed block.
+                if priority_op.data.chunks() <= chunks_left {
+                    chunks_left -= priority_op.data.chunks();
+                    proposed_block.priority_ops.push(priority_op);
+                    next_serial_id += 1;
+                } else {
+                    return (chunks_left, proposed_block);
+                }
+            }
         }
 
         while let Some(reverted_tx) = mempool_state.transactions_queue.reverted_queue_front() {
@@ -385,27 +399,26 @@ impl MempoolBlocksHandler {
         &self,
         current_unprocessed_priority_op: u64,
     ) -> (usize, Vec<PriorityOp>) {
-        let (sender, receiver) = oneshot::channel();
-        self.eth_watch_req
-            .clone()
-            .send(EthWatchRequest::GetPriorityQueueOps {
-                op_start_id: current_unprocessed_priority_op,
-                max_chunks: self.max_block_size_chunks,
-                resp: sender,
-            })
-            .await
-            .expect("ETH watch req receiver dropped");
+        let mut result = vec![];
+        let mut mempool_state = self.mempool_state.write().await;
 
-        let priority_ops = receiver.await.expect("Err response from eth watch");
-
-        (
-            self.max_block_size_chunks
-                - priority_ops
-                    .iter()
-                    .map(|op| op.data.chunks())
-                    .sum::<usize>(),
-            priority_ops,
-        )
+        let mut used_chunks = 0;
+        let mut current_priority_op = current_unprocessed_priority_op;
+        while let Some(op) = mempool_state.transactions_queue.pop_front_priority_op() {
+            if op.serial_id < current_priority_op {
+                // We can skip already processed priority operations
+                continue;
+            }
+            if used_chunks + op.data.chunks() <= self.max_block_size_chunks {
+                used_chunks += op.data.chunks();
+                result.push(op);
+                current_priority_op += 1;
+            } else {
+                mempool_state.transactions_queue.push_front_priority_op(op);
+                break;
+            }
+        }
+        (self.max_block_size_chunks - used_chunks, result)
     }
 
     async fn prepare_tx_for_block(
@@ -575,8 +588,37 @@ impl MempoolTransactionsHandler {
             ("token", tx.tx.token_id().to_string()),
         ];
         metrics::histogram!("process_tx", tx.elapsed(), &labels);
-
         self.mempool_state.write().await.add_tx(tx);
+
+        Ok(())
+    }
+
+    async fn add_priority_op(&mut self, ops: Vec<PriorityOp>) -> Result<(), TxAddError> {
+        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
+            vlog::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        storage
+            .chain()
+            .mempool_schema()
+            .insert_priority_ops(&ops)
+            .await
+            .map_err(|err| {
+                vlog::warn!("Mempool storage access error: {}", err);
+                TxAddError::DbError
+            })?;
+
+        for op in &ops {
+            let labels = vec![
+                ("stage", "mempool".to_string()),
+                ("name", op.data.variance_name()),
+                ("token", op.data.token_id().to_string()),
+            ];
+            // metrics::histogram!("process_tx", op.elapsed(), &labels);
+        }
+
+        self.mempool_state.write().await.add_ops(ops);
         Ok(())
     }
 
@@ -644,6 +686,10 @@ impl MempoolTransactionsHandler {
                 }
                 MempoolTransactionRequest::NewTxsBatch(txs, eth_signatures, resp) => {
                     let tx_add_result = self.add_batch(txs, eth_signatures).await;
+                    resp.send(tx_add_result).unwrap_or_default();
+                }
+                MempoolTransactionRequest::NewPriorityOps(ops, resp) => {
+                    let tx_add_result = self.add_priority_op(ops).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
             }

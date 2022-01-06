@@ -116,6 +116,7 @@ pub async fn run_core(
         eth_gateway.clone(),
         &config.contracts,
         &config.eth_watch,
+        mempool_tx_request_sender.clone(),
     );
 
     // Insert pending withdrawals into database (if required)

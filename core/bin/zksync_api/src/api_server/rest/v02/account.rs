@@ -29,6 +29,8 @@ use crate::{
     api_server::helpers::get_depositing, api_try, core_api_client::CoreApiClient,
     fee_ticker::PriceError, utils::token_db_cache::TokenDBCache,
 };
+use zksync_api_types::v02::pagination::Latest;
+use zksync_api_types::Either;
 
 /// Shared data between `api/v02/accounts` endpoints.
 #[derive(Clone)]
@@ -247,7 +249,6 @@ impl ApiAccountData {
 
         let depositing = get_depositing(
             &mut transaction,
-            &self.core_api_client,
             &self.tokens,
             address,
             self.confirmations_for_eth_event,
@@ -342,17 +343,21 @@ impl ApiAccountData {
         address: Address,
         account_id: Option<AccountId>,
     ) -> Result<Paginated<Transaction, SerialId>, Error> {
+        let serial_id = match query.from.inner {
+            Either::Left(a) => a,
+            Either::Right(b) => 0,
+        };
         let new_query = PaginationQuery {
             from: PendingOpsRequest {
                 address,
                 account_id,
-                serial_id: query.from,
+                serial_id,
             },
             limit: query.limit,
             direction: query.direction,
         };
-        let mut client = self.core_api_client.clone();
-        client.paginate_checked(&new_query).await
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        storage.paginate_checked(&new_query).await
     }
 }
 

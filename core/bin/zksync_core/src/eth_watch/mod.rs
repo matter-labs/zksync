@@ -21,14 +21,6 @@ use itertools::Itertools;
 use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
 
-// Workspace deps
-use zksync_api_types::{
-    v02::{
-        pagination::{Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
-        transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
-    },
-    Either,
-};
 use zksync_config::{ContractsConfig, ETHWatchConfig};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
@@ -39,6 +31,7 @@ use zksync_types::{
 
 // Local deps
 use self::{client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops};
+use crate::mempool::MempoolTransactionRequest;
 
 mod client;
 mod eth_state;
@@ -69,11 +62,6 @@ pub enum WatcherMode {
 #[derive(Debug)]
 pub enum EthWatchRequest {
     PollETHNode,
-    GetPriorityQueueOps {
-        op_start_id: u64,
-        max_chunks: usize,
-        resp: oneshot::Sender<Vec<PriorityOp>>,
-    },
     GetNewTokens {
         last_eth_block: Option<u64>,
         resp: oneshot::Sender<Vec<NewTokenEvent>>,
@@ -94,6 +82,7 @@ fn is_missing_priority_op_error(error: &anyhow::Error) -> bool {
 
 pub struct EthWatch<W: EthClient> {
     client: W,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     eth_state: ETHState,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
@@ -101,9 +90,14 @@ pub struct EthWatch<W: EthClient> {
 }
 
 impl<W: EthClient> EthWatch<W> {
-    pub fn new(client: W, number_of_confirmations_for_event: u64) -> Self {
+    pub fn new(
+        client: W,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+        number_of_confirmations_for_event: u64,
+    ) -> Self {
         Self {
             client,
+            mempool_tx_sender,
             eth_state: ETHState::default(),
             mode: WatcherMode::Working,
             number_of_confirmations_for_event,
@@ -234,16 +228,19 @@ impl<W: EthClient> EthWatch<W> {
             new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
         let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
-        let priority_queue: HashMap<u64, _> = self
+        let priority_queue = self
             .client
             .get_priority_op_events(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
-            .await?
-            .into_iter()
+            .await?;
+        let priority_queue_map: HashMap<u64, _> = priority_queue
+            .iter()
+            .cloned()
             .map(|priority_op| (priority_op.serial_id, priority_op.into()))
             .collect();
+
         let new_tokens = self
             .client
             .get_new_tokens_events(
@@ -251,6 +248,7 @@ impl<W: EthClient> EthWatch<W> {
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
+
         let new_register_nft_factory_events = self
             .client
             .get_new_register_nft_factory_events(
@@ -259,7 +257,7 @@ impl<W: EthClient> EthWatch<W> {
             )
             .await?;
 
-        let mut new_priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
+        let mut new_priority_op_ids: Vec<_> = priority_queue_map.keys().cloned().collect();
         new_priority_op_ids.sort_unstable();
         vlog::debug!(
             "Updating eth state: block_range=[{},{}], new_priority_ops={:?}",
@@ -268,21 +266,22 @@ impl<W: EthClient> EthWatch<W> {
             new_priority_op_ids
         );
 
-        let mut new_priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
-        new_priority_op_ids.sort_unstable();
-        vlog::debug!(
-            "Updating eth state: block_range=[{},{}], new_priority_ops={:?}",
-            previous_block_with_accepted_events,
-            new_block_with_accepted_events,
-            new_priority_op_ids
-        );
+        let (sender, receiver) = oneshot::channel();
+        self.mempool_tx_sender
+            .send(MempoolTransactionRequest::NewPriorityOps(
+                priority_queue,
+                sender,
+            ))
+            .await?;
 
+        // TODO maybe retry? It can be the only problem is database
+        receiver.await?;
         // The backup block number is not used.
         let state = ETHState::new(
             current_ethereum_block,
             current_ethereum_block,
             unconfirmed_queue,
-            priority_queue,
+            priority_queue_map,
             new_tokens,
             new_register_nft_factory_events,
         );
@@ -438,14 +437,6 @@ impl<W: EthClient> EthWatch<W> {
                         }
                     }
                 }
-                EthWatchRequest::GetPriorityQueueOps {
-                    op_start_id,
-                    max_chunks,
-                    resp,
-                } => {
-                    resp.send(self.get_priority_requests(op_start_id, max_chunks))
-                        .unwrap_or_default();
-                }
                 EthWatchRequest::GetNewTokens {
                     last_eth_block,
                     resp,
@@ -471,6 +462,7 @@ pub fn start_eth_watch(
     eth_gateway: EthereumGateway,
     contract_config: &ContractsConfig,
     eth_watcher_config: &ETHWatchConfig,
+    mempool_req_sender: mpsc::Sender<MempoolTransactionRequest>,
 ) -> JoinHandle<()> {
     let eth_client = EthHttpClient::new(
         eth_gateway,
@@ -478,7 +470,11 @@ pub fn start_eth_watch(
         contract_config.governance_addr,
     );
 
-    let eth_watch = EthWatch::new(eth_client, eth_watcher_config.confirmations_for_eth_event);
+    let eth_watch = EthWatch::new(
+        eth_client,
+        mempool_req_sender,
+        eth_watcher_config.confirmations_for_eth_event,
+    );
 
     tokio::spawn(eth_watch.run(eth_req_receiver));
 
