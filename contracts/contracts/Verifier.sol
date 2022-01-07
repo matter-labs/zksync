@@ -18,7 +18,7 @@ contract Verifier is KeysWithPlonkVerifier, KeysWithPlonkVerifierOld, Config {
 
     function verifyAggregatedBlockProof(
         uint256[] memory _recursiveInput,
-        uint256[] memory _proof,
+        uint256[] calldata _proof,
         uint8[] memory _vkIndexes,
         uint256[] memory _individualVksInputs,
         uint256[16] memory _subproofsLimbs

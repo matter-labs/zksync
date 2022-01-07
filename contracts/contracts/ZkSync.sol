@@ -201,7 +201,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev WARNING: Only for Exodus mode
     /// @dev Canceling may take several separate transactions to be completed
     /// @param _n number of requests to process
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
+    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] calldata _depositsPubdata) external {
         // All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
@@ -603,7 +603,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Reverts unverified blocks
-    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external {
+    function revertBlocks(StoredBlockInfo[] calldata _blocksToRevert) external {
         // All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
@@ -645,7 +645,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         address _nftCreatorAddress,
         uint32 _nftSerialId,
         bytes32 _nftContentHash,
-        uint256[] memory _proof
+        uint256[] calldata _proof
     ) external {
         // All functions delegated to additional should NOT be nonReentrant
         delegateAdditional();

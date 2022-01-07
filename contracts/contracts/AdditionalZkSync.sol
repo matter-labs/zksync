@@ -47,7 +47,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         address _nftCreatorAddress,
         uint32 _nftSerialId,
         bytes32 _nftContentHash,
-        uint256[] memory _proof
+        uint256[] calldata _proof
     ) external {
         require(_accountId <= MAX_ACCOUNT_ID, "e");
         require(_accountId != SPECIAL_ACCOUNT_ID, "v");
@@ -91,7 +91,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         performedExodus[_accountId][_tokenId] = true;
     }
 
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
+    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] calldata _depositsPubdata) external {
         require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
         require(toProcess > 0, "9"); // no deposits to process
@@ -114,6 +114,9 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
 
+    /// @notice processing new approval of decrease upgrade notice period time to zero
+    /// @param addr address of the account that approved the reduction of the upgrade notice period to zero
+    /// NOTE: does NOT revert if the address is not a security council member or number of approvals is already sufficient
     function approveCutUpgradeNoticePeriod(address addr) internal {
         address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS = [
             $(SECURITY_COUNCIL_MEMBERS)
@@ -124,7 +127,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
                 numberOfApprovalsFromSecurityCouncil += 1;
                 emit ApproveCutUpgradeNoticePeriod(addr);
 
-                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_THRESHOLD) {
+                if (numberOfApprovalsFromSecurityCouncil >= SECURITY_COUNCIL_THRESHOLD) {
                     if (approvedUpgradeNoticePeriod > 0) {
                         approvedUpgradeNoticePeriod = 0;
                         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
@@ -209,7 +212,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Reverts unverified blocks
-    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external {
+    function revertBlocks(StoredBlockInfo[] calldata _blocksToRevert) external {
         requireActive();
 
         governance.requireActiveValidator(msg.sender);
