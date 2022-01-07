@@ -22,7 +22,7 @@ use futures::{
         mpsc::{self, Receiver},
         oneshot,
     },
-    SinkExt, StreamExt,
+    StreamExt,
 };
 
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,7 @@ use zksync_types::{
 
 // Local uses
 use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
-use crate::{eth_watch::EthWatchRequest, wait_for_tasks};
+use crate::wait_for_tasks;
 
 mod mempool_transactions_queue;
 
@@ -631,7 +631,7 @@ impl MempoolTransactionsHandler {
             ops
         };
         // Nothing to insert
-        if ops.len() == 0 {
+        if ops.is_empty() {
             return Ok(());
         }
         storage
@@ -645,7 +645,7 @@ impl MempoolTransactionsHandler {
             })?;
 
         for op in &ops {
-            let labels = vec![
+            let _labels = vec![
                 ("stage", "mempool".to_string()),
                 ("name", op.data.variance_name()),
                 ("token", op.data.token_id().to_string()),

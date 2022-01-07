@@ -186,11 +186,8 @@ pub async fn run_core(
     );
 
     // Start private API.
-    let private_api_task = start_private_core_api(
-        mempool_tx_request_sender,
-        eth_watch_req_sender,
-        config.api.private.clone(),
-    );
+    let private_api_task =
+        start_private_core_api(mempool_tx_request_sender, config.api.private.clone());
 
     let task_futures = vec![
         eth_watch_task,

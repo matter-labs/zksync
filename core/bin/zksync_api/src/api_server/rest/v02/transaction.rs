@@ -15,14 +15,13 @@ use zksync_api_types::{
         Toggle2FA, Toggle2FAResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
         TxInBlockStatus,
     },
-    PriorityOpLookupQuery, TxWithSignature,
+    TxWithSignature,
 };
 use zksync_types::{tx::TxHash, EthBlockId};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
 use crate::api_server::tx_sender::{SubmitError, TxSender};
-use web3::types::H256;
 
 /// Shared data between `api/v0.2/transactions` endpoints.
 #[derive(Clone)]
@@ -268,10 +267,6 @@ mod tests {
             _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
         ) -> Json<Result<(), ()>> {
             Json(Ok(()))
-        }
-
-        async fn get_unconfirmed_op(_query: Json<PriorityOpLookupQuery>) -> Json<Option<()>> {
-            Json(None)
         }
 
         let server = actix_test::start(move || {

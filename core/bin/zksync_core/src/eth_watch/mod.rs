@@ -19,15 +19,12 @@ use thiserror::Error;
 pub use client::{get_web3_block_number, EthHttpClient};
 use itertools::Itertools;
 use tokio::{task::JoinHandle, time};
-use web3::types::{Address, BlockNumber};
+use web3::types::BlockNumber;
 
 use zksync_config::{ContractsConfig, ETHWatchConfig};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
-use zksync_types::{
-    tx::TxHash, NewTokenEvent, Nonce, PriorityOp, PubKeyHash, RegisterNFTFactoryEvent, SerialId,
-    ZkSyncPriorityOp, H256,
-};
+use zksync_types::{NewTokenEvent, PriorityOp, RegisterNFTFactoryEvent, SerialId};
 
 // Local deps
 use self::{client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops};

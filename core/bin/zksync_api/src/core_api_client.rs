@@ -1,12 +1,5 @@
-use zksync_api_types::{
-    v02::{
-        pagination::{Paginated, PaginationQuery, PendingOpsRequest},
-        transaction::Transaction,
-    },
-    PriorityOpLookupQuery,
-};
 pub use zksync_types::EthBlockId;
-use zksync_types::{tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx};
+use zksync_types::{tx::TxEthSignature, SignedZkSyncTx};
 
 use crate::tx_error::TxAddError;
 

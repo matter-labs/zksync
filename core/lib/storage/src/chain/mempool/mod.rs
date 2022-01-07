@@ -20,9 +20,8 @@ use zksync_types::{
 // Local imports
 use self::records::{MempoolPriorityOp, MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
-use sqlx::Connection;
+
 use zksync_api_types::v02::account::OngoingDeposit;
-use zksync_api_types::v02::pagination::ApiEither;
 
 pub mod records;
 

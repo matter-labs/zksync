@@ -29,7 +29,7 @@ use crate::{
     api_server::helpers::get_depositing, api_try, core_api_client::CoreApiClient,
     fee_ticker::PriceError, utils::token_db_cache::TokenDBCache,
 };
-use zksync_api_types::v02::pagination::Latest;
+
 use zksync_api_types::Either;
 
 /// Shared data between `api/v02/accounts` endpoints.
@@ -345,7 +345,7 @@ impl ApiAccountData {
     ) -> Result<Paginated<Transaction, SerialId>, Error> {
         let serial_id = match query.from.inner {
             Either::Left(a) => a,
-            Either::Right(b) => 0,
+            Either::Right(_b) => 0,
         };
         let new_query = PaginationQuery {
             from: PendingOpsRequest {
@@ -494,7 +494,7 @@ mod tests {
     use zksync_api_client::rest::client::Client;
     use zksync_api_types::v02::{
         account::{DepositingAccountBalances, DepositingFunds},
-        pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest},
+        pagination::{PaginationDirection, PaginationQuery},
         transaction::{L1Transaction, TransactionData},
         ApiVersion,
     };
@@ -645,33 +645,6 @@ mod tests {
             self.api_server.stop().await;
             self.core_server.stop().await;
         }
-    }
-
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
-    async fn unconfirmed_ops_and_deposits_loopback() -> anyhow::Result<()> {
-        let (client, server) = get_unconfirmed_ops_and_deposits_loopback(
-            create_pending_ops_handle(),
-            create_pending_deposits_handle(),
-        );
-        client
-            .get_unconfirmed_ops(&PaginationQuery {
-                from: PendingOpsRequest {
-                    address: Address::default(),
-                    account_id: Some(AccountId::default()),
-                    serial_id: ApiEither::from(0),
-                },
-                limit: 0,
-                direction: PaginationDirection::Newer,
-            })
-            .await?;
-        client.get_unconfirmed_deposits(Address::default()).await?;
-
-        server.stop().await;
-        Ok(())
     }
 
     #[actix_rt::test]

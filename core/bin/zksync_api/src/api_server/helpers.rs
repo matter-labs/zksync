@@ -2,24 +2,19 @@
 
 // Built-in uses
 use std::collections::HashMap;
-use std::time::Instant;
 
 // External uses
 use num::BigUint;
 
 // Workspace uses
-use zksync_api_types::v02::account::{
-    DepositingAccountBalances, DepositingFunds, OngoingDeposit, OngoingDepositsResp,
-};
+use zksync_api_types::v02::account::{DepositingAccountBalances, DepositingFunds, OngoingDeposit};
 use zksync_storage::StorageProcessor;
 use zksync_types::{Address, H256};
 use zksync_utils::remove_prefix;
 
 // Local uses
 use super::rest::v02::error::Error;
-use crate::{
-    core_api_client::CoreApiClient, fee_ticker::PriceError, utils::token_db_cache::TokenDBCache,
-};
+use crate::{fee_ticker::PriceError, utils::token_db_cache::TokenDBCache};
 
 pub fn try_parse_hash(query: &str) -> Result<H256, hex::FromHexError> {
     const HASH_SIZE: usize = 32; // 32 bytes

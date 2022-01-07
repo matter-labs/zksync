@@ -15,7 +15,6 @@ use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use chrono::Duration;
 use num::{rational::Ratio, BigUint, FromPrimitive};
-use std::io::Read;
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
 use zksync_types::{Address, BlockNumber, Token, TokenId, TokenKind};

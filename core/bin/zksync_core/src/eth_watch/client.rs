@@ -10,7 +10,7 @@ use web3::{
     Web3,
 };
 
-use zksync_contracts::{erc20_contract, governance_contract, zksync_contract};
+use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{
     Address, NewTokenEvent, Nonce, PriorityOp, RegisterNFTFactoryEvent, H160, U256,

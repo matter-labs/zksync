@@ -23,7 +23,7 @@ use super::{
     error::{Error, InvalidDataError},
     paginate_trait::Paginate,
 };
-use crate::core_api_client::CoreApiClient;
+
 use zksync_api_types::v02::transaction::{L1Transaction, TransactionData, TxInBlockStatus};
 
 #[async_trait::async_trait]

@@ -1,22 +1,21 @@
 use std::cmp::max;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_api_types::v02::pagination::{
-    ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest,
-};
 use zksync_types::{
     AccountId, Deposit, FullExit, NewTokenEvent, Nonce, PriorityOp, RegisterNFTFactoryEvent,
-    TokenId, ZkSyncPriorityOp, H256,
+    SerialId, TokenId, ZkSyncPriorityOp, H256,
 };
+
+use futures::channel::mpsc;
+use futures::StreamExt;
+use tokio::sync::RwLock;
 
 use super::is_missing_priority_op_error;
 use crate::eth_watch::{client::EthClient, EthWatch};
 use crate::mempool::MempoolTransactionRequest;
-use futures::channel::mpsc;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 struct FakeEthClientData {
     priority_ops: HashMap<u64, Vec<PriorityOp>>,
@@ -136,11 +135,34 @@ fn create_watcher<T: EthClient>(
     EthWatch::new(client, mempool_tx_sender, 1)
 }
 
+async fn fake_mempool(
+    mut receiver: mpsc::Receiver<MempoolTransactionRequest>,
+    data: Arc<RwLock<HashMap<SerialId, (PriorityOp, bool)>>>,
+) {
+    while let Some(a) = receiver.next().await {
+        match a {
+            MempoolTransactionRequest::NewTx(_, _) => {
+                unreachable!()
+            }
+            MempoolTransactionRequest::NewPriorityOps(ops, conf, channel) => {
+                for op in &ops {
+                    let mut lock = data.write().await;
+                    lock.insert(op.serial_id, (op.clone(), conf));
+                }
+                channel.send(Ok(())).unwrap_or_default()
+            }
+            MempoolTransactionRequest::NewTxsBatch(_, _, _) => unreachable!(),
+        }
+    }
+}
+
 #[tokio::test]
 async fn test_operation_queues() {
     let mut client = FakeEthClient::new();
 
     let (sender, receiver) = mpsc::channel(10);
+    let data = Arc::new(RwLock::new(HashMap::new()));
+    tokio::spawn(fake_mempool(receiver, data.clone()));
     let from_addr = [1u8; 20].into();
     let to_addr = [2u8; 20].into();
 
@@ -204,38 +226,16 @@ async fn test_operation_queues() {
     assert_eq!(unconfirmed_queue[1].serial_id, 2);
 
     priority_queues.get(&0).unwrap();
-    // TODO it was moved from eth watcher to database
-    // watcher
-    //     .find_ongoing_op_by_eth_hash(H256::from_slice(&[3u8; 32]))
-    //     .unwrap();
-
-    // Make sure that the old behavior of the pending deposits getter has not changed.
-    // let deposits = watcher.get_ongoing_deposits_for(to_addr);
-    // assert_eq!(deposits.len(), 1);
-    // Check that the new pending operations getter shows only deposits with the same `to` address.
-    // let ops = watcher.get_ongoing_ops_for(PaginationQuery {
-    //     from: PendingOpsRequest {
-    //         address: to_addr,
-    //         account_id: Some(AccountId(1)),
-    //         serial_id: ApiEither::from(0),
-    //     },
-    //     limit: 2,
-    //     direction: PaginationDirection::Newer,
-    // });
-    // assert_eq!(ops.list[0].tx_hash, priority_ops[1].tx_hash());
-    // assert_eq!(ops.list[1].tx_hash, priority_ops[2].tx_hash());
-    // assert!(watcher
-    //     .get_ongoing_ops_for(PaginationQuery {
-    //         from: PendingOpsRequest {
-    //             address: from_addr,
-    //             account_id: Some(AccountId(0)),
-    //             serial_id: ApiEither::from(0)
-    //         },
-    //         limit: 3,
-    //         direction: PaginationDirection::Newer
-    //     })
-    //     .list
-    //     .is_empty());
+    let reader = data.read().await;
+    let (op, confirmed) = reader.get(&priority_ops[0].serial_id).unwrap();
+    assert_eq!(op.tx_hash(), priority_ops[0].tx_hash());
+    assert!(confirmed);
+    let (op, confirmed) = reader.get(&priority_ops[1].serial_id).unwrap();
+    assert!(!confirmed);
+    assert_eq!(op.tx_hash(), priority_ops[1].tx_hash());
+    let (op, confirmed) = reader.get(&priority_ops[2].serial_id).unwrap();
+    assert!(!confirmed);
+    assert_eq!(op.tx_hash(), priority_ops[2].tx_hash());
 }
 
 /// This test simulates the situation when eth watch module did not poll Ethereum node for some time
@@ -248,6 +248,8 @@ async fn test_operation_queues_time_lag() {
     // Client's block number will be 110, thus both first and second operations should get to the priority queue
     // in eth watcher.
     let (sender, receiver) = mpsc::channel(10);
+    let data = Arc::new(RwLock::new(HashMap::new()));
+    tokio::spawn(fake_mempool(receiver, data.clone()));
     client
         .add_operations(&[
             PriorityOp {
@@ -319,6 +321,8 @@ async fn test_operation_queues_time_lag() {
 async fn test_restore_and_poll() {
     let mut client = FakeEthClient::new();
     let (sender, receiver) = mpsc::channel(10);
+    let data = Arc::new(RwLock::new(HashMap::new()));
+    tokio::spawn(fake_mempool(receiver, data.clone()));
     client
         .add_operations(&[
             PriorityOp {
@@ -390,11 +394,11 @@ async fn test_restore_and_poll() {
     assert_eq!(unconfirmed_queue.len(), 2);
     assert_eq!(unconfirmed_queue[0].serial_id, 3);
     priority_queues.get(&1).unwrap();
-    // watcher
-    //     .find_ongoing_op_by_eth_hash(H256::from_slice(&[2u8; 32]))
-    //     .unwrap();
-    // let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
-    // assert_eq!(deposits.len(), 1);
+
+    let reader = data.read().await;
+    let (op, confirmed) = reader.get(&3).unwrap();
+    assert_eq!(op.eth_hash, H256::from_slice(&[2u8; 32]));
+    assert!(!confirmed);
 }
 
 /// Checks that even for a big gap between skipped blocks, state is restored correctly.
@@ -402,6 +406,8 @@ async fn test_restore_and_poll() {
 async fn test_restore_and_poll_time_lag() {
     let (sender, receiver) = mpsc::channel(10);
     let mut client = FakeEthClient::new();
+    let data = Arc::new(RwLock::new(HashMap::new()));
+    tokio::spawn(fake_mempool(receiver, data.clone()));
     client
         .add_operations(&[
             PriorityOp {
@@ -452,6 +458,8 @@ async fn test_serial_id_gaps() {
         to: [2u8; 20].into(),
     });
 
+    let data = Arc::new(RwLock::new(HashMap::new()));
+    tokio::spawn(fake_mempool(receiver, data.clone()));
     let mut client = FakeEthClient::new();
     client
         .add_operations(&[

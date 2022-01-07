@@ -225,6 +225,52 @@ mod tests {
 
         transactions_queue.add_priority_ops(vec![
             PriorityOp {
+                serial_id: 3,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 1,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 2,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+        ]);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 1);
+        transactions_queue.push_front_priority_op(op);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 1);
+        transactions_queue.add_priority_ops(vec![
+            PriorityOp {
                 serial_id: 1,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
@@ -251,7 +297,33 @@ mod tests {
                 eth_block_index: None,
             },
             PriorityOp {
-                serial_id: 3,
+                serial_id: 4,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 6,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 5,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
                     token: Default::default(),
@@ -265,15 +337,20 @@ mod tests {
             },
         ]);
         let op = transactions_queue.pop_front_priority_op().unwrap();
-        assert_eq!(op.serial_id, 1);
-        transactions_queue.push_front_priority_op(op);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
-        assert_eq!(op.serial_id, 1);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
         assert_eq!(op.serial_id, 2);
         let op = transactions_queue.pop_front_priority_op().unwrap();
         assert_eq!(op.serial_id, 3);
+        transactions_queue.push_front_priority_op(op);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 3);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 4);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 5);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 6);
     }
+
     #[test]
     fn test_mempool_transactions_queue() {
         let mut transactions_queue = MempoolTransactionsQueue {
