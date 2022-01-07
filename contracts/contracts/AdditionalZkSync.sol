@@ -114,7 +114,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
 
-    function approvedCutUpgradeNoticePeriod(address addr) internal {
+    function approveCutUpgradeNoticePeriod(address addr) internal {
         address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS = [
             $(SECURITY_COUNCIL_MEMBERS)
         ];
@@ -122,7 +122,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             if (SECURITY_COUNCIL_MEMBERS[id] == addr && !securityCouncilApproves[id]) {
                 securityCouncilApproves[id] = true;
                 numberOfApprovalsFromSecurityCouncil += 1;
-                emit approveCutUpgradeNoticePeriod(addr);
+                emit ApproveCutUpgradeNoticePeriod(addr);
 
                 if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_THRESHOLD) {
                     if (approvedUpgradeNoticePeriod > 0) {
@@ -138,10 +138,11 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     /// @notice approve to decrease upgrade notice period time to zero
     /// NOTE: сan only be called after the start of the upgrade
-    function cutUpgradeNoticePeriod() external {
+    function cutUpgradeNoticePeriod(bytes32 targetsHash) external {
         require(upgradeStartTimestamp != 0, "p1");
+        require(getUpgradeTargetsHash() == targetsHash, "p3"); // given targets are not in the active upgrade
 
-        approvedCutUpgradeNoticePeriod(msg.sender);
+        approveCutUpgradeNoticePeriod(msg.sender);
     }
 
     /// @notice approve to decrease upgrade notice period time to zero by signatures
@@ -150,17 +151,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
         require(upgradeStartTimestamp != 0, "p2");
 
-        // Get the addresses of contracts that are being prepared for the upgrade.
-        address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
-        (, bytes memory newTarget0) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 0));
-        (, bytes memory newTarget1) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 1));
-        (, bytes memory newTarget2) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 2));
-
-        address newTargetAddress0 = abi.decode(newTarget0, (address));
-        address newTargetAddress1 = abi.decode(newTarget1, (address));
-        address newTargetAddress2 = abi.decode(newTarget2, (address));
-
-        bytes32 targetsHash = keccak256(abi.encodePacked(newTargetAddress0, newTargetAddress1, newTargetAddress2));
+        bytes32 targetsHash = getUpgradeTargetsHash();
         // The Message includes a hash of the addresses of the contracts to which the upgrade will take place to prevent reuse signature.
         bytes32 messageHash = keccak256(
             abi.encodePacked(
@@ -172,8 +163,24 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
         for (uint256 i = 0; i < signatures.length; ++i) {
             address recoveredAddress = Utils.recoverAddressFromEthSignature(signatures[i], messageHash);
-            approvedCutUpgradeNoticePeriod(recoveredAddress);
+            approveCutUpgradeNoticePeriod(recoveredAddress);
         }
+    }
+
+    /// @return hash of the concatenation of targets for which there is an upgrade
+    /// NOTE: revert if upgrade is not active at this moment
+    function getUpgradeTargetsHash() internal returns (bytes32) {
+        // Get the addresses of contracts that are being prepared for the upgrade.
+        address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
+        (, bytes memory newTarget0) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 0));
+        (, bytes memory newTarget1) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 1));
+        (, bytes memory newTarget2) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 2));
+
+        address newTargetAddress0 = abi.decode(newTarget0, (address));
+        address newTargetAddress1 = abi.decode(newTarget1, (address));
+        address newTargetAddress2 = abi.decode(newTarget2, (address));
+
+        return keccak256(abi.encodePacked(newTargetAddress0, newTargetAddress1, newTargetAddress2));
     }
 
     /// @notice Set data for changing pubkey hash using onchain authorization.
