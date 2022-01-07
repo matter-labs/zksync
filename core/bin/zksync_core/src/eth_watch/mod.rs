@@ -219,7 +219,6 @@ impl<W: EthClient> EthWatch<W> {
         current_ethereum_block: u64,
         unprocessed_blocks_amount: u64,
     ) -> anyhow::Result<ETHState> {
-        println!("Update eth state");
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =

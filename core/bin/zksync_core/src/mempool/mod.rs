@@ -415,10 +415,6 @@ impl MempoolBlocksHandler {
         let mut used_chunks = 0;
         let mut current_priority_op = current_unprocessed_priority_op;
         while let Some(op) = mempool_state.transactions_queue.pop_front_priority_op() {
-            println!(
-                "Current priority op {:?} {:?} {:?}",
-                current_priority_op, &op, &mempool_state.transactions_queue.priority_ops
-            );
             if op.serial_id < current_priority_op {
                 // We can skip already processed priority operations
                 continue;
@@ -728,7 +724,6 @@ impl MempoolTransactionsHandler {
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolTransactionRequest::NewPriorityOps(ops, confirmed, resp) => {
-                    println!("{:?} {:}", &ops, confirmed);
                     let tx_add_result = self.add_priority_op(ops, confirmed).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }

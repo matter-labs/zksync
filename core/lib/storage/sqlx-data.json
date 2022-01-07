@@ -906,64 +906,6 @@
       "nullable": []
     }
   },
-  "1a84ba248544924514aab6c1c84247759a80650f057fa23898f9cb2a8ce79eaf": {
-    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1 AND serial_id > $2   ORDER BY serial_id LIMIT $3",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "deadline_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "eth_block_index",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "1a8ff6100bfc7521b3728c817a4014355e09d6ca1c251bbcee6f7cf013b6800d": {
     "query": "SELECT * FROM mint_nft_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -4862,24 +4804,6 @@
       ]
     }
   },
-  "a13b0b7762fe522402979b1e37e2f557026b8a92b0a0e50630384a92abb7ead8": {
-    "query": "SELECT count(*) from mempool_priority_operations",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "a154c713c54d22beec24fd99856956ab851fc6daf5692ffc6e0255c7dc6f16c1": {
     "query": "\n                SELECT * FROM account_pubkey_updates\n                WHERE account_id = $1 AND block_number > $2\n            ",
     "describe": {
@@ -7835,6 +7759,64 @@
       ],
       "parameters": {
         "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "f304a33fcdc1938225230fe688710dfd92ec45915db3e4561c31b4c26a91ca6f": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1 AND serial_id >= $2   ORDER BY serial_id LIMIT $3",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
           "Int8"
         ]
       },

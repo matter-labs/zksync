@@ -412,7 +412,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         // We `DO UPDATE` for two cases, first of all we must confirm the priority operations
         // and the next scenario we work with network splits, and until we execute priority op the data under serial_id may be different
 
-        println!("Insert {:?} {:?}", &ops, confirmed);
         let mut transaction = self.0.start_transaction().await?;
         for op in ops {
             let serial_id = op.serial_id as i64;
@@ -432,10 +431,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 ),
             };
 
-            let row = sqlx::query!("SELECT count(*) from mempool_priority_operations")
-                .fetch_all(transaction.conn())
-                .await?;
-            println!("Row {:?}", row);
             sqlx::query!(
                 "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at, confirmed) \
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10)
@@ -463,7 +458,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             )
                 .execute(transaction.conn())
                 .await?;
-            println!("Insert {:?} {:?}", &op, confirmed);
         }
         transaction.commit().await?;
         metrics::histogram!("sql.chain", start.elapsed(), "schema" => "mempool", "method" => "insert_priority_ops");
@@ -484,7 +478,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     }
 
     pub async fn remove_priority_op_from_mempool(&mut self, id: i64) -> QueryResult<()> {
-        println!("Remove priority op {:?}", id);
         sqlx::query!(
             "DELETE FROM mempool_priority_operations WHERE serial_id=$1",
             id
@@ -502,7 +495,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     ) -> QueryResult<Vec<PriorityOp>> {
         let ops = sqlx::query_as!(
             MempoolPriorityOp,
-            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1 AND serial_id > $2   ORDER BY serial_id LIMIT $3",
+            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1 AND serial_id >= $2   ORDER BY serial_id LIMIT $3",
             address.as_bytes().to_vec(),
             start_serial_id,
             limit as i64
