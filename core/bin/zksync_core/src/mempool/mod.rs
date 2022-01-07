@@ -221,7 +221,13 @@ impl MempoolState {
 
         // Initialize the queue with reverted transactions loaded from the database.
         // TODO set actual last processed priority op
-        let mut transactions_queue = MempoolTransactionsQueue::new(reverted_txs, 0);
+        let serial_id = transaction
+            .chain()
+            .operations_schema()
+            .get_max_priority_op_serial_id()
+            .await
+            .expect("Error in getting last priority op");
+        let mut transactions_queue = MempoolTransactionsQueue::new(reverted_txs, serial_id);
 
         transactions_queue.add_priority_ops(priority_ops);
 
@@ -598,7 +604,24 @@ impl MempoolTransactionsHandler {
             vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
+        let last_processed_priority_op = storage
+            .chain()
+            .operations_schema()
+            .get_max_priority_op_serial_id()
+            .await
+            .map_err(|_| TxAddError::DbError)?;
 
+        let ops = if let Some(serial_id) = last_processed_priority_op {
+            ops.into_iter()
+                .filter(|op| op.serial_id > serial_id)
+                .collect()
+        } else {
+            ops
+        };
+        // Nothing to insert
+        if ops.len() == 0 {
+            return Ok(());
+        }
         storage
             .chain()
             .mempool_schema()

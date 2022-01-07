@@ -350,15 +350,15 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     }
 
     /// Returns the highest serial id of the executed priority ops
-    pub async fn get_max_priority_op_serial_id(&mut self) -> QueryResult<SerialId> {
+    pub async fn get_max_priority_op_serial_id(&mut self) -> QueryResult<Option<SerialId>> {
         let start = Instant::now();
 
         let max_serial_id = sqlx::query!(
-            r#"SELECT max(priority_op_serialid) as "max!" FROM executed_priority_operations;"#
+            r#"SELECT max(priority_op_serialid) as "max" FROM executed_priority_operations;"#
         )
-        .fetch_optional(self.0.conn())
+        .fetch_one(self.0.conn())
         .await?;
-        let max_serial_id = max_serial_id.map(|record| record.max as u64).unwrap_or(0);
+        let max_serial_id = max_serial_id.max.map(|record| record as u64);
 
         metrics::histogram!(
             "sql.chain.operations.get_max_priority_op_serial_id",

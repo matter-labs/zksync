@@ -43,12 +43,6 @@ impl CoreApiClient {
         self.post(&endpoint, data).await
     }
 
-    async fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> anyhow::Result<T> {
-        let response = self.client.get(url).send().await?.json().await?;
-
-        Ok(response)
-    }
-
     async fn post<T: serde::de::DeserializeOwned>(
         &self,
         url: &str,

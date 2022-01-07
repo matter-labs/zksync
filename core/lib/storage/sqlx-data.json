@@ -1186,6 +1186,24 @@
       ]
     }
   },
+  "1f79561a685158771354106ab8ea867babbe89752d1ba6b892b09171f1ca5773": {
+    "query": "SELECT max(priority_op_serialid) as \"max\" FROM executed_priority_operations;",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "1fbfd087b4c05dc6a682c0020bfae07b3eea537e3e96f0316a7ec3ed63df9f88": {
     "query": "DELETE FROM account_tree_cache WHERE block < $1",
     "describe": {
@@ -3466,24 +3484,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "77a2e1137af7e8aba1ba026ab997005b079264c13bea68054d21bb4d4f0f9195": {
-    "query": "SELECT max(priority_op_serialid) as \"max!\" FROM executed_priority_operations;",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "77a35660d36e4b67dafa930ea4cce469b73e3f6d14a67aeda89233c7aa82206a": {
