@@ -8,5 +8,6 @@ CREATE TABLE mempool_priority_operations (
     eth_hash BYTEA NOT NULL,
     eth_block BIGINT NOT NULL,
     eth_block_index INTEGER NOT NULL,
+    confirmed BOOL NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );

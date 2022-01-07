@@ -2394,26 +2394,6 @@
       ]
     }
   },
-  "45dd90ea59046924cc2b61f077df5c59c3df98538789b8fb105a3290f1cb4b03": {
-    "query": "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at) SELECT u.serial_id, u.data, u.deadline_block, u.eth_hash, u.eth_block, u.eth_block_index, u.l1_address, u.l2_address, u.type, now()\n                FROM UNNEST ($1::bigint[], $2::jsonb[], $3::integer[], $4::bytea[], $5::integer[], $6::integer[], $7::bytea[], $8::bytea[], $9::text[])\n                AS u(serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type)\n            ON CONFLICT DO NOTHING",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8Array",
-          "JsonbArray",
-          "Int4Array",
-          "ByteaArray",
-          "Int4Array",
-          "Int4Array",
-          "ByteaArray",
-          "ByteaArray",
-          "TextArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "46f6716e4da5b4ce70ae9dfceb0f35d18908f4d7369da95f209a979e896db269": {
     "query": "\n            WITH aggr_exec AS (\n                SELECT\n                    aggregate_operations.confirmed,\n                    execute_aggregated_blocks_binding.block_number\n                FROM aggregate_operations\n                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                WHERE aggregate_operations.confirmed = true\n            ), tx_hashes AS (\n                SELECT DISTINCT tx_hash FROM tx_filters\n                WHERE address = $1\n            ), transactions AS (\n                SELECT\n                    *\n                FROM (\n                    SELECT\n                        concat_ws(',', block_number, block_index) AS tx_id,\n                        tx,\n                        'sync-tx:' || encode(executed_transactions.tx_hash, 'hex') AS hash,\n                        null as pq_id,\n                        null as eth_block,\n                        success,\n                        fail_reason,\n                        block_number,\n                        created_at,\n                        batch_id\n                    FROM tx_hashes\n                    INNER JOIN executed_transactions\n                        ON tx_hashes.tx_hash = executed_transactions.tx_hash\n                    union all\n                    select\n                        concat_ws(',', block_number, block_index) as tx_id,\n                        operation as tx,\n                        '0x' || encode(eth_hash, 'hex') as hash,\n                        priority_op_serialid as pq_id,\n                        eth_block,\n                        true as success,\n                        null as fail_reason,\n                        block_number,\n                        created_at,\n                        Null::bigint as batch_id\n                    from\n                        executed_priority_operations\n                    where\n                        from_account = $1\n                        or\n                        to_account = $1) t\n                order by\n                    block_number desc, created_at desc\n                offset\n                    $2\n                limit\n                    $3\n            )\n            select\n                tx_id as \"tx_id!\",\n                hash as \"hash?\",\n                eth_block as \"eth_block?\",\n                pq_id as \"pq_id?\",\n                tx as \"tx!\",\n                success as \"success?\",\n                fail_reason as \"fail_reason?\",\n                true as \"commited!\",\n                coalesce(verified.confirmed, false) as \"verified!\",\n                created_at as \"created_at!\",\n                batch_id as \"batch_id?\"\n            from transactions\n            LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number\n            order by transactions.block_number desc, created_at desc\n            ",
     "describe": {
@@ -3778,60 +3758,6 @@
       ]
     }
   },
-  "7dd6e695a5f22f477efd7f21a0bd2bdefcbd514e12a6028dbd8851742c7033d2": {
-    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations ORDER BY serial_id",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "deadline_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "eth_block_index",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "7dfa76c3e12c301dc3d7fbf820ecf0be45e0b1c5f01ce13f7cdc1a82880804c1": {
     "query": "\n            SELECT * FROM forced_exit_requests\n            WHERE id = $1\n            LIMIT 1\n            ",
     "describe": {
@@ -4936,6 +4862,24 @@
       ]
     }
   },
+  "a13b0b7762fe522402979b1e37e2f557026b8a92b0a0e50630384a92abb7ead8": {
+    "query": "SELECT count(*) from mempool_priority_operations",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "a154c713c54d22beec24fd99856956ab851fc6daf5692ffc6e0255c7dc6f16c1": {
     "query": "\n                SELECT * FROM account_pubkey_updates\n                WHERE account_id = $1 AND block_number > $2\n            ",
     "describe": {
@@ -5147,6 +5091,27 @@
       "parameters": {
         "Left": [
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a9d7d792386fa78820e0120bde57eb034135ba31ad35fca773993955ebd51acf": {
+    "query": "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at, confirmed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10)\n                ON CONFLICT (serial_id) DO UPDATE SET\n                data=$2,\n                deadline_block=$3,\n                eth_hash=$4,\n                eth_block=$5,\n                eth_block_index=$6,\n                l1_address=$7,\n                l2_address=$8,\n                type=$9,\n                confirmed=$10\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb",
+          "Int8",
+          "Bytea",
+          "Int8",
+          "Int4",
+          "Bytea",
+          "Bytea",
+          "Text",
+          "Bool"
         ]
       },
       "nullable": []
@@ -6824,6 +6789,60 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "e174083d24c22c7ddc5d9bac0734509bc666cb6a7ee7c296f04b307618770165": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed ORDER BY serial_id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "e188272dd4fd0e228f4fcd7182eff49db1316e061b6d9940da543981f8a179d6": {

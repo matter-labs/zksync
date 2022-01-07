@@ -100,7 +100,7 @@ impl MempoolTransactionsQueue {
         ops.sort_by_key(|key| key.serial_id);
         for op in ops {
             if let Some(serial_id) = self.last_processed_priority_op {
-                if op.serial_id < serial_id {
+                if op.serial_id <= serial_id {
                     continue;
                 }
             }

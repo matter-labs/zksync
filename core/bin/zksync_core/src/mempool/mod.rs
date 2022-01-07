@@ -119,7 +119,12 @@ pub enum MempoolTransactionRequest {
     /// oneshot is used to receive tx add result.
     NewTx(Box<SignedZkSyncTx>, oneshot::Sender<Result<(), TxAddError>>),
 
-    NewPriorityOps(Vec<PriorityOp>, oneshot::Sender<Result<(), TxAddError>>),
+    /// Add new priority ops, confirmed or not
+    NewPriorityOps(
+        Vec<PriorityOp>,
+        bool,
+        oneshot::Sender<Result<(), TxAddError>>,
+    ),
     /// Add a new batch of transactions to the mempool. All transactions in batch must
     /// be either executed successfully, or otherwise fail all together.
     /// Invariants for each individual transaction in the batch are the same as in
@@ -196,7 +201,7 @@ impl MempoolState {
         let priority_ops = transaction
             .chain()
             .mempool_schema()
-            .get_priority_ops()
+            .get_confirmed_priority_ops()
             .await
             .expect("Get priority ops failed");
 
@@ -599,7 +604,11 @@ impl MempoolTransactionsHandler {
         Ok(())
     }
 
-    async fn add_priority_op(&mut self, ops: Vec<PriorityOp>) -> Result<(), TxAddError> {
+    async fn add_priority_op(
+        &mut self,
+        ops: Vec<PriorityOp>,
+        confirmed: bool,
+    ) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
@@ -625,7 +634,7 @@ impl MempoolTransactionsHandler {
         storage
             .chain()
             .mempool_schema()
-            .insert_priority_ops(&ops)
+            .insert_priority_ops(&ops, confirmed)
             .await
             .map_err(|err| {
                 vlog::warn!("Mempool storage access error: {}", err);
@@ -641,7 +650,11 @@ impl MempoolTransactionsHandler {
             // metrics::histogram!("process_tx", op.elapsed(), &labels);
         }
 
-        self.mempool_state.write().await.add_ops(ops);
+        // Add to queue only confirmed priority operations
+        if confirmed {
+            self.mempool_state.write().await.add_ops(ops);
+        }
+
         Ok(())
     }
 
@@ -711,8 +724,9 @@ impl MempoolTransactionsHandler {
                     let tx_add_result = self.add_batch(txs, eth_signatures).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
-                MempoolTransactionRequest::NewPriorityOps(ops, resp) => {
-                    let tx_add_result = self.add_priority_op(ops).await;
+                MempoolTransactionRequest::NewPriorityOps(ops, confirmed, resp) => {
+                    println!("{:?} {:}", &ops, confirmed);
+                    let tx_add_result = self.add_priority_op(ops, confirmed).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
             }

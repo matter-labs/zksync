@@ -20,6 +20,7 @@ use zksync_types::{
 // Local imports
 use self::records::{MempoolPriorityOp, MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
+use sqlx::Connection;
 use zksync_api_types::v02::account::OngoingDeposit;
 use zksync_api_types::v02::pagination::ApiEither;
 
@@ -402,63 +403,78 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn insert_priority_ops(&mut self, ops: &[PriorityOp]) -> QueryResult<()> {
+    pub async fn insert_priority_ops(
+        &mut self,
+        ops: &[PriorityOp],
+        confirmed: bool,
+    ) -> QueryResult<()> {
         let start = Instant::now();
-        let mut serial_ids = vec![];
-        let mut data = vec![];
-        let mut deadline_blocks = vec![];
-        let mut eth_hashes = vec![];
-        let mut eth_blocks = vec![];
-        let mut eth_block_indexes = vec![];
-        let mut l1_addresses = vec![];
-        let mut l2_addresses = vec![];
-        let mut types = vec![];
-        for op in ops {
-            serial_ids.push(op.serial_id as i64);
-            data.push(serde_json::to_value(op.data.clone()).expect("Should be encoded"));
-            deadline_blocks.push(op.deadline_block as i32);
-            eth_hashes.push(op.eth_hash.as_bytes().to_vec());
-            eth_blocks.push(op.eth_block as i32);
-            eth_block_indexes.push(op.eth_block_index.map(|v| v as i32).unwrap_or_default());
-            types.push(op.data.variance_name());
-            match &op.data {
-                ZkSyncPriorityOp::Deposit(dep) => {
-                    l1_addresses.push(dep.from.as_bytes().to_vec());
-                    l2_addresses.push(dep.to.as_bytes().to_vec());
-                }
-                ZkSyncPriorityOp::FullExit(fe) => {
-                    l1_addresses.push(fe.eth_address.as_bytes().to_vec());
-                    l2_addresses.push(fe.eth_address.as_bytes().to_vec());
-                }
-            }
-        }
+        // Multi insert in this specific scenario is less convenient, because we have to `DO UPDATE`
+        // We `DO UPDATE` for two cases, first of all we must confirm the priority operations
+        // and the next scenario we work with network splits, and until we execute priority op the data under serial_id may be different
 
-        sqlx::query!(
-            "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at) \
-            SELECT u.serial_id, u.data, u.deadline_block, u.eth_hash, u.eth_block, u.eth_block_index, u.l1_address, u.l2_address, u.type, now()
-                FROM UNNEST ($1::bigint[], $2::jsonb[], $3::integer[], $4::bytea[], $5::integer[], $6::integer[], $7::bytea[], $8::bytea[], $9::text[])
-                AS u(serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type)
-            ON CONFLICT DO NOTHING",
-            &serial_ids,
-            &data,
-            &deadline_blocks,
-            &eth_hashes,
-            &eth_blocks,
-            &eth_block_indexes,
-            &l1_addresses,
-            &l2_addresses,
-            &types
-        )
-        .execute(self.0.conn())
-        .await?;
+        println!("Insert {:?} {:?}", &ops, confirmed);
+        let mut transaction = self.0.start_transaction().await?;
+        for op in ops {
+            let serial_id = op.serial_id as i64;
+            let data = serde_json::to_value(op.data.clone()).expect("Should be encoded");
+            let deadline_block = op.deadline_block as i64;
+            let eth_hash = op.eth_hash.as_bytes().to_vec();
+            let eth_block = op.eth_block as i64;
+            let eth_block_index = op.eth_block_index.map(|v| v as i32).unwrap_or_default();
+            let op_type = op.data.variance_name();
+            let (l1_address, l2_address) = match &op.data {
+                ZkSyncPriorityOp::Deposit(dep) => {
+                    (dep.from.as_bytes().to_vec(), dep.to.as_bytes().to_vec())
+                }
+                ZkSyncPriorityOp::FullExit(fe) => (
+                    fe.eth_address.as_bytes().to_vec(),
+                    fe.eth_address.as_bytes().to_vec(),
+                ),
+            };
+
+            let row = sqlx::query!("SELECT count(*) from mempool_priority_operations")
+                .fetch_all(transaction.conn())
+                .await?;
+            println!("Row {:?}", row);
+            sqlx::query!(
+                "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at, confirmed) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10)
+                ON CONFLICT (serial_id) DO UPDATE SET
+                data=$2,
+                deadline_block=$3,
+                eth_hash=$4,
+                eth_block=$5,
+                eth_block_index=$6,
+                l1_address=$7,
+                l2_address=$8,
+                type=$9,
+                confirmed=$10
+                ",
+                serial_id,
+                data,
+                deadline_block,
+                eth_hash,
+                eth_block,
+                eth_block_index,
+                l1_address,
+                l2_address,
+                op_type,
+                confirmed
+            )
+                .execute(transaction.conn())
+                .await?;
+            println!("Insert {:?} {:?}", &op, confirmed);
+        }
+        transaction.commit().await?;
         metrics::histogram!("sql.chain", start.elapsed(), "schema" => "mempool", "method" => "insert_priority_ops");
         Ok(())
     }
 
-    pub async fn get_priority_ops(&mut self) -> QueryResult<Vec<PriorityOp>> {
+    pub async fn get_confirmed_priority_ops(&mut self) -> QueryResult<Vec<PriorityOp>> {
         let ops = sqlx::query_as!(
             MempoolPriorityOp,
-            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations ORDER BY serial_id"
+            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed ORDER BY serial_id"
         )
         .fetch_all(self.0.conn())
         .await?;

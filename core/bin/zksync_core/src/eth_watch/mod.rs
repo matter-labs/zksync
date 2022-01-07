@@ -222,6 +222,7 @@ impl<W: EthClient> EthWatch<W> {
         current_ethereum_block: u64,
         unprocessed_blocks_amount: u64,
     ) -> anyhow::Result<ETHState> {
+        println!("Update eth state");
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
@@ -266,16 +267,31 @@ impl<W: EthClient> EthWatch<W> {
             new_priority_op_ids
         );
 
+        // Add unconfirmed priority ops to queue
         let (sender, receiver) = oneshot::channel();
         self.mempool_tx_sender
             .send(MempoolTransactionRequest::NewPriorityOps(
-                priority_queue,
+                unconfirmed_queue.clone(),
+                false,
                 sender,
             ))
             .await?;
 
         // TODO maybe retry? It can be the only problem is database
-        receiver.await?;
+        receiver.await??;
+
+        // Add confirmed priority ops to queue
+        let (sender, receiver) = oneshot::channel();
+        self.mempool_tx_sender
+            .send(MempoolTransactionRequest::NewPriorityOps(
+                priority_queue,
+                true,
+                sender,
+            ))
+            .await?;
+
+        // TODO maybe retry? It can be the only problem is database
+        receiver.await??;
         // The backup block number is not used.
         let state = ETHState::new(
             current_ethereum_block,
@@ -341,6 +357,11 @@ impl<W: EthClient> EthWatch<W> {
         let start = Instant::now();
         let last_block_number = self.client.block_number().await?;
 
+        println!(
+            "{:?} {:?} poll",
+            last_block_number,
+            self.eth_state.last_ethereum_block()
+        );
         if last_block_number > self.eth_state.last_ethereum_block() {
             self.process_new_blocks(last_block_number).await?;
         }
