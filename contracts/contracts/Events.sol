@@ -66,7 +66,7 @@ interface Events {
     );
 
     /// @notice Approve cut of upgrade notice period by addr
-    event approveCutUpgradeNoticePeriod(address addr);
+    event ApproveCutUpgradeNoticePeriod(address addr);
 
     /// @notice Notice period changed
     event NoticePeriodChange(uint256 newNoticePeriod);
