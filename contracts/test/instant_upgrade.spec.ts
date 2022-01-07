@@ -19,13 +19,17 @@ const SECURITY_COUNCIL_MEMBERS = hardhat.config.solpp.defs.SECURITY_COUNCIL_MEMB
 const SECURITY_COUNCIL_THRESHOLD = parseInt(hardhat.config.solpp.defs.SECURITY_COUNCIL_THRESHOLD);
 const UPGRADE_GATEKEEPER_ADDRESS = hardhat.config.solpp.defs.UPGRADE_GATEKEEPER_ADDRESS;
 
-async function signApproveCutUpgradeNoticePeriod(gatekeeper, signer): Promise<string> {
+async function getUpgradeTargetsHash(gatekeeper): Promise<string> {
     const targets = await Promise.all([
         gatekeeper.nextTargets(0),
         gatekeeper.nextTargets(1),
         gatekeeper.nextTargets(2)
     ]);
-    const targetsHash = ethers.utils.solidityKeccak256(['address', 'address', 'address'], targets);
+    return ethers.utils.solidityKeccak256(['address', 'address', 'address'], targets);
+}
+
+async function signApproveCutUpgradeNoticePeriod(gatekeeper, signer): Promise<string> {
+    const targetsHash = await getUpgradeTargetsHash(gatekeeper);
     const signature = await signer.signMessage(`Approved new ZkSync's target contracts hash\n${targetsHash}`);
 
     return signature;
@@ -70,7 +74,9 @@ describe('Instant upgrade with security council members', function () {
     });
 
     it('should fail to speed up upgrade before upgrade started', async () => {
-        const { revertReason } = await getCallRevertReason(() => zkSyncTarget.cutUpgradeNoticePeriod());
+        const { revertReason } = await getCallRevertReason(() =>
+            zkSyncTarget.cutUpgradeNoticePeriod(ethers.constants.HashZero)
+        );
         expect(revertReason).to.eq('p1');
     });
 
@@ -80,21 +86,35 @@ describe('Instant upgrade with security council members', function () {
     });
 
     context('cut upgrade notice period through `cutUpgradeNoticePeriod`', function () {
+        before(async () => {
+            const targets = [ethers.constants.AddressZero, ethers.constants.AddressZero, zkSyncTarget.address];
+            await upgradeGatekeeper.setNextTargets(targets);
+        });
+
         beforeEach(async () => {
             await zkSyncTarget.enableUpgradeFromScratch();
         });
 
         it('should NOT cut upgrade notice period without permission', async () => {
-            const tx = await zkSyncTarget.cutUpgradeNoticePeriod();
+            const targetsHash = await getUpgradeTargetsHash(upgradeGatekeeper);
+            const tx = await zkSyncTarget.cutUpgradeNoticePeriod(targetsHash);
             expect(tx).to.not.emit(zkSyncTarget, 'NoticePeriodChange');
-            expect(tx).to.not.emit(zkSyncTarget, 'approveCutUpgradeNoticePeriod');
+            expect(tx).to.not.emit(zkSyncTarget, 'ApproveCutUpgradeNoticePeriod');
+        });
+
+        it('should NOT cut upgrade notice period with incorrect targets hash', async () => {
+            const { revertReason } = await getCallRevertReason(() =>
+                zkSyncTarget.cutUpgradeNoticePeriod(ethers.constants.HashZero)
+            );
+            expect(revertReason).to.eq('p3');
         });
 
         it('cut upgrade notice period', async () => {
+            const targetsHash = await getUpgradeTargetsHash(upgradeGatekeeper);
             const noticePeriodBefore = await zkSyncTarget.getApprovedUpgradeNoticePeriod();
             for (let i = 0; i < SECURITY_COUNCIL_MEMBERS_NUMBER; ++i) {
-                const tx = await zkSyncTarget.connect(securityCouncilMembers[i]).cutUpgradeNoticePeriod();
-                expect(tx).to.emit(zkSyncTarget, 'approveCutUpgradeNoticePeriod');
+                const tx = await zkSyncTarget.connect(securityCouncilMembers[i]).cutUpgradeNoticePeriod(targetsHash);
+                expect(tx).to.emit(zkSyncTarget, 'ApproveCutUpgradeNoticePeriod');
                 if (i == SECURITY_COUNCIL_THRESHOLD - 1) {
                     expect(tx).to.emit(zkSyncTarget, 'NoticePeriodChange');
                 } else {
@@ -122,7 +142,7 @@ describe('Instant upgrade with security council members', function () {
             const signature = await signApproveCutUpgradeNoticePeriod(upgradeGatekeeper, zkSyncTarget.signer);
             const tx = await zkSyncTarget.cutUpgradeNoticePeriodBySignature([signature]);
             expect(tx).to.not.emit(zkSyncTarget, 'NoticePeriodChange');
-            expect(tx).to.not.emit(zkSyncTarget, 'approveCutUpgradeNoticePeriod');
+            expect(tx).to.not.emit(zkSyncTarget, 'ApproveCutUpgradeNoticePeriod');
         });
 
         it('cut upgrade notice period', async () => {
@@ -133,7 +153,7 @@ describe('Instant upgrade with security council members', function () {
                 signatures.push(signature);
             }
             const tx = await zkSyncTarget.cutUpgradeNoticePeriodBySignature(signatures);
-            expect(tx).to.emit(zkSyncTarget, 'approveCutUpgradeNoticePeriod');
+            expect(tx).to.emit(zkSyncTarget, 'ApproveCutUpgradeNoticePeriod');
             expect(tx).to.emit(zkSyncTarget, 'NoticePeriodChange');
             const noticePeriodAfter = await zkSyncTarget.getApprovedUpgradeNoticePeriod();
 
