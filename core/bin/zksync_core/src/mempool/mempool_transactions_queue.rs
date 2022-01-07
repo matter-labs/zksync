@@ -47,7 +47,7 @@ pub struct MempoolTransactionsQueue {
     pending_txs: BinaryHeap<MempoolPendingTransaction>,
 
     last_processed_priority_op: Option<SerialId>,
-    priority_ops: VecDeque<PriorityOp>,
+    pub priority_ops: VecDeque<PriorityOp>,
 }
 
 impl MempoolTransactionsQueue {
@@ -91,8 +91,8 @@ impl MempoolTransactionsQueue {
         op
     }
 
-    pub fn push_front_priority_op(&mut self, tx: PriorityOp) {
-        self.priority_ops.push_front(tx);
+    pub fn push_front_priority_op(&mut self, op: PriorityOp) {
+        self.priority_ops.push_front(op);
     }
 
     // TODO make it claner
@@ -113,7 +113,7 @@ impl MempoolTransactionsQueue {
                 }
             }
             if !find {
-                self.priority_ops.push_front(op);
+                self.priority_ops.push_back(op);
             }
         }
     }
@@ -169,7 +169,9 @@ mod tests {
     use crate::mempool::Address;
     use chrono::Utc;
     use zksync_types::tx::{TimeRange, Transfer, Withdraw};
-    use zksync_types::{AccountId, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx};
+    use zksync_types::{
+        AccountId, Deposit, Nonce, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
+    };
 
     fn get_transfer_with_timestamps(valid_from: u64, valid_until: u64) -> SignedTxVariant {
         let transfer = Transfer::new(
@@ -211,6 +213,67 @@ mod tests {
         })
     }
 
+    #[test]
+    fn test_priority_queue() {
+        let mut transactions_queue = MempoolTransactionsQueue {
+            reverted_txs: VecDeque::new(),
+            ready_txs: VecDeque::new(),
+            pending_txs: BinaryHeap::new(),
+            last_processed_priority_op: None,
+            priority_ops: Default::default(),
+        };
+
+        transactions_queue.add_priority_ops(vec![
+            PriorityOp {
+                serial_id: 1,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 2,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 3,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+        ]);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 1);
+        transactions_queue.push_front_priority_op(op);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 1);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 2);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 3);
+    }
     #[test]
     fn test_mempool_transactions_queue() {
         let mut transactions_queue = MempoolTransactionsQueue {

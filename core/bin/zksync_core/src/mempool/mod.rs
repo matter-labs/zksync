@@ -280,7 +280,6 @@ impl MempoolState {
 struct MempoolBlocksHandler {
     mempool_state: Arc<RwLock<MempoolState>>,
     requests: mpsc::Receiver<MempoolBlocksRequest>,
-    eth_watch_req: mpsc::Sender<EthWatchRequest>,
     max_block_size_chunks: usize,
 }
 
@@ -416,6 +415,10 @@ impl MempoolBlocksHandler {
         let mut used_chunks = 0;
         let mut current_priority_op = current_unprocessed_priority_op;
         while let Some(op) = mempool_state.transactions_queue.pop_front_priority_op() {
+            println!(
+                "Current priority op {:?} {:?} {:?}",
+                current_priority_op, &op, &mempool_state.transactions_queue.priority_ops
+            );
             if op.serial_id < current_priority_op {
                 // We can skip already processed priority operations
                 continue;
@@ -739,7 +742,6 @@ pub fn run_mempool_tasks(
     db_pool: ConnectionPool,
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,
-    eth_watch_req: mpsc::Sender<EthWatchRequest>,
     number_of_mempool_transaction_handlers: u8,
     channel_capacity: usize,
     block_chunk_sizes: Vec<usize>,
@@ -771,7 +773,6 @@ pub fn run_mempool_tasks(
         let blocks_handler = MempoolBlocksHandler {
             mempool_state,
             requests: block_requests,
-            eth_watch_req,
             max_block_size_chunks,
         };
         tasks.push(tokio::spawn(blocks_handler.run()));

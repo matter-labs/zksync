@@ -14,7 +14,7 @@ use zksync_api_types::v02::transaction::{
 use zksync_types::{
     mempool::{RevertedTxVariant, SignedTxVariant},
     tx::{TxEthSignature, TxHash},
-    Address, BlockNumber, ExecutedOperations, ExecutedTx, PriorityOp, SerialId, SignedZkSyncTx,
+    Address, BlockNumber, ExecutedOperations, ExecutedTx, PriorityOp, SignedZkSyncTx,
     ZkSyncPriorityOp, H256,
 };
 // Local imports

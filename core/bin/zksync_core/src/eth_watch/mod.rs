@@ -334,34 +334,10 @@ impl<W: EthClient> EthWatch<W> {
         new_tokens
     }
 
-    fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {
-        let mut result = Vec::new();
-
-        let mut used_chunks = 0;
-        let mut current_priority_op = first_serial_id;
-
-        while let Some(op) = self.eth_state.priority_queue().get(&current_priority_op) {
-            if used_chunks + op.as_ref().data.chunks() <= max_chunks {
-                result.push(op.as_ref().clone());
-                used_chunks += op.as_ref().data.chunks();
-                current_priority_op += 1;
-            } else {
-                break;
-            }
-        }
-
-        result
-    }
-
     async fn poll_eth_node(&mut self) -> anyhow::Result<()> {
         let start = Instant::now();
         let last_block_number = self.client.block_number().await?;
 
-        println!(
-            "{:?} {:?} poll",
-            last_block_number,
-            self.eth_state.last_ethereum_block()
-        );
         if last_block_number > self.eth_state.last_ethereum_block() {
             self.process_new_blocks(last_block_number).await?;
         }
