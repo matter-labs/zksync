@@ -166,6 +166,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
         for (uint256 i = 0; i < signatures.length; ++i) {
             address recoveredAddress = Utils.recoverAddressFromEthSignature(signatures[i], messageHash);
+            require(recoveredAddress != address(0x00), "p4"); // invalid signature
             approveCutUpgradeNoticePeriod(recoveredAddress);
         }
     }
