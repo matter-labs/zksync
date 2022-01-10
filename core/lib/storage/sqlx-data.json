@@ -1708,32 +1708,6 @@
       ]
     }
   },
-  "311eb879affeff3c877d978d0a7ac443d904edbc606a213ecc5959dbedc16b3e": {
-    "query": "SELECT created_at, block_number FROM executed_priority_operations\n                WHERE tx_hash = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
-    }
-  },
   "3186e2d96b7f1e1339ac9f09221ae15aba8dff112083079fc6ef5f3acbfc1553": {
     "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, kind )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4, kind = $5\n            ",
     "describe": {
@@ -2242,26 +2216,6 @@
       "nullable": [
         false,
         false
-      ]
-    }
-  },
-  "4868140cb6b644efc751687b9a8dcd04324072bffbcc69ec29306b8a9793645e": {
-    "query": "\n            SELECT SUM(usd_amount_scale6) as total FROM subsidies\n            WHERE subsidy_type = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "total",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
@@ -4810,24 +4764,6 @@
       "nullable": []
     }
   },
-  "a665923ec57382f357f6bb65f6e35876fbfedbf1661b3ce34f2458b63eebc68e": {
-    "query": "\n            INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )\n            VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Int8",
-          "Int4",
-          "Numeric",
-          "Numeric",
-          "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "a77668a3dce7f7cd1f45816f932eea685d429c3d75b40ea8e1a1bb9fc29f11c6": {
     "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
     "describe": {
@@ -7123,6 +7059,32 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "ee7dd724ce25e19db5af8db44976eaf7767a464574aaa3a18e40717a20b4d828": {
+    "query": "SELECT created_at, block_number FROM executed_priority_operations\n                WHERE tx_hash = $1 ORDER BY created_at DESC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "f057b85811c3991b73c58991fc8dae8bf4cdf9d2238171ca13a3fdf1172f2c91": {

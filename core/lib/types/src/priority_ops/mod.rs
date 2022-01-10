@@ -489,6 +489,7 @@ impl PriorityOp {
         bytes.extend_from_slice(self.eth_hash.as_bytes());
         bytes.extend_from_slice(&self.eth_block.to_be_bytes());
         bytes.extend_from_slice(&self.eth_block_index.unwrap_or(0).to_be_bytes());
+        bytes.extend_from_slice(&self.serial_id.to_be_bytes());
 
         let hash = sha256(&bytes);
         let mut out = [0u8; 32];
