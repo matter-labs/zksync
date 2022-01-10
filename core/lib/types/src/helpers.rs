@@ -140,7 +140,7 @@ mod test {
 
     #[test]
     fn test_roundtrip() {
-        let zero = BigUint::from_u32(1).unwrap();
+        let zero = BigUint::from_u32(0).unwrap();
         let one = BigUint::from_u32(1).unwrap();
         {
             let round_trip_zero = unpack_token_amount(&pack_token_amount(&zero));

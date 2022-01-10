@@ -174,6 +174,16 @@ impl ApiError for CoreApiError {
     }
 }
 
+impl ApiError for anyhow::Error {
+    fn error_type(&self) -> String {
+        "internalError".to_string()
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::Other
+    }
+}
+
 impl ApiError for SubmitError {
     fn error_type(&self) -> String {
         String::from("submitError")
@@ -191,6 +201,7 @@ impl ApiError for SubmitError {
             Self::Internal(_) => ErrorCode::InternalError,
             Self::Toggle2FA(_) => ErrorCode::Toggle2FAError,
             Self::Other(_) => ErrorCode::Other,
+            Self::PriceError(_) => ErrorCode::InternalError,
         }
     }
 }

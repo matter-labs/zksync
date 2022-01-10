@@ -391,7 +391,7 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
     storage
         .chain()
         .block_schema()
-        .save_block(Block {
+        .save_full_block(Block {
             block_number: BlockNumber(3),
             new_root_hash: Default::default(),
             fee_account: AccountId(0),

@@ -2,7 +2,6 @@
 use std::sync::Mutex;
 // Workspace deps
 use zksync_config::ChainConfig;
-use zksync_crypto::bellman::Circuit;
 use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
 use zksync_crypto::Engine;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
@@ -12,7 +11,6 @@ use zksync_utils::parse_env;
 // Local deps
 use crate::{ProverConfig, ProverImpl};
 use tokio::time::Instant;
-use zksync_crypto::franklin_crypto::circuit::test::TestConstraintSystem;
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
 
 /// We prepare some data before making proof for each block size, so we cache it in case next block
@@ -58,17 +56,6 @@ impl PlonkStepByStepProver {
         witness: zksync_circuit::circuit::ZkSyncCircuit<'_, Engine>,
         block_size: usize,
     ) -> anyhow::Result<SingleProof> {
-        let start = Instant::now();
-        // we do this way here so old precomp is dropped
-        let mut cs = TestConstraintSystem::<Engine>::new();
-        witness.clone().synthesize(&mut cs).unwrap();
-
-        if let Some(err) = cs.which_is_unsatisfied() {
-            println!("unconstrained: {}", cs.find_unconstrained());
-            println!("number of constraints {}", cs.num_constraints());
-            println!("Unsatisfied {:?}", err);
-        }
-        metrics::histogram!("prover", start.elapsed(), "stage" => "test_constraint_system", "type" => "single_proof");
         let valid_cached_precomp = {
             self.prepared_computations
                 .lock()

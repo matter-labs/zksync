@@ -105,6 +105,7 @@ impl SumbitErrorCode {
             SubmitError::Internal(_) => Self::Internal,
             SubmitError::Other(_) => Self::Other,
             SubmitError::Toggle2FA(_) => Self::Other,
+            SubmitError::PriceError(_) => Self::Other,
         }
     }
 

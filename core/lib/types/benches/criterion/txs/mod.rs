@@ -132,7 +132,7 @@ impl TxBenchSetup {
         // We signed transaction manually, so it doesn't have a signature cache by default.
         // So unlike in other functions, we call `check_correctness` if needed to create such a cache.
         if with_cache {
-            tx.check_correctness();
+            let _ = tx.check_correctness();
         }
 
         tx

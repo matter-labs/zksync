@@ -176,12 +176,17 @@ async fn revert_blocks_test() {
         None,
     );
 
+    let mut iteration = 0;
+
     // Verify 1
     // Commit 3
     // Revert 2
     // Revert all uncommitted transactions
+    iteration += 1;
+    println!("Iteration: {}", iteration);
     let (state, account_set, last_block) =
         execute_blocks(&mut test_setup, BlockNumber(0), 1, 3, 2).await;
+    println!("Iteration {} completed, recreating state...", iteration);
 
     sender.send(()).expect("sk stop send");
     handler.join().expect("sk thread join");
@@ -203,9 +208,12 @@ async fn revert_blocks_test() {
     // Commit 3
     // Revert 2
     // Try to revert some unverified blocks
-
+    iteration += 1;
+    println!("Iteration: {}", iteration);
     let (state, account_set, last_block) =
         execute_blocks(&mut test_setup, start_block_number, 2, 3, 2).await;
+    println!("Iteration {} completed, recreating state...", iteration);
+
     sender.send(()).expect("sk stop send");
     handler.join().expect("sk thread join");
 
@@ -226,11 +234,15 @@ async fn revert_blocks_test() {
     // Commit 1
     // Revert 0
     // Do not revert blocks for verifying restore
-
+    iteration += 1;
+    println!("Iteration: {}", iteration);
     let (state, _, _) = execute_blocks(&mut test_setup, start_block_number, 1, 1, 0).await;
+    println!("Iteration {} completed, recreating state...", iteration);
+
     sender.send(()).expect("sk stop send");
     handler.join().expect("sk thread join");
 
+    println!("Verifying restored state");
     verify_restore(
         &test_config,
         &contracts,

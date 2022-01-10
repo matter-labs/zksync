@@ -1250,7 +1250,7 @@ export class Wallet {
 
     async getEthereumBalance(token: TokenLike): Promise<BigNumber> {
         try {
-            return getEthereumBalance(this.ethSigner.provider, this.provider, this.cachedAddress, token);
+            return await getEthereumBalance(this.ethSigner.provider, this.provider, this.cachedAddress, token);
         } catch (e) {
             this.modifyEthersError(e);
         }

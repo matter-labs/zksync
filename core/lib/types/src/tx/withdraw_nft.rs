@@ -1,5 +1,7 @@
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use thiserror::Error;
 
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
@@ -11,7 +13,10 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
-use crate::tx::error::TransactionSignatureError;
+use crate::tx::error::{
+    FEE_AMOUNT_IS_NOT_PACKABLE, WRONG_ACCOUNT_ID, WRONG_FEE_ERROR, WRONG_SIGNATURE,
+    WRONG_TIME_RANGE, WRONG_TOKEN, WRONG_TOKEN_FOR_PAYING_FEE,
+};
 use crate::tx::version::TxVersion;
 use crate::{
     account::PubKeyHash,
@@ -105,14 +110,12 @@ impl WithdrawNFT {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             account_id, from, to, token, fee_token, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 
@@ -134,29 +137,6 @@ impl WithdrawNFT {
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out.extend_from_slice(&self.time_range.as_be_bytes());
         out
-    }
-
-    /// Verifies the transaction correctness:
-    ///
-    /// - `account_id` field must be within supported range.
-    /// - `token` field must be within supported range.
-    /// - `amount` field must represent a packable value.
-    /// - `fee` field must represent a packable value.
-    /// - zkSync signature must correspond to the PubKeyHash of the account.
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = is_fee_amount_packable(&self.fee)
-            && self.account_id <= max_account_id()
-            && self.fee_token <= max_processable_token()
-            && self.token <= max_token_id()
-            && self.token >= TokenId(MIN_NFT_TOKEN_ID)
-            && self.time_range.check_correctness();
-
-        if valid {
-            let signer = self.verify_signature();
-            valid = valid && signer.is_some();
-            self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        }
-        valid
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
@@ -209,5 +189,69 @@ impl WithdrawNFT {
     #[doc(hidden)]
     pub fn wipe_signer_cache(&mut self) {
         self.cached_signer = VerifiedSignatureCache::NotCached;
+    }
+
+    /// Verifies the transaction correctness:
+    ///
+    /// - `account_id` field must be within supported range.
+    /// - `token` field must be within supported range.
+    /// - `fee` field must represent a packable value.
+    /// - zkSync signature must correspond to the PubKeyHash of the account.
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        if self.fee > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongFee);
+        }
+
+        if self.token > max_token_id() && self.token < TokenId(MIN_NFT_TOKEN_ID) {
+            return Err(TransactionError::WrongToken);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+        if self.account_id > max_account_id() {
+            return Err(TransactionError::WrongAccountId);
+        }
+
+        if !self.time_range.check_correctness() {
+            return Err(TransactionError::WrongTimeRange);
+        }
+
+        // Fee can only be paid in processable tokens
+        if self.fee_token > max_processable_token() {
+            return Err(TransactionError::WrongFeeToken);
+        }
+
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if signer.is_none() {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    WrongFee,
+    FeeNotPackable,
+    WrongAccountId,
+    WrongToken,
+    WrongTimeRange,
+    WrongSignature,
+    WrongFeeToken,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongFee => WRONG_FEE_ERROR,
+            TransactionError::FeeNotPackable => FEE_AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongAccountId => WRONG_ACCOUNT_ID,
+            TransactionError::WrongToken => WRONG_TOKEN,
+            TransactionError::WrongTimeRange => WRONG_TIME_RANGE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+            TransactionError::WrongFeeToken => WRONG_TOKEN_FOR_PAYING_FEE,
+        };
+        write!(f, "{}", error)
     }
 }
