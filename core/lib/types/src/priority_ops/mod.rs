@@ -485,7 +485,7 @@ impl PriorityOp {
     }
 
     pub fn tx_hash(&self) -> TxHash {
-        let mut bytes = Vec::with_capacity(48);
+        let mut bytes = Vec::with_capacity(56);
         bytes.extend_from_slice(self.eth_hash.as_bytes());
         bytes.extend_from_slice(&self.eth_block.to_be_bytes());
         bytes.extend_from_slice(&self.eth_block_index.unwrap_or(0).to_be_bytes());
