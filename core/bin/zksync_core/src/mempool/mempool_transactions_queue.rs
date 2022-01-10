@@ -95,24 +95,22 @@ impl MempoolTransactionsQueue {
         self.priority_ops.push_front(op);
     }
 
-    // TODO make it claner
     pub fn add_priority_ops(&mut self, mut ops: Vec<PriorityOp>) {
         ops.sort_by_key(|key| key.serial_id);
         for op in ops {
+            // Do not add old operations
             if let Some(serial_id) = self.last_processed_priority_op {
                 if op.serial_id <= serial_id {
                     continue;
                 }
             }
 
-            let mut find = false;
-            for ready_ops in &self.priority_ops {
-                if ready_ops.serial_id == op.serial_id {
-                    find = true;
-                    continue;
-                }
-            }
-            if !find {
+            // Add a new operation only if it is not already in the queue
+            if !self
+                .priority_ops
+                .iter()
+                .any(|pr_op| pr_op.serial_id == op.serial_id)
+            {
                 self.priority_ops.push_back(op);
             }
         }

@@ -274,8 +274,7 @@ impl<W: EthClient> EthWatch<W> {
             .await?;
 
         // TODO maybe retry? It can be the only problem is database
-        receiver.await??;
-
+        receiver.await.expect("Mempool actor was dropped")?;
         // Add confirmed priority ops to queue
         let (sender, receiver) = oneshot::channel();
         self.mempool_tx_sender
@@ -287,7 +286,7 @@ impl<W: EthClient> EthWatch<W> {
             .await?;
 
         // TODO maybe retry? It can be the only problem is database
-        receiver.await??;
+        receiver.await.expect("Mempool actor was dropped")?;
         // The backup block number is not used.
         let state = ETHState::new(
             current_ethereum_block,

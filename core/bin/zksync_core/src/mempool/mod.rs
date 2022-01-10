@@ -225,7 +225,6 @@ impl MempoolState {
         let (mempool_size, reverted_queue_size) = (mempool_txs.len(), reverted_txs.len());
 
         // Initialize the queue with reverted transactions loaded from the database.
-        // TODO set actual last processed priority op
         let serial_id = transaction
             .chain()
             .operations_schema()
@@ -302,23 +301,23 @@ impl MempoolBlocksHandler {
         // Unlike transactions, they are requested from the Eth watch.
         let next_op_id = reverted_tx.next_priority_op_id;
         while next_serial_id < next_op_id {
-            // TODO Fix reverting blocks
             let mut priority_op = None;
+            // Find the necessary serial id and skip the already processed
             while let Some(op) = mempool_state.transactions_queue.pop_front_priority_op() {
                 if next_serial_id == op.serial_id {
                     priority_op = Some(op);
                     break;
                 }
             }
-            if let Some(priority_op) = priority_op {
-                // If the operation doesn't fit, return the proposed block.
-                if priority_op.data.chunks() <= chunks_left {
-                    chunks_left -= priority_op.data.chunks();
-                    proposed_block.priority_ops.push(priority_op);
-                    next_serial_id += 1;
-                } else {
-                    return (chunks_left, proposed_block);
-                }
+
+            let priority_op = priority_op.expect("Operation not found in the priority queue");
+            // If the operation doesn't fit, return the proposed block.
+            if priority_op.data.chunks() <= chunks_left {
+                chunks_left -= priority_op.data.chunks();
+                proposed_block.priority_ops.push(priority_op);
+                next_serial_id += 1;
+            } else {
+                return (chunks_left, proposed_block);
             }
         }
 
@@ -419,6 +418,10 @@ impl MempoolBlocksHandler {
                 // We can skip already processed priority operations
                 continue;
             }
+            assert_eq!(
+                current_priority_op, op.serial_id,
+                "Wrong order for priority ops"
+            );
             if used_chunks + op.data.chunks() <= self.max_block_size_chunks {
                 used_chunks += op.data.chunks();
                 result.push(op);
@@ -641,12 +644,12 @@ impl MempoolTransactionsHandler {
             })?;
 
         for op in &ops {
-            let _labels = vec![
+            let labels = vec![
                 ("stage", "mempool".to_string()),
                 ("name", op.data.variance_name()),
                 ("token", op.data.token_id().to_string()),
             ];
-            // metrics::histogram!("process_tx", op.elapsed(), &labels);
+            metrics::increment_counter!("process_tx_count", &labels);
         }
 
         // Add to queue only confirmed priority operations
