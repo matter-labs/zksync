@@ -1739,32 +1739,6 @@
       "nullable": []
     }
   },
-  "311eb879affeff3c877d978d0a7ac443d904edbc606a213ecc5959dbedc16b3e": {
-    "query": "SELECT created_at, block_number FROM executed_priority_operations\n                WHERE tx_hash = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
-    }
-  },
   "3186e2d96b7f1e1339ac9f09221ae15aba8dff112083079fc6ef5f3acbfc1553": {
     "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, kind )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4, kind = $5\n            ",
     "describe": {
@@ -7276,6 +7250,32 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "ee7dd724ce25e19db5af8db44976eaf7767a464574aaa3a18e40717a20b4d828": {
+    "query": "SELECT created_at, block_number FROM executed_priority_operations\n                WHERE tx_hash = $1 ORDER BY created_at DESC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "f057b85811c3991b73c58991fc8dae8bf4cdf9d2238171ca13a3fdf1172f2c91": {
