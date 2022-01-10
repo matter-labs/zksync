@@ -270,8 +270,8 @@ impl ApiV01 {
         if limit > 0 {
             // We've got some free space, so load unconfirmed operations to
             // fill the rest of the limit.
-            let mut storage = self_.access_storage().await?;
             // Fetch ongoing deposits, since they must be reported within the transactions history.
+            let mut storage = self_.access_storage().await?;
             let mut ongoing_ops = storage
                 .chain()
                 .mempool_schema()

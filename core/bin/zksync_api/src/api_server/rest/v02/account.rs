@@ -30,8 +30,6 @@ use crate::{
     utils::token_db_cache::TokenDBCache,
 };
 
-use zksync_api_types::Either;
-
 /// Shared data between `api/v02/accounts` endpoints.
 #[derive(Clone)]
 struct ApiAccountData {
@@ -336,15 +334,11 @@ impl ApiAccountData {
         address: Address,
         account_id: Option<AccountId>,
     ) -> Result<Paginated<Transaction, SerialId>, Error> {
-        let serial_id = match query.from.inner {
-            Either::Left(a) => a,
-            Either::Right(_b) => 0,
-        };
         let new_query = PaginationQuery {
             from: PendingOpsRequest {
                 address,
                 account_id,
-                serial_id,
+                serial_id: query.from,
             },
             limit: query.limit,
             direction: query.direction,

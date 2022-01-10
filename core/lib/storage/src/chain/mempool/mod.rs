@@ -14,7 +14,7 @@ use zksync_api_types::v02::transaction::{
 use zksync_types::{
     mempool::{RevertedTxVariant, SignedTxVariant},
     tx::{TxEthSignature, TxHash},
-    Address, BlockNumber, ExecutedOperations, ExecutedTx, PriorityOp, SignedZkSyncTx,
+    Address, BlockNumber, ExecutedOperations, ExecutedTx, PriorityOp, SerialId, SignedZkSyncTx,
     ZkSyncPriorityOp, H256,
 };
 // Local imports
@@ -22,6 +22,7 @@ use self::records::{MempoolPriorityOp, MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
 
 use zksync_api_types::v02::account::OngoingDeposit;
+use zksync_api_types::v02::pagination::PaginationDirection;
 
 pub mod records;
 
@@ -487,19 +488,43 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         Ok(())
     }
 
+    pub async fn get_max_serial_id_pending_deposits(
+        &mut self,
+        address: Address,
+    ) -> QueryResult<Option<SerialId>> {
+        let serial_id = sqlx::query!(
+            "SELECT max(serial_id) FROM mempool_priority_operations WHERE l2_address = $1",
+            address.as_bytes().to_vec()
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max;
+        Ok(serial_id.map(|v| v as u64))
+    }
+
     pub async fn get_pending_deposits_for(
         &mut self,
         address: Address,
         start_serial_id: i64,
         limit: u32,
+        direction: PaginationDirection,
     ) -> QueryResult<Vec<PriorityOp>> {
-        let ops = sqlx::query_as!(
-            MempoolPriorityOp,
-            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1 AND serial_id >= $2   ORDER BY serial_id LIMIT $3",
-            address.as_bytes().to_vec(),
-            start_serial_id,
-            limit as i64
-        )
+        let query = "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1";
+        let query = match direction {
+            PaginationDirection::Newer => {
+                format!("{} AND serial_id >= $2 ORDER BY serial_id LIMIT $3", query)
+            }
+            PaginationDirection::Older => {
+                format!(
+                    "{} AND serial_id <= $2 ORDER BY serial_id DESC LIMIT $3",
+                    query
+                )
+            }
+        };
+        let ops: Vec<MempoolPriorityOp> = sqlx::query_as(query.as_str())
+            .bind(address.as_bytes().to_vec())
+            .bind(start_serial_id)
+            .bind(limit as i64)
             .fetch_all(self.0.conn())
             .await?;
         Ok(ops

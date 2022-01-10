@@ -275,11 +275,37 @@ impl Paginate<PendingOpsRequest> for StorageProcessor<'_> {
     async fn paginate(
         &mut self,
         query: &PaginationQuery<PendingOpsRequest>,
-    ) -> Result<Paginated<Transaction, SerialId>, Error> {
+    ) -> Result<Paginated<Transaction, Self::OutputId>, Error> {
+        let serial_id = match query.from.serial_id.inner {
+            Either::Left(serial_id) => serial_id,
+            Either::Right(_) => {
+                if let Some(serial_id) = self
+                    .chain()
+                    .mempool_schema()
+                    .get_max_serial_id_pending_deposits(query.from.address)
+                    .await?
+                {
+                    serial_id
+                } else {
+                    return Ok(Paginated::new(
+                        Vec::new(),
+                        Default::default(),
+                        query.limit,
+                        query.direction,
+                        0,
+                    ));
+                }
+            }
+        };
         let result = self
             .chain()
             .mempool_schema()
-            .get_pending_deposits_for(query.from.address, query.from.serial_id as i64, query.limit)
+            .get_pending_deposits_for(
+                query.from.address,
+                serial_id as i64,
+                query.limit,
+                query.direction,
+            )
             .await
             .map_err(Error::storage)?;
 
@@ -308,7 +334,7 @@ impl Paginate<PendingOpsRequest> for StorageProcessor<'_> {
 
         Ok(Paginated::new(
             txs,
-            query.from.serial_id,
+            serial_id,
             query.limit,
             query.direction,
             count,
