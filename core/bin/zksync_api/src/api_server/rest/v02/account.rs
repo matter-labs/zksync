@@ -599,19 +599,47 @@ mod tests {
                 .chain()
                 .mempool_schema()
                 .insert_priority_ops(
-                    &[PriorityOp {
-                        serial_id: 10,
-                        data: ZkSyncPriorityOp::Deposit(Deposit {
-                            from: Default::default(),
-                            token: TokenId(0),
-                            amount: BigUint::from(100500u64),
-                            to: address,
-                        }),
-                        deadline_block: 0,
-                        eth_hash: H256::from_slice(&[0u8; 32]),
-                        eth_block: 25,
-                        eth_block_index: Some(1),
-                    }],
+                    &[
+                        PriorityOp {
+                            serial_id: 10,
+                            data: ZkSyncPriorityOp::Deposit(Deposit {
+                                from: Default::default(),
+                                token: TokenId(0),
+                                amount: BigUint::from(100500u64),
+                                to: address,
+                            }),
+                            deadline_block: 0,
+                            eth_hash: H256::from_slice(&[0u8; 32]),
+                            eth_block: 25,
+                            eth_block_index: Some(1),
+                        },
+                        PriorityOp {
+                            serial_id: 11,
+                            data: ZkSyncPriorityOp::Deposit(Deposit {
+                                from: Default::default(),
+                                token: TokenId(0),
+                                amount: BigUint::from(100500u64),
+                                to: address,
+                            }),
+                            deadline_block: 0,
+                            eth_hash: H256::from_slice(&[0u8; 32]),
+                            eth_block: 25,
+                            eth_block_index: Some(1),
+                        },
+                        PriorityOp {
+                            serial_id: 12,
+                            data: ZkSyncPriorityOp::Deposit(Deposit {
+                                from: Default::default(),
+                                token: TokenId(0),
+                                amount: BigUint::from(100500u64),
+                                to: address,
+                            }),
+                            deadline_block: 0,
+                            eth_hash: H256::from_slice(&[0u8; 32]),
+                            eth_block: 25,
+                            eth_block_index: Some(1),
+                        },
+                    ],
                     false,
                 )
                 .await?;
@@ -619,7 +647,7 @@ mod tests {
         let balances = vec![(
             String::from("ETH"),
             DepositingFunds {
-                amount: BigUint::from(100500u32),
+                amount: BigUint::from(301500u32),
                 expected_accept_block: 25 + server.confirmations_for_eth_event,
             },
         )]
@@ -646,18 +674,19 @@ mod tests {
         assert_eq!(txs.list[0].tx_hash, tx_hash);
 
         let query = PaginationQuery {
-            from: ApiEither::from(1),
-            limit: 1,
-            direction: PaginationDirection::Newer,
+            from: ApiEither::from_str("latest").unwrap(),
+            limit: 2,
+            direction: PaginationDirection::Older,
         };
         let response = client
             .account_pending_txs(&query, &account_id.to_string())
             .await?;
         let txs: Paginated<Transaction, SerialId> = deserialize_response_result(response)?;
+        assert_eq!(txs.list.len(), 2);
         match &txs.list[0].op {
             TransactionData::L1(tx) => match tx {
                 L1Transaction::Deposit(deposit) => {
-                    assert_eq!(deposit.id, 10);
+                    assert_eq!(deposit.id, 12);
                 }
                 _ => panic!("should return deposit"),
             },

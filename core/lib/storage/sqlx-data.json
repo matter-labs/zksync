@@ -3228,6 +3228,26 @@
       ]
     }
   },
+  "6dc607f308901fe61aff418005ec906b1e2defc5d61d88299400c4ffb4f25bb1": {
+    "query": "SELECT max(serial_id) FROM mempool_priority_operations WHERE l2_address = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "6dfbe5878cdb5d4d7050ee282a3552e20af4f9d676feb2256f351d59f39bbf63": {
     "query": "\n                INSERT INTO no_2fa_pub_key_hash VALUES ( $1, $2 )\n                ON CONFLICT (account_id) DO UPDATE SET pub_key_hash = $2\n                ",
     "describe": {
@@ -7759,64 +7779,6 @@
       ],
       "parameters": {
         "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "f304a33fcdc1938225230fe688710dfd92ec45915db3e4561c31b4c26a91ca6f": {
-    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1 AND serial_id >= $2   ORDER BY serial_id LIMIT $3",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "deadline_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "eth_block_index",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
           "Int8"
         ]
       },
