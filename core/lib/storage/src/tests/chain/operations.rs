@@ -1,8 +1,12 @@
 // External imports
 use chrono::{Duration, Utc};
 // Workspace imports
-use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber};
+use zksync_types::{
+    aggregated_operations::AggregatedActionType, Address, BlockNumber, Deposit, ZkSyncPriorityOp,
+    H256,
+};
 // Local imports
+use crate::chain::mempool::MempoolSchema;
 use crate::{
     chain::{
         block::BlockSchema,
@@ -443,16 +447,22 @@ async fn test_remove_executed_priority_operations(
         let executed_priority_op = NewExecutedPriorityOperation {
             block_number,
             block_index: 1,
-            operation: Default::default(),
-            from_account: Default::default(),
-            to_account: Default::default(),
+            operation: serde_json::to_value(ZkSyncPriorityOp::Deposit(Deposit {
+                from: Address::zero(),
+                token: Default::default(),
+                amount: Default::default(),
+                to: Address::zero(),
+            }))
+            .unwrap(),
+            from_account: Address::zero().as_bytes().to_vec(),
+            to_account: Address::zero().as_bytes().to_vec(),
             priority_op_serialid: block_number,
             deadline_block: 100,
-            eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            eth_hash: H256::zero().as_bytes().to_vec(),
             eth_block: 10,
             created_at: chrono::Utc::now(),
             eth_block_index: Some(1),
-            tx_hash: Default::default(),
+            tx_hash: H256::zero().as_bytes().to_vec(),
             affected_accounts: Default::default(),
             token: Default::default(),
         };
@@ -463,7 +473,7 @@ async fn test_remove_executed_priority_operations(
 
     // Remove priority operation with block numbers greater than 3.
     OperationsSchema(&mut storage)
-        .remove_executed_priority_operations(BlockNumber(3))
+        .return_executed_priority_operations_to_mempool(BlockNumber(3))
         .await?;
 
     // Check that priority operation from the 3rd block is present and from the 4th is not.
@@ -477,6 +487,10 @@ async fn test_remove_executed_priority_operations(
         .await?;
     assert!(block4_txs.is_empty());
 
+    let mempool_txs = MempoolSchema(&mut storage)
+        .get_confirmed_priority_ops()
+        .await?;
+    assert_eq!(mempool_txs.len(), 2);
     Ok(())
 }
 

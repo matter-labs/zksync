@@ -2,6 +2,7 @@
 use chrono::prelude::*;
 use serde_json::value::Value;
 use sqlx::FromRow;
+use zksync_types::{PriorityOp, H256};
 // Workspace imports
 // Local imports
 use crate::StorageActionType;
@@ -30,6 +31,19 @@ pub struct StoredExecutedPriorityOperation {
     /// This field must be optional because of backward compatibility.
     pub eth_block_index: Option<i64>,
     pub tx_hash: Vec<u8>,
+}
+
+impl From<StoredExecutedPriorityOperation> for PriorityOp {
+    fn from(value: StoredExecutedPriorityOperation) -> Self {
+        Self {
+            serial_id: value.priority_op_serialid as u64,
+            data: serde_json::from_value(value.operation).expect("Should be correct stored"),
+            deadline_block: value.deadline_block as u64,
+            eth_hash: H256::from_slice(&value.eth_hash),
+            eth_block: value.eth_block as u64,
+            eth_block_index: Some(value.block_index as u64),
+        }
+    }
 }
 
 #[derive(Debug, Clone, FromRow)]

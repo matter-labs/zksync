@@ -2024,6 +2024,92 @@
       ]
     }
   },
+  "38a95c4e1356fb51dfb58fc880aea90b6ffb514520150e2c9b7bfe38fdeb0d80": {
+    "query": "SELECT * FROM executed_priority_operations WHERE block_number > $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "operation",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_account",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_account",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "priority_op_serialid",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 8,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "eth_block_index",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 11,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
+    }
+  },
   "38e7464ba17d495fe87cf1412ffe10af8dc4b44f99dc2df1ec580f20f609b650": {
     "query": "SELECT max(number) FROM incomplete_blocks",
     "describe": {
@@ -2085,26 +2171,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "399d6d7196f0353420ebc7546baa916d5f963bbe97aa5b35543582f0b873d773": {
-    "query": "SELECT tx_hash FROM executed_priority_operations WHERE block_number > $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
     }
   },
   "3a61f335dc699e6126346c77cea44995e48efb57d39624c63c55d342ca2ea1b1": {

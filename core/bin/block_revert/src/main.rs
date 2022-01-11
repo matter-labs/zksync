@@ -79,7 +79,7 @@ async fn revert_blocks_in_storage(
     transaction
         .chain()
         .operations_schema()
-        .remove_executed_priority_operations(last_block)
+        .return_executed_priority_operations_to_mempool(last_block)
         .await?;
     println!("`executed_priority_operations` table is cleaned");
     transaction

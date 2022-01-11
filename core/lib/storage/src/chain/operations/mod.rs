@@ -6,7 +6,7 @@ use chrono::{Duration, Utc};
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     tx::TxHash,
-    BlockNumber, SerialId, H256,
+    BlockNumber, PriorityOp, SerialId, H256,
 };
 // Local imports
 use self::records::{
@@ -590,31 +590,41 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     }
 
     // Removes executed priority operations for blocks with number greater than `last_block`
-    pub async fn remove_executed_priority_operations(
+    pub async fn return_executed_priority_operations_to_mempool(
         &mut self,
         last_block: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
 
-        let records = sqlx::query!(
-            "SELECT tx_hash FROM executed_priority_operations WHERE block_number > $1",
+        let records = sqlx::query_as!(
+            StoredExecutedPriorityOperation,
+            "SELECT * FROM executed_priority_operations WHERE block_number > $1",
             *last_block as i64
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(transaction.conn())
         .await?;
-        let hashes: Vec<Vec<u8>> = records.into_iter().map(|r| r.tx_hash).collect();
+
+        let hashes: Vec<Vec<u8>> = records.iter().map(|r| r.tx_hash.clone()).collect();
+        {
+            let ops: Vec<PriorityOp> = records.into_iter().map(|rec| rec.into()).collect();
+            MempoolSchema(&mut transaction)
+                .insert_priority_ops(&ops, true)
+                .await?;
+        }
 
         sqlx::query!("DELETE FROM tx_filters WHERE tx_hash = ANY($1)", &hashes)
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
         sqlx::query!(
             "DELETE FROM executed_priority_operations WHERE block_number > $1",
             *last_block as i64
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
+        transaction.commit().await?;
         metrics::histogram!(
             "sql.chain.operations.remove_executed_priority_operations",
             start.elapsed()
