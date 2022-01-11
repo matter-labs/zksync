@@ -1,8 +1,8 @@
 import { expect, use } from 'chai';
 import { solidity } from 'ethereum-waffle';
 import { Signer, utils } from 'ethers';
-import { ForcedExit } from '../../typechain/ForcedExit';
-import { ForcedExitFactory } from '../../typechain/ForcedExitFactory';
+import { ForcedExit } from '../typechain/ForcedExit';
+import { ForcedExitFactory } from '../typechain/ForcedExitFactory';
 
 import * as hardhat from 'hardhat';
 
