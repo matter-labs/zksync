@@ -161,7 +161,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         additionalZkSync = AdditionalZkSync($(NEW_ADDITIONAL_ZKSYNC_ADDRESS));
     }
 
-    function cutUpgradeNoticePeriod() external {
+    function cutUpgradeNoticePeriod(bytes32 targetsHash) external {
         // All functions delegated to additional contract should NOT be nonReentrant
         delegateAdditional();
     }
