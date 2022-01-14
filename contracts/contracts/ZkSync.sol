@@ -513,7 +513,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @dev Executes one block
-    /// @dev 1. Processes all pending operations (Send Exits, Complete priority requests)
+    /// @dev 1. Processes all priority operations or save them as pending
     /// @dev 2. Finalizes block on Ethereum
     /// @dev _executedBlockIdx is index in the array of the blocks that we want to execute together
     function executeOneBlock(
