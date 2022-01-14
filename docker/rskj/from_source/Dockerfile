@@ -53,7 +53,7 @@ COPY node.conf /etc/rsk/node.conf
 COPY logback.xml /etc/rsk/logback.xml
 
 EXPOSE 4444
-EXPOSE 4445
+EXPOSE 50505
 
 # Define default command.
 CMD ["/usr/bin/supervisord"]
