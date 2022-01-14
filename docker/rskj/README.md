@@ -7,4 +7,6 @@ This alternative docker image will build the jar from the sourcecode.
 ## How to use
 
 Copy the `Dockerfile` and `supervisord.conf` files located in `/rskj/from_source` to `/rskj` (replacing the already
-existing files)
+existing files).
+
+It is recommended that you run `docker-compose build --no-cache`
