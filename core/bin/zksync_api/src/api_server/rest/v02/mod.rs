@@ -55,7 +55,7 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
             zk_config,
             tx_sender.pool.clone(),
             tx_sender.tokens.clone(),
-            tx_sender.ticker_requests.clone(),
+            tx_sender.ticker.clone(),
         ))
         .service(transaction::api_scope(tx_sender))
 }

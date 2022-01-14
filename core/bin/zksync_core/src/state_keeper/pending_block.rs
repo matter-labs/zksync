@@ -4,7 +4,7 @@ use zksync_state::state::CollectedFee;
 use zksync_types::{
     block::{ExecutedOperations, ExecutedTx, PendingBlock as SendablePendingBlock},
     gas_counter::GasCounter,
-    AccountUpdates, BlockNumber, H256,
+    AccountUpdates, BlockNumber,
 };
 
 use crate::committer::AppliedUpdatesRequest;
@@ -20,6 +20,7 @@ pub(super) struct PendingBlock {
     pub(super) chunks_left: usize,
     pub(super) pending_op_block_index: u32,
     pub(super) unprocessed_priority_op_before: u64,
+    pub(super) unprocessed_priority_op_current: u64,
     pub(super) pending_block_iteration: usize,
     pub(super) gas_counter: GasCounter,
     /// Option denoting if this block should be generated faster than usual.
@@ -28,7 +29,6 @@ pub(super) struct PendingBlock {
     pub(super) collected_fees: Vec<CollectedFee>,
     /// Number of stored account updates in the db (from `account_updates` field)
     pub(super) stored_account_updates: usize,
-    pub(super) previous_block_root_hash: H256,
     pub(super) timestamp: u64,
 
     // Two fields below are for optimization: we don't want to overwrite all the block contents over and over.
@@ -44,7 +44,6 @@ impl PendingBlock {
         number: BlockNumber,
         unprocessed_priority_op_before: u64,
         max_block_size: usize,
-        previous_block_root_hash: H256,
         timestamp: u64,
     ) -> Self {
         Self {
@@ -55,12 +54,12 @@ impl PendingBlock {
             chunks_left: max_block_size,
             pending_op_block_index: 0,
             unprocessed_priority_op_before,
+            unprocessed_priority_op_current: unprocessed_priority_op_before,
             pending_block_iteration: 0,
             gas_counter: GasCounter::new(),
             fast_processing_required: false,
             collected_fees: Vec::new(),
             stored_account_updates: 0,
-            previous_block_root_hash,
             timestamp,
 
             success_txs_pending_len: 0,
@@ -107,6 +106,11 @@ impl PendingBlock {
             self.collected_fees.push(fee);
         }
         self.pending_op_block_index += 1;
+
+        if exec_result.is_priority() {
+            self.unprocessed_priority_op_current += 1;
+        }
+
         self.success_operations.push(exec_result);
     }
 
@@ -135,7 +139,6 @@ impl PendingBlock {
             pending_block_iteration: self.pending_block_iteration,
             success_operations: new_success_operations,
             failed_txs: new_failed_operations,
-            previous_block_root_hash: self.previous_block_root_hash,
             timestamp: self.timestamp,
         }
     }
@@ -171,14 +174,12 @@ mod tests {
     fn pending_block() -> PendingBlock {
         // Fields that aren't interesting in the testing context.
         let unprocessed_priority_op_before = 0;
-        let prev_root_hash = H256::repeat_byte(0x1a);
         let timestamp = 0;
 
         PendingBlock::new(
             STARTING_BLOCK,
             unprocessed_priority_op_before,
             CHUNKS_PER_BLOCK,
-            prev_root_hash,
             timestamp,
         )
     }

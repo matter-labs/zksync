@@ -9,10 +9,6 @@ use actix_web::{
     Scope,
 };
 use bigdecimal::{BigDecimal, Zero};
-use futures::{
-    channel::{mpsc, oneshot},
-    prelude::*,
-};
 use num::{rational::Ratio, BigUint, FromPrimitive};
 
 // Workspace uses
@@ -33,7 +29,7 @@ use super::{
 };
 use crate::{
     api_try,
-    fee_ticker::{PriceError, TickerRequest, TokenPriceRequestType},
+    fee_ticker::{FeeTicker, PriceError, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
 };
 
@@ -41,7 +37,7 @@ use crate::{
 #[derive(Clone)]
 struct ApiTokenData {
     min_market_volume: Ratio<BigUint>,
-    fee_ticker: mpsc::Sender<TickerRequest>,
+    fee_ticker: FeeTicker,
     tokens: TokenDBCache,
     pool: ConnectionPool,
 }
@@ -51,7 +47,7 @@ impl ApiTokenData {
         config: &ZkSyncConfig,
         pool: ConnectionPool,
         tokens: TokenDBCache,
-        fee_ticker: mpsc::Sender<TickerRequest>,
+        fee_ticker: FeeTicker,
     ) -> Self {
         Self {
             min_market_volume: Ratio::from(
@@ -63,7 +59,9 @@ impl ApiTokenData {
             fee_ticker,
         }
     }
+}
 
+impl ApiTokenData {
     async fn is_token_enabled_for_fees(
         &self,
         storage: &mut StorageProcessor<'_>,
@@ -143,21 +141,11 @@ impl ApiTokenData {
     }
 
     async fn token_price_usd(&self, token: TokenLike) -> Result<BigDecimal, Error> {
-        let (price_sender, price_receiver) = oneshot::channel();
         self.fee_ticker
-            .clone()
-            .send(TickerRequest::GetTokenPrice {
-                token,
-                response: price_sender,
-                req_type: TokenPriceRequestType::USDForOneToken,
-            })
+            .get_token_price(token, TokenPriceRequestType::USDForOneToken)
             .await
-            .map_err(Error::storage)?;
-
-        let price_result = price_receiver.await.map_err(Error::storage)?;
-        price_result.map_err(Error::from)
+            .map_err(Error::storage)
     }
-
     // TODO: take `currency` as enum. (ZKS-628)
     async fn token_price_in(
         &self,
@@ -278,7 +266,7 @@ pub fn api_scope(
     config: &ZkSyncConfig,
     pool: ConnectionPool,
     tokens_db: TokenDBCache,
-    fee_ticker: mpsc::Sender<TickerRequest>,
+    fee_ticker: FeeTicker,
 ) -> Scope {
     let data = ApiTokenData::new(config, pool, tokens_db, fee_ticker);
 
@@ -333,13 +321,14 @@ mod tests {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let prices = [
+        let prices = vec![
             (TokenLike::Id(TokenId(1)), 10_u64.into()),
             (TokenLike::Symbol(String::from("PHNX")), 10_u64.into()),
             (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
             (Address::default().into(), 1_u64.into()),
         ];
-        let fee_ticker = dummy_fee_ticker(&prices);
+
+        let fee_ticker = dummy_fee_ticker(&prices, None);
 
         let shared_data = SharedData {
             net: cfg.config.chain.eth.network,

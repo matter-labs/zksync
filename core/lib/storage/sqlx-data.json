@@ -42,6 +42,18 @@
       ]
     }
   },
+  "022eb06117f5a1ce548b596cd55600e6c2c0b8a07d6daf99794d6c6704182299": {
+    "query": "DELETE FROM incomplete_blocks WHERE number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "052bc740befe43cd3d8d915371cb055187d4ff4ebf019fe12c8dc85b296acc47": {
     "query": "SELECT tx_hash, tx FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
     "describe": {
@@ -1708,30 +1720,23 @@
       ]
     }
   },
-  "311eb879affeff3c877d978d0a7ac443d904edbc606a213ecc5959dbedc16b3e": {
-    "query": "SELECT created_at, block_number FROM executed_priority_operations\n                WHERE tx_hash = $1",
+  "30ef0469f0125289ac955a30e1fab1cc8f06511ba9d4907ae8a3678482f8a0a2": {
+    "query": "\n            INSERT INTO incomplete_blocks (number, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit,  timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            ",
     "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        }
-      ],
+      "columns": [],
       "parameters": {
         "Left": [
-          "Bytea"
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8"
         ]
       },
-      "nullable": [
-        false,
-        false
-      ]
+      "nullable": []
     }
   },
   "3186e2d96b7f1e1339ac9f09221ae15aba8dff112083079fc6ef5f3acbfc1553": {
@@ -1759,6 +1764,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "32534621f625f4eb72d416e0a35e01d32b322a7efe0c1b6f477e545a1ce25f9e": {
+    "query": "SELECT root_hash FROM blocks WHERE number = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "root_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "3538961dd16f0eb374b50b33cae9a656426720c7fdf5d26ac406f44f47692e01": {
@@ -1837,6 +1862,24 @@
         "Left": [
           "Bytea"
         ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "38e7464ba17d495fe87cf1412ffe10af8dc4b44f99dc2df1ec580f20f609b650": {
+    "query": "SELECT max(number) FROM incomplete_blocks",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
       },
       "nullable": [
         null
@@ -2746,23 +2789,6 @@
       ]
     }
   },
-  "5ab853a2edb8a8e2ac1c95f30aa209cb4e06f41fb55872e2d1f28e3a59e38517": {
-    "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5, timestamp = $6\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "5b92ff5c1c97c0d870e75902d4f89b0725075b8a2f3f41cc4a4e443f792d1b5c": {
     "query": "DELETE FROM eth_unprocessed_aggregated_ops WHERE op_id = ANY($1)",
     "describe": {
@@ -3047,20 +3073,6 @@
       "nullable": []
     }
   },
-  "6e99e599875e2567cc2f280fda3dbb0ae6a13fcc065dca1f6e96204bd14c27d1": {
-    "query": "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "7102023319626d8894376477c6681184464f79c2b588bdb227d22cf032f3e8b7": {
     "query": "\n                SELECT account_id FROM balances\n                WHERE coin_id = $1 AND balance = 1 AND account_id != $2\n            ",
     "describe": {
@@ -3080,6 +3092,20 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "712e8cd4000a84a0ac7d518f4ea32fe986fa90224371a3bf86e95548d9936c3f": {
+    "query": "INSERT INTO server_config (contract_addr, gov_contract_addr, nft_factory_addr) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {
@@ -4540,6 +4566,22 @@
       ]
     }
   },
+  "9b56392b97b79d99c83f86e21a4d2f4616c11ff2ff283c31b6a340d2353e7202": {
+    "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, timestamp)\n            VALUES ($1, $2, $3, $4, $5)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, timestamp = $5\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "9c0a30a24bb6c2481323effc74b01db6163f9e9a368da85ceda727b6e547f087": {
     "query": "DELETE FROM data_restore_rollup_blocks",
     "describe": {
@@ -4798,6 +4840,18 @@
         "Left": [
           "Int8",
           "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a80a6fbc454119fbb9532ad3f5f10d62236e62fead0f0ae05357874247c851d1": {
+    "query": "DELETE FROM incomplete_blocks WHERE number = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
           "Int8"
         ]
       },
@@ -5870,6 +5924,26 @@
       "nullable": []
     }
   },
+  "c7d334b71d4b70daf8e2d09c1d938fdcdd22e8800939ef6e58c44a125dc48d37": {
+    "query": "\n                SELECT account_id \n                FROM account_creates WHERE address = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "cb492484bab6e66f89a4d80649d3559566a681db153152a52449acf931a1d039": {
     "query": "SELECT * FROM block_witness WHERE block = $1",
     "describe": {
@@ -6010,6 +6084,30 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "ceddeadf425bad4196cfc489a3ff56a4ea14a1e44872bc3d0e8c1795646ee89a": {
+    "query": "\n                SELECT min(number), max(number)\n                FROM incomplete_blocks\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "min",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null,
+        null
+      ]
     }
   },
   "d106212871e6b0266259fa0f819ab51c1e58ec799a45b618a4ec4d67d00f49be": {
@@ -6579,6 +6677,24 @@
       "nullable": []
     }
   },
+  "e467ed3636ed729ba60433573e822ce940b213f1931a404badb35025231fd87b": {
+    "query": "SELECT chunks_left FROM pending_block\n            LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "chunks_left",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "e515899938d5ced7b83234fcea6ad024184702eca40b1fae1a16467649722a10": {
     "query": "\n                INSERT INTO execute_aggregated_blocks_binding\n                SELECT \n                    aggregate_operations.id, blocks.number\n                FROM aggregate_operations\n                INNER JOIN blocks ON blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block\n                WHERE aggregate_operations.action_type = 'ExecuteBlocks' and aggregate_operations.id = $1\n                ",
     "describe": {
@@ -6782,6 +6898,68 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "e8810aa7bae2def2bb6863eafa2468a070b37cb4428fe1622a32aca2e646cba0": {
+    "query": "SELECT * FROM incomplete_blocks WHERE number = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "fee_account_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "unprocessed_prior_op_before",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "unprocessed_prior_op_after",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "block_size",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "commit_gas_limit",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "verify_gas_limit",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "timestamp",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
     }
   },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {
@@ -7072,6 +7250,32 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "ee7dd724ce25e19db5af8db44976eaf7767a464574aaa3a18e40717a20b4d828": {
+    "query": "SELECT created_at, block_number FROM executed_priority_operations\n                WHERE tx_hash = $1 ORDER BY created_at DESC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "f057b85811c3991b73c58991fc8dae8bf4cdf9d2238171ca13a3fdf1172f2c91": {

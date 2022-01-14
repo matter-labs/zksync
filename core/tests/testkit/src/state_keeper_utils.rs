@@ -7,7 +7,8 @@ use tokio::runtime::Runtime;
 use zksync_core::{
     committer::CommitRequest,
     state_keeper::{
-        start_state_keeper, StateKeeperRequest, ZkSyncStateInitParams, ZkSyncStateKeeper,
+        start_root_hash_calculator, start_state_keeper, StateKeeperRequest, ZkSyncStateInitParams,
+        ZkSyncStateKeeper,
     },
     tx_event_emitter::ProcessedOperations,
 };
@@ -60,7 +61,7 @@ pub fn spawn_state_keeper(
     block_chunks_sizes.dedup();
 
     let max_miniblock_iterations = *block_chunks_sizes.iter().max().unwrap();
-    let state_keeper = ZkSyncStateKeeper::new(
+    let (state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
         initial_state,
         *fee_account,
         state_keeper_req_receiver,
@@ -75,9 +76,11 @@ pub fn spawn_state_keeper(
     let sk_thread_handle = std::thread::spawn(move || {
         let main_runtime = Runtime::new().expect("main runtime start");
         main_runtime.block_on(async move {
-            let state_keeper_task = start_state_keeper(state_keeper, None);
+            let state_keeper_task = start_state_keeper(state_keeper);
+            let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
             tokio::select! {
                 _ = stop_state_keeper_receiver => {},
+                _ = root_hash_calculator_task => {},
                 _ = state_keeper_task => {},
             }
         })

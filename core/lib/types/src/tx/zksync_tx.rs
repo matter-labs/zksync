@@ -3,19 +3,21 @@ use num::BigUint;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+
 use zksync_basic_types::{AccountId, Address};
+use zksync_crypto::params::ETH_TOKEN_ID;
 
 use crate::{
     operations::{ChangePubKeyOp, MintNFTOp},
     tx::{
-        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, MintNFT, Swap, TimeRange,
-        Transfer, TxEthSignature, TxHash, TxSignature, Withdraw, WithdrawNFT,
+        error::{CloseOperationsDisabled, TransactionError},
+        ChangePubKey, Close, ForcedExit, MintNFT, Swap, TimeRange, Transfer, TxEthSignature,
+        TxHash, TxSignature, Withdraw, WithdrawNFT,
     },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
     WithdrawNFTOp, WithdrawOp,
 };
-use zksync_crypto::params::ETH_TOKEN_ID;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
@@ -254,17 +256,18 @@ impl ZkSyncTx {
     ///
     /// Note that this method doesn't check whether transaction will succeed, so transaction
     /// can fail even if this method returned `true` (i.e., if account didn't have enough balance).
-    pub fn check_correctness(&mut self) -> bool {
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
         match self {
-            ZkSyncTx::Transfer(tx) => tx.check_correctness(),
-            ZkSyncTx::Withdraw(tx) => tx.check_correctness(),
-            ZkSyncTx::Close(tx) => tx.check_correctness(),
-            ZkSyncTx::ChangePubKey(tx) => tx.check_correctness(),
-            ZkSyncTx::ForcedExit(tx) => tx.check_correctness(),
-            ZkSyncTx::MintNFT(tx) => tx.check_correctness(),
-            ZkSyncTx::Swap(tx) => tx.check_correctness(),
-            ZkSyncTx::WithdrawNFT(tx) => tx.check_correctness(),
+            ZkSyncTx::Transfer(tx) => tx.check_correctness()?,
+            ZkSyncTx::Withdraw(tx) => tx.check_correctness()?,
+            ZkSyncTx::Close(tx) => tx.check_correctness()?,
+            ZkSyncTx::ChangePubKey(tx) => tx.check_correctness()?,
+            ZkSyncTx::ForcedExit(tx) => tx.check_correctness()?,
+            ZkSyncTx::MintNFT(tx) => tx.check_correctness()?,
+            ZkSyncTx::Swap(tx) => tx.check_correctness()?,
+            ZkSyncTx::WithdrawNFT(tx) => tx.check_correctness()?,
         }
+        Ok(())
     }
 
     /// Returns a message that user has to sign to send the transaction.

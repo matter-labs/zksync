@@ -31,7 +31,7 @@ impl StateKeeperTester {
         let mut init_params = ZkSyncStateInitParams::default();
         init_params.insert_account(AccountId(0), fee_collector.clone());
 
-        let state_keeper = ZkSyncStateKeeper::new(
+        let (state_keeper, _root_hash_calculator) = ZkSyncStateKeeper::new(
             init_params,
             fee_collector.address,
             request_rx,
@@ -282,7 +282,7 @@ mod apply_priority_op {
         );
         assert!(!pending_block.account_updates.is_empty());
         assert!(!pending_block.success_operations.is_empty());
-        assert_eq!(tester.state_keeper.current_unprocessed_priority_op, 1);
+        assert_eq!(pending_block.unprocessed_priority_op_current, 1);
     }
 
     /// Checks if processing deposit fails because of
@@ -472,7 +472,13 @@ async fn seal_pending_block() {
     assert!(tester.state_keeper.pending_block.account_updates.is_empty());
     assert_eq!(tester.state_keeper.pending_block.chunks_left, 20);
 
-    if let Some(CommitRequest::Block((block, updates))) = tester.response_rx.next().await {
+    assert!(matches!(
+        tester.response_rx.next().await,
+        Some(CommitRequest::PendingBlock(_))
+    ));
+    if let Some(CommitRequest::SealIncompleteBlock((block, updates))) =
+        tester.response_rx.next().await
+    {
         let collected_fees = tester
             .state_keeper
             .state
@@ -580,8 +586,16 @@ mod execute_proposed_block {
         // Second batch
         apply_batch_with_two_transfers(&mut tester).await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 4);
         } else {
             panic!("Block is not received!");
@@ -605,7 +619,13 @@ mod execute_proposed_block {
 
         // Second batch
         apply_batch_with_two_transfers(&mut tester).await;
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 2);
         } else {
             panic!("Block is not received!");
@@ -619,8 +639,16 @@ mod execute_proposed_block {
         // Single tx
         apply_single_transfer(&mut tester).await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 3);
         } else {
             panic!("Block is not received!");
@@ -652,7 +680,13 @@ mod execute_proposed_block {
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 2);
         } else {
             panic!("Block is not received!");
@@ -666,8 +700,16 @@ mod execute_proposed_block {
         // Last single tx
         apply_single_transfer(&mut tester).await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // Check sealed block
-        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+        if let Some(CommitRequest::SealIncompleteBlock((block, _))) =
+            tester.response_rx.next().await
+        {
             assert_eq!(block.block.block_transactions.len(), 3);
         } else {
             panic!("Block is not received!");
@@ -753,7 +795,11 @@ mod execute_proposed_block {
             .await;
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::PendingBlock(_))
+        ));
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
         assert!(matches!(
             tester.response_rx.next().await,
@@ -794,9 +840,16 @@ mod execute_proposed_block {
             .state_keeper
             .execute_proposed_block(proposed_block)
             .await;
+
+        // Proposed block is *always* sent, even if block was sealed.
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
     }
 
@@ -826,10 +879,16 @@ mod execute_proposed_block {
             .execute_proposed_block(proposed_block)
             .await;
 
+        // Proposed block is *always* sent, even if block was sealed.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
+
         // We should receive the next block, since it must be sealed right after.
         assert!(matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
+            Some(CommitRequest::SealIncompleteBlock(_))
         ));
     }
 
@@ -1306,9 +1365,13 @@ mod execute_proposed_block {
             .await;
 
         // Checks that one block is sealed and pending block has only the last withdrawal.
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::PendingBlock(_))
+        ));
         if !matches!(
             tester.response_rx.next().await,
-            Some(CommitRequest::Block((_, _)))
+            Some(CommitRequest::SealIncompleteBlock((_, _)))
         ) {
             panic!("Sealed block is not received");
         }
@@ -1454,10 +1517,7 @@ async fn correctly_restore_pending_block_timestamp() {
 
     // Run initialize function and process the pending block.
     // This operation should successfully execute the transfer even though now it's past the time it's valid.
-    tester
-        .state_keeper
-        .initialize(Some(pending_block.clone()))
-        .await;
+    tester.state_keeper.initialize(Some(pending_block.clone()));
 
     assert_eq!(
         tester.state_keeper.pending_block.number, pending_block.number,

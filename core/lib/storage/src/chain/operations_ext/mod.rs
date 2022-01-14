@@ -1389,9 +1389,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let result = if let Some(record) = record {
             Some((record.created_at, BlockNumber(record.block_number as u32)))
         } else {
+            // TxHash is not unique for priority operations so we have to get the max created_at
+            // because we are using this function for paginating starting from the latest transaction
             let record = sqlx::query!(
                 "SELECT created_at, block_number FROM executed_priority_operations
-                WHERE tx_hash = $1",
+                WHERE tx_hash = $1 ORDER BY created_at DESC",
                 tx_hash.as_ref()
             )
             .fetch_optional(transaction.conn())
