@@ -459,8 +459,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             withdrawnNFTs[op.tokenId] = address(_factory);
             emit WithdrawalNFT(op.tokenId);
         } catch {
-            pendingWithdrawnNFTs[op.tokenId] = op;
-            emit WithdrawalNFTPending(op.tokenId);
+            storePendingNFT(op);
         }
     }
 
@@ -489,9 +488,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         if (sent) {
             emit Withdrawal(_tokenId, _amount);
         } else {
-            bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
-            increaseBalanceToWithdraw(packedBalanceKey, _amount);
-            emit WithdrawalPending(_tokenId, _recipient, _amount);
+            storePendingBalance(_tokenId, _recipient, _amount);
         }
     }
 
