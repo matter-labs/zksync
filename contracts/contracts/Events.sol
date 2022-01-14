@@ -18,7 +18,7 @@ interface Events {
     event Withdrawal(uint16 indexed tokenId, uint128 amount);
 
     /// @notice Event emitted when user funds are withdrawn from the zkSync state but not from contract
-    event WithdrawalPending(uint16 indexed tokenId, uint128 amount);
+    event WithdrawalPending(uint16 indexed tokenId, address recepient, uint128 amount);
 
     /// @notice Event emitted when user NFT is withdrawn from the zkSync state and contract
     event WithdrawalNFT(uint32 indexed tokenId);
