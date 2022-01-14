@@ -18,7 +18,7 @@ export type Nonce = number | 'committed';
 
 export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
 
-export function l1_chain_id(network?: Network): number {
+export function l1ChainId(network?: Network): number {
     if (network === 'rinkeby' || network === 'rinkeby-beta') {
         return 3;
     }

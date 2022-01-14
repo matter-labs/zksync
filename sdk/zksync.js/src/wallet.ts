@@ -33,7 +33,7 @@ import {
     TokenRatio,
     WeiRatio,
     Toggle2FARequest,
-    l1_chain_id
+    l1ChainId
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -79,6 +79,15 @@ export class Wallet {
         return this;
     }
 
+    async verifyNetworks() {
+        if (this.provider.network != undefined && this.ethSigner.provider != undefined) {
+            const ethNetwork = await this.ethSigner.provider.getNetwork();
+            if (l1ChainId(this.provider.network) !== ethNetwork.chainId) {
+                throw new Error("ETH network and ZkSync network doesn't matched");
+            }
+        }
+    }
+
     static async fromEthSigner(
         ethWallet: ethers.Signer,
         provider: SyncProvider,
@@ -86,13 +95,6 @@ export class Wallet {
         accountId?: number,
         ethSignerType?: EthSignerType
     ): Promise<Wallet> {
-        if (provider.network !== undefined && ethWallet.provider !== undefined) {
-            const ethNetwork = await ethWallet.provider.getNetwork();
-            if (l1_chain_id(provider.network) !== ethNetwork.chainId) {
-                throw new Error("ETH network and ZkSync network doesn't matched");
-            }
-        }
-
         if (signer == null) {
             const signerResult = await Signer.fromETHSignature(ethWallet);
             signer = signerResult.signer;
@@ -112,6 +114,7 @@ export class Wallet {
         );
 
         wallet.connect(provider);
+        await wallet.verifyNetworks();
         return wallet;
     }
 
@@ -144,6 +147,7 @@ export class Wallet {
             ethSignerType
         );
         wallet.connect(provider);
+        await wallet.verifyNetworks();
         return wallet;
     }
 
