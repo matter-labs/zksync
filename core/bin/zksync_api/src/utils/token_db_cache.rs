@@ -88,7 +88,7 @@ impl TokenDBCache {
         storage: &mut StorageProcessor<'_>,
     ) -> Result<Vec<Token>, anyhow::Error> {
         let tokens = storage.tokens_schema().load_tokens().await?;
-        Ok(tokens.into_iter().map(|(_k, v)| v).collect())
+        Ok(tokens.into_values().collect())
     }
 
     pub async fn get_token_market_volume(

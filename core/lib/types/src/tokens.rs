@@ -93,7 +93,7 @@ impl TokenLike {
 }
 
 /// Token supported in zkSync protocol
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Token {
     /// id is used for tx signature and serialization
     pub id: TokenId,
@@ -112,6 +112,12 @@ pub enum TokenKind {
     ERC20,
     NFT,
     None,
+}
+
+impl Default for TokenKind {
+    fn default() -> Self {
+        Self::ERC20
+    }
 }
 
 impl Token {

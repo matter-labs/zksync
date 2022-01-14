@@ -27,7 +27,7 @@ impl From<TxAddError> for RpcErrorCodes {
     fn from(error: TxAddError) -> Self {
         match error {
             TxAddError::NonceMismatch => Self::NonceMismatch,
-            TxAddError::IncorrectTx => Self::IncorrectTx,
+            TxAddError::IncorrectTx(_) => Self::IncorrectTx,
             TxAddError::TxFeeTooLow => Self::FeeTooLow,
             TxAddError::TxBatchFeeTooLow => Self::FeeTooLow,
             TxAddError::MissingEthSignature => Self::MissingEthSignature,
@@ -99,6 +99,11 @@ impl From<SubmitError> for jsonrpc_core::Error {
             SubmitError::Other(message) => Self {
                 code: ErrorCode::InternalError,
                 message,
+                data: None,
+            },
+            SubmitError::PriceError(error) => Self {
+                code: ErrorCode::InternalError,
+                message: error.to_string(),
                 data: None,
             },
         }

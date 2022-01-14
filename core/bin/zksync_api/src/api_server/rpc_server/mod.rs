@@ -2,11 +2,7 @@
 use std::time::Instant;
 
 // External uses
-use bigdecimal::BigDecimal;
-use futures::{
-    channel::{mpsc, oneshot},
-    SinkExt,
-};
+use futures::channel::mpsc;
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 use tokio::task::JoinHandle;
@@ -20,15 +16,11 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, BlockNumber, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BlockNumber};
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 // Local uses
-use crate::{
-    fee_ticker::{PriceError, ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
-    signature_checker::VerifySignatureRequest,
-    utils::shared_lru_cache::AsyncLruCache,
-};
+use crate::{signature_checker::VerifySignatureRequest, utils::shared_lru_cache::AsyncLruCache};
 
 pub mod error;
 mod ip_insert_middleware;
@@ -39,6 +31,7 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use crate::fee_ticker::FeeTicker;
 use ip_insert_middleware::IpInsertMiddleWare;
 
 #[derive(Clone)]
@@ -56,7 +49,7 @@ impl RpcApp {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        ticker: FeeTicker,
         config: &CommonApiConfig,
         private_url: String,
         confirmations_for_eth_event: u64,
@@ -66,7 +59,7 @@ impl RpcApp {
         let tx_sender = TxSender::new(
             connection_pool,
             sign_verify_request_sender,
-            ticker_request_sender,
+            ticker,
             config,
             private_url,
         );
@@ -184,100 +177,6 @@ impl RpcApp {
         Ok(res)
     }
 
-    async fn token_allowed_for_fees(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        token: TokenLike,
-    ) -> Result<bool> {
-        let (sender, receiver) = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::IsTokenAllowed {
-                token: token.clone(),
-                response: sender,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        receiver
-            .await
-            .expect("ticker answer sender dropped")
-            .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-                Error::internal_error()
-            })
-    }
-
-    async fn ticker_batch_fee_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<ResponseBatchFee> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetBatchTxFee {
-                transactions,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
-            Error::internal_error()
-        })
-    }
-
-    async fn ticker_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<ResponseFee> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTxFee {
-                tx_type,
-                address,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            vlog::warn!(
-                "Internal Server Error: '{}'; input: {:?}, {:?}",
-                err,
-                tx_type,
-                token,
-            );
-            Error::internal_error()
-        })
-    }
-
-    async fn ticker_price_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        token: TokenLike,
-        req_type: TokenPriceRequestType,
-    ) -> Result<BigDecimal> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTokenPrice {
-                token: token.clone(),
-                response: req.0,
-                req_type,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| match err {
-            PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
-            _ => {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-                Error::internal_error()
-            }
-        })
-    }
-
     async fn get_account_state(&self, address: Address) -> Result<AccountStateInfo> {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
@@ -357,7 +256,7 @@ impl RpcApp {
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-    ticker_request_sender: mpsc::Sender<TickerRequest>,
+    ticker: FeeTicker,
     config: &JsonRpcConfig,
     common_api_config: &CommonApiConfig,
     private_url: String,
@@ -367,7 +266,7 @@ pub fn start_rpc_server(
     let rpc_app = RpcApp::new(
         connection_pool,
         sign_verify_request_sender,
-        ticker_request_sender,
+        ticker,
         common_api_config,
         private_url,
         confirmations_for_eth_event,
@@ -391,8 +290,8 @@ pub fn start_rpc_server(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use serde::{Deserialize, Serialize};
+    use zksync_types::TxFeeTypes;
 
     #[test]
     fn tx_fee_type_serialization() {

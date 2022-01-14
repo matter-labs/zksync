@@ -127,7 +127,7 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         storage
             .chain()
             .block_schema()
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Vec::new(),
@@ -152,7 +152,7 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
     storage
         .chain()
         .block_schema()
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             block_number,
             BLOCK_SIZE_CHUNKS,
             Vec::new(),
@@ -250,7 +250,7 @@ async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<(
     storage
         .chain()
         .block_schema()
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(1),
             BLOCK_SIZE_CHUNKS,
             Vec::new(),
@@ -288,7 +288,7 @@ async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<(
     storage
         .chain()
         .block_schema()
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(2),
             BLOCK_SIZE_CHUNKS,
             Vec::new(),

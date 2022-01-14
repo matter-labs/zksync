@@ -6,7 +6,7 @@ pub mod watcher;
 
 // Built-in uses
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     time::{Duration, Instant},
 };
 
@@ -25,12 +25,6 @@ use crate::fee_ticker::validator::{cache::TokenCacheWrapper, watcher::TokenWatch
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 
 const CRITICAL_NUMBER_OF_ERRORS: u32 = 500;
-
-#[derive(Clone, Debug)]
-struct AcceptanceData {
-    last_refresh: Instant,
-    allowed: bool,
-}
 
 /// We don't want to send requests to the Internet for every request from users.
 /// Market updater periodically updates the values of the token market in the cache  
@@ -100,38 +94,31 @@ impl<W: TokenWatcher> MarketUpdater<W> {
 
 /// Fee token validator decides whether certain ERC20 token is suitable for paying fees.
 #[derive(Debug, Clone)]
-pub struct FeeTokenValidator<W> {
+pub struct FeeTokenValidator {
     // Storage for unconditionally valid tokens, such as ETH
     unconditionally_valid: HashSet<Address>,
     tokens_cache: TokenCacheWrapper,
-    /// List of tokens that are accepted to pay fees in.
-    /// Whitelist is better in this case, because it requires fewer requests to different APIs
-    tokens: HashMap<Address, AcceptanceData>,
     available_time: chrono::Duration,
     liquidity_volume: BigDecimal,
-    watcher: W,
 }
 
-impl<W: TokenWatcher> FeeTokenValidator<W> {
+impl FeeTokenValidator {
     pub(crate) fn new(
         cache: impl Into<TokenCacheWrapper>,
         available_time: chrono::Duration,
         liquidity_volume: BigDecimal,
         unconditionally_valid: HashSet<Address>,
-        watcher: W,
     ) -> Self {
         Self {
             unconditionally_valid,
             tokens_cache: cache.into(),
-            tokens: Default::default(),
             available_time,
             liquidity_volume,
-            watcher,
         }
     }
 
     /// Returns `true` if token can be used to pay fees.
-    pub(crate) async fn token_allowed(&mut self, token: TokenLike) -> anyhow::Result<bool> {
+    pub(crate) async fn token_allowed(&self, token: TokenLike) -> anyhow::Result<bool> {
         let token = self.resolve_token(token).await?;
         if let Some(token) = token {
             if self.unconditionally_valid.contains(&token.address) {
@@ -148,50 +135,23 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         self.tokens_cache.get_token(token).await
     }
 
-    async fn check_token(&mut self, token: Token) -> anyhow::Result<bool> {
+    async fn check_token(&self, token: Token) -> anyhow::Result<bool> {
         let start = Instant::now();
-        if let Some(acceptance_data) = self.tokens.get(&token.address) {
-            if chrono::Duration::from_std(acceptance_data.last_refresh.elapsed())
-                .expect("Correct duration")
-                < self.available_time
-            {
-                return Ok(acceptance_data.allowed);
-            }
-        }
-
         let volume = match self.get_token_market_volume(&token).await? {
             Some(volume) => volume,
-            None => self.get_remote_token_market(&token).await?,
+            None => return Ok(false),
         };
 
         if Utc::now() - volume.last_updated > self.available_time {
             vlog::warn!("Token market amount for {} is not relevant", &token.symbol)
         }
         let allowed = ratio_to_big_decimal(&volume.market_volume, 2) >= self.liquidity_volume;
-        self.tokens.insert(
-            token.address,
-            AcceptanceData {
-                last_refresh: Instant::now(),
-                allowed,
-            },
-        );
         metrics::histogram!("ticker.validator.check_token", start.elapsed());
         Ok(allowed)
     }
-    // I think, it's redundant method and we could remove watcher from validator and store it only in updater
-    async fn get_remote_token_market(
-        &mut self,
-        token: &Token,
-    ) -> anyhow::Result<TokenMarketVolume> {
-        let volume = self.watcher.get_token_market_volume(token).await?;
-        Ok(TokenMarketVolume {
-            market_volume: big_decimal_to_ratio(&volume).unwrap(),
-            last_updated: Utc::now(),
-        })
-    }
 
     async fn get_token_market_volume(
-        &mut self,
+        &self,
         token: &Token,
     ) -> anyhow::Result<Option<TokenMarketVolume>> {
         self.tokens_cache.get_token_market_volume(token.id).await
@@ -206,6 +166,7 @@ mod tests {
     use bigdecimal::Zero;
     use num::rational::Ratio;
     use num::BigUint;
+    use std::collections::HashMap;
     use std::str::FromStr;
     use std::sync::Arc;
     use tokio::sync::Mutex;
@@ -291,12 +252,11 @@ mod tests {
             amounts: Arc::new(Mutex::new(amounts)),
         };
 
-        let mut validator = FeeTokenValidator::new(
+        let validator = FeeTokenValidator::new(
             cache.clone(),
             chrono::Duration::seconds(100),
             BigDecimal::from(100),
             unconditionally_valid,
-            watcher.clone(),
         );
 
         let mut updater = MarketUpdater::new(cache, watcher);
@@ -340,7 +300,5 @@ mod tests {
         assert!(dai_allowed);
         assert!(!phnx_allowed);
         assert!(eth_allowed);
-        assert!(validator.tokens.get(&dai_token_address).unwrap().allowed);
-        assert!(!validator.tokens.get(&phnx_token_address).unwrap().allowed);
     }
 }

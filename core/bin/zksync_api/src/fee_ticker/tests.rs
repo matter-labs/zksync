@@ -1,10 +1,12 @@
+use std::any::Any;
+
 use actix_web::{web, App, HttpResponse, HttpServer};
 
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::Utc;
+use futures::executor::block_on;
 use futures::future::{AbortHandle, Abortable};
-use futures::{channel::mpsc, executor::block_on};
 use std::str::FromStr;
 use std::thread::sleep;
 use tokio::time::Duration;
@@ -28,12 +30,12 @@ use crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations;
 const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
 
 #[derive(Debug, Clone)]
-struct TestToken {
-    id: TokenId,
-    price_usd: Ratio<BigUint>,
-    risk_factor: Option<Ratio<BigUint>>,
-    precision: u8,
-    address: Address,
+pub(crate) struct TestToken {
+    pub id: TokenId,
+    pub price_usd: Ratio<BigUint>,
+    pub risk_factor: Option<Ratio<BigUint>>,
+    pub precision: u8,
+    pub address: Address,
 }
 
 impl TestToken {
@@ -93,7 +95,7 @@ impl TestToken {
         Self::new(TokenId(4), 0.0, Some(0.9), 18, Address::default())
     }
 
-    fn all_tokens() -> Vec<Self> {
+    pub(crate) fn all_tokens() -> Vec<Self> {
         vec![
             Self::eth(),
             Self::cheap(),
@@ -106,7 +108,7 @@ impl TestToken {
 
 const SUBSIDY_CPK_PRICE_USD_SCALED: u64 = 10000000; // 10 dollars
 
-fn get_test_ticker_config() -> TickerConfig {
+pub fn get_test_ticker_config() -> TickerConfig {
     TickerConfig {
         zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot("0.001")
             .unwrap(),
@@ -125,9 +127,51 @@ fn get_test_ticker_config() -> TickerConfig {
 }
 
 struct MockApiProvider;
+
 #[async_trait]
 impl FeeTickerAPI for MockApiProvider {
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+    async fn keep_price_updated(self) {
+        // Just do nothing
+    }
+}
+
+#[derive(Clone)]
+struct MockTickerInfo {
+    pub future_blocks: BlocksInFutureAggregatedOperations,
+    pub remaining_chunks: Option<usize>,
+}
+
+impl Default for MockTickerInfo {
+    fn default() -> Self {
+        Self {
+            future_blocks: BlocksInFutureAggregatedOperations {
+                blocks_to_commit: 0,
+                blocks_to_prove: 0,
+                blocks_to_execute: 0,
+            },
+            remaining_chunks: None,
+        }
+    }
+}
+
+#[async_trait]
+impl FeeTickerInfo for MockTickerInfo {
+    async fn is_account_new(&self, _address: Address) -> anyhow::Result<bool> {
+        // Always false for simplicity.
+        Ok(false)
+    }
+
+    async fn blocks_in_future_aggregated_operations(
+        &self,
+    ) -> anyhow::Result<BlocksInFutureAggregatedOperations> {
+        Ok(self.future_blocks.clone())
+    }
+
+    async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>> {
+        Ok(self.remaining_chunks)
+    }
+
+    async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
         for test_token in TestToken::all_tokens() {
             if TokenLike::Id(test_token.id) == token {
                 let token_price = TokenPrice {
@@ -160,59 +204,13 @@ impl FeeTickerAPI for MockApiProvider {
         unreachable!("incorrect token input")
     }
 
-    async fn keep_price_updated(self) {
-        // Just do nothing
-    }
-}
-
-struct MockTickerInfo {
-    pub future_blocks: BlocksInFutureAggregatedOperations,
-    pub remaining_chunks: Option<usize>,
-}
-
-impl Default for MockTickerInfo {
-    fn default() -> Self {
-        Self {
-            future_blocks: BlocksInFutureAggregatedOperations {
-                blocks_to_commit: 0,
-                blocks_to_prove: 0,
-                blocks_to_execute: 0,
-            },
-            remaining_chunks: None,
-        }
-    }
-}
-
-#[async_trait]
-impl FeeTickerInfo for MockTickerInfo {
-    async fn is_account_new(&mut self, _address: Address) -> bool {
-        // Always false for simplicity.
-        false
-    }
-
-    async fn blocks_in_future_aggregated_operations(
-        &mut self,
-    ) -> BlocksInFutureAggregatedOperations {
-        self.future_blocks.clone()
-    }
-
-    async fn remaining_chunks_in_pending_block(&mut self) -> Option<usize> {
-        self.remaining_chunks
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
     }
 }
 
 fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
     UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(num, precision)
-}
-
-#[derive(Debug)]
-struct FakeTokenWatcher;
-
-#[async_trait::async_trait]
-impl TokenWatcher for FakeTokenWatcher {
-    async fn get_token_market_volume(&mut self, _token: &Token) -> anyhow::Result<BigDecimal> {
-        unreachable!()
-    }
 }
 
 struct ErrorTickerApi;
@@ -266,20 +264,21 @@ fn run_server(token_address: Address) -> (String, AbortHandle) {
     (address, abort_handle)
 }
 
-type TestFeeTicker = FeeTicker<MockApiProvider, MockTickerInfo, FakeTokenWatcher>;
-
 fn get_normal_and_subsidy_fee(
-    ticker: &mut TestFeeTicker,
+    ticker: &mut FeeTicker,
     tx_type: TxFeeTypes,
     token: TokenLike,
     address: Address,
     future_blocks: Option<BlocksInFutureAggregatedOperations>,
     remaining_chunks: Option<usize>,
 ) -> (Ratio<BigUint>, Ratio<BigUint>) {
+    let mut info: Box<MockTickerInfo> = ticker.info.clone().into_any().downcast().unwrap();
     if let Some(blocks) = future_blocks {
-        ticker.info.future_blocks = blocks;
+        info.future_blocks = blocks;
     }
-    ticker.info.remaining_chunks = remaining_chunks;
+    info.remaining_chunks = remaining_chunks;
+
+    ticker.info = info;
     let fee_in_token = block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
         .expect("failed to get fee in token");
 
@@ -303,7 +302,7 @@ fn get_normal_and_subsidy_fee(
 }
 
 fn get_token_fee_in_usd(
-    ticker: &mut TestFeeTicker,
+    ticker: &mut FeeTicker,
     tx_type: TxFeeTypes,
     token: TokenLike,
     address: Address,
@@ -320,12 +319,12 @@ fn get_token_fee_in_usd(
     )
     .0;
 
-    let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+    let token_precision = block_on(ticker.info.get_token(token.clone()))
         .unwrap()
         .decimals;
 
     // Fee in usd
-    (block_on(MockApiProvider.get_last_quote(token))
+    (block_on(ticker.info.get_last_token_price(token))
         .expect("failed to get fee in usd")
         .usd_price
         / BigUint::from(10u32).pow(u32::from(token_precision)))
@@ -333,7 +332,7 @@ fn get_token_fee_in_usd(
 }
 
 fn get_subsidy_token_fee_in_usd(
-    ticker: &mut TestFeeTicker,
+    ticker: &mut FeeTicker,
     tx_type: TxFeeTypes,
     token: TokenLike,
     address: Address,
@@ -349,25 +348,25 @@ fn get_subsidy_token_fee_in_usd(
         remaining_chunks,
     )
     .1;
-    let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+    let token_precision = block_on(ticker.info.get_token(token.clone()))
         .unwrap()
         .decimals;
 
     // Fee in usd
-    (block_on(MockApiProvider.get_last_quote(token))
+    (block_on(ticker.info.get_last_token_price(token))
         .expect("failed to get fee in usd")
         .usd_price
         / BigUint::from(10u32).pow(u32::from(token_precision)))
         * fee_in_token
 }
 
-fn convert_to_usd(amount: &Ratio<BigUint>, token: TokenLike) -> Ratio<BigUint> {
-    let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+fn convert_to_usd(ticker: &FeeTicker, amount: &Ratio<BigUint>, token: TokenLike) -> Ratio<BigUint> {
+    let token_precision = block_on(ticker.info.get_token(token.clone()))
         .unwrap()
         .decimals;
 
     // Fee in usd
-    (block_on(MockApiProvider.get_last_quote(token))
+    (block_on(ticker.info.get_last_token_price(token))
         .expect("failed to get fee in usd")
         .usd_price
         / BigUint::from(10u32).pow(u32::from(token_precision)))
@@ -384,17 +383,10 @@ fn test_ticker_subsidy() {
         chrono::Duration::seconds(100),
         BigDecimal::from(100),
         Default::default(),
-        FakeTokenWatcher,
     );
 
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(
-        MockApiProvider,
-        MockTickerInfo::default(),
-        mpsc::channel(1).1,
-        config,
-        validator,
-    );
+    let mut ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     // Only CREATE2 is subsidized
     let cpk = |cpk_type: ChangePubKeyType| {
@@ -410,7 +402,7 @@ fn test_ticker_subsidy() {
         None,
     );
     let create2_subsidy_price_usd =
-        convert_to_usd(&create2_subsidy_price, TokenLike::Id(TokenId(0)));
+        convert_to_usd(&ticker, &create2_subsidy_price, TokenLike::Id(TokenId(0)));
 
     // Due to precision-rounding, the price might differ, but it shouldn't by more than 1 cent
     assert!(
@@ -453,7 +445,7 @@ fn test_ticker_subsidy() {
     );
     assert_eq!(normal_transfer_price, subsidy_transfer_price);
     let normal_transfer_price_usd =
-        convert_to_usd(&normal_transfer_price, TokenLike::Id(TokenId(0)));
+        convert_to_usd(&ticker, &normal_transfer_price, TokenLike::Id(TokenId(0)));
 
     // Subsidy also works for batches
     let batch_price_token = block_on(ticker.get_batch_from_ticker_in_wei(
@@ -466,6 +458,7 @@ fn test_ticker_subsidy() {
     ))
     .unwrap();
     let subsidy_batch_price_usd = convert_to_usd(
+        &ticker,
         &Ratio::from(batch_price_token.subsidized_fee.total_fee),
         TokenLike::Id(TokenId(0)),
     );
@@ -511,17 +504,10 @@ fn test_ticker_formula() {
         chrono::Duration::seconds(100),
         BigDecimal::from(100),
         Default::default(),
-        FakeTokenWatcher,
     );
 
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(
-        MockApiProvider,
-        MockTickerInfo::default(),
-        mpsc::channel(1).1,
-        config,
-        validator,
-    );
+    let mut ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
         let max = std::cmp::max(a.clone(), b.clone());
@@ -752,17 +738,10 @@ fn test_zero_price_token_fee() {
         chrono::Duration::seconds(100),
         BigDecimal::from(100),
         Default::default(),
-        FakeTokenWatcher,
     );
 
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(
-        MockApiProvider,
-        MockTickerInfo::default(),
-        mpsc::channel(1).1,
-        config,
-        validator,
-    );
+    let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     let token = TestToken::zero_price();
 
@@ -805,7 +784,6 @@ async fn test_error_coingecko_api() {
         chrono::Duration::seconds(100),
         BigDecimal::from(100),
         Default::default(),
-        FakeTokenWatcher,
     );
     let connection_pool = ConnectionPool::new(Some(1));
     {
@@ -827,16 +805,10 @@ async fn test_error_coingecko_api() {
             .await
             .unwrap();
     }
-    let ticker_api = TickerApi::new(connection_pool, coingecko);
+    let _ticker_api = TickerApi::new(connection_pool, coingecko);
 
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(
-        ticker_api,
-        MockTickerInfo::default(),
-        mpsc::channel(1).1,
-        config,
-        validator,
-    );
+    let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
     for _ in 0..1000 {
         ticker
             .get_fee_from_ticker_in_wei(
@@ -862,11 +834,8 @@ async fn test_error_api() {
         chrono::Duration::seconds(100),
         BigDecimal::from(100),
         Default::default(),
-        FakeTokenWatcher,
     );
     let connection_pool = ConnectionPool::new(Some(1));
-    let second_connection_pool = connection_pool.clone();
-    let ticker_api = TickerApi::new(second_connection_pool, ErrorTickerApi);
     connection_pool
         .access_storage()
         .await
@@ -882,13 +851,7 @@ async fn test_error_api() {
         .await
         .unwrap();
     let config = get_test_ticker_config();
-    let mut ticker = FeeTicker::new(
-        ticker_api,
-        MockTickerInfo::default(),
-        mpsc::channel(1).1,
-        config,
-        validator,
-    );
+    let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     ticker
         .get_fee_from_ticker_in_wei(
