@@ -509,6 +509,29 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         emit WithdrawalPending(_tokenId, _recipient, _amount);
     }
 
+    /// @dev helper function to process ETH/ERC20 withdrawal
+    function handleWithdrawFT(
+        bool _completeWithdrawals,
+        uint16 _tokenId,
+        address _addr,
+        uint128 _amount
+    ) internal {
+        if (_completeWithdrawals) {
+            withdrawOrStore(_tokenId, _addr, _amount);
+        } else {
+            storePendingBalance(_tokenId, _addr, _amount);
+        }
+    }
+
+    /// @dev helper function to process NFT withdrawal
+    function handleWithdrawNFT(bool _completeWithdrawals, Operations.WithdrawNFT memory _op) internal {
+        if (_completeWithdrawals) {
+            withdrawOrStoreNFT(_op);
+        } else {
+            storePendingNFT(_op);
+        }
+    }
+
     /// @dev Executes one block
     /// @dev 1. Processes all priority operations or save them as pending
     /// @dev 2. Finalizes block on Ethereum
@@ -536,28 +559,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
                 // Circuit guarantees that partial exits are available only for fungible tokens
                 require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf1");
-                if (_completeWithdrawals) {
-                    withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
-                } else {
-                    storePendingBalance(uint16(op.tokenId), op.owner, op.amount);
-                }
+                handleWithdrawFT(_completeWithdrawals, uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
                 // Circuit guarantees that forced exits are available only for fungible tokens
                 require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf2");
-                if (_completeWithdrawals) {
-                    withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
-                } else {
-                    storePendingBalance(uint16(op.tokenId), op.target, op.amount);
-                }
+                handleWithdrawFT(_completeWithdrawals, uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
-                    if (_completeWithdrawals) {
-                        withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
-                    } else {
-                        storePendingBalance(uint16(op.tokenId), op.owner, op.amount);
-                    }
+                    handleWithdrawFT(_completeWithdrawals, uint16(op.tokenId), op.owner, op.amount);
                 } else {
                     if (op.amount == 1) {
                         Operations.WithdrawNFT memory withdrawNftOp = Operations.WithdrawNFT(
@@ -568,20 +579,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                             op.owner,
                             op.tokenId
                         );
-                        if (_completeWithdrawals) {
-                            withdrawOrStoreNFT(withdrawNftOp);
-                        } else {
-                            storePendingNFT(withdrawNftOp);
-                        }
+                        handleWithdrawNFT(_completeWithdrawals, withdrawNftOp);
                     }
                 }
             } else if (opType == Operations.OpType.WithdrawNFT) {
                 Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
-                if (_completeWithdrawals) {
-                    withdrawOrStoreNFT(op);
-                } else {
-                    storePendingNFT(op);
-                }
+                handleWithdrawNFT(_completeWithdrawals, op);
             } else {
                 revert("l"); // unsupported op in block execution
             }
