@@ -18,6 +18,19 @@ export type Nonce = number | 'committed';
 
 export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
 
+export function l1_chain_id(network?: Network): number {
+    if (network === 'rinkeby' || network === 'rinkeby-beta') {
+        return 3;
+    }
+    if (network === 'ropsten' || network === 'ropsten-beta') {
+        return 4;
+    }
+    if (network === 'mainnet') {
+        return 1;
+    }
+    return 9;
+}
+
 export interface Create2Data {
     creatorAddress: string;
     saltArg: string;

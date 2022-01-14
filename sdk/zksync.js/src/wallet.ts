@@ -32,7 +32,8 @@ import {
     WithdrawNFT,
     TokenRatio,
     WeiRatio,
-    Toggle2FARequest
+    Toggle2FARequest,
+    l1_chain_id
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -85,6 +86,13 @@ export class Wallet {
         accountId?: number,
         ethSignerType?: EthSignerType
     ): Promise<Wallet> {
+        if (provider.network !== undefined && ethWallet.provider !== undefined) {
+            const ethNetwork = await ethWallet.provider.getNetwork();
+            if (l1_chain_id(provider.network) !== ethNetwork.chainId) {
+                throw new Error("ETH network and ZkSync network doesn't matched");
+            }
+        }
+
         if (signer == null) {
             const signerResult = await Signer.fromETHSignature(ethWallet);
             signer = signerResult.signer;
