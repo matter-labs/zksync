@@ -2,6 +2,7 @@
 
 pragma solidity ^0.7.0;
 
+import "./ReentrancyGuard.sol";
 import "./Governance.sol";
 import "./IERC20.sol";
 import "./Utils.sol";
@@ -9,12 +10,12 @@ import "./Utils.sol";
 /// @title Token Governance Contract
 /// @author Matter Labs
 /// @notice Contract is used to allow anyone to add new ERC20 tokens to zkSync given sufficient payment
-contract TokenGovernance {
+contract TokenGovernance is ReentrancyGuard {
     /// @notice Token lister added or removed (see `tokenLister`)
     event TokenListerUpdate(address indexed tokenLister, bool isActive);
 
     /// @notice Listing fee token set
-    event ListingFeeTokenUpdate(IERC20 indexed newListingFeeToken);
+    event ListingFeeTokenUpdate(ITrustedTransfarableERC20 indexed newListingFeeToken);
 
     /// @notice Listing fee set
     event ListingFeeUpdate(uint256 newListingFee);
@@ -29,7 +30,7 @@ contract TokenGovernance {
     Governance public governance;
 
     /// @notice Token used to collect listing fee for addition of new token to zkSync network
-    IERC20 public listingFeeToken;
+    ITrustedTransfarableERC20 public listingFeeToken;
 
     /// @notice Token listing fee
     uint256 public listingFee;
@@ -45,11 +46,13 @@ contract TokenGovernance {
 
     constructor(
         Governance _governance,
-        IERC20 _listingFeeToken,
+        ITrustedTransfarableERC20 _listingFeeToken,
         uint256 _listingFee,
         uint16 _listingCap,
         address _treasury
     ) {
+        initializeReentrancyGuard();
+
         governance = _governance;
         listingFeeToken = _listingFeeToken;
         listingFee = _listingFee;
@@ -65,11 +68,11 @@ contract TokenGovernance {
     /// @notice Adds new ERC20 token to zkSync network.
     /// @notice If caller is not present in the `tokenLister` map payment of `listingFee` in `listingFeeToken` should be made.
     /// @notice NOTE: before calling this function make sure to approve `listingFeeToken` transfer for this contract.
-    function addToken(address _token) external {
+    function addToken(address _token) external nonReentrant {
         require(governance.totalTokens() < listingCap, "can't add more tokens"); // Impossible to add more tokens using this contract
-        if (!tokenLister[msg.sender]) {
+        if (!tokenLister[msg.sender] && listingFee > 0) {
             // Collect fees
-            bool feeTransferOk = Utils.transferFromERC20(listingFeeToken, msg.sender, treasury, listingFee);
+            bool feeTransferOk = listingFeeToken.transferFrom(msg.sender, treasury, listingFee);
             require(feeTransferOk, "fee transfer failed"); // Failed to receive payment for token addition.
         }
         governance.addToken(_token);
@@ -79,7 +82,7 @@ contract TokenGovernance {
 
     /// @notice Set new listing token and fee
     /// @notice Can be called only by zkSync governor
-    function setListingFeeToken(IERC20 _newListingFeeToken, uint256 _newListingFee) external {
+    function setListingFeeToken(ITrustedTransfarableERC20 _newListingFeeToken, uint256 _newListingFee) external {
         governance.requireGovernor(msg.sender);
         listingFeeToken = _newListingFeeToken;
         listingFee = _newListingFee;

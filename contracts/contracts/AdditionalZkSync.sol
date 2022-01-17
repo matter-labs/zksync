@@ -47,7 +47,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         address _nftCreatorAddress,
         uint32 _nftSerialId,
         bytes32 _nftContentHash,
-        uint256[] memory _proof
+        uint256[] calldata _proof
     ) external {
         require(_accountId <= MAX_ACCOUNT_ID, "e");
         require(_accountId != SPECIAL_ACCOUNT_ID, "v");
@@ -74,7 +74,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         if (_tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
             bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
-            emit WithdrawalPending(uint16(_tokenId), _amount);
+            emit WithdrawalPending(uint16(_tokenId), _owner, _amount);
         } else {
             require(_amount != 0, "Z"); // Unsupported nft amount
             Operations.WithdrawNFT memory withdrawNftOp = Operations.WithdrawNFT(
@@ -91,12 +91,12 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         performedExodus[_accountId][_tokenId] = true;
     }
 
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external {
+    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] calldata _depositsPubdata) external {
         require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
         require(toProcess > 0, "9"); // no deposits to process
         uint64 currentDepositIdx = 0;
-        for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
+        for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; ++id) {
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
                 bytes memory depositPubdata = _depositsPubdata[currentDepositIdx];
                 require(Utils.hashBytesToBytes20(depositPubdata) == priorityRequests[id].hashedPubData, "a");
@@ -114,16 +114,20 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
 
-    function approvedCutUpgradeNoticePeriod(address addr) internal {
+    /// @notice processing new approval of decrease upgrade notice period time to zero
+    /// @param addr address of the account that approved the reduction of the upgrade notice period to zero
+    /// NOTE: does NOT revert if the address is not a security council member or number of approvals is already sufficient
+    function approveCutUpgradeNoticePeriod(address addr) internal {
         address payable[SECURITY_COUNCIL_MEMBERS_NUMBER] memory SECURITY_COUNCIL_MEMBERS = [
             $(SECURITY_COUNCIL_MEMBERS)
         ];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
             if (SECURITY_COUNCIL_MEMBERS[id] == addr && !securityCouncilApproves[id]) {
                 securityCouncilApproves[id] = true;
-                numberOfApprovalsFromSecurityCouncil++;
+                numberOfApprovalsFromSecurityCouncil += 1;
+                emit ApproveCutUpgradeNoticePeriod(addr);
 
-                if (numberOfApprovalsFromSecurityCouncil == SECURITY_COUNCIL_THRESHOLD) {
+                if (numberOfApprovalsFromSecurityCouncil >= SECURITY_COUNCIL_THRESHOLD) {
                     if (approvedUpgradeNoticePeriod > 0) {
                         approvedUpgradeNoticePeriod = 0;
                         emit NoticePeriodChange(approvedUpgradeNoticePeriod);
@@ -135,23 +139,23 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         }
     }
 
-    function cutUpgradeNoticePeriod() external {
-        requireActive();
-        require(upgradeStartTimestamp != 0);
+    /// @notice approve to decrease upgrade notice period time to zero
+    /// NOTE: сan only be called after the start of the upgrade
+    function cutUpgradeNoticePeriod(bytes32 targetsHash) external {
+        require(upgradeStartTimestamp != 0, "p1");
+        require(getUpgradeTargetsHash() == targetsHash, "p3"); // given targets are not in the active upgrade
 
-        approvedCutUpgradeNoticePeriod(msg.sender);
+        approveCutUpgradeNoticePeriod(msg.sender);
     }
 
+    /// @notice approve to decrease upgrade notice period time to zero by signatures
+    /// NOTE: Can accept many signatures at a time, thus it is possible
+    /// to completely cut the upgrade notice period in one transaction
     function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
-        requireActive();
-        require(upgradeStartTimestamp != 0);
+        require(upgradeStartTimestamp != 0, "p2");
 
-        address gatekeeper = 0x38A43F4330f24fe920F943409709fc9A6084C939;
-        (, bytes memory newTarget0) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 0));
-        (, bytes memory newTarget1) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 1));
-        (, bytes memory newTarget2) = gatekeeper.call(abi.encodeWithSignature("nextTargets(uint256)", 2));
-
-        bytes32 targetsHash = keccak256(abi.encodePacked(newTarget0, newTarget1, newTarget2));
+        bytes32 targetsHash = getUpgradeTargetsHash();
+        // The Message includes a hash of the addresses of the contracts to which the upgrade will take place to prevent reuse signature.
         bytes32 messageHash = keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n110",
@@ -162,8 +166,25 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
         for (uint256 i = 0; i < signatures.length; ++i) {
             address recoveredAddress = Utils.recoverAddressFromEthSignature(signatures[i], messageHash);
-            approvedCutUpgradeNoticePeriod(recoveredAddress);
+            require(recoveredAddress != address(0x00), "p4"); // invalid signature
+            approveCutUpgradeNoticePeriod(recoveredAddress);
         }
+    }
+
+    /// @return hash of the concatenation of targets for which there is an upgrade
+    /// NOTE: revert if upgrade is not active at this moment
+    function getUpgradeTargetsHash() internal returns (bytes32) {
+        // Get the addresses of contracts that are being prepared for the upgrade.
+        address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
+        (, bytes memory newTarget0) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 0));
+        (, bytes memory newTarget1) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 1));
+        (, bytes memory newTarget2) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 2));
+
+        address newTargetAddress0 = abi.decode(newTarget0, (address));
+        address newTargetAddress1 = abi.decode(newTarget1, (address));
+        address newTargetAddress2 = abi.decode(newTarget2, (address));
+
+        return keccak256(abi.encodePacked(newTargetAddress0, newTargetAddress1, newTargetAddress2));
     }
 
     /// @notice Set data for changing pubkey hash using onchain authorization.
@@ -192,7 +213,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Reverts unverified blocks
-    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external {
+    function revertBlocks(StoredBlockInfo[] calldata _blocksToRevert) external {
         requireActive();
 
         governance.requireActiveValidator(msg.sender);

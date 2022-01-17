@@ -2,9 +2,9 @@ import { expect, use } from 'chai';
 import { solidity } from 'ethereum-waffle';
 import { BigNumber, BigNumberish, ethers, Signer } from 'ethers';
 const { getCallRevertReason } = require('./common');
-import { ZkSyncNFTFactory } from '../../typechain/ZkSyncNFTFactory';
-import { ZkSyncNFTFactoryFactory } from '../../typechain/ZkSyncNFTFactoryFactory';
-import { ZkSyncNFTFactoryUnitTest, ZkSyncNFTFactoryUnitTestFactory } from '../../typechain';
+import { ZkSyncNFTFactory } from '../typechain/ZkSyncNFTFactory';
+import { ZkSyncNFTFactoryFactory } from '../typechain/ZkSyncNFTFactoryFactory';
+import { ZkSyncNFTFactoryUnitTest, ZkSyncNFTFactoryUnitTestFactory } from '../typechain';
 
 import * as hardhat from 'hardhat';
 

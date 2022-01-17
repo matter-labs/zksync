@@ -2,21 +2,26 @@ import { Contract, ethers, constants, BigNumber } from 'ethers';
 import { keccak256, parseEther } from 'ethers/lib/utils';
 import { ETHProxy } from 'zksync';
 import { Address, TokenAddress } from 'zksync/build/types';
-import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
+import { Deployer, readContractCode, readProductionContracts } from '../src.ts/deploy';
 
 const hardhat = require('hardhat');
 const { simpleEncode } = require('ethereumjs-abi');
 const { expect } = require('chai');
-const { getCallRevertReason, IERC20_INTERFACE, DEFAULT_REVERT_REASON } = require('./common');
+const { getCallRevertReason, IERC20_INTERFACE } = require('./common');
 import * as zksync from 'zksync';
 import {
     ZkSync,
+    TestnetERC20Token,
+    DummyERC20NoTransferReturnValue,
+    DummyERC20NoTransferReturnValueFactory,
+    DummyERC20BytesTransferReturnValue,
+    DummyERC20BytesTransferReturnValueFactory,
     ZkSyncProcessOpUnitTest,
     ZkSyncProcessOpUnitTestFactory,
     ZKSyncSignatureUnitTest,
     ZKSyncSignatureUnitTestFactory,
     ZkSyncWithdrawalUnitTestFactory
-} from '../../typechain';
+} from '../typechain';
 
 const TEST_PRIORITY_EXPIRATION = 101;
 const CHUNK_SIZE = 10;
@@ -281,15 +286,38 @@ describe('zkSync withdraw unit tests', function () {
     this.timeout(50000);
 
     let zksyncContract: ZkSync;
-    let tokenContract;
+    let tokenContract: TestnetERC20Token;
     let incorrectTokenContract;
-    let ethProxy;
+    let ethProxy: ETHProxy;
+    let EOA_Address: string;
+    let tokenNoTransferReturnValue: DummyERC20NoTransferReturnValue;
+    let tokenBytesTransferReturnValue: DummyERC20BytesTransferReturnValue;
     before(async () => {
         [wallet] = await hardhat.ethers.getSigners();
+        EOA_Address = wallet.address;
+
         const contracts = readProductionContracts();
         contracts.zkSync = readContractCode('dev-contracts/ZkSyncWithdrawalUnitTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
         await deployer.deployAll({ gasLimit: 6500000 });
+
+        const tokenNoTransferReturnValueFactory = await hardhat.ethers.getContractFactory(
+            'DummyERC20NoTransferReturnValue'
+        );
+        const tokenNoTransferReturnValueContract = await tokenNoTransferReturnValueFactory.deploy();
+        tokenNoTransferReturnValue = DummyERC20NoTransferReturnValueFactory.connect(
+            tokenNoTransferReturnValueContract.address,
+            tokenNoTransferReturnValueContract.signer
+        );
+
+        const tokenBytesTransferReturnValueFactory = await hardhat.ethers.getContractFactory(
+            'DummyERC20BytesTransferReturnValue'
+        );
+        const tokenBytesTransferReturnValueContract = await tokenBytesTransferReturnValueFactory.deploy('0xDEADBEEF');
+        tokenBytesTransferReturnValue = DummyERC20BytesTransferReturnValueFactory.connect(
+            tokenBytesTransferReturnValueContract.address,
+            tokenBytesTransferReturnValueContract.signer
+        );
 
         zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
@@ -299,6 +327,9 @@ describe('zkSync withdraw unit tests', function () {
 
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
+        await govContract.addToken(EOA_Address);
+        await govContract.addToken(tokenNoTransferReturnValue.address);
+        await govContract.addToken(tokenBytesTransferReturnValue.address);
 
         ethProxy = new ETHProxy(wallet.provider, {
             mainContract: zksyncContract.address,
@@ -323,13 +354,17 @@ describe('zkSync withdraw unit tests', function () {
             await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount, { gasLimit: 300000 });
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
+        // minimum amount between pending balance and requested amount
+        const withdrawnAmount = amount.lt(contractBalanceBefore) ? amount : contractBalanceBefore;
 
         const expectedBalance =
-            token == constants.AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
+            token == constants.AddressZero
+                ? balanceBefore.add(withdrawnAmount).sub(gasFee)
+                : balanceBefore.add(withdrawnAmount);
         expect(balanceAfter.toString(), 'withdraw account balance mismatch').eq(expectedBalance.toString());
 
         const contractBalanceAfter = BigNumber.from(await zksyncContract.getPendingBalance(ethWallet.address, token));
-        const expectedContractBalance = contractBalanceBefore.sub(amount);
+        const expectedContractBalance = contractBalanceBefore.sub(withdrawnAmount);
         expect(contractBalanceAfter.toString(), 'withdraw contract balance mismatch').eq(
             expectedContractBalance.toString()
         );
@@ -366,10 +401,8 @@ describe('zkSync withdraw unit tests', function () {
         await sendETH.wait();
 
         await zksyncContract.setBalanceToWithdraw(wallet.address, 0, withdrawAmount);
-        const { revertReason } = await getCallRevertReason(
-            async () => await performWithdraw(wallet, constants.AddressZero, 0, withdrawAmount.add(1))
-        );
-        expect(revertReason, 'wrong revert reason').eq('aa');
+        // shouldn't revert
+        await performWithdraw(wallet, constants.AddressZero, 0, withdrawAmount.add(1));
     });
 
     it('Withdraw ERC20 success', async () => {
@@ -399,15 +432,10 @@ describe('zkSync withdraw unit tests', function () {
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
         const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
-        try {
-            const { revertReason } = await getCallRevertReason(
-                async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
-            );
-            expect(revertReason).to.not.eq(DEFAULT_REVERT_REASON);
-        } catch (err) {}
+        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1));
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
 
-        expect(onchainBalAfter).eq(onchainBalBefore);
+        expect(onchainBalAfter).eq(onchainBalBefore.add(withdrawAmount));
     });
 
     it('Withdraw ERC20 unsupported token', async () => {
@@ -418,6 +446,30 @@ describe('zkSync withdraw unit tests', function () {
             async () => await performWithdraw(wallet, incorrectTokenContract.address, 1, withdrawAmount.add(1))
         );
         expect(revertReason, 'wrong revert reason').eq('1i');
+    });
+
+    it('Withdraw token with empty return value', async () => {
+        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
+        await zksyncContract.withdrawOrStoreExternal(3, EOA_Address, 1);
+        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
+        expect(balanceAfter.eq(balanceBefore));
+    });
+
+    it('Should save pending balance for token without bytecode', async () => {
+        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, EOA_Address);
+        await zksyncContract.withdrawOrStoreExternal(2, EOA_Address, 1);
+        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, EOA_Address);
+        expect(balanceAfter.eq(balanceBefore.add(1)));
+    });
+
+    it('Should save pending balance for token with incorrect return value', async () => {
+        const balanceBefore = await zksyncContract.getPendingBalance(
+            EOA_Address,
+            tokenBytesTransferReturnValue.address
+        );
+        await zksyncContract.withdrawOrStoreExternal(4, EOA_Address, 1);
+        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenBytesTransferReturnValue.address);
+        expect(balanceAfter.eq(balanceBefore.add(1)));
     });
 });
 

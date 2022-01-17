@@ -16,6 +16,7 @@ GENESIS_ROOT="0x2d5ab622df708ab44944bb02377be85b6f27812e9ae520734873b7a193898ba4
 LISTING_GOVERNANCE="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
 NFT_FACTORY_ADDR=""
 ADDITIONAL_ZKSYNC_ADDR="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"
+CREATE2_FACTORY_ADDR=""
 # The initial version of the deployed zkSync contract.
 # Data restore uses this variable for tracking contract updates and
 # setting correct available block chunk sizes.

@@ -2,8 +2,7 @@
 pragma solidity ^0.7.0;
 
 /**
- * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
- * the optional functions; to access them see {ERC20Detailed}.
+ * @dev Interface of the ERC20 standard as defined in the EIP.
  */
 interface IERC20 {
     /**
@@ -19,11 +18,9 @@ interface IERC20 {
     /**
      * @dev Moves `amount` tokens from the caller's account to `recipient`.
      *
-     * Returns a boolean value indicating whether the operation succeeded.
-     *
      * Emits a {Transfer} event.
      */
-    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external;
 
     /**
      * @dev Returns the remaining number of tokens that `spender` will be
@@ -55,15 +52,13 @@ interface IERC20 {
      * allowance mechanism. `amount` is then deducted from the caller's
      * allowance.
      *
-     * Returns a boolean value indicating whether the operation succeeded.
-     *
      * Emits a {Transfer} event.
      */
     function transferFrom(
         address sender,
         address recipient,
         uint256 amount
-    ) external returns (bool);
+    ) external;
 
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
@@ -78,4 +73,36 @@ interface IERC20 {
      * a call to {approve}. `value` is the new allowance.
      */
     event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+/// @dev Interface of the ERC20 standard as defined in the EIP.
+/// 1. Implements only `transfer` and `transferFrom` methods
+/// 2. These methods return a boolean value which indicates success of the transaction
+/// Note: It is assumed that the interface applies to those `ERC20` tokens whose code exactly matches the standard.
+/// Note: Used to perform transfers for tokens that explicitly return a boolean value
+/// (if the token returns any other data or does not return at all, then the function call will reverted)
+interface ITrustedTransfarableERC20 {
+    /**
+     * @dev Moves `amount` tokens from the caller's account to `recipient`.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     *
+     * Emits a {Transfer} event.
+     */
+    function transfer(address recipient, uint256 amount) external returns (bool);
+
+    /**
+     * @dev Moves `amount` tokens from `sender` to `recipient` using the
+     * allowance mechanism. `amount` is then deducted from the caller's
+     * allowance.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     *
+     * Emits a {Transfer} event.
+     */
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 }
