@@ -285,36 +285,11 @@ impl FeeTickerInfo for TickerInfo {
 }
 
 impl TickerInfo {
-    // Version of `update_stored_value` which returns a `Result` for convenient error handling.
-    async fn _update_stored_value(
-        &self,
-        token_id: TokenId,
-        price: TokenPrice,
-    ) -> Result<(), anyhow::Error> {
-        let mut storage = self
-            .db
-            .access_storage()
-            .await
-            .map_err(|e| format_err!("Can't access storage: {}", e))?;
-
-        storage
-            .tokens_schema()
-            .update_historical_ticker_price(token_id, price)
-            .await
-            .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e))?;
-
-        Ok(())
-    }
-
     async fn update_stored_value(&self, token_id: TokenId, price: TokenPrice) {
         self.price_cache
             .write()
             .await
             .insert(token_id, TokenCacheEntry::new(price.clone()));
-        self._update_stored_value(token_id, price)
-            .await
-            .map_err(|e| vlog::warn!("Failed to update historical ticker price: {}", e))
-            .unwrap_or_default();
     }
 
     async fn get_stored_value(&self, token_id: TokenId) -> Option<TokenPrice> {
