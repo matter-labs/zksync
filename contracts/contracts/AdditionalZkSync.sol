@@ -74,7 +74,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         if (_tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
             bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
-            emit WithdrawalPending(uint16(_tokenId), _amount);
+            emit WithdrawalPending(uint16(_tokenId), _owner, _amount);
         } else {
             require(_amount != 0, "Z"); // Unsupported nft amount
             Operations.WithdrawNFT memory withdrawNftOp = Operations.WithdrawNFT(
