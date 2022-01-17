@@ -1,0 +1,21 @@
+name: Publish NPM packages
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'ref or tag to publish NPM packages from'
+        default: ''
+        required: false
+
+jobs:
+  publish-zksync:
+    name: Publish zksync.js
+    uses: matter-labs/zksync-dev/.github/workflows/npm.publish.yml@devops/publish-npm-zksync
+    with:
+      working-directory: sdk/zksync.js
+      build-command: |
+        npm install
+        npm run build
+      ref: ${{ github.event.inputs.ref }}
+    secrets:
+      notify-webhook: ${{ secrets.MATTERMOST_WEBHOOK }}
