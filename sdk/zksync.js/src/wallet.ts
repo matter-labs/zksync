@@ -83,7 +83,9 @@ export class Wallet {
         if (this.provider.network != undefined && this.ethSigner.provider != undefined) {
             const ethNetwork = await this.ethSigner.provider.getNetwork();
             if (l1ChainId(this.provider.network) !== ethNetwork.chainId) {
-                throw new Error("ETH network and ZkSync network doesn't matched");
+                throw new Error(
+                    `ETH network ${ethNetwork.name} and ZkSync network ${this.provider.network} don't match`
+                );
             }
         }
     }
