@@ -226,7 +226,7 @@ impl FeeTickerInfo for TickerInfo {
             .map_err(|e| vlog::warn!("Failed to get historical ticker price: {}", e));
 
         if let Ok(Some(historical_price)) = historical_price {
-            self.update_stored_value(token.id, historical_price.clone())
+            self.update_cached_value(token.id, historical_price.clone())
                 .await;
             metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "historical");
             return Ok(historical_price);
@@ -285,7 +285,7 @@ impl FeeTickerInfo for TickerInfo {
 }
 
 impl TickerInfo {
-    async fn update_stored_value(&self, token_id: TokenId, price: TokenPrice) {
+    async fn update_cached_value(&self, token_id: TokenId, price: TokenPrice) {
         self.price_cache
             .write()
             .await
