@@ -874,7 +874,7 @@ export class Wallet {
         return submitSignedTransaction(signedWithdrawTransaction, this.provider, withdraw.fastProcessing);
     }
 
-    async isCorrectSigningKeySet(): Promise<boolean> {
+    async isCorrespondingSigningKeySet(): Promise<boolean> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
         }
