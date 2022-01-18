@@ -32,7 +32,8 @@ import {
     WithdrawNFT,
     TokenRatio,
     WeiRatio,
-    Toggle2FARequest
+    Toggle2FARequest,
+    l1ChainId
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -78,6 +79,17 @@ export class Wallet {
         return this;
     }
 
+    async verifyNetworks() {
+        if (this.provider.network != undefined && this.ethSigner.provider != undefined) {
+            const ethNetwork = await this.ethSigner.provider.getNetwork();
+            if (l1ChainId(this.provider.network) !== ethNetwork.chainId) {
+                throw new Error(
+                    `ETH network ${ethNetwork.name} and ZkSync network ${this.provider.network} don't match`
+                );
+            }
+        }
+    }
+
     static async fromEthSigner(
         ethWallet: ethers.Signer,
         provider: SyncProvider,
@@ -104,6 +116,7 @@ export class Wallet {
         );
 
         wallet.connect(provider);
+        await wallet.verifyNetworks();
         return wallet;
     }
 
@@ -136,6 +149,7 @@ export class Wallet {
             ethSignerType
         );
         wallet.connect(provider);
+        await wallet.verifyNetworks();
         return wallet;
     }
 
