@@ -24,4 +24,9 @@ hex = "0.4"
 
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
-metrics = "0.17"
+metrics = { version = "0.17", optional = true }
+
+[features]
+default= ['with-metrics']
+with-metrics = ["metrics"]
+
