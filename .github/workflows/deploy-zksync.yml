@@ -151,12 +151,12 @@ jobs:
           state: ${{ fromJSON(env.OUTCOMES)[job.status] }}
           deployment_id: ${{ needs.setup.outputs.deployment_id }}
       -
-        if: failure() || cancelled()
-        name: Notify to Mattermost (on unsuccessful deploys)
+        if: failure()
+        name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         with:
           type: ${{ job.status }}
-          job_name: '*Deployment to "${{ needs.setup.outputs.environment }}" failed*'
+          job_name: '*Deployment to `${{ needs.setup.outputs.environment }}` did not succeed*'
           icon_emoji: octocat
-          channel: 'matterlabs-alerts'
+          channel: 'ci-notifications'
           url: ${{ secrets.MATTERMOST_WEBHOOK }}
