@@ -888,13 +888,22 @@ export class Wallet {
         return submitSignedTransaction(signedWithdrawTransaction, this.provider, withdraw.fastProcessing);
     }
 
-    async isSigningKeySet(): Promise<boolean> {
+    async isCorrespondingSigningKeySet(): Promise<boolean> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
         }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const signerPubKeyHash = await this.signer.pubKeyHash();
         return currentPubKeyHash === signerPubKeyHash;
+    }
+
+    async isSigningKeySet(): Promise<boolean> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for current pubkey calculation.');
+        }
+        const currentPubKeyHash = await this.getCurrentPubKeyHash();
+        const zeroPubKeyHash = 'sync:0000000000000000000000000000000000000000';
+        return zeroPubKeyHash !== currentPubKeyHash;
     }
 
     async getChangePubKey(changePubKey: {
