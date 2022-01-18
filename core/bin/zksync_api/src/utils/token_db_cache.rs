@@ -7,8 +7,9 @@ use zksync_storage::StorageProcessor;
 use zksync_types::tokens::TokenMarketVolume;
 use zksync_types::{Token, TokenId, TokenLike, NFT};
 
-// Make no more than (Number of tokens) queries per minute to database is a good enough result for updating names for tokens.
-const TOKEN_INVALIDATE_CACHE: Duration = Duration::from_secs(60);
+// Make no more than (Number of tokens) queries per 5 minutes to database is a good result
+// for updating names for tokens.
+const TOKEN_INVALIDATE_CACHE: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, Default)]
 pub struct TokenDBCache {
