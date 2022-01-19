@@ -2,7 +2,7 @@ use zksync_types::{AccountId, TokenId};
 
 use super::utils::*;
 
-/// Checks if withdrawal is processed correctly by the state_keeper
+/// Checks if withdrawal is processed correctly by the state_keeper.
 #[test]
 fn success() {
     let mut tester = StateKeeperTester::new(6, 1, 1);
@@ -29,7 +29,7 @@ fn success() {
     assert!(!pending_block.collected_fees.is_empty());
 }
 
-/// Checks if fast withdrawal makes fast processing required
+/// Checks if fast withdrawal makes fast processing required.
 #[test]
 fn fast_withdrawal() {
     let mut tester = StateKeeperTester::new(6, 1, 1);
@@ -50,7 +50,7 @@ fn fast_withdrawal() {
     assert!(pending_block.fast_processing_required);
 }
 
-/// Checks if withdrawal that will fail is processed correctly
+/// Checks if withdrawal that will fail is processed correctly.
 #[test]
 fn failure() {
     let mut tester = StateKeeperTester::new(6, 1, 1);
@@ -77,8 +77,7 @@ fn failure() {
     assert!(pending_block.collected_fees.is_empty());
 }
 
-/// Checks if processing withdrawal fails because of
-/// small number of chunks left in the block
+/// Checks if processing withdrawal fails because of small number of chunks left in the block.
 #[test]
 fn not_enough_chunks() {
     let mut tester = StateKeeperTester::new(1, 1, 1);

@@ -2,7 +2,7 @@ use zksync_types::TokenId;
 
 use super::utils::*;
 
-/// Checks if deposit is processed correctly by the state_keeper
+/// Checks if deposit is processed correctly by the state_keeper.
 #[test]
 fn success() {
     let mut tester = StateKeeperTester::new(8, 1, 1);
@@ -21,8 +21,7 @@ fn success() {
     assert_eq!(pending_block.unprocessed_priority_op_current, 1);
 }
 
-/// Checks if processing deposit fails because of
-/// small number of chunks left in the block
+/// Checks if processing deposit fails because of small number of chunks left in the block.
 #[test]
 fn not_enough_chunks() {
     let mut tester = StateKeeperTester::new(1, 1, 1);

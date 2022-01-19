@@ -7,8 +7,7 @@ use super::utils::*;
 use crate::mempool::ProposedBlock;
 
 /// Checks if processing withdrawal fails because the gas limit is reached.
-/// This sends 46 withdrawals (very inefficient, but all constants in
-/// GasCounter are hardcoded, so I see no way out)
+/// This sends 46 withdrawals (very inefficient, but all constants in GasCounter are hardcoded, so we can't do much here).
 #[test]
 fn gas_limit_reached() {
     let withdrawals_number = (TX_GAS_LIMIT - VerifyCost::base_cost().as_u64() * 130 / 100)
@@ -91,7 +90,7 @@ async fn gas_count_change() {
         .state_keeper
         .execute_proposed_block(proposed_block)
         .await;
-    // Check that gas count shouldn't change
+    // Check that gas count shouldn't change.
     assert_eq!(
         initial_gas_count,
         tester
@@ -108,7 +107,7 @@ async fn gas_count_change() {
     let result = tester.state_keeper.apply_tx(&third_transfer);
 
     assert!(result.is_included());
-    // Check that gas count should increase
+    // Check that gas count should increase.
     assert!(
         initial_gas_count
             < tester

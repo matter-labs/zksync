@@ -8,7 +8,7 @@ use super::utils::*;
 use crate::mempool::ProposedBlock;
 
 /// Checks if executing a proposed_block with just enough chunks is done correctly
-/// and checks if number of chunks left is correct after each operation
+/// and checks if number of chunks left is correct after each operation.
 #[tokio::test]
 async fn just_enough_chunks() {
     let mut tester = StateKeeperTester::new(8, 3, 3);
@@ -28,7 +28,7 @@ async fn just_enough_chunks() {
 
 /// Checks if executing a proposed_block is done correctly
 /// when two batches don`t fit into one block.
-/// Also, checks if number of chunks left is correct after each operation
+/// Also, checks if number of chunks left is correct after each operation.
 #[tokio::test]
 async fn chunks_to_fit_three_transfers_2_2_1() {
     let mut tester = StateKeeperTester::new(6, 3, 3);
@@ -57,7 +57,7 @@ async fn chunks_to_fit_three_transfers_2_2_1() {
 
 /// Checks if executing a proposed_block is done correctly
 /// when two single txs and one batch don`t fit into one block.
-/// Also, checks if number of chunks left is correct after each operation
+/// Also, checks if number of chunks left is correct after each operation.
 #[tokio::test]
 async fn chunks_to_fit_three_transfers_1_1_2_1() {
     let mut tester = StateKeeperTester::new(6, 3, 3);
@@ -90,7 +90,7 @@ async fn chunks_to_fit_three_transfers_1_1_2_1() {
         .await;
 }
 
-/// Checks if executing a small proposed_block is done correctly
+/// Checks if executing a small proposed_block is done correctly.
 #[tokio::test]
 async fn small() {
     let mut tester = StateKeeperTester::new(20, 3, 3);
@@ -132,7 +132,7 @@ async fn small() {
 
 /// Checks if executing a proposed_block is done correctly
 /// There are more chunks than one can fit in 1 block,
-/// so 1 block should get sealed in the process
+/// so 1 block should get sealed in the process.
 #[tokio::test]
 async fn few_chunks() {
     let mut tester = StateKeeperTester::new(12, 3, 3);
@@ -169,7 +169,7 @@ async fn few_chunks() {
 }
 
 /// Checks if executing a proposed_block is done correctly
-/// max_iterations == 0, so the block should get sealed, not stored
+/// max_iterations == 0, so the block should get sealed, not stored.
 #[tokio::test]
 async fn few_iterations() {
     let mut tester = StateKeeperTester::new(20, 0, 0);
@@ -323,7 +323,7 @@ async fn pending_block_updates() {
 
     // --- Phase 4: Successful tx in pending block, failed tx in update. ---
 
-    // Then send the block with the bad transaction only
+    // Then send the block with the bad transaction only.
     let bad_withdraw = create_account_and_withdrawal(
         &mut tester,
         TokenId(2),

@@ -7,7 +7,7 @@ use super::utils::*;
 use crate::state_keeper::utils::system_time_timestamp;
 
 /// Checks if block sealing is done correctly by sealing a block
-/// with 1 priority_op, 1 succeeded tx, 1 failed tx
+/// with 1 priority_op, 1 succeeded tx, 1 failed tx.
 #[tokio::test]
 async fn seal_pending_block() {
     let mut tester = StateKeeperTester::new(20, 3, 3);
