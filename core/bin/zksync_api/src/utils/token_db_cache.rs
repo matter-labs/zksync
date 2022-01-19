@@ -1,3 +1,4 @@
+use std::time::{Duration, Instant};
 use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
@@ -6,10 +7,13 @@ use zksync_storage::StorageProcessor;
 use zksync_types::tokens::TokenMarketVolume;
 use zksync_types::{Token, TokenId, TokenLike, NFT};
 
+// Make no more than (Number of tokens) queries per 5 minutes to database is a good result
+// for updating names for tokens.
+const TOKEN_INVALIDATE_CACHE: Duration = Duration::from_secs(5 * 60);
+
 #[derive(Debug, Clone, Default)]
 pub struct TokenDBCache {
-    // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-97)
-    cache: Arc<RwLock<HashMap<TokenLike, Token>>>,
+    cache: Arc<RwLock<HashMap<TokenLike, (Token, Instant)>>>,
     nft_tokens: Arc<RwLock<HashMap<TokenId, NFT>>>,
 }
 
@@ -23,17 +27,12 @@ impl TokenDBCache {
         storage: &mut StorageProcessor<'_>,
         token_query: impl Into<TokenLike>,
     ) -> anyhow::Result<Option<Token>> {
-        self.get_token_impl(storage, token_query.into()).await
-    }
-
-    async fn get_token_impl(
-        &self,
-        storage: &mut StorageProcessor<'_>,
-        token_query: TokenLike,
-    ) -> anyhow::Result<Option<Token>> {
+        let token_query = token_query.into();
         // Just return token from cache.
-        if let Some(token) = self.cache.read().await.get(&token_query) {
-            return Ok(Some(token.clone()));
+        if let Some((token, update_time)) = self.cache.read().await.get(&token_query) {
+            if update_time.elapsed() < TOKEN_INVALIDATE_CACHE {
+                return Ok(Some(token.clone()));
+            }
         }
         // Tries to fetch token from the underlying database.
         let token = {
@@ -44,7 +43,10 @@ impl TokenDBCache {
         };
         // Stores received token into the local cache.
         if let Some(token) = &token {
-            self.cache.write().await.insert(token_query, token.clone());
+            self.cache
+                .write()
+                .await
+                .insert(token_query, (token.clone(), Instant::now()));
         }
 
         Ok(token)

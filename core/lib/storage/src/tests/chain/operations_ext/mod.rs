@@ -625,6 +625,24 @@ async fn get_tx_created_at_and_block_number(mut storage: StorageProcessor<'_>) -
     assert!(result.is_some());
     assert_eq!(result.unwrap().1, BlockNumber(1));
 
+    // Get created_at for priority op for correct block
+    let tx_hash = setup.get_tx_hash(0, 0);
+    let result = storage
+        .chain()
+        .operations_ext_schema()
+        .get_tx_created_at_for_block_number(tx_hash, BlockNumber(1))
+        .await?;
+    assert!(result.is_some());
+
+    // Get created_at for priority op for wrong block
+    let tx_hash = setup.get_tx_hash(0, 0);
+    let result = storage
+        .chain()
+        .operations_ext_schema()
+        .get_tx_created_at_for_block_number(tx_hash, BlockNumber(10))
+        .await?;
+    assert!(result.is_none());
+
     // Try to get unexisting tx
     setup.add_block(2);
     let tx_hash = setup.get_tx_hash(1, 0);
