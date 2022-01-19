@@ -189,6 +189,12 @@ export class Deployer {
 
     public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
         let genesis_root = process.env.CONTRACTS_GENESIS_ROOT;
+
+        if (!genesis_root) {
+            console.log(`\nCONTRACTS_GENESIS_ROOT env variable is not present. Forgot to reset env?\n`);
+            process.exit(1);
+        }
+
         const deployFactoryContract = await deployContract(
             this.deployWallet,
             this.deployFactoryCode,

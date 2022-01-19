@@ -1,6 +1,9 @@
 // Built-in deps
+use std::fmt;
 use std::sync::Arc;
-use std::{fmt, time::Instant};
+
+#[cfg(feature = "with-metrics")]
+use std::time::Instant;
 
 // External uses
 use web3::{
@@ -90,6 +93,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     }
 
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let count = self
             .inner
@@ -97,11 +101,13 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             .eth()
             .transaction_count(self.inner.sender_account, Some(BlockNumber::Pending))
             .await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.pending_nonce", start.elapsed());
         Ok(count)
     }
 
     pub async fn current_nonce(&self) -> Result<U256, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let nonce = self
             .inner
@@ -109,6 +115,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             .eth()
             .transaction_count(self.inner.sender_account, Some(BlockNumber::Latest))
             .await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.current_nonce", start.elapsed());
         Ok(nonce)
     }
@@ -117,25 +124,31 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         &self,
         id: BlockId,
     ) -> Result<Option<web3::types::Block<H256>>, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let block = self.inner.web3.eth().block(id).await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.block", start.elapsed());
         Ok(block)
     }
 
     pub async fn block_number(&self) -> Result<U64, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let block_number = self.inner.web3.eth().block_number().await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.block_number", start.elapsed());
         Ok(block_number)
     }
 
     pub async fn get_gas_price(&self) -> Result<U256, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let mut network_gas_price = self.inner.web3.eth().gas_price().await?;
         let percent_gas_price_factor =
             U256::from((self.inner.gas_price_factor * 100.0).round() as u64);
         network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.get_gas_price", start.elapsed());
         Ok(network_gas_price)
     }
@@ -155,9 +168,10 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         contract_addr: H160,
         options: Options,
     ) -> Result<SignedCallResult, anyhow::Error> {
-        // fetch current gas_price
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
 
+        // fetch current gas_price
         let gas_price = match options.gas_price {
             Some(gas_price) => gas_price,
             None => self.get_gas_price().await?,
@@ -202,6 +216,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             .sha3(Bytes(signed_tx.clone()))
             .await?;
 
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!(
             "eth_client.direct.sign_prepared_tx_for_addr",
             start.elapsed()
@@ -215,6 +230,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     }
 
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let tx = self
             .inner
@@ -222,6 +238,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             .eth()
             .send_raw_transaction(Bytes(tx))
             .await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.send_raw_tx", start.elapsed());
         Ok(tx)
     }
@@ -230,8 +247,10 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         &self,
         tx_hash: H256,
     ) -> Result<Option<TransactionReceipt>, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let receipt = self.inner.web3.eth().transaction_receipt(tx_hash).await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.tx_receipt", start.elapsed());
         Ok(receipt)
     }
@@ -240,6 +259,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         &self,
         tx_hash: H256,
     ) -> Result<Option<FailureInfo>, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let transaction = self.inner.web3.eth().transaction(tx_hash.into()).await?;
         let receipt = self.inner.web3.eth().transaction_receipt(tx_hash).await?;
@@ -265,23 +285,35 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                     .web3
                     .eth()
                     .call(call_request, receipt.block_number.map(Into::into))
-                    .await?;
-                let revert_code = hex::encode(&encoded_revert_reason.0);
-                let revert_reason = if encoded_revert_reason.0.len() >= 4 {
-                    let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
-
-                    ethabi::decode(
-                        &[ethabi::ParamType::String],
-                        encoded_string_without_function_hash,
-                    )?
-                    .into_iter()
-                    .next()
-                    .unwrap()
-                    .to_string()
+                    .await;
+                let (revert_code, revert_reason) = if let Err(web3::Error::Rpc(e)) =
+                    encoded_revert_reason
+                {
+                    let revert_code = e.message.clone();
+                    let mut revert_reason = e.message;
+                    revert_reason.replace_range(0..20, "");
+                    (revert_code, revert_reason)
                 } else {
-                    "unknown".to_string()
+                    let encoded_revert_reason = encoded_revert_reason?;
+                    let revert_code = hex::encode(&encoded_revert_reason.0);
+                    let revert_reason = if encoded_revert_reason.0.len() >= 4 {
+                        let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
+
+                        ethabi::decode(
+                            &[ethabi::ParamType::String],
+                            encoded_string_without_function_hash,
+                        )?
+                        .into_iter()
+                        .next()
+                        .unwrap()
+                        .to_string()
+                    } else {
+                        "unknown".to_string()
+                    };
+                    (revert_code, revert_reason)
                 };
 
+                #[cfg(feature = "with-metrics")]
                 metrics::histogram!("eth_client.direct.failure_reason", start.elapsed());
                 Ok(Some(FailureInfo {
                     revert_code,
@@ -295,8 +327,10 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     }
 
     pub async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let balance = self.inner.web3.eth().balance(address, None).await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.eth_balance", start.elapsed());
         Ok(balance)
     }
@@ -310,6 +344,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         token_address: Address,
         erc20_abi: ethabi::Contract,
     ) -> Result<U256, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let res = self
             .call_contract_function(
@@ -322,6 +357,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                 erc20_abi,
             )
             .await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.allowance", start.elapsed());
         Ok(res)
     }
@@ -369,9 +405,11 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         B: Into<Option<BlockId>>,
         P: Tokenize,
     {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let contract = Contract::new(self.inner.web3.eth(), token_address, erc20_abi);
         let res = contract.query(func, params, from, options, block).await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.call_contract_function", start.elapsed());
         Ok(res)
     }
@@ -381,6 +419,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         hash: H256,
         current_block: Option<u64>,
     ) -> anyhow::Result<Option<ExecutedTxStatus>> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
 
         let receipt = self.tx_receipt(hash).await?;
@@ -412,13 +451,16 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             }
             _ => Ok(None),
         };
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.get_tx_status", start.elapsed());
         Ok(res?)
     }
 
     pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {
+        #[cfg(feature = "with-metrics")]
         let start = Instant::now();
         let logs = self.inner.web3.eth().logs(filter).await?;
+        #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.logs", start.elapsed());
         Ok(logs)
     }
@@ -454,12 +496,16 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     }
 
     pub async fn get_tx(&self, hash: H256) -> Result<Option<Transaction>, anyhow::Error> {
+        #[cfg(feature = "with-metrics")]
+        let start = Instant::now();
         let tx = self
             .inner
             .web3
             .eth()
             .transaction(TransactionId::Hash(hash))
             .await?;
+        #[cfg(feature = "with-metrics")]
+        metrics::histogram!("eth_client.direct.get_tx", start.elapsed());
         Ok(tx)
     }
 }

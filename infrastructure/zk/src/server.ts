@@ -10,7 +10,7 @@ export async function core() {
     prepareForcedExitRequestAccount();
 
     await utils.spawn(
-        'cargo run --bin zksync_server --release -- --components=eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner'
+        'cargo run --bin zksync_server --release -- --components=eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner,fetchers'
     );
 }
 

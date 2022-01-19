@@ -12,17 +12,16 @@ use zksync_api_types::{
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
-    block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
+    block::{Block, BlockMetadata, ExecutedOperations, IncompleteBlock, PendingBlock},
     event::block::BlockStatus,
     AccountId, BlockNumber, Fr, ZkSyncOp, H256, U256,
 };
 // Local imports
 use self::records::{
     AccountTreeCache, BlockTransactionItem, StorageBlock, StorageBlockDetails,
-    StorageBlockMetadata, StoragePendingBlock, TransactionItem,
+    StorageBlockMetadata, StoragePendingBlock, StorageRootHash, TransactionItem,
 };
 use crate::{
-    chain::account::records::EthAccountType,
     chain::operations::{
         records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
@@ -30,6 +29,7 @@ use crate::{
         },
         OperationsSchema,
     },
+    chain::{account::records::EthAccountType, block::records::StorageIncompleteBlock},
     QueryResult, StorageProcessor,
 };
 
@@ -630,6 +630,24 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
+    /// Returns the number of existing incomplete block.
+    /// Returns `None` if there are no incomplte blocks in the database.
+    ///
+    /// Note: Used only for testing.
+    #[cfg(test)]
+    pub(crate) async fn get_last_incomplete_block_number(
+        &mut self,
+    ) -> QueryResult<Option<BlockNumber>> {
+        let start = Instant::now();
+        let result = sqlx::query!("SELECT max(number) FROM incomplete_blocks")
+            .fetch_one(self.0.conn())
+            .await?
+            .max
+            .map(|block| BlockNumber(block as u32));
+        metrics::histogram!("sql.chain.block.get_last_incomplete_block", start.elapsed());
+        Ok(result)
+    }
+
     /// Returns the number of last block which commit is confirmed on Ethereum.
     pub async fn get_last_committed_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
@@ -658,6 +676,22 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     /// Returns the number of last block for which proof has been confirmed on Ethereum.
+    pub async fn get_last_proven_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
+            .get_last_block_by_aggregated_action(
+                AggregatedActionType::PublishProofBlocksOnchain,
+                Some(true),
+            )
+            .await;
+        metrics::histogram!(
+            "sql.chain.block.get_last_proven_confirmed_block",
+            start.elapsed()
+        );
+        result
+    }
+
+    /// Returns the number of last block for which executed operations has been confirmed on Ethereum .
     /// Essentially, it's number of last block for which updates were applied to the chain state.
     pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
@@ -679,6 +713,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .get_last_verified_confirmed_block()
             .await?;
         Ok(block_number <= last_finalized_block)
+    }
+
+    pub async fn pending_block_chunks_left(&mut self) -> QueryResult<Option<usize>> {
+        let start = Instant::now();
+        let maybe_block_chunks = sqlx::query!(
+            "SELECT chunks_left FROM pending_block
+            LIMIT 1"
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.chain.block.pending_block_chunks_left", start.elapsed());
+
+        Ok(maybe_block_chunks.map(|val| val.chunks_left as usize))
     }
 
     /// Helper method for retrieving pending blocks from the database.
@@ -727,8 +774,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             }
         }
 
-        let previous_block_root_hash = H256::from_slice(&block.previous_root_hash);
-
         let result = PendingBlock {
             number: BlockNumber(block.number as u32),
             chunks_left: block.chunks_left as usize,
@@ -736,7 +781,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             pending_block_iteration: block.pending_block_iteration as usize,
             success_operations,
             failed_txs,
-            previous_block_root_hash,
             timestamp: block.timestamp.unwrap_or_else(|| {
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -770,19 +814,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             chunks_left: pending_block.chunks_left as i64,
             unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
             pending_block_iteration: pending_block.pending_block_iteration as i64,
-            previous_root_hash: pending_block.previous_block_root_hash.as_bytes().to_vec(),
+            previous_root_hash: Vec::new(), // Not used anywhere, left here for the backward compatibility.
             timestamp: Some(pending_block.timestamp as i64),
         };
 
         // Store the pending block header.
         sqlx::query!("
-            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, timestamp)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (number)
             DO UPDATE
-              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5, timestamp = $6
+              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, timestamp = $5
             ",
-            storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration, storage_block.previous_root_hash,
+            storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration,
             storage_block.timestamp
         ).execute(transaction.conn())
         .await?;
@@ -841,47 +885,26 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(count)
     }
 
-    pub async fn save_block(&mut self, block: Block) -> QueryResult<()> {
+    /// Stores completed block into the database.
+    ///
+    /// This method assumes that `Block` was created from the corresponding `IncompleteBlock`
+    /// object from the DB, and doesn't do any checks regarding that.
+    pub async fn finish_incomplete_block(&mut self, block: Block) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
-        let number = i64::from(*block.block_number);
-        let root_hash = block.new_root_hash.to_bytes();
-        let fee_account_id = i64::from(*block.fee_account);
-        let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
-        let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
-        let block_size = block.block_chunks_size as i64;
-        let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
-        let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
-        let commitment = block.block_commitment.as_bytes().to_vec();
-        let timestamp = Some(block.timestamp as i64);
-
-        BlockSchema(&mut transaction)
-            .save_block_transactions(block.block_number, block.block_transactions)
-            .await?;
-
         let new_block = StorageBlock {
-            number,
-            root_hash,
-            fee_account_id,
-            unprocessed_prior_op_before,
-            unprocessed_prior_op_after,
-            block_size,
-            commit_gas_limit,
-            verify_gas_limit,
-            commitment,
-            timestamp,
+            number: i64::from(*block.block_number),
+            root_hash: block.new_root_hash.to_bytes(),
+            fee_account_id: i64::from(*block.fee_account),
+            unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
+            unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
+            block_size: block.block_chunks_size as i64,
+            commit_gas_limit: block.commit_gas_limit.as_u64() as i64,
+            verify_gas_limit: block.verify_gas_limit.as_u64() as i64,
+            commitment: block.block_commitment.as_bytes().to_vec(),
+            timestamp: Some(block.timestamp as i64),
         };
-
-        // Remove pending block (as it's now completed).
-        sqlx::query!(
-            "
-            DELETE FROM pending_block WHERE number = $1
-            ",
-            new_block.number
-        )
-        .execute(transaction.conn())
-        .await?;
 
         // Save new completed block.
         sqlx::query!("
@@ -894,10 +917,218 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         ).execute(transaction.conn())
         .await?;
 
+        // Remove incomplete block from which this block was created.
+        sqlx::query!(
+            "DELETE FROM incomplete_blocks WHERE number = $1",
+            new_block.number
+        )
+        .execute(transaction.conn())
+        .await?;
+
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.save_block", start.elapsed());
         Ok(())
+    }
+
+    /// Saves incomplete block to the database.
+    ///
+    /// This method **does not** save block transactions.
+    /// They are expected to be saved prior, during processing of previous pending blocks.
+    pub async fn save_incomplete_block(&mut self, block: IncompleteBlock) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let number = i64::from(*block.block_number);
+        let fee_account_id = i64::from(*block.fee_account);
+        let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
+        let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
+        let block_size = block.block_chunks_size as i64;
+        let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
+        let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
+        let timestamp = Some(block.timestamp as i64);
+
+        let new_block = StorageIncompleteBlock {
+            number,
+            fee_account_id,
+            unprocessed_prior_op_before,
+            unprocessed_prior_op_after,
+            block_size,
+            commit_gas_limit,
+            verify_gas_limit,
+            timestamp,
+        };
+
+        // Remove pending block, as it's now sealed.
+        // Note that the block is NOT completed yet: root hash calculation should still happen.
+        sqlx::query!(
+            "
+            DELETE FROM pending_block WHERE number = $1
+            ",
+            new_block.number
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        // Save this block.
+        sqlx::query!("
+            INSERT INTO incomplete_blocks (number, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit,  timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ",
+            new_block.number, new_block.fee_account_id, new_block.unprocessed_prior_op_before,
+            new_block.unprocessed_prior_op_after, new_block.block_size, new_block.commit_gas_limit, new_block.verify_gas_limit,
+            new_block.timestamp,
+        ).execute(transaction.conn())
+        .await?;
+
+        transaction.commit().await?;
+
+        metrics::histogram!("sql.chain.block.save_incomplete_block", start.elapsed());
+        Ok(())
+    }
+
+    /// This method saves block transactions, and then does both `save_incomplete_block`
+    /// and `save_block` for a `Block` object.
+    ///
+    /// It is an alternative for calling two mentioned methods separately that has several use cases:
+    /// - In some contexts, root hash for the block is known immediately (e.g. data restore).
+    /// - In most DB/API tests, the process of block sealing doesn't really matter: these tests check the behavior
+    ///   of blocks that are already stored in the DB, not *how* they are stored.
+    pub async fn save_full_block(&mut self, block: Block) -> anyhow::Result<()> {
+        let full_block = block.clone();
+        let incomplete_block = IncompleteBlock::new(
+            block.block_number,
+            block.fee_account,
+            block.block_transactions,
+            block.processed_priority_ops,
+            block.block_chunks_size,
+            block.commit_gas_limit,
+            block.verify_gas_limit,
+            block.timestamp,
+        );
+        let mut transaction = self.0.start_transaction().await?;
+
+        BlockSchema(&mut transaction)
+            .save_block_transactions(
+                full_block.block_number,
+                full_block.block_transactions.clone(),
+            )
+            .await?;
+        BlockSchema(&mut transaction)
+            .save_incomplete_block(incomplete_block)
+            .await?;
+        BlockSchema(&mut transaction)
+            .finish_incomplete_block(full_block)
+            .await?;
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
+    /// Returns the range of existing incomplete blocks.
+    ///
+    /// Returned range is *inclusive*, meaning that both returned blocks (if they were returned)
+    /// exist in the database, and represent minimum and maximum existing blocks correspondingly.
+    pub async fn incomplete_blocks_range(
+        &mut self,
+    ) -> QueryResult<Option<(BlockNumber, BlockNumber)>> {
+        let start = Instant::now();
+
+        let raw_numbers = sqlx::query!(
+            "
+                SELECT min(number), max(number)
+                FROM incomplete_blocks
+            ",
+        )
+        .fetch_one(self.0.conn())
+        .await?;
+
+        let block_numbers = match (raw_numbers.min, raw_numbers.max) {
+            (Some(min), Some(max)) => Some((BlockNumber(min as u32), BlockNumber(max as u32))),
+            (None, None) => None,
+            _ => {
+                panic!("Inconsistent results for min/max query: {:?}", raw_numbers);
+            }
+        };
+
+        metrics::histogram!("sql.chain.block.incomplete_blocks_range", start.elapsed());
+        Ok(block_numbers)
+    }
+
+    // Helper method for retrieving incomplete blocks from the database.
+    async fn get_storage_incomplete_block(
+        &mut self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<StorageIncompleteBlock>> {
+        let start = Instant::now();
+        let block = sqlx::query_as!(
+            StorageIncompleteBlock,
+            "SELECT * FROM incomplete_blocks WHERE number = $1",
+            i64::from(*block)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.block.get_storage_incomplete_block",
+            start.elapsed()
+        );
+
+        Ok(block)
+    }
+
+    /// Given the block number, attempts to retrieve data to complete it from the database.
+    /// Returns `None` if the block with provided number does not exist yet.
+    ///
+    /// Data to complete consists of `IncompleteBlock` object and the root hash of the previous block.
+    pub async fn get_data_to_complete_block(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<(Option<IncompleteBlock>, Option<Fr>)> {
+        let start = Instant::now();
+        // Load block header.
+        let stored_block =
+            if let Some(block) = self.get_storage_incomplete_block(block_number).await? {
+                block
+            } else {
+                return Ok((None, None));
+            };
+
+        // Load transactions for this block.
+        let block_transactions = self.get_block_executed_ops(block_number).await?;
+
+        // Return the obtained block in the expected format.
+        let block = Some(IncompleteBlock::new(
+            block_number,
+            AccountId(stored_block.fee_account_id as u32),
+            block_transactions,
+            (
+                stored_block.unprocessed_prior_op_before as u64,
+                stored_block.unprocessed_prior_op_after as u64,
+            ),
+            stored_block.block_size as usize,
+            U256::from(stored_block.commit_gas_limit as u64),
+            U256::from(stored_block.verify_gas_limit as u64),
+            stored_block.timestamp.unwrap_or_default() as u64,
+        ));
+
+        // Load previous block root hash.
+        let prev_block_number = block_number - 1;
+        let previous_root_hash = sqlx::query_as!(
+            StorageRootHash,
+            "SELECT root_hash FROM blocks WHERE number = $1",
+            i64::from(*prev_block_number)
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|entry| FeConvert::from_bytes(&entry.root_hash).expect("Unparsable root hash"));
+
+        metrics::histogram!(
+            "sql.chain.block.get_data_to_complete_block",
+            start.elapsed()
+        );
+
+        Ok((block, previous_root_hash))
     }
 
     pub async fn save_block_metadata(
@@ -1027,20 +1258,27 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub async fn save_genesis_block(&mut self, root_hash: Fr) -> QueryResult<()> {
-        let block = Block {
+        let mut transaction = self.0.start_transaction().await?;
+
+        let full_block = Block {
             block_number: BlockNumber(0),
-            new_root_hash: root_hash,
             fee_account: AccountId(0),
             block_transactions: Vec::new(),
             processed_priority_ops: (0, 0),
             block_chunks_size: 0,
             commit_gas_limit: 0u32.into(),
             verify_gas_limit: 0u32.into(),
-            block_commitment: H256::zero(),
             timestamp: 0,
+            new_root_hash: root_hash,
+            block_commitment: H256::zero(),
         };
 
-        Ok(self.save_block(block).await?)
+        BlockSchema(&mut transaction)
+            .save_full_block(full_block)
+            .await?;
+        transaction.commit().await?;
+
+        Ok(())
     }
 
     /// Retrieves both L1 and L2 operations stored in the block for the given pagination query
@@ -1248,17 +1486,36 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
+        // We should retrieve last committed block for which an aggregated operation was created.
+        // Events for blocks are created by `eth_sender` after sending transaction to L1, so until then there is
+        // no event and no need to create a `revert` one.
+        // If aggregated operation was created, but was not sent to L1, that's also not a problem: event schema
+        // ignores events for non-exist
+        //
+        // TODO (ZKS-856): `get_last_committed_block` returns the last block for which *an aggregated operation*
+        // is created. Currently, it seems that events are created by eth sender after confirming an L1 transaction.
+        // We need to check that if aggregated operation was created, but not sent or not confirmed, this will not
+        // result in extra events being created.
+        // Please, update the comment above after resolving this TODO to match the new logic.
         let last_committed_block = transaction
             .chain()
             .block_schema()
             .get_last_committed_block()
             .await?;
+
         for block_number in *last_block..=*last_committed_block {
             transaction
                 .event_schema()
                 .store_block_event(BlockNumber(block_number), BlockStatus::Reverted)
                 .await?;
         }
+
+        sqlx::query!(
+            "DELETE FROM incomplete_blocks WHERE number > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
 
         sqlx::query!("DELETE FROM blocks WHERE number > $1", *last_block as i64)
             .execute(transaction.conn())

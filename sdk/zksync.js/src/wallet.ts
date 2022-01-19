@@ -32,7 +32,8 @@ import {
     WithdrawNFT,
     TokenRatio,
     WeiRatio,
-    Toggle2FARequest
+    Toggle2FARequest,
+    l1ChainId
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -78,6 +79,17 @@ export class Wallet {
         return this;
     }
 
+    async verifyNetworks() {
+        if (this.provider.network != undefined && this.ethSigner.provider != undefined) {
+            const ethNetwork = await this.ethSigner.provider.getNetwork();
+            if (l1ChainId(this.provider.network) !== ethNetwork.chainId) {
+                throw new Error(
+                    `ETH network ${ethNetwork.name} and ZkSync network ${this.provider.network} don't match`
+                );
+            }
+        }
+    }
+
     static async fromEthSigner(
         ethWallet: ethers.Signer,
         provider: SyncProvider,
@@ -104,6 +116,7 @@ export class Wallet {
         );
 
         wallet.connect(provider);
+        await wallet.verifyNetworks();
         return wallet;
     }
 
@@ -136,6 +149,7 @@ export class Wallet {
             ethSignerType
         );
         wallet.connect(provider);
+        await wallet.verifyNetworks();
         return wallet;
     }
 
@@ -874,13 +888,22 @@ export class Wallet {
         return submitSignedTransaction(signedWithdrawTransaction, this.provider, withdraw.fastProcessing);
     }
 
-    async isSigningKeySet(): Promise<boolean> {
+    async isCorrespondingSigningKeySet(): Promise<boolean> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
         }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const signerPubKeyHash = await this.signer.pubKeyHash();
         return currentPubKeyHash === signerPubKeyHash;
+    }
+
+    async isSigningKeySet(): Promise<boolean> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for current pubkey calculation.');
+        }
+        const currentPubKeyHash = await this.getCurrentPubKeyHash();
+        const zeroPubKeyHash = 'sync:0000000000000000000000000000000000000000';
+        return zeroPubKeyHash !== currentPubKeyHash;
     }
 
     async getChangePubKey(changePubKey: {
@@ -1250,7 +1273,7 @@ export class Wallet {
 
     async getEthereumBalance(token: TokenLike): Promise<BigNumber> {
         try {
-            return getEthereumBalance(this.ethSigner.provider, this.provider, this.cachedAddress, token);
+            return await getEthereumBalance(this.ethSigner.provider, this.provider, this.cachedAddress, token);
         } catch (e) {
             this.modifyEthersError(e);
         }

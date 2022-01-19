@@ -1,5 +1,6 @@
+#[cfg(test)]
 use std::{collections::HashMap, sync::Arc};
-
+#[cfg(test)]
 use tokio::sync::Mutex;
 
 use zksync_storage::ConnectionPool;
@@ -10,6 +11,7 @@ use crate::utils::token_db_cache::TokenDBCache;
 #[derive(Debug, Clone)]
 pub(crate) enum TokenCacheWrapper {
     DB(TokenInDBCache),
+    #[cfg(test)]
     Memory(TokenInMemoryCache),
 }
 
@@ -20,7 +22,8 @@ pub(crate) struct TokenInDBCache {
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct TokenInMemoryCache {
+#[cfg(test)]
+pub struct TokenInMemoryCache {
     tokens: Arc<Mutex<HashMap<TokenLike, Token>>>,
     market: Arc<Mutex<HashMap<TokenId, TokenMarketVolume>>>,
 }
@@ -52,6 +55,7 @@ impl TokenInMemoryCache {
     }
 }
 
+#[cfg(test)]
 impl From<TokenInMemoryCache> for TokenCacheWrapper {
     fn from(cache: TokenInMemoryCache) -> Self {
         Self::Memory(cache)
@@ -73,6 +77,7 @@ impl TokenCacheWrapper {
                     .get_token(&mut cache.pool.access_storage().await?, token_like)
                     .await
             }
+            #[cfg(test)]
             Self::Memory(cache) => Ok(cache.tokens.lock().await.get(&token_like).cloned()),
         }
     }
@@ -89,6 +94,7 @@ impl TokenCacheWrapper {
                 )
                 .await
             }
+            #[cfg(test)]
             Self::Memory(cache) => Ok(cache.market.lock().await.get(&token_id).cloned()),
         }
     }
@@ -107,6 +113,7 @@ impl TokenCacheWrapper {
                 )
                 .await
             }
+            #[cfg(test)]
             Self::Memory(cache) => {
                 cache.market.lock().await.insert(token_id, market_volume);
                 Ok(())
@@ -118,6 +125,7 @@ impl TokenCacheWrapper {
             Self::DB(cache) => {
                 TokenDBCache::get_all_tokens(&mut cache.pool.access_storage().await?).await
             }
+            #[cfg(test)]
             Self::Memory(cache) => Ok(cache
                 .tokens
                 .lock()

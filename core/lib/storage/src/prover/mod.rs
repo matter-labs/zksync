@@ -70,14 +70,15 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
     pub async fn mark_stale_jobs_as_idle(&mut self) -> QueryResult<()> {
         let start = Instant::now();
-        sqlx::query!(
+        let result = sqlx::query!(
             "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')
-            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
+            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds' RETURNING id",
             ProverJobStatus::Idle.to_number(),
             ProverJobStatus::InProgress.to_number(),
         )
-        .execute(self.0.conn())
+        .fetch_all(self.0.conn())
         .await?;
+        metrics::counter!("stale_jobs", result.len() as u64);
         metrics::histogram!("sql", start.elapsed(), "prover" => "mark_stale_jobs_as_idle");
         Ok(())
     }

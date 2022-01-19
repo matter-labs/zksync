@@ -16,7 +16,7 @@ use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Address};
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 // Local uses
-use crate::fee_ticker::TickerRequest;
+use crate::fee_ticker::FeeTicker;
 use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
@@ -179,7 +179,7 @@ struct RpcSubApp {
 pub fn start_ws_server(
     db_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-    ticker_request_sender: mpsc::Sender<TickerRequest>,
+    ticker: FeeTicker,
     common_config: &CommonApiConfig,
     config: &JsonRpcConfig,
     miniblock_iteration_interval: Duration,
@@ -200,7 +200,7 @@ pub fn start_ws_server(
     let req_rpc_app = super::rpc_server::RpcApp::new(
         db_pool,
         sign_verify_request_sender,
-        ticker_request_sender,
+        ticker,
         common_config,
         private_url,
         confirmations_for_eth_event,
