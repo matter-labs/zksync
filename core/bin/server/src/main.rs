@@ -6,7 +6,7 @@ use structopt::StructOpt;
 
 use serde::{Deserialize, Serialize};
 
-use zksync_api::fee_ticker::{run_ticker_task, TickerRequest};
+use zksync_api::fee_ticker::{run_updaters, FeeTicker, TickerInfo};
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
@@ -42,6 +42,7 @@ pub enum Component {
     RpcWebSocketApi,
 
     // Core components
+    Fetchers,
     EthSender,
     Core,
     WitnessGenerator,
@@ -65,6 +66,7 @@ impl FromStr for Component {
             "witness-generator" => Ok(Component::WitnessGenerator),
             "forced-exit" => Ok(Component::ForcedExit),
             "prometheus" => Ok(Component::Prometheus),
+            "fetchers" => Ok(Component::Fetchers),
             "core" => Ok(Component::Core),
             "rejected-task-cleaner" => Ok(Component::RejectedTaskCleaner),
             other => Err(format!("{} is not a valid component name", other)),
@@ -88,6 +90,7 @@ impl Default for ComponentsToRun {
             Component::Prometheus,
             Component::Core,
             Component::RejectedTaskCleaner,
+            Component::Fetchers,
         ])
     }
 }
@@ -113,7 +116,7 @@ struct Opt {
     /// comma-separated list of components to launch
     #[structopt(
         long,
-        default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner"
+        default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner,fetchers"
     )]
     components: ComponentsToRun,
 }
@@ -159,6 +162,12 @@ async fn run_server(components: &ComponentsToRun) {
         ));
     }
 
+    if components.0.contains(&Component::Fetchers) {
+        // Run price fetchers
+        let mut price_tasks = run_price_updaters(connection_pool.clone());
+        tasks.append(&mut price_tasks);
+    }
+
     if components.0.iter().any(|c| {
         matches!(
             c,
@@ -178,10 +187,6 @@ async fn run_server(components: &ComponentsToRun) {
             tasks.push(task);
         }
 
-        // Run ticker
-        let (task, ticker_request_sender) = run_ticker(connection_pool.clone(), channel_size);
-        tasks.push(task);
-
         // Run signer
         let (sign_check_sender, sign_check_receiver) = mpsc::channel(channel_size);
         tasks.push(zksync_api::signature_checker::start_sign_checker(
@@ -193,12 +198,21 @@ async fn run_server(components: &ComponentsToRun) {
         let contracts_config = ContractsConfig::from_env();
         let common_config = CommonApiConfig::from_env();
         let chain_config = ChainConfig::from_env();
+        let ticker_info = Box::new(TickerInfo::new(connection_pool.clone()));
+        let fee_ticker_config = TickerConfig::from_env();
+
+        let ticker = FeeTicker::new_with_default_validator(
+            ticker_info,
+            fee_ticker_config,
+            chain_config.max_blocks_to_aggregate(),
+            connection_pool.clone(),
+        );
 
         if components.0.contains(&Component::RpcWebSocketApi) {
             tasks.push(zksync_api::api_server::rpc_subscriptions::start_ws_server(
                 connection_pool.clone(),
                 sign_check_sender.clone(),
-                ticker_request_sender.clone(),
+                ticker.clone(),
                 &common_config,
                 &JsonRpcConfig::from_env(),
                 chain_config.state_keeper.miniblock_iteration_interval(),
@@ -211,7 +225,7 @@ async fn run_server(components: &ComponentsToRun) {
             tasks.push(zksync_api::api_server::rpc_server::start_rpc_server(
                 connection_pool.clone(),
                 sign_check_sender.clone(),
-                ticker_request_sender.clone(),
+                ticker.clone(),
                 &JsonRpcConfig::from_env(),
                 &common_config,
                 private_config.url.clone(),
@@ -224,7 +238,7 @@ async fn run_server(components: &ComponentsToRun) {
                 connection_pool.clone(),
                 RestApiConfig::from_env().bind_addr(),
                 contracts_config.contract_addr,
-                ticker_request_sender,
+                ticker,
                 sign_check_sender,
                 private_config.url,
             );
@@ -330,21 +344,9 @@ pub fn run_eth_sender(connection_pool: ConnectionPool) -> JoinHandle<()> {
     zksync_eth_sender::run_eth_sender(connection_pool, eth_gateway, eth_sender_config)
 }
 
-pub fn run_ticker(
-    connection_pool: ConnectionPool,
-    channel_size: usize,
-) -> (JoinHandle<()>, mpsc::Sender<TickerRequest>) {
-    vlog::info!("Starting Ticker actors");
-    let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(channel_size);
-    let chain_config = ChainConfig::from_env();
+pub fn run_price_updaters(connection_pool: ConnectionPool) -> Vec<JoinHandle<()>> {
     let ticker_config = TickerConfig::from_env();
-    let task = run_ticker_task(
-        connection_pool,
-        ticker_request_receiver,
-        &ticker_config,
-        chain_config.max_blocks_to_aggregate(),
-    );
-    (task, ticker_request_sender)
+    run_updaters(connection_pool, &ticker_config)
 }
 
 pub fn create_eth_gateway() -> EthereumGateway {

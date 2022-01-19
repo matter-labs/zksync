@@ -142,6 +142,24 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         })
     }
 
+    /// Check the existence of an account by the address on the zksync network,
+    /// will return true if the account exists
+    pub async fn does_account_exist(&mut self, address: Address) -> QueryResult<bool> {
+        let start = Instant::now();
+
+        let result = sqlx::query!(
+            r#"
+                SELECT account_id 
+                FROM account_creates WHERE address = $1
+                "#,
+            address.as_bytes()
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.chain.account.does_account_exist", start.elapsed());
+        Ok(result.is_some())
+    }
+
     /// Obtains both committed and verified state for the account by its address.
     pub async fn account_state_by_address(
         &mut self,

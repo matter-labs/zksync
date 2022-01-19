@@ -715,6 +715,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(block_number <= last_finalized_block)
     }
 
+    pub async fn pending_block_chunks_left(&mut self) -> QueryResult<Option<usize>> {
+        let start = Instant::now();
+        let maybe_block_chunks = sqlx::query!(
+            "SELECT chunks_left FROM pending_block
+            LIMIT 1"
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.chain.block.pending_block_chunks_left", start.elapsed());
+
+        Ok(maybe_block_chunks.map(|val| val.chunks_left as usize))
+    }
+
     /// Helper method for retrieving pending blocks from the database.
     async fn load_storage_pending_block(&mut self) -> QueryResult<Option<StoragePendingBlock>> {
         let start = Instant::now();
@@ -801,6 +814,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             chunks_left: pending_block.chunks_left as i64,
             unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
             pending_block_iteration: pending_block.pending_block_iteration as i64,
+            previous_root_hash: Vec::new(), // Not used anywhere, left here for the backward compatibility.
             timestamp: Some(pending_block.timestamp as i64),
         };
 
@@ -1290,18 +1304,17 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 }
             }
         };
-        let created_at_and_block = transaction
+        let created_at = transaction
             .chain()
             .operations_ext_schema()
-            .get_tx_created_at_and_block_number(tx_hash)
+            .get_tx_created_at_for_block_number(tx_hash, query.from.block_number)
             .await?;
-        let block_txs = if let Some((time_from, block_number)) = created_at_and_block {
-            if block_number == query.from.block_number {
-                let raw_txs: Vec<TransactionItem> = match query.direction {
-                    PaginationDirection::Newer => {
-                        sqlx::query_as!(
-                            TransactionItem,
-                            r#"
+        let block_txs = if let Some(time_from) = created_at {
+            let raw_txs: Vec<TransactionItem> = match query.direction {
+                PaginationDirection::Newer => {
+                    sqlx::query_as!(
+                        TransactionItem,
+                        r#"
                                 WITH transactions AS (
                                     SELECT
                                         tx_hash,
@@ -1349,17 +1362,17 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                 ORDER BY created_at ASC, block_index ASC
                                 LIMIT $3
                             "#,
-                            i64::from(*block_number),
-                            time_from,
-                            i64::from(query.limit),
-                        )
-                        .fetch_all(transaction.conn())
-                        .await?
-                    }
-                    PaginationDirection::Older => {
-                        sqlx::query_as!(
-                            TransactionItem,
-                            r#"
+                        i64::from(*query.from.block_number),
+                        time_from,
+                        i64::from(query.limit),
+                    )
+                    .fetch_all(transaction.conn())
+                    .await?
+                }
+                PaginationDirection::Older => {
+                    sqlx::query_as!(
+                        TransactionItem,
+                        r#"
                                 WITH transactions AS (
                                     SELECT
                                         tx_hash,
@@ -1407,27 +1420,24 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                 ORDER BY created_at DESC, block_index DESC
                                 LIMIT $3
                             "#,
-                            i64::from(*block_number),
-                            time_from,
-                            i64::from(query.limit),
-                        )
-                        .fetch_all(transaction.conn())
-                        .await?
-                    }
-                };
-                let is_block_finalized = transaction
-                    .chain()
-                    .block_schema()
-                    .is_block_finalized(block_number)
-                    .await?;
-                let txs: Vec<Transaction> = raw_txs
-                    .into_iter()
-                    .map(|tx| TransactionItem::transaction_from_item(tx, is_block_finalized))
-                    .collect();
-                Some(txs)
-            } else {
-                None
-            }
+                        i64::from(*query.from.block_number),
+                        time_from,
+                        i64::from(query.limit),
+                    )
+                    .fetch_all(transaction.conn())
+                    .await?
+                }
+            };
+            let is_block_finalized = transaction
+                .chain()
+                .block_schema()
+                .is_block_finalized(query.from.block_number)
+                .await?;
+            let txs: Vec<Transaction> = raw_txs
+                .into_iter()
+                .map(|tx| TransactionItem::transaction_from_item(tx, is_block_finalized))
+                .collect();
+            Some(txs)
         } else {
             None
         };

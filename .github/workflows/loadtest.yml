@@ -189,7 +189,7 @@ jobs:
       MASTER_WALLET_PK: ${{ secrets.CI_LOADTEST_MAIN_PRIVKEY }}
       ACCOUNTS_AMOUNT: 20
       OPERATIONS_PER_ACCOUNT: 20
-      MAIN_TOKEN: "USDT"
+      MAIN_TOKEN: "BAT"
       ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
       ETH_NETWORK: "rinkeby"
       RUST_LOG: info

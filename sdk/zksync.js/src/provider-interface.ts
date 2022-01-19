@@ -11,7 +11,8 @@ import {
     TxEthSignature,
     TxEthSignatureVariant,
     NFTInfo,
-    Toggle2FARequest
+    Toggle2FARequest,
+    Network
 } from './types';
 import { BigNumber } from 'ethers';
 import { TokenSet, isNFT } from './utils';
@@ -22,6 +23,7 @@ export abstract class SyncProvider {
     public providerType: 'RPC' | 'Rest';
     // For HTTP provider
     public pollIntervalMilliSecs = 1000;
+    public network?: Network;
 
     abstract submitTx(tx: any, signature?: TxEthSignatureVariant, fastProcessing?: boolean): Promise<string>;
     abstract submitTxsBatch(
