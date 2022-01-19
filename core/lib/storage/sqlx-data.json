@@ -2148,6 +2148,27 @@
       "nullable": []
     }
   },
+  "452d2211793f1c7769dea00c16badd8138f2b570013e4d8f7a7960e9a1962339": {
+    "query": "SELECT created_at FROM executed_transactions\n            WHERE tx_hash = $1 AND block_number = $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "457b4a87812ac9dcad6fbfc356952f05481a5729074ce305c3dedb33f99672f6": {
     "query": "\n            DELETE FROM pending_block WHERE number = $1\n            ",
     "describe": {
@@ -5282,6 +5303,27 @@
         false,
         false,
         true
+      ]
+    }
+  },
+  "bee961dea51ccd96f32dc5196b62f72586d1f2797af3001018ec70c1af193d02": {
+    "query": "SELECT created_at FROM executed_priority_operations\n                WHERE tx_hash = $1 AND block_number = $2 ORDER BY created_at DESC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
