@@ -292,7 +292,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
         let mut pk_x_serialized = signature
             .pk
             .get_x()
-            .into_bits_le_strict(cs.namespace(|| "pk_x_bits into bits strict"))?;
+            .into_bits_le(cs.namespace(|| "pk_x_bits into bits strict"))?;
 
         assert_eq!(pk_x_serialized.len(), FR_BIT_WIDTH);
 
@@ -307,7 +307,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
         let mut r_x_serialized = signature
             .r
             .get_x()
-            .into_bits_le_strict(cs.namespace(|| "r_x_bits into bits strict"))?;
+            .into_bits_le(cs.namespace(|| "r_x_bits into bits strict"))?;
 
         assert_eq!(r_x_serialized.len(), FR_BIT_WIDTH);
 
