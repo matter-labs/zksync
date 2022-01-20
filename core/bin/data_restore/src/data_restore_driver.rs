@@ -248,21 +248,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         self.tree_state = tree_state;
     }
 
-    async fn store_tree_cache(&mut self, interactor: &mut StorageInteractor<'_>) {
-        vlog::info!(
-            "Storing the tree cache, block number: {}",
-            self.tree_state.block_number
-        );
-        self.tree_state.state.root_hash();
-        let tree_cache = self.tree_state.state.get_balance_tree().get_internals();
-        interactor
-            .store_tree_cache(
-                self.tree_state.block_number,
-                serde_json::to_value(tree_cache).expect("failed to serialize tree cache"),
-            )
-            .await;
-    }
-
     async fn update_tree_cache(&mut self, interactor: &mut StorageInteractor<'_>) {
         vlog::info!(
             "Updating the tree cache, block number: {}",
@@ -380,6 +365,9 @@ impl<T: Transport> DataRestoreDriver<T> {
                     // to keep the `state_keeper` consistent with the `eth_sender`.
                     transaction.update_eth_state().await;
 
+                    // We update tree cache for each load of updates to allow fast restart.
+                    self.update_tree_cache(&mut transaction).await;
+
                     transaction.commit().await;
 
                     vlog::info!(
@@ -409,12 +397,6 @@ impl<T: Transport> DataRestoreDriver<T> {
                         if self.final_hash.is_some() && !final_hash_was_found {
                             panic!("Final hash was not met during the state restoring process");
                         }
-
-                        // We've restored all the blocks, our job is done. Store the tree cache for
-                        // consequent usage.
-                        self.update_tree_cache(interactor).await;
-
-                        break;
                     }
                 }
             }
@@ -424,7 +406,6 @@ impl<T: Transport> DataRestoreDriver<T> {
                 std::thread::sleep(std::time::Duration::from_secs(5));
             } else {
                 last_watched_block = self.events_state.last_watched_eth_block_number;
-                self.update_tree_cache(interactor).await;
             }
         }
     }
@@ -529,8 +510,6 @@ impl<T: Transport> DataRestoreDriver<T> {
     ) -> Vec<RollupOpsBlock> {
         let new_blocks = self.get_new_operation_blocks_from_events().await;
 
-        //  dbg!(new_blocks.clone());
-
         interactor.save_rollup_ops(&new_blocks).await;
 
         vlog::debug!("Updated operations storage");
@@ -556,8 +535,6 @@ impl<T: Transport> DataRestoreDriver<T> {
             .iter()
             .filter(|bl| bl.block_num > self.tree_state.block_number)
         {
-            dbg!(event.clone());
-
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.
             // These blocks go one after the other, and checking only the last transaction hash is safe.

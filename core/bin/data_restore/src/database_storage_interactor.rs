@@ -81,8 +81,6 @@ impl<'a> DatabaseStorageInteractor<'a> {
             });
         }
 
-        dbg!(ops.iter().map(|b| b.block_num).collect::<Vec<_>>());
-
         self.storage
             .data_restore_schema()
             .save_rollup_ops(ops.as_slice())
