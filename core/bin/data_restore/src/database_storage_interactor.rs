@@ -81,6 +81,8 @@ impl<'a> DatabaseStorageInteractor<'a> {
             });
         }
 
+        dbg!(ops.iter().map(|b| b.block_num).collect::<Vec<_>>());
+
         self.storage
             .data_restore_schema()
             .save_rollup_ops(ops.as_slice())
@@ -392,6 +394,39 @@ impl<'a> DatabaseStorageInteractor<'a> {
             .store_account_tree_cache(block_number, tree_cache)
             .await
             .expect("Failed to store the tree cache");
+    }
+
+    pub async fn update_tree_cache(
+        &mut self,
+        block_number: BlockNumber,
+        tree_cache: serde_json::Value,
+    ) {
+        let mut transaction = self
+            .storage
+            .start_transaction()
+            .await
+            .expect("Failed to start transaction");
+
+        transaction
+            .chain()
+            .block_schema()
+            .remove_old_account_tree_cache(block_number)
+            .await
+            .expect("Failed to remove old tree cache");
+
+        // It is safe to store the new tree cache without additional checks
+        // since on conflict it does nothing.
+        transaction
+            .chain()
+            .block_schema()
+            .store_account_tree_cache(block_number, tree_cache)
+            .await
+            .expect("Failed to store new tree cache");
+
+        transaction
+            .commit()
+            .await
+            .expect("Failed to update tree cache");
     }
 
     pub async fn get_storage_state(&mut self) -> StorageUpdateState {

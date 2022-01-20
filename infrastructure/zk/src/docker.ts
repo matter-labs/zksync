@@ -45,13 +45,15 @@ async function _build(image: string) {
     }
     const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
     const latestImage = `-t matterlabs/${image}:latest`;
-    const taggedImage = ['nginx', 'server', 'prover'].includes(image) ? `-t matterlabs/${image}:${imageTag}` : '';
+    const taggedImage = ['nginx', 'server', 'prover', 'data-restore'].includes(image)
+        ? `-t matterlabs/${image}:${imageTag}`
+        : '';
     await utils.spawn(`DOCKER_BUILDKIT=1 docker build ${latestImage} ${taggedImage} -f ./docker/${image}/Dockerfile .`);
 }
 
 async function _push(image: string) {
-    await utils.spawn(`docker push matterlabs/${image}:latest`);
-    if (['nginx', 'server', 'prover', 'event-listener'].includes(image)) {
+    //  await utils.spawn(`docker push matterlabs/${image}:latest`);
+    if (['nginx', 'server', 'prover', 'event-listener', 'data-restore'].includes(image)) {
         const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
         await utils.spawn(`docker push matterlabs/${image}:${imageTag}`);
     }
@@ -62,7 +64,7 @@ export async function build(image: string) {
 }
 
 export async function push(image: string) {
-    await dockerCommand('build', image);
+    //  await dockerCommand('build', image);
     await dockerCommand('push', image);
 }
 

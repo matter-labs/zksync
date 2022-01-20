@@ -324,6 +324,14 @@ impl InMemoryStorageInteractor {
         // Inmemory storage doesn't support caching.
     }
 
+    pub async fn update_tree_cache(
+        &mut self,
+        _block_number: BlockNumber,
+        _tree_cache: serde_json::Value,
+    ) {
+        // Inmemory storage doesn't support caching.
+    }
+
     pub async fn get_max_priority_op_serial_id(&mut self) -> SerialId {
         let number_of_priority_ops = self
             .inner
