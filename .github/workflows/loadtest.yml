@@ -41,7 +41,6 @@ jobs:
       image: dysnix/kubectl:v1.20-gcloud
 
     env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
       DEPLOY_APPS: -l name=sqlproxy
 
     outputs:
@@ -64,8 +63,18 @@ jobs:
           ref: master
           token: ${{ secrets.GH_TOKEN }}
       -
-        name: Create ~/.kube/config
-        run: ./.github/scripts/write-kubeconf.sh
+        id: kubeConf
+        run: |
+          kube_token=$(cat /var/run/secrets/tokens/github-actions-deployer)
+          echo "::add-mask::$kube_token"
+          echo "::set-output name=token::$kube_token"
+      -
+        name: Generate ~/.kube/config
+        run: |
+          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
+          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
+          kubectl config set-context default --user=user --cluster=default
+          kubectl config use-context default
       -
         name: Provision SQLProxy
         working-directory: helm-infra
@@ -146,16 +155,26 @@ jobs:
     needs: [dbsetup]
     container:
       image: dysnix/kubectl:v1.20-gcloud
-    env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
     steps:
       - uses: actions/checkout@v2
       - uses: actions/download-artifact@v2
         with:
           name: deployed_contracts
       -
-        name: Create ~/.kube/config
-        run: .github/scripts/write-kubeconf.sh
+        id: kubeConf
+        run: |
+          kube_token=$(cat /var/run/secrets/tokens/github-actions-deployer)
+          echo "::add-mask::$kube_token"
+          echo "::set-output name=token::$kube_token"
+      -
+        name: Generate ~/.kube/config
+        run: |
+          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
+          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
+          kubectl config set-context default --user=user --cluster=default
+          kubectl config use-context default
       -
         name: Update contracts in the ConfigMap
         run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
@@ -205,16 +224,25 @@ jobs:
     needs: [dbsetup, loadtest]
     container:
       image: dysnix/kubectl:v1.20-gcloud
-    env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
     if: always()
     steps:
       - uses: actions/checkout@v2
       - run: rm -f etc/env/${ZKSYNC_ENV}.env
       -
-        name: Create ~/.kube/config
-        run: .github/scripts/write-kubeconf.sh
+        id: kubeConf
+        run: |
+          kube_token=$(cat /var/run/secrets/tokens/github-actions-deployer)
+          echo "::add-mask::$kube_token"
+          echo "::set-output name=token::$kube_token"
+      -
+        name: Generate ~/.kube/config
+        run: |
+          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
+          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
+          kubectl config set-context default --user=user --cluster=default
+          kubectl config use-context default
       -
         name: Scale loadtest to 0 replicas
         run: |
