@@ -316,14 +316,6 @@ impl InMemoryStorageInteractor {
         None
     }
 
-    pub async fn store_tree_cache(
-        &mut self,
-        _block_number: BlockNumber,
-        _tree_cache: serde_json::Value,
-    ) {
-        // Inmemory storage doesn't support caching.
-    }
-
     pub async fn update_tree_cache(
         &mut self,
         _block_number: BlockNumber,

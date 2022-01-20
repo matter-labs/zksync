@@ -381,19 +381,6 @@ impl<'a> DatabaseStorageInteractor<'a> {
         }
     }
 
-    pub async fn store_tree_cache(
-        &mut self,
-        block_number: BlockNumber,
-        tree_cache: serde_json::Value,
-    ) {
-        self.storage
-            .chain()
-            .block_schema()
-            .store_account_tree_cache(block_number, tree_cache)
-            .await
-            .expect("Failed to store the tree cache");
-    }
-
     pub async fn update_tree_cache(
         &mut self,
         block_number: BlockNumber,
