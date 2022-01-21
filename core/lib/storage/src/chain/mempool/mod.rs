@@ -416,6 +416,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
         for op in ops {
             let serial_id = op.serial_id as i64;
+            let tx_hash = op.tx_hash().to_string();
             let data = serde_json::to_value(op.data.clone()).expect("Should be encoded");
             let deadline_block = op.deadline_block as i64;
             let eth_hash = op.eth_hash.as_bytes().to_vec();
@@ -433,23 +434,25 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             };
 
             sqlx::query!(
-                "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at, confirmed) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10)
+                "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, tx_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at, confirmed) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), $11)
                 ON CONFLICT (serial_id) DO UPDATE SET
                 data=$2,
                 deadline_block=$3,
                 eth_hash=$4,
-                eth_block=$5,
-                eth_block_index=$6,
-                l1_address=$7,
-                l2_address=$8,
-                type=$9,
-                confirmed=$10
+                tx_hash=$5,
+                eth_block=$6,
+                eth_block_index=$7,
+                l1_address=$8,
+                l2_address=$9,
+                type=$10,
+                confirmed=$11
                 ",
                 serial_id,
                 data,
                 deadline_block,
                 eth_hash,
+                tx_hash,
                 eth_block,
                 eth_block_index,
                 l1_address,
@@ -468,7 +471,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     pub async fn get_confirmed_priority_ops(&mut self) -> QueryResult<Vec<PriorityOp>> {
         let ops = sqlx::query_as!(
             MempoolPriorityOp,
-            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed ORDER BY serial_id"
+            "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed ORDER BY serial_id"
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -509,7 +512,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         limit: u32,
         direction: PaginationDirection,
     ) -> QueryResult<Vec<PriorityOp>> {
-        let query = "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1";
+        let query = "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE l2_address = $1";
         let query = match direction {
             PaginationDirection::Newer => {
                 format!("{} AND serial_id >= $2 ORDER BY serial_id LIMIT $3", query)
@@ -539,7 +542,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     ) -> QueryResult<Option<PriorityOp>> {
         let op = sqlx::query_as!(
             MempoolPriorityOp,
-            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE eth_hash = $1",
+            "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE eth_hash = $1",
             tx_hash.as_bytes().to_vec()
         )
             .fetch_optional(self.0.conn())
@@ -549,7 +552,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     pub async fn get_pending_deposits(&mut self, address: Address) -> QueryResult<Vec<PriorityOp>> {
         let ops = sqlx::query_as!(
             MempoolPriorityOp,
-            "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE type = 'Deposit' AND l2_address = $1  ORDER BY serial_id",
+            "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE type = 'Deposit' AND l2_address = $1  ORDER BY serial_id",
             address.as_bytes().to_vec()
         )
             .fetch_all(self.0.conn())

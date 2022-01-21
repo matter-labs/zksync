@@ -44,6 +44,7 @@ pub struct QueuedBatchTx {
 #[derive(Debug, FromRow)]
 pub struct MempoolPriorityOp {
     pub serial_id: i64,
+    pub tx_hash: String,
     pub eth_hash: Vec<u8>,
     pub data: serde_json::Value,
     pub created_at: DateTime<Utc>,

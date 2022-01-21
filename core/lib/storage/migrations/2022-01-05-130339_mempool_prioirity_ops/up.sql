@@ -6,6 +6,7 @@ CREATE TABLE mempool_priority_operations (
     type TEXT NOT NULL,
     deadline_block BIGINT NOT NULL,
     eth_hash BYTEA NOT NULL,
+    tx_hash TEXT NOT NULL,
     eth_block BIGINT NOT NULL,
     eth_block_index INTEGER NOT NULL,
     confirmed BOOL NOT NULL,

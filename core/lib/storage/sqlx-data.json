@@ -489,62 +489,6 @@
       "nullable": []
     }
   },
-  "1327b9155d0948d418977e0597aa781527646e71dc275d6cdb9c127f31dfaba3": {
-    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE eth_hash = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "deadline_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "eth_block_index",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "1401ea10d9e110da48aac1ebfa7aeb855c273adf34f6ee92b0fdaaf7de603049": {
     "query": "\n                SELECT tx_hash, created_at\n                FROM mempool_txs\n                INNER JOIN txs_batches_hashes\n                ON txs_batches_hashes.batch_id = mempool_txs.batch_id\n                WHERE batch_hash = $1\n                ORDER BY id ASC\n            ",
     "describe": {
@@ -1158,62 +1102,6 @@
       "nullable": []
     }
   },
-  "21796531ebd7af29fdd375c8fe536617525cd8762a38baa78b8075f71868df6b": {
-    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE type = 'Deposit' AND l2_address = $1  ORDER BY serial_id",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "deadline_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "eth_block_index",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "21d959769e02bf5c52b68e69732363716534dbbbf0638a500ef46152136d2cab": {
     "query": "\n                    SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n                    WHERE address = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -1693,6 +1581,68 @@
         null,
         null,
         null
+      ]
+    }
+  },
+  "2d7003702f3ddcd23d8b65aa8f06b49a007b2f91d6326b2813353962d2926992": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE eth_hash = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -2283,6 +2233,66 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "4404459ff7cdb69a6f040ab6393926e1252635f3ce1aeb1fb75822919948ca82": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed ORDER BY serial_id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "444fd4dfaf4e0fdf1675c857b17feb5cf1f02ea0eb3e1e7bb60deb093fadb19f": {
@@ -5101,27 +5111,6 @@
       "nullable": []
     }
   },
-  "a9d7d792386fa78820e0120bde57eb034135ba31ad35fca773993955ebd51acf": {
-    "query": "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at, confirmed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10)\n                ON CONFLICT (serial_id) DO UPDATE SET\n                data=$2,\n                deadline_block=$3,\n                eth_hash=$4,\n                eth_block=$5,\n                eth_block_index=$6,\n                l1_address=$7,\n                l2_address=$8,\n                type=$9,\n                confirmed=$10\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Jsonb",
-          "Int8",
-          "Bytea",
-          "Int8",
-          "Int4",
-          "Bytea",
-          "Bytea",
-          "Text",
-          "Bool"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "aaaf2bcea738151db11f6152772516a46ef7d23ae885936094226b837369ee3c": {
     "query": "DELETE FROM mempool_txs\n            WHERE tx_hash = ANY($1)",
     "describe": {
@@ -5277,6 +5266,28 @@
         true,
         true
       ]
+    }
+  },
+  "aec3f1cd09164e70d12b5e1e1c5e1b0bce96bea3e4b40defc97383d30ad5995d": {
+    "query": "INSERT INTO mempool_priority_operations (serial_id, data, deadline_block, eth_hash, tx_hash, eth_block, eth_block_index, l1_address, l2_address, type, created_at, confirmed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), $11)\n                ON CONFLICT (serial_id) DO UPDATE SET\n                data=$2,\n                deadline_block=$3,\n                eth_hash=$4,\n                tx_hash=$5,\n                eth_block=$6,\n                eth_block_index=$7,\n                l1_address=$8,\n                l2_address=$9,\n                type=$10,\n                confirmed=$11\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb",
+          "Int8",
+          "Bytea",
+          "Text",
+          "Int8",
+          "Int4",
+          "Bytea",
+          "Bytea",
+          "Text",
+          "Bool"
+        ]
+      },
+      "nullable": []
     }
   },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {
@@ -6427,6 +6438,68 @@
       ]
     }
   },
+  "d191daef2963e4b3743407d09f3f1a61f279338e8e20d603cfabd85e715ed723": {
+    "query": "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE type = 'Deposit' AND l2_address = $1  ORDER BY serial_id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "eth_block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "d32a820014652b70f2035bccb22df070dc98c416813520de6b20157ed670756e": {
     "query": "\n                    UPDATE accounts \n                    SET last_block = $1, nonce = $2\n                    WHERE id = $3\n                    ",
     "describe": {
@@ -6815,60 +6888,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "e174083d24c22c7ddc5d9bac0734509bc666cb6a7ee7c296f04b307618770165": {
-    "query": "SELECT serial_id,data,deadline_block,eth_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed ORDER BY serial_id",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "deadline_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "eth_block_index",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "e188272dd4fd0e228f4fcd7182eff49db1316e061b6d9940da543981f8a179d6": {
