@@ -17,6 +17,7 @@ pub struct StoredOperation {
 
 #[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct StoredExecutedPriorityOperation {
+    pub sequencer_id: Option<i64>,
     pub block_number: i64,
     pub block_index: i32,
     pub operation: Value,
@@ -34,6 +35,7 @@ pub struct StoredExecutedPriorityOperation {
 
 #[derive(Debug, Clone, FromRow)]
 pub struct StoredExecutedTransaction {
+    pub sequencer_id: Option<i64>,
     pub block_number: i64,
     pub block_index: Option<i32>,
     pub tx: Value,

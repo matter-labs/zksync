@@ -88,6 +88,7 @@ pub struct BlockTransactionItem {
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct TransactionItem {
+    pub sequencer_id: Option<i64>,
     pub tx_hash: Vec<u8>,
     pub block_number: i64,
     pub op: Value,

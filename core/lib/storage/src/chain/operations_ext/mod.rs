@@ -968,13 +968,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 }
             }
         };
-        let created_at_and_block = transaction
+        let sequencer_id = transaction
             .chain()
             .operations_ext_schema()
-            .get_tx_created_at_and_block_number(tx_hash)
+            .get_tx_sequencer_id(tx_hash)
             .await?;
 
-        let txs = if let Some((time_from, _)) = created_at_and_block {
+        let txs = if let Some(id_from) = sequencer_id {
             let raw_txs = if let Some(address) = query.from.second_address {
                 // It's impossible to have priority operations for two accounts
                 transaction
@@ -985,7 +985,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         address,
                         query.from.token,
                         i64::from(query.limit),
-                        time_from,
+                        id_from,
                         query.direction,
                     )
                     .await?
@@ -997,7 +997,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         query.from.address,
                         query.from.token,
                         i64::from(query.limit),
-                        time_from,
+                        id_from,
                         query.direction,
                     )
                     .await?;
@@ -1009,7 +1009,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                             query.from.address,
                             query.from.token,
                             i64::from(query.limit),
-                            time_from,
+                            id_from,
                             query.direction,
                         )
                         .await?,
@@ -1057,18 +1057,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         second_address: Address,
         token: Option<TokenId>,
         limit: i64,
-        time_from: DateTime<Utc>,
+        id_from: i64,
         direction: PaginationDirection,
     ) -> QueryResult<Vec<TransactionItem>> {
         let query_direction = match direction {
             PaginationDirection::Newer => {
-                "WHERE created_at >= $4 
-                ORDER BY created_at
+                "WHERE sequencer_id >= $4 
+                ORDER BY sequencer_id 
                 LIMIT $5"
             }
             PaginationDirection::Older => {
-                "WHERE created_at <= $4
-                ORDER BY created_at DESC
+                "WHERE sequencer_id <= $4
+                ORDER BY sequencer_id DESC
                 LIMIT $5"
             }
         };
@@ -1090,6 +1090,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 )
                 SELECT                     
                     executed_transactions.tx_hash,
+                    sequencer_id,
                     tx as op,
                     block_number,
                     created_at,
@@ -1111,7 +1112,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .bind(address.as_bytes())
             .bind(&second_address.as_bytes())
             .bind(token.unwrap_or_default().0 as i32)
-            .bind(time_from)
+            .bind(id_from)
             .bind(limit)
             .fetch_all(self.0.conn())
             .await?)
@@ -1121,18 +1122,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         address: Address,
         token: Option<TokenId>,
         limit: i64,
-        time_from: DateTime<Utc>,
+        id_from: i64,
         direction: PaginationDirection,
     ) -> QueryResult<Vec<TransactionItem>> {
         let query_direction = match direction {
             PaginationDirection::Newer => {
-                "AND created_at >= $3 
-                ORDER BY created_at
+                "AND sequencer_id  >= $3 
+                ORDER BY sequencer_id 
                 LIMIT $4"
             }
             PaginationDirection::Older => {
-                "AND created_at <= $3
-                ORDER BY created_at DESC
+                "AND sequencer_id <= $3
+                ORDER BY sequencer_id DESC
                 LIMIT $4"
             }
         };
@@ -1146,6 +1147,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let query = format!(
             r#"
             SELECT DISTINCT
+                executed_priority_operations.sequencer_id,
                 executed_priority_operations.tx_hash,
                 operation as op,
                 block_number,
@@ -1166,7 +1168,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
             .bind(token.unwrap_or_default().0 as i32)
-            .bind(time_from)
+            .bind(id_from)
             .bind(limit)
             .fetch_all(self.0.conn())
             .await?)
@@ -1177,18 +1179,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         address: Address,
         token: Option<TokenId>,
         limit: i64,
-        time_from: DateTime<Utc>,
+        id_from: i64,
         direction: PaginationDirection,
     ) -> QueryResult<Vec<TransactionItem>> {
         let query_direction = match direction {
             PaginationDirection::Newer => {
-                "AND created_at >= $3
-                ORDER BY created_at
+                "AND txs.sequencer_id >= $3
+                ORDER BY txs.sequencer_id
                 LIMIT $4"
             }
             PaginationDirection::Older => {
-                "AND created_at <= $3
-                ORDER BY created_at DESC
+                "AND txs.sequencer_id  <= $3
+                ORDER BY txs.sequencer_id DESC
                 LIMIT $4"
             }
         };
@@ -1202,7 +1204,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let query = format!(
             r#"
                SELECT DISTINCT
-                    executed_transactions.tx_hash,
+                    txs.sequencer_id,
+                    txs.tx_hash,
                     tx as op,
                     block_number,
                     created_at,
@@ -1213,9 +1216,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     block_index,
                     batch_id
                 FROM tx_filters
-                INNER JOIN executed_transactions
-                    ON tx_filters.tx_hash = executed_transactions.tx_hash
-                WHERE address = $1 {} {}
+                INNER JOIN executed_transactions txs
+                    ON tx_filters.tx_hash = txs.tx_hash
+                WHERE address = $1 {} {} 
             "#,
             token_query, query_direction
         );
@@ -1223,7 +1226,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
             .bind(token.unwrap_or_default().0 as i32)
-            .bind(time_from)
+            .bind(id_from)
             .bind(limit)
             .fetch_all(self.0.conn())
             .await?)
@@ -1371,23 +1374,24 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     }
 
     /// Returns `created_at` for `block_number` fields for transaction with given hash.
-    pub async fn get_tx_created_at_for_block_number(
+    pub async fn get_tx_sequencer_id_for_block(
         &mut self,
         tx_hash: TxHash,
         block_number: BlockNumber,
-    ) -> QueryResult<Option<DateTime<Utc>>> {
+    ) -> QueryResult<Option<i64>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let result = sqlx::query!(
-            "SELECT created_at FROM executed_transactions
+            "SELECT sequencer_id FROM executed_transactions
             WHERE tx_hash = $1 AND block_number = $2",
             tx_hash.as_ref(),
             block_number.0 as i32
         )
         .fetch_optional(transaction.conn())
         .await?
-        .map(|record| record.created_at);
+        .map(|record| record.sequencer_id)
+        .flatten();
 
         if result.is_some() {
             return Ok(result);
@@ -1396,32 +1400,27 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         // TxHash is not unique for priority operations so we have to get the max created_at
         // because we are using this function for paginating starting from the latest transaction
         let result = sqlx::query!(
-            "SELECT created_at FROM executed_priority_operations
-                WHERE tx_hash = $1 AND block_number = $2 ORDER BY created_at DESC",
+            r#"SELECT sequencer_id  FROM executed_priority_operations
+                WHERE tx_hash = $1 AND block_number = $2 ORDER BY created_at DESC"#,
             tx_hash.as_ref(),
             block_number.0 as i32
         )
         .fetch_optional(transaction.conn())
         .await?
-        .map(|record| record.created_at);
+        .map(|record| record.sequencer_id)
+        .flatten();
         transaction.commit().await?;
 
-        metrics::histogram!(
-            "sql.chain.block.get_tx_created_at_for_block_number",
-            start.elapsed()
-        );
+        metrics::histogram!("sql.chain.block.get_tx_sequencer_id", start.elapsed());
         Ok(result)
     }
     /// Returns `created_at` and `block_number` fields for transaction with given hash.
-    pub async fn get_tx_created_at_and_block_number(
-        &mut self,
-        tx_hash: TxHash,
-    ) -> QueryResult<Option<(DateTime<Utc>, BlockNumber)>> {
+    pub async fn get_tx_sequencer_id(&mut self, tx_hash: TxHash) -> QueryResult<Option<i64>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let record = sqlx::query!(
-            "SELECT created_at, block_number FROM executed_transactions
+            "SELECT sequencer_id FROM executed_transactions
             WHERE tx_hash = $1",
             tx_hash.as_ref()
         )
@@ -1429,26 +1428,24 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await?;
 
         let result = if let Some(record) = record {
-            Some((record.created_at, BlockNumber(record.block_number as u32)))
+            Some(record.sequencer_id)
         } else {
             // TxHash is not unique for priority operations so we have to get the max created_at
             // because we are using this function for paginating starting from the latest transaction
             let record = sqlx::query!(
-                "SELECT created_at, block_number FROM executed_priority_operations
-                WHERE tx_hash = $1 ORDER BY created_at DESC",
+                r#"SELECT sequencer_id FROM executed_priority_operations
+                WHERE tx_hash = $1 ORDER BY created_at DESC"#,
                 tx_hash.as_ref()
             )
             .fetch_optional(transaction.conn())
             .await?;
 
-            record.map(|record| (record.created_at, BlockNumber(record.block_number as u32)))
-        };
+            record.map(|record| record.sequencer_id)
+        }
+        .flatten();
         transaction.commit().await?;
 
-        metrics::histogram!(
-            "sql.chain.block.get_tx_created_at_and_block_number",
-            start.elapsed()
-        );
+        metrics::histogram!("sql.chain.block.get_tx_sequencer_id", start.elapsed());
         Ok(result)
     }
 
