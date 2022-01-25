@@ -605,42 +605,42 @@ async fn get_tx_sequnecner_id(mut storage: StorageProcessor<'_>) -> QueryResult<
     setup.add_block(1);
     commit_schema_data(&mut storage, &setup).await?;
 
-    // Get sequencer_id for priority op
+    // Get sequence_number for priority op
     let tx_hash = setup.get_tx_hash(0, 0);
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_sequencer_id(tx_hash)
+        .get_tx_sequence_number(tx_hash)
         .await?;
     assert!(result.is_some());
     let tx_0_0 = result.unwrap();
 
-    // Get sequencer_id for next tx
+    // Get sequence_number for next tx
     let tx_hash = setup.get_tx_hash(0, 1);
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_sequencer_id(tx_hash)
+        .get_tx_sequence_number(tx_hash)
         .await?;
     assert!(result.is_some());
     assert_eq!(result.unwrap(), tx_0_0 + 1);
 
-    // Get sequencer_id for priority op for correct block
+    // Get sequence_number for priority op for correct block
     let tx_hash = setup.get_tx_hash(0, 0);
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_sequencer_id_for_block(tx_hash, BlockNumber(1))
+        .get_tx_sequence_number_for_block(tx_hash, BlockNumber(1))
         .await?;
     assert!(result.is_some());
     assert_eq!(tx_0_0, result.unwrap());
 
-    // Get sequencer_id for priority op for wrong block
+    // Get sequence_number for priority op for wrong block
     let tx_hash = setup.get_tx_hash(0, 0);
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_sequencer_id_for_block(tx_hash, BlockNumber(10))
+        .get_tx_sequence_number_for_block(tx_hash, BlockNumber(10))
         .await?;
     assert!(result.is_none());
 
@@ -650,7 +650,7 @@ async fn get_tx_sequnecner_id(mut storage: StorageProcessor<'_>) -> QueryResult<
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_sequencer_id(tx_hash)
+        .get_tx_sequence_number(tx_hash)
         .await?;
     assert!(result.is_none());
 

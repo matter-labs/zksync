@@ -1383,7 +1383,7 @@
         },
         {
           "ordinal": 14,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -1793,12 +1793,12 @@
     }
   },
   "32cae2c7cdcdb3facca5659a677188d1887e9d49835a1271021a7b7b24114b05": {
-    "query": "SELECT sequencer_id FROM executed_transactions\n            WHERE tx_hash = $1",
+    "query": "SELECT sequence_number FROM executed_transactions\n            WHERE tx_hash = $1",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -2002,12 +2002,12 @@
     }
   },
   "3f66026deb158782050957fda92f75ca3f2209c1bfe62af42dfdf8a883a3e450": {
-    "query": "\n                                WITH transactions AS (\n                                    SELECT\n                                        sequencer_id,\n                                        tx_hash,\n                                        tx as op,\n                                        block_number,\n                                        created_at,\n                                        success,\n                                        fail_reason,\n                                        Null::bytea as eth_hash,\n                                        Null::bigint as priority_op_serialid,\n                                        block_index,\n                                        batch_id\n                                    FROM executed_transactions\n                                    WHERE block_number = $1 AND sequencer_id <= $2\n                                ), priority_ops AS (\n                                    SELECT\n                                        sequencer_id,\n                                        tx_hash,\n                                        operation as op,\n                                        block_number,\n                                        created_at,\n                                        true as success,\n                                        Null as fail_reason,\n                                        eth_hash,\n                                        priority_op_serialid,\n                                        block_index,\n                                        Null::bigint as batch_id\n                                    FROM executed_priority_operations\n                                    WHERE block_number = $1 AND sequencer_id <= $2\n                                ), everything AS (\n                                    SELECT * FROM transactions\n                                    UNION ALL\n                                    SELECT * FROM priority_ops\n                                )\n                                SELECT\n                                    sequencer_id,\n                                    tx_hash as \"tx_hash!\",\n                                    block_number as \"block_number!\",\n                                    op as \"op!\",\n                                    created_at as \"created_at!\",\n                                    success as \"success!\",\n                                    fail_reason as \"fail_reason?\",\n                                    eth_hash as \"eth_hash?\",\n                                    priority_op_serialid as \"priority_op_serialid?\",\n                                    batch_id as \"batch_id?\"\n                                FROM everything\n                                ORDER BY created_at DESC, block_index DESC\n                                LIMIT $3\n                            ",
+    "query": "\n                                WITH transactions AS (\n                                    SELECT\n                                        sequence_number,\n                                        tx_hash,\n                                        tx as op,\n                                        block_number,\n                                        created_at,\n                                        success,\n                                        fail_reason,\n                                        Null::bytea as eth_hash,\n                                        Null::bigint as priority_op_serialid,\n                                        block_index,\n                                        batch_id\n                                    FROM executed_transactions\n                                    WHERE block_number = $1 AND sequence_number <= $2\n                                ), priority_ops AS (\n                                    SELECT\n                                        sequence_number,\n                                        tx_hash,\n                                        operation as op,\n                                        block_number,\n                                        created_at,\n                                        true as success,\n                                        Null as fail_reason,\n                                        eth_hash,\n                                        priority_op_serialid,\n                                        block_index,\n                                        Null::bigint as batch_id\n                                    FROM executed_priority_operations\n                                    WHERE block_number = $1 AND sequence_number <= $2\n                                ), everything AS (\n                                    SELECT * FROM transactions\n                                    UNION ALL\n                                    SELECT * FROM priority_ops\n                                )\n                                SELECT\n                                    sequence_number,\n                                    tx_hash as \"tx_hash!\",\n                                    block_number as \"block_number!\",\n                                    op as \"op!\",\n                                    created_at as \"created_at!\",\n                                    success as \"success!\",\n                                    fail_reason as \"fail_reason?\",\n                                    eth_hash as \"eth_hash?\",\n                                    priority_op_serialid as \"priority_op_serialid?\",\n                                    batch_id as \"batch_id?\"\n                                FROM everything\n                                ORDER BY created_at DESC, block_index DESC\n                                LIMIT $3\n                            ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         },
         {
@@ -3057,7 +3057,7 @@
         },
         {
           "ordinal": 12,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -5083,12 +5083,12 @@
     }
   },
   "b7d6e502c04a9c40a8bff3ad713046875a3db3a9c693fdf4d4ab72d66f8868ce": {
-    "query": "SELECT sequencer_id FROM executed_priority_operations\n                WHERE tx_hash = $1 ORDER BY created_at DESC",
+    "query": "SELECT sequence_number FROM executed_priority_operations\n                WHERE tx_hash = $1 ORDER BY created_at DESC",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -5147,12 +5147,12 @@
     }
   },
   "bbd5b9e8a5903133d50eb261e82768de8ced7a250e44981fc62f7df1fa44edc8": {
-    "query": "SELECT sequencer_id  FROM executed_priority_operations\n                WHERE tx_hash = $1 AND block_number = $2 ORDER BY created_at DESC",
+    "query": "SELECT sequence_number  FROM executed_priority_operations\n                WHERE tx_hash = $1 AND block_number = $2 ORDER BY created_at DESC",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -5487,7 +5487,7 @@
         },
         {
           "ordinal": 12,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -6126,12 +6126,12 @@
     }
   },
   "d0767ff0f2930a90367584a74c2a7de9fc81dee0089781368490ef1825b8172e": {
-    "query": "SELECT sequencer_id FROM executed_transactions\n            WHERE tx_hash = $1 AND block_number = $2",
+    "query": "SELECT sequence_number FROM executed_transactions\n            WHERE tx_hash = $1 AND block_number = $2",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -6819,7 +6819,7 @@
         },
         {
           "ordinal": 14,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -7295,12 +7295,12 @@
     }
   },
   "ee810fae4c6c7d181abe24b1cf7c91d6f1e0c7126bdec28fe8d653568ce52b24": {
-    "query": "\n                                WITH transactions AS (\n                                    SELECT\n                                        sequencer_id,\n                                        tx_hash,\n                                        tx as op,\n                                        block_number,\n                                        created_at,\n                                        success,\n                                        fail_reason,\n                                        Null::bytea as eth_hash,\n                                        Null::bigint as priority_op_serialid,\n                                        block_index,\n                                        batch_id\n                                    FROM executed_transactions\n                                    WHERE block_number = $1 AND sequencer_id >= $2\n                                ), priority_ops AS (\n                                    SELECT\n                                        sequencer_id,\n                                        tx_hash,\n                                        operation as op,\n                                        block_number,\n                                        created_at,\n                                        true as success,\n                                        Null as fail_reason,\n                                        eth_hash,\n                                        priority_op_serialid,\n                                        block_index,\n                                        Null::bigint as batch_id\n                                    FROM executed_priority_operations\n                                    WHERE block_number = $1 AND sequencer_id >= $2\n                                ), everything AS (\n                                    SELECT * FROM transactions\n                                    UNION ALL\n                                    SELECT * FROM priority_ops\n                                )\n                                SELECT\n                                    sequencer_id,\n                                    tx_hash as \"tx_hash!\",\n                                    block_number as \"block_number!\",\n                                    op as \"op!\",\n                                    created_at as \"created_at!\",\n                                    success as \"success!\",\n                                    fail_reason as \"fail_reason?\",\n                                    eth_hash as \"eth_hash?\",\n                                    priority_op_serialid as \"priority_op_serialid?\",\n                                    batch_id as \"batch_id?\"\n                                FROM everything\n                                ORDER BY created_at ASC, block_index ASC\n                                LIMIT $3\n                            ",
+    "query": "\n                                WITH transactions AS (\n                                    SELECT\n                                        sequence_number,\n                                        tx_hash,\n                                        tx as op,\n                                        block_number,\n                                        created_at,\n                                        success,\n                                        fail_reason,\n                                        Null::bytea as eth_hash,\n                                        Null::bigint as priority_op_serialid,\n                                        block_index,\n                                        batch_id\n                                    FROM executed_transactions\n                                    WHERE block_number = $1 AND sequence_number >= $2\n                                ), priority_ops AS (\n                                    SELECT\n                                        sequence_number,\n                                        tx_hash,\n                                        operation as op,\n                                        block_number,\n                                        created_at,\n                                        true as success,\n                                        Null as fail_reason,\n                                        eth_hash,\n                                        priority_op_serialid,\n                                        block_index,\n                                        Null::bigint as batch_id\n                                    FROM executed_priority_operations\n                                    WHERE block_number = $1 AND sequence_number >= $2\n                                ), everything AS (\n                                    SELECT * FROM transactions\n                                    UNION ALL\n                                    SELECT * FROM priority_ops\n                                )\n                                SELECT\n                                    sequence_number,\n                                    tx_hash as \"tx_hash!\",\n                                    block_number as \"block_number!\",\n                                    op as \"op!\",\n                                    created_at as \"created_at!\",\n                                    success as \"success!\",\n                                    fail_reason as \"fail_reason?\",\n                                    eth_hash as \"eth_hash?\",\n                                    priority_op_serialid as \"priority_op_serialid?\",\n                                    batch_id as \"batch_id?\"\n                                FROM everything\n                                ORDER BY created_at ASC, block_index ASC\n                                LIMIT $3\n                            ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         },
         {
@@ -7490,7 +7490,7 @@
         },
         {
           "ordinal": 14,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
@@ -7584,7 +7584,7 @@
         },
         {
           "ordinal": 12,
-          "name": "sequencer_id",
+          "name": "sequence_number",
           "type_info": "Int8"
         }
       ],
