@@ -1,3 +1,4 @@
+use std::cmp::min;
 // Built-in deps
 use std::time::Instant;
 
@@ -1822,5 +1823,107 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
         Ok(())
+    }
+
+    pub async fn min_block_for_update_sequence(&mut self) -> i64 {
+        let executed_txs_block = sqlx::query!(
+            "SELECT MIN(block_number) FROM executed_transactions WHERE sequence_number IS NULL"
+        )
+        .fetch_one(self.0.conn())
+        .await
+        .unwrap()
+        .min
+        .unwrap_or(0);
+        let executed_pr_op_block = sqlx::query!(
+            "SELECT MIN(block_number) FROM executed_priority_operations WHERE sequence_number IS NULL"
+        )
+        .fetch_one(self.0.conn())
+        .await
+            .unwrap()
+            .min
+            .unwrap_or(0);
+        min(executed_txs_block, executed_pr_op_block)
+    }
+
+    pub async fn update_sequence_number_for_blocks(
+        &mut self,
+        from_block: i64,
+        to_block: i64,
+        known_last_sequence_number: Option<i64>,
+    ) -> i64 {
+        let mut transaction = self.0.start_transaction().await.unwrap();
+        let mut sequence_number: i64 = if let Some(number) = known_last_sequence_number {
+            number
+        } else {
+            let executed_txs_count = sqlx::query!(
+                r#"SELECT COUNT(*) as "count!" FROM executed_transactions WHERE block_number < $1"#,
+                from_block
+            )
+            .fetch_one(transaction.conn())
+            .await
+            .unwrap()
+            .count;
+            let priority_ops_count = sqlx::query!(
+                r#"SELECT COUNT(*) as "count!" FROM executed_priority_operations WHERE block_number < $1"#,
+                from_block
+            )
+            .fetch_one(transaction.conn())
+            .await
+            .unwrap()
+            .count;
+            executed_txs_count + priority_ops_count
+        };
+
+        let records = sqlx::query!(
+            r#"
+                WITH transactions AS (
+                    SELECT block_number, created_at, Null::bigint as priority_op_serialid, tx_hash, block_index
+                    FROM executed_transactions
+                    WHERE block_number BETWEEN $1 AND $2
+                ), priority_ops AS (
+                    SELECT block_number, created_at, priority_op_serialid, tx_hash, block_index
+                    FROM executed_priority_operations
+                    WHERE block_number BETWEEN $1 AND $2
+                ), everything AS (
+                    SELECT * FROM transactions
+                    UNION ALL
+                    SELECT * FROM priority_ops
+                )
+                SELECT
+                    block_number, priority_op_serialid, tx_hash, block_index
+                FROM everything
+                ORDER BY created_at, block_index
+            "#,
+            from_block,
+            to_block
+        )
+        .fetch_all(transaction.conn())
+        .await
+        .unwrap();
+
+        for record in records {
+            sequence_number += 1;
+            if let Some(serial_id) = record.priority_op_serialid {
+                sqlx::query!(
+                    "UPDATE executed_priority_operations SET sequence_number = $1 WHERE priority_op_serialid = $2",
+                    sequence_number,
+                    serial_id
+                )
+                .execute(transaction.conn())
+                .await
+                .unwrap();
+            } else {
+                sqlx::query!(
+                    "UPDATE executed_transactions SET sequence_number = $1 WHERE tx_hash = $2",
+                    sequence_number,
+                    record.tx_hash
+                )
+                .execute(transaction.conn())
+                .await
+                .unwrap();
+            }
+        }
+        transaction.commit().await.unwrap();
+        sequence_number
     }
 }
