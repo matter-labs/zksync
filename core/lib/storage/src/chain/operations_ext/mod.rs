@@ -1370,6 +1370,48 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(count as u32)
     }
 
+    /// Returns `created_at` for `block_number` fields for transaction with given hash.
+    pub async fn get_tx_created_at_for_block_number(
+        &mut self,
+        tx_hash: TxHash,
+        block_number: BlockNumber,
+    ) -> QueryResult<Option<DateTime<Utc>>> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let result = sqlx::query!(
+            "SELECT created_at FROM executed_transactions
+            WHERE tx_hash = $1 AND block_number = $2",
+            tx_hash.as_ref(),
+            block_number.0 as i32
+        )
+        .fetch_optional(transaction.conn())
+        .await?
+        .map(|record| record.created_at);
+
+        if result.is_some() {
+            return Ok(result);
+        }
+
+        // TxHash is not unique for priority operations so we have to get the max created_at
+        // because we are using this function for paginating starting from the latest transaction
+        let result = sqlx::query!(
+            "SELECT created_at FROM executed_priority_operations
+                WHERE tx_hash = $1 AND block_number = $2 ORDER BY created_at DESC",
+            tx_hash.as_ref(),
+            block_number.0 as i32
+        )
+        .fetch_optional(transaction.conn())
+        .await?
+        .map(|record| record.created_at);
+        transaction.commit().await?;
+
+        metrics::histogram!(
+            "sql.chain.block.get_tx_created_at_for_block_number",
+            start.elapsed()
+        );
+        Ok(result)
+    }
     /// Returns `created_at` and `block_number` fields for transaction with given hash.
     pub async fn get_tx_created_at_and_block_number(
         &mut self,
