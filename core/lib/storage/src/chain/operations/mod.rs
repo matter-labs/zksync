@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 // Built-in deps
 use std::time::Instant;
 // External imports
@@ -299,7 +300,77 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         );
         Ok(())
     }
+    // TODO remove it ZKS-931
+    pub async fn remove_outstanding_tx_filters(&mut self) -> QueryResult<()> {
+        // We can do something like this, but this query will block tx_filter table for a long long time.
+        // So I have to rewrite this logic to rust
+        // sqlx::query!(
+        //     r#"DELETE FROM tx_filters WHERE tx_hash NOT IN (
+        //         WITH transactions AS (
+        //             SELECT tx_hash
+        //             FROM executed_transactions
+        //         ), priority_ops AS (
+        //             SELECT tx_hash
+        //             FROM executed_priority_operations
+        //         ), everything AS (
+        //             SELECT * FROM transactions
+        //             UNION ALL
+        //             SELECT * FROM priority_ops
+        //         )
+        //         SELECT
+        //             tx_hash as "tx_hash!"
+        //         FROM everything
+        //     )"#
+        // )
+        // .execute(self.0.conn())
+        // .await?;
 
+        let mut transaction = self.0.start_transaction().await?;
+        let tx_hashes: HashSet<Vec<u8>> = sqlx::query!(
+            r#"
+                WITH transactions AS (
+                    SELECT tx_hash
+                    FROM executed_transactions
+                ), priority_ops AS (
+                    SELECT tx_hash
+                    FROM executed_priority_operations
+                ), everything AS (
+                    SELECT * FROM transactions
+                    UNION ALL
+                    SELECT * FROM priority_ops
+                )
+                SELECT
+                    tx_hash as "tx_hash!"
+                FROM everything"#
+        )
+        .fetch_all(transaction.conn())
+        .await?
+        .into_iter()
+        .map(|value| value.tx_hash)
+        .collect();
+
+        let tx_filter_hashes: HashSet<Vec<u8>> =
+            sqlx::query!("SELECT DISTINCT tx_hash FROM tx_filters")
+                .fetch_all(transaction.conn())
+                .await?
+                .into_iter()
+                .map(|value| value.tx_hash)
+                .collect();
+
+        let difference: Vec<Vec<u8>> = tx_filter_hashes
+            .difference(&tx_hashes)
+            .into_iter()
+            .cloned()
+            .collect();
+
+        for chunk in difference.chunks(100) {
+            sqlx::query!("DELETE FROM tx_filters WHERE tx_hash = ANY ($1)", chunk)
+                .execute(transaction.conn())
+                .await?;
+        }
+
+        Ok(())
+    }
     /// Stores executed priority operation in database.
     ///
     /// This method is made public to fill the database for tests, do not use it for

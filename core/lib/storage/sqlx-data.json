@@ -489,6 +489,24 @@
       "nullable": []
     }
   },
+  "11decdd07f890f291a8526e42e110ed277ff894b1b5b52f319001c9d8311e954": {
+    "query": "\n                WITH transactions AS (\n                    SELECT tx_hash\n                    FROM executed_transactions\n                ), priority_ops AS (\n                    SELECT tx_hash\n                    FROM executed_priority_operations\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\"\n                FROM everything",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "1401ea10d9e110da48aac1ebfa7aeb855c273adf34f6ee92b0fdaaf7de603049": {
     "query": "\n                SELECT tx_hash, created_at\n                FROM mempool_txs\n                INNER JOIN txs_batches_hashes\n                ON txs_batches_hashes.batch_id = mempool_txs.batch_id\n                WHERE batch_hash = $1\n                ORDER BY id ASC\n            ",
     "describe": {
@@ -3787,6 +3805,24 @@
         null,
         null,
         null
+      ]
+    }
+  },
+  "7fe39c62da8c820d95f98238a0f206970328e97a9eed6f532e97d2346074941e": {
+    "query": "SELECT DISTINCT tx_hash FROM tx_filters",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
       ]
     }
   },
