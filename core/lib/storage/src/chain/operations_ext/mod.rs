@@ -1825,6 +1825,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(())
     }
 
+    // TODO ZKS-931 Remove it after migration
     pub async fn min_block_for_update_sequence(&mut self) -> i64 {
         let executed_txs_block = sqlx::query!(
             "SELECT MIN(block_number) FROM executed_transactions WHERE sequence_number IS NULL"
@@ -1845,6 +1846,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         min(executed_txs_block, executed_pr_op_block)
     }
 
+    // TODO ZKS-931 Remove it after migration
     pub async fn update_sequence_number_for_blocks(
         &mut self,
         from_block: i64,

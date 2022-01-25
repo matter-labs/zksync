@@ -9,6 +9,7 @@ license = "Apache-2.0"
 keywords = ["blockchain", "zksync"]
 categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
+#TODO remove it ZKS-931
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
