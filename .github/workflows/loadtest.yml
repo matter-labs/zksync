@@ -13,6 +13,7 @@ concurrency: deploy-${{ github.event.inputs.environment }}
 env:
   ZKSYNC_ENV: loadtest
   HF_ARGS: -e loadtest
+  DEPLOY_SA_NAME: gha-deployer-stage
 
 jobs:
   update:
@@ -39,10 +40,10 @@ jobs:
     needs: [update]
     container:
       image: dysnix/kubectl:v1.20-gcloud
-
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
     env:
       DEPLOY_APPS: -l name=sqlproxy
-
     outputs:
       image_tag: ${{ steps.set.outputs.shortRev }}
 
@@ -65,7 +66,7 @@ jobs:
       -
         id: kubeConf
         run: |
-          kube_token=$(cat /var/run/secrets/tokens/github-actions-deployer)
+          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
           echo "::add-mask::$kube_token"
           echo "::set-output name=token::$kube_token"
       -
@@ -165,7 +166,7 @@ jobs:
       -
         id: kubeConf
         run: |
-          kube_token=$(cat /var/run/secrets/tokens/github-actions-deployer)
+          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
           echo "::add-mask::$kube_token"
           echo "::set-output name=token::$kube_token"
       -
@@ -233,7 +234,7 @@ jobs:
       -
         id: kubeConf
         run: |
-          kube_token=$(cat /var/run/secrets/tokens/github-actions-deployer)
+          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
           echo "::add-mask::$kube_token"
           echo "::set-output name=token::$kube_token"
       -

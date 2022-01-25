@@ -122,7 +122,7 @@ jobs:
       -
         id: kubeConf
         run: |
-          kube_token=$(cat /var/run/secrets/tokens/github-actions-deployer)
+          kube_token=$(cat /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.runner }})
           echo "::add-mask::$kube_token"
           echo "::set-output name=token::$kube_token"
       -

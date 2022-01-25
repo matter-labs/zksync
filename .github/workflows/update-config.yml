@@ -17,7 +17,7 @@ defaults:
 concurrency: update-config-${{ github.event.inputs.environment }}
 
 jobs:
-  pre:
+  setup:
     runs-on: [k8s, stage]
     steps:
       - uses: actions/checkout@v2
@@ -50,19 +50,19 @@ jobs:
 
   updateConfig:
     name: Update Config
-    needs: [pre]
-    runs-on: [k8s, deployer, "${{ needs.pre.outputs.runner }}"]
+    needs: [setup]
+    runs-on: [k8s, deployer, "${{ needs.setup.outputs.runner }}"]
     container:
       image: dysnix/kubectl:v1.20-gcloud
       volumes:
         - /var/run/secrets/tokens:/var/run/secrets/tokens
     env:
-      ENVFILE: ./compiled_envs/${{ needs.pre.outputs.environment }}.env
+      ENVFILE: ./compiled_envs/${{ needs.setup.outputs.environment }}.env
     steps:
       -
         id: kubeConf
         run: |
-          kube_token=$(cat /var/run/secrets/tokens/github-actions-deployer)
+          kube_token=$(cat /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.runner }})
           echo "::add-mask::$kube_token"
           echo "::set-output name=token::$kube_token"
       -
@@ -78,7 +78,7 @@ jobs:
         with:
           repository: matter-labs/configs
           path: configs
-          ref: ${{ needs.pre.outputs.configRef }}
+          ref: ${{ needs.setup.outputs.configRef }}
           token: ${{ secrets.GH_TOKEN }}
       -
         name: Update Server Config
@@ -86,7 +86,7 @@ jobs:
         run: |
           sudo apk --no-cache add yarn
           ./bin/config
-          ./bin/config compile ${{ needs.pre.outputs.environment }}
-          kubectl delete configmap -n ${{ needs.pre.outputs.namespace }} server-env-custom || /bin/true
-          kubectl create configmap -n ${{ needs.pre.outputs.namespace }} server-env-custom --from-env-file=${{ env.ENVFILE }}
-          # kubectl delete pod -n ${{ needs.pre.outputs.namespace }} -l app.kubernetes.io/instance=server
+          ./bin/config compile ${{ needs.setup.outputs.environment }}
+          kubectl delete configmap -n ${{ needs.setup.outputs.namespace }} server-env-custom || /bin/true
+          kubectl create configmap -n ${{ needs.setup.outputs.namespace }} server-env-custom --from-env-file=${{ env.ENVFILE }}
+          # kubectl delete pod -n ${{ needs.setup.outputs.namespace }} -l app.kubernetes.io/instance=server
