@@ -7052,26 +7052,6 @@
       ]
     }
   },
-  "e8c69e16fe0e447d578dee61807b418ee4e8d5aebb60034cbc640eafceb593e2": {
-    "query": "SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Timestamptz"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {
     "query": "\n                SELECT * FROM prover_job_queue\n                WHERE job_status = $1\n                ORDER BY (job_priority, id, first_block)\n                LIMIT 1\n            ",
     "describe": {
@@ -7719,6 +7699,26 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "f57d1b54785c52a96afa9a95c4f1a08808732c9aaa850c32ed7d1158fdf541c4": {
+    "query": "\n        SELECT tx_hash FROM executed_transactions \n        WHERE success = false AND created_at < $1 LIMIT 1000",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
         false
       ]
     }

@@ -272,11 +272,16 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
         let mut transaction = self.0.start_transaction().await?;
         let offset = Utc::now() - max_age;
-        let tx_hashes: Vec<Vec<u8>> = sqlx::query!("SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000", offset).fetch_all(transaction.conn()).await?
+        let tx_hashes: Vec<Vec<u8>> = sqlx::query!(
+            r#"
+        SELECT tx_hash FROM executed_transactions 
+        WHERE success = false AND created_at < $1 LIMIT 1000"#,
+            offset
+        )
+        .fetch_all(transaction.conn())
+        .await?
         .into_iter()
-        .map(|value| {
-            value.tx_hash
-        })
+        .map(|value| value.tx_hash)
         .collect();
 
         sqlx::query!(
@@ -300,6 +305,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         );
         Ok(())
     }
+
     // TODO remove it ZKS-931
     pub async fn remove_outstanding_tx_filters(&mut self) -> QueryResult<()> {
         // We can do something like this, but this query will block tx_filter table for a long long time.
