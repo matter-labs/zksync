@@ -240,7 +240,6 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 tokens.push(*token);
             }
         }
-
         sqlx::query!(
             "
             INSERT INTO tx_filters (address, token, tx_hash)
@@ -270,13 +269,29 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     pub async fn remove_rejected_transactions(&mut self, max_age: Duration) -> QueryResult<()> {
         let start = Instant::now();
 
+        let mut transaction = self.0.start_transaction().await?;
         let offset = Utc::now() - max_age;
+        let tx_hashes: Vec<Vec<u8>> = sqlx::query!("SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000", offset).fetch_all(transaction.conn()).await?
+        .into_iter()
+        .map(|value| {
+            value.tx_hash
+        })
+        .collect();
+
         sqlx::query!(
-            "DELETE FROM executed_transactions WHERE tx_hash IN (SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000)",
-            offset
+            "DELETE FROM executed_transactions WHERE tx_hash = ANY ($1)",
+            &tx_hashes
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
+        sqlx::query!(
+            "DELETE FROM tx_filters WHERE tx_hash = ANY ($1)",
+            &tx_hashes
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        transaction.commit().await?;
 
         metrics::histogram!(
             "sql.chain.operations.remove_rejected_transactions",

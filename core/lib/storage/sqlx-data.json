@@ -2854,6 +2854,18 @@
       "nullable": []
     }
   },
+  "5e5becde03270ceb82f605ea94c70dac192e9a0f7dd2c918d8dc26d1902d2067": {
+    "query": "DELETE FROM tx_filters WHERE tx_hash = ANY ($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "5fac3f8e9ad91897751e7f14c56723f24d1c85ed146679296525e667b55b3947": {
     "query": "\n            SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n            WHERE id >= $1 AND kind = 'ERC20'::token_kind\n            ORDER BY id ASC\n            LIMIT $2\n            ",
     "describe": {
@@ -4823,18 +4835,6 @@
       "nullable": []
     }
   },
-  "a545c7251d381afbb2bdcbaef0cc5f1bc322db47ee0db555b83b9e19119bc756": {
-    "query": "DELETE FROM executed_transactions WHERE tx_hash IN (SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Timestamptz"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "a665923ec57382f357f6bb65f6e35876fbfedbf1661b3ce34f2458b63eebc68e": {
     "query": "\n            INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )\n            VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n            ",
     "describe": {
@@ -5705,6 +5705,18 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "c31936ecaa097fc0711fa24e79ee415bfc3da855f29b2138ecbaced1341d5e7f": {
+    "query": "DELETE FROM executed_transactions WHERE tx_hash = ANY ($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray"
+        ]
+      },
+      "nullable": []
     }
   },
   "c3632674ee6614b83e258c75447dc986507481a56fbdd5e05dedd0775f21fb79": {
@@ -7001,6 +7013,26 @@
         false,
         false,
         true
+      ]
+    }
+  },
+  "e8c69e16fe0e447d578dee61807b418ee4e8d5aebb60034cbc640eafceb593e2": {
+    "query": "SELECT tx_hash FROM executed_transactions WHERE success = false AND created_at < $1 LIMIT 1000",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
