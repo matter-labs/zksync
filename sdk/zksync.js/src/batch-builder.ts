@@ -58,7 +58,7 @@ export class BatchBuilder {
      */
     async build(
         feeToken?: TokenLike
-    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature | null; totalFee: TotalFee }> {
+    ): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature; totalFee: TotalFee }> {
         if (this.txs.length == 0) {
             throw new Error('Transaction batch cannot be empty');
         }
@@ -312,7 +312,7 @@ export class BatchBuilder {
     /**
      * Sets transactions nonces, assembles the batch and constructs the message to be signed by user.
      */
-    private async processTransactions(): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature | null }> {
+    private async processTransactions(): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature }> {
         return await this.wallet.processBatchBuilderTransactions(this.nonce, this.txs);
     }
 }

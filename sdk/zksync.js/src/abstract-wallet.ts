@@ -193,7 +193,7 @@ export abstract class AbstractWallet {
     abstract processBatchBuilderTransactions(
         startNonce: Nonce,
         txs: BatchBuilderInternalTx[]
-    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature | null }>;
+    ): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature }>;
 
     // *************
     // L2 operations

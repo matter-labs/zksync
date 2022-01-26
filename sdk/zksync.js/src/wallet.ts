@@ -153,7 +153,7 @@ export class Wallet extends AbstractWallet {
     async processBatchBuilderTransactions(
         startNonce: Nonce,
         txs: BatchBuilderInternalTx[]
-    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature | null }> {
+    ): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature }> {
         const processedTxs: SignedTransaction[] = [];
         let messages: string[] = [];
         let nonce: number = await this.getNonce(startNonce);
