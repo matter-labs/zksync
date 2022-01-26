@@ -70,8 +70,8 @@ jobs:
         run: |
           kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
           kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context default --user=user --cluster=default
-          kubectl config use-context default
+          kubectl config set-context matterlabs-zksync-${{ needs.setup.outputs.runner }} --user=user --cluster=default
+          kubectl config use-context matterlabs-zksync-${{ needs.setup.outputs.runner }}
       -
         name: Clone configs
         uses: actions/checkout@v2

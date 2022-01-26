@@ -14,6 +14,7 @@ env:
   ZKSYNC_ENV: loadtest
   HF_ARGS: -e loadtest
   DEPLOY_SA_NAME: gha-deployer-stage
+  DEPLOY_K8S_CONTEXT: matterlabs-zksync-stage
 
 jobs:
   update:
@@ -74,8 +75,8 @@ jobs:
         run: |
           kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
           kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context default --user=user --cluster=default
-          kubectl config use-context default
+          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
+          kubectl config use-context $DEPLOY_K8S_CONTEXT
       -
         name: Provision SQLProxy
         working-directory: helm-infra
@@ -174,8 +175,8 @@ jobs:
         run: |
           kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
           kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context default --user=user --cluster=default
-          kubectl config use-context default
+          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
+          kubectl config use-context $DEPLOY_K8S_CONTEXT
       -
         name: Update contracts in the ConfigMap
         run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
@@ -243,8 +244,8 @@ jobs:
         run: |
           kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
           kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context default --user=user --cluster=default
-          kubectl config use-context default
+          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
+          kubectl config use-context $DEPLOY_K8S_CONTEXT
       -
         name: Scale loadtest to 0 replicas
         run: |
