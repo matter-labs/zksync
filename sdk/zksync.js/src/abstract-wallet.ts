@@ -11,15 +11,12 @@ import {
     ChangePubKeyECDSA,
     ChangePubKeyOnchain,
     ChangePubkeyTypes,
-    Create2Data,
-    EthSignerType,
     ForcedExit,
     MintNFT,
     NFT,
     Nonce,
     Order,
     PubKeyHash,
-    Ratio,
     SignedTransaction,
     Swap,
     TokenLike,
@@ -58,18 +55,9 @@ export abstract class AbstractWallet {
         return this;
     }
 
-    batchBuilder(nonce?: Nonce): BatchBuilder {
-        return BatchBuilder.fromWallet(this, nonce);
-    }
-
-    abstract processBatchBuilderTransactions(
-        startNonce: Nonce,
-        txs: BatchBuilderInternalTx[]
-    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature | null }>;
-
-    /***********
-     * Abstract getters
-     */
+    // ****************
+    // Abstract getters
+    //
 
     /**
      * Returns the current Ethereum signer connected to this wallet.
@@ -95,10 +83,9 @@ export abstract class AbstractWallet {
      */
     abstract syncSignerPubKeyHash(): Promise<PubKeyHash>;
 
-    /***************
-     * Basic getters
-     ***************
-     */
+    // *************
+    // Basic getters
+    //
 
     address(): Address {
         return this.cachedAddress;
@@ -185,18 +172,41 @@ export abstract class AbstractWallet {
         }
     }
 
-    /***************
-     * L2 operations
+    // *********************
+    // Batch builder methods
+    //
+
+    /**
+     * Creates a batch builder instance.
      *
-     * Operations below each come in three signatures:
-     * - `getXXX`: get the full transaction with L2 signature.
-     * - `signXXX`: get the full transaction with both L2 and L1 signatures.
-     * - `XXX` or `syncXXX`: sign and send the transaction to zkSync.
-     *
-     * All these methods accept incomplete transaction data, and if they return signed transaction, this transaction will
-     * be "completed". "Incomplete transaction data" means that e.g. account IDs are not resolved or tokens are represented
-     * by their names/addresses rather than by their IDs in the zkSync network.
+     * @param nonce Nonce that should be used as the nonce of the first transaction in the batch.
+     * @returns Batch builder object
      */
+    batchBuilder(nonce?: Nonce): BatchBuilder {
+        return BatchBuilder.fromWallet(this, nonce);
+    }
+
+    /**
+     * Internal method used to process transactions created via batch builder.
+     * Should not be used directly.
+     */
+    abstract processBatchBuilderTransactions(
+        startNonce: Nonce,
+        txs: BatchBuilderInternalTx[]
+    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature | null }>;
+
+    // *************
+    // L2 operations
+    //
+    // Operations below each come in three signatures:
+    // - `getXXX`: get the full transaction with L2 signature.
+    // - `signXXX`: get the full transaction with both L2 and L1 signatures.
+    // - `XXX` or `syncXXX`: sign and send the transaction to zkSync.
+    //
+    // All these methods accept incomplete transaction data, and if they return signed transaction, this transaction will
+    // be "completed". "Incomplete transaction data" means that e.g. account IDs are not resolved or tokens are represented
+    // by their names/addresses rather than by their IDs in the zkSync network.
+    //
 
     // Transfer part
 
@@ -494,11 +504,11 @@ export abstract class AbstractWallet {
         return await this.provider.toggle2FA(await this.getToggle2FA(enable, pubKeyHash));
     }
 
-    /***************
-     * L1 operations
-     *
-     * Priority operations, ones that sent through Ethereum.
-     */
+    // *************
+    // L1 operations
+    //
+    // Priority operations, ones that sent through Ethereum.
+    //
 
     async approveERC20TokenDeposits(
         token: TokenLike,
@@ -692,11 +702,11 @@ export abstract class AbstractWallet {
         };
     }
 
-    /***************
-     * L1 getters
-     *
-     * Getter methods that query information from Web3.
-     */
+    // **********
+    // L1 getters
+    //
+    // Getter methods that query information from Web3.
+    //
 
     async isOnchainAuthSigningKeySet(nonce: Nonce = 'committed'): Promise<boolean> {
         const mainZkSyncContract = this.getZkSyncMainContract();
@@ -738,9 +748,9 @@ export abstract class AbstractWallet {
         );
     }
 
-    /***********
-     * Internal methods.
-     */
+    // ****************
+    // Internal methods
+    //
 
     protected async verifyNetworks() {
         if (this.provider.network != undefined && this.ethSigner().provider != undefined) {

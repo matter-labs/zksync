@@ -1,11 +1,9 @@
-import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from 'ethers';
-import { ErrorCode } from '@ethersproject/logger';
+import { BigNumber, BigNumberish, ethers } from 'ethers';
 import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
 import { Create2WalletSigner, Signer, unableToSign } from './signer';
-import { BatchBuilder, BatchBuilderInternalTx } from './batch-builder';
+import { BatchBuilderInternalTx } from './batch-builder';
 import {
-    AccountState,
     Address,
     ChangePubKey,
     ChangePubKeyCREATE2,
@@ -29,34 +27,13 @@ import {
     Withdraw,
     WithdrawNFT,
     TokenRatio,
-    WeiRatio,
-    Toggle2FARequest,
-    l1ChainId
+    WeiRatio
 } from './types';
-import {
-    ERC20_APPROVE_TRESHOLD,
-    ERC20_DEPOSIT_GAS_LIMIT,
-    ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT,
-    ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
-    getChangePubkeyLegacyMessage,
-    getChangePubkeyMessage,
-    getEthereumBalance,
-    getSignedBytesFromMessage,
-    IERC20_INTERFACE,
-    isTokenETH,
-    MAX_ERC20_APPROVE_AMOUNT,
-    MAX_TIMESTAMP,
-    signMessagePersonalAPI,
-    isNFT,
-    SYNC_MAIN_CONTRACT_INTERFACE,
-    getToggle2FAMessage
-} from './utils';
-import { Transaction, ETHOperation, submitSignedTransaction } from './operations';
+import { getChangePubkeyLegacyMessage, getChangePubkeyMessage, MAX_TIMESTAMP, isNFT } from './utils';
+import { Transaction, submitSignedTransaction } from './operations';
 import { AbstractWallet } from './abstract-wallet';
 
 export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransactionsBatch } from './operations';
-
-const EthersErrorCode = ErrorCode;
 
 export class Wallet extends AbstractWallet {
     private constructor(
@@ -70,6 +47,88 @@ export class Wallet extends AbstractWallet {
         super(cachedAddress, accountId);
     }
 
+    // ************
+    // Constructors
+    //
+
+    static async fromEthSigner(
+        ethWallet: ethers.Signer,
+        provider: SyncProvider,
+        signer?: Signer,
+        accountId?: number,
+        ethSignerType?: EthSignerType
+    ): Promise<Wallet> {
+        if (signer == null) {
+            const signerResult = await Signer.fromETHSignature(ethWallet);
+            signer = signerResult.signer;
+            ethSignerType = ethSignerType || signerResult.ethSignatureType;
+        } else if (ethSignerType == null) {
+            throw new Error('If you passed signer, you must also pass ethSignerType.');
+        }
+
+        const ethMessageSigner = new EthMessageSigner(ethWallet, ethSignerType);
+        const wallet = new Wallet(
+            ethWallet,
+            ethMessageSigner,
+            await ethWallet.getAddress(),
+            signer,
+            accountId,
+            ethSignerType
+        );
+
+        wallet.connect(provider);
+        await wallet.verifyNetworks();
+        return wallet;
+    }
+
+    static async fromCreate2Data(
+        syncSigner: Signer,
+        provider: SyncProvider,
+        create2Data: Create2Data,
+        accountId?: number
+    ): Promise<Wallet> {
+        const create2Signer = new Create2WalletSigner(await syncSigner.pubKeyHash(), create2Data);
+        return await Wallet.fromEthSigner(create2Signer, provider, syncSigner, accountId, {
+            verificationMethod: 'ERC-1271',
+            isSignedMsgPrefixed: true
+        });
+    }
+
+    static async fromEthSignerNoKeys(
+        ethWallet: ethers.Signer,
+        provider: SyncProvider,
+        accountId?: number,
+        ethSignerType?: EthSignerType
+    ): Promise<Wallet> {
+        const ethMessageSigner = new EthMessageSigner(ethWallet, ethSignerType);
+        const wallet = new Wallet(
+            ethWallet,
+            ethMessageSigner,
+            await ethWallet.getAddress(),
+            undefined,
+            accountId,
+            ethSignerType
+        );
+        wallet.connect(provider);
+        await wallet.verifyNetworks();
+        return wallet;
+    }
+
+    static async fromSyncSigner(
+        ethWallet: ethers.Signer,
+        syncSigner: Signer,
+        provider: SyncProvider,
+        accountId?: number
+    ) {
+        return await Wallet.fromEthSigner(ethWallet, provider, syncSigner, accountId, {
+            verificationMethod: 'ERC-1271',
+            isSignedMsgPrefixed: true
+        });
+    }
+
+    // ****************
+    // Abstract getters
+    //
 
     ethSigner(): ethers.Signer {
         return this._ethSigner;
@@ -86,6 +145,10 @@ export class Wallet extends AbstractWallet {
     async syncSignerPubKeyHash(): Promise<PubKeyHash> {
         return await this.signer.pubKeyHash();
     }
+
+    // *********************
+    // Batch builder methods
+    //
 
     async processBatchBuilderTransactions(
         startNonce: Nonce,
@@ -166,80 +229,9 @@ export class Wallet extends AbstractWallet {
         };
     }
 
-    static async fromEthSigner(
-        ethWallet: ethers.Signer,
-        provider: SyncProvider,
-        signer?: Signer,
-        accountId?: number,
-        ethSignerType?: EthSignerType
-    ): Promise<Wallet> {
-        if (signer == null) {
-            const signerResult = await Signer.fromETHSignature(ethWallet);
-            signer = signerResult.signer;
-            ethSignerType = ethSignerType || signerResult.ethSignatureType;
-        } else if (ethSignerType == null) {
-            throw new Error('If you passed signer, you must also pass ethSignerType.');
-        }
-
-        const ethMessageSigner = new EthMessageSigner(ethWallet, ethSignerType);
-        const wallet = new Wallet(
-            ethWallet,
-            ethMessageSigner,
-            await ethWallet.getAddress(),
-            signer,
-            accountId,
-            ethSignerType
-        );
-
-        wallet.connect(provider);
-        await wallet.verifyNetworks();
-        return wallet;
-    }
-
-    static async fromCreate2Data(
-        syncSigner: Signer,
-        provider: SyncProvider,
-        create2Data: Create2Data,
-        accountId?: number
-    ): Promise<Wallet> {
-        const create2Signer = new Create2WalletSigner(await syncSigner.pubKeyHash(), create2Data);
-        return await Wallet.fromEthSigner(create2Signer, provider, syncSigner, accountId, {
-            verificationMethod: 'ERC-1271',
-            isSignedMsgPrefixed: true
-        });
-    }
-
-    static async fromEthSignerNoKeys(
-        ethWallet: ethers.Signer,
-        provider: SyncProvider,
-        accountId?: number,
-        ethSignerType?: EthSignerType
-    ): Promise<Wallet> {
-        const ethMessageSigner = new EthMessageSigner(ethWallet, ethSignerType);
-        const wallet = new Wallet(
-            ethWallet,
-            ethMessageSigner,
-            await ethWallet.getAddress(),
-            undefined,
-            accountId,
-            ethSignerType
-        );
-        wallet.connect(provider);
-        await wallet.verifyNetworks();
-        return wallet;
-    }
-
-    static async fromSyncSigner(
-        ethWallet: ethers.Signer,
-        syncSigner: Signer,
-        provider: SyncProvider,
-        accountId?: number
-    ) {
-        return await Wallet.fromEthSigner(ethWallet, provider, syncSigner, accountId, {
-            verificationMethod: 'ERC-1271',
-            isSignedMsgPrefixed: true
-        });
-    }
+    // **************
+    // L2 operations
+    //
 
     async getTransfer(transfer: {
         to: Address;
@@ -296,359 +288,17 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignTransfer({
-                stringAmount,
-                stringFee,
-                stringToken,
-                to: transfer.to,
-                nonce: transfer.nonce,
-                accountId: this.accountId
-            });
+                  stringAmount,
+                  stringFee,
+                  stringToken,
+                  to: transfer.to,
+                  nonce: transfer.nonce,
+                  accountId: this.accountId
+              });
         return {
             tx: signedTransferTransaction,
             ethereumSignature
         };
-    }
-
-    async getForcedExit(forcedExit: {
-        target: Address;
-        token: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<ForcedExit> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-        await this.setRequiredAccountIdFromServer('perform a Forced Exit');
-
-        const tokenId = this.provider.tokenSet.resolveTokenId(forcedExit.token);
-
-        const transactionData = {
-            initiatorAccountId: this.accountId,
-            target: forcedExit.target,
-            tokenId,
-            fee: forcedExit.fee,
-            nonce: forcedExit.nonce,
-            validFrom: forcedExit.validFrom || 0,
-            validUntil: forcedExit.validUntil || MAX_TIMESTAMP
-        };
-
-        return await this.signer.signSyncForcedExit(transactionData);
-    }
-
-    async signSyncForcedExit(forcedExit: {
-        target: Address;
-        token: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<SignedTransaction> {
-        const signedForcedExitTransaction = await this.getForcedExit(forcedExit);
-
-        const stringFee = BigNumber.from(forcedExit.fee).isZero()
-            ? null
-            : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
-        const ethereumSignature = unableToSign(this.ethSigner())
-            ? null
-            : await this.ethMessageSigner().ethSignForcedExit({
-                stringToken,
-                stringFee,
-                target: forcedExit.target,
-                nonce: forcedExit.nonce
-            });
-
-        return {
-            tx: signedForcedExitTransaction,
-            ethereumSignature
-        };
-    }
-
-    async syncForcedExit(forcedExit: {
-        target: Address;
-        token: TokenLike;
-        fee?: BigNumberish;
-        nonce?: Nonce;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<Transaction> {
-        forcedExit.nonce = forcedExit.nonce != null ? await this.getNonce(forcedExit.nonce) : await this.getNonce();
-        if (forcedExit.fee == null) {
-            const fullFee = await this.provider.getTransactionFee('ForcedExit', forcedExit.target, forcedExit.token);
-            forcedExit.fee = fullFee.totalFee;
-        }
-
-        const signedForcedExitTransaction = await this.signSyncForcedExit(forcedExit as any);
-        return submitSignedTransaction(signedForcedExitTransaction, this.provider);
-    }
-
-    // Note that in syncMultiTransfer, unlike in syncTransfer,
-    // users need to specify the fee for each transaction.
-    // The main reason is that multitransfer enables paying fees
-    // in multiple tokens, (as long as the total sum
-    // of fees is enough to cover up the fees for all of the transactions).
-    // That might bring an inattentive user in a trouble like the following:
-    //
-    // A user wants to submit transactions in multiple tokens and
-    // wants to pay the fees with only some of them. If the user forgets
-    // to set the fees' value to 0 for transactions with tokens
-    // he won't pay the fee with, then this user will overpay a lot.
-    //
-    // That's why we want the users to be explicit about fees in multitransfers.
-    async syncMultiTransfer(
-        transfers: {
-            to: Address;
-            token: TokenLike;
-            amount: BigNumberish;
-            fee: BigNumberish;
-            nonce?: Nonce;
-            validFrom?: number;
-            validUntil?: number;
-        }[]
-    ): Promise<Transaction[]> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-
-        if (transfers.length == 0) return [];
-
-        await this.setRequiredAccountIdFromServer('Transfer funds');
-
-        let batch = [];
-        let messages: string[] = [];
-
-        let nextNonce = transfers[0].nonce != null ? await this.getNonce(transfers[0].nonce) : await this.getNonce();
-        const batchNonce = nextNonce;
-
-        for (let i = 0; i < transfers.length; i++) {
-            const transfer = transfers[i];
-            const nonce = nextNonce;
-            nextNonce += 1;
-
-            const tx: Transfer = await this.getTransfer({
-                to: transfer.to,
-                token: transfer.token,
-                amount: transfer.amount,
-                fee: transfer.fee,
-                nonce,
-                validFrom: transfer.validFrom || 0,
-                validUntil: transfer.validUntil || MAX_TIMESTAMP
-            });
-            const message = await this.getTransferEthMessagePart(transfer);
-            messages.push(message);
-            batch.push({ tx, signature: null });
-        }
-
-        messages.push(`Nonce: ${batchNonce}`);
-        const message = messages.filter((part) => part.length != 0).join('\n');
-        const ethSignatures = unableToSign(this.ethSigner())
-            ? []
-            : [await this.ethMessageSigner().getEthMessageSignature(message)];
-
-        const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignatures);
-        return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
-    }
-
-    async syncTransferNFT(transfer: {
-        to: Address;
-        token: NFT;
-        feeToken: TokenLike;
-        fee?: BigNumberish;
-        nonce?: Nonce;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<Transaction[]> {
-        transfer.nonce = transfer.nonce != null ? await this.getNonce(transfer.nonce) : await this.getNonce();
-
-        let fee: BigNumberish;
-        if (transfer.fee == null) {
-            fee = await this.provider.getTransactionsBatchFee(
-                ['Transfer', 'Transfer'],
-                [transfer.to, this.address()],
-                transfer.feeToken
-            );
-        } else {
-            fee = transfer.fee;
-        }
-
-        const txNFT = {
-            to: transfer.to,
-            token: transfer.token.id,
-            amount: 1,
-            fee: 0
-        };
-        const txFee = {
-            to: this.address(),
-            token: transfer.feeToken,
-            amount: 0,
-            fee
-        };
-
-        return await this.syncMultiTransfer([txNFT, txFee]);
-    }
-
-    async getLimitOrder(order: {
-        tokenSell: TokenLike;
-        tokenBuy: TokenLike;
-        ratio: TokenRatio | WeiRatio;
-        recipient?: Address;
-        nonce?: Nonce;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<Order> {
-        return this.getOrder({
-            ...order,
-            amount: 0
-        });
-    }
-
-    async getOrder(order: {
-        tokenSell: TokenLike;
-        tokenBuy: TokenLike;
-        ratio: TokenRatio | WeiRatio;
-        amount: BigNumberish;
-        recipient?: Address;
-        nonce?: Nonce;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<Order> {
-        if (!this.signer) {
-            throw new Error('zkSync signer is required for signing an order');
-        }
-        await this.setRequiredAccountIdFromServer('Swap order');
-        const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
-        const recipient = order.recipient || this.address();
-
-        let ratio: Ratio;
-        const sell = order.tokenSell;
-        const buy = order.tokenBuy;
-
-        if (!order.ratio[sell] || !order.ratio[buy]) {
-            throw new Error(`Wrong tokens in the ratio object: should be ${sell} and ${buy}`);
-        }
-
-        if (order.ratio.type == 'Wei') {
-            ratio = [order.ratio[sell], order.ratio[buy]];
-        } else if (order.ratio.type == 'Token') {
-            ratio = [
-                this.provider.tokenSet.parseToken(sell, order.ratio[sell].toString()),
-                this.provider.tokenSet.parseToken(buy, order.ratio[buy].toString())
-            ];
-        }
-
-        const signedOrder = await this.signer.signSyncOrder({
-            accountId: this.accountId,
-            recipient,
-            nonce,
-            amount: order.amount || BigNumber.from(0),
-            tokenSell: this.provider.tokenSet.resolveTokenId(order.tokenSell),
-            tokenBuy: this.provider.tokenSet.resolveTokenId(order.tokenBuy),
-            validFrom: order.validFrom || 0,
-            validUntil: order.validUntil || MAX_TIMESTAMP,
-            ratio
-        });
-
-        return this.signOrder(signedOrder);
-    }
-
-    async signOrder(order: Order): Promise<Order> {
-        const stringAmount = BigNumber.from(order.amount).isZero()
-            ? null
-            : this.provider.tokenSet.formatToken(order.tokenSell, order.amount);
-        const stringTokenSell = await this.provider.getTokenSymbol(order.tokenSell);
-        const stringTokenBuy = await this.provider.getTokenSymbol(order.tokenBuy);
-        const ethereumSignature = unableToSign(this.ethSigner())
-            ? null
-            : await this.ethMessageSigner().ethSignOrder({
-                amount: stringAmount,
-                tokenSell: stringTokenSell,
-                tokenBuy: stringTokenBuy,
-                nonce: order.nonce,
-                recipient: order.recipient,
-                ratio: order.ratio
-            });
-        order.ethSignature = ethereumSignature;
-        return order;
-    }
-
-    async getSwap(swap: {
-        orders: [Order, Order];
-        feeToken: number;
-        amounts: [BigNumberish, BigNumberish];
-        nonce: number;
-        fee: BigNumberish;
-    }): Promise<Swap> {
-        if (!this.signer) {
-            throw new Error('zkSync signer is required for swapping funds');
-        }
-        await this.setRequiredAccountIdFromServer('Swap submission');
-        const feeToken = this.provider.tokenSet.resolveTokenId(swap.feeToken);
-
-        return this.signer.signSyncSwap({
-            ...swap,
-            submitterId: await this.getAccountId(),
-            submitterAddress: this.address(),
-            feeToken
-        });
-    }
-
-    async signSyncSwap(swap: {
-        orders: [Order, Order];
-        feeToken: number;
-        amounts: [BigNumberish, BigNumberish];
-        nonce: number;
-        fee: BigNumberish;
-    }): Promise<SignedTransaction> {
-        const signedSwapTransaction = await this.getSwap(swap);
-        const stringFee = BigNumber.from(swap.fee).isZero()
-            ? null
-            : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
-        const ethereumSignature = unableToSign(this.ethSigner())
-            ? null
-            : await this.ethMessageSigner().ethSignSwap({
-                fee: stringFee,
-                feeToken: stringToken,
-                nonce: swap.nonce
-            });
-
-        return {
-            tx: signedSwapTransaction,
-            ethereumSignature: [
-                ethereumSignature,
-                swap.orders[0].ethSignature || null,
-                swap.orders[1].ethSignature || null
-            ]
-        };
-    }
-
-    async syncSwap(swap: {
-        orders: [Order, Order];
-        feeToken: TokenLike;
-        amounts?: [BigNumberish, BigNumberish];
-        nonce?: number;
-        fee?: BigNumberish;
-    }): Promise<Transaction> {
-        swap.nonce = swap.nonce != null ? await this.getNonce(swap.nonce) : await this.getNonce();
-        if (swap.fee == null) {
-            const fullFee = await this.provider.getTransactionFee('Swap', this.address(), swap.feeToken);
-            swap.fee = fullFee.totalFee;
-        }
-
-        if (swap.amounts == null) {
-            let amount0 = BigNumber.from(swap.orders[0].amount);
-            let amount1 = BigNumber.from(swap.orders[1].amount);
-            if (!amount0.eq(0) && !amount1.eq(0)) {
-                swap.amounts = [amount0, amount1];
-            } else {
-                throw new Error('If amounts in orders are implicit, you must specify them during submission');
-            }
-        }
-
-        const signedSwapTransaction = await this.signSyncSwap(swap as any);
-        return submitSignedTransaction(signedSwapTransaction, this.provider);
     }
 
     async syncTransfer(transfer: {
@@ -670,262 +320,7 @@ export class Wallet extends AbstractWallet {
         return submitSignedTransaction(signedTransferTransaction, this.provider);
     }
 
-    async getMintNFT(mintNFT: {
-        recipient: string;
-        contentHash: string;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<MintNFT> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-        await this.setRequiredAccountIdFromServer('MintNFT');
-
-        const feeTokenId = this.provider.tokenSet.resolveTokenId(mintNFT.feeToken);
-        const transactionData = {
-            creatorId: this.accountId,
-            creatorAddress: this.address(),
-            recipient: mintNFT.recipient,
-            contentHash: mintNFT.contentHash,
-            feeTokenId,
-            fee: mintNFT.fee,
-            nonce: mintNFT.nonce
-        };
-
-        return await this.signer.signMintNFT(transactionData);
-    }
-
-    async getWithdrawNFT(withdrawNFT: {
-        to: string;
-        token: TokenLike;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<WithdrawNFT> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-        await this.setRequiredAccountIdFromServer('WithdrawNFT');
-
-        const tokenId = this.provider.tokenSet.resolveTokenId(withdrawNFT.token);
-        const feeTokenId = this.provider.tokenSet.resolveTokenId(withdrawNFT.feeToken);
-        const transactionData = {
-            accountId: this.accountId,
-            from: this.address(),
-            to: withdrawNFT.to,
-            tokenId,
-            feeTokenId,
-            fee: withdrawNFT.fee,
-            nonce: withdrawNFT.nonce,
-            validFrom: withdrawNFT.validFrom,
-            validUntil: withdrawNFT.validUntil
-        };
-
-        return await this.signer.signWithdrawNFT(transactionData);
-    }
-
-    async getWithdrawFromSyncToEthereum(withdraw: {
-        ethAddress: string;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Withdraw> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-        await this.setRequiredAccountIdFromServer('Withdraw funds');
-
-        const tokenId = this.provider.tokenSet.resolveTokenId(withdraw.token);
-        const transactionData = {
-            accountId: this.accountId,
-            from: this.address(),
-            ethAddress: withdraw.ethAddress,
-            tokenId,
-            amount: withdraw.amount,
-            fee: withdraw.fee,
-            nonce: withdraw.nonce,
-            validFrom: withdraw.validFrom,
-            validUntil: withdraw.validUntil
-        };
-
-        return await this.signer.signSyncWithdraw(transactionData);
-    }
-
-    async signMintNFT(mintNFT: {
-        recipient: string;
-        contentHash: string;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<SignedTransaction> {
-        const signedMintNFTTransaction = await this.getMintNFT(mintNFT as any);
-
-        const stringFee = BigNumber.from(mintNFT.fee).isZero()
-            ? null
-            : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
-        const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
-        const ethereumSignature = unableToSign(this.ethSigner())
-            ? null
-            : await this.ethMessageSigner().ethSignMintNFT({
-                stringFeeToken,
-                stringFee,
-                recipient: mintNFT.recipient,
-                contentHash: mintNFT.contentHash,
-                nonce: mintNFT.nonce
-            });
-
-        return {
-            tx: signedMintNFTTransaction,
-            ethereumSignature
-        };
-    }
-
-    async signWithdrawNFT(withdrawNFT: {
-        to: string;
-        token: number;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<SignedTransaction> {
-        withdrawNFT.validFrom = withdrawNFT.validFrom || 0;
-        withdrawNFT.validUntil = withdrawNFT.validUntil || MAX_TIMESTAMP;
-        const signedWithdrawNFTTransaction = await this.getWithdrawNFT(withdrawNFT as any);
-
-        const stringFee = BigNumber.from(withdrawNFT.fee).isZero()
-            ? null
-            : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
-        const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
-        const ethereumSignature = unableToSign(this.ethSigner())
-            ? null
-            : await this.ethMessageSigner().ethSignWithdrawNFT({
-                token: withdrawNFT.token,
-                to: withdrawNFT.to,
-                stringFee,
-                stringFeeToken,
-                nonce: withdrawNFT.nonce
-            });
-
-        return {
-            tx: signedWithdrawNFTTransaction,
-            ethereumSignature
-        };
-    }
-
-    async signWithdrawFromSyncToEthereum(withdraw: {
-        ethAddress: string;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<SignedTransaction> {
-        withdraw.validFrom = withdraw.validFrom || 0;
-        withdraw.validUntil = withdraw.validUntil || MAX_TIMESTAMP;
-        const signedWithdrawTransaction = await this.getWithdrawFromSyncToEthereum(withdraw as any);
-
-        const stringAmount = BigNumber.from(withdraw.amount).isZero()
-            ? null
-            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
-        const stringFee = BigNumber.from(withdraw.fee).isZero()
-            ? null
-            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
-        const ethereumSignature = unableToSign(this.ethSigner())
-            ? null
-            : await this.ethMessageSigner().ethSignWithdraw({
-                stringAmount,
-                stringFee,
-                stringToken,
-                ethAddress: withdraw.ethAddress,
-                nonce: withdraw.nonce,
-                accountId: this.accountId
-            });
-
-        return {
-            tx: signedWithdrawTransaction,
-            ethereumSignature
-        };
-    }
-
-    async mintNFT(mintNFT: {
-        recipient: Address;
-        contentHash: ethers.BytesLike;
-        feeToken: TokenLike;
-        fee?: BigNumberish;
-        nonce?: Nonce;
-    }): Promise<Transaction> {
-        mintNFT.nonce = mintNFT.nonce != null ? await this.getNonce(mintNFT.nonce) : await this.getNonce();
-        mintNFT.contentHash = ethers.utils.hexlify(mintNFT.contentHash);
-
-        if (mintNFT.fee == null) {
-            const fullFee = await this.provider.getTransactionFee('MintNFT', mintNFT.recipient, mintNFT.feeToken);
-            mintNFT.fee = fullFee.totalFee;
-        }
-
-        const signedMintNFTTransaction = await this.signMintNFT(mintNFT as any);
-
-        return submitSignedTransaction(signedMintNFTTransaction, this.provider, false);
-    }
-
-    async withdrawNFT(withdrawNFT: {
-        to: string;
-        token: number;
-        feeToken: TokenLike;
-        fee?: BigNumberish;
-        nonce?: Nonce;
-        fastProcessing?: boolean;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<Transaction> {
-        withdrawNFT.nonce = withdrawNFT.nonce != null ? await this.getNonce(withdrawNFT.nonce) : await this.getNonce();
-        if (!isNFT(withdrawNFT.token)) {
-            throw new Error('This token ID does not correspond to an NFT');
-        }
-
-        if (withdrawNFT.fee == null) {
-            const feeType = withdrawNFT.fastProcessing === true ? 'FastWithdrawNFT' : 'WithdrawNFT';
-
-            const fullFee = await this.provider.getTransactionFee(feeType, withdrawNFT.to, withdrawNFT.feeToken);
-            withdrawNFT.fee = fullFee.totalFee;
-        }
-
-        const signedWithdrawNFTTransaction = await this.signWithdrawNFT(withdrawNFT as any);
-
-        return submitSignedTransaction(signedWithdrawNFTTransaction, this.provider, withdrawNFT.fastProcessing);
-    }
-
-    async withdrawFromSyncToEthereum(withdraw: {
-        ethAddress: string;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee?: BigNumberish;
-        nonce?: Nonce;
-        fastProcessing?: boolean;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<Transaction> {
-        withdraw.nonce = withdraw.nonce != null ? await this.getNonce(withdraw.nonce) : await this.getNonce();
-
-        if (withdraw.fee == null) {
-            const feeType = withdraw.fastProcessing === true ? 'FastWithdraw' : 'Withdraw';
-
-            const fullFee = await this.provider.getTransactionFee(feeType, withdraw.ethAddress, withdraw.token);
-            withdraw.fee = fullFee.totalFee;
-        }
-
-        const signedWithdrawTransaction = await this.signWithdrawFromSyncToEthereum(withdraw as any);
-
-        return submitSignedTransaction(signedWithdrawTransaction, this.provider, withdraw.fastProcessing);
-    }
+    // ChangePubKey part
 
     async getChangePubKey(changePubKey: {
         feeToken: TokenLike;
@@ -1063,6 +458,612 @@ export class Wallet extends AbstractWallet {
 
         return submitSignedTransaction(txData, this.provider);
     }
+
+    // Withdraw part
+
+    async getWithdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<Withdraw> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('Withdraw funds');
+
+        const tokenId = this.provider.tokenSet.resolveTokenId(withdraw.token);
+        const transactionData = {
+            accountId: this.accountId,
+            from: this.address(),
+            ethAddress: withdraw.ethAddress,
+            tokenId,
+            amount: withdraw.amount,
+            fee: withdraw.fee,
+            nonce: withdraw.nonce,
+            validFrom: withdraw.validFrom,
+            validUntil: withdraw.validUntil
+        };
+
+        return await this.signer.signSyncWithdraw(transactionData);
+    }
+
+    async signWithdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<SignedTransaction> {
+        withdraw.validFrom = withdraw.validFrom || 0;
+        withdraw.validUntil = withdraw.validUntil || MAX_TIMESTAMP;
+        const signedWithdrawTransaction = await this.getWithdrawFromSyncToEthereum(withdraw as any);
+
+        const stringAmount = BigNumber.from(withdraw.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
+        const stringFee = BigNumber.from(withdraw.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
+        const ethereumSignature = unableToSign(this.ethSigner())
+            ? null
+            : await this.ethMessageSigner().ethSignWithdraw({
+                  stringAmount,
+                  stringFee,
+                  stringToken,
+                  ethAddress: withdraw.ethAddress,
+                  nonce: withdraw.nonce,
+                  accountId: this.accountId
+              });
+
+        return {
+            tx: signedWithdrawTransaction,
+            ethereumSignature
+        };
+    }
+
+    async withdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+        fastProcessing?: boolean;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Transaction> {
+        withdraw.nonce = withdraw.nonce != null ? await this.getNonce(withdraw.nonce) : await this.getNonce();
+
+        if (withdraw.fee == null) {
+            const feeType = withdraw.fastProcessing === true ? 'FastWithdraw' : 'Withdraw';
+
+            const fullFee = await this.provider.getTransactionFee(feeType, withdraw.ethAddress, withdraw.token);
+            withdraw.fee = fullFee.totalFee;
+        }
+
+        const signedWithdrawTransaction = await this.signWithdrawFromSyncToEthereum(withdraw as any);
+
+        return submitSignedTransaction(signedWithdrawTransaction, this.provider, withdraw.fastProcessing);
+    }
+
+    // Forced exit part
+
+    async getForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<ForcedExit> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('perform a Forced Exit');
+
+        const tokenId = this.provider.tokenSet.resolveTokenId(forcedExit.token);
+
+        const transactionData = {
+            initiatorAccountId: this.accountId,
+            target: forcedExit.target,
+            tokenId,
+            fee: forcedExit.fee,
+            nonce: forcedExit.nonce,
+            validFrom: forcedExit.validFrom || 0,
+            validUntil: forcedExit.validUntil || MAX_TIMESTAMP
+        };
+
+        return await this.signer.signSyncForcedExit(transactionData);
+    }
+
+    async signSyncForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<SignedTransaction> {
+        const signedForcedExitTransaction = await this.getForcedExit(forcedExit);
+
+        const stringFee = BigNumber.from(forcedExit.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
+        const ethereumSignature = unableToSign(this.ethSigner())
+            ? null
+            : await this.ethMessageSigner().ethSignForcedExit({
+                  stringToken,
+                  stringFee,
+                  target: forcedExit.target,
+                  nonce: forcedExit.nonce
+              });
+
+        return {
+            tx: signedForcedExitTransaction,
+            ethereumSignature
+        };
+    }
+
+    async syncForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Transaction> {
+        forcedExit.nonce = forcedExit.nonce != null ? await this.getNonce(forcedExit.nonce) : await this.getNonce();
+        if (forcedExit.fee == null) {
+            const fullFee = await this.provider.getTransactionFee('ForcedExit', forcedExit.target, forcedExit.token);
+            forcedExit.fee = fullFee.totalFee;
+        }
+
+        const signedForcedExitTransaction = await this.signSyncForcedExit(forcedExit as any);
+        return submitSignedTransaction(signedForcedExitTransaction, this.provider);
+    }
+
+    // Swap part
+
+    async getLimitOrder(order: {
+        tokenSell: TokenLike;
+        tokenBuy: TokenLike;
+        ratio: TokenRatio | WeiRatio;
+        recipient?: Address;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Order> {
+        return this.getOrder({
+            ...order,
+            amount: 0
+        });
+    }
+
+    async getOrder(order: {
+        tokenSell: TokenLike;
+        tokenBuy: TokenLike;
+        ratio: TokenRatio | WeiRatio;
+        amount: BigNumberish;
+        recipient?: Address;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Order> {
+        if (!this.signer) {
+            throw new Error('zkSync signer is required for signing an order');
+        }
+        await this.setRequiredAccountIdFromServer('Swap order');
+        const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
+        const recipient = order.recipient || this.address();
+
+        let ratio: Ratio;
+        const sell = order.tokenSell;
+        const buy = order.tokenBuy;
+
+        if (!order.ratio[sell] || !order.ratio[buy]) {
+            throw new Error(`Wrong tokens in the ratio object: should be ${sell} and ${buy}`);
+        }
+
+        if (order.ratio.type == 'Wei') {
+            ratio = [order.ratio[sell], order.ratio[buy]];
+        } else if (order.ratio.type == 'Token') {
+            ratio = [
+                this.provider.tokenSet.parseToken(sell, order.ratio[sell].toString()),
+                this.provider.tokenSet.parseToken(buy, order.ratio[buy].toString())
+            ];
+        }
+
+        const signedOrder = await this.signer.signSyncOrder({
+            accountId: this.accountId,
+            recipient,
+            nonce,
+            amount: order.amount || BigNumber.from(0),
+            tokenSell: this.provider.tokenSet.resolveTokenId(order.tokenSell),
+            tokenBuy: this.provider.tokenSet.resolveTokenId(order.tokenBuy),
+            validFrom: order.validFrom || 0,
+            validUntil: order.validUntil || MAX_TIMESTAMP,
+            ratio
+        });
+
+        return this.signOrder(signedOrder);
+    }
+
+    async signOrder(order: Order): Promise<Order> {
+        const stringAmount = BigNumber.from(order.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(order.tokenSell, order.amount);
+        const stringTokenSell = await this.provider.getTokenSymbol(order.tokenSell);
+        const stringTokenBuy = await this.provider.getTokenSymbol(order.tokenBuy);
+        const ethereumSignature = unableToSign(this.ethSigner())
+            ? null
+            : await this.ethMessageSigner().ethSignOrder({
+                  amount: stringAmount,
+                  tokenSell: stringTokenSell,
+                  tokenBuy: stringTokenBuy,
+                  nonce: order.nonce,
+                  recipient: order.recipient,
+                  ratio: order.ratio
+              });
+        order.ethSignature = ethereumSignature;
+        return order;
+    }
+
+    async getSwap(swap: {
+        orders: [Order, Order];
+        feeToken: number;
+        amounts: [BigNumberish, BigNumberish];
+        nonce: number;
+        fee: BigNumberish;
+    }): Promise<Swap> {
+        if (!this.signer) {
+            throw new Error('zkSync signer is required for swapping funds');
+        }
+        await this.setRequiredAccountIdFromServer('Swap submission');
+        const feeToken = this.provider.tokenSet.resolveTokenId(swap.feeToken);
+
+        return this.signer.signSyncSwap({
+            ...swap,
+            submitterId: await this.getAccountId(),
+            submitterAddress: this.address(),
+            feeToken
+        });
+    }
+
+    async signSyncSwap(swap: {
+        orders: [Order, Order];
+        feeToken: number;
+        amounts: [BigNumberish, BigNumberish];
+        nonce: number;
+        fee: BigNumberish;
+    }): Promise<SignedTransaction> {
+        const signedSwapTransaction = await this.getSwap(swap);
+        const stringFee = BigNumber.from(swap.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
+        const ethereumSignature = unableToSign(this.ethSigner())
+            ? null
+            : await this.ethMessageSigner().ethSignSwap({
+                  fee: stringFee,
+                  feeToken: stringToken,
+                  nonce: swap.nonce
+              });
+
+        return {
+            tx: signedSwapTransaction,
+            ethereumSignature: [
+                ethereumSignature,
+                swap.orders[0].ethSignature || null,
+                swap.orders[1].ethSignature || null
+            ]
+        };
+    }
+
+    async syncSwap(swap: {
+        orders: [Order, Order];
+        feeToken: TokenLike;
+        amounts?: [BigNumberish, BigNumberish];
+        nonce?: number;
+        fee?: BigNumberish;
+    }): Promise<Transaction> {
+        swap.nonce = swap.nonce != null ? await this.getNonce(swap.nonce) : await this.getNonce();
+        if (swap.fee == null) {
+            const fullFee = await this.provider.getTransactionFee('Swap', this.address(), swap.feeToken);
+            swap.fee = fullFee.totalFee;
+        }
+
+        if (swap.amounts == null) {
+            let amount0 = BigNumber.from(swap.orders[0].amount);
+            let amount1 = BigNumber.from(swap.orders[1].amount);
+            if (!amount0.eq(0) && !amount1.eq(0)) {
+                swap.amounts = [amount0, amount1];
+            } else {
+                throw new Error('If amounts in orders are implicit, you must specify them during submission');
+            }
+        }
+
+        const signedSwapTransaction = await this.signSyncSwap(swap as any);
+        return submitSignedTransaction(signedSwapTransaction, this.provider);
+    }
+
+    // Mint NFT part
+
+    async getMintNFT(mintNFT: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<MintNFT> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('MintNFT');
+
+        const feeTokenId = this.provider.tokenSet.resolveTokenId(mintNFT.feeToken);
+        const transactionData = {
+            creatorId: this.accountId,
+            creatorAddress: this.address(),
+            recipient: mintNFT.recipient,
+            contentHash: mintNFT.contentHash,
+            feeTokenId,
+            fee: mintNFT.fee,
+            nonce: mintNFT.nonce
+        };
+
+        return await this.signer.signMintNFT(transactionData);
+    }
+
+    async signMintNFT(mintNFT: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<SignedTransaction> {
+        const signedMintNFTTransaction = await this.getMintNFT(mintNFT as any);
+
+        const stringFee = BigNumber.from(mintNFT.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
+        const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
+        const ethereumSignature = unableToSign(this.ethSigner())
+            ? null
+            : await this.ethMessageSigner().ethSignMintNFT({
+                  stringFeeToken,
+                  stringFee,
+                  recipient: mintNFT.recipient,
+                  contentHash: mintNFT.contentHash,
+                  nonce: mintNFT.nonce
+              });
+
+        return {
+            tx: signedMintNFTTransaction,
+            ethereumSignature
+        };
+    }
+
+    async mintNFT(mintNFT: {
+        recipient: Address;
+        contentHash: ethers.BytesLike;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+    }): Promise<Transaction> {
+        mintNFT.nonce = mintNFT.nonce != null ? await this.getNonce(mintNFT.nonce) : await this.getNonce();
+        mintNFT.contentHash = ethers.utils.hexlify(mintNFT.contentHash);
+
+        if (mintNFT.fee == null) {
+            const fullFee = await this.provider.getTransactionFee('MintNFT', mintNFT.recipient, mintNFT.feeToken);
+            mintNFT.fee = fullFee.totalFee;
+        }
+
+        const signedMintNFTTransaction = await this.signMintNFT(mintNFT as any);
+
+        return submitSignedTransaction(signedMintNFTTransaction, this.provider, false);
+    }
+
+    // Withdraw NFT part
+    async getWithdrawNFT(withdrawNFT: {
+        to: string;
+        token: TokenLike;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<WithdrawNFT> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('WithdrawNFT');
+
+        const tokenId = this.provider.tokenSet.resolveTokenId(withdrawNFT.token);
+        const feeTokenId = this.provider.tokenSet.resolveTokenId(withdrawNFT.feeToken);
+        const transactionData = {
+            accountId: this.accountId,
+            from: this.address(),
+            to: withdrawNFT.to,
+            tokenId,
+            feeTokenId,
+            fee: withdrawNFT.fee,
+            nonce: withdrawNFT.nonce,
+            validFrom: withdrawNFT.validFrom,
+            validUntil: withdrawNFT.validUntil
+        };
+
+        return await this.signer.signWithdrawNFT(transactionData);
+    }
+
+    async signWithdrawNFT(withdrawNFT: {
+        to: string;
+        token: number;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<SignedTransaction> {
+        withdrawNFT.validFrom = withdrawNFT.validFrom || 0;
+        withdrawNFT.validUntil = withdrawNFT.validUntil || MAX_TIMESTAMP;
+        const signedWithdrawNFTTransaction = await this.getWithdrawNFT(withdrawNFT as any);
+
+        const stringFee = BigNumber.from(withdrawNFT.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
+        const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
+        const ethereumSignature = unableToSign(this.ethSigner())
+            ? null
+            : await this.ethMessageSigner().ethSignWithdrawNFT({
+                  token: withdrawNFT.token,
+                  to: withdrawNFT.to,
+                  stringFee,
+                  stringFeeToken,
+                  nonce: withdrawNFT.nonce
+              });
+
+        return {
+            tx: signedWithdrawNFTTransaction,
+            ethereumSignature
+        };
+    }
+
+    async withdrawNFT(withdrawNFT: {
+        to: string;
+        token: number;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+        fastProcessing?: boolean;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Transaction> {
+        withdrawNFT.nonce = withdrawNFT.nonce != null ? await this.getNonce(withdrawNFT.nonce) : await this.getNonce();
+        if (!isNFT(withdrawNFT.token)) {
+            throw new Error('This token ID does not correspond to an NFT');
+        }
+
+        if (withdrawNFT.fee == null) {
+            const feeType = withdrawNFT.fastProcessing === true ? 'FastWithdrawNFT' : 'WithdrawNFT';
+
+            const fullFee = await this.provider.getTransactionFee(feeType, withdrawNFT.to, withdrawNFT.feeToken);
+            withdrawNFT.fee = fullFee.totalFee;
+        }
+
+        const signedWithdrawNFTTransaction = await this.signWithdrawNFT(withdrawNFT as any);
+
+        return submitSignedTransaction(signedWithdrawNFTTransaction, this.provider, withdrawNFT.fastProcessing);
+    }
+
+    // Transfer NFT part
+
+    async syncTransferNFT(transfer: {
+        to: Address;
+        token: NFT;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Transaction[]> {
+        transfer.nonce = transfer.nonce != null ? await this.getNonce(transfer.nonce) : await this.getNonce();
+
+        let fee: BigNumberish;
+        if (transfer.fee == null) {
+            fee = await this.provider.getTransactionsBatchFee(
+                ['Transfer', 'Transfer'],
+                [transfer.to, this.address()],
+                transfer.feeToken
+            );
+        } else {
+            fee = transfer.fee;
+        }
+
+        const txNFT = {
+            to: transfer.to,
+            token: transfer.token.id,
+            amount: 1,
+            fee: 0
+        };
+        const txFee = {
+            to: this.address(),
+            token: transfer.feeToken,
+            amount: 0,
+            fee
+        };
+
+        return await this.syncMultiTransfer([txNFT, txFee]);
+    }
+
+    // Multi-transfer part
+
+    // Note: this method signature requires to specify fee in each transaction.
+    // For details, see the comment on this method in `AbstractWallet` class.
+    async syncMultiTransfer(
+        transfers: {
+            to: Address;
+            token: TokenLike;
+            amount: BigNumberish;
+            fee: BigNumberish;
+            nonce?: Nonce;
+            validFrom?: number;
+            validUntil?: number;
+        }[]
+    ): Promise<Transaction[]> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+
+        if (transfers.length == 0) return [];
+
+        await this.setRequiredAccountIdFromServer('Transfer funds');
+
+        let batch = [];
+        let messages: string[] = [];
+
+        let nextNonce = transfers[0].nonce != null ? await this.getNonce(transfers[0].nonce) : await this.getNonce();
+        const batchNonce = nextNonce;
+
+        for (let i = 0; i < transfers.length; i++) {
+            const transfer = transfers[i];
+            const nonce = nextNonce;
+            nextNonce += 1;
+
+            const tx: Transfer = await this.getTransfer({
+                to: transfer.to,
+                token: transfer.token,
+                amount: transfer.amount,
+                fee: transfer.fee,
+                nonce,
+                validFrom: transfer.validFrom || 0,
+                validUntil: transfer.validUntil || MAX_TIMESTAMP
+            });
+            const message = await this.getTransferEthMessagePart(transfer);
+            messages.push(message);
+            batch.push({ tx, signature: null });
+        }
+
+        messages.push(`Nonce: ${batchNonce}`);
+        const message = messages.filter((part) => part.length != 0).join('\n');
+        const ethSignatures = unableToSign(this.ethSigner())
+            ? []
+            : [await this.ethMessageSigner().getEthMessageSignature(message)];
+
+        const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignatures);
+        return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
+    }
+
+    // ****************
+    // Internal methods
+    //
+
     getWithdrawNFTEthMessagePart(withdrawNFT: {
         to: string;
         token: number;
