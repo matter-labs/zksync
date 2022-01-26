@@ -2,8 +2,7 @@ import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from '
 import { ErrorCode } from '@ethersproject/logger';
 import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
-import { Create2WalletSigner, Signer, unableToSign } from './signer';
-import { BatchBuilder } from './batch-builder';
+import { BatchBuilder, BatchBuilderInternalTx } from './batch-builder';
 import {
     AccountState,
     Address,
@@ -63,6 +62,11 @@ export abstract class AbstractWallet {
         return BatchBuilder.fromWallet(this, nonce);
     }
 
+    abstract processBatchBuilderTransactions(
+        startNonce: Nonce,
+        txs: BatchBuilderInternalTx[]
+    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature | null }>;
+
     /***********
      * Abstract getters
      */
@@ -70,7 +74,7 @@ export abstract class AbstractWallet {
     /**
      * Returns the current Ethereum signer connected to this wallet.
      */
-    protected abstract ethSigner(): ethers.Signer;
+    abstract ethSigner(): ethers.Signer;
 
     /**
      * Returns the current Ethereum **message** signer connected to this wallet.
@@ -78,18 +82,18 @@ export abstract class AbstractWallet {
      * Ethereum message signer differs from common Ethereum signer in that message signer
      * returns Ethereum signatures along with its type (e.g. ECDSA / EIP1271).
      */
-    protected abstract ethMessageSigner(): EthMessageSigner;
+    abstract ethMessageSigner(): EthMessageSigner;
 
     /**
      * Returns `true` if this wallet instance has a connected L2 signer.
      */
-    protected abstract syncSignerConnected(): boolean;
+    abstract syncSignerConnected(): boolean;
 
     /**
      * Returns the PubKeyHash that current *signer* uses
      * (as opposed to the one set in the account).
      */
-    protected abstract syncSignerPubKeyHash(): Promise<PubKeyHash>;
+    abstract syncSignerPubKeyHash(): Promise<PubKeyHash>;
 
     /***************
      * Basic getters

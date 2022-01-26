@@ -3,7 +3,7 @@ import { ErrorCode } from '@ethersproject/logger';
 import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
 import { Create2WalletSigner, Signer, unableToSign } from './signer';
-import { BatchBuilder } from './batch-builder';
+import { BatchBuilder, BatchBuilderInternalTx } from './batch-builder';
 import {
     AccountState,
     Address,
@@ -72,6 +72,85 @@ export class Wallet {
     connect(provider: SyncProvider) {
         this.provider = provider;
         return this;
+    }
+
+    async processBatchBuilderTransactions(
+        startNonce: Nonce,
+        txs: BatchBuilderInternalTx[]
+    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature | null }> {
+        const processedTxs: SignedTransaction[] = [];
+        let messages: string[] = [];
+        let nonce: number = await this.getNonce(startNonce);
+        const batchNonce = nonce;
+        for (const tx of txs) {
+            tx.tx.nonce = nonce++;
+            switch (tx.type) {
+                case 'Withdraw':
+                    messages.push(this.getWithdrawEthMessagePart(tx.tx));
+                    const withdraw = { tx: await this.getWithdrawFromSyncToEthereum(tx.tx) };
+                    processedTxs.push(withdraw);
+                    break;
+                case 'Transfer':
+                    messages.push(await this.getTransferEthMessagePart(tx.tx));
+                    const transfer = { tx: await this.getTransfer(tx.tx) };
+                    processedTxs.push(transfer);
+                    break;
+                case 'ChangePubKey':
+                    // ChangePubKey requires its own Ethereum signature, we either expect
+                    // it to be signed already or do it here.
+                    const changePubKey: ChangePubKey = tx.alreadySigned
+                        ? tx.tx
+                        : (await this.signSetSigningKey(tx.tx)).tx;
+                    const currentPubKeyHash = await this.getCurrentPubKeyHash();
+                    if (currentPubKeyHash === changePubKey.newPkHash) {
+                        throw new Error('Current signing key is already set');
+                    }
+                    messages.push(
+                        this.getChangePubKeyEthMessagePart({
+                            pubKeyHash: changePubKey.newPkHash,
+                            feeToken: tx.token,
+                            fee: changePubKey.fee
+                        })
+                    );
+                    processedTxs.push({ tx: changePubKey });
+                    break;
+                case 'ForcedExit':
+                    messages.push(this.getForcedExitEthMessagePart(tx.tx));
+                    const forcedExit = { tx: await this.getForcedExit(tx.tx) };
+                    processedTxs.push(forcedExit);
+                    break;
+                case 'MintNFT':
+                    messages.push(this.getMintNFTEthMessagePart(tx.tx));
+                    const mintNft = { tx: await this.getMintNFT(tx.tx) };
+                    processedTxs.push(mintNft);
+                    break;
+                case 'Swap':
+                    messages.push(this.getSwapEthSignMessagePart(tx.tx));
+                    const swap = {
+                        tx: await this.getSwap(tx.tx),
+                        ethereumSignature: [
+                            null,
+                            tx.tx.orders[0].ethSignature || null,
+                            tx.tx.orders[1].ethSignature || null
+                        ]
+                    };
+                    processedTxs.push(swap);
+                    break;
+                case 'WithdrawNFT':
+                    messages.push(this.getWithdrawNFTEthMessagePart(tx.tx));
+                    const withdrawNft = { tx: await this.getWithdrawNFT(tx.tx) };
+                    processedTxs.push(withdrawNft);
+                    break;
+            }
+        }
+        messages.push(`Nonce: ${batchNonce}`);
+
+        const message = messages.filter((part) => part.length != 0).join('\n');
+        const signature = await this.ethMessageSigner.getEthMessageSignature(message);
+        return {
+            txs: processedTxs,
+            signature
+        };
     }
 
     async verifyNetworks() {
