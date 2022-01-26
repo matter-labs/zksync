@@ -38,22 +38,14 @@ import {
     ERC20_DEPOSIT_GAS_LIMIT,
     ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT,
     ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
-    getChangePubkeyLegacyMessage,
-    getChangePubkeyMessage,
     getEthereumBalance,
-    getSignedBytesFromMessage,
     IERC20_INTERFACE,
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
-    MAX_TIMESTAMP,
-    signMessagePersonalAPI,
-    isNFT,
     SYNC_MAIN_CONTRACT_INTERFACE,
     getToggle2FAMessage
 } from './utils';
-import { Transaction, ETHOperation, submitSignedTransaction } from './operations';
-
-export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransactionsBatch } from './operations';
+import { Transaction, ETHOperation } from './operations';
 
 const EthersErrorCode = ErrorCode;
 
@@ -79,6 +71,14 @@ export abstract class AbstractWallet {
      * Returns the current Ethereum signer connected to this wallet.
      */
     protected abstract ethSigner(): ethers.Signer;
+
+    /**
+     * Returns the current Ethereum **message** signer connected to this wallet.
+     *
+     * Ethereum message signer differs from common Ethereum signer in that message signer
+     * returns Ethereum signatures along with its type (e.g. ECDSA / EIP1271).
+     */
+    protected abstract ethMessageSigner(): EthMessageSigner;
 
     /**
      * Returns `true` if this wallet instance has a connected L2 signer.
@@ -471,7 +471,7 @@ export abstract class AbstractWallet {
     async getToggle2FA(enable: boolean, pubKeyHash?: PubKeyHash): Promise<Toggle2FARequest> {
         const accountId = await this.getAccountId();
         const timestamp = new Date().getTime();
-        const signature = await this.ethMessageSigner.getEthMessageSignature(
+        const signature = await this.ethMessageSigner().getEthMessageSignature(
             getToggle2FAMessage(enable, timestamp, pubKeyHash)
         );
 
@@ -676,7 +676,7 @@ export abstract class AbstractWallet {
         accountAddress: Address;
     }> {
         await this.setRequiredAccountIdFromServer('Sign register factory');
-        const signature = await this.ethMessageSigner.ethSignRegisterFactoryMessage(
+        const signature = await this.ethMessageSigner().ethSignRegisterFactoryMessage(
             factoryAddress,
             this.accountId,
             this.address()
