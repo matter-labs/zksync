@@ -28,17 +28,6 @@ type TokenDescription = Token & {
 async function deployToken(token: TokenDescription): Promise<Token> {
     token.implementation = token.implementation || DEFAULT_ERC20;
 
-    //Using https://iancoleman.io/bip39/
-    //with mnemonic: fine music test violin matrix prize squirrel panther purchase material script deal
-    //And m/44'/137'/0'/0/1
-    //Address: 0x21083592E07aBc6c47CAc83F1A4a32a2a43d584e
-    //Private key: 0x374c1bfbc62a9de83725724eac94a124b8c6fca54ed9e91708fdeeb497bc1d6b
-    //Public key: 0x02a821240c910fd7f91fa01e7b2e8495268b7d059fdea9fc24737f949b13deca65
-    //This way we can import the account used by zkSync, but it does not have RBTC balance
-    //const result = await provider.send('personal_importRawKey', ['374c1bfbc62a9de83725724eac94a124b8c6fca54ed9e91708fdeeb497bc1d6b', '']);
-    //const wallet = new Wallet(Buffer.from('374c1bfbc62a9de83725724eac94a124b8c6fca54ed9e91708fdeeb497bc1d6b', 'hex'), provider)
-    //Where 374c1bfbc62a9de83725724eac94a124b8c6fca54ed9e91708fdeeb497bc1d6b is the private key
-
     //So, instead, we will use an existing test account with RBTC balance
     let wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow1_privK, 'hex'), provider);
     //const wallet = Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/137'/0'/0/1").connect(provider);
@@ -49,32 +38,42 @@ async function deployToken(token: TokenDescription): Promise<Token> {
         { gasLimit: 5000000 }
     );
 
+    //These erc20 tokens are deployed and allocated to some accounts just for testing.
+    //These deployments initially lead to a "nonce too high error on RSKJ" during zk init.
+    //So we added "waits" for contract deployment TX to be mined. The following WILL BLOCK execution until no. of confirmations is met
+    //use this together with tx.wait() keep the accountSlots / nonce mismatch within 5
+    // We do not use the timeout paramater. Just block execution until token is deployed.
+    await provider.waitForTransaction(erc20.deployTransaction.hash, 1);
+
+    // now we premine to allocate token balances to some accounts
+
     await erc20.mint(wallet.address, parseEther('3000000000'));
     wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow_privK, 'hex'), provider);
     await erc20.mint(wallet.address, parseEther('3000000000'));
     wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow2_privK, 'hex'), provider);
-    await erc20.mint(wallet.address, parseEther('3000000000'));
+
+    // occasionally wait for 1 confirmation to keep nonce increase within 5
+    let tx = await erc20.mint(wallet.address, parseEther('3000000000'));
+    await tx.wait(1);
+
     wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow3_privK, 'hex'), provider);
     await erc20.mint(wallet.address, parseEther('3000000000'));
     wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow4_privK, 'hex'), provider);
     await erc20.mint(wallet.address, parseEther('3000000000'));
     wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow5_privK, 'hex'), provider);
-    await erc20.mint(wallet.address, parseEther('3000000000'));
-    // wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow6_privK, 'hex'), provider);
-    // await erc20.mint(wallet.address, parseEther('3000000000'));
+    //wait
+    tx = await erc20.mint(wallet.address, parseEther('3000000000'));
+    await tx.wait(1);
+
     wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow7_privK, 'hex'), provider);
     await erc20.mint(wallet.address, parseEther('3000000000'));
     wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow8_privK, 'hex'), provider);
     await erc20.mint(wallet.address, parseEther('3000000000'));
     wallet = new Wallet(Buffer.from(ethTestConfig.account_with_rbtc_cow9_privK, 'hex'), provider);
-    await erc20.mint(wallet.address, parseEther('3000000000'));
+    //wait
+    tx = await erc20.mint(wallet.address, parseEther('3000000000'));
+    await tx.wait(1);
 
-    //for (let i = 0; i < 10; ++i) {
-    //const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/137'/0'/0/" + i).connect(
-    // provider
-    //);
-    // await erc20.mint(testWallet.address, parseEther('3000000000'));
-    // }
     token.address = erc20.address;
 
     // Remove the unneeded field
