@@ -2,5 +2,5 @@
 # Amount of confirmations for the priority operation to be processed.
 # In production this should be a non-zero value because of block reverts.
 confirmations_for_eth_event=0
-# How often we want to poll the Ethereum node.
+# How often we want to poll the RSK node.
 eth_node_poll_interval=300
