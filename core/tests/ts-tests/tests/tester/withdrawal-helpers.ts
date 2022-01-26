@@ -77,7 +77,7 @@ async function setRevert(
 
 Tester.prototype.testRecoverETHWithdrawal = async function (from: Wallet, to: Address, amount: BigNumber) {
     // Make sure that the withdrawal will fail
-    await setRevert(from.ethSigner, this.syncProvider, to, 'ETH', true);
+    await setRevert(from.ethSigner(), this.syncProvider, to, 'ETH', true);
     const balanceBefore = await this.ethProvider.getBalance(to);
     const withdrawTx = await from.withdrawFromSyncToEthereum({
         ethAddress: to,
@@ -96,7 +96,7 @@ Tester.prototype.testRecoverETHWithdrawal = async function (from: Wallet, to: Ad
     expect(balanceBefore.eq(balanceAfter), 'The withdrawal did not fail the first time').to.be.true;
 
     // Make sure that the withdrawal will pass now
-    await setRevert(from.ethSigner, this.syncProvider, to, 'ETH', false);
+    await setRevert(from.ethSigner(), this.syncProvider, to, 'ETH', false);
 
     // Re-try
     const withdrawPendingTx = await from.withdrawPendingBalance(to, 'ETH');
@@ -115,10 +115,10 @@ Tester.prototype.testRecoverERC20Withdrawal = async function (
     amount: BigNumber
 ) {
     // Make sure that the withdrawal will be reverted
-    await setRevert(from.ethSigner, from.provider, to, token, true);
+    await setRevert(from.ethSigner(), from.provider, to, token, true);
 
     const getToBalance = () =>
-        utils.getEthereumBalance(from.ethSigner.provider as ethers.providers.Provider, from.provider, to, token);
+        utils.getEthereumBalance(from.ethSigner().provider as ethers.providers.Provider, from.provider, to, token);
 
     const balanceBefore = await getToBalance();
     const withdrawTx = await from.withdrawFromSyncToEthereum({
@@ -139,7 +139,7 @@ Tester.prototype.testRecoverERC20Withdrawal = async function (
     expect(balanceBefore.eq(balanceAfter), 'The withdrawal did not fail the first time').to.be.true;
 
     // Make sure that the withdrawal will pass now
-    await setRevert(from.ethSigner, from.provider, to, token, false);
+    await setRevert(from.ethSigner(), from.provider, to, token, false);
 
     // Re-try
     const withdrawPendingTx = await from.withdrawPendingBalance(to, token);
@@ -165,7 +165,7 @@ Tester.prototype.testRecoverMultipleWithdrawals = async function (
 
     // Make sure that all the withdrawal will fall
     for (let i = 0; i < to.length; i++) {
-        await setRevert(from.ethSigner, this.syncProvider, to[i], token[i], true);
+        await setRevert(from.ethSigner(), this.syncProvider, to[i], token[i], true);
     }
 
     // Send the withdrawals and wait until they are sent onchain
@@ -194,7 +194,7 @@ Tester.prototype.testRecoverMultipleWithdrawals = async function (
 
     // Make sure that all the withdrawal will pass now
     for (let i = 0; i < to.length; i++) {
-        await setRevert(from.ethSigner, this.syncProvider, to[i], token[i], false);
+        await setRevert(from.ethSigner(), this.syncProvider, to[i], token[i], false);
     }
 
     const handle = await from.withdrawPendingBalances(to, token, {

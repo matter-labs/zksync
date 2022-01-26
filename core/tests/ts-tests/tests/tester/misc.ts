@@ -203,7 +203,7 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
     // For every sender there's corresponding signature, otherwise, batch verification would fail.
     const ethSignatures: TxEthSignature[] = [];
     for (let i = 0; i < wallets.length - 1; ++i) {
-        ethSignatures.push(await wallets[i].getEthMessageSignature(message));
+        ethSignatures.push(await wallets[i].ethMessageSigner().getEthMessageSignature(message));
     }
 
     const senderBefore = await batchSender.getBalance(token);
@@ -254,7 +254,7 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
     const message = `From: ${from.address().toLowerCase()}\n${from.getTransferEthMessagePart(_transfer1)}\nNonce: ${
         _transfer1.nonce
     }\n\nFrom: ${to.address().toLowerCase()}\n${to.getTransferEthMessagePart(_transfer2)}\nNonce: ${_transfer1.nonce}`;
-    const ethSignature = await from.getEthMessageSignature(message);
+    const ethSignature = await from.ethMessageSigner().getEthMessageSignature(message);
 
     let thrown = true;
     try {
@@ -306,7 +306,10 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
         `Nonce: ${transfer.nonce}\n` +
         `Fee: ${stringFee} ${stringToken}\n` +
         `Account Id: ${transfer.accountId}`;
-    const signedTransfer = { tx: transfer, ethereumSignature: await from.getEthMessageSignature(transferMessage) }; // Transfer
+    const signedTransfer = {
+        tx: transfer,
+        ethereumSignature: await from.ethMessageSigner().getEthMessageSignature(transferMessage)
+    }; // Transfer
 
     // Withdraw
     const nonce = await to.getNonce();
@@ -327,7 +330,10 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
         `Nonce: ${withdraw.nonce}\n` +
         `Fee: ${stringFee} ${stringToken}\n` +
         `Account Id: ${withdraw.accountId}`;
-    const signedWithdraw = { tx: withdraw, ethereumSignature: await to.getEthMessageSignature(withdrawMessage) }; // Withdraw
+    const signedWithdraw = {
+        tx: withdraw,
+        ethereumSignature: await to.ethMessageSigner().getEthMessageSignature(withdrawMessage)
+    }; // Withdraw
 
     const batch = [signedTransfer, signedWithdraw];
 
@@ -340,7 +346,10 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     const message = Uint8Array.from(Buffer.from(batchHash, 'hex'));
 
     // Both wallets sign it.
-    const ethSignatures = [await to.getEthMessageSignature(message), await from.getEthMessageSignature(message)];
+    const ethSignatures = [
+        await to.ethMessageSigner().getEthMessageSignature(message),
+        await from.ethMessageSigner().getEthMessageSignature(message)
+    ];
 
     const handles = await submitSignedTransactionsBatch(to.provider, batch, ethSignatures);
     // We only expect that API doesn't reject this batch due to Eth signature error.
@@ -404,7 +413,7 @@ Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wall
     ).to.be.true;
 
     // Now we submit the CREATE2 ChangePubKey
-    const create2data = (create2Wallet.ethSigner as Create2WalletSigner).create2WalletData;
+    const create2data = (create2Wallet.ethSigner() as Create2WalletSigner).create2WalletData;
     const cpkTx = await create2Wallet.getChangePubKey({
         feeToken: token,
         fee: subsidyYotalFee,
@@ -476,7 +485,7 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
             .gte(5 * SUBSIDY_ACCEPTED_SCALED_DIFFERENCE)
     ).to.be.true;
 
-    const create2data = (create2Wallet.ethSigner as Create2WalletSigner).create2WalletData;
+    const create2data = (create2Wallet.ethSigner() as Create2WalletSigner).create2WalletData;
     const cpkTx = await create2Wallet.getChangePubKey({
         feeToken: token,
         fee: BigNumber.from(0),

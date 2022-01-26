@@ -3,7 +3,6 @@ import {
     Address,
     TokenLike,
     Nonce,
-    ChangePubKey,
     ChangePubKeyFee,
     SignedTransaction,
     TxEthSignature,
