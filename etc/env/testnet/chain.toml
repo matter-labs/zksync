@@ -16,7 +16,7 @@ account_tree_depth=32
 balance_tree_depth=32
 
 [chain.eth]
-# Name of the used Ethereum network
+# Name of the used RSK network (since Ethers uses localhost for different works as Ethereum, different RSK networks are differentiated by its chain id in eth_client.toml)
 network="localhost"
 
 [chain.state_keeper]
@@ -43,4 +43,4 @@ block_prove_deadline=1
 block_execute_deadline=1
 # Max gas that can be used to execute aggregated operation
 # for now (should be > 4kk which is max gas for one block commit/verify/execute)
-max_aggregated_tx_gas=6000000
+max_aggregated_tx_gas=5000000
