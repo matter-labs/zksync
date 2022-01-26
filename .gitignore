@@ -29,6 +29,7 @@ Cargo.lock
 !/etc/env/ci.env
 !/etc/env/base
 !/etc/env/testnet
+!/etc/env/mainnet
 /etc/tokens/localhost.json
 !/keys
 /keys/*

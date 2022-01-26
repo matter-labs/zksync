@@ -1,0 +1,10 @@
+[event_listener]
+# The port used by the server.
+ws_port = 3032
+
+# URL for access to the EventListener server.
+ws_url="ws://127.0.0.1:3032"
+
+# PostgreSQL channel name to listen on. Must be equal to the one
+# hardcoded into database migrations.
+channel_name = "event_channel"
