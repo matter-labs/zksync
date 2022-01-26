@@ -355,6 +355,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .map(|value| value.tx_hash)
         .collect();
 
+        println!("Txs len {:?}", tx_hashes.len());
         let tx_filter_hashes: HashSet<Vec<u8>> =
             sqlx::query!("SELECT DISTINCT tx_hash FROM tx_filters")
                 .fetch_all(transaction.conn())
@@ -362,6 +363,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 .into_iter()
                 .map(|value| value.tx_hash)
                 .collect();
+        println!("Filters len {:?}", tx_filter_hashes.len());
 
         let difference: Vec<Vec<u8>> = tx_filter_hashes
             .difference(&tx_hashes)
@@ -369,11 +371,14 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             .cloned()
             .collect();
 
+        println!("Difference len {:?}", difference.len());
         for chunk in difference.chunks(100) {
             sqlx::query!("DELETE FROM tx_filters WHERE tx_hash = ANY ($1)", chunk)
                 .execute(transaction.conn())
                 .await?;
         }
+
+        transaction.commit().await?;
 
         Ok(())
     }
