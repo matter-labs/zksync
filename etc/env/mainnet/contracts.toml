@@ -29,5 +29,5 @@ init_contract_version=6
 upgrade_eth_blocks=[]
 
 [contracts.test]
-dummy_verifier=true
+dummy_verifier=false
 easy_exodus=false
