@@ -3861,6 +3861,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "remove_outstanding_tx_filters"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ethabi",
+ "structopt",
+ "tokio",
+ "web3",
+ "zksync_config",
+ "zksync_eth_client",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "remove_proofs"
 version = "1.0.0"
 dependencies = [
