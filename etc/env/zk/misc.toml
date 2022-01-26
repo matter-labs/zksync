@@ -1,0 +1,56 @@
+# Whether to ask user about dangerous actions or not
+zksync_action="dont_ask"
+
+# Miscellaneous options for different infrastructure elements
+[misc]
+# Download setup files from SETUP_NETWORK_DIR if PROVER_DOWNLOAD_SETUP=1 or use local files if PROVER_DOWNLOAD_SETUP=0
+prover_download_setup=false
+# Network location of setup files
+prover_setup_network_dir="-"
+
+# Used to configure env for docker
+docker_dummy_prover=false
+
+
+# API key for the analytics script
+etherscan_api_key="unset"
+
+# Configuration for the fee seller script
+max_liquidation_fee_percent=5
+# fee_account_private_key is set in `private.toml`
+
+reserve_fee_accumulator_address="unset"
+
+established_assets_for_withdrawing_through_zksync="ETH,DAI,USDC"
+
+# Format of logs in stdout could be "plain" for development purposes and "json" for production
+log_format="plain"
+
+sentry_url="unset"
+
+# The address of the regenesis multisig smart contract
+regenesis_multisig_address="0xAA7113B9de498556dC76eDFEFc57681083c861C1"
+
+# The number of parter signatures we need to get for the regenesis
+regenesis_threshold=2
+
+
+# Token in which we want accept fees for permissionless token listing
+listing_fee_token="0x0000000000000000000000000000000000000000"
+
+# The number of token (in wei) we want to be payed for listing a token
+listing_fee=10000000000000000
+
+# Listing cap, the maximum number of tokens which can be listed (2^16 - 100 by default)
+listing_cap=65436
+
+# The address which will receive funds from permissionless token listings
+listing_treasury="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
+
+# Security council parameters
+security_council_members_number=3
+security_council_members=["0x22C3F9177F485bF9a058cE4C7253Da81a59495Db","0x56dF84566a67e87808A73dA0Be61a40bda3e2AFA","0xCE004d039cD86b08274FC453bd5536E6e9F6Fac7"]
+
+security_council_2_weeks_threshold=1
+security_council_1_week_threshold=2
+security_council_3_days_threshold=3

@@ -1,0 +1,32 @@
+# Environment configuration for the Rust code
+# We don't provide the group name like `[rust]` here, because we don't want
+# these variables to be prefixed during the compiling. 
+
+# `RUST_LOG` environmnet variable for `env_logger`
+# Here we use TOML multiline strings: newlines will be trimmed.
+RUST_LOG="""\
+zksync_api=debug,\
+zksync_core=debug,\
+zksync_eth_sender=debug,\
+zksync_event_listener=info,\
+zksync_witness_generator=debug,\
+zksync_gateway_watcher=info,\
+zksync_server=debug,\
+zksync_prover=debug,\
+dummy_prover=info,\
+key_generator=info,\
+zksync_data_restore=info,\
+zksync_eth_client=info,\
+zksync_storage=info,\
+zksync_state=info,\
+zksync_types=info,\
+exodus_test=info,\
+loadtest=debug,\
+kube=debug,\
+dev_ticker=info,\
+block_sizes_test=info,\
+zksync_forced_exit_requests=info\
+"""
+
+# `RUST_BACKTRACE` variable
+RUST_BACKTRACE=1

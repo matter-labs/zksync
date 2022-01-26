@@ -30,6 +30,7 @@ Cargo.lock
 !/etc/env/base
 !/etc/env/testnet
 !/etc/env/mainnet
+!/etc/env/zk
 /etc/tokens/localhost.json
 !/keys
 /keys/*
