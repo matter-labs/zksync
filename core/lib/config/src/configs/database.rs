@@ -32,7 +32,7 @@ impl DBConfig {
     }
 
     pub fn rejected_transactions_cleaner_interval(&self) -> time::Duration {
-        time::Duration::from_secs(self.rejected_transactions_cleaner_interval * Self::SECS_PER_HOUR)
+        time::Duration::from_secs(self.rejected_transactions_cleaner_interval)
     }
 }
 

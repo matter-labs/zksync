@@ -21,7 +21,6 @@ use zksync_types::{
 use self::records::{MempoolPriorityOp, MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
 
-use zksync_api_types::v02::account::OngoingDeposit;
 use zksync_api_types::v02::pagination::PaginationDirection;
 
 pub mod records;

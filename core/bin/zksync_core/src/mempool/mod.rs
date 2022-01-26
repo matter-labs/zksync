@@ -725,7 +725,7 @@ impl MempoolTransactionsHandler {
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolTransactionRequest::NewPriorityOps(ops, confirmed, resp) => {
-                    let tx_add_result = self.add_priority_op(ops, confirmed).await;
+                    let tx_add_result = self.add_priority_ops(ops, confirmed).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
             }
