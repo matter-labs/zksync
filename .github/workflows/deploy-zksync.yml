@@ -43,7 +43,6 @@ jobs:
       config_ref: ${{ github.event.inputs.config_ref }}
       deployment_id: ${{ github.event.inputs.deployment_id || steps.deployment.outputs.deployment_id }}
       environment: ${{ github.event.inputs.environment }}
-      kubeConf: ${{ steps.envMap.outputs.kubeConf }}
       hfEnv: ${{ steps.envMap.outputs.hfEnv }}
       namespace: ${{ steps.envMap.outputs.namespace }}
       runner: ${{ steps.envMap.outputs.runner }}
@@ -68,13 +67,12 @@ jobs:
             {
               ".*": {
                 "hfEnv": "${{ github.event.inputs.environment }}",
-                "kubeConf": "KUBECONF_STAGE",
                 "runner": "stage",
                 "namespace": "${{ github.event.inputs.environment }}"
               },
-              "^rinkeby$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
-              "^ropsten$": { "kubeConf": "KUBECONF_TESTNET", "runner": "testnet" },
-              "^mainnet$": { "kubeConf": "KUBECONF_MAINNET", "runner": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
+              "^rinkeby$": { "runner": "testnet" },
+              "^ropsten$": { "runner": "testnet" },
+              "^mainnet$": { "runner": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
             }
       -
         ## For manually invoked workflow_dispatch we create a deployment event
@@ -111,10 +109,10 @@ jobs:
     runs-on: [k8s, deployer, "${{ needs.setup.outputs.runner }}"]
     container:
       image: dysnix/kubectl:v1.20-gcloud
-
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
     env:
       DEPLOY_APPS: -l name=${{ github.event.inputs.server_release }} -l name=${{ github.event.inputs.prover_release }}
-      KUBECONF: ${{ secrets[needs.setup.outputs.kubeConf] }}
       # Helmfile environment name
       HFENV: ${{ needs.setup.outputs.hfEnv }}
       IMAGE_TAG: ${{ needs.setup.outputs.image_tag }}
@@ -122,8 +120,18 @@ jobs:
 
     steps:
       -
-        name: Create ~/.kube/config
-        run: mkdir -p ~/.kube && echo "$KUBECONF" | base64 -d > ~/.kube/config
+        id: kubeConf
+        run: |
+          kube_token=$(cat /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.runner }})
+          echo "::add-mask::$kube_token"
+          echo "::set-output name=token::$kube_token"
+      -
+        name: Generate ~/.kube/config
+        run: |
+          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
+          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
+          kubectl config set-context default --user=user --cluster=default
+          kubectl config use-context default
       -
         name: Clone helm-infra
         uses: actions/checkout@v2
