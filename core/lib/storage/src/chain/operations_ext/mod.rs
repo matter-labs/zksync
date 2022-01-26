@@ -1875,6 +1875,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .count;
             executed_txs_count + priority_ops_count
         };
+        println!("seq_no {:?}", sequence_number);
 
         let records = sqlx::query!(
             r#"
@@ -1903,6 +1904,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await
         .unwrap();
 
+        println!("Number of txs {}", records.len());
         for record in records {
             sequence_number += 1;
             if let Some(serial_id) = record.priority_op_serialid {
@@ -1924,6 +1926,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 .await
                 .unwrap();
             }
+            println!("Update for seq no {}", sequence_number);
         }
         transaction.commit().await.unwrap();
         sequence_number
