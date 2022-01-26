@@ -278,6 +278,7 @@ impl Paginate<PendingOpsRequest> for StorageProcessor<'_> {
     ) -> Result<Paginated<Transaction, Self::OutputId>, Error> {
         let serial_id = match query.from.serial_id.inner {
             Either::Left(serial_id) => serial_id,
+            // Right means the latest serial id
             Either::Right(_) => {
                 if let Some(serial_id) = self
                     .chain()
@@ -300,12 +301,7 @@ impl Paginate<PendingOpsRequest> for StorageProcessor<'_> {
         let result = self
             .chain()
             .mempool_schema()
-            .get_pending_deposits_for(
-                query.from.address,
-                serial_id as i64,
-                query.limit,
-                query.direction,
-            )
+            .get_pending_deposits_for(query.from.address, serial_id, query.limit, query.direction)
             .await
             .map_err(Error::storage)?;
 

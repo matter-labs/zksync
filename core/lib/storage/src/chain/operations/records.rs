@@ -37,7 +37,7 @@ impl From<StoredExecutedPriorityOperation> for PriorityOp {
     fn from(value: StoredExecutedPriorityOperation) -> Self {
         Self {
             serial_id: value.priority_op_serialid as u64,
-            data: serde_json::from_value(value.operation).expect("Should be correct stored"),
+            data: serde_json::from_value(value.operation).expect("Should be correctly stored"),
             deadline_block: value.deadline_block as u64,
             eth_hash: H256::from_slice(&value.eth_hash),
             eth_block: value.eth_block as u64,

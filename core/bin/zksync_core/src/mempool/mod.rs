@@ -15,7 +15,7 @@
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
 // Built-in deps
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, iter, sync::Arc};
 // External uses
 use futures::{
     channel::{
@@ -301,16 +301,12 @@ impl MempoolBlocksHandler {
         // Unlike transactions, they are requested from the Eth watch.
         let next_op_id = reverted_tx.next_priority_op_id;
         while next_serial_id < next_op_id {
-            let mut priority_op = None;
             // Find the necessary serial id and skip the already processed
-            while let Some(op) = mempool_state.transactions_queue.pop_front_priority_op() {
-                if next_serial_id == op.serial_id {
-                    priority_op = Some(op);
-                    break;
-                }
-            }
+            let priority_op =
+                iter::from_fn(|| mempool_state.transactions_queue.pop_front_priority_op())
+                    .find(|op| op.serial_id == next_serial_id)
+                    .expect("Operation not found in the priority queue");
 
-            let priority_op = priority_op.expect("Operation not found in the priority queue");
             // If the operation doesn't fit, return the proposed block.
             if priority_op.data.chunks() <= chunks_left {
                 chunks_left -= priority_op.data.chunks();
@@ -414,7 +410,10 @@ impl MempoolBlocksHandler {
         let mut used_chunks = 0;
         let mut current_priority_op = current_unprocessed_priority_op;
         while let Some(op) = mempool_state.transactions_queue.pop_front_priority_op() {
+            // Since the transaction addition is asynchronous process and we are checking node many times,
+            // We can find some already processed priority ops
             if op.serial_id < current_priority_op {
+                vlog::warn!("Already processed priority op was found in queue");
                 // We can skip already processed priority operations
                 continue;
             }
@@ -581,7 +580,7 @@ impl MempoolTransactionsHandler {
         }
 
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
+            vlog::error!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 
@@ -591,7 +590,7 @@ impl MempoolTransactionsHandler {
             .insert_tx(&tx)
             .await
             .map_err(|err| {
-                vlog::warn!("Mempool storage access error: {}", err);
+                vlog::error!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
 
@@ -606,13 +605,15 @@ impl MempoolTransactionsHandler {
         Ok(())
     }
 
-    async fn add_priority_op(
+    /// Add priority operations to the mempool. For a better UX, we save unconfirmed transactions
+    /// to the database. And we will move them to the real queue when they are confirmed.
+    async fn add_priority_ops(
         &mut self,
-        ops: Vec<PriorityOp>,
+        mut ops: Vec<PriorityOp>,
         confirmed: bool,
     ) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
+            vlog::error!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
         let last_processed_priority_op = storage
@@ -622,13 +623,10 @@ impl MempoolTransactionsHandler {
             .await
             .map_err(|_| TxAddError::DbError)?;
 
-        let ops = if let Some(serial_id) = last_processed_priority_op {
-            ops.into_iter()
-                .filter(|op| op.serial_id > serial_id)
-                .collect()
-        } else {
-            ops
-        };
+        if let Some(serial_id) = last_processed_priority_op {
+            ops.retain(|op| op.serial_id > serial_id)
+        }
+
         // Nothing to insert
         if ops.is_empty() {
             return Ok(());
@@ -639,7 +637,7 @@ impl MempoolTransactionsHandler {
             .insert_priority_ops(&ops, confirmed)
             .await
             .map_err(|err| {
-                vlog::warn!("Mempool storage access error: {}", err);
+                vlog::error!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
 
@@ -684,7 +682,7 @@ impl MempoolTransactionsHandler {
         }
 
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            vlog::warn!("Mempool storage access error: {}", err);
+            vlog::error!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 

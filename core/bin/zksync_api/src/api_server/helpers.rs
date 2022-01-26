@@ -76,7 +76,10 @@ pub async fn get_depositing(
     let pending_ops = storage
         .chain()
         .mempool_schema()
-        .get_ongoing_deposits(address)
-        .await?;
+        .get_pending_deposits(address)
+        .await?
+        .into_iter()
+        .map(OngoingDeposit::new)
+        .collect();
     depositing_from_pending_ops(storage, tokens, pending_ops, confirmations_for_eth_event).await
 }

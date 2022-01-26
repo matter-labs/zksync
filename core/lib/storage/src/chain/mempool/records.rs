@@ -53,17 +53,15 @@ pub struct MempoolPriorityOp {
     pub deadline_block: i64,
 }
 
-impl TryFrom<MempoolPriorityOp> for PriorityOp {
-    type Error = serde_json::Error;
-
-    fn try_from(value: MempoolPriorityOp) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<MempoolPriorityOp> for PriorityOp {
+    fn from(value: MempoolPriorityOp) -> Self {
+        Self {
             serial_id: value.serial_id as u64,
-            data: serde_json::from_value(value.data)?,
+            data: serde_json::from_value(value.data).expect("Should be correctly stored"),
             deadline_block: value.deadline_block as u64,
             eth_hash: H256::from_slice(&value.eth_hash),
             eth_block: value.eth_block as u64,
             eth_block_index: Some(value.eth_block_index as u64),
-        })
+        }
     }
 }
