@@ -77,7 +77,7 @@ export class BatchBuilder {
 
         const { txs, message } = await this.processTransactions();
 
-        let signature = await this.wallet.getEthMessageSignature(message);
+        let signature = await this.wallet.ethMessageSigner.getEthMessageSignature(message);
 
         return {
             txs,

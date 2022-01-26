@@ -160,21 +160,6 @@ export class Wallet {
         });
     }
 
-    async getEthMessageSignature(message: ethers.utils.BytesLike): Promise<TxEthSignature> {
-        if (this.ethSignerType == null) {
-            throw new Error('ethSignerType is unknown');
-        }
-
-        const signedBytes = getSignedBytesFromMessage(message, !this.ethSignerType.isSignedMsgPrefixed);
-
-        const signature = await signMessagePersonalAPI(this.ethSigner, signedBytes);
-
-        return {
-            type: this.ethSignerType.verificationMethod === 'ECDSA' ? 'EthereumSignature' : 'EIP1271Signature',
-            signature
-        };
-    }
-
     batchBuilder(nonce?: Nonce): BatchBuilder {
         return BatchBuilder.fromWallet(this, nonce);
     }
@@ -938,7 +923,9 @@ export class Wallet {
     async getToggle2FA(enable: boolean, pubKeyHash?: PubKeyHash): Promise<Toggle2FARequest> {
         const accountId = await this.getAccountId();
         const timestamp = new Date().getTime();
-        const signature = await this.getEthMessageSignature(getToggle2FAMessage(enable, timestamp, pubKeyHash));
+        const signature = await this.ethMessageSigner.getEthMessageSignature(
+            getToggle2FAMessage(enable, timestamp, pubKeyHash)
+        );
 
         return {
             accountId,
@@ -980,7 +967,7 @@ export class Wallet {
                 this.accountId,
                 changePubKey.batchHash
             );
-            const ethSignature = (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+            const ethSignature = (await this.ethMessageSigner.getEthMessageSignature(changePubKeyMessage)).signature;
             ethAuthData = {
                 type: 'ECDSA',
                 ethSignature,
@@ -1001,7 +988,7 @@ export class Wallet {
         } else if (changePubKey.ethAuthType === 'ECDSALegacyMessage') {
             await this.setRequiredAccountIdFromServer('ChangePubKey authorized by ECDSALegacyMessage.');
             const changePubKeyMessage = getChangePubkeyLegacyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
-            ethSignature = (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+            ethSignature = (await this.ethMessageSigner.getEthMessageSignature(changePubKeyMessage)).signature;
         } else {
             throw new Error('Unsupported SetSigningKey type');
         }
