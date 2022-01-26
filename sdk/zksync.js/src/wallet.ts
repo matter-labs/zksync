@@ -60,14 +60,31 @@ const EthersErrorCode = ErrorCode;
 
 export class Wallet extends AbstractWallet {
     private constructor(
-        public ethSigner: ethers.Signer,
-        public ethMessageSigner: EthMessageSigner,
+        public _ethSigner: ethers.Signer,
+        public _ethMessageSigner: EthMessageSigner,
         public cachedAddress: Address,
         public signer?: Signer,
         public accountId?: number,
         public ethSignerType?: EthSignerType
     ) {
         super(cachedAddress, accountId);
+    }
+
+
+    ethSigner(): ethers.Signer {
+        return this._ethSigner;
+    }
+
+    ethMessageSigner(): EthMessageSigner {
+        return this._ethMessageSigner;
+    }
+
+    syncSignerConnected(): boolean {
+        return this.signer !== null;
+    }
+
+    async syncSignerPubKeyHash(): Promise<PubKeyHash> {
+        return await this.signer.pubKeyHash();
     }
 
     async processBatchBuilderTransactions(
@@ -142,7 +159,7 @@ export class Wallet extends AbstractWallet {
         messages.push(`Nonce: ${batchNonce}`);
 
         const message = messages.filter((part) => part.length != 0).join('\n');
-        const signature = await this.ethMessageSigner.getEthMessageSignature(message);
+        const signature = await this.ethMessageSigner().getEthMessageSignature(message);
         return {
             txs: processedTxs,
             signature
@@ -276,16 +293,16 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
-        const ethereumSignature = unableToSign(this.ethSigner)
+        const ethereumSignature = unableToSign(this.ethSigner())
             ? null
-            : await this.ethMessageSigner.ethSignTransfer({
-                  stringAmount,
-                  stringFee,
-                  stringToken,
-                  to: transfer.to,
-                  nonce: transfer.nonce,
-                  accountId: this.accountId
-              });
+            : await this.ethMessageSigner().ethSignTransfer({
+                stringAmount,
+                stringFee,
+                stringToken,
+                to: transfer.to,
+                nonce: transfer.nonce,
+                accountId: this.accountId
+            });
         return {
             tx: signedTransferTransaction,
             ethereumSignature
@@ -334,14 +351,14 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
-        const ethereumSignature = unableToSign(this.ethSigner)
+        const ethereumSignature = unableToSign(this.ethSigner())
             ? null
-            : await this.ethMessageSigner.ethSignForcedExit({
-                  stringToken,
-                  stringFee,
-                  target: forcedExit.target,
-                  nonce: forcedExit.nonce
-              });
+            : await this.ethMessageSigner().ethSignForcedExit({
+                stringToken,
+                stringFee,
+                target: forcedExit.target,
+                nonce: forcedExit.nonce
+            });
 
         return {
             tx: signedForcedExitTransaction,
@@ -426,9 +443,9 @@ export class Wallet extends AbstractWallet {
 
         messages.push(`Nonce: ${batchNonce}`);
         const message = messages.filter((part) => part.length != 0).join('\n');
-        const ethSignatures = unableToSign(this.ethSigner)
+        const ethSignatures = unableToSign(this.ethSigner())
             ? []
-            : [await this.ethMessageSigner.getEthMessageSignature(message)];
+            : [await this.ethMessageSigner().getEthMessageSignature(message)];
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignatures);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
@@ -542,16 +559,16 @@ export class Wallet extends AbstractWallet {
             : this.provider.tokenSet.formatToken(order.tokenSell, order.amount);
         const stringTokenSell = await this.provider.getTokenSymbol(order.tokenSell);
         const stringTokenBuy = await this.provider.getTokenSymbol(order.tokenBuy);
-        const ethereumSignature = unableToSign(this.ethSigner)
+        const ethereumSignature = unableToSign(this.ethSigner())
             ? null
-            : await this.ethMessageSigner.ethSignOrder({
-                  amount: stringAmount,
-                  tokenSell: stringTokenSell,
-                  tokenBuy: stringTokenBuy,
-                  nonce: order.nonce,
-                  recipient: order.recipient,
-                  ratio: order.ratio
-              });
+            : await this.ethMessageSigner().ethSignOrder({
+                amount: stringAmount,
+                tokenSell: stringTokenSell,
+                tokenBuy: stringTokenBuy,
+                nonce: order.nonce,
+                recipient: order.recipient,
+                ratio: order.ratio
+            });
         order.ethSignature = ethereumSignature;
         return order;
     }
@@ -589,13 +606,13 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
-        const ethereumSignature = unableToSign(this.ethSigner)
+        const ethereumSignature = unableToSign(this.ethSigner())
             ? null
-            : await this.ethMessageSigner.ethSignSwap({
-                  fee: stringFee,
-                  feeToken: stringToken,
-                  nonce: swap.nonce
-              });
+            : await this.ethMessageSigner().ethSignSwap({
+                fee: stringFee,
+                feeToken: stringToken,
+                nonce: swap.nonce
+            });
 
         return {
             tx: signedSwapTransaction,
@@ -753,15 +770,15 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
         const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
-        const ethereumSignature = unableToSign(this.ethSigner)
+        const ethereumSignature = unableToSign(this.ethSigner())
             ? null
-            : await this.ethMessageSigner.ethSignMintNFT({
-                  stringFeeToken,
-                  stringFee,
-                  recipient: mintNFT.recipient,
-                  contentHash: mintNFT.contentHash,
-                  nonce: mintNFT.nonce
-              });
+            : await this.ethMessageSigner().ethSignMintNFT({
+                stringFeeToken,
+                stringFee,
+                recipient: mintNFT.recipient,
+                contentHash: mintNFT.contentHash,
+                nonce: mintNFT.nonce
+            });
 
         return {
             tx: signedMintNFTTransaction,
@@ -786,15 +803,15 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
         const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
-        const ethereumSignature = unableToSign(this.ethSigner)
+        const ethereumSignature = unableToSign(this.ethSigner())
             ? null
-            : await this.ethMessageSigner.ethSignWithdrawNFT({
-                  token: withdrawNFT.token,
-                  to: withdrawNFT.to,
-                  stringFee,
-                  stringFeeToken,
-                  nonce: withdrawNFT.nonce
-              });
+            : await this.ethMessageSigner().ethSignWithdrawNFT({
+                token: withdrawNFT.token,
+                to: withdrawNFT.to,
+                stringFee,
+                stringFeeToken,
+                nonce: withdrawNFT.nonce
+            });
 
         return {
             tx: signedWithdrawNFTTransaction,
@@ -822,16 +839,16 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
-        const ethereumSignature = unableToSign(this.ethSigner)
+        const ethereumSignature = unableToSign(this.ethSigner())
             ? null
-            : await this.ethMessageSigner.ethSignWithdraw({
-                  stringAmount,
-                  stringFee,
-                  stringToken,
-                  ethAddress: withdraw.ethAddress,
-                  nonce: withdraw.nonce,
-                  accountId: this.accountId
-              });
+            : await this.ethMessageSigner().ethSignWithdraw({
+                stringAmount,
+                stringFee,
+                stringToken,
+                ethAddress: withdraw.ethAddress,
+                nonce: withdraw.nonce,
+                accountId: this.accountId
+            });
 
         return {
             tx: signedWithdrawTransaction,
@@ -969,15 +986,16 @@ export class Wallet extends AbstractWallet {
                 this.accountId,
                 changePubKey.batchHash
             );
-            const ethSignature = (await this.ethMessageSigner.getEthMessageSignature(changePubKeyMessage)).signature;
+            const ethSignature = (await this.ethMessageSigner().getEthMessageSignature(changePubKeyMessage)).signature;
             ethAuthData = {
                 type: 'ECDSA',
                 ethSignature,
                 batchHash: changePubKey.batchHash
             };
         } else if (changePubKey.ethAuthType === 'CREATE2') {
-            if (this.ethSigner instanceof Create2WalletSigner) {
-                const create2data = this.ethSigner.create2WalletData;
+            const ethSigner = this.ethSigner();
+            if (ethSigner instanceof Create2WalletSigner) {
+                const create2data = ethSigner.create2WalletData;
                 ethAuthData = {
                     type: 'CREATE2',
                     creatorAddress: create2data.creatorAddress,
@@ -990,7 +1008,7 @@ export class Wallet extends AbstractWallet {
         } else if (changePubKey.ethAuthType === 'ECDSALegacyMessage') {
             await this.setRequiredAccountIdFromServer('ChangePubKey authorized by ECDSALegacyMessage.');
             const changePubKeyMessage = getChangePubkeyLegacyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
-            ethSignature = (await this.ethMessageSigner.getEthMessageSignature(changePubKeyMessage)).signature;
+            ethSignature = (await this.ethMessageSigner().getEthMessageSignature(changePubKeyMessage)).signature;
         } else {
             throw new Error('Unsupported SetSigningKey type');
         }
@@ -1055,7 +1073,7 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
         const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
-        return this.ethMessageSigner.getWithdrawNFTEthMessagePart({
+        return this.ethMessageSigner().getWithdrawNFTEthMessagePart({
             token: withdrawNFT.token,
             to: withdrawNFT.to,
             stringFee,
@@ -1081,7 +1099,7 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = await this.provider.getTokenSymbol(transfer.token);
-        return this.ethMessageSigner.getTransferEthMessagePart({
+        return this.ethMessageSigner().getTransferEthMessagePart({
             stringAmount,
             stringFee,
             stringToken,
@@ -1102,7 +1120,7 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
-        return this.ethMessageSigner.getWithdrawEthMessagePart({
+        return this.ethMessageSigner().getWithdrawEthMessagePart({
             stringAmount,
             stringFee,
             stringToken,
@@ -1119,7 +1137,7 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(changePubKey.feeToken, changePubKey.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(changePubKey.feeToken);
-        return this.ethMessageSigner.getChangePubKeyEthMessagePart({
+        return this.ethMessageSigner().getChangePubKeyEthMessagePart({
             pubKeyHash: changePubKey.pubKeyHash,
             stringToken,
             stringFee
@@ -1136,7 +1154,7 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
         const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
-        return this.ethMessageSigner.getMintNFTEthMessagePart({
+        return this.ethMessageSigner().getMintNFTEthMessagePart({
             stringFeeToken,
             stringFee,
             recipient: mintNFT.recipient,
@@ -1149,7 +1167,7 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
-        return this.ethMessageSigner.getSwapEthSignMessagePart({
+        return this.ethMessageSigner().getSwapEthSignMessagePart({
             fee: stringFee,
             feeToken: stringToken
         });
@@ -1160,7 +1178,7 @@ export class Wallet extends AbstractWallet {
             ? null
             : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
-        return this.ethMessageSigner.getForcedExitEthMessagePart({
+        return this.ethMessageSigner().getForcedExitEthMessagePart({
             stringToken,
             stringFee,
             target: forcedExit.target

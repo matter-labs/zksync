@@ -53,11 +53,11 @@ Wallet.prototype.withdrawPendingBalance = async function (
     token: TokenLike,
     amount?: BigNumberish
 ): Promise<ContractTransaction> {
-    checkEthProvider(this.ethSigner);
+    checkEthProvider(this.ethSigner());
 
     const zksyncContract = this.getZkSyncMainContract();
 
-    const gasPrice = await this.ethSigner.getGasPrice();
+    const gasPrice = await this.ethSigner().getGasPrice();
 
     const tokenAddress = this.provider.tokenSet.resolveTokenAddress(token);
     const withdrawAmount = amount ? amount : await zksyncContract.getPendingBalance(from, tokenAddress);
@@ -75,7 +75,7 @@ Wallet.prototype.withdrawPendingBalances = async function (
     multicallParams: MulticallParams,
     amounts?: BigNumberish[]
 ): Promise<ContractTransaction> {
-    checkEthProvider(this.ethSigner);
+    checkEthProvider(this.ethSigner());
 
     if (tokens.length != addresses.length) {
         throw new Error('The array of addresses and the tokens should be the same length');
@@ -84,7 +84,7 @@ Wallet.prototype.withdrawPendingBalances = async function (
     const multicallAddress = multicallParams.address || getMulticallAddressByNetwork(multicallParams.network);
 
     const zksyncContract = this.getZkSyncMainContract();
-    const gasPrice = await this.ethSigner.getGasPrice();
+    const gasPrice = await this.ethSigner().getGasPrice();
 
     const tokensAddresses = tokens.map((token) => this.provider.tokenSet.resolveTokenAddress(token));
 
@@ -109,7 +109,7 @@ Wallet.prototype.withdrawPendingBalances = async function (
         return [zksyncContract.address, callData];
     });
 
-    const multicallContract = new Contract(multicallAddress, MULTICALL_INTERFACE, this.ethSigner);
+    const multicallContract = new Contract(multicallAddress, MULTICALL_INTERFACE, this.ethSigner());
 
     return multicallContract.aggregate(calls, {
         gasLimit: multicallParams.gasLimit || BigNumber.from('300000'),
