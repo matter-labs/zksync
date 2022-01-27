@@ -59,12 +59,12 @@ const FullExitTestSuite = (token: types.TokenSymbol) =>
             // make a deposit so that wallet is assigned an accountId
             await tester.testDeposit(carl, token, DEPOSIT_AMOUNT, true);
 
-            const oldSigner = carl.ethSigner;
-            carl.ethSigner = tester.ethWallet;
+            const oldSigner = carl._ethSigner;
+            carl._ethSigner = tester.ethWallet;
             const [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
             expect(before.eq(after), 'Balance after incorrect Full Exit should not change').to.be.true;
-            carl.ethSigner = oldSigner;
+            carl._ethSigner = oldSigner;
         });
 
         step('should execute NFT full-exit', async () => {

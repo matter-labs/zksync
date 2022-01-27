@@ -13,6 +13,8 @@ concurrency: deploy-${{ github.event.inputs.environment }}
 env:
   ZKSYNC_ENV: loadtest
   HF_ARGS: -e loadtest
+  DEPLOY_SA_NAME: gha-deployer-stage
+  DEPLOY_K8S_CONTEXT: matterlabs-zksync-stage
 
 jobs:
   update:
@@ -39,11 +41,10 @@ jobs:
     needs: [update]
     container:
       image: dysnix/kubectl:v1.20-gcloud
-
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
     env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
       DEPLOY_APPS: -l name=sqlproxy
-
     outputs:
       image_tag: ${{ steps.set.outputs.shortRev }}
 
@@ -64,8 +65,18 @@ jobs:
           ref: master
           token: ${{ secrets.GH_TOKEN }}
       -
-        name: Create ~/.kube/config
-        run: ./.github/scripts/write-kubeconf.sh
+        id: kubeConf
+        run: |
+          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
+          echo "::add-mask::$kube_token"
+          echo "::set-output name=token::$kube_token"
+      -
+        name: Generate ~/.kube/config
+        run: |
+          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
+          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
+          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
+          kubectl config use-context $DEPLOY_K8S_CONTEXT
       -
         name: Provision SQLProxy
         working-directory: helm-infra
@@ -146,16 +157,26 @@ jobs:
     needs: [dbsetup]
     container:
       image: dysnix/kubectl:v1.20-gcloud
-    env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
     steps:
       - uses: actions/checkout@v2
       - uses: actions/download-artifact@v2
         with:
           name: deployed_contracts
       -
-        name: Create ~/.kube/config
-        run: .github/scripts/write-kubeconf.sh
+        id: kubeConf
+        run: |
+          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
+          echo "::add-mask::$kube_token"
+          echo "::set-output name=token::$kube_token"
+      -
+        name: Generate ~/.kube/config
+        run: |
+          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
+          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
+          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
+          kubectl config use-context $DEPLOY_K8S_CONTEXT
       -
         name: Update contracts in the ConfigMap
         run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
@@ -198,6 +219,7 @@ jobs:
       - name: Run loadtest
         run: cargo run --bin loadnext
 
+
   cleanup:
     name: Cleanup loadtest environment
     ## stage selects the specific cluster
@@ -205,19 +227,37 @@ jobs:
     needs: [dbsetup, loadtest]
     container:
       image: dysnix/kubectl:v1.20-gcloud
-    env:
-      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
-
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
     if: always()
     steps:
       - uses: actions/checkout@v2
       - run: rm -f etc/env/${ZKSYNC_ENV}.env
       -
-        name: Create ~/.kube/config
-        run: .github/scripts/write-kubeconf.sh
+        id: kubeConf
+        run: |
+          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
+          echo "::add-mask::$kube_token"
+          echo "::set-output name=token::$kube_token"
+      -
+        name: Generate ~/.kube/config
+        run: |
+          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
+          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
+          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
+          kubectl config use-context $DEPLOY_K8S_CONTEXT
       -
         name: Scale loadtest to 0 replicas
         run: |
           kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 server
           kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 prover
           kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 sqlproxy-gcloud-sqlproxy
+      -
+        name: Notify to Mattermost (on incidents)
+        uses: tferreira/matterfy@releases/v1
+        with:
+          type: ${{ job.status }}
+          job_name: '*Loadtest did not succeed*'
+          icon_emoji: octocat
+          channel: 'ci-notifications'
+          url: ${{ secrets.MATTERMOST_WEBHOOK }}

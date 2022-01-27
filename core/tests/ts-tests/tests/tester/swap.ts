@@ -239,7 +239,7 @@ Tester.prototype.testSwapBatch = async function (
         })
         .build(tokenA);
 
-    const handles = await wallet.submitSignedTransactionsBatch(this.syncProvider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(this.syncProvider, batch.txs, [batch.signature!]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
 
     const nonceAfter = await walletA.getNonce();

@@ -18,6 +18,8 @@ pub struct StoredOperation {
 
 #[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct StoredExecutedPriorityOperation {
+    // Number from a sequence consisting of priority operations and transactions
+    pub sequence_number: Option<i64>,
     pub block_number: i64,
     pub block_index: i32,
     pub operation: Value,
@@ -48,6 +50,8 @@ impl From<StoredExecutedPriorityOperation> for PriorityOp {
 
 #[derive(Debug, Clone, FromRow)]
 pub struct StoredExecutedTransaction {
+    // Number from a sequence consisting of priority operations and transactions
+    pub sequence_number: Option<i64>,
     pub block_number: i64,
     pub block_index: Option<i32>,
     pub tx: Value,
