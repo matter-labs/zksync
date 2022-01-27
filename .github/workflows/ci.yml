@@ -187,12 +187,13 @@ jobs:
         run: ci_run zk test integration testkit --offline
 
   notify:
-    if: failure()
+    if: always()
     name: Notify on failures
     runs-on: ubuntu-latest
     needs: [lint, unit-tests, integration, circuit-tests, testkit]
     steps:
       -
+        if: failure()
         name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         with:
