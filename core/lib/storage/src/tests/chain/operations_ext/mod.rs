@@ -600,46 +600,47 @@ async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryRes
 
 /// Test `get_tx_created_at_and_block_number` method
 #[db_test]
-async fn get_tx_created_at_and_block_number(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+async fn get_tx_sequnecner_id(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let mut setup = TransactionsHistoryTestSetup::new();
     setup.add_block(1);
     commit_schema_data(&mut storage, &setup).await?;
 
-    // Get priority op created_at and block_number
+    // Get sequence_number for priority op
     let tx_hash = setup.get_tx_hash(0, 0);
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_created_at_and_block_number(tx_hash)
+        .get_tx_sequence_number(tx_hash)
         .await?;
     assert!(result.is_some());
-    assert_eq!(result.unwrap().1, BlockNumber(1));
+    let tx_0_0 = result.unwrap();
 
-    // Get transaction created_at and block_number
+    // Get sequence_number for next tx
     let tx_hash = setup.get_tx_hash(0, 1);
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_created_at_and_block_number(tx_hash)
+        .get_tx_sequence_number(tx_hash)
         .await?;
     assert!(result.is_some());
-    assert_eq!(result.unwrap().1, BlockNumber(1));
+    assert_eq!(result.unwrap(), tx_0_0 + 1);
 
-    // Get created_at for priority op for correct block
+    // Get sequence_number for priority op for correct block
     let tx_hash = setup.get_tx_hash(0, 0);
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_created_at_for_block_number(tx_hash, BlockNumber(1))
+        .get_tx_sequence_number_for_block(tx_hash, BlockNumber(1))
         .await?;
     assert!(result.is_some());
+    assert_eq!(tx_0_0, result.unwrap());
 
-    // Get created_at for priority op for wrong block
+    // Get sequence_number for priority op for wrong block
     let tx_hash = setup.get_tx_hash(0, 0);
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_created_at_for_block_number(tx_hash, BlockNumber(10))
+        .get_tx_sequence_number_for_block(tx_hash, BlockNumber(10))
         .await?;
     assert!(result.is_none());
 
@@ -649,7 +650,7 @@ async fn get_tx_created_at_and_block_number(mut storage: StorageProcessor<'_>) -
     let result = storage
         .chain()
         .operations_ext_schema()
-        .get_tx_created_at_and_block_number(tx_hash)
+        .get_tx_sequence_number(tx_hash)
         .await?;
     assert!(result.is_none());
 

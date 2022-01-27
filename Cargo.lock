@@ -5270,6 +5270,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
+name = "update_sequnce_number"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "structopt",
+ "tokio",
+ "zksync_config",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "url"
 version = "1.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
