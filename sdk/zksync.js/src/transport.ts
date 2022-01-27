@@ -106,11 +106,16 @@ export class WSTransport extends AbstractJSONRPCTransport {
         return transport;
     }
 
-    subscriptionsSupported(): boolean {
+    override subscriptionsSupported(): boolean {
         return true;
     }
 
-    async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
+    override async subscribe(
+        subMethod: string,
+        subParams,
+        unsubMethod: string,
+        cb: (data: any) => void
+    ): Promise<Subscription> {
         const req = { jsonrpc: '2.0', method: subMethod, params: subParams };
         const sub = await this.ws.sendRequest(req);
 

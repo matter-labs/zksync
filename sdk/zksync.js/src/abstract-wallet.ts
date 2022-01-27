@@ -108,7 +108,7 @@ export abstract class AbstractWallet {
     }
 
     async getAccountState(): Promise<AccountState> {
-        return this.provider.getState(this.address());
+        return await this.provider.getState(this.address());
     }
 
     async resolveAccountId(): Promise<number> {

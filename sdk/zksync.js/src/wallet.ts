@@ -39,9 +39,9 @@ export class Wallet extends AbstractWallet {
     private constructor(
         public _ethSigner: ethers.Signer,
         public _ethMessageSigner: EthMessageSigner,
-        public cachedAddress: Address,
+        cachedAddress: Address,
         public signer?: Signer,
-        public accountId?: number,
+        accountId?: number,
         public ethSignerType?: EthSignerType
     ) {
         super(cachedAddress, accountId);
@@ -130,19 +130,19 @@ export class Wallet extends AbstractWallet {
     // Abstract getters
     //
 
-    ethSigner(): ethers.Signer {
+    override ethSigner(): ethers.Signer {
         return this._ethSigner;
     }
 
-    ethMessageSigner(): EthMessageSigner {
+    override ethMessageSigner(): EthMessageSigner {
         return this._ethMessageSigner;
     }
 
-    syncSignerConnected(): boolean {
+    override syncSignerConnected(): boolean {
         return this.signer !== null;
     }
 
-    async syncSignerPubKeyHash(): Promise<PubKeyHash> {
+    override async syncSignerPubKeyHash(): Promise<PubKeyHash> {
         return await this.signer.pubKeyHash();
     }
 
@@ -150,7 +150,7 @@ export class Wallet extends AbstractWallet {
     // Batch builder methods
     //
 
-    async processBatchBuilderTransactions(
+    override async processBatchBuilderTransactions(
         startNonce: Nonce,
         txs: BatchBuilderInternalTx[]
     ): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature }> {
@@ -233,7 +233,7 @@ export class Wallet extends AbstractWallet {
     // L2 operations
     //
 
-    async getTransfer(transfer: {
+    override async getTransfer(transfer: {
         to: Address;
         token: TokenLike;
         amount: BigNumberish;
@@ -265,7 +265,7 @@ export class Wallet extends AbstractWallet {
         return this.signer.signSyncTransfer(transactionData);
     }
 
-    async signSyncTransfer(transfer: {
+    override async signSyncTransfer(transfer: {
         to: Address;
         token: TokenLike;
         amount: BigNumberish;
@@ -301,7 +301,7 @@ export class Wallet extends AbstractWallet {
         };
     }
 
-    async syncTransfer(transfer: {
+    override async syncTransfer(transfer: {
         to: Address;
         token: TokenLike;
         amount: BigNumberish;
@@ -322,7 +322,7 @@ export class Wallet extends AbstractWallet {
 
     // ChangePubKey part
 
-    async getChangePubKey(changePubKey: {
+    override async getChangePubKey(changePubKey: {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
@@ -356,7 +356,7 @@ export class Wallet extends AbstractWallet {
         return changePubKeyTx;
     }
 
-    async signSetSigningKey(changePubKey: {
+    override async signSetSigningKey(changePubKey: {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
@@ -418,7 +418,7 @@ export class Wallet extends AbstractWallet {
         };
     }
 
-    async setSigningKey(changePubKey: {
+    override async setSigningKey(changePubKey: {
         feeToken: TokenLike;
         ethAuthType: ChangePubkeyTypes;
         fee?: BigNumberish;
@@ -461,7 +461,7 @@ export class Wallet extends AbstractWallet {
 
     // Withdraw part
 
-    async getWithdrawFromSyncToEthereum(withdraw: {
+    override async getWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
         amount: BigNumberish;
@@ -491,7 +491,7 @@ export class Wallet extends AbstractWallet {
         return await this.signer.signSyncWithdraw(transactionData);
     }
 
-    async signWithdrawFromSyncToEthereum(withdraw: {
+    override async signWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
         amount: BigNumberish;
@@ -528,7 +528,7 @@ export class Wallet extends AbstractWallet {
         };
     }
 
-    async withdrawFromSyncToEthereum(withdraw: {
+    override async withdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
         amount: BigNumberish;
@@ -554,7 +554,7 @@ export class Wallet extends AbstractWallet {
 
     // Forced exit part
 
-    async getForcedExit(forcedExit: {
+    override async getForcedExit(forcedExit: {
         target: Address;
         token: TokenLike;
         fee: BigNumberish;
@@ -582,7 +582,7 @@ export class Wallet extends AbstractWallet {
         return await this.signer.signSyncForcedExit(transactionData);
     }
 
-    async signSyncForcedExit(forcedExit: {
+    override async signSyncForcedExit(forcedExit: {
         target: Address;
         token: TokenLike;
         fee: BigNumberish;
@@ -611,7 +611,7 @@ export class Wallet extends AbstractWallet {
         };
     }
 
-    async syncForcedExit(forcedExit: {
+    override async syncForcedExit(forcedExit: {
         target: Address;
         token: TokenLike;
         fee?: BigNumberish;
@@ -631,7 +631,7 @@ export class Wallet extends AbstractWallet {
 
     // Swap part
 
-    async getLimitOrder(order: {
+    override async getLimitOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         ratio: TokenRatio | WeiRatio;
@@ -646,7 +646,7 @@ export class Wallet extends AbstractWallet {
         });
     }
 
-    async getOrder(order: {
+    override async getOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         ratio: TokenRatio | WeiRatio;
@@ -695,7 +695,7 @@ export class Wallet extends AbstractWallet {
         return this.signOrder(signedOrder);
     }
 
-    async signOrder(order: Order): Promise<Order> {
+    override async signOrder(order: Order): Promise<Order> {
         const stringAmount = BigNumber.from(order.amount).isZero()
             ? null
             : this.provider.tokenSet.formatToken(order.tokenSell, order.amount);
@@ -715,7 +715,7 @@ export class Wallet extends AbstractWallet {
         return order;
     }
 
-    async getSwap(swap: {
+    override async getSwap(swap: {
         orders: [Order, Order];
         feeToken: number;
         amounts: [BigNumberish, BigNumberish];
@@ -736,7 +736,7 @@ export class Wallet extends AbstractWallet {
         });
     }
 
-    async signSyncSwap(swap: {
+    override async signSyncSwap(swap: {
         orders: [Order, Order];
         feeToken: number;
         amounts: [BigNumberish, BigNumberish];
@@ -766,7 +766,7 @@ export class Wallet extends AbstractWallet {
         };
     }
 
-    async syncSwap(swap: {
+    override async syncSwap(swap: {
         orders: [Order, Order];
         feeToken: TokenLike;
         amounts?: [BigNumberish, BigNumberish];
@@ -795,7 +795,7 @@ export class Wallet extends AbstractWallet {
 
     // Mint NFT part
 
-    async getMintNFT(mintNFT: {
+    override async getMintNFT(mintNFT: {
         recipient: string;
         contentHash: string;
         feeToken: TokenLike;
@@ -821,7 +821,7 @@ export class Wallet extends AbstractWallet {
         return await this.signer.signMintNFT(transactionData);
     }
 
-    async signMintNFT(mintNFT: {
+    override async signMintNFT(mintNFT: {
         recipient: string;
         contentHash: string;
         feeToken: TokenLike;
@@ -850,7 +850,7 @@ export class Wallet extends AbstractWallet {
         };
     }
 
-    async mintNFT(mintNFT: {
+    override async mintNFT(mintNFT: {
         recipient: Address;
         contentHash: ethers.BytesLike;
         feeToken: TokenLike;
@@ -871,7 +871,7 @@ export class Wallet extends AbstractWallet {
     }
 
     // Withdraw NFT part
-    async getWithdrawNFT(withdrawNFT: {
+    override async getWithdrawNFT(withdrawNFT: {
         to: string;
         token: TokenLike;
         feeToken: TokenLike;
@@ -902,7 +902,7 @@ export class Wallet extends AbstractWallet {
         return await this.signer.signWithdrawNFT(transactionData);
     }
 
-    async signWithdrawNFT(withdrawNFT: {
+    override async signWithdrawNFT(withdrawNFT: {
         to: string;
         token: number;
         feeToken: TokenLike;
@@ -935,7 +935,7 @@ export class Wallet extends AbstractWallet {
         };
     }
 
-    async withdrawNFT(withdrawNFT: {
+    override async withdrawNFT(withdrawNFT: {
         to: string;
         token: number;
         feeToken: TokenLike;
@@ -964,7 +964,7 @@ export class Wallet extends AbstractWallet {
 
     // Transfer NFT part
 
-    async syncTransferNFT(transfer: {
+    override async syncTransferNFT(transfer: {
         to: Address;
         token: NFT;
         feeToken: TokenLike;
@@ -1006,7 +1006,7 @@ export class Wallet extends AbstractWallet {
 
     // Note: this method signature requires to specify fee in each transaction.
     // For details, see the comment on this method in `AbstractWallet` class.
-    async syncMultiTransfer(
+    override async syncMultiTransfer(
         transfers: {
             to: Address;
             token: TokenLike;
