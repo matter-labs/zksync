@@ -1905,29 +1905,61 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .unwrap();
 
         println!("Number of txs {}", records.len());
+        let mut priority_ops_serial_ids = vec![];
+        let mut priority_ops_seqeunce_numbers = vec![];
+
+        let mut executed_txs_hashes = vec![];
+        let mut executed_txs_seqeunce_numbers = vec![];
         for record in records {
             sequence_number += 1;
             if let Some(serial_id) = record.priority_op_serialid {
-                sqlx::query!(
-                    "UPDATE executed_priority_operations SET sequence_number = $1 WHERE priority_op_serialid = $2",
-                    sequence_number,
-                    serial_id
-                )
-                .execute(transaction.conn())
-                .await
-                .unwrap();
+                priority_ops_serial_ids.push(serial_id);
+                priority_ops_seqeunce_numbers.push(sequence_number);
+                // sqlx::query!(
+                //     "UPDATE executed_priority_operations SET sequence_number = $1 WHERE priority_op_serialid = $2",
+                //     sequence_number,
+                //     serial_id
+                // )
+                // .execute(transaction.conn())
+                // .await
+                // .unwrap();
             } else {
-                sqlx::query!(
-                    "UPDATE executed_transactions SET sequence_number = $1 WHERE tx_hash = $2",
-                    sequence_number,
-                    record.tx_hash
-                )
-                .execute(transaction.conn())
-                .await
-                .unwrap();
+                executed_txs_hashes.push(record.tx_hash.unwrap());
+                executed_txs_seqeunce_numbers.push(sequence_number);
+                // sqlx::query!(
+                //     "UPDATE executed_transactions SET sequence_number = $1 WHERE tx_hash = $2",
+                //     sequence_number,
+                //     record.tx_hash
+                // )
+                // .execute(transaction.conn())
+                // .await
+                // .unwrap();
             }
             println!("Update for seq no {}", sequence_number);
         }
+        sqlx::query!(
+            "UPDATE executed_priority_operations SET sequence_number = u.sequence_number \
+            FROM UNNEST ($1::bigint[], $2::bigint[])
+            AS u(serial_id, sequence_number)
+            WHERE executed_priority_operations.priority_op_serialid= u.serial_id",
+            &priority_ops_serial_ids,
+            &priority_ops_seqeunce_numbers
+        )
+        .execute(transaction.conn())
+        .await
+        .unwrap();
+
+        sqlx::query!(
+            "UPDATE executed_transactions SET sequence_number = u.sequence_number \
+            FROM UNNEST ($1::bytea[], $2::bigint[])
+            AS u(tx_hash, sequence_number)
+            WHERE executed_transactions.tx_hash = u.tx_hash",
+            &executed_txs_hashes,
+            &executed_txs_seqeunce_numbers
+        )
+        .execute(transaction.conn())
+        .await
+        .unwrap();
         transaction.commit().await.unwrap();
         sequence_number
     }

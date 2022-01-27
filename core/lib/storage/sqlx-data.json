@@ -4774,6 +4774,19 @@
       "nullable": []
     }
   },
+  "9f7d6ba7d22b619ca57063ce01af6ec4b96cc72f6ef8185402085392ee52a16f": {
+    "query": "UPDATE executed_priority_operations SET sequence_number = u.sequence_number FROM UNNEST ($1::bigint[], $2::bigint[])\n            AS u(serial_id, sequence_number)\n            WHERE executed_priority_operations.priority_op_serialid= u.serial_id",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "Int8Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "9fbf3d0ae8610fb464ac74ff989860eb913f4bfb14790373021ef456b671ed96": {
     "query": "SELECT * FROM eth_tx_hashes\n                WHERE eth_op_id = $1\n                ORDER BY id ASC",
     "describe": {
@@ -5294,6 +5307,19 @@
         false,
         true
       ]
+    }
+  },
+  "b73068eda52bc4b119edd3c2479106d64522e7f72915ed8ff9e89bade70491f5": {
+    "query": "UPDATE executed_transactions SET sequence_number = u.sequence_number FROM UNNEST ($1::bytea[], $2::bigint[])\n            AS u(tx_hash, sequence_number)\n            WHERE executed_transactions.tx_hash = u.tx_hash",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
+          "Int8Array"
+        ]
+      },
+      "nullable": []
     }
   },
   "b89088c6516e2db2e01bfdf0afa5a8fdd7e20fde80183884a9769eae9b635010": {
@@ -6022,19 +6048,6 @@
         false,
         false
       ]
-    }
-  },
-  "c591564b539a15625665b113d0eb053b639b8c78857429d28f05136229440bcb": {
-    "query": "UPDATE executed_transactions SET sequence_number = $1 WHERE tx_hash = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea"
-        ]
-      },
-      "nullable": []
     }
   },
   "c7459e7624c46417d3a91fc39b05128cf3e88097ae114d8aad6e22b9b2cd84e9": {
@@ -7393,19 +7406,6 @@
       "nullable": [
         false
       ]
-    }
-  },
-  "eb735fc15e431998e4d71aaf02c2755e273d2f3d26b5f92cd49428f59ad0556e": {
-    "query": "UPDATE executed_priority_operations SET sequence_number = $1 WHERE priority_op_serialid = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "ed4f6300995e13af62d0263cad9dfce76ae5aa8d2a5bc2be8e2f4b7de32fa2f6": {
