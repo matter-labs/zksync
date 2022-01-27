@@ -1,5 +1,5 @@
 import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from 'ethers';
-import { ErrorCode } from '@ethersproject/logger';
+import { ErrorCode as EthersErrorCode } from '@ethersproject/logger';
 import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
 import { BatchBuilder, BatchBuilderInternalTx } from './batch-builder';
@@ -42,8 +42,6 @@ import {
     getToggle2FAMessage
 } from './utils';
 import { Transaction, ETHOperation } from './operations';
-
-const EthersErrorCode = ErrorCode;
 
 export abstract class AbstractWallet {
     public provider: SyncProvider;
@@ -104,7 +102,7 @@ export abstract class AbstractWallet {
     }
 
     async getAccountId(): Promise<number | undefined> {
-        return (await this.provider.getState(this.address())).id;
+        return (await this.getAccountState()).id;
     }
 
     async getAccountState(): Promise<AccountState> {

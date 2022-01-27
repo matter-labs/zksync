@@ -36,7 +36,7 @@ import { AbstractWallet } from './abstract-wallet';
 export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransactionsBatch } from './operations';
 
 export class Wallet extends AbstractWallet {
-    private constructor(
+    protected constructor(
         public _ethSigner: ethers.Signer,
         public _ethMessageSigner: EthMessageSigner,
         cachedAddress: Address,
