@@ -1,7 +1,7 @@
 // External imports
 use chrono::{Duration, Utc};
 // Workspace imports
-use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber};
+use zksync_types::{aggregated_operations::AggregatedActionType, Address, BlockNumber};
 // Local imports
 use crate::{
     chain::{
@@ -297,7 +297,7 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
     let timestamp_1 = Utc::now() - Duration::weeks(1);
     let executed_tx_1 = NewExecutedTransaction {
         block_number: BLOCK_NUMBER,
-        tx_hash: vec![0x12, 0xAD, 0xBE, 0xEF],
+        tx_hash: vec![1, 2, 3, 4],
         tx: Default::default(),
         operation: Default::default(),
         from_account: Default::default(),
@@ -310,19 +310,24 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         created_at: timestamp_1,
         eth_sign_data: None,
         batch_id: None,
-        affected_accounts: Vec::new(),
-        used_tokens: Vec::new(),
+        affected_accounts: vec![Address::zero().as_bytes().to_vec()],
+        used_tokens: vec![0],
     };
     let timestamp_2 = timestamp_1 - Duration::weeks(1);
     let mut executed_tx_2 = executed_tx_1.clone();
     // Set new timestamp and different tx_hash since it's a PK.
     executed_tx_2.created_at = timestamp_2;
     executed_tx_2.tx_hash = vec![0, 11, 21, 5];
-    // Successful one.
+
     let mut executed_tx_3 = executed_tx_1.clone();
-    executed_tx_3.success = true;
-    executed_tx_3.tx_hash = vec![1, 1, 2, 30];
-    executed_tx_3.created_at = timestamp_2 - Duration::weeks(1);
+    executed_tx_3.success = false;
+    executed_tx_3.tx_hash = vec![10, 2, 4, 30];
+    executed_tx_3.created_at = timestamp_2;
+    // Successful one.
+    let mut executed_tx_4 = executed_tx_1.clone();
+    executed_tx_4.success = true;
+    executed_tx_4.tx_hash = vec![1, 1, 2, 30];
+    executed_tx_4.created_at = timestamp_2 - Duration::weeks(1);
     // Store them.
     storage
         .chain()
@@ -339,6 +344,11 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .operations_schema()
         .store_executed_tx(executed_tx_3)
         .await?;
+    storage
+        .chain()
+        .operations_schema()
+        .store_executed_tx(executed_tx_4)
+        .await?;
     // First check, no transactions removed.
     storage
         .chain()
@@ -351,8 +361,16 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .stats_schema()
         .count_outstanding_proofs(block_number)
         .await?;
-    assert_eq!(count, 3);
-    // Second transaction should be removed.
+
+    let count_tx_filters = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(Default::default(), None, None)
+        .await?;
+    assert_eq!(count, 4);
+    assert_eq!(count_tx_filters, 4);
+
+    // Second and third transaction should be removed.
     storage
         .chain()
         .operations_schema()
@@ -363,7 +381,13 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .stats_schema()
         .count_outstanding_proofs(block_number)
         .await?;
+    let count_tx_filters = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(Default::default(), None, None)
+        .await?;
     assert_eq!(count, 2);
+    assert_eq!(count_tx_filters, 2);
     // Finally, no rejected transactions remain.
     storage
         .chain()
@@ -375,14 +399,26 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .stats_schema()
         .count_outstanding_proofs(block_number)
         .await?;
+    let count_tx_filters = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(Default::default(), None, None)
+        .await?;
     assert_eq!(count, 1);
+    assert_eq!(count_tx_filters, 1);
     // The last one is indeed succesful.
     let count = storage
         .chain()
         .stats_schema()
         .count_total_transactions()
         .await?;
+    let count_tx_filters = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(Default::default(), None, None)
+        .await?;
     assert_eq!(count, 1);
+    assert_eq!(count_tx_filters, 1);
 
     Ok(())
 }

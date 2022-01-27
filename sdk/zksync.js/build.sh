@@ -1,3 +1,4 @@
+#!/bin/bash -e
 # Removing the old build
 rm -rf ./build
 
