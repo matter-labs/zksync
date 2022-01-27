@@ -36,7 +36,7 @@ const TestSuite = (providerType: 'REST' | 'RPC') =>
             }
 
             // This is needed to interact with blockchain
-            alice.ethSigner.connect(tester.ethProvider);
+            alice.ethSigner().connect(tester.ethProvider);
         });
 
         after('disconnect tester', async () => {
@@ -71,7 +71,7 @@ const TestSuite = (providerType: 'REST' | 'RPC') =>
         it('forced_exit_request should recover mutiple tokens', async () => {
             await tester.testForcedExitRequestMultipleTokens(
                 alice,
-                bob.ethSigner,
+                bob.ethSigner(),
                 chuck.address(),
                 ['ETH', erc20Token],
                 [TX_AMOUNT, TX_AMOUNT.mul(2)]
