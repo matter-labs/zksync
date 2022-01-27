@@ -1935,7 +1935,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 // .await
                 // .unwrap();
             }
-            println!("Update for seq no {}", sequence_number);
         }
         sqlx::query!(
             "UPDATE executed_priority_operations SET sequence_number = u.sequence_number \
@@ -1949,6 +1948,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await
         .unwrap();
 
+        println!(
+            "Update priority ops seq no {:?}",
+            &priority_ops_seqeunce_numbers
+        );
         sqlx::query!(
             "UPDATE executed_transactions SET sequence_number = u.sequence_number \
             FROM UNNEST ($1::bytea[], $2::bigint[])
@@ -1960,6 +1963,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .execute(transaction.conn())
         .await
         .unwrap();
+        println!("Update txs seq no {:?}", &executed_txs_seqeunce_numbers);
         transaction.commit().await.unwrap();
         sequence_number
     }
