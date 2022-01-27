@@ -10,6 +10,7 @@ members = [
     "core/bin/remove_proofs",
     "core/bin/update_sequnce_number",
 
+    "core/bin/remove_outstanding_tx_filters",
     # Server micro-services
     "core/bin/zksync_api",
     "core/bin/zksync_core",
