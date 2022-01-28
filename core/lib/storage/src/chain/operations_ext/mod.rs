@@ -1,4 +1,3 @@
-use std::cmp::min;
 // Built-in deps
 use std::time::Instant;
 

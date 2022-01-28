@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 // Built-in deps
 use std::time::Instant;
 // External imports
