@@ -669,6 +669,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         fail_reason,
                         block_number,
                         created_at,
+                        sequence_number,
                         batch_id
                     FROM tx_hashes
                     INNER JOIN executed_transactions
@@ -684,6 +685,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         null as fail_reason,
                         block_number,
                         created_at,
+                        sequence_number,
                         Null::bigint as batch_id
                     from
                         executed_priority_operations
@@ -712,7 +714,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 batch_id as "batch_id?"
             from transactions
             LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number
-            order by transactions.block_number desc, created_at desc
+            order by transactions.block_number desc, sequence_number desc
             "#,
             address.as_ref(), offset as i64, limit as i64
         ).fetch_all(transaction.conn())
@@ -841,6 +843,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         fail_reason,
                         block_number,
                         created_at,
+                        sequence_number,
                         batch_id
                     from tx_hashes
                     inner join executed_transactions
@@ -858,6 +861,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         null as fail_reason,
                         block_number,
                         created_at,
+                        sequence_number,
                         Null::bigint as batch_id
                     from 
                         executed_priority_operations
@@ -871,7 +875,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         (block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6))
                     ) t
                 order by
-                    block_number desc, created_at desc
+                    sequence_number desc
                 limit 
                     $7
             )
@@ -892,7 +896,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 committed.block_number = transactions.block_number AND committed.confirmed = true
             left join aggr_exec verified on
                 verified.block_number = transactions.block_number AND verified.confirmed = true
-            order by transactions.block_number desc, created_at desc
+            order by transactions.sequence_number desc
             "#,
             address.as_ref(),
             block_id as i64,
@@ -1246,18 +1250,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     SELECT DISTINCT tx_hash FROM tx_filters
                     WHERE address = $1
                 ), transactions AS (
-                    SELECT executed_transactions.tx_hash, created_at, block_index
+                    SELECT executed_transactions.tx_hash, sequence_number
                     FROM tx_hashes
                     INNER JOIN executed_transactions
                         ON tx_hashes.tx_hash = executed_transactions.tx_hash
-                ORDER BY created_at DESC, block_index DESC
+                ORDER BY sequence_number DESC
                 LIMIT 1
                 ), priority_ops AS (
-                    SELECT executed_priority_operations.tx_hash, created_at, block_index
+                    SELECT executed_priority_operations.tx_hash, executed_priority_operations.sequence_number
                     FROM tx_hashes
                     INNER JOIN executed_priority_operations
                         ON tx_hashes.tx_hash = executed_priority_operations.tx_hash
-                ORDER BY created_at DESC, block_index DESC
+                ORDER BY sequence_number DESC
                 LIMIT 1
                 ), everything AS (
                     SELECT * FROM transactions
@@ -1267,7 +1271,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 SELECT
                     tx_hash as "tx_hash!"
                 FROM everything
-                ORDER BY created_at DESC, block_index DESC
+                ORDER BY sequence_number DESC
                 LIMIT 1
             "#,
             address.as_bytes()
@@ -1291,11 +1295,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let record = sqlx::query!(
             r#"
                 WITH transactions AS (
-                    SELECT tx_hash, created_at, block_index
+                    SELECT tx_hash, sequence_number
                     FROM executed_transactions
                     WHERE block_number = $1
                 ), priority_ops AS (
-                    SELECT tx_hash, created_at, block_index
+                    SELECT tx_hash, sequence_number
                     FROM executed_priority_operations
                     WHERE block_number = $1
                 ), everything AS (
@@ -1306,7 +1310,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 SELECT
                     tx_hash as "tx_hash!"
                 FROM everything
-                ORDER BY created_at DESC, block_index DESC
+                ORDER BY sequence_number DESC
                 LIMIT 1
             "#,
             i64::from(*block_number)
@@ -1402,7 +1406,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         // because we are using this function for paginating starting from the latest transaction
         let result = sqlx::query!(
             r#"SELECT sequence_number  FROM executed_priority_operations
-                WHERE tx_hash = $1 AND block_number = $2 ORDER BY created_at DESC"#,
+                WHERE tx_hash = $1 AND block_number = $2 ORDER BY sequence_number DESC"#,
             tx_hash.as_ref(),
             block_number.0 as i32
         )
@@ -1435,7 +1439,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             // because we are using this function for paginating starting from the latest transaction
             let record = sqlx::query!(
                 r#"SELECT sequence_number FROM executed_priority_operations
-                WHERE tx_hash = $1 ORDER BY created_at DESC"#,
+                WHERE tx_hash = $1 ORDER BY sequence_number DESC"#,
                 tx_hash.as_ref()
             )
             .fetch_optional(transaction.conn())
@@ -1465,7 +1469,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 INNER JOIN txs_batches_hashes
                 ON txs_batches_hashes.batch_id = COALESCE(executed_transactions.batch_id, 0)
                 WHERE batch_hash = $1
-                ORDER BY created_at ASC, block_index ASC
+                ORDER BY sequence_number ASC
             "#,
             batch_hash.as_ref()
         )
@@ -1823,148 +1827,5 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
         Ok(())
-    }
-
-    // TODO ZKS-931 Remove it after migration
-    pub async fn min_block_for_update_sequence(&mut self) -> i64 {
-        let executed_txs_block = sqlx::query!(
-            "SELECT MIN(block_number) FROM executed_transactions WHERE sequence_number IS NULL"
-        )
-        .fetch_one(self.0.conn())
-        .await
-        .unwrap()
-        .min
-        .unwrap_or(0);
-        let executed_pr_op_block = sqlx::query!(
-            "SELECT MIN(block_number) FROM executed_priority_operations WHERE sequence_number IS NULL"
-        )
-        .fetch_one(self.0.conn())
-        .await
-            .unwrap()
-            .min
-            .unwrap_or(0);
-        min(executed_txs_block, executed_pr_op_block)
-    }
-
-    // TODO ZKS-931 Remove it after migration
-    pub async fn update_sequence_number_for_blocks(
-        &mut self,
-        from_block: i64,
-        to_block: i64,
-        known_last_sequence_number: Option<i64>,
-    ) -> i64 {
-        let mut transaction = self.0.start_transaction().await.unwrap();
-        let mut sequence_number: i64 = if let Some(number) = known_last_sequence_number {
-            number
-        } else {
-            let executed_txs_count = sqlx::query!(
-                r#"SELECT COUNT(*) as "count!" FROM executed_transactions WHERE block_number < $1"#,
-                from_block
-            )
-            .fetch_one(transaction.conn())
-            .await
-            .unwrap()
-            .count;
-            let priority_ops_count = sqlx::query!(
-                r#"SELECT COUNT(*) as "count!" FROM executed_priority_operations WHERE block_number < $1"#,
-                from_block
-            )
-            .fetch_one(transaction.conn())
-            .await
-            .unwrap()
-            .count;
-            executed_txs_count + priority_ops_count
-        };
-        println!("seq_no {:?}", sequence_number);
-
-        let records = sqlx::query!(
-            r#"
-                WITH transactions AS (
-                    SELECT block_number, created_at, Null::bigint as priority_op_serialid, tx_hash, block_index
-                    FROM executed_transactions
-                    WHERE block_number BETWEEN $1 AND $2
-                ), priority_ops AS (
-                    SELECT block_number, created_at, priority_op_serialid, tx_hash, block_index
-                    FROM executed_priority_operations
-                    WHERE block_number BETWEEN $1 AND $2
-                ), everything AS (
-                    SELECT * FROM transactions
-                    UNION ALL
-                    SELECT * FROM priority_ops
-                )
-                SELECT
-                    block_number, priority_op_serialid, tx_hash, block_index
-                FROM everything
-                ORDER BY created_at, block_index
-            "#,
-            from_block,
-            to_block
-        )
-        .fetch_all(transaction.conn())
-        .await
-        .unwrap();
-
-        println!("Number of txs {}", records.len());
-        let mut priority_ops_serial_ids = vec![];
-        let mut priority_ops_seqeunce_numbers = vec![];
-
-        let mut executed_txs_hashes = vec![];
-        let mut executed_txs_seqeunce_numbers = vec![];
-        for record in records {
-            sequence_number += 1;
-            if let Some(serial_id) = record.priority_op_serialid {
-                priority_ops_serial_ids.push(serial_id);
-                priority_ops_seqeunce_numbers.push(sequence_number);
-                // sqlx::query!(
-                //     "UPDATE executed_priority_operations SET sequence_number = $1 WHERE priority_op_serialid = $2",
-                //     sequence_number,
-                //     serial_id
-                // )
-                // .execute(transaction.conn())
-                // .await
-                // .unwrap();
-            } else {
-                executed_txs_hashes.push(record.tx_hash.unwrap());
-                executed_txs_seqeunce_numbers.push(sequence_number);
-                // sqlx::query!(
-                //     "UPDATE executed_transactions SET sequence_number = $1 WHERE tx_hash = $2",
-                //     sequence_number,
-                //     record.tx_hash
-                // )
-                // .execute(transaction.conn())
-                // .await
-                // .unwrap();
-            }
-        }
-        sqlx::query!(
-            "UPDATE executed_priority_operations SET sequence_number = u.sequence_number \
-            FROM UNNEST ($1::bigint[], $2::bigint[])
-            AS u(serial_id, sequence_number)
-            WHERE executed_priority_operations.priority_op_serialid= u.serial_id",
-            &priority_ops_serial_ids,
-            &priority_ops_seqeunce_numbers
-        )
-        .execute(transaction.conn())
-        .await
-        .unwrap();
-
-        println!(
-            "Update priority ops seq no {:?}",
-            &priority_ops_seqeunce_numbers
-        );
-        sqlx::query!(
-            "UPDATE executed_transactions SET sequence_number = u.sequence_number \
-            FROM UNNEST ($1::bytea[], $2::bigint[])
-            AS u(tx_hash, sequence_number)
-            WHERE executed_transactions.tx_hash = u.tx_hash",
-            &executed_txs_hashes,
-            &executed_txs_seqeunce_numbers
-        )
-        .execute(transaction.conn())
-        .await
-        .unwrap();
-        println!("Update txs seq no {:?}", &executed_txs_seqeunce_numbers);
-        transaction.commit().await.unwrap();
-        sequence_number
     }
 }
