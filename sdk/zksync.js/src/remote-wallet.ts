@@ -220,19 +220,7 @@ export class RemoteWallet extends AbstractWallet {
 
     // Swap part
 
-    override async getLimitOrder(order: {
-        tokenSell: TokenLike;
-        tokenBuy: TokenLike;
-        ratio: TokenRatio | WeiRatio;
-        recipient?: Address;
-        nonce?: Nonce;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<Order> {
-        throw Error('Not implemented');
-    }
-
-    override async getOrder(order: {
+    override async signOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         ratio: TokenRatio | WeiRatio;
@@ -242,10 +230,6 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order> {
-        throw Error('Not implemented');
-    }
-
-    override async signOrder(order: Order): Promise<Order> {
         throw Error('Not implemented');
     }
 

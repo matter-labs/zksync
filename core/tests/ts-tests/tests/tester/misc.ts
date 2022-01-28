@@ -251,8 +251,9 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
     // transfer1 and transfer2 are from different wallets.
     const batch: SignedTransaction[] = [{ tx: transfer1 }, { tx: transfer2 }];
 
-    const message = `From: ${from.address().toLowerCase()}\n${from.getTransferEthMessagePart(_transfer1)}\nNonce: ${_transfer1.nonce
-        }\n\nFrom: ${to.address().toLowerCase()}\n${to.getTransferEthMessagePart(_transfer2)}\nNonce: ${_transfer1.nonce}`;
+    const message = `From: ${from.address().toLowerCase()}\n${from.getTransferEthMessagePart(_transfer1)}\nNonce: ${
+        _transfer1.nonce
+    }\n\nFrom: ${to.address().toLowerCase()}\n${to.getTransferEthMessagePart(_transfer2)}\nNonce: ${_transfer1.nonce}`;
     const ethSignature = await from.ethMessageSigner().getEthMessageSignature(message);
 
     let thrown = true;
@@ -413,14 +414,16 @@ Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wall
 
     // Now we submit the CREATE2 ChangePubKey
     const create2data = (create2Wallet.ethSigner() as Create2WalletSigner).create2WalletData;
-    const cpkTx = (await create2Wallet.signSetSigningKey({
-        feeToken: token,
-        fee: subsidyYotalFee,
-        nonce: 0,
-        validFrom: 0,
-        validUntil: MAX_TIMESTAMP,
-        ethAuthType: "CREATE2",
-    })).tx as ChangePubKey;
+    const cpkTx = (
+        await create2Wallet.signSetSigningKey({
+            feeToken: token,
+            fee: subsidyYotalFee,
+            nonce: 0,
+            validFrom: 0,
+            validUntil: MAX_TIMESTAMP,
+            ethAuthType: 'CREATE2'
+        })
+    ).tx as ChangePubKey;
     cpkTx.ethAuthData = {
         type: 'CREATE2',
         ...create2data
@@ -486,27 +489,31 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
     ).to.be.true;
 
     const create2data = (create2Wallet.ethSigner() as Create2WalletSigner).create2WalletData;
-    const cpkTx = (await create2Wallet.signSetSigningKey({
-        feeToken: token,
-        fee: BigNumber.from(0),
-        nonce: 0,
-        validFrom: 0,
-        validUntil: MAX_TIMESTAMP,
-        ethAuthType: "CREATE2"
-    })).tx as ChangePubKey;
+    const cpkTx = (
+        await create2Wallet.signSetSigningKey({
+            feeToken: token,
+            fee: BigNumber.from(0),
+            nonce: 0,
+            validFrom: 0,
+            validUntil: MAX_TIMESTAMP,
+            ethAuthType: 'CREATE2'
+        })
+    ).tx as ChangePubKey;
     cpkTx.ethAuthData = {
         type: 'CREATE2',
         ...create2data
     };
-    const transferTx = (await create2Wallet.signSyncTransfer({
-        token,
-        fee: subsidyYotalFee,
-        nonce: 1,
-        validFrom: 0,
-        validUntil: MAX_TIMESTAMP,
-        amount: BigNumber.from('1'),
-        to: create2Wallet.address()
-    })).tx;
+    const transferTx = (
+        await create2Wallet.signSyncTransfer({
+            token,
+            fee: subsidyYotalFee,
+            nonce: 1,
+            validFrom: 0,
+            validUntil: MAX_TIMESTAMP,
+            amount: BigNumber.from('1'),
+            to: create2Wallet.address()
+        })
+    ).tx;
     const txs = [{ tx: cpkTx }, { tx: transferTx }];
 
     await expect(transport.request('submit_txs_batch', [txs, []]), 'Submitted transaction with the wrong fee').to.be

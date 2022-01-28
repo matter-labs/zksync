@@ -294,7 +294,7 @@ export abstract class AbstractWallet {
 
     // Swap part
 
-    abstract getLimitOrder(order: {
+    async signLimitOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         ratio: TokenRatio | WeiRatio;
@@ -302,9 +302,14 @@ export abstract class AbstractWallet {
         nonce?: Nonce;
         validFrom?: number;
         validUntil?: number;
-    }): Promise<Order>;
+    }): Promise<Order> {
+        return await this.signOrder({
+            ...order,
+            amount: 0
+        });
+    }
 
-    abstract getOrder(order: {
+    abstract signOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         ratio: TokenRatio | WeiRatio;
@@ -314,8 +319,6 @@ export abstract class AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order>;
-
-    abstract signOrder(order: Order): Promise<Order>;
 
     abstract signSyncSwap(swap: {
         orders: [Order, Order];

@@ -256,13 +256,13 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignTransfer({
-                stringAmount,
-                stringFee,
-                stringToken,
-                to: transfer.to,
-                nonce: transfer.nonce,
-                accountId: this.accountId
-            });
+                  stringAmount,
+                  stringFee,
+                  stringToken,
+                  to: transfer.to,
+                  nonce: transfer.nonce,
+                  accountId: this.accountId
+              });
         return {
             tx: signedTransferTransaction,
             ethereumSignature
@@ -418,13 +418,13 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignWithdraw({
-                stringAmount,
-                stringFee,
-                stringToken,
-                ethAddress: withdraw.ethAddress,
-                nonce: withdraw.nonce,
-                accountId: this.accountId
-            });
+                  stringAmount,
+                  stringFee,
+                  stringToken,
+                  ethAddress: withdraw.ethAddress,
+                  nonce: withdraw.nonce,
+                  accountId: this.accountId
+              });
 
         return {
             tx: signedWithdrawTransaction,
@@ -475,11 +475,11 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignForcedExit({
-                stringToken,
-                stringFee,
-                target: forcedExit.target,
-                nonce: forcedExit.nonce
-            });
+                  stringToken,
+                  stringFee,
+                  target: forcedExit.target,
+                  nonce: forcedExit.nonce
+              });
 
         return {
             tx: signedForcedExitTransaction,
@@ -507,22 +507,7 @@ export class Wallet extends AbstractWallet {
 
     // Swap part
 
-    override async getLimitOrder(order: {
-        tokenSell: TokenLike;
-        tokenBuy: TokenLike;
-        ratio: TokenRatio | WeiRatio;
-        recipient?: Address;
-        nonce?: Nonce;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<Order> {
-        return this.getOrder({
-            ...order,
-            amount: 0
-        });
-    }
-
-    override async getOrder(order: {
+    override async signOrder(orderData: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         ratio: TokenRatio | WeiRatio;
@@ -532,46 +517,8 @@ export class Wallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order> {
-        if (!this.signer) {
-            throw new Error('zkSync signer is required for signing an order');
-        }
-        await this.setRequiredAccountIdFromServer('Swap order');
-        const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
-        const recipient = order.recipient || this.address();
+        const order = await this.getPartialOrder(orderData);
 
-        let ratio: Ratio;
-        const sell = order.tokenSell;
-        const buy = order.tokenBuy;
-
-        if (!order.ratio[sell] || !order.ratio[buy]) {
-            throw new Error(`Wrong tokens in the ratio object: should be ${sell} and ${buy}`);
-        }
-
-        if (order.ratio.type == 'Wei') {
-            ratio = [order.ratio[sell], order.ratio[buy]];
-        } else if (order.ratio.type == 'Token') {
-            ratio = [
-                this.provider.tokenSet.parseToken(sell, order.ratio[sell].toString()),
-                this.provider.tokenSet.parseToken(buy, order.ratio[buy].toString())
-            ];
-        }
-
-        const signedOrder = await this.signer.signSyncOrder({
-            accountId: this.accountId,
-            recipient,
-            nonce,
-            amount: order.amount || BigNumber.from(0),
-            tokenSell: this.provider.tokenSet.resolveTokenId(order.tokenSell),
-            tokenBuy: this.provider.tokenSet.resolveTokenId(order.tokenBuy),
-            validFrom: order.validFrom || 0,
-            validUntil: order.validUntil || MAX_TIMESTAMP,
-            ratio
-        });
-
-        return this.signOrder(signedOrder);
-    }
-
-    override async signOrder(order: Order): Promise<Order> {
         const stringAmount = BigNumber.from(order.amount).isZero()
             ? null
             : this.provider.tokenSet.formatToken(order.tokenSell, order.amount);
@@ -580,13 +527,13 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignOrder({
-                amount: stringAmount,
-                tokenSell: stringTokenSell,
-                tokenBuy: stringTokenBuy,
-                nonce: order.nonce,
-                recipient: order.recipient,
-                ratio: order.ratio
-            });
+                  amount: stringAmount,
+                  tokenSell: stringTokenSell,
+                  tokenBuy: stringTokenBuy,
+                  nonce: order.nonce,
+                  recipient: order.recipient,
+                  ratio: order.ratio
+              });
         order.ethSignature = ethereumSignature;
         return order;
     }
@@ -606,10 +553,10 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignSwap({
-                fee: stringFee,
-                feeToken: stringToken,
-                nonce: swap.nonce
-            });
+                  fee: stringFee,
+                  feeToken: stringToken,
+                  nonce: swap.nonce
+              });
 
         return {
             tx: signedSwapTransaction,
@@ -666,12 +613,12 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignMintNFT({
-                stringFeeToken,
-                stringFee,
-                recipient: mintNFT.recipient,
-                contentHash: mintNFT.contentHash,
-                nonce: mintNFT.nonce
-            });
+                  stringFeeToken,
+                  stringFee,
+                  recipient: mintNFT.recipient,
+                  contentHash: mintNFT.contentHash,
+                  nonce: mintNFT.nonce
+              });
 
         return {
             tx: signedMintNFTTransaction,
@@ -721,12 +668,12 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignWithdrawNFT({
-                token: withdrawNFT.token,
-                to: withdrawNFT.to,
-                stringFee,
-                stringFeeToken,
-                nonce: withdrawNFT.nonce
-            });
+                  token: withdrawNFT.token,
+                  to: withdrawNFT.to,
+                  stringFee,
+                  stringFeeToken,
+                  nonce: withdrawNFT.nonce
+              });
 
         return {
             tx: signedWithdrawNFTTransaction,
@@ -1185,5 +1132,54 @@ export class Wallet extends AbstractWallet {
             stringFee,
             target: forcedExit.target
         });
+    }
+
+    async getPartialOrder(order: {
+        tokenSell: TokenLike;
+        tokenBuy: TokenLike;
+        ratio: TokenRatio | WeiRatio;
+        amount: BigNumberish;
+        recipient?: Address;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Order> {
+        if (!this.signer) {
+            throw new Error('zkSync signer is required for signing an order');
+        }
+        await this.setRequiredAccountIdFromServer('Swap order');
+        const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
+        const recipient = order.recipient || this.address();
+
+        let ratio: Ratio;
+        const sell = order.tokenSell;
+        const buy = order.tokenBuy;
+
+        if (!order.ratio[sell] || !order.ratio[buy]) {
+            throw new Error(`Wrong tokens in the ratio object: should be ${sell} and ${buy}`);
+        }
+
+        if (order.ratio.type == 'Wei') {
+            ratio = [order.ratio[sell], order.ratio[buy]];
+        } else if (order.ratio.type == 'Token') {
+            ratio = [
+                this.provider.tokenSet.parseToken(sell, order.ratio[sell].toString()),
+                this.provider.tokenSet.parseToken(buy, order.ratio[buy].toString())
+            ];
+        }
+
+        const partialOrder = await this.signer.signSyncOrder({
+            accountId: this.accountId,
+            recipient,
+            nonce,
+            amount: order.amount || BigNumber.from(0),
+            tokenSell: this.provider.tokenSet.resolveTokenId(order.tokenSell),
+            tokenBuy: this.provider.tokenSet.resolveTokenId(order.tokenBuy),
+            validFrom: order.validFrom || 0,
+            validUntil: order.validUntil || MAX_TIMESTAMP,
+            ratio
+        });
+
+        return partialOrder;
     }
 }
