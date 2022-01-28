@@ -46,7 +46,7 @@ import { Transaction, ETHOperation } from './operations';
 export abstract class AbstractWallet {
     public provider: SyncProvider;
 
-    protected constructor(public cachedAddress: Address, public accountId?: number) {}
+    protected constructor(public cachedAddress: Address, public accountId?: number) { }
 
     connect(provider: SyncProvider) {
         this.provider = provider;
@@ -208,16 +208,6 @@ export abstract class AbstractWallet {
 
     // Transfer part
 
-    abstract getTransfer(transfer: {
-        to: Address;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Transfer>;
-
     abstract signSyncTransfer(transfer: {
         to: Address;
         token: TokenLike;
@@ -240,16 +230,6 @@ export abstract class AbstractWallet {
 
     // ChangePubKey part
 
-    abstract getChangePubKey(changePubKey: {
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
-        ethSignature?: string;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<ChangePubKey>;
-
     abstract signSetSigningKey(changePubKey: {
         feeToken: TokenLike;
         fee: BigNumberish;
@@ -270,16 +250,6 @@ export abstract class AbstractWallet {
     }): Promise<Transaction>;
 
     // Withdraw part
-
-    abstract getWithdrawFromSyncToEthereum(withdraw: {
-        ethAddress: string;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Withdraw>;
 
     abstract signWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
@@ -303,15 +273,6 @@ export abstract class AbstractWallet {
     }): Promise<Transaction>;
 
     // Forced exit part
-
-    abstract getForcedExit(forcedExit: {
-        target: Address;
-        token: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<ForcedExit>;
 
     abstract signSyncForcedExit(forcedExit: {
         target: Address;
@@ -356,14 +317,6 @@ export abstract class AbstractWallet {
 
     abstract signOrder(order: Order): Promise<Order>;
 
-    abstract getSwap(swap: {
-        orders: [Order, Order];
-        feeToken: number;
-        amounts: [BigNumberish, BigNumberish];
-        nonce: number;
-        fee: BigNumberish;
-    }): Promise<Swap>;
-
     abstract signSyncSwap(swap: {
         orders: [Order, Order];
         feeToken: number;
@@ -382,14 +335,6 @@ export abstract class AbstractWallet {
 
     // Mint NFT part
 
-    abstract getMintNFT(mintNFT: {
-        recipient: string;
-        contentHash: string;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<MintNFT>;
-
     abstract signMintNFT(mintNFT: {
         recipient: string;
         contentHash: string;
@@ -407,16 +352,6 @@ export abstract class AbstractWallet {
     }): Promise<Transaction>;
 
     // Withdraw NFT part
-
-    abstract getWithdrawNFT(withdrawNFT: {
-        to: string;
-        token: TokenLike;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<WithdrawNFT>;
 
     abstract signWithdrawNFT(withdrawNFT: {
         to: string;

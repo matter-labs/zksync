@@ -1,50 +1,37 @@
-import { BigNumber, BigNumberish, ethers } from 'ethers';
+import { BigNumberish, ethers } from 'ethers';
 import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
-import { Create2WalletSigner, Signer, unableToSign } from './signer';
 import { BatchBuilderInternalTx } from './batch-builder';
 import {
     Address,
-    ChangePubKey,
-    ChangePubKeyCREATE2,
-    ChangePubKeyECDSA,
-    ChangePubKeyOnchain,
     ChangePubkeyTypes,
-    Create2Data,
     EthSignerType,
-    ForcedExit,
-    MintNFT,
     NFT,
     Nonce,
     Order,
     PubKeyHash,
-    Ratio,
     SignedTransaction,
-    Swap,
     TokenLike,
-    Transfer,
     TxEthSignature,
-    Withdraw,
-    WithdrawNFT,
     TokenRatio,
     WeiRatio
 } from './types';
-import { getChangePubkeyLegacyMessage, getChangePubkeyMessage, MAX_TIMESTAMP, isNFT } from './utils';
-import { Transaction, submitSignedTransaction } from './operations';
+import { Transaction, submitSignedTransaction, submitSignedTransactionsBatch } from './operations';
 import { AbstractWallet } from './abstract-wallet';
 
 export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransactionsBatch } from './operations';
 
 export class RemoteWallet extends AbstractWallet {
+    private web3Signer: ethers.Signer;
+
     protected constructor(
-        public _ethSigner: ethers.Signer,
-        public _ethMessageSigner: EthMessageSigner,
+        private web3Provider: ethers.providers.Web3Provider,
+        private _ethMessageSigner: EthMessageSigner,
         cachedAddress: Address,
-        public signer?: Signer,
         accountId?: number,
-        public ethSignerType?: EthSignerType
     ) {
         super(cachedAddress, accountId);
+        this.web3Signer = web3Provider.getSigner();
     }
 
     // ************
@@ -52,13 +39,23 @@ export class RemoteWallet extends AbstractWallet {
     //
 
     static async fromEthSigner(
-        ethWallet: ethers.Signer,
+        web3Provider: ethers.providers.Web3Provider,
         provider: SyncProvider,
-        signer?: Signer,
-        accountId?: number,
-        ethSignerType?: EthSignerType
+        accountId?: number
     ): Promise<RemoteWallet> {
-        throw Error("Not implemented");
+        // Since this wallet implementation requires the signer to support custom RPC method,
+        // we can assume that eth signer type is a constant to avoid requesting a signature each time
+        // user connects.
+        const ethSignerType: EthSignerType = {
+            verificationMethod: 'ERC-1271',
+            isSignedMsgPrefixed: true,
+        };
+
+        const ethMessageSigner = new EthMessageSigner(web3Provider.getSigner(), ethSignerType);
+        const wallet = new RemoteWallet(web3Provider, ethMessageSigner, await web3Provider.getSigner().getAddress(), accountId);
+        wallet.connect(provider);
+        await wallet.verifyNetworks();
+        return wallet;
     }
 
 
@@ -67,7 +64,7 @@ export class RemoteWallet extends AbstractWallet {
     //
 
     override ethSigner(): ethers.Signer {
-        return this._ethSigner;
+        return this.web3Signer;
     }
 
     override ethMessageSigner(): EthMessageSigner {
@@ -75,11 +72,12 @@ export class RemoteWallet extends AbstractWallet {
     }
 
     override syncSignerConnected(): boolean {
-        return this.signer !== null;
+        // Sync signer is the Eth signer, which is always connected.
+        return true;
     }
 
     override async syncSignerPubKeyHash(): Promise<PubKeyHash> {
-        return await this.signer.pubKeyHash();
+        return await this.callExtSignerPubKeyHash();
     }
 
     // *********************
@@ -90,24 +88,22 @@ export class RemoteWallet extends AbstractWallet {
         startNonce: Nonce,
         txs: BatchBuilderInternalTx[]
     ): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature }> {
-        throw Error("Not implemented");
+        let nonce: number = await this.getNonce(startNonce);
+        // Collect transaction bodies and set nonces in it.
+        const txsToSign = txs.map(tx => {
+            tx.tx.nonce = nonce;
+            nonce += 1;
+            return tx.tx;
+        });
+        const signedTransactions = await this.callExtSignZkSyncBatch(txsToSign);
+        // Each transaction will have its own Ethereum signature, if it's required.
+        // There will be no umbrella signature for the whole batch.
+        return { txs: signedTransactions };
     }
 
     // **************
     // L2 operations
     //
-
-    override async getTransfer(transfer: {
-        to: Address;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Transfer> {
-        throw Error("Not implemented");
-    }
 
     override async signSyncTransfer(transfer: {
         to: Address;
@@ -118,7 +114,8 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        throw Error("Not implemented");
+        const signed = await this.callExtSignZkSyncBatch([transfer]);
+        return signed[0];
     }
 
     override async syncTransfer(transfer: {
@@ -130,22 +127,11 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Transaction> {
-        throw Error("Not implemented");
+        const signed = await this.signSyncTransfer(transfer as any);
+        return submitSignedTransaction(signed, this.provider);
     }
 
     // ChangePubKey part
-
-    override async getChangePubKey(changePubKey: {
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
-        ethSignature?: string;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<ChangePubKey> {
-        throw Error("Not implemented");
-    }
 
     override async signSetSigningKey(changePubKey: {
         feeToken: TokenLike;
@@ -156,7 +142,8 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        throw Error("Not implemented");
+        const signed = await this.callExtSignZkSyncBatch([changePubKey]);
+        return signed[0];
     }
 
     override async setSigningKey(changePubKey: {
@@ -167,22 +154,11 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Transaction> {
-        throw Error("Not implemented");
+        const signed = await this.signSetSigningKey(changePubKey as any);
+        return submitSignedTransaction(signed, this.provider);
     }
 
     // Withdraw part
-
-    override async getWithdrawFromSyncToEthereum(withdraw: {
-        ethAddress: string;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Withdraw> {
-        throw Error("Not implemented");
-    }
 
     override async signWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
@@ -193,7 +169,8 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        throw Error("Not implemented");
+        const signed = await this.callExtSignZkSyncBatch([withdraw]);
+        return signed[0];
     }
 
     override async withdrawFromSyncToEthereum(withdraw: {
@@ -206,21 +183,12 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Transaction> {
-        throw Error("Not implemented");
+        const fastProcessing = withdraw.fastProcessing;
+        const signed = await this.signWithdrawFromSyncToEthereum(withdraw as any);
+        return submitSignedTransaction(signed, this.provider, fastProcessing);
     }
 
     // Forced exit part
-
-    override async getForcedExit(forcedExit: {
-        target: Address;
-        token: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<ForcedExit> {
-        throw Error("Not implemented");
-    }
 
     override async signSyncForcedExit(forcedExit: {
         target: Address;
@@ -230,7 +198,8 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        throw Error("Not implemented");
+        const signed = await this.callExtSignZkSyncBatch([forcedExit]);
+        return signed[0];
     }
 
     override async syncForcedExit(forcedExit: {
@@ -241,7 +210,8 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Transaction> {
-        throw Error("Not implemented");
+        const signed = await this.signSyncForcedExit(forcedExit as any);
+        return submitSignedTransaction(signed, this.provider);
     }
 
     // Swap part
@@ -275,16 +245,6 @@ export class RemoteWallet extends AbstractWallet {
         throw Error("Not implemented");
     }
 
-    override async getSwap(swap: {
-        orders: [Order, Order];
-        feeToken: number;
-        amounts: [BigNumberish, BigNumberish];
-        nonce: number;
-        fee: BigNumberish;
-    }): Promise<Swap> {
-        throw Error("Not implemented");
-    }
-
     override async signSyncSwap(swap: {
         orders: [Order, Order];
         feeToken: number;
@@ -292,7 +252,8 @@ export class RemoteWallet extends AbstractWallet {
         nonce: number;
         fee: BigNumberish;
     }): Promise<SignedTransaction> {
-        throw Error("Not implemented");
+        const signed = await this.callExtSignZkSyncBatch([swap]);
+        return signed[0];
     }
 
     override async syncSwap(swap: {
@@ -302,20 +263,11 @@ export class RemoteWallet extends AbstractWallet {
         nonce?: number;
         fee?: BigNumberish;
     }): Promise<Transaction> {
-        throw Error("Not implemented");
+        const signed = await this.signSyncSwap(swap as any);
+        return submitSignedTransaction(signed, this.provider);
     }
 
     // Mint NFT part
-
-    override async getMintNFT(mintNFT: {
-        recipient: string;
-        contentHash: string;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<MintNFT> {
-        throw Error("Not implemented");
-    }
 
     override async signMintNFT(mintNFT: {
         recipient: string;
@@ -324,7 +276,8 @@ export class RemoteWallet extends AbstractWallet {
         fee: BigNumberish;
         nonce: number;
     }): Promise<SignedTransaction> {
-        throw Error("Not implemented");
+        const signed = await this.callExtSignZkSyncBatch([mintNFT]);
+        return signed[0];
     }
 
     override async mintNFT(mintNFT: {
@@ -334,21 +287,11 @@ export class RemoteWallet extends AbstractWallet {
         fee?: BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
-        throw Error("Not implemented");
+        const signed = await this.signMintNFT(mintNFT as any);
+        return submitSignedTransaction(signed, this.provider);
     }
 
     // Withdraw NFT part
-    override async getWithdrawNFT(withdrawNFT: {
-        to: string;
-        token: TokenLike;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<WithdrawNFT> {
-        throw Error("Not implemented");
-    }
 
     override async signWithdrawNFT(withdrawNFT: {
         to: string;
@@ -359,7 +302,8 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        throw Error("Not implemented");
+        const signed = await this.callExtSignZkSyncBatch([withdrawNFT]);
+        return signed[0];
     }
 
     override async withdrawNFT(withdrawNFT: {
@@ -372,7 +316,9 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Transaction> {
-        throw Error("Not implemented");
+        const fastProcessing = withdrawNFT.fastProcessing;
+        const signed = await this.signWithdrawNFT(withdrawNFT as any);
+        return submitSignedTransaction(signed, this.provider, fastProcessing);
     }
 
     // Transfer NFT part
@@ -386,7 +332,33 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Transaction[]> {
-        throw Error("Not implemented");
+        transfer.nonce = transfer.nonce != null ? await this.getNonce(transfer.nonce) : await this.getNonce();
+
+        let fee: BigNumberish;
+        if (transfer.fee == null) {
+            fee = await this.provider.getTransactionsBatchFee(
+                ['Transfer', 'Transfer'],
+                [transfer.to, this.address()],
+                transfer.feeToken
+            );
+        } else {
+            fee = transfer.fee;
+        }
+
+        const txNFT = {
+            to: transfer.to,
+            token: transfer.token.id,
+            amount: 1,
+            fee: 0
+        };
+        const txFee = {
+            to: this.address(),
+            token: transfer.feeToken,
+            amount: 0,
+            fee
+        };
+
+        return await this.syncMultiTransfer([txNFT, txFee]);
     }
 
     // Multi-transfer part
@@ -404,6 +376,66 @@ export class RemoteWallet extends AbstractWallet {
             validUntil?: number;
         }[]
     ): Promise<Transaction[]> {
-        throw Error("Not implemented");
+        const signed = await this.callExtSignZkSyncBatch(transfers);
+        return submitSignedTransactionsBatch(this.provider, signed);
+    }
+
+    // ****************
+    // Internal methods
+    //
+
+    /**
+     * Performs an RPC call to the custom `zkSync_signBatch` method.
+     * This method is specified here: https://github.com/argentlabs/argent-contracts-l2/discussions/4
+     * 
+     * Basically, it's an addition to the WalletConnect server that accepts intentionally incomplete
+     * transactions (e.g. with no account IDs resolved), and returns transactions with both L1 and L2
+     * signatures.
+     * 
+     * @param txs A list of transactions to be signed.
+     * 
+     * @returns A list of singed transactions.
+     */
+    protected async callExtSignZkSyncBatch(txs: any[]): Promise<SignedTransaction[]> {
+        try {
+            // Response must be an array of signed transactions.
+            // Transactions are flattened (ethereum signatures are on the same level as L2 signatures),
+            // so we need to "unflat" each one.
+            const response: any[] = await this.web3Provider.send("zkSync_signerPubKeyHash", null);
+
+            const transactions = response.map((tx) => {
+                const ethereumSignature = tx["ethereumSignature"];
+                // Remove the L1 signature from the transaction data.
+                delete tx["ethereumSignature"];
+                return {
+                    tx,
+                    ethereumSignature
+                };
+            });
+
+            return transactions;
+        } catch (e) {
+            console.error(`Received an error performing 'zkSync_signBatch' request: ${e.toString()}`);
+            throw new Error("Wallet server returned a malformed response to the sign batch request");
+        }
+    }
+
+    /**
+     * Performs an RPC call to the custom `zkSync_signerPubKeyHash` method.
+     * 
+     * This method should return a public key hash associated with the wallet
+     */
+    protected async callExtSignerPubKeyHash(): Promise<PubKeyHash> {
+        try {
+            const response = await this.web3Provider.send("zkSync_signerPubKeyHash", null);
+            if (!response["pubKeyHash"]) {
+                throw new Error("Wallet server returned a malformed response to the PubKeyHash request");
+            }
+            return response["pubKeyHash"];
+        }
+        catch (e) {
+            console.error(`Received an error performing 'zkSync_signerPubKeyHash' request: ${e.toString()}`);
+            throw new Error("Wallet server returned a malformed response to the PubKeyHash request");
+        }
     }
 }

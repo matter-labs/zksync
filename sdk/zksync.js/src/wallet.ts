@@ -37,8 +37,8 @@ export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransac
 
 export class Wallet extends AbstractWallet {
     protected constructor(
-        public _ethSigner: ethers.Signer,
-        public _ethMessageSigner: EthMessageSigner,
+        private _ethSigner: ethers.Signer,
+        private _ethMessageSigner: EthMessageSigner,
         cachedAddress: Address,
         public signer?: Signer,
         accountId?: number,
@@ -233,38 +233,6 @@ export class Wallet extends AbstractWallet {
     // L2 operations
     //
 
-    override async getTransfer(transfer: {
-        to: Address;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Transfer> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-
-        await this.setRequiredAccountIdFromServer('Transfer funds');
-
-        const tokenId = this.provider.tokenSet.resolveTokenId(transfer.token);
-
-        const transactionData = {
-            accountId: this.accountId,
-            from: this.address(),
-            to: transfer.to,
-            tokenId,
-            amount: transfer.amount,
-            fee: transfer.fee,
-            nonce: transfer.nonce,
-            validFrom: transfer.validFrom,
-            validUntil: transfer.validUntil
-        };
-
-        return this.signer.signSyncTransfer(transactionData);
-    }
-
     override async signSyncTransfer(transfer: {
         to: Address;
         token: TokenLike;
@@ -288,13 +256,13 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignTransfer({
-                  stringAmount,
-                  stringFee,
-                  stringToken,
-                  to: transfer.to,
-                  nonce: transfer.nonce,
-                  accountId: this.accountId
-              });
+                stringAmount,
+                stringFee,
+                stringToken,
+                to: transfer.to,
+                nonce: transfer.nonce,
+                accountId: this.accountId
+            });
         return {
             tx: signedTransferTransaction,
             ethereumSignature
@@ -321,40 +289,6 @@ export class Wallet extends AbstractWallet {
     }
 
     // ChangePubKey part
-
-    override async getChangePubKey(changePubKey: {
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
-        ethSignature?: string;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<ChangePubKey> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for current pubkey calculation.');
-        }
-
-        const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
-        const newPkHash = await this.signer.pubKeyHash();
-
-        await this.setRequiredAccountIdFromServer('Set Signing Key');
-
-        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
-            accountId: this.accountId,
-            account: this.address(),
-            newPkHash,
-            nonce: changePubKey.nonce,
-            feeTokenId,
-            fee: BigNumber.from(changePubKey.fee).toString(),
-            ethAuthData: changePubKey.ethAuthData,
-            ethSignature: changePubKey.ethSignature,
-            validFrom: changePubKey.validFrom,
-            validUntil: changePubKey.validUntil
-        });
-
-        return changePubKeyTx;
-    }
 
     override async signSetSigningKey(changePubKey: {
         feeToken: TokenLike;
@@ -461,36 +395,6 @@ export class Wallet extends AbstractWallet {
 
     // Withdraw part
 
-    override async getWithdrawFromSyncToEthereum(withdraw: {
-        ethAddress: string;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Withdraw> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-        await this.setRequiredAccountIdFromServer('Withdraw funds');
-
-        const tokenId = this.provider.tokenSet.resolveTokenId(withdraw.token);
-        const transactionData = {
-            accountId: this.accountId,
-            from: this.address(),
-            ethAddress: withdraw.ethAddress,
-            tokenId,
-            amount: withdraw.amount,
-            fee: withdraw.fee,
-            nonce: withdraw.nonce,
-            validFrom: withdraw.validFrom,
-            validUntil: withdraw.validUntil
-        };
-
-        return await this.signer.signSyncWithdraw(transactionData);
-    }
-
     override async signWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
@@ -514,13 +418,13 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignWithdraw({
-                  stringAmount,
-                  stringFee,
-                  stringToken,
-                  ethAddress: withdraw.ethAddress,
-                  nonce: withdraw.nonce,
-                  accountId: this.accountId
-              });
+                stringAmount,
+                stringFee,
+                stringToken,
+                ethAddress: withdraw.ethAddress,
+                nonce: withdraw.nonce,
+                accountId: this.accountId
+            });
 
         return {
             tx: signedWithdrawTransaction,
@@ -554,34 +458,6 @@ export class Wallet extends AbstractWallet {
 
     // Forced exit part
 
-    override async getForcedExit(forcedExit: {
-        target: Address;
-        token: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<ForcedExit> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-        await this.setRequiredAccountIdFromServer('perform a Forced Exit');
-
-        const tokenId = this.provider.tokenSet.resolveTokenId(forcedExit.token);
-
-        const transactionData = {
-            initiatorAccountId: this.accountId,
-            target: forcedExit.target,
-            tokenId,
-            fee: forcedExit.fee,
-            nonce: forcedExit.nonce,
-            validFrom: forcedExit.validFrom || 0,
-            validUntil: forcedExit.validUntil || MAX_TIMESTAMP
-        };
-
-        return await this.signer.signSyncForcedExit(transactionData);
-    }
-
     override async signSyncForcedExit(forcedExit: {
         target: Address;
         token: TokenLike;
@@ -599,11 +475,11 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignForcedExit({
-                  stringToken,
-                  stringFee,
-                  target: forcedExit.target,
-                  nonce: forcedExit.nonce
-              });
+                stringToken,
+                stringFee,
+                target: forcedExit.target,
+                nonce: forcedExit.nonce
+            });
 
         return {
             tx: signedForcedExitTransaction,
@@ -704,36 +580,15 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignOrder({
-                  amount: stringAmount,
-                  tokenSell: stringTokenSell,
-                  tokenBuy: stringTokenBuy,
-                  nonce: order.nonce,
-                  recipient: order.recipient,
-                  ratio: order.ratio
-              });
+                amount: stringAmount,
+                tokenSell: stringTokenSell,
+                tokenBuy: stringTokenBuy,
+                nonce: order.nonce,
+                recipient: order.recipient,
+                ratio: order.ratio
+            });
         order.ethSignature = ethereumSignature;
         return order;
-    }
-
-    override async getSwap(swap: {
-        orders: [Order, Order];
-        feeToken: number;
-        amounts: [BigNumberish, BigNumberish];
-        nonce: number;
-        fee: BigNumberish;
-    }): Promise<Swap> {
-        if (!this.signer) {
-            throw new Error('zkSync signer is required for swapping funds');
-        }
-        await this.setRequiredAccountIdFromServer('Swap submission');
-        const feeToken = this.provider.tokenSet.resolveTokenId(swap.feeToken);
-
-        return this.signer.signSyncSwap({
-            ...swap,
-            submitterId: await this.getAccountId(),
-            submitterAddress: this.address(),
-            feeToken
-        });
     }
 
     override async signSyncSwap(swap: {
@@ -751,10 +606,10 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignSwap({
-                  fee: stringFee,
-                  feeToken: stringToken,
-                  nonce: swap.nonce
-              });
+                fee: stringFee,
+                feeToken: stringToken,
+                nonce: swap.nonce
+            });
 
         return {
             tx: signedSwapTransaction,
@@ -795,32 +650,6 @@ export class Wallet extends AbstractWallet {
 
     // Mint NFT part
 
-    override async getMintNFT(mintNFT: {
-        recipient: string;
-        contentHash: string;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<MintNFT> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-        await this.setRequiredAccountIdFromServer('MintNFT');
-
-        const feeTokenId = this.provider.tokenSet.resolveTokenId(mintNFT.feeToken);
-        const transactionData = {
-            creatorId: this.accountId,
-            creatorAddress: this.address(),
-            recipient: mintNFT.recipient,
-            contentHash: mintNFT.contentHash,
-            feeTokenId,
-            fee: mintNFT.fee,
-            nonce: mintNFT.nonce
-        };
-
-        return await this.signer.signMintNFT(transactionData);
-    }
-
     override async signMintNFT(mintNFT: {
         recipient: string;
         contentHash: string;
@@ -837,12 +666,12 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignMintNFT({
-                  stringFeeToken,
-                  stringFee,
-                  recipient: mintNFT.recipient,
-                  contentHash: mintNFT.contentHash,
-                  nonce: mintNFT.nonce
-              });
+                stringFeeToken,
+                stringFee,
+                recipient: mintNFT.recipient,
+                contentHash: mintNFT.contentHash,
+                nonce: mintNFT.nonce
+            });
 
         return {
             tx: signedMintNFTTransaction,
@@ -871,36 +700,6 @@ export class Wallet extends AbstractWallet {
     }
 
     // Withdraw NFT part
-    override async getWithdrawNFT(withdrawNFT: {
-        to: string;
-        token: TokenLike;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<WithdrawNFT> {
-        if (!this.signer) {
-            throw new Error('ZKSync signer is required for sending zksync transactions.');
-        }
-        await this.setRequiredAccountIdFromServer('WithdrawNFT');
-
-        const tokenId = this.provider.tokenSet.resolveTokenId(withdrawNFT.token);
-        const feeTokenId = this.provider.tokenSet.resolveTokenId(withdrawNFT.feeToken);
-        const transactionData = {
-            accountId: this.accountId,
-            from: this.address(),
-            to: withdrawNFT.to,
-            tokenId,
-            feeTokenId,
-            fee: withdrawNFT.fee,
-            nonce: withdrawNFT.nonce,
-            validFrom: withdrawNFT.validFrom,
-            validUntil: withdrawNFT.validUntil
-        };
-
-        return await this.signer.signWithdrawNFT(transactionData);
-    }
 
     override async signWithdrawNFT(withdrawNFT: {
         to: string;
@@ -922,12 +721,12 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignWithdrawNFT({
-                  token: withdrawNFT.token,
-                  to: withdrawNFT.to,
-                  stringFee,
-                  stringFeeToken,
-                  nonce: withdrawNFT.nonce
-              });
+                token: withdrawNFT.token,
+                to: withdrawNFT.to,
+                stringFee,
+                stringFeeToken,
+                nonce: withdrawNFT.nonce
+            });
 
         return {
             tx: signedWithdrawNFTTransaction,
@@ -1063,6 +862,208 @@ export class Wallet extends AbstractWallet {
     // ****************
     // Internal methods
     //
+
+    protected async getTransfer(transfer: {
+        to: Address;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<Transfer> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+
+        await this.setRequiredAccountIdFromServer('Transfer funds');
+
+        const tokenId = this.provider.tokenSet.resolveTokenId(transfer.token);
+
+        const transactionData = {
+            accountId: this.accountId,
+            from: this.address(),
+            to: transfer.to,
+            tokenId,
+            amount: transfer.amount,
+            fee: transfer.fee,
+            nonce: transfer.nonce,
+            validFrom: transfer.validFrom,
+            validUntil: transfer.validUntil
+        };
+
+        return this.signer.signSyncTransfer(transactionData);
+    }
+
+    protected async getChangePubKey(changePubKey: {
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethSignature?: string;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<ChangePubKey> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for current pubkey calculation.');
+        }
+
+        const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
+        const newPkHash = await this.signer.pubKeyHash();
+
+        await this.setRequiredAccountIdFromServer('Set Signing Key');
+
+        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
+            accountId: this.accountId,
+            account: this.address(),
+            newPkHash,
+            nonce: changePubKey.nonce,
+            feeTokenId,
+            fee: BigNumber.from(changePubKey.fee).toString(),
+            ethAuthData: changePubKey.ethAuthData,
+            ethSignature: changePubKey.ethSignature,
+            validFrom: changePubKey.validFrom,
+            validUntil: changePubKey.validUntil
+        });
+
+        return changePubKeyTx;
+    }
+
+    protected async getWithdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<Withdraw> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('Withdraw funds');
+
+        const tokenId = this.provider.tokenSet.resolveTokenId(withdraw.token);
+        const transactionData = {
+            accountId: this.accountId,
+            from: this.address(),
+            ethAddress: withdraw.ethAddress,
+            tokenId,
+            amount: withdraw.amount,
+            fee: withdraw.fee,
+            nonce: withdraw.nonce,
+            validFrom: withdraw.validFrom,
+            validUntil: withdraw.validUntil
+        };
+
+        return await this.signer.signSyncWithdraw(transactionData);
+    }
+
+    protected async getForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<ForcedExit> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('perform a Forced Exit');
+
+        const tokenId = this.provider.tokenSet.resolveTokenId(forcedExit.token);
+
+        const transactionData = {
+            initiatorAccountId: this.accountId,
+            target: forcedExit.target,
+            tokenId,
+            fee: forcedExit.fee,
+            nonce: forcedExit.nonce,
+            validFrom: forcedExit.validFrom || 0,
+            validUntil: forcedExit.validUntil || MAX_TIMESTAMP
+        };
+
+        return await this.signer.signSyncForcedExit(transactionData);
+    }
+
+    protected async getSwap(swap: {
+        orders: [Order, Order];
+        feeToken: number;
+        amounts: [BigNumberish, BigNumberish];
+        nonce: number;
+        fee: BigNumberish;
+    }): Promise<Swap> {
+        if (!this.signer) {
+            throw new Error('zkSync signer is required for swapping funds');
+        }
+        await this.setRequiredAccountIdFromServer('Swap submission');
+        const feeToken = this.provider.tokenSet.resolveTokenId(swap.feeToken);
+
+        return this.signer.signSyncSwap({
+            ...swap,
+            submitterId: await this.getAccountId(),
+            submitterAddress: this.address(),
+            feeToken
+        });
+    }
+
+    protected async getMintNFT(mintNFT: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<MintNFT> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('MintNFT');
+
+        const feeTokenId = this.provider.tokenSet.resolveTokenId(mintNFT.feeToken);
+        const transactionData = {
+            creatorId: this.accountId,
+            creatorAddress: this.address(),
+            recipient: mintNFT.recipient,
+            contentHash: mintNFT.contentHash,
+            feeTokenId,
+            fee: mintNFT.fee,
+            nonce: mintNFT.nonce
+        };
+
+        return await this.signer.signMintNFT(transactionData);
+    }
+
+    protected async getWithdrawNFT(withdrawNFT: {
+        to: string;
+        token: TokenLike;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<WithdrawNFT> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('WithdrawNFT');
+
+        const tokenId = this.provider.tokenSet.resolveTokenId(withdrawNFT.token);
+        const feeTokenId = this.provider.tokenSet.resolveTokenId(withdrawNFT.feeToken);
+        const transactionData = {
+            accountId: this.accountId,
+            from: this.address(),
+            to: withdrawNFT.to,
+            tokenId,
+            feeTokenId,
+            fee: withdrawNFT.fee,
+            nonce: withdrawNFT.nonce,
+            validFrom: withdrawNFT.validFrom,
+            validUntil: withdrawNFT.validUntil
+        };
+
+        return await this.signer.signWithdrawNFT(transactionData);
+    }
 
     getWithdrawNFTEthMessagePart(withdrawNFT: {
         to: string;
