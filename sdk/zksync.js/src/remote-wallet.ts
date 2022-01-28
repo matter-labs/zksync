@@ -230,7 +230,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order> {
-        throw Error('Not implemented');
+        return await this.callExtSignOrder(order);
     }
 
     override async signSyncSwap(swap: {
@@ -389,7 +389,7 @@ export class RemoteWallet extends AbstractWallet {
             // Response must be an array of signed transactions.
             // Transactions are flattened (ethereum signatures are on the same level as L2 signatures),
             // so we need to "unflat" each one.
-            const response: any[] = await this.web3Provider.send('zkSync_signerPubKeyHash', null);
+            const response: any[] = await this.web3Provider.send('zkSync_signBatch', [txs]);
 
             const transactions = response.map((tx) => {
                 const ethereumSignature = tx['ethereumSignature'];
@@ -405,6 +405,32 @@ export class RemoteWallet extends AbstractWallet {
         } catch (e) {
             console.error(`Received an error performing 'zkSync_signBatch' request: ${e.toString()}`);
             throw new Error('Wallet server returned a malformed response to the sign batch request');
+        }
+    }
+
+    /**
+     * Performs an RPC call to the custom `zkSync_signOrder` method.
+     *
+     * @param txs An order data to be signed.
+     *
+     * @returns The completed and signed offer.
+     */
+    protected async callExtSignOrder(order: any): Promise<Order> {
+        try {
+            // Response must be an array of signed transactions.
+            // Transactions are flattened (ethereum signatures are on the same level as L2 signatures),
+            // so we need to "unflat" each one.
+            const signedOrder: any = await this.web3Provider.send('zkSync_signOrder', [order]);
+
+            // Sanity check
+            if (!signedOrder['signature']) {
+                throw new Error('Wallet server returned a malformed response to the sign order request');
+            }
+
+            return signedOrder as Order;
+        } catch (e) {
+            console.error(`Received an error performing 'zkSync_signOrder' request: ${e.toString()}`);
+            throw new Error('Wallet server returned a malformed response to the sign order request');
         }
     }
 
