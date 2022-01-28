@@ -2,7 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, Create2WalletSigner } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
-import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
+import { ChangePubKey, SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
 import { MAX_TIMESTAMP } from 'zksync/build/utils';
 import { Transaction } from 'zksync';
@@ -192,7 +192,7 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
             validFrom: 0,
             validUntil: MAX_TIMESTAMP
         };
-        const transfer = await sender.getTransfer(transferArgs);
+        const transfer = (await sender.signSyncTransfer(transferArgs)).tx;
         batch.push({ tx: transfer });
 
         const messagePart = await sender.getTransferEthMessagePart(transferArgs);
@@ -246,14 +246,13 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
         validFrom: 0,
         validUntil: MAX_TIMESTAMP
     };
-    const transfer1 = await from.getTransfer(_transfer1);
-    const transfer2 = await to.getTransfer(_transfer2);
+    const transfer1 = (await from.signSyncTransfer(_transfer1)).tx;
+    const transfer2 = (await to.signSyncTransfer(_transfer2)).tx;
     // transfer1 and transfer2 are from different wallets.
     const batch: SignedTransaction[] = [{ tx: transfer1 }, { tx: transfer2 }];
 
-    const message = `From: ${from.address().toLowerCase()}\n${from.getTransferEthMessagePart(_transfer1)}\nNonce: ${
-        _transfer1.nonce
-    }\n\nFrom: ${to.address().toLowerCase()}\n${to.getTransferEthMessagePart(_transfer2)}\nNonce: ${_transfer1.nonce}`;
+    const message = `From: ${from.address().toLowerCase()}\n${from.getTransferEthMessagePart(_transfer1)}\nNonce: ${_transfer1.nonce
+        }\n\nFrom: ${to.address().toLowerCase()}\n${to.getTransferEthMessagePart(_transfer2)}\nNonce: ${_transfer1.nonce}`;
     const ethSignature = await from.ethMessageSigner().getEthMessageSignature(message);
 
     let thrown = true;
@@ -295,7 +294,7 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
         validFrom: 0,
         validUntil: MAX_TIMESTAMP
     };
-    const transfer = await from.getTransfer(_transfer);
+    const transfer = (await from.signSyncTransfer(_transfer)).tx as Transfer;
     // Resolve all the information needed for human-readable message.
     const stringAmount = from.provider.tokenSet.formatToken(_transfer.token, transfer.amount);
     let stringFee = from.provider.tokenSet.formatToken(_transfer.token, transfer.fee);
@@ -322,7 +321,7 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
         validFrom: 0,
         validUntil: MAX_TIMESTAMP
     };
-    const withdraw = await to.getWithdrawFromSyncToEthereum(_withdraw);
+    const withdraw = (await to.signWithdrawFromSyncToEthereum(_withdraw)).tx as Withdraw;
     stringFee = from.provider.tokenSet.formatToken(_transfer.token, 0);
     const withdrawMessage =
         `Withdraw ${stringAmount} ${stringToken}\n` +
@@ -414,17 +413,18 @@ Tester.prototype.testSubsidyForCREATE2ChangePubKey = async function (create2Wall
 
     // Now we submit the CREATE2 ChangePubKey
     const create2data = (create2Wallet.ethSigner() as Create2WalletSigner).create2WalletData;
-    const cpkTx = await create2Wallet.getChangePubKey({
+    const cpkTx = (await create2Wallet.signSetSigningKey({
         feeToken: token,
         fee: subsidyYotalFee,
         nonce: 0,
         validFrom: 0,
         validUntil: MAX_TIMESTAMP,
-        ethAuthData: {
-            type: 'CREATE2',
-            ...create2data
-        }
-    });
+        ethAuthType: "CREATE2",
+    })).tx as ChangePubKey;
+    cpkTx.ethAuthData = {
+        type: 'CREATE2',
+        ...create2data
+    };
     await expect(transport.request('tx_submit', [cpkTx, null])).to.be.rejected;
 
     // The transaction is submitted successfully
@@ -486,18 +486,19 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
     ).to.be.true;
 
     const create2data = (create2Wallet.ethSigner() as Create2WalletSigner).create2WalletData;
-    const cpkTx = await create2Wallet.getChangePubKey({
+    const cpkTx = (await create2Wallet.signSetSigningKey({
         feeToken: token,
         fee: BigNumber.from(0),
         nonce: 0,
         validFrom: 0,
         validUntil: MAX_TIMESTAMP,
-        ethAuthData: {
-            type: 'CREATE2',
-            ...create2data
-        }
-    });
-    const transferTx = await create2Wallet.getTransfer({
+        ethAuthType: "CREATE2"
+    })).tx as ChangePubKey;
+    cpkTx.ethAuthData = {
+        type: 'CREATE2',
+        ...create2data
+    };
+    const transferTx = (await create2Wallet.signSyncTransfer({
         token,
         fee: subsidyYotalFee,
         nonce: 1,
@@ -505,7 +506,7 @@ Tester.prototype.testSubsidyForBatch = async function (create2Wallet: Wallet, to
         validUntil: MAX_TIMESTAMP,
         amount: BigNumber.from('1'),
         to: create2Wallet.address()
-    });
+    })).tx;
     const txs = [{ tx: cpkTx }, { tx: transferTx }];
 
     await expect(transport.request('submit_txs_batch', [txs, []]), 'Submitted transaction with the wrong fee').to.be

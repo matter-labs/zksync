@@ -37,7 +37,7 @@ export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransac
 
 export class Wallet extends AbstractWallet {
     protected constructor(
-        private _ethSigner: ethers.Signer,
+        public _ethSigner: ethers.Signer,
         private _ethMessageSigner: EthMessageSigner,
         cachedAddress: Address,
         public signer?: Signer,
@@ -256,13 +256,13 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignTransfer({
-                  stringAmount,
-                  stringFee,
-                  stringToken,
-                  to: transfer.to,
-                  nonce: transfer.nonce,
-                  accountId: this.accountId
-              });
+                stringAmount,
+                stringFee,
+                stringToken,
+                to: transfer.to,
+                nonce: transfer.nonce,
+                accountId: this.accountId
+            });
         return {
             tx: signedTransferTransaction,
             ethereumSignature
@@ -418,13 +418,13 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignWithdraw({
-                  stringAmount,
-                  stringFee,
-                  stringToken,
-                  ethAddress: withdraw.ethAddress,
-                  nonce: withdraw.nonce,
-                  accountId: this.accountId
-              });
+                stringAmount,
+                stringFee,
+                stringToken,
+                ethAddress: withdraw.ethAddress,
+                nonce: withdraw.nonce,
+                accountId: this.accountId
+            });
 
         return {
             tx: signedWithdrawTransaction,
@@ -475,11 +475,11 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignForcedExit({
-                  stringToken,
-                  stringFee,
-                  target: forcedExit.target,
-                  nonce: forcedExit.nonce
-              });
+                stringToken,
+                stringFee,
+                target: forcedExit.target,
+                nonce: forcedExit.nonce
+            });
 
         return {
             tx: signedForcedExitTransaction,
@@ -580,13 +580,13 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignOrder({
-                  amount: stringAmount,
-                  tokenSell: stringTokenSell,
-                  tokenBuy: stringTokenBuy,
-                  nonce: order.nonce,
-                  recipient: order.recipient,
-                  ratio: order.ratio
-              });
+                amount: stringAmount,
+                tokenSell: stringTokenSell,
+                tokenBuy: stringTokenBuy,
+                nonce: order.nonce,
+                recipient: order.recipient,
+                ratio: order.ratio
+            });
         order.ethSignature = ethereumSignature;
         return order;
     }
@@ -606,10 +606,10 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignSwap({
-                  fee: stringFee,
-                  feeToken: stringToken,
-                  nonce: swap.nonce
-              });
+                fee: stringFee,
+                feeToken: stringToken,
+                nonce: swap.nonce
+            });
 
         return {
             tx: signedSwapTransaction,
@@ -666,12 +666,12 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignMintNFT({
-                  stringFeeToken,
-                  stringFee,
-                  recipient: mintNFT.recipient,
-                  contentHash: mintNFT.contentHash,
-                  nonce: mintNFT.nonce
-              });
+                stringFeeToken,
+                stringFee,
+                recipient: mintNFT.recipient,
+                contentHash: mintNFT.contentHash,
+                nonce: mintNFT.nonce
+            });
 
         return {
             tx: signedMintNFTTransaction,
@@ -721,12 +721,12 @@ export class Wallet extends AbstractWallet {
         const ethereumSignature = unableToSign(this.ethSigner())
             ? null
             : await this.ethMessageSigner().ethSignWithdrawNFT({
-                  token: withdrawNFT.token,
-                  to: withdrawNFT.to,
-                  stringFee,
-                  stringFeeToken,
-                  nonce: withdrawNFT.nonce
-              });
+                token: withdrawNFT.token,
+                to: withdrawNFT.to,
+                stringFee,
+                stringFeeToken,
+                nonce: withdrawNFT.nonce
+            });
 
         return {
             tx: signedWithdrawNFTTransaction,
