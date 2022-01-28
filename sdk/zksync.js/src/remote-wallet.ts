@@ -417,10 +417,8 @@ export class RemoteWallet extends AbstractWallet {
      */
     protected async callExtSignOrder(order: any): Promise<Order> {
         try {
-            // Response must be an array of signed transactions.
-            // Transactions are flattened (ethereum signatures are on the same level as L2 signatures),
-            // so we need to "unflat" each one.
-            const signedOrder: any = await this.web3Provider.send('zkSync_signOrder', [order]);
+            // For now, we assume that the same method will be used for both signing transactions and orders.
+            const signedOrder: any = await this.web3Provider.send('zkSync_signBatch', [order]);
 
             // Sanity check
             if (!signedOrder['signature']) {
