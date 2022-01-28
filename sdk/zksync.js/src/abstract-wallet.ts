@@ -46,7 +46,7 @@ import { Transaction, ETHOperation } from './operations';
 export abstract class AbstractWallet {
     public provider: SyncProvider;
 
-    protected constructor(public cachedAddress: Address, public accountId?: number) { }
+    protected constructor(public cachedAddress: Address, public accountId?: number) {}
 
     connect(provider: SyncProvider) {
         this.provider = provider;

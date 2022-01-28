@@ -28,7 +28,7 @@ export class RemoteWallet extends AbstractWallet {
         private web3Provider: ethers.providers.Web3Provider,
         private _ethMessageSigner: EthMessageSigner,
         cachedAddress: Address,
-        accountId?: number,
+        accountId?: number
     ) {
         super(cachedAddress, accountId);
         this.web3Signer = web3Provider.getSigner();
@@ -48,16 +48,20 @@ export class RemoteWallet extends AbstractWallet {
         // user connects.
         const ethSignerType: EthSignerType = {
             verificationMethod: 'ERC-1271',
-            isSignedMsgPrefixed: true,
+            isSignedMsgPrefixed: true
         };
 
         const ethMessageSigner = new EthMessageSigner(web3Provider.getSigner(), ethSignerType);
-        const wallet = new RemoteWallet(web3Provider, ethMessageSigner, await web3Provider.getSigner().getAddress(), accountId);
+        const wallet = new RemoteWallet(
+            web3Provider,
+            ethMessageSigner,
+            await web3Provider.getSigner().getAddress(),
+            accountId
+        );
         wallet.connect(provider);
         await wallet.verifyNetworks();
         return wallet;
     }
-
 
     // ****************
     // Abstract getters
@@ -90,7 +94,7 @@ export class RemoteWallet extends AbstractWallet {
     ): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature }> {
         let nonce: number = await this.getNonce(startNonce);
         // Collect transaction bodies and set nonces in it.
-        const txsToSign = txs.map(tx => {
+        const txsToSign = txs.map((tx) => {
             tx.tx.nonce = nonce;
             nonce += 1;
             return tx.tx;
@@ -225,7 +229,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order> {
-        throw Error("Not implemented");
+        throw Error('Not implemented');
     }
 
     override async getOrder(order: {
@@ -238,11 +242,11 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order> {
-        throw Error("Not implemented");
+        throw Error('Not implemented');
     }
 
     override async signOrder(order: Order): Promise<Order> {
-        throw Error("Not implemented");
+        throw Error('Not implemented');
     }
 
     override async signSyncSwap(swap: {
@@ -387,13 +391,13 @@ export class RemoteWallet extends AbstractWallet {
     /**
      * Performs an RPC call to the custom `zkSync_signBatch` method.
      * This method is specified here: https://github.com/argentlabs/argent-contracts-l2/discussions/4
-     * 
+     *
      * Basically, it's an addition to the WalletConnect server that accepts intentionally incomplete
      * transactions (e.g. with no account IDs resolved), and returns transactions with both L1 and L2
      * signatures.
-     * 
+     *
      * @param txs A list of transactions to be signed.
-     * 
+     *
      * @returns A list of singed transactions.
      */
     protected async callExtSignZkSyncBatch(txs: any[]): Promise<SignedTransaction[]> {
@@ -401,12 +405,12 @@ export class RemoteWallet extends AbstractWallet {
             // Response must be an array of signed transactions.
             // Transactions are flattened (ethereum signatures are on the same level as L2 signatures),
             // so we need to "unflat" each one.
-            const response: any[] = await this.web3Provider.send("zkSync_signerPubKeyHash", null);
+            const response: any[] = await this.web3Provider.send('zkSync_signerPubKeyHash', null);
 
             const transactions = response.map((tx) => {
-                const ethereumSignature = tx["ethereumSignature"];
+                const ethereumSignature = tx['ethereumSignature'];
                 // Remove the L1 signature from the transaction data.
-                delete tx["ethereumSignature"];
+                delete tx['ethereumSignature'];
                 return {
                     tx,
                     ethereumSignature
@@ -416,26 +420,25 @@ export class RemoteWallet extends AbstractWallet {
             return transactions;
         } catch (e) {
             console.error(`Received an error performing 'zkSync_signBatch' request: ${e.toString()}`);
-            throw new Error("Wallet server returned a malformed response to the sign batch request");
+            throw new Error('Wallet server returned a malformed response to the sign batch request');
         }
     }
 
     /**
      * Performs an RPC call to the custom `zkSync_signerPubKeyHash` method.
-     * 
+     *
      * This method should return a public key hash associated with the wallet
      */
     protected async callExtSignerPubKeyHash(): Promise<PubKeyHash> {
         try {
-            const response = await this.web3Provider.send("zkSync_signerPubKeyHash", null);
-            if (!response["pubKeyHash"]) {
-                throw new Error("Wallet server returned a malformed response to the PubKeyHash request");
+            const response = await this.web3Provider.send('zkSync_signerPubKeyHash', null);
+            if (!response['pubKeyHash']) {
+                throw new Error('Wallet server returned a malformed response to the PubKeyHash request');
             }
-            return response["pubKeyHash"];
-        }
-        catch (e) {
+            return response['pubKeyHash'];
+        } catch (e) {
             console.error(`Received an error performing 'zkSync_signerPubKeyHash' request: ${e.toString()}`);
-            throw new Error("Wallet server returned a malformed response to the PubKeyHash request");
+            throw new Error('Wallet server returned a malformed response to the PubKeyHash request');
         }
     }
 }
