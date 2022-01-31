@@ -306,7 +306,7 @@ export class Provider extends SyncProvider {
         return await this.transport.request('get_nft_id_by_tx_hash', [txHash]);
     }
 
-    async disconnect() {
+    override async disconnect() {
         return await this.transport.disconnect();
     }
 }

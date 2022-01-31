@@ -42,7 +42,7 @@ Tester.prototype.testSwapMissingSignatures = async function (
 ) {
     const { totalFee: fee } = await this.syncProvider.getTransactionFee('Swap', walletA.address(), tokenA);
 
-    const orderA = await walletA.getOrder({
+    const orderA = await walletA.signOrder({
         tokenSell: tokenA,
         tokenBuy: tokenB,
         amount,
@@ -52,7 +52,7 @@ Tester.prototype.testSwapMissingSignatures = async function (
         })
     });
 
-    const orderB = await walletB.getOrder({
+    const orderB = await walletB.signOrder({
         tokenSell: tokenB,
         tokenBuy: tokenA,
         amount: amount.mul(2),
@@ -98,7 +98,7 @@ Tester.prototype.testSwapNFT = async function (
     const { totalFee: fee } = await this.syncProvider.getTransactionFee('Swap', walletA.address(), token);
     expect(await walletB.getNFT(nft), 'wallet does not own an NFT').to.exist;
 
-    const orderA = await walletA.getOrder({
+    const orderA = await walletA.signOrder({
         tokenSell: token,
         tokenBuy: nft,
         amount,
@@ -108,7 +108,7 @@ Tester.prototype.testSwapNFT = async function (
         })
     });
 
-    const orderB = await walletB.getOrder({
+    const orderB = await walletB.signOrder({
         tokenSell: nft,
         tokenBuy: token,
         amount: 1,
@@ -143,7 +143,7 @@ Tester.prototype.testSwap = async function (
     const stateABefore = (await this.syncProvider.getState(walletA.address())).committed;
     const stateBBefore = (await this.syncProvider.getState(walletB.address())).committed;
 
-    const orderA = await walletA.getOrder({
+    const orderA = await walletA.signOrder({
         tokenSell: tokenA,
         tokenBuy: tokenB,
         amount,
@@ -153,7 +153,7 @@ Tester.prototype.testSwap = async function (
         })
     });
 
-    const orderB = await walletB.getOrder({
+    const orderB = await walletB.signOrder({
         tokenSell: tokenB,
         tokenBuy: tokenA,
         amount: amount.mul(2),
@@ -207,7 +207,7 @@ Tester.prototype.testSwapBatch = async function (
     const nonceBefore = await walletA.getNonce();
 
     // these are limit orders, so they can be reused
-    const orderA = await walletA.getLimitOrder({
+    const orderA = await walletA.signLimitOrder({
         tokenSell: tokenA,
         tokenBuy: tokenB,
         ratio: utils.weiRatio({
@@ -216,7 +216,7 @@ Tester.prototype.testSwapBatch = async function (
         })
     });
 
-    const orderB = await walletB.getLimitOrder({
+    const orderB = await walletB.signLimitOrder({
         tokenSell: tokenB,
         tokenBuy: tokenA,
         ratio: utils.weiRatio({
@@ -239,7 +239,7 @@ Tester.prototype.testSwapBatch = async function (
         })
         .build(tokenA);
 
-    const handles = await wallet.submitSignedTransactionsBatch(this.syncProvider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(this.syncProvider, batch.txs, [batch.signature!]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
 
     const nonceAfter = await walletA.getNonce();

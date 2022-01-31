@@ -87,7 +87,7 @@ describe(`No2FA tests`, () => {
         // Making sure that the wallet has no Ethereum private key
         // but has wrong l2 private key
         hilda = await Wallet.fromSyncSigner(
-            new No2FAWalletSigner(hilda.address(), hilda.ethSigner.provider),
+            new No2FAWalletSigner(hilda.address(), hilda.ethSigner().provider),
             Signer.fromPrivateKey(zkPrivateKeyWith2FA),
             hilda.provider
         );

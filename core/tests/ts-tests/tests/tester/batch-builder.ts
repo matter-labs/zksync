@@ -85,7 +85,7 @@ Tester.prototype.testBatchBuilderChangePubKey = async function (
     const totalFee = batch.totalFee.get(token)!;
 
     const balanceBefore = await sender.getBalance(token);
-    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature!]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     expect(await sender.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
     const balanceAfter = await sender.getBalance(token);
@@ -133,7 +133,7 @@ Tester.prototype.testBatchBuilderSignedChangePubKey = async function (
     expect(fee.eq(totalFee), 'Wrong caclucated fee').to.be.true;
 
     const balanceBefore = await sender.getBalance(token);
-    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature!]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     expect(await sender.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
     const balanceAfter = await sender.getBalance(token);
@@ -157,7 +157,7 @@ Tester.prototype.testBatchBuilderTransfers = async function (
 
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature!]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
@@ -215,7 +215,7 @@ Tester.prototype.testBatchBuilderPayInDifferentToken = async function (
     const senderBeforeFeeToken = await sender.getBalance(feeToken);
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature!]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfterFeeToken = await sender.getBalance(feeToken);
     const senderAfter = await sender.getBalance(token);
@@ -244,7 +244,7 @@ Tester.prototype.testBatchBuilderGenericUsage = async function (
 
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature!]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
@@ -266,7 +266,7 @@ Tester.prototype.testBatchBuilderNFT = async function (from: Wallet, to: Wallet,
     const totalMintFee = mint_batch.totalFee.get(feeToken)!;
 
     const mint_handles = await wallet.submitSignedTransactionsBatch(from.provider, mint_batch.txs, [
-        mint_batch.signature
+        mint_batch.signature!
     ]);
     await Promise.all(mint_handles.map((handle) => handle.awaitVerifyReceipt()));
 
@@ -290,7 +290,7 @@ Tester.prototype.testBatchBuilderNFT = async function (from: Wallet, to: Wallet,
     const totalWithdrawFee = withdraw_batch.totalFee.get(feeToken)!;
 
     const withdraw_handles = await wallet.submitSignedTransactionsBatch(to.provider, withdraw_batch.txs, [
-        withdraw_batch.signature
+        withdraw_batch.signature!
     ]);
     await Promise.all(withdraw_handles.map((handle) => handle.awaitReceipt()));
 

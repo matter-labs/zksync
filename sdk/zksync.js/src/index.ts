@@ -1,4 +1,5 @@
 export { Wallet, Transaction, ETHOperation, submitSignedTransaction, submitSignedTransactionsBatch } from './wallet';
+export { RemoteWallet } from './remote-wallet';
 export { Provider, ETHProxy, getDefaultProvider } from './provider';
 export { RestProvider, getDefaultRestProvider } from './rest-provider';
 export { SyncProvider } from './provider-interface';
@@ -10,4 +11,5 @@ export * as wallet from './wallet';
 export * as types from './types';
 export * as utils from './utils';
 export * as crypto from './crypto';
+export * as operations from './operations';
 import './withdraw-helpers';
