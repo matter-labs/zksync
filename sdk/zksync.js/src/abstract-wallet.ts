@@ -6,24 +6,14 @@ import { BatchBuilder, BatchBuilderInternalTx } from './batch-builder';
 import {
     AccountState,
     Address,
-    ChangePubKey,
-    ChangePubKeyCREATE2,
-    ChangePubKeyECDSA,
-    ChangePubKeyOnchain,
     ChangePubkeyTypes,
-    ForcedExit,
-    MintNFT,
     NFT,
     Nonce,
     Order,
     PubKeyHash,
     SignedTransaction,
-    Swap,
     TokenLike,
-    Transfer,
     TxEthSignature,
-    Withdraw,
-    WithdrawNFT,
     TokenRatio,
     WeiRatio,
     Toggle2FARequest,
@@ -208,16 +198,6 @@ export abstract class AbstractWallet {
 
     // Transfer part
 
-    abstract getTransfer(transfer: {
-        to: Address;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Transfer>;
-
     abstract signSyncTransfer(transfer: {
         to: Address;
         token: TokenLike;
@@ -240,16 +220,6 @@ export abstract class AbstractWallet {
 
     // ChangePubKey part
 
-    abstract getChangePubKey(changePubKey: {
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
-        ethSignature?: string;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<ChangePubKey>;
-
     abstract signSetSigningKey(changePubKey: {
         feeToken: TokenLike;
         fee: BigNumberish;
@@ -270,16 +240,6 @@ export abstract class AbstractWallet {
     }): Promise<Transaction>;
 
     // Withdraw part
-
-    abstract getWithdrawFromSyncToEthereum(withdraw: {
-        ethAddress: string;
-        token: TokenLike;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<Withdraw>;
 
     abstract signWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
@@ -304,15 +264,6 @@ export abstract class AbstractWallet {
 
     // Forced exit part
 
-    abstract getForcedExit(forcedExit: {
-        target: Address;
-        token: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom?: number;
-        validUntil?: number;
-    }): Promise<ForcedExit>;
-
     abstract signSyncForcedExit(forcedExit: {
         target: Address;
         token: TokenLike;
@@ -333,7 +284,7 @@ export abstract class AbstractWallet {
 
     // Swap part
 
-    abstract getLimitOrder(order: {
+    async signLimitOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         ratio: TokenRatio | WeiRatio;
@@ -341,9 +292,14 @@ export abstract class AbstractWallet {
         nonce?: Nonce;
         validFrom?: number;
         validUntil?: number;
-    }): Promise<Order>;
+    }): Promise<Order> {
+        return await this.signOrder({
+            ...order,
+            amount: 0
+        });
+    }
 
-    abstract getOrder(order: {
+    abstract signOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         ratio: TokenRatio | WeiRatio;
@@ -353,16 +309,6 @@ export abstract class AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order>;
-
-    abstract signOrder(order: Order): Promise<Order>;
-
-    abstract getSwap(swap: {
-        orders: [Order, Order];
-        feeToken: number;
-        amounts: [BigNumberish, BigNumberish];
-        nonce: number;
-        fee: BigNumberish;
-    }): Promise<Swap>;
 
     abstract signSyncSwap(swap: {
         orders: [Order, Order];
@@ -382,14 +328,6 @@ export abstract class AbstractWallet {
 
     // Mint NFT part
 
-    abstract getMintNFT(mintNFT: {
-        recipient: string;
-        contentHash: string;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<MintNFT>;
-
     abstract signMintNFT(mintNFT: {
         recipient: string;
         contentHash: string;
@@ -407,16 +345,6 @@ export abstract class AbstractWallet {
     }): Promise<Transaction>;
 
     // Withdraw NFT part
-
-    abstract getWithdrawNFT(withdrawNFT: {
-        to: string;
-        token: TokenLike;
-        feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Promise<WithdrawNFT>;
 
     abstract signWithdrawNFT(withdrawNFT: {
         to: string;
