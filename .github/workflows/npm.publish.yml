@@ -20,7 +20,9 @@ on:
       notify-webhook:
         description: Chat notification webhook
         required: true
-
+      token:
+        description: NPM token
+        required: true
 jobs:
   local-call-publish:
     name: Build NPM package
@@ -53,7 +55,7 @@ jobs:
         run: |
           npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.token }}
       -
         if: failure()
         name: Notify to Mattermost (on incidents)

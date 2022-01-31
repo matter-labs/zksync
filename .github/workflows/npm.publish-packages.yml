@@ -19,3 +19,4 @@ jobs:
       ref: ${{ github.event.inputs.ref }}
     secrets:
       notify-webhook: ${{ secrets.MATTERMOST_WEBHOOK }}
+      token: ${{ secrets.NPM_TOKEN }}
