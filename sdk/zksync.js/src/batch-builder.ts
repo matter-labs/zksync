@@ -3,7 +3,6 @@ import {
     Address,
     TokenLike,
     Nonce,
-    ChangePubKey,
     ChangePubKeyFee,
     SignedTransaction,
     TxEthSignature,
@@ -12,12 +11,12 @@ import {
     Order
 } from './types';
 import { MAX_TIMESTAMP } from './utils';
-import { Wallet } from './wallet';
+import { AbstractWallet } from './abstract-wallet';
 
 /**
  * Used by `BatchBuilder` to store transactions until the `build()` call.
  */
-interface InternalTx {
+export interface BatchBuilderInternalTx {
     type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT' | 'WithdrawNFT' | 'Swap';
     tx: any;
     feeType:
@@ -41,9 +40,13 @@ interface InternalTx {
  * Provides interface for constructing batches of transactions.
  */
 export class BatchBuilder {
-    private constructor(private wallet: Wallet, private nonce: Nonce, private txs: InternalTx[] = []) {}
+    private constructor(
+        private wallet: AbstractWallet,
+        private nonce: Nonce,
+        private txs: BatchBuilderInternalTx[] = []
+    ) {}
 
-    static fromWallet(wallet: Wallet, nonce?: Nonce): BatchBuilder {
+    static fromWallet(wallet: AbstractWallet, nonce?: Nonce): BatchBuilder {
         return new BatchBuilder(wallet, nonce, []);
     }
 
@@ -55,7 +58,7 @@ export class BatchBuilder {
      */
     async build(
         feeToken?: TokenLike
-    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature; totalFee: TotalFee }> {
+    ): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature; totalFee: TotalFee }> {
         if (this.txs.length == 0) {
             throw new Error('Transaction batch cannot be empty');
         }
@@ -75,9 +78,7 @@ export class BatchBuilder {
             totalFee.set(token, curr.add(fee));
         }
 
-        const { txs, message } = await this.processTransactions();
-
-        let signature = await this.wallet.getEthMessageSignature(message);
+        const { txs, signature } = await this.processTransactions();
 
         return {
             txs,
@@ -311,76 +312,7 @@ export class BatchBuilder {
     /**
      * Sets transactions nonces, assembles the batch and constructs the message to be signed by user.
      */
-    private async processTransactions(): Promise<{ txs: SignedTransaction[]; message: string }> {
-        const processedTxs: SignedTransaction[] = [];
-        let messages: string[] = [];
-        let nonce: number = await this.wallet.getNonce(this.nonce);
-        const batchNonce = nonce;
-        for (const tx of this.txs) {
-            tx.tx.nonce = nonce++;
-            switch (tx.type) {
-                case 'Withdraw':
-                    messages.push(this.wallet.getWithdrawEthMessagePart(tx.tx));
-                    const withdraw = { tx: await this.wallet.getWithdrawFromSyncToEthereum(tx.tx) };
-                    processedTxs.push(withdraw);
-                    break;
-                case 'Transfer':
-                    messages.push(await this.wallet.getTransferEthMessagePart(tx.tx));
-                    const transfer = { tx: await this.wallet.getTransfer(tx.tx) };
-                    processedTxs.push(transfer);
-                    break;
-                case 'ChangePubKey':
-                    // ChangePubKey requires its own Ethereum signature, we either expect
-                    // it to be signed already or do it here.
-                    const changePubKey: ChangePubKey = tx.alreadySigned
-                        ? tx.tx
-                        : (await this.wallet.signSetSigningKey(tx.tx)).tx;
-                    const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
-                    if (currentPubKeyHash === changePubKey.newPkHash) {
-                        throw new Error('Current signing key is already set');
-                    }
-                    messages.push(
-                        this.wallet.getChangePubKeyEthMessagePart({
-                            pubKeyHash: changePubKey.newPkHash,
-                            feeToken: tx.token,
-                            fee: changePubKey.fee
-                        })
-                    );
-                    processedTxs.push({ tx: changePubKey });
-                    break;
-                case 'ForcedExit':
-                    messages.push(this.wallet.getForcedExitEthMessagePart(tx.tx));
-                    const forcedExit = { tx: await this.wallet.getForcedExit(tx.tx) };
-                    processedTxs.push(forcedExit);
-                    break;
-                case 'MintNFT':
-                    messages.push(this.wallet.getMintNFTEthMessagePart(tx.tx));
-                    const mintNft = { tx: await this.wallet.getMintNFT(tx.tx) };
-                    processedTxs.push(mintNft);
-                    break;
-                case 'Swap':
-                    messages.push(this.wallet.getSwapEthSignMessagePart(tx.tx));
-                    const swap = {
-                        tx: await this.wallet.getSwap(tx.tx),
-                        ethereumSignature: [
-                            null,
-                            tx.tx.orders[0].ethSignature || null,
-                            tx.tx.orders[1].ethSignature || null
-                        ]
-                    };
-                    processedTxs.push(swap);
-                    break;
-                case 'WithdrawNFT':
-                    messages.push(this.wallet.getWithdrawNFTEthMessagePart(tx.tx));
-                    const withdrawNft = { tx: await this.wallet.getWithdrawNFT(tx.tx) };
-                    processedTxs.push(withdrawNft);
-                    break;
-            }
-        }
-        messages.push(`Nonce: ${batchNonce}`);
-        return {
-            txs: processedTxs,
-            message: messages.filter((part) => part.length != 0).join('\n')
-        };
+    private async processTransactions(): Promise<{ txs: SignedTransaction[]; signature?: TxEthSignature }> {
+        return await this.wallet.processBatchBuilderTransactions(this.nonce, this.txs);
     }
 }

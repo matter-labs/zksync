@@ -239,7 +239,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         success,
                         fail_reason,
                         created_at,
-                        batch_id
+                        batch_id,
+                        sequence_number
                     FROM executed_transactions
                     WHERE block_number = $1
                 ), priority_ops AS (
@@ -250,7 +251,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         true as success,
                         Null as fail_reason,
                         created_at,
-                        Null::bigint as batch_id
+                        Null::bigint as batch_id,
+                        sequence_number
                     FROM executed_priority_operations
                     WHERE block_number = $1
                 ), everything AS (
@@ -267,7 +269,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     created_at as "created_at!",
                     batch_id as "batch_id?"
                 FROM everything
-                ORDER BY created_at DESC
+                ORDER BY sequence_number DESC
             "#,
             i64::from(*block)
         )
@@ -1304,20 +1306,20 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 }
             }
         };
-        let created_at_and_block = transaction
+        let sequence_number = transaction
             .chain()
             .operations_ext_schema()
-            .get_tx_created_at_and_block_number(tx_hash)
+            .get_tx_sequence_number_for_block(tx_hash, query.from.block_number)
             .await?;
-        let block_txs = if let Some((time_from, block_number)) = created_at_and_block {
-            if block_number == query.from.block_number {
-                let raw_txs: Vec<TransactionItem> = match query.direction {
-                    PaginationDirection::Newer => {
-                        sqlx::query_as!(
-                            TransactionItem,
-                            r#"
+        let block_txs = if let Some(sequence_number) = sequence_number {
+            let raw_txs: Vec<TransactionItem> = match query.direction {
+                PaginationDirection::Newer => {
+                    sqlx::query_as!(
+                        TransactionItem,
+                        r#"
                                 WITH transactions AS (
                                     SELECT
+                                        sequence_number,
                                         tx_hash,
                                         tx as op,
                                         block_number,
@@ -1329,9 +1331,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         block_index,
                                         batch_id
                                     FROM executed_transactions
-                                    WHERE block_number = $1 AND created_at >= $2
+                                    WHERE block_number = $1 AND sequence_number >= $2
                                 ), priority_ops AS (
                                     SELECT
+                                        sequence_number,
                                         tx_hash,
                                         operation as op,
                                         block_number,
@@ -1343,13 +1346,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         block_index,
                                         Null::bigint as batch_id
                                     FROM executed_priority_operations
-                                    WHERE block_number = $1 AND created_at >= $2
+                                    WHERE block_number = $1 AND sequence_number >= $2
                                 ), everything AS (
                                     SELECT * FROM transactions
                                     UNION ALL
                                     SELECT * FROM priority_ops
                                 )
                                 SELECT
+                                    sequence_number,
                                     tx_hash as "tx_hash!",
                                     block_number as "block_number!",
                                     op as "op!",
@@ -1360,22 +1364,23 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                     priority_op_serialid as "priority_op_serialid?",
                                     batch_id as "batch_id?"
                                 FROM everything
-                                ORDER BY created_at ASC, block_index ASC
+                                ORDER BY sequence_number ASC
                                 LIMIT $3
                             "#,
-                            i64::from(*block_number),
-                            time_from,
-                            i64::from(query.limit),
-                        )
-                        .fetch_all(transaction.conn())
-                        .await?
-                    }
-                    PaginationDirection::Older => {
-                        sqlx::query_as!(
-                            TransactionItem,
-                            r#"
+                        i64::from(*query.from.block_number),
+                        sequence_number,
+                        i64::from(query.limit),
+                    )
+                    .fetch_all(transaction.conn())
+                    .await?
+                }
+                PaginationDirection::Older => {
+                    sqlx::query_as!(
+                        TransactionItem,
+                        r#"
                                 WITH transactions AS (
                                     SELECT
+                                        sequence_number,
                                         tx_hash,
                                         tx as op,
                                         block_number,
@@ -1387,9 +1392,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         block_index,
                                         batch_id
                                     FROM executed_transactions
-                                    WHERE block_number = $1 AND created_at <= $2
+                                    WHERE block_number = $1 AND sequence_number <= $2
                                 ), priority_ops AS (
                                     SELECT
+                                        sequence_number,
                                         tx_hash,
                                         operation as op,
                                         block_number,
@@ -1401,13 +1407,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         block_index,
                                         Null::bigint as batch_id
                                     FROM executed_priority_operations
-                                    WHERE block_number = $1 AND created_at <= $2
+                                    WHERE block_number = $1 AND sequence_number <= $2
                                 ), everything AS (
                                     SELECT * FROM transactions
                                     UNION ALL
                                     SELECT * FROM priority_ops
                                 )
                                 SELECT
+                                    sequence_number,
                                     tx_hash as "tx_hash!",
                                     block_number as "block_number!",
                                     op as "op!",
@@ -1418,30 +1425,27 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                     priority_op_serialid as "priority_op_serialid?",
                                     batch_id as "batch_id?"
                                 FROM everything
-                                ORDER BY created_at DESC, block_index DESC
+                                ORDER BY sequence_number DESC 
                                 LIMIT $3
                             "#,
-                            i64::from(*block_number),
-                            time_from,
-                            i64::from(query.limit),
-                        )
-                        .fetch_all(transaction.conn())
-                        .await?
-                    }
-                };
-                let is_block_finalized = transaction
-                    .chain()
-                    .block_schema()
-                    .is_block_finalized(block_number)
-                    .await?;
-                let txs: Vec<Transaction> = raw_txs
-                    .into_iter()
-                    .map(|tx| TransactionItem::transaction_from_item(tx, is_block_finalized))
-                    .collect();
-                Some(txs)
-            } else {
-                None
-            }
+                        i64::from(*query.from.block_number),
+                        sequence_number,
+                        i64::from(query.limit),
+                    )
+                    .fetch_all(transaction.conn())
+                    .await?
+                }
+            };
+            let is_block_finalized = transaction
+                .chain()
+                .block_schema()
+                .is_block_finalized(query.from.block_number)
+                .await?;
+            let txs: Vec<Transaction> = raw_txs
+                .into_iter()
+                .map(|tx| TransactionItem::transaction_from_item(tx, is_block_finalized))
+                .collect();
+            Some(txs)
         } else {
             None
         };
@@ -1652,11 +1656,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let records = sqlx::query!(
             r#"
                 WITH transactions AS (
-                    SELECT tx_hash, created_at, block_index
+                    SELECT tx_hash, sequence_number
                     FROM executed_transactions
                     WHERE block_number = $1
                 ), priority_ops AS (
-                    SELECT tx_hash, created_at, block_index
+                    SELECT tx_hash, sequence_number
                     FROM executed_priority_operations
                     WHERE block_number = $1
                 ), everything AS (
@@ -1666,7 +1670,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 )
                 SELECT tx_hash as "tx_hash!"
                 FROM everything
-                ORDER BY created_at, block_index
+                ORDER BY sequence_number
             "#,
             i64::from(*block_number)
         )
