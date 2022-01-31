@@ -48,5 +48,5 @@ core/lib/storage/.env
 
 .zcli-config.json
 
-cert.pem
-key.pem
+*.pem
+bin/mkcert

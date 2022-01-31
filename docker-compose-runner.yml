@@ -40,3 +40,5 @@ services:
       - CACHE_DIR=/usr/src/cache
       - SCCACHE_CACHE_SIZE=50g
       - CI=1
+      - CAROOT=/usr/src/zksync
+      - NODE_EXTRA_CA_CERTS=/usr/src/zksync/rootCA.pem
