@@ -155,7 +155,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
 
-    }).timeout(500000);
+    }).timeout(1000000);
 
 
     step('should test swaps and limit orders', async () => {
