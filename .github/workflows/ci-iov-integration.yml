@@ -38,16 +38,22 @@ jobs:
       - name: restart dev-liquidity-token-watcher and dev-ticker
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
-      - name: server-integration-tests
+      - name: generate certificates
         run: |
           ci_run mkcert -CAROOT
           ci_run mkcert --install
           ci_run mkcert 127.0.0.1 localhost
           ci_run mv 127.0.0.1+1-key.pem key.pem
           ci_run mv 127.0.0.1+1.pem cert.pem
+
+      - name: server-integration-tests
+        run: |
           ci_run zk dummy-prover enable &>/dev/null &
-          ci_run zk dummy-prover run &>/dev/null &
+          ci_run sleep 30
           ci_run zk server &>/dev/null &
+          ci_run sleep 30
+          ci_run zk dummy-prover run &>/dev/null &
+          ci_run sleep 30
           ci_run zk test i server
 
 
