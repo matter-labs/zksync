@@ -48,12 +48,12 @@ jobs:
 
       - name: server-integration-tests
         run: |
-          ci_run zk dummy-prover enable &>/dev/null &
-          ci_run sleep 30
+          ci_run zk dummy-prover enable
+          ci_run sleep 500
           ci_run zk server &>/dev/null &
-          ci_run sleep 30
+          ci_run sleep 60
           ci_run zk dummy-prover run &>/dev/null &
-          ci_run sleep 30
+          ci_run sleep 200
           ci_run zk test i server
 
 
