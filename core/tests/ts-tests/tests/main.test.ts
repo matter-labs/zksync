@@ -155,7 +155,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
 
-    });
+    }).timeout(500000);
 
 
     step('should test swaps and limit orders', async () => {
@@ -187,7 +187,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport}, pr
 
     step('should execute a withdrawal', async () => {
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
-    });
+    }).timeout(500000);
 
     step('should execute NFT transfer', async () => {
         if (onlyBasic) {
