@@ -112,7 +112,7 @@ export class RemoteWallet extends AbstractWallet {
         const txsToSign = txs.map((tx) => {
             tx.tx.nonce = nonce;
             nonce += 1;
-            return tx.tx;
+            return { type: tx.type, ...tx.tx };
         });
         const signedTransactions = await this.callExtSignZkSyncBatch(txsToSign);
         // Each transaction will have its own Ethereum signature, if it's required.
@@ -133,7 +133,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([transfer]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'Transfer', ...transfer }]);
         return signed[0];
     }
 
@@ -161,7 +161,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([changePubKey]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'ChangePubKey', ...changePubKey }]);
         return signed[0];
     }
 
@@ -188,7 +188,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([withdraw]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'Withdraw', ...withdraw }]);
         return signed[0];
     }
 
@@ -217,7 +217,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([forcedExit]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'ForcedExit', ...forcedExit }]);
         return signed[0];
     }
 
@@ -245,7 +245,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order> {
-        return await this.callExtSignOrder(order);
+        return await this.callExtSignOrder({ type: 'Order', ...order });
     }
 
     override async signSyncSwap(swap: {
@@ -255,7 +255,7 @@ export class RemoteWallet extends AbstractWallet {
         nonce: number;
         fee: BigNumberish;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([swap]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'Swap', ...swap }]);
         return signed[0];
     }
 
@@ -279,7 +279,7 @@ export class RemoteWallet extends AbstractWallet {
         fee: BigNumberish;
         nonce: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([mintNFT]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'MintNFT', ...mintNFT }]);
         return signed[0];
     }
 
@@ -305,7 +305,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([withdrawNFT]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'WithdrawNFT', ...withdrawNFT }]);
         return signed[0];
     }
 
@@ -369,7 +369,7 @@ export class RemoteWallet extends AbstractWallet {
     // Note: this method signature requires to specify fee in each transaction.
     // For details, see the comment on this method in `AbstractWallet` class.
     override async syncMultiTransfer(
-        transfers: {
+        _transfers: {
             to: Address;
             token: TokenLike;
             amount: BigNumberish;
@@ -379,6 +379,12 @@ export class RemoteWallet extends AbstractWallet {
             validUntil?: number;
         }[]
     ): Promise<Transaction[]> {
+        const transfers = _transfers.map((transfer) => {
+            return {
+                type: 'Transfer',
+                ...transfer
+            };
+        });
         const signed = await this.callExtSignZkSyncBatch(transfers);
         return submitSignedTransactionsBatch(this.provider, signed);
     }
@@ -424,7 +430,7 @@ export class RemoteWallet extends AbstractWallet {
     }
 
     /**
-     * Performs an RPC call to the custom `zkSync_signOrder` method.
+     * Performs an RPC call to the custom `zkSync_signBatch` method.
      *
      * @param txs An order data to be signed.
      *
