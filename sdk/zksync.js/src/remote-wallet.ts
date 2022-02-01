@@ -245,7 +245,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order> {
-        return await this.callExtSignOrder(order);
+        return await this.callExtSignOrder({type: 'Order', ...order});
     }
 
     override async signSyncSwap(swap: {
@@ -430,7 +430,7 @@ export class RemoteWallet extends AbstractWallet {
     }
 
     /**
-     * Performs an RPC call to the custom `zkSync_signOrder` method.
+     * Performs an RPC call to the custom `zkSync_signBatch` method.
      *
      * @param txs An order data to be signed.
      *
@@ -439,7 +439,7 @@ export class RemoteWallet extends AbstractWallet {
     protected async callExtSignOrder(order: any): Promise<Order> {
         try {
             // For now, we assume that the same method will be used for both signing transactions and orders.
-            const signedOrder: any = await this.web3Provider.send('zkSync_signOrder', [order]);
+            const signedOrder: any = await this.web3Provider.send('zkSync_signBatch', [order]);
 
             // Sanity check
             if (!signedOrder['signature']) {
