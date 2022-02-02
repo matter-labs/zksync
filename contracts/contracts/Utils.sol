@@ -42,10 +42,10 @@ library Utils {
             signV := byte(0, mload(add(_signature, 96)))
         }
 
-        address recoverAddress = ecrecover(_messageHash, signV, signR, signS);
-        require(recoverAddress != address(0), "p4"); // invalid signature
+        address recoveredAddress = ecrecover(_messageHash, signV, signR, signS);
+        require(recoveredAddress != address(0), "p4"); // invalid signature
 
-        return recoverAddress;
+        return recoveredAddress;
     }
 
     /// @notice Returns new_hash = hash(old_hash + bytes)
