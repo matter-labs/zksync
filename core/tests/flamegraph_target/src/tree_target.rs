@@ -10,7 +10,7 @@ type Value = u64;
 type Tree = SparseMerkleTree<u64, Fr, RescueHasher<Engine>>;
 
 // This binary is a playground, so feel free to change the params to achieve behavior you want.
-const INITIALIZED_VALUES: usize = 1_000_000;
+const INITIALIZED_VALUES: usize = 100_000;
 const N_CYCLES: usize = 1_000;
 const VALUES_PER_CYCLE: usize = 1_000;
 
