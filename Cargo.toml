@@ -39,6 +39,7 @@ members = [
     "core/lib/balancer",
 
     # Test infrastructure
+    "core/tests/flamegraph_target",
     "core/tests/test_account",
     "core/tests/testkit",
     "core/tests/loadnext",
