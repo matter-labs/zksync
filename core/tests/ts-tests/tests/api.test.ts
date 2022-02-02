@@ -394,7 +394,7 @@ describe('ZkSync web3 API tests', () => {
                 expect(log[key], 'Incorrect data').to.eql(expected);
             }
         }
-    });
+    }).timeout(1000000);
 
     it('should check erc721 calls', async () => {
         const contentHash = '0x218145f24cb870cc72ec7f0cc734b86f3e9a744666282f99023f022be77aaea6';

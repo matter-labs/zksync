@@ -58,5 +58,5 @@ jobs:
           ci_run zk server &>/dev/null &
           ci_run zk dummy-prover run &>/dev/null &
           ci_run sleep 200
-          ci_run zk test i server
+          ci_run zk test i all
 
