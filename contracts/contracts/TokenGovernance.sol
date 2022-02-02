@@ -4,7 +4,7 @@ pragma solidity ^0.7.0;
 
 import "./ReentrancyGuard.sol";
 import "./Governance.sol";
-import "./IERC20.sol";
+import "./ITrustedTransfarableERC20.sol";
 import "./Utils.sol";
 
 /// @title Token Governance Contract
@@ -15,7 +15,7 @@ contract TokenGovernance is ReentrancyGuard {
     event TokenListerUpdate(address indexed tokenLister, bool isActive);
 
     /// @notice Listing fee token set
-    event ListingFeeTokenUpdate(ITrustedTransfarableERC20 indexed newListingFeeToken);
+    event ListingFeeTokenUpdate(ITrustedTransfarableERC20 indexed newListingFeeToken, uint256 newListingFee);
 
     /// @notice Listing fee set
     event ListingFeeUpdate(uint256 newListingFee);
@@ -87,7 +87,7 @@ contract TokenGovernance is ReentrancyGuard {
         listingFeeToken = _newListingFeeToken;
         listingFee = _newListingFee;
 
-        emit ListingFeeTokenUpdate(_newListingFeeToken);
+        emit ListingFeeTokenUpdate(_newListingFeeToken, _newListingFee);
     }
 
     /// @notice Set new listing fee

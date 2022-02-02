@@ -46,7 +46,7 @@ contract ReentrancyGuard {
             sstore(LOCK_FLAG_ADDRESS, _NOT_ENTERED)
         }
 
-        // Check that storage slot for reentrancy guard is empty to rule out possibility of slot conflict
+        // Check that storage slot for reentrancy guard is empty to rule out possibility of double initialization
         require(lockSlotOldValue == 0, "1B");
     }
 

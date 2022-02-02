@@ -29,7 +29,7 @@ contract Config {
     uint8 internal constant SUCCESS_FLAG_BYTES = 1;
 
     /// @dev Max amount of tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
-    uint16 internal constant MAX_AMOUNT_OF_REGISTERED_TOKENS = $(MAX_AMOUNT_OF_REGISTERED_TOKENS);
+    uint32 internal constant MAX_AMOUNT_OF_REGISTERED_TOKENS = $(MAX_AMOUNT_OF_REGISTERED_TOKENS);
 
     /// @dev Max account id that could be registered in the network
     uint32 internal constant MAX_ACCOUNT_ID = $$((2**24) - 1);
