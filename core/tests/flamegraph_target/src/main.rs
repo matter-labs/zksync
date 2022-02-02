@@ -35,6 +35,8 @@ struct Options {
 
 fn main() {
     let options = Options::from_args();
+
+    // Not much currently, but we may want to add another targets in the future.
     match options.target {
         Target::Tree => {
             tree_target::analyze_tree();

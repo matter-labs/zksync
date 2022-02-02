@@ -20,3 +20,7 @@ for said code only.
 Target code should be written in a manner that stresses component in the most possible way.
 If your code needs initialization, separate it from the actual stressing logic, so that in the resulting
 flamegraph they will be easily distinguishable.
+
+That being said, the code is just a playground. It is expected to be adjusted to what you need, so it is
+OK to keep the code simple to parameterize with loops, constants, and whatever else helps you achieve
+representative performance charts.
