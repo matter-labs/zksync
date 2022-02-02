@@ -123,7 +123,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         ];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
             if (SECURITY_COUNCIL_MEMBERS[id] == addr) {
-                // approve cut upgrade notice period if need
+                // approve cut upgrade notice period if needed
                 if (!securityCouncilApproves[id]) {
                     securityCouncilApproves[id] = true;
                     numberOfApprovalsFromSecurityCouncil += 1;
