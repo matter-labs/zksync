@@ -101,7 +101,6 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         &self,
         block: BlockNumber,
     ) -> Result<CircuitAccountTree, anyhow::Error> {
-        let start = time::Instant::now();
         let mut storage = self.database.acquire_connection().await?;
         let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
 
@@ -179,12 +178,10 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             );
         }
 
-        metrics::histogram!("witness_generator.load_account_tree", start.elapsed());
         Ok(circuit_account_tree)
     }
 
     async fn prepare_witness_and_save_it(&self, block: Block) -> anyhow::Result<()> {
-        let start = time::Instant::now();
         let timer = time::Instant::now();
         let mut storage = self.database.acquire_connection().await?;
 
@@ -208,11 +205,6 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 serde_json::to_value(witness).expect("Witness serialize to json"),
             )
             .await?;
-
-        metrics::histogram!(
-            "witness_generator.prepare_witness_and_save_it",
-            start.elapsed()
-        );
         Ok(())
     }
 
