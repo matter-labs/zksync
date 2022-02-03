@@ -116,8 +116,8 @@ impl Order {
             "Ratio: {sell}:{buy}\n\
             Address: {recipient:?}\n\
             Nonce: {nonce}",
-            sell = self.price.0.to_string(),
-            buy = self.price.1.to_string(),
+            sell = self.price.0,
+            buy = self.price.1,
             recipient = self.recipient_address,
             nonce = self.nonce
         )
