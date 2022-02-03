@@ -162,7 +162,7 @@ jobs:
           ci_run zk run verify-keys unpack
 
       - name: circuit-tests
-        run: ci_run zk test crypto-rust
+        run: ci_run zk test circuit 20
 
   testkit:
     runs-on: [self-hosted, ci-runner]
