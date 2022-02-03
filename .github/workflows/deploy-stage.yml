@@ -5,6 +5,7 @@ on:
       - dev
       - breaking
       - hotfix/*
+      - build-runner-gcp
     tags:
       - hotfix-*
 
@@ -24,7 +25,7 @@ jobs:
 
   build-images:
     name: Build and Push Docker Images
-    runs-on: [self-hosted, MAIN]
+    runs-on: [self-hosted, ci-runner]
 
     steps:
     - uses: actions/checkout@v2
@@ -55,21 +56,21 @@ jobs:
         docker-compose down
 
   # Reminder: when disabling the deploy stage - comment the whole job out!
-  deploy:
-    name: Deploy Stage environment
-    runs-on: [k8s, deployer, stage]
-    needs: [setup, build-images]
-    steps:
-      - name: Deploy
-        uses: aurelien-baudet/workflow-dispatch@v2
-        with:
-          workflow: Deploy
-          token: ${{ secrets.GH_TOKEN }}
-          wait-for-completion-timeout: 10m
-          wait-for-completion-interval: 1m
-          inputs: |
-            {
-              "environment": "stage",
-              "image_tag": "${{ needs.setup.outputs.image_tag }}",
-              "config_ref": "master"
-            }
+  # deploy:
+  #   name: Deploy Stage environment
+  #   runs-on: [k8s, deployer, stage]
+  #   needs: [setup, build-images]
+  #   steps:
+  #     - name: Deploy
+  #       uses: aurelien-baudet/workflow-dispatch@v2
+  #       with:
+  #         workflow: Deploy
+  #         token: ${{ secrets.GH_TOKEN }}
+  #         wait-for-completion-timeout: 10m
+  #         wait-for-completion-interval: 1m
+  #         inputs: |
+  #           {
+  #             "environment": "stage",
+  #             "image_tag": "${{ needs.setup.outputs.image_tag }}",
+  #             "config_ref": "master"
+  #           }
