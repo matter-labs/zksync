@@ -239,7 +239,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         success,
                         fail_reason,
                         created_at,
-                        batch_id
+                        batch_id,
+                        sequence_number
                     FROM executed_transactions
                     WHERE block_number = $1
                 ), priority_ops AS (
@@ -250,7 +251,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         true as success,
                         Null as fail_reason,
                         created_at,
-                        Null::bigint as batch_id
+                        Null::bigint as batch_id,
+                        sequence_number
                     FROM executed_priority_operations
                     WHERE block_number = $1
                 ), everything AS (
@@ -267,7 +269,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     created_at as "created_at!",
                     batch_id as "batch_id?"
                 FROM everything
-                ORDER BY created_at DESC
+                ORDER BY sequence_number DESC
             "#,
             i64::from(*block)
         )
@@ -1362,7 +1364,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                     priority_op_serialid as "priority_op_serialid?",
                                     batch_id as "batch_id?"
                                 FROM everything
-                                ORDER BY created_at ASC, block_index ASC
+                                ORDER BY sequence_number ASC
                                 LIMIT $3
                             "#,
                         i64::from(*query.from.block_number),
@@ -1423,7 +1425,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                     priority_op_serialid as "priority_op_serialid?",
                                     batch_id as "batch_id?"
                                 FROM everything
-                                ORDER BY created_at DESC, block_index DESC
+                                ORDER BY sequence_number DESC 
                                 LIMIT $3
                             "#,
                         i64::from(*query.from.block_number),
@@ -1660,11 +1662,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let records = sqlx::query!(
             r#"
                 WITH transactions AS (
-                    SELECT tx_hash, created_at, block_index
+                    SELECT tx_hash, sequence_number
                     FROM executed_transactions
                     WHERE block_number = $1
                 ), priority_ops AS (
-                    SELECT tx_hash, created_at, block_index
+                    SELECT tx_hash, sequence_number
                     FROM executed_priority_operations
                     WHERE block_number = $1
                 ), everything AS (
@@ -1674,7 +1676,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 )
                 SELECT tx_hash as "tx_hash!"
                 FROM everything
-                ORDER BY created_at, block_index
+                ORDER BY sequence_number
             "#,
             i64::from(*block_number)
         )

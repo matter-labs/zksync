@@ -1561,6 +1561,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "flamegraph_target"
+version = "0.1.0"
+dependencies = [
+ "structopt",
+ "zksync_crypto",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3861,21 +3869,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "remove_outstanding_tx_filters"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ethabi",
- "structopt",
- "tokio",
- "web3",
- "zksync_config",
- "zksync_eth_client",
- "zksync_storage",
- "zksync_types",
-]
-
-[[package]]
 name = "remove_proofs"
 version = "1.0.0"
 dependencies = [
@@ -5268,18 +5261,6 @@ name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
-
-[[package]]
-name = "update_sequnce_number"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "structopt",
- "tokio",
- "zksync_config",
- "zksync_storage",
- "zksync_types",
-]
 
 [[package]]
 name = "url"

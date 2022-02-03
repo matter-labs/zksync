@@ -4,7 +4,7 @@ import { Wallet } from '../src/wallet';
 import { getTokens } from 'reading-tool';
 
 import { Provider } from '../src/provider';
-import { Network } from '../build/types';
+import { Network } from '../src/types';
 
 describe('Wallet with mock provider', function () {
     async function getWallet(ethPrivateKey: Uint8Array, network: Network): Promise<Wallet> {

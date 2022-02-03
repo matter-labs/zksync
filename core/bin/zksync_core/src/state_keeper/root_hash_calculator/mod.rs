@@ -102,6 +102,16 @@ impl RootHashCalculator {
             job.block.0 as f64,
             "stage" => "root_hash_calculator"
         );
+        self.report_memory_stats();
+    }
+
+    fn report_memory_stats(&self) {
+        let memory_stats = self.state.tree_memory_stats();
+        metrics::histogram!("tree_memory_usage", memory_stats.allocated_total as f64, "type" => "total");
+        metrics::histogram!("tree_memory_usage", memory_stats.items as f64, "type" => "items");
+        metrics::histogram!("tree_memory_usage", memory_stats.nodes as f64, "type" => "nodes");
+        metrics::histogram!("tree_memory_usage", memory_stats.prehashed as f64, "type" => "prehashed");
+        metrics::histogram!("tree_memory_usage", memory_stats.cache as f64, "type" => "cache");
     }
 }
 
