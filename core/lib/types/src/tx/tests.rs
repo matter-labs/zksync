@@ -98,7 +98,7 @@ fn test_print_swap_for_protocol() {
 
     let print_signer = |name, key: PrivateKey<Bn256>| {
         println!("Signer ({}):", name);
-        println!("Private key: {}", key.0.to_string());
+        println!("Private key: {}", key.0);
         let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
         println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
     };
@@ -163,7 +163,7 @@ fn test_print_transfer_for_protocol() {
     );
 
     println!("Signer:");
-    println!("Private key: {}", key.0.to_string());
+    println!("Private key: {}", key.0);
     let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
@@ -224,7 +224,7 @@ fn test_print_change_pub_key_for_protocol() {
     );
 
     println!("Signer:");
-    println!("Private key: {}", key.0.to_string());
+    println!("Private key: {}", key.0);
     let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
@@ -283,7 +283,7 @@ fn test_print_withdraw_for_protocol() {
     );
 
     println!("Signer:");
-    println!("Private key: {}", key.0.to_string());
+    println!("Private key: {}", key.0);
     let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
@@ -346,7 +346,7 @@ fn test_print_withdraw_nft_for_protocol() {
     );
 
     println!("Signer:");
-    println!("Private key: {}", key.0.to_string());
+    println!("Private key: {}", key.0);
     let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
@@ -398,7 +398,7 @@ fn test_print_mint_nft_for_protocol() {
     );
 
     println!("Signer:");
-    println!("Private key: {}", key.0.to_string());
+    println!("Private key: {}", key.0);
     let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
     println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
 
