@@ -45,7 +45,7 @@ export async function contracts() {
 export async function circuit(threads: number = 1, testName?: string, ...args: string[]) {
     await utils.spawn(
         `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''}
-         -- --ignored --test-threads ${threads} ${args.join(' ')}`
+         -- --ignored ${args.join(' ')}`
     );
 }
 
