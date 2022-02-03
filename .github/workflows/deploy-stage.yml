@@ -41,6 +41,7 @@ jobs:
         chmod +x install.sh
         ./install.sh -y
         source $HOME/.cargo/env
+        apt-get install -y pkg-config
         cargo sqlx --version || cargo install sqlx-cli
         zk
         zk run yarn
