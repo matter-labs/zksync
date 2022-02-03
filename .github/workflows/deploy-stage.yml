@@ -37,7 +37,7 @@ jobs:
 
     - name: init
       run: |
-        curl https://sh.rustup.rs -sSf | sh
+        curl https://sh.rustup.rs -sSf | sh -y
         cargo sqlx --version || cargo install sqlx-cli
         zk
         zk run yarn
