@@ -57,14 +57,14 @@ impl StoredOperation {
 }
 
 impl StoredExecutedTransaction {
-    pub fn into_executed_tx(self) -> Result<ExecutedTx, anyhow::Error> {
+    pub fn into_executed_tx(self) -> ExecutedTx {
         let tx: ZkSyncTx = serde_json::from_value(self.tx).expect("Unparsable ZkSyncTx in db");
         let franklin_op: Option<ZkSyncOp> =
             serde_json::from_value(self.operation).expect("Unparsable ZkSyncOp in db");
         let eth_sign_data = self
             .eth_sign_data
             .map(|value| serde_json::from_value(value).expect("Unparsable EthSignData"));
-        Ok(ExecutedTx {
+        ExecutedTx {
             signed_tx: SignedZkSyncTx {
                 tx,
                 eth_sign_data,
@@ -78,7 +78,7 @@ impl StoredExecutedTransaction {
                 .map(|val| u32::try_from(val).expect("Invalid block index")),
             created_at: self.created_at,
             batch_id: self.batch_id,
-        })
+        }
     }
 }
 

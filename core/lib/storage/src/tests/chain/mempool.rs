@@ -3,11 +3,11 @@ use chrono::Utc;
 // Workspace imports
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_types::{
-    block::Block,
+    block::{Block, ExecutedOperations},
     mempool::SignedTxVariant,
     priority_ops::FullExit,
     tx::{ChangePubKey, Transfer, TxHash, Withdraw},
-    AccountId, Address, BlockNumber, ExecutedPriorityOp, FullExitOp, Nonce, PriorityOp,
+    AccountId, Address, BlockNumber, ExecutedPriorityOp, ExecutedTx, FullExitOp, Nonce, PriorityOp,
     SignedZkSyncTx, TokenId, ZkSyncOp, ZkSyncPriorityOp, ZkSyncTx, H256,
 };
 // Local imports
@@ -387,24 +387,6 @@ async fn test_get_batch_info_from_mempool(mut storage: StorageProcessor<'_>) -> 
 async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let txs = gen_transfers(5);
 
-    // Save the last block.
-    storage
-        .chain()
-        .block_schema()
-        .save_full_block(Block {
-            block_number: BlockNumber(3),
-            new_root_hash: Default::default(),
-            fee_account: AccountId(0),
-            block_transactions: Vec::new(),
-            processed_priority_ops: (0u64, 1), // Next priority operation serial id is 1.
-            block_chunks_size: 0usize,
-            commit_gas_limit: Default::default(),
-            verify_gas_limit: Default::default(),
-            block_commitment: Default::default(),
-            timestamp: 0u64,
-        })
-        .await?;
-
     // Save priority operation with serial id 1.
     let priority_op = FullExit {
         account_id: AccountId(0),
@@ -422,7 +404,7 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
             eth_block_index: None,
         },
         op: ZkSyncOp::FullExit(Box::new(FullExitOp {
-            priority_op,
+            priority_op: priority_op.clone(),
             withdraw_amount: None,
             creator_account_id: None,
             creator_address: None,
@@ -444,27 +426,31 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
     // Insert 5 executed transactions.
     for block_number in 1..=5 {
         let tx_data = txs.get(block_number - 1).unwrap();
-        let executed_tx = NewExecutedTransaction {
-            block_number: block_number as i64,
-            tx_hash: tx_data.hash().as_ref().to_vec(),
-            tx: serde_json::to_value(&tx_data.tx).unwrap(),
-            operation: Default::default(),
-            from_account: Default::default(),
-            to_account: None,
+        let executed_tx = ExecutedOperations::Tx(Box::new(ExecutedTx {
+            signed_tx: tx_data.clone(),
             success: true,
+            op: None,
             fail_reason: None,
-            block_index: None,
-            primary_account_address: Default::default(),
-            nonce: Default::default(),
-            created_at: chrono::Utc::now(),
-            eth_sign_data: None,
+            block_index: Some(0),
+            created_at: Utc::now(),
             batch_id: None,
-            affected_accounts: Vec::new(),
-            used_tokens: Vec::new(),
-        };
+        }));
 
-        OperationsSchema(&mut storage)
-            .store_executed_tx(executed_tx)
+        storage
+            .chain()
+            .block_schema()
+            .save_full_block(Block {
+                block_number: BlockNumber(block_number as u32),
+                new_root_hash: Default::default(),
+                fee_account: AccountId(0),
+                block_transactions: vec![executed_tx],
+                processed_priority_ops: (0u64, 1), // Next priority operation serial id is 1.
+                block_chunks_size: 0usize,
+                commit_gas_limit: Default::default(),
+                verify_gas_limit: Default::default(),
+                block_commitment: Default::default(),
+                timestamp: block_number as u64,
+            })
             .await?;
     }
 
@@ -474,10 +460,14 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
         .await?;
 
     // Check that the first 3 txs are executed and 2 last are in mempool.
-    let (mempool_txs, reverted_txs) = storage.chain().mempool_schema().load_txs().await?;
+    let blocks = storage
+        .chain()
+        .mempool_schema()
+        .get_reverted_blocks(&[380], AccountId(1))
+        .await?;
     // No transactions in the mempool apart from the reverted ones.
-    assert!(mempool_txs.is_empty());
-    assert_eq!(reverted_txs.len(), 2);
+    // assert!(mempool_txs.is_empty());
+    assert_eq!(blocks.len(), 2);
     for block_number in 1..=5 {
         let tx_hash = txs.get(block_number - 1).unwrap().hash();
         let tx_in_executed = OperationsSchema(&mut storage)
@@ -491,11 +481,34 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
         }
     }
     // The order of priority operations is preserved.
-    let mut reverted_iter = reverted_txs.iter();
+    let mut reverted_iter = blocks.iter();
     // Block number 4.
-    assert_eq!(reverted_iter.next().unwrap().next_priority_op_id, 1u64);
-    // Block number 5.
-    assert_eq!(reverted_iter.next().unwrap().next_priority_op_id, 2u64);
+    let block = reverted_iter.next().unwrap();
+    assert_eq!(block.block_number, BlockNumber(4));
+    assert_eq!(block.processed_priority_ops, (0, 1));
+    assert_eq!(block.timestamp, 4u64);
+    assert_eq!(block.block_transactions.len(), 1);
 
+    let tx_data = txs.get(3).unwrap();
+    let block_tx = &block.block_transactions[0];
+    assert_eq!(block_tx.account_id(), tx_data.tx.account_id());
+    assert_eq!(block_tx.token_id(), tx_data.tx.token_id());
+    assert_eq!(block_tx.variance_name(), tx_data.tx.variance_name());
+
+    // Block number 5.
+    let block = reverted_iter.next().unwrap();
+    assert_eq!(block.block_number, BlockNumber(5));
+    assert_eq!(block.processed_priority_ops, (0, 1));
+    assert_eq!(block.timestamp, 5u64);
+    assert_eq!(block.block_transactions.len(), 2);
+    let tx_data = txs.get(4).unwrap();
+    let block_tx = &block.block_transactions[0];
+    assert_eq!(block_tx.account_id(), tx_data.tx.account_id());
+    assert_eq!(block_tx.token_id(), tx_data.tx.token_id());
+    assert_eq!(block_tx.variance_name(), tx_data.tx.variance_name());
+    let block_tx = &block.block_transactions[1];
+    assert_eq!(block_tx.account_id().unwrap(), priority_op.account_id);
+    assert_eq!(block_tx.token_id(), priority_op.token);
+    assert_eq!(block_tx.variance_name(), "FullExit");
     Ok(())
 }

@@ -9,6 +9,8 @@ RUN apt-get update; apt-get install -y make bash git openssl libssl-dev gcc g++ 
 RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
 RUN apt-get install -y nodejs
 RUN npm install -g yarn
+RUN npm install -g ts-node
+
 
 # Install required node packages
 RUN yarn global add aglio

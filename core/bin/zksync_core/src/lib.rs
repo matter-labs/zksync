@@ -123,9 +123,14 @@ pub async fn run_core(
     let mut storage_processor = connection_pool.access_storage().await?;
 
     // Start state keeper and root hash calculator.
-    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await;
+    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(
+        &mut storage_processor,
+        config.chain.state_keeper.fee_account_addr,
+        &config.chain.state_keeper.block_chunk_sizes,
+    )
+    .await;
 
-    let (state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
+    let (mut state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
         state_keeper_init,
         config.chain.state_keeper.fee_account_addr,
         state_keeper_req_receiver,
@@ -136,6 +141,9 @@ pub async fn run_core(
         processed_tx_events_sender,
     );
     let root_hash_queue = state_keeper.root_hash_queue();
+    // Execute reverted blocks before start
+    state_keeper.execute_reverted_blocks().await;
+
     let state_keeper_task = start_state_keeper(state_keeper);
     let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
 

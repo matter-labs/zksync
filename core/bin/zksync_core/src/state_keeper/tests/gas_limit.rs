@@ -168,7 +168,6 @@ async fn gas_limit_sealing() {
         SignedTxVariant::Tx(tx) => tx.clone(),
         _ => panic!("Tx was expected"),
     };
-
     let proposed_block = ProposedBlock {
         txs,
         priority_ops: Vec::new(),

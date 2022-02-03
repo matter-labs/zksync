@@ -61,6 +61,10 @@ pub struct ZkSyncStateKeeper {
     /// Queue for root hash calculator.
     /// Contains blocks that were sealed but for which root hash has not been calculated yet.
     root_hash_queue: BlockRootHashJobQueue,
+
+    /// Queue of reverted blocks
+    /// They will be executed before the start of the StateKeeper
+    reverted_blocks: VecDeque<IncompleteBlock>,
 }
 
 impl ZkSyncStateKeeper {
@@ -147,6 +151,7 @@ impl ZkSyncStateKeeper {
             processed_tx_events_sender,
 
             root_hash_queue,
+            reverted_blocks: initial_state.reverted_blocks.clone(),
         };
         keeper.initialize(initial_state.pending_block);
 
@@ -237,6 +242,12 @@ impl ZkSyncStateKeeper {
         metrics::histogram!("state_keeper.initialize", start.elapsed());
     }
 
+    pub async fn execute_reverted_blocks(&mut self) {
+        while let Some(block) = self.reverted_blocks.pop_front() {
+            self.execute_incomplete_block(block).await
+        }
+    }
+
     async fn run(mut self) {
         while let Some(req) = self.rx_for_blocks.next().await {
             match req {
@@ -268,6 +279,40 @@ impl ZkSyncStateKeeper {
                 }
             }
         }
+    }
+
+    async fn execute_incomplete_block(&mut self, block: IncompleteBlock) {
+        let (before_priority_op, after_priority_op) = block.processed_priority_ops;
+        self.pending_block = PendingBlock::new(
+            block.block_number,
+            before_priority_op,
+            self.config.max_block_size(),
+            block.timestamp,
+        );
+
+        for tx in block.block_transactions {
+            match tx {
+                ExecutedOperations::Tx(tx) => {
+                    if let ApplyOutcome::NotIncluded = self.apply_tx(&tx.signed_tx) {
+                        // It's not necessary to include all txs because we can change the rules, cause of some bugs.
+                        // However, it's not a common situation in most of the cases it should be applied as is
+                        vlog::error!("The transaction was not included in a block when a block recovery was performed: {:?}", &tx.signed_tx)
+                    }
+                }
+                ExecutedOperations::PriorityOp(op) => self
+                    .apply_priority_op(&op.priority_op)
+                    .assert_included("Should be applied"),
+            }
+        }
+        assert_eq!(
+            self.pending_block.unprocessed_priority_op_current, after_priority_op,
+            "Unexpected executed priority operations amount after applying reverted blocks."
+        );
+        self.seal_pending_block().await;
+        self.tx_for_commitments
+            .send(CommitRequest::RemoveRevertedBlock(block.block_number))
+            .await
+            .expect("committer receiver dropped");
     }
 
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
@@ -658,47 +703,42 @@ impl ZkSyncStateKeeper {
         // should be spearated.
         let current_block = self.pending_block.number;
         let next_unprocessed_priority_op = self.pending_block.unprocessed_priority_op_current;
-        let mut pending_block = std::mem::replace(
-            &mut self.pending_block,
-            PendingBlock::new(
-                current_block,
-                next_unprocessed_priority_op,
-                self.config.max_block_size(),
-                system_time_timestamp(),
-            ),
+        let new_pending_block = PendingBlock::new(
+            self.pending_block.number + 1,
+            next_unprocessed_priority_op,
+            self.config.max_block_size(),
+            system_time_timestamp(),
         );
 
-        let mut block_transactions = pending_block.success_operations.clone(); // TODO (ZKS-821): Avoid cloning.
+        let mut block_transactions = self.pending_block.success_operations.clone(); // TODO (ZKS-821): Avoid cloning.
         block_transactions.extend(
-            pending_block
+            self.pending_block
                 .failed_txs
                 .iter()
                 .cloned() // TODO (ZKS-821): Avoid cloning.
                 .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
         );
 
-        let commit_gas_limit = pending_block.gas_counter.commit_gas_limit();
-        let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
+        let commit_gas_limit = self.pending_block.gas_counter.commit_gas_limit();
+        let verify_gas_limit = self.pending_block.gas_counter.verify_gas_limit();
 
         let block = IncompleteBlock::new_from_available_block_sizes(
-            pending_block.number,
+            self.pending_block.number,
             self.config.fee_account_id,
             block_transactions,
             (
-                pending_block.unprocessed_priority_op_before,
-                pending_block.unprocessed_priority_op_current,
+                self.pending_block.unprocessed_priority_op_before,
+                self.pending_block.unprocessed_priority_op_current,
             ),
             &self.config.available_block_chunk_sizes,
             commit_gas_limit,
             verify_gas_limit,
-            pending_block.timestamp,
+            self.pending_block.timestamp,
         );
 
         // Update the fields of the new pending block.
-        *self.pending_block.number += 1;
-
         let block_metadata = BlockMetadata {
-            fast_processing: pending_block.fast_processing_required,
+            fast_processing: self.pending_block.fast_processing_required,
         };
 
         for tx in &block.block_transactions {
@@ -718,30 +758,30 @@ impl ZkSyncStateKeeper {
         let block_commit_request = BlockCommitRequest {
             block,
             block_metadata,
-            accounts_updated: pending_block.account_updates.clone(),
+            accounts_updated: self.pending_block.account_updates.clone(),
         };
-        let applied_updates_request = pending_block.prepare_applied_updates_request();
+        let applied_updates_request = self.pending_block.prepare_applied_updates_request();
         let root_hash_job = BlockRootHashJob {
             block: current_block,
-            updates: pending_block.account_updates.clone(),
+            updates: self.pending_block.account_updates.clone(),
         };
 
         vlog::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
             *block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),
-            pending_block.chunks_left,
-            pending_block.pending_block_iteration
+            self.pending_block.chunks_left,
+            self.pending_block.pending_block_iteration
         );
 
         let commit_request =
             CommitRequest::SealIncompleteBlock((block_commit_request, applied_updates_request));
+        self.pending_block = new_pending_block;
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
         self.root_hash_queue.push(root_hash_job).await;
-
         metrics::histogram!("state_keeper.seal_pending_block", start.elapsed());
     }
 
@@ -780,6 +820,7 @@ impl ZkSyncStateKeeper {
 
             pending_block: None,
             root_hash_jobs: Vec::new(),
+            reverted_blocks: self.reverted_blocks.clone(),
         }
     }
 }

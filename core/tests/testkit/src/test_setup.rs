@@ -938,6 +938,9 @@ impl TestSetup {
                 CommitRequest::PendingBlock(_) => {
                     // Pending blocks are ignored.
                 }
+                CommitRequest::RemoveRevertedBlock(_) => {
+                    // Remove reverted blocks are ignored
+                }
             }
         }
         panic!("Proposed blocks receiver dropped");
@@ -965,6 +968,9 @@ impl TestSetup {
                 );
             }
             CommitRequest::PendingBlock(_) => {
+                // Nothing to be done.
+            }
+            CommitRequest::RemoveRevertedBlock(_) => {
                 // Nothing to be done.
             }
         }

@@ -11,6 +11,15 @@ use zksync_types::{PriorityOp, SignedZkSyncTx, H256};
 // Local imports
 
 #[derive(Debug, FromRow)]
+pub struct RevertedBlock {
+    pub number: i64,
+    // These values should not change after re-applying the reverted block.
+    pub unprocessed_priority_op_before: i64,
+    pub unprocessed_priority_op_after: i64,
+    pub timestamp: i64,
+}
+
+#[derive(Debug, FromRow)]
 pub struct MempoolTx {
     pub id: i64,
     pub tx_hash: String,
@@ -19,6 +28,7 @@ pub struct MempoolTx {
     pub eth_sign_data: Option<serde_json::Value>,
     pub batch_id: i64,
     pub next_priority_op_serial_id: Option<i64>,
+    pub reverted: bool,
 }
 
 impl TryFrom<MempoolTx> for SignedZkSyncTx {
@@ -49,7 +59,7 @@ pub struct MempoolPriorityOp {
     pub data: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub eth_block: i64,
-    pub eth_block_index: i32,
+    pub eth_block_index: Option<i32>,
     pub deadline_block: i64,
 }
 
@@ -61,7 +71,7 @@ impl From<MempoolPriorityOp> for PriorityOp {
             deadline_block: value.deadline_block as u64,
             eth_hash: H256::from_slice(&value.eth_hash),
             eth_block: value.eth_block as u64,
-            eth_block_index: Some(value.eth_block_index as u64),
+            eth_block_index: value.eth_block_index.map(|i| i as u64),
         }
     }
 }

@@ -305,7 +305,12 @@ impl MempoolBlocksHandler {
             let priority_op =
                 iter::from_fn(|| mempool_state.transactions_queue.pop_front_priority_op())
                     .find(|op| op.serial_id == next_serial_id)
-                    .expect("Operation not found in the priority queue");
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Operation not found in the priority queue {}",
+                            next_serial_id,
+                        )
+                    });
 
             // If the operation doesn't fit, return the proposed block.
             if priority_op.data.chunks() <= chunks_left {

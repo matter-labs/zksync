@@ -36,6 +36,7 @@ Cargo.lock
 /volumes
 /logs
 /loadtest-config
+/core/tests/blocks.json
 
 .ipynb_checkpoints
 

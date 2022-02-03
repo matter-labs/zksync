@@ -451,7 +451,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let start = Instant::now();
 
         let max_serial_id = sqlx::query!(
-            r#"SELECT max(priority_op_serialid) as "max" FROM executed_priority_operations;"#
+            r#"SELECT max(priority_op_serialid) as "max" FROM executed_priority_operations"#
         )
         .fetch_one(self.0.conn())
         .await?;

@@ -8,20 +8,24 @@ use std::{
 // External imports
 use itertools::Itertools;
 // Workspace imports
+use zksync_api_types::v02::pagination::PaginationDirection;
 use zksync_api_types::v02::transaction::{
     ApiTxBatch, BatchStatus, TxHashSerializeWrapper, TxInBlockStatus,
 };
 use zksync_types::{
+    block::IncompleteBlock,
     mempool::{RevertedTxVariant, SignedTxVariant},
     tx::{TxEthSignature, TxHash},
-    Address, BlockNumber, ExecutedOperations, ExecutedTx, PriorityOp, SerialId, SignedZkSyncTx,
-    ZkSyncPriorityOp, H256,
+    AccountId, Address, BlockNumber, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
+    PriorityOp, SerialId, SignedZkSyncTx, ZkSyncPriorityOp, H256,
 };
 // Local imports
-use self::records::{MempoolPriorityOp, MempoolTx, QueuedBatchTx};
+use self::records::{MempoolPriorityOp, MempoolTx, QueuedBatchTx, RevertedBlock};
 use crate::{QueryResult, StorageProcessor};
 
-use zksync_api_types::v02::pagination::PaginationDirection;
+use crate::chain::operations::records::{
+    StoredExecutedPriorityOperation, StoredExecutedTransaction,
+};
 
 pub mod records;
 
@@ -43,7 +47,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         // Load the transactions from mempool along with corresponding batch IDs.
         let txs: Vec<MempoolTx> = sqlx::query_as!(
             MempoolTx,
-            "SELECT * FROM mempool_txs
+            "SELECT * FROM mempool_txs WHERE reverted = false
             ORDER BY created_at",
         )
         .fetch_all(self.0.conn())
@@ -128,6 +132,26 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         Ok((txs.into(), reverted_txs.into()))
     }
 
+    pub async fn remove_reverted_block(&mut self, block_number: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            "DELETE FROM reverted_block WHERE number = $1",
+            *block_number as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        sqlx::query!(
+            "DELETE FROM mempool_reverted_txs_meta WHERE block_number = $1",
+            *block_number as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        transaction.commit().await?;
+        metrics::histogram!("sql.chain.mempool.remove_reverted_block", start.elapsed());
+        Ok(())
+    }
+
     /// Adds a new transactions batch to the mempool schema.
     /// Returns id of the inserted batch
     pub async fn insert_batch(
@@ -204,7 +228,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .await?;
         }
 
-        // If there're signatures for the whole batch, store them too.
+        // If there are signatures for the whole batch, store them too.
         for signature in eth_signatures {
             let signature = serde_json::to_value(signature)?;
             sqlx::query!(
@@ -435,11 +459,11 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             };
 
             sqlx::query!(
-                "INSERT INTO mempool_priority_operations (\
-                    serial_id, data, deadline_block, eth_hash, tx_hash,\
-                    eth_block, eth_block_index, l1_address, \
-                    l2_address, type, created_at, confirmed\
-                 ) \
+                "INSERT INTO mempool_priority_operations (
+                    serial_id, data, deadline_block, eth_hash, tx_hash,
+                    eth_block, eth_block_index, l1_address, 
+                    l2_address, type, created_at, confirmed
+                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), $11)
                 ON CONFLICT (serial_id) DO UPDATE SET
                 data=$2, deadline_block=$3, eth_hash=$4, tx_hash=$5,
@@ -469,7 +493,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     pub async fn get_confirmed_priority_ops(&mut self) -> QueryResult<Vec<PriorityOp>> {
         let ops = sqlx::query_as!(
             MempoolPriorityOp,
-            "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed ORDER BY serial_id"
+            "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed AND reverted = false ORDER BY serial_id"
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -633,6 +657,111 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         Ok(result)
     }
 
+    pub async fn get_reverted_blocks(
+        &mut self,
+        available_block_sizes: &[usize],
+        fee_account_id: AccountId,
+    ) -> QueryResult<VecDeque<IncompleteBlock>> {
+        let mut transaction = self.0.start_transaction().await?;
+        let blocks = sqlx::query_as!(
+            RevertedBlock,
+            "SELECT * FROM reverted_block ORDER BY number"
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+        let mut incomplete_blocks = VecDeque::new();
+        for block in blocks {
+            let mut executed_operations = Vec::new();
+            let executed_ops = sqlx::query_as!(
+                StoredExecutedTransaction,
+               r#"
+                SELECT 
+                -- We don't use sequence number here, so we can just skip it.
+                Null::bigint as sequence_number,
+                mempool_reverted_txs_meta.block_number, 
+                mempool_reverted_txs_meta.block_index, 
+                mempool_txs.tx, 
+                mempool_reverted_txs_meta.nonce as "nonce!", 
+                mempool_reverted_txs_meta.operation, 
+                mempool_reverted_txs_meta.tx_hash_bytes as tx_hash,
+                mempool_reverted_txs_meta.from_account,
+                mempool_reverted_txs_meta.to_account,
+                mempool_reverted_txs_meta.success,
+                mempool_reverted_txs_meta.fail_reason,
+                mempool_reverted_txs_meta.primary_account_address,
+                mempool_txs.created_at,
+                mempool_txs.eth_sign_data,
+                mempool_txs.batch_id as "batch_id?"
+                FROM mempool_txs INNER JOIN mempool_reverted_txs_meta 
+                ON mempool_txs.tx_hash = mempool_reverted_txs_meta.tx_hash 
+                WHERE mempool_reverted_txs_meta.block_number=$1 AND mempool_reverted_txs_meta.tx_type='L2'"#, 
+                block.number
+            ).fetch_all(transaction.conn()).await?;
+
+            let executed_ops = executed_ops
+                .into_iter()
+                .map(|stored_exec| stored_exec.into_executed_tx())
+                .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
+            executed_operations.extend(executed_ops);
+            let executed_priority_ops = sqlx::query_as!(
+                StoredExecutedPriorityOperation,
+                r#"SELECT 
+                -- We don't use sequence number here, so we can just skip it.
+                Null::bigint as sequence_number,
+                mempool_reverted_txs_meta.block_number, 
+                mempool_reverted_txs_meta.block_index as "block_index!", 
+                mempool_reverted_txs_meta.operation, 
+                mempool_reverted_txs_meta.from_account,
+                mempool_reverted_txs_meta.to_account as "to_account!",
+                mempool_priority_operations.serial_id as priority_op_serialid,
+                mempool_priority_operations.deadline_block,
+                mempool_priority_operations.eth_hash,
+                mempool_priority_operations.eth_block,
+                mempool_priority_operations.created_at,
+                cast(mempool_priority_operations.eth_block_index as bigint) as "eth_block_index?",
+                mempool_reverted_txs_meta.tx_hash_bytes as tx_hash
+                 FROM mempool_priority_operations INNER JOIN mempool_reverted_txs_meta 
+                ON mempool_priority_operations.tx_hash = mempool_reverted_txs_meta.tx_hash 
+                WHERE mempool_reverted_txs_meta.block_number=$1 AND mempool_reverted_txs_meta.tx_type='L1'"#, 
+                block.number
+            ).fetch_all(transaction.conn()).await?;
+            let executed_priority_ops = executed_priority_ops
+                .into_iter()
+                .map(|op| ExecutedOperations::PriorityOp(Box::new(op.into_executed())));
+
+            executed_operations.sort_by_key(|exec_op| {
+                match exec_op {
+                    ExecutedOperations::Tx(tx) => {
+                        if let Some(idx) = tx.block_index {
+                            idx
+                        } else {
+                            // failed operations are at the end.
+                            u32::MAX
+                        }
+                    }
+                    ExecutedOperations::PriorityOp(op) => op.block_index,
+                }
+            });
+
+            executed_operations.extend(executed_priority_ops);
+            incomplete_blocks.push_back(IncompleteBlock::new_from_available_block_sizes(
+                BlockNumber(block.number as u32),
+                fee_account_id,
+                executed_operations,
+                (
+                    block.unprocessed_priority_op_before as u64,
+                    block.unprocessed_priority_op_after as u64,
+                ),
+                available_block_sizes,
+                Default::default(),
+                Default::default(),
+                block.timestamp as u64,
+            ));
+        }
+        transaction.commit().await?;
+        Ok(incomplete_blocks)
+    }
+
     // Returns executed txs back to mempool for blocks with number greater than `last_block`
     pub async fn return_executed_txs_to_mempool(
         &mut self,
@@ -649,6 +778,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .ok_or_else(|| anyhow::Error::msg("Failed to load last block from the database"))?;
 
         let mut reverted_txs = Vec::new();
+        let mut reverted_operations = Vec::new();
         let mut next_priority_op_serial_id = last_block.processed_priority_ops.1;
         let mut block_number = last_block_number + 1;
 
@@ -658,19 +788,82 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 .block_schema()
                 .get_block_executed_ops(block_number)
                 .await?;
+
             if block_transactions.is_empty() {
                 break;
             }
+
+            let block_for_revert = transaction
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await?;
+            let (number, processed_priority_ops_before, processed_priority_ops_after, timestamp) =
+                if let Some(block) = block_for_revert {
+                    (
+                        *block.block_number as i64,
+                        block.processed_priority_ops.0 as i64,
+                        block.processed_priority_ops.1 as i64,
+                        block.timestamp as i64,
+                    )
+                } else {
+                    let (block_for_revert, _) = transaction
+                        .chain()
+                        .block_schema()
+                        .get_data_to_complete_block(block_number)
+                        .await?;
+                    let data = if let Some(block) = block_for_revert {
+                        (
+                            *block.block_number as i64,
+                            block.processed_priority_ops.0 as i64,
+                            block.processed_priority_ops.1 as i64,
+                            block.timestamp as i64,
+                        )
+                    } else {
+                        let block = transaction
+                            .chain()
+                            .block_schema()
+                            .load_pending_block()
+                            .await?
+                            .expect("Block does not exist");
+
+                        let unprocessed_priority_op_after = block.unprocessed_priority_op_before
+                            + block_transactions
+                                .iter()
+                                .filter(|ex| ex.is_priority())
+                                .count() as u64;
+                        (
+                            *block.number as i64,
+                            block.unprocessed_priority_op_before as i64,
+                            unprocessed_priority_op_after as i64,
+                            block.timestamp as i64,
+                        )
+                    };
+                    data
+                };
+
+            sqlx::query!(
+                r#"
+                INSERT INTO reverted_block (
+                    number, unprocessed_priority_op_before, 
+                    unprocessed_priority_op_after, timestamp
+                ) VALUES ( $1, $2, $3, $4 )"#,
+                number,
+                processed_priority_ops_before,
+                processed_priority_ops_after,
+                timestamp,
+            )
+            .execute(transaction.conn())
+            .await?;
             vlog::info!("Reverting transactions from the block {}", block_number);
 
             for executed_tx in block_transactions {
                 if !executed_tx.is_successful() {
                     continue;
                 }
-
                 match executed_tx {
                     ExecutedOperations::Tx(tx) => {
-                        reverted_txs.push((tx, next_priority_op_serial_id));
+                        reverted_txs.push((tx, block_number, next_priority_op_serial_id));
                     }
                     ExecutedOperations::PriorityOp(priority_op) => {
                         assert_eq!(
@@ -678,6 +871,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                             next_priority_op_serial_id
                         );
                         next_priority_op_serial_id += 1;
+                        reverted_operations.push((priority_op, block_number));
                     }
                 }
             }
@@ -685,13 +879,23 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             block_number = block_number + 1;
         }
 
-        for (reverted_tx, next_priority_op_serial_id) in reverted_txs {
+        for (reverted_tx, block_number, next_priority_op_serial_id) in reverted_txs {
             let ExecutedTx {
                 signed_tx,
+                success,
                 created_at,
                 batch_id,
-                ..
+                op,
+                block_index,
+                fail_reason,
             } = *reverted_tx;
+
+            let block_index = block_index.map(|b| b as i32);
+            let nonce = signed_tx.nonce();
+            let from_account = signed_tx.from_account().as_bytes().to_vec();
+            let to_account = signed_tx.to_account().map(|a| a.as_bytes().to_vec());
+            let primary_account_address = signed_tx.account().as_bytes().to_vec();
+
             let SignedZkSyncTx {
                 tx, eth_sign_data, ..
             } = signed_tx;
@@ -700,13 +904,36 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             let tx_hash = hex::encode(&tx_hash_bytes);
             let tx_value =
                 serde_json::to_value(tx).expect("Failed to serialize reverted transaction");
+            let operation =
+                serde_json::to_value(op).expect("Failed to serialize reverted transaction");
             let eth_sign_data = eth_sign_data.as_ref().map(|sign_data| {
                 serde_json::to_value(sign_data).expect("Failed to serialize Ethereum sign data")
             });
 
             sqlx::query!(
-                "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id, next_priority_op_serial_id)
-                VALUES ($1, $2, $3, $4, $5, $6)",
+                r#"INSERT INTO mempool_reverted_txs_meta (
+                 tx_hash, operation, block_number, block_index, tx_hash_bytes, nonce, from_account, 
+                 to_account, success, fail_reason, primary_account_address, tx_type
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'L2')"#,
+                tx_hash,
+                operation,
+                *block_number as i64,
+                block_index,
+                tx_hash_bytes,
+                *nonce as i64,
+                from_account,
+                to_account,
+                success,
+                fail_reason,
+                primary_account_address,
+            )
+            .execute(transaction.conn())
+            .await?;
+
+            sqlx::query!(
+                "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id, next_priority_op_serial_id, reverted)
+                VALUES ($1, $2, $3, $4, $5, $6, true)",
                 tx_hash,
                 tx_value,
                 created_at,
@@ -726,11 +953,90 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .await?;
         }
 
+        for (op, block_number) in reverted_operations {
+            let ExecutedPriorityOp {
+                priority_op,
+                op,
+                block_index,
+                created_at,
+            } = *op;
+
+            let tx_hash_bytes = priority_op.tx_hash().as_ref().to_vec();
+            let tx_hash = hex::encode(&tx_hash_bytes);
+            let data = serde_json::to_value(&priority_op.data)
+                .expect("Failed to serialize reverted transaction");
+            let operation =
+                serde_json::to_value(op).expect("Failed to serialize reverted transaction");
+
+            let serial_id = priority_op.serial_id as i64;
+            let l1_address = priority_op.data.from_account().as_bytes().to_vec();
+            let l2_address = priority_op.data.to_account().as_bytes().to_vec();
+            let op_type = priority_op.data.variance_name();
+            let deadline_block = priority_op.deadline_block as i64;
+            let eth_hash = priority_op.eth_hash.as_bytes().to_vec();
+            let eth_block = priority_op.eth_block as i64;
+            let eth_block_index = priority_op.eth_block_index.map(|a| a as i32);
+
+            sqlx::query!(
+                r#"INSERT INTO mempool_reverted_txs_meta (
+                 tx_hash, operation, block_number, block_index, tx_hash_bytes, 
+                 from_account, to_account, primary_account_address, 
+                 success, tx_type
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, 'L1')"#,
+                tx_hash,
+                operation,
+                *block_number as i64,
+                block_index as i32,
+                tx_hash_bytes,
+                l1_address,
+                l2_address,
+                l2_address,
+            )
+            .execute(transaction.conn())
+            .await?;
+
+            sqlx::query!(
+                "INSERT INTO mempool_priority_operations (
+                    serial_id, data, l1_address, l2_address, 
+                    type, deadline_block, eth_hash, tx_hash, eth_block, 
+                    eth_block_index, created_at, confirmed, reverted
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, true)",
+                serial_id,
+                data,
+                l1_address,
+                l2_address,
+                op_type,
+                deadline_block,
+                eth_hash,
+                tx_hash,
+                eth_block,
+                eth_block_index,
+                created_at
+            )
+            .execute(transaction.conn())
+            .await?;
+
+            sqlx::query!(
+                "DELETE FROM tx_filters
+                WHERE tx_hash = $1",
+                &tx_hash_bytes
+            )
+            .execute(transaction.conn())
+            .await?;
+        }
+
         sqlx::query!(
-            r#"
-            DELETE FROM executed_transactions
-            WHERE block_number > $1
-        "#,
+            r"DELETE FROM executed_priority_operations 
+            WHERE block_number > $1",
+            *last_block_number as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        sqlx::query!(
+            r"DELETE FROM executed_transactions
+            WHERE block_number > $1",
             *last_block_number as i64
         )
         .execute(transaction.conn())
