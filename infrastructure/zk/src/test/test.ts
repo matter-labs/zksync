@@ -75,7 +75,7 @@ export async function serverRust() {
 }
 
 export async function cryptoRust() {
-    await circuit(6);
+    await circuit(20);
     await rustCryptoTests();
 }
 
