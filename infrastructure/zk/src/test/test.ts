@@ -43,10 +43,10 @@ export async function contracts() {
 }
 
 export async function circuit(threads: number = 1, testName?: string, ...args: string[]) {
-    await utils.spawn(
-        `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''}
-         -- --ignored --test-threads ${threads} ${args.join(' ')}`
-    );
+    const command = `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''}
+    -- --ignored --test-threads ${threads} ${args.join(' ')}`;
+    console.log(`Command is "${command}"`);
+    await utils.spawn(command);
 }
 
 export async function prover() {
@@ -75,7 +75,7 @@ export async function serverRust() {
 }
 
 export async function cryptoRust() {
-    await circuit(9);
+    await circuit(12);
     await rustCryptoTests();
 }
 
