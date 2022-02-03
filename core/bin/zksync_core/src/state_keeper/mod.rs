@@ -387,6 +387,8 @@ impl ZkSyncStateKeeper {
         let non_executed_op = self
             .state
             .priority_op_to_zksync_op(priority_op.data.clone());
+
+        #[allow(clippy::question_mark)] // False positive, we aren't returning `Result`.
         if self
             .pending_block
             .gas_counter

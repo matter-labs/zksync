@@ -1,0 +1,18 @@
+[package]
+name = "flamegraph_target"
+version = "0.1.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our tests.
+
+[dependencies]
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+structopt = "0.3.20"
+
+# Debug symbols are enabled for this binary even in release.
+# The corresponding setting is set in the workspace root's `Cargo.toml`.

@@ -1561,6 +1561,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "flamegraph_target"
+version = "0.1.0"
+dependencies = [
+ "structopt",
+ "zksync_crypto",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"

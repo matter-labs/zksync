@@ -19,22 +19,22 @@ export type Nonce = number | 'committed';
 export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
 
 const MAINNET_NETWORK_CHAIN_ID = 1;
-const RINKEBY_NETWORK_CHAIN_ID = 3;
-const ROPSTEN_NETWROK_CHAIN_ID = 4;
-const LOCALHOST_NETWROK_CHAIN_ID = 9;
+const ROPSTEN_NETWORK_CHAIN_ID = 3;
+const RINKEBY_NETWORK_CHAIN_ID = 4;
+const LOCALHOST_NETWORK_CHAIN_ID = 9;
 
 export function l1ChainId(network?: Network): number {
     if (network === 'rinkeby' || network === 'rinkeby-beta') {
         return RINKEBY_NETWORK_CHAIN_ID;
     }
     if (network === 'ropsten' || network === 'ropsten-beta') {
-        return ROPSTEN_NETWROK_CHAIN_ID;
+        return ROPSTEN_NETWORK_CHAIN_ID;
     }
     if (network === 'mainnet') {
         return MAINNET_NETWORK_CHAIN_ID;
     }
     if (network === 'localhost') {
-        return LOCALHOST_NETWROK_CHAIN_ID;
+        return LOCALHOST_NETWORK_CHAIN_ID;
     }
     throw new Error('Unsupported netwrok');
 }
