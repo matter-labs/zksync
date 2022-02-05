@@ -35,6 +35,7 @@ impl ApiTransactionData {
     }
 
     async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<Receipt>, Error> {
+        // Try to find in the DB.
         let mut storage = self
             .tx_sender
             .pool
@@ -48,23 +49,31 @@ impl ApiTransactionData {
             .await
             .map_err(Error::storage)?
         {
-            Ok(Some(receipt))
-        } else if let Some(op) = self
+            return Ok(Some(receipt));
+        }
+
+        // DB lookup failed. Important to drop the connection, so it returns to the pool.
+        // Otherwise, if remote call takes too long, the connection will not be available for the whole time.
+        drop(storage);
+
+        // Try to get pending op.
+        if let Some(op) = self
             .tx_sender
             .core_api_client
             .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
             .await
             .map_err(Error::core_api)?
         {
-            Ok(Some(Receipt::L1(L1Receipt {
+            return Ok(Some(Receipt::L1(L1Receipt {
                 status: TxInBlockStatus::Queued,
                 eth_block: EthBlockId(op.eth_block),
                 rollup_block: None,
                 id: op.serial_id,
-            })))
-        } else {
-            Ok(None)
+            })));
         }
+
+        // Nothing.
+        Ok(None)
     }
 
     async fn tx_data(&self, tx_hash: TxHash) -> Result<Option<TxData>, Error> {
