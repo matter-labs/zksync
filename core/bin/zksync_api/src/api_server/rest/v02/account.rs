@@ -26,8 +26,8 @@ use super::{
     response::ApiResult,
 };
 use crate::{
-    api_server::helpers::get_depositing, api_try, core_api_client::CoreApiClient,
-    fee_ticker::PriceError, utils::token_db_cache::TokenDBCache,
+    api_try, core_api_client::CoreApiClient, fee_ticker::PriceError,
+    utils::token_db_cache::TokenDBCache,
 };
 
 /// Shared data between `api/v02/accounts` endpoints.
@@ -242,17 +242,23 @@ impl ApiAccountData {
         address: Address,
         account_id: Option<AccountId>,
     ) -> Result<AccountState, Error> {
+        // **Important**: We should get ongoing deposits *before* acquiring connection to the database.
+        // Otherwise we can starve the pool.
+        let pending_ops =
+            crate::api_server::helpers::get_pending_ops(&self.core_api_client, address).await?; // TODO: add timeout.
+
+        // Only acquire connection *after* we got info on deposits.
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
 
-        let depositing = get_depositing(
+        let depositing = crate::api_server::helpers::depositing_from_pending_ops(
             &mut transaction,
-            &self.core_api_client,
             &self.tokens,
-            address,
+            pending_ops,
             self.confirmations_for_eth_event,
         )
         .await?;
+
         let (committed, finalized) = if let Some(account_id) = account_id {
             let (finalized_state, committed_state) = transaction
                 .chain()
