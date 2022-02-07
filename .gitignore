@@ -28,6 +28,9 @@ Cargo.lock
 !/etc/env/docker.env
 !/etc/env/ci.env
 !/etc/env/base
+!/etc/env/testnet
+!/etc/env/mainnet
+!/etc/env/zk_original_configuration
 /etc/tokens/localhost.json
 !/keys
 /keys/*

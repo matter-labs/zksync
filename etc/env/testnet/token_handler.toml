@@ -1,0 +1,7 @@
+[token_handler]
+# The name of the trusted token list.
+token_list_name="localhost"
+# How often (in seconds) we want to poll the Ethereum Watch module.
+poll_interval=10
+# Address to which notifications of new added tokens will be sent.
+webhook_url=""

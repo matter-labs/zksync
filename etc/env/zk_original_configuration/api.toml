@@ -1,0 +1,60 @@
+# Configuration for the core API servers.
+
+# Common configuration options for the API
+[api.common]
+# Size of LRU caches for requests
+caches_size=10000
+# Determines the required minimum account age for `ForcedExit` operation to be allowed.
+# It is set to 0 for the development purpuces (e.g. tests), but it is recommended to keep this
+# value at least 24 hours for production.
+# Type of value is seconds.
+forced_exit_minimum_account_age_secs=0
+# List of account IDs that do not have to pay fees for operations.
+fee_free_accounts=[]
+
+# Ability to perform change pub key with zero fee
+enforce_pubkey_change_fee=true
+
+max_number_of_transactions_per_batch=200
+max_number_of_authors_per_batch=10
+
+# Configuration for the admin API server
+[api.admin]
+port=8080
+url="http://127.0.0.1:8080"
+# secret_auth is set in `private.toml`
+
+# Configuration for the REST API server
+[api.rest]
+port=3001
+url="http://127.0.0.1:3001"
+
+# Configuration for the JSON RPC server
+[api.json_rpc]
+# Port for the HTTP RPC API.
+http_port=3030
+http_url="http://127.0.0.1:3030"
+# Port for the WebSocket RPC API.
+ws_port=3031
+ws_url="ws://127.0.0.1:3031"
+
+# Configuration for the web3 JSON RPC server
+[api.web3]
+port=3002
+url="http://127.0.0.1:3002"
+max_block_range=10
+
+# Configuration for the core private server.
+[api.private]
+port=8090
+url="http://127.0.0.1:8090"
+
+# Configuration for the prover server.
+[api.prover]
+port=8088
+url="http://127.0.0.1:8088"
+# secret_auth is set in `private.toml`
+
+# Configuration for the prometheus exporter server.
+[api.prometheus]
+port=3312

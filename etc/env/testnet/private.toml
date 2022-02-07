@@ -10,7 +10,7 @@ database_url="postgres://postgres@localhost/plasma"
 operator_private_key="0xc1783a9a8222e47778911c58bb5aac1343eb425159ff140799e0a283bfb8fa16"
 
 # Address to be used for zkSync account managing the interaction with a contract on Ethereum.
-# Derived from the `OPERATOR_PRIVATE_KEY`.
+# Derived from the `OPERATOR_PRIVATE_KEY`. <env_address>
 operator_commit_eth_addr="0xdebe71e1de41fc77c44df4b6db940026e31b0e71"
 
 [chain.state_keeper]
