@@ -60,21 +60,6 @@ export class RemoteWallet extends AbstractWallet {
         );
         wallet.connect(provider);
         await wallet.verifyNetworks();
-
-        // Before creating the account, we should check that the private key is indeed managed remotely.
-        try {
-            wallet.syncSignerPubKeyHash();
-        } catch (e) {
-            // TODO: Catching general error is a bad idea, as a lot of things can throw an exception.
-            // Generally we should catch a concrete error stating that such a method is not supported, and throw an
-            // exception only in that case. And, probably, have a retry mechanism, so we don't create the wallet if it
-            // was just a WalletConnect glitch.
-            throw new Error(
-                "There was an attempt to create a wallet that manages user keys remotely, \
-                but the server doesn't seem to have required capabilities"
-            );
-        }
-
         return wallet;
     }
 
