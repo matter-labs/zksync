@@ -29,7 +29,7 @@ declare module './tester' {
 
 Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken: TokenLike) {
     const contractAddress = await wallet.provider.getContractAddress();
-    const ethProxy = new ETHProxy(wallet.ethSigner.provider!, contractAddress);
+    const ethProxy = new ETHProxy(wallet.ethSigner().provider!, contractAddress);
     const defaultNFTFactoryAddress = (await ethProxy.getGovernanceContract().defaultFactory()).toLowerCase();
 
     const type = 'MintNFT';
@@ -55,7 +55,7 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
     expect(nftInfo.withdrawnFactory, 'NFT info before withdrawing is wrong').to.be.null;
 
     const contract = await deployContract(
-        wallet.ethSigner,
+        wallet.ethSigner(),
         readFactoryCode(),
         [
             'TestFactory',

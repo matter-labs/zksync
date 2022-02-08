@@ -1,7 +1,7 @@
 use num::BigUint;
 use std::collections::{HashMap, HashSet};
 
-use zksync_crypto::{params, params::NFT_STORAGE_ACCOUNT_ID, Fr};
+use zksync_crypto::{merkle_tree::TreeMemoryUsage, params, params::NFT_STORAGE_ACCOUNT_ID, Fr};
 use zksync_types::{
     helpers::reverse_updates,
     operations::{TransferOp, TransferToNewOp, ZkSyncOp},
@@ -109,6 +109,10 @@ impl ZkSyncState {
             next_free_id: AccountId(next_free_id as u32),
             nfts,
         }
+    }
+
+    pub fn tree_memory_stats(&self) -> TreeMemoryUsage {
+        self.balance_tree.memory_stats()
     }
 
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {

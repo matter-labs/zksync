@@ -32,7 +32,7 @@ pub fn try_parse_hash(query: &str) -> Result<H256, hex::FromHexError> {
     Ok(H256::from_slice(&slice))
 }
 
-async fn depositing_from_pending_ops(
+pub(crate) async fn depositing_from_pending_ops(
     storage: &mut StorageProcessor<'_>,
     tokens: &TokenDBCache,
     pending_ops: OngoingDepositsResp,
@@ -72,7 +72,7 @@ async fn depositing_from_pending_ops(
     Ok(DepositingAccountBalances { balances })
 }
 
-async fn get_pending_ops(
+pub(crate) async fn get_pending_ops(
     core_api_client: &CoreApiClient,
     address: Address,
 ) -> Result<OngoingDepositsResp, Error> {

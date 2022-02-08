@@ -254,7 +254,7 @@ describe('ZkSync REST API V0.2 tests', () => {
             .addTransfer({ to: bob.address(), token: 'ETH', amount: alice.provider.tokenSet.parseToken('ETH', '1') })
             .addTransfer({ to: bob.address(), token: 'ETH', amount: alice.provider.tokenSet.parseToken('ETH', '1') })
             .build('ETH');
-        const submitBatchResponse = await provider.submitTxsBatchNew(batch.txs, [batch.signature]);
+        const submitBatchResponse = await provider.submitTxsBatchNew(batch.txs, [batch.signature!]);
         await provider.notifyAnyTransaction(submitBatchResponse.transactionHashes[0], 'COMMIT');
         const batchInfo = await provider.getBatch(submitBatchResponse.batchHash);
         expect(batchInfo.batchHash).to.eql(submitBatchResponse.batchHash);
@@ -294,7 +294,7 @@ describe('ZkSync web3 API tests', () => {
         tokenAddress = alice.provider.tokenSet.resolveTokenAddress(token);
         const erc20InterfacePath = path.join(process.env['ZKSYNC_HOME'] as string, 'etc', 'web3-abi', 'ERC20.json');
         const erc20Interface = new ethers.utils.Interface(require(erc20InterfacePath));
-        erc20Contract = new ethers.Contract(tokenAddress, erc20Interface, alice.ethSigner);
+        erc20Contract = new ethers.Contract(tokenAddress, erc20Interface, alice.ethSigner());
 
         const zksyncProxyInterfacePath = path.join(
             process.env['ZKSYNC_HOME'] as string,
@@ -303,7 +303,7 @@ describe('ZkSync web3 API tests', () => {
             'ZkSyncProxy.json'
         );
         const zksyncProxyInterface = new ethers.utils.Interface(require(zksyncProxyInterfacePath));
-        zksyncProxyContract = new ethers.Contract(zksyncProxyAddress, zksyncProxyInterface, alice.ethSigner);
+        zksyncProxyContract = new ethers.Contract(zksyncProxyAddress, zksyncProxyInterface, alice.ethSigner());
 
         const nftFactoryInterfacePath = path.join(
             process.env['ZKSYNC_HOME'] as string,
@@ -312,7 +312,7 @@ describe('ZkSync web3 API tests', () => {
             'NFTFactory.json'
         );
         const nftFactoryInterface = new ethers.utils.Interface(require(nftFactoryInterfacePath));
-        nftFactoryContract = new ethers.Contract(nftFactoryAddress, nftFactoryInterface, alice.ethSigner);
+        nftFactoryContract = new ethers.Contract(nftFactoryAddress, nftFactoryInterface, alice.ethSigner());
     });
 
     it('should check logs', async () => {
