@@ -8,17 +8,15 @@ All notable changes to the contracts will be documented in this file.
 
 ### Added
 
-- `cutUpgradeNoticePeriodBySignature` a function with which security council member can approve instant upgrade with
-  provided signatures
-- `Create2Factory.sol` - smart contract with which all targets will be deployed to redeploy target with the same address
-  even if self-destruct is called on it
+- `cutUpgradeNoticePeriodBySignature` a function for approving instant upgrade by security council members
+- `Create2Factory.sol` - the smart contract that used to deploys targets
 - New event `ApproveCutUpgradeNoticePeriod(address)` emitted after security council member approve upgrade
-- Check that deposited amount above zero
+- Check that the deposited amount is non-zero
 
 ### Changed
 
 - Upgrade can be initialized/finished in case of exodus mode
-- `cutUpgradeNoticePeriod` takes hash of targets to which upgrades initialized
+- `cutUpgradeNoticePeriod` takes the hash of targets to which upgrades initialized
 - `WithdrawalPending` - event parameters changed
 - `Withdraw`/`ForcedExit`/`FullExit` may be executed on `executeBlocks` or stored as pending depending on the input
   parameters when executing the block
