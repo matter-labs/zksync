@@ -1,0 +1,29 @@
+name: Update Config
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Zksync Environment (mainnet, stage, rinkeby etc)
+        required: true
+      ref:
+        description: Branch/tag to fetch configs from
+        required: true
+
+jobs:
+  setup:
+    name: Setup
+    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@dev
+    with:
+      environment: ${{ github.event.inputs.environment }}
+
+  update:
+    name: Update
+    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@dev
+    needs: [setup]
+    with:
+      environment: ${{ github.event.inputs.environment }}
+      ref: ${{ github.event.inputs.ref }}
+      cluster: ${{ needs.setup.outputs.cluster }}
+      namespace: ${{ needs.setup.outputs.release-namespace }}
+    secrets:
+      github-token: ${{ secrets.GH_TOKEN }}

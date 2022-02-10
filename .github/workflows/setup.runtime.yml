@@ -1,0 +1,56 @@
+name: Setup
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Zksync Environment (mainnet, stage, rinkeby etc)
+        type: string
+        required: true
+    outputs:
+      release-environment:
+        description: Helmfile release environment
+        value: ${{ jobs.setup.outputs.hfEnv }}
+      release-namespace:
+        description: Helmfile/Helm release namespace (usually matches the environment)
+        value: ${{ jobs.setup.outputs.namespace }}
+      cluster:
+        description: Runtime cluster label, i.e. self-hosted runner label (mainnet, testnet or stage)
+        value: ${{ jobs.setup.outputs.cluster }}
+
+defaults:
+  run:
+    shell: bash -leo pipefail {0}
+
+# Disable simultaneous deployments into a single environment
+concurrency: setup-env-${{ inputs.environment }}
+
+jobs:
+  setup:
+    name: Runtime
+    runs-on: [k8s, stage]
+    outputs:
+      hfEnv: ${{ steps.envMap.outputs.hfEnv }}
+      namespace: ${{ steps.envMap.outputs.namespace }}
+      cluster: ${{ steps.envMap.outputs.cluster }}
+
+    steps:
+      - uses: actions/checkout@v2
+      -
+        name: Map runtime environment data
+        id: envMap
+        uses: kanga333/variable-mapper@v0.2.2
+        with:
+          key: ${{ inputs.environment }}
+          export_to: output
+          mode: overwrite
+          map: |
+            {
+              ".*": {
+                "namespace": "${{ inputs.environment }}",
+                "hfEnv": "${{ inputs.environment }}",
+                "cluster": "stage"
+              },
+              "^rinkeby$": { "cluster": "testnet" },
+              "^ropsten$": { "cluster": "testnet" },
+              "^mainnet$": { "cluster": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
+            }
