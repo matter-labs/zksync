@@ -81,7 +81,9 @@ export class RemoteWallet extends AbstractWallet {
     }
 
     override async syncSignerPubKeyHash(): Promise<PubKeyHash> {
-        return await this.callExtSignerPubKeyHash();
+        let pubKeyHash = await this.callExtSignerPubKeyHash();
+        pubKeyHash = pubKeyHash.replace('0x', 'sync:');
+        return pubKeyHash;
     }
 
     // *********************
@@ -382,10 +384,11 @@ export class RemoteWallet extends AbstractWallet {
      *
      * Makes all fields that represent amount to be of `string` type
      * and all fields that represent tokens to be token ids i.e. of `number` type.
+     * Also, it renames `ethAddress` parameter to `to` for withdrawals.
      *
      * @param txs A list of transactions
      *
-     * @protected A list of prepared transactions
+     * @returns A list of prepared transactions
      */
     protected prepareTxsBeforeSending(txs: any[]): any[] {
         const amountFields = ['amount', 'fee'];
@@ -403,6 +406,10 @@ export class RemoteWallet extends AbstractWallet {
             }
             if ('amounts' in tx) {
                 tx.amounts = [BigNumber.from(tx.amounts[0]).toString(), BigNumber.from(tx.amounts[1]).toString()];
+            }
+            if ('ethAddress' in tx) {
+                tx.to = tx.ethAddress;
+                delete tx.ethAddress;
             }
             return tx;
         });
