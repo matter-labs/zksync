@@ -1,0 +1,106 @@
+name: Deploy
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Zksync Environment (mainnet, stage, rinkeby etc)
+        type: string
+        required: true
+      cluster:
+        description: Specifies Kubernets cluster
+        required: true
+        type: string
+      release-environment:
+        description: Helmfile release environment
+        required: true
+        type: string
+      release-namespace:
+        description: Helmfile/Helm release namespace (usually matches the environment)
+        type: string
+        required: true
+      image-tag:
+        description: Image tag (built image tag to deploy)
+        type: string
+        required: true
+      deployment-id:
+        description: Deployment for this pipeline
+        type: string
+        required: true
+      scaleup:
+        description: Force scaling the server deployment up to 1 replica
+        type: boolean
+        required: false
+      server-release:
+        description: Name of helm release for server
+        type: string
+        required: false
+        default: server
+      prover-release:
+        description: Name of helm release for prover
+        type: string
+        required: false
+        default: prover
+
+    secrets:
+      github-token:
+        description: GitHub token
+        required: false
+
+defaults:
+  run:
+    shell: bash -leo pipefail {0}
+
+# Disable simultaneous deployments into a single environment
+concurrency: deploy-app-${{ inputs.environment }}
+
+jobs:
+  deploy:
+    name: Server
+    runs-on: [self-hosted, deployer, "${{ inputs.cluster }}"]
+    container:
+      image: dysnix/kubectl:v1.20-gcloud
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
+    env:
+      DEPLOY_APPS: -l name=${{ inputs.server-release }} -l name=${{ inputs.prover-release }}
+      IMAGE_TAG: ${{ inputs.image-tag }}
+
+    steps:
+      -
+        name: Clone helm-infra
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/helm-infra
+          path: helm-infra
+          token: ${{ secrets.github-token }}
+      -
+        id: kubeConf
+        run: |
+          kube_token=$(cat /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }})
+          echo "::add-mask::$kube_token"
+          echo "::set-output name=token::$kube_token"
+      -
+        name: Generate ~/.kube/config
+        run: |
+          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
+          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
+          kubectl config set-context matterlabs-zksync-${{ inputs.cluster }} --user=user --cluster=default
+          kubectl config use-context matterlabs-zksync-${{ inputs.cluster }}
+      -
+        name: Deploy Zksync
+        working-directory: helm-infra
+        run: |
+          UPDATE_REPOS=y helmfile -e ${{ inputs.release-environment }} repos
+          helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS apply --args "timeout 180s"
+      -
+        name: Scale Up
+        if: inputs.scaleup
+        run: kubectl scale deployment -n ${{ inputs.release-namespace }} server --replicas=1
+      -
+        if: always()
+        name: Update deployment status
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          state: ${{ (job.status != 'cancelled') && job.status || 'inactive' }}
+          deployment_id: ${{ inputs.deployment-id }}
