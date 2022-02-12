@@ -463,7 +463,7 @@ export class RemoteWallet extends AbstractWallet {
         try {
             const preparedOrder = this.prepareTxsBeforeSending([order]);
             // For now, we assume that the same method will be used for both signing transactions and orders.
-            const signedOrder: any = (await this.web3Provider.send('zkSync_signBatch', preparedOrder))[0];
+            const signedOrder: any = (await this.web3Provider.send('zkSync_signBatch', [preparedOrder]))[0];
 
             // Sanity check
             if (!signedOrder['signature']) {
