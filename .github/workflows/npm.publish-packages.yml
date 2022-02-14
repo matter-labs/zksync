@@ -29,8 +29,8 @@ jobs:
         name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         with:
-          type: ${{ (job.zksync.result != 'cancelled') && job.zksync.result || 'failure' }}
-          job_name: '*Deployment to `${{ needs.setup.outputs.environment }}` resulted in `${{ job.deploy.result }}`*'
+          type: ${{ (job.zksync.result == 'success') && 'success' || 'failure' }}
+          job_name: '*Publishing `${{ needs.zksync.outputs.package-name }}@${{ needs.zksync.outputs.package-version }}` ${{ needs.zksync.outputs.status }}*'
           icon_emoji: octocat
           channel: 'ci-notifications'
           url: ${{ secrets.MATTERMOST_WEBHOOK }}
