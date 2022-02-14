@@ -1,0 +1,14 @@
+// * {
+//     background: transparent;
+// }
+// body, .card {
+//     background: transparent !important;
+// }
+// html {
+//     background: rgb(243, 245, 254) !important;
+// }
+@import "./bootstrap/bootstrap.scss";
+@import "../node_modules/bootstrap-vue/dist/bootstrap-vue.css";
+.btn-primary {
+    color: white;
+}

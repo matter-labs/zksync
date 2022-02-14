@@ -1,6 +1,6 @@
 export default {
     'http://localhost': {
-        API_SERVER: 'http://localhost:3001',
+        API_SERVER: 'https://localhost:3001',
         ETH_NETWORK: 'localhost',
         WS_API_ADDR: 'ws://localhost:3031',
         HTTP_RPC_API_ADDR: 'http://localhost:3030'

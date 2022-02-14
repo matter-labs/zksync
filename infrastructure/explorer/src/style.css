@@ -1,0 +1,11 @@
+.nowrap {
+    white-space: nowrap;
+}
+
+.displaynone {
+    display: none;
+}
+
+.cursorpointer {
+    cursor: pointer;
+}
