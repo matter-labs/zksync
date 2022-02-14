@@ -1,0 +1,55 @@
+name: Deploy Stage
+on:
+  push:
+    branches:
+      - dev
+      - breaking
+      - hotfix/*
+      - devops/refactor-workflow-call
+    tags:
+      - hotfix-*
+
+jobs:
+  images:
+    name: Build Docker Images
+    runs-on: [self-hosted, MAIN]
+
+    outputs:
+      image-tag: ${{ steps.sha.outputs.short }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - id: sha
+      run: echo "::set-output name=short::$(git rev-parse --short HEAD)"
+    # - name: setup-env
+    #   run: |
+    #     echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+    #     echo CI=1 >> $GITHUB_ENV
+    #     echo $(pwd)/bin >> $GITHUB_PATH
+
+    # - name: init
+    #   run: |
+    #     cargo sqlx --version || cargo install sqlx-cli
+    #     zk
+    #     zk run yarn
+    #     cp etc/tokens/{test,localhost}.json
+    #     zk run verify-keys unpack
+    #     zk up
+    #     zk db basic-setup
+
+    # - name: update-images
+    #   run: |
+    #     docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+    #     zk docker push rust
+
+    # - name: docker-down
+    #   if: always()
+    #   run: |
+    #     docker-compose down
+  test:
+    name: Result
+    runs-on: [self-hosted, stage]
+    needs: [images]
+    steps:
+      - run: |
+          echo ${{ needs.images.outputs.image-tag }}
