@@ -1,0 +1,36 @@
+# Sensitive values which MUST be different for production
+# Values provided here are valid for the development infrastructure only.
+
+# Address of the databaase server.
+database_url="postgres://postgres@localhost/plasma"
+
+[eth_sender.sender]
+# Set in env file for development, production, staging and testnet.
+operator_private_key="0x27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"
+# Address to be used for zkSync account managing the interaction with a contract on Ethereum.
+# Derived from the `OPERATOR_PRIVATE_KEY`.
+operator_commit_eth_addr="0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7" 
+
+[chain.state_keeper]
+fee_account_addr="0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7"
+last_tx_signer_used="false"
+last_tx_signer_address="0x36615cf349d7f6344891b1e7ca7c72883f5dc049"
+last_tx_signer_private_key="0x03c807e375d9a70fb5f21984496e018baed148dad00829b58d7ca9e557f2998c"
+
+[api.admin]
+# Secret for the authorization tokens generation
+secret_auth="sample"
+
+[api.prover]
+# Secret for the authorization tokens generation
+secret_auth="sample"
+
+[misc]
+# Private key for the fee seller account
+fee_account_private_key="0x27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"
+
+[forced_exit_requests]
+# L2 private key of the account that sends ForcedExits
+sender_private_key="0x0092788f3890ed50dcab7f72fb574a0a9d30b1bc778ba076c609c311a8555352" 
+# L1 private key of the account that sends ForcedExits
+sender_eth_private_key="0x0559b9f000b4e4bbb7fe02e1374cef9623c2ab7c3791204b490e1f229191d104"

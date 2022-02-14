@@ -9,7 +9,7 @@ export async function getDefaultRestProvider(
     pollIntervalMilliSecs?: number
 ): Promise<RestProvider> {
     if (network === 'localhost') {
-        return await RestProvider.newProvider('http://127.0.0.1:3001/api/v0.2', pollIntervalMilliSecs);
+        return await RestProvider.newProvider('https://127.0.0.1:3001/api/v0.2', pollIntervalMilliSecs);
     } else if (network === 'ropsten') {
         return await RestProvider.newProvider('https://ropsten-api.zksync.io/api/v0.2', pollIntervalMilliSecs);
     } else if (network === 'rinkeby') {
@@ -61,7 +61,7 @@ export class RestProvider extends SyncProvider {
     }
 
     static async newProvider(
-        address: string = 'http://127.0.0.1:3001/api/v0.2',
+        address: string = 'https://127.0.0.1:3001/api/v0.2',
         pollIntervalMilliSecs?: number
     ): Promise<RestProvider> {
         const provider = new RestProvider(address);

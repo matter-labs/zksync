@@ -1,0 +1,33 @@
+# Addresses of the deployed zkSync contracts.
+# Values of this file are updated automatically by the contract deploy script.
+
+[contracts]
+UPGRADE_GATEKEEPER_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
+GOVERNANCE_TARGET_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
+VERIFIER_TARGET_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
+CONTRACT_TARGET_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
+CONTRACT_ADDR="0x70a0F165d6f8054d0d0CF8dFd4DD2005f0AF6B55"
+GOVERNANCE_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
+VERIFIER_ADDR="0xDAbb67b676F5b01FcC8997Cc8439846D0d8078ca"
+FORCED_EXIT_ADDR="0x9c7AeE886D6FcFc14e37784f143a6dAccEf50Db7"
+DEPLOY_FACTORY_ADDR="0xFC073319977e314F251EAE6ae6bE76B0B3BAeeCF"
+GENESIS_TX_HASH="0xb99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e"
+GENESIS_ROOT="0x2d5ab622df708ab44944bb02377be85b6f27812e9ae520734873b7a193898ba4"
+LISTING_GOVERNANCE="0xaFe6A91979021206ad79F58562Eef4204720E2A3"
+NFT_FACTORY_ADDR=""
+ADDITIONAL_ZKSYNC_ADDR="0x7fbaD9d9C9a1204F45FA38CcbF732B0930F8B582"
+# The initial version of the deployed zkSync contract.
+# Data restore uses this variable for tracking contract updates and
+# setting correct available block chunk sizes.
+init_contract_version=6
+
+# Ethereum blocks that include UpgradeComplete events emitted by
+# the upgrade gatekeeper contract. We have to provide them from
+# config since obtaining them from Web3 node is not reliable.
+# (e.g. hot-fix upgrades, multiple contract version upgrades in
+# a single deploy etc. are not taken into account)
+upgrade_eth_blocks=[]
+
+[contracts.test]
+dummy_verifier=false
+easy_exodus=false

@@ -16,7 +16,7 @@ account_tree_depth=32
 balance_tree_depth=32
 
 [chain.eth]
-# Name of the used RSK network (since Ethers uses localhost for different works as Ethereum, different RSK networks are differentiated by its chain id in eth_client.toml)
+# Name of the used Ethereum network
 network="localhost"
 
 [chain.state_keeper]

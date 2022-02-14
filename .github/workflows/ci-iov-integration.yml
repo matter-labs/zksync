@@ -1,0 +1,67 @@
+name: ri-aggregation CI Integration
+on:
+  push:
+    branches:
+    - rsk_merge_master_Dec2021
+    #- rsk_port_initial
+  
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: rsk_merge_master_Dec2021
+
+      - name: modify rsk node conf and install mkcert
+        run: |
+          sed -i '/autoMine/ s/true/false/' docker/rskj/node.conf
+          wget https://github.com/FiloSottile/mkcert/releases/download/v1.4.3/mkcert-v1.4.3-linux-amd64
+          chmod +x ./mkcert*
+          cp ./mkcert* bin/mkcert
+
+      - name: start-services (rskj, postgres, zk)
+        run: |
+          docker-compose -f docker-compose-runner.yml down
+          docker-compose -f docker-compose-runner.yml pull
+          docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk 
+          ci_run sccache --start-server &
+
+              
+      - name: setup-env (path)
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
+      - name: generate SSL certificates
+        run: |
+          ci_run mkcert -CAROOT
+          ci_run mkcert --install
+          ci_run mkcert 127.0.0.1 localhost
+          ci_run mv 127.0.0.1+1-key.pem key.pem
+          ci_run mv 127.0.0.1+1.pem cert.pem
+
+      - name: run zk init
+        run: |
+          sed -i '/plonkSetup/d' infrastructure/zk/src/init.ts
+          ci_run zk
+          ci_run zk init
+
+      - name: restart dev-liquidity-token-watcher and dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
+
+
+      - name: run integration tests
+        run: |
+          ci_run zk dummy-prover enable
+          ci_run sleep 500
+          ci_run zk server &>/dev/null &
+          ci_run zk dummy-prover run &>/dev/null &
+          ci_run sleep 200
+          ci_run zk test i server
+          ci_run zk test i zcli
+          ci_run zk test i api
+          ci_run zk test i api-docs
+          ci_run zk test i withdrawal-helpers
+          ci_run zk test i rust-sdk
+

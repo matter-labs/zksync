@@ -6,7 +6,7 @@ import { ALL_NETWORKS, Network, Config, AccountInfo, TxInfo, TxDetails } from '.
 
 export function apiServer(network: Network) {
     const servers = {
-        localhost: 'http://localhost:3001',
+        localhost: 'https://localhost:3001',
         ropsten: 'https://ropsten-api.zksync.io',
         rinkeby: 'https://rinkeby-api.zksync.io',
         mainnet: 'https://api.zksync.io'

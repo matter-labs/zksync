@@ -29,4 +29,4 @@ hooks-worker-handler-host: 127.0.0.1
 hooks-worker-handler-port: 61321
 config: ./dredd.yml
 blueprint: ./blueprint/test.apib
-endpoint: 'http://127.0.0.1:3001/api/v0.2'
+endpoint: 'https://127.0.0.1:3001/api/v0.2'

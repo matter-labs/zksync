@@ -1,7 +1,7 @@
 [eth_client]
-chain_id=33
+chain_id=30
 # Coefficient for increasing the network gas price. Normally it's 1, we use the network-provided price (and limit it
 # with the gas adjuster in eth sender). However, it can be increased to speed up the transaction mining time.
 gas_price_factor=1
-# Addresses of the RSK node API, separated by comma. Consider change the web3_url to a particular IP pointing to an RSK full node.
-web3_url="http://127.0.0.1:4444"
+# Addresses of the Ethereum node API, separated by comma. Consider change the web3_url to a particular IP pointing to an RSK full node.
+web3_url="https://public-node.rsk.co"

@@ -1,0 +1,26 @@
+# Options related to the block proving routine.
+
+# Prover application settings
+[prover.prover]
+# Interval of notifying about an ongoing job.
+heartbeat_interval=1000 # Milliseconds
+# Interval between the prover rounds.
+cycle_wait=500 # Milliseconds
+# Timeout for the requests to the prover server.
+request_timeout=10 # Seconds
+# Flag for dying after proving cycle
+die_after_proof=false
+
+# Core applications settings
+[prover.core]
+# Timeout to consider prover gone.
+gone_timeout=60000 # Milliseconds
+# Amount of provers in the cluser if there is no pending jobs.
+idle_provers=1
+
+# Witness generator application settings
+[prover.witness_generator]
+# Interval to check whether a new witness generation job should be started.
+prepare_data_interval=500 # Milliseconds
+# Amount of witness generator threads.
+witness_generators=2

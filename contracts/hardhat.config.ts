@@ -99,7 +99,7 @@ export default {
     networks: {
         env: {
             url: process.env.ETH_CLIENT_WEB3_URL?.split(',')[0],
-            chainId: 33
+            chainId: parseInt(process.env.ETH_CLIENT_CHAIN_ID)
         },
         hardhat: {
             allowUnlimitedContractSize: true
