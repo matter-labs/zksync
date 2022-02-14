@@ -23,13 +23,13 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     needs: [zksync]
-    if: always() && !cancelled()
+    if: always() && (needs.zksync.result == 'failure' || needs.zksync.result == 'success')
     steps:
       -
         name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         with:
-          type: ${{ (job.zksync.result == 'success') && 'success' || 'failure' }}
+          type: ${{ job.zksync.result }}
           job_name: '*Publishing `${{ needs.zksync.outputs.package-name }}@${{ needs.zksync.outputs.package-version }}` ${{ needs.zksync.outputs.status }}*'
           icon_emoji: octocat
           channel: 'ci-notifications'

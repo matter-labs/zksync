@@ -26,10 +26,6 @@ on:
         description: Deployment for this pipeline
         type: string
         required: true
-      config-ref:
-        description: Specifies config reposiotry ref to
-        type: string
-        required: false
       scaleup:
         description: Force scaling the server deployment up to 1 replica
         type: boolean
