@@ -27,7 +27,7 @@ on:
         type: string
         required: true
       config-ref:
-        description: Specifies config reposiotry ref to 
+        description: Specifies config reposiotry ref to
         type: string
         required: false
       scaleup:
