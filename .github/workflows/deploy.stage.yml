@@ -5,7 +5,7 @@ on:
       - dev
       - breaking
       - hotfix/*
-      - devops/refactor-workflow-call
+      # - devops/refactor-workflow-call
     tags:
       - hotfix-*
 

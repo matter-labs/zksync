@@ -1,0 +1,42 @@
+name: Deploy from Chat
+on:
+  deployment:
+
+# Disable simultaneous deployments into a single environment
+concurrency: deploy-chat-${{ github.event.inputs.environment }}
+
+jobs:
+  setup:
+    name: Setup
+    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@devops/refactor-workflow-call
+    with:
+      find-latest-config: true
+      environment: ${{ github.event.inputs.environment }}
+    secrets:
+      github-token: ${{ secrets.GH_TOKEN }}
+
+  update:
+    name: Update
+    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@devops/refactor-workflow-call
+    needs: [setup]
+    with:
+      ref: ${{ needs.setup.outputs.config-tag }}
+      cluster: ${{ needs.setup.outputs.cluster }}
+      environment: ${{ needs.setup.outputs.environment }}
+      namespace: ${{ needs.setup.outputs.release-namespace }}
+    secrets:
+      github-token: ${{ secrets.GH_TOKEN }}
+
+  deploy:
+    name: Deploy
+    uses: matter-labs/zksync-dev/.github/workflows/deploy.yml@devops/refactor-workflow-call
+    needs: [setup, update]
+    with:
+      cluster: ${{ needs.setup.outputs.cluster }}
+      environment: ${{ needs.setup.outputs.environment }}
+      release-environment: ${{ needs.setup.outputs.release-environment }}
+      release-namespace: ${{ needs.setup.outputs.release-namespace }}
+      deployment-id: ${{ needs.setup.outputs.deployment-id }}
+      image-tag: ${{ needs.setup.outputs.sha-short }}
+    secrets:
+      github-token: ${{ secrets.GH_TOKEN }}

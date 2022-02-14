@@ -11,6 +11,15 @@ on:
         type: boolean
         required: false
         default: false
+      find-latest-config:
+        description: Find the latest config tag (-rN) for the given version
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      github-token:
+        description: GitHub token
+        required: false
     outputs:
       environment:
         description: Zksync Environment
@@ -30,6 +39,9 @@ on:
       deployment-id:
         description: GitHub Deployment ID, a non-empty value when setup handles the deployment creation
         value: ${{ jobs.setup.outputs.deployment-id }}
+      config-tag:
+        description: Latest config tag for the given release (accounts -rN suffix)
+        value: ${{ jobs.setup.outputs.config-tag }}
 
 defaults:
   run:
@@ -48,6 +60,7 @@ jobs:
       cluster: ${{ steps.envMap.outputs.cluster }}
       sha-short: ${{ steps.sha.outputs.short }}
       deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+      config-tag: ${{ steps.latest-config.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v2
@@ -81,3 +94,20 @@ jobs:
         with:
           token: ${{ github.token }}
           environment: ${{ inputs.environment }}
+      -
+        name: Match the tag vX.Y.Z-rN pattern
+        uses: actions-ecosystem/action-regex-match@v2
+        id: regex
+        with:
+          text: ${{ github.ref }}
+          regex: '^(v\d+\.\d+\.\d+)(-r\d+)?$'
+      -
+        name: Find the latest config "-rN" tag
+        uses: dysnix/find-latest-tag@v2
+        if: inputs.find-latest-config && steps.regex.outputs.match != ''
+        id: latest-config
+        with:
+          prefix: ${{ steps.regex.outputs.group1 }}
+          regex: ^${{ steps.regex.outputs.group1 }}(-r\d+)?$
+          token: ${{ secrets.github-token }}
+          repository: matter-labs/configs
