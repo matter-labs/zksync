@@ -9,47 +9,72 @@ on:
     tags:
       - hotfix-*
 
+# Disable simultaneous deployments into stage
+concurrency: deploy-stage
+
 jobs:
   images:
     name: Build Docker Images
     runs-on: [self-hosted, MAIN]
-
-    outputs:
-      image-tag: ${{ steps.sha.outputs.short }}
-
     steps:
     - uses: actions/checkout@v2
-    - id: sha
-      run: echo "::set-output name=short::$(git rev-parse --short HEAD)"
-    # - name: setup-env
-    #   run: |
-    #     echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-    #     echo CI=1 >> $GITHUB_ENV
-    #     echo $(pwd)/bin >> $GITHUB_PATH
+    -
+      name: setup-env
+      run: |
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
+    -
+      name: init
+      run: |
+        cargo sqlx --version || cargo install sqlx-cli
+        zk
+        zk run yarn
+        cp etc/tokens/{test,localhost}.json
+        zk run verify-keys unpack
+        zk up
+        zk db basic-setup
+    -
+      name: update-images
+      run: |
+        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        echo zk docker push rust
+    -
+      name: docker-down
+      if: always()
+      run: |
+        docker-compose down
 
-    # - name: init
-    #   run: |
-    #     cargo sqlx --version || cargo install sqlx-cli
-    #     zk
-    #     zk run yarn
-    #     cp etc/tokens/{test,localhost}.json
-    #     zk run verify-keys unpack
-    #     zk up
-    #     zk db basic-setup
-
-    # - name: update-images
-    #   run: |
-    #     docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
-    #     zk docker push rust
-
-    # - name: docker-down
-    #   if: always()
-    #   run: |
-    #     docker-compose down
-  test:
-    name: Result
-    runs-on: [self-hosted, stage]
+  setup:
+    name: Setup
+    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@devops/refactor-workflow-call
     needs: [images]
-    steps:
-      - run: |
-          echo ${{ needs.images.outputs.image-tag }}
+    with:
+      environment: stage
+      create-deployment: true
+
+  update:
+    name: Update
+    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@devops/refactor-workflow-call
+    needs: [setup]
+    with:
+      ref: master
+      cluster: ${{ needs.setup.outputs.cluster }}
+      environment: ${{ needs.setup.outputs.environment }}
+      namespace: ${{ needs.setup.outputs.release-namespace }}
+    secrets:
+      github-token: ${{ secrets.GH_TOKEN }}
+
+  deploy:
+    name: Deploy
+    uses: matter-labs/zksync-dev/.github/workflows/deploy.yml@devops/refactor-workflow-call
+    needs: [setup, update]
+    with:
+      cluster: ${{ needs.setup.outputs.cluster }}
+      environment: ${{ needs.setup.outputs.environment }}
+      release-environment: ${{ needs.setup.outputs.release-environment }}
+      release-namespace: ${{ needs.setup.outputs.release-namespace }}
+      deployment-id: ${{ needs.setup.outputs.deployment-id }}
+      image-tag: ${{ needs.setup.outputs.sha-short }}
+    secrets:
+      github-token: ${{ secrets.GH_TOKEN }}

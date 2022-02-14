@@ -6,7 +6,15 @@ on:
         description: Zksync Environment (mainnet, stage, rinkeby etc)
         type: string
         required: true
+      create-deployment:
+        description: Create GitHub deployment for the given environment
+        type: boolean
+        required: false
+        default: false
     outputs:
+      environment:
+        description: Zksync Environment
+        value: ${{ inputs.environment }}
       release-environment:
         description: Helmfile release environment
         value: ${{ jobs.setup.outputs.hfEnv }}
@@ -16,6 +24,12 @@ on:
       cluster:
         description: Runtime cluster label, i.e. self-hosted runner label (mainnet, testnet or stage)
         value: ${{ jobs.setup.outputs.cluster }}
+      sha-short:
+        description: Short SHA used for image tagging
+        value: ${{ jobs.setup.outputs.sha-short }}
+      deployment-id:
+        description: GitHub Deployment ID, a non-empty value when setup handles the deployment creation
+        value: ${{ jobs.setup.outputs.deployment-id }}
 
 defaults:
   run:
@@ -27,11 +41,13 @@ concurrency: setup-env-${{ inputs.environment }}
 jobs:
   setup:
     name: Runtime
-    runs-on: [k8s, stage]
+    runs-on: [self-hosted, stage]
     outputs:
       hfEnv: ${{ steps.envMap.outputs.hfEnv }}
       namespace: ${{ steps.envMap.outputs.namespace }}
       cluster: ${{ steps.envMap.outputs.cluster }}
+      sha-short: ${{ steps.sha.outputs.short }}
+      deployment-id: ${{ steps.deployment.outputs.deployment_id }}
 
     steps:
       - uses: actions/checkout@v2
@@ -54,3 +70,14 @@ jobs:
               "^ropsten$": { "cluster": "testnet" },
               "^mainnet$": { "cluster": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
             }
+      -
+        run: echo "::set-output name=short::$(git rev-parse --short HEAD)"
+        id: sha
+      -
+        name: Create GitHub Deployment
+        uses: chrnorm/deployment-action@releases/v1
+        id: deployment
+        if: inputs.create-deployment
+        with:
+          token: ${{ github.token }}
+          environment: ${{ inputs.environment }}
