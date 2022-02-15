@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Zksync Environment (mainnet, stage, rinkeby etc)
+        description: zkSync Environment (mainnet, stage, rinkeby etc)
         required: true
       ref:
         description: Branch/tag to fetch configs from

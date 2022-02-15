@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: Zksync Environment (mainnet, stage, rinkeby etc)
+        description: zkSync Environment (mainnet, stage, rinkeby etc)
         type: string
         required: true
       create-deployment:
@@ -22,7 +22,7 @@ on:
         required: false
     outputs:
       environment:
-        description: Zksync Environment
+        description: zkSync Environment
         value: ${{ inputs.environment }}
       release-environment:
         description: Helmfile release environment
