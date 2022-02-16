@@ -72,4 +72,6 @@ jobs:
           ./bin/config compile ${{ inputs.environment }}
           kubectl delete configmap -n ${{ inputs.namespace }} server-env-custom || /bin/true
           kubectl create configmap -n ${{ inputs.namespace }} server-env-custom --from-env-file=${{ env.ENVFILE }}
+
+          ## JFI: Decide if we need to restart server/prover and might be others. Should this be a parameter?
           # kubectl delete pod -n ${{ inputs.namespace }} -l app.kubernetes.io/instance=server
