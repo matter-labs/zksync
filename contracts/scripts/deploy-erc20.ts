@@ -59,7 +59,7 @@ async function main() {
 
     program
         .command('add')
-        .option('-n, --token-name <token_name>')
+        .option('-n, --token_name <token_name>')
         .option('-s, --symbol <symbol>')
         .option('-d, --decimals <decimals>')
         .option('-i --implementation <implementation>')
