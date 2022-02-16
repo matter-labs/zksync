@@ -14,7 +14,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
 
     uint8 constant SERIAL_ID_FOOTPRINT_OFFSET = CREATOR_ID_FOOTPRINT_OFFSET + CREATOR_ID_SIZE_BITS;
     uint8 constant SERIAL_ID_SIZE_BITS = 32;
-    bytes constant sha256MultiHash = hex"1220";
+    bytes constant SHA256_MULTI_HASH = hex"1220";
     bytes constant ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
     /// @notice Packs address and token ID into single word to use as a key in balances mapping
@@ -154,7 +154,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
     }
 
     function ipfsCID(bytes32 source) public pure returns (string memory) {
-        return toBase58(abi.encodePacked(sha256MultiHash, source));
+        return toBase58(abi.encodePacked(SHA256_MULTI_HASH, source));
     }
 
     function reverse(uint8[] memory input) internal pure returns (uint8[] memory) {

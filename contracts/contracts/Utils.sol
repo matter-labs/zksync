@@ -25,6 +25,7 @@ library Utils {
     /// @param _signature 65 bytes concatenated. R (32) + S (32) + V (1)
     /// @param _messageHash signed message hash.
     /// @return address of the signer
+    /// NOTE: will revert if signature is invalid
     function recoverAddressFromEthSignature(bytes memory _signature, bytes32 _messageHash)
         internal
         pure
@@ -41,7 +42,10 @@ library Utils {
             signV := byte(0, mload(add(_signature, 96)))
         }
 
-        return ecrecover(_messageHash, signV, signR, signS);
+        address recoveredAddress = ecrecover(_messageHash, signV, signR, signS);
+        require(recoveredAddress != address(0), "p4"); // invalid signature
+
+        return recoveredAddress;
     }
 
     /// @notice Returns new_hash = hash(old_hash + bytes)

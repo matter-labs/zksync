@@ -190,7 +190,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         _token.transfer(_to, _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint256 balanceDiff = balanceBefore.sub(balanceAfter);
-        require(balanceDiff > 0, "c1"); // transfer is considered successful only if the balance of the contract increased after transfer
+        require(balanceDiff > 0, "c1"); // transfer is considered successful only if the balance of the contract decreased after transfer
         require(balanceDiff <= _maxAmount, "7"); // rollup balance difference (before and after transfer) is bigger than `_maxAmount`
 
         // It is safe to convert `balanceDiff` to `uint128` without additional checks, because `balanceDiff <= _maxAmount`
@@ -212,11 +212,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
         require(msg.value > 0, "M"); // Zero-value deposits are forbidden by zkSync rollup logic
         requireActive();
-        // It is safe to convert `msg.value` to `uint128` without additional checks:
-        // - 1 Ether is 10^18 Wei
-        // - Total supply of Ether is 118,019,446 (as of December 27, 2021)
-        // - 2^128 > 10^38 > (Total supply of Ether) * 10^18
-        registerDeposit(0, uint128(msg.value), _zkSyncAddress);
+        registerDeposit(0, SafeCast.toUint128(msg.value), _zkSyncAddress);
     }
 
     /// @notice Deposit ERC20 token to Layer 2 - transfer ERC20 tokens from user into contract, validate it, register deposit
@@ -276,9 +272,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint128 amount = Utils.minU128(balance, _amount);
         require(amount > 0, "f1"); // Nothing to withdraw
 
-        // Update the value before the external call to reduce the attack surface for malicious contracts trying to hijack control flow.
-        pendingBalances[packedBalanceKey].balanceToWithdraw = balance - amount;
-
         if (tokenId == 0) {
             (bool success, ) = _owner.call{value: amount}("");
             require(success, "d"); // ETH withdraw failed
@@ -286,13 +279,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             // We will allow withdrawals of `value` such that:
             // `value` <= user pending balance
             // `value` can be bigger then `amount` requested if token takes fee from sender in addition to `amount` requested
-            uint128 withdrawnAmount = this.transferERC20(IERC20(_token), _owner, amount, balance);
-
-            if (withdrawnAmount != amount) {
-                // `transferERC20` include check that `withdrawnAmount <= balance` so it's safe.
-                pendingBalances[packedBalanceKey].balanceToWithdraw = balance - withdrawnAmount;
-            }
+            amount = this.transferERC20(IERC20(_token), _owner, amount, balance);
         }
+
+        pendingBalances[packedBalanceKey].balanceToWithdraw = balance - amount;
         emit Withdrawal(tokenId, amount);
     }
 
@@ -378,7 +368,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev Process one block commit using previous block StoredBlockInfo,
     /// @dev returns new block StoredBlockInfo
-    /// @dev NOTE: does not change storage (only emit events)!
     function commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo memory _newBlock)
         internal
         view
@@ -488,7 +477,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         if (sent) {
             emit Withdrawal(_tokenId, _amount);
         } else {
-            storePendingBalance(_tokenId, _recipient, _amount);
+            increasePendingBalance(_tokenId, _recipient, _amount);
         }
     }
 
@@ -498,8 +487,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         emit WithdrawalNFTPending(op.tokenId);
     }
 
-    /// @dev Increment `_recipient` balance to withdraw
-    function storePendingBalance(
+    /// @dev Increase `_recipient` balance to withdraw
+    function increasePendingBalance(
         uint16 _tokenId,
         address _recipient,
         uint128 _amount
@@ -519,7 +508,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         if (_completeWithdrawals) {
             withdrawOrStore(_tokenId, _addr, _amount);
         } else {
-            storePendingBalance(_tokenId, _addr, _amount);
+            increasePendingBalance(_tokenId, _addr, _amount);
         }
     }
 
@@ -654,7 +643,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
     function activateExodusMode() external returns (bool) {
-        requireActive();
+        if (exodusMode) {
+            return false;
+        }
+
         // #if EASY_EXODUS
         bool trigger = true;
         // #else
@@ -846,7 +838,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             )
         );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
-        return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
+        return recoveredAddress == _changePk.owner;
     }
 
     /// @notice Checks that signature is valid for pubkey change message
@@ -870,7 +862,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             )
         );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
-        return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
+        return recoveredAddress == _changePk.owner;
     }
 
     /// @notice Checks that signature is valid for pubkey change message, old version differs by form of the signed message.
@@ -898,7 +890,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             )
         );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
-        return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
+        return recoveredAddress == _changePk.owner;
     }
 
     /// @notice Checks that signature is valid for pubkey change message

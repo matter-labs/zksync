@@ -192,7 +192,7 @@ contract Governance is Config {
         bytes32 messageHash = keccak256(packRegisterNFTFactoryMsg(_creatorAccountId, _creatorAddress, msg.sender));
 
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
-        require(recoveredAddress == _creatorAddress && recoveredAddress != address(0), "ws");
+        require(recoveredAddress == _creatorAddress, "ws");
         nftFactories[_creatorAccountId][_creatorAddress] = NFTFactory(msg.sender);
         emit NFTFactoryRegisteredCreator(_creatorAccountId, _creatorAddress, msg.sender);
     }

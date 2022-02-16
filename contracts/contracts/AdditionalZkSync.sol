@@ -122,15 +122,18 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             $(SECURITY_COUNCIL_MEMBERS)
         ];
         for (uint256 id = 0; id < SECURITY_COUNCIL_MEMBERS_NUMBER; ++id) {
-            if (SECURITY_COUNCIL_MEMBERS[id] == addr && !securityCouncilApproves[id]) {
-                securityCouncilApproves[id] = true;
-                numberOfApprovalsFromSecurityCouncil += 1;
-                emit ApproveCutUpgradeNoticePeriod(addr);
+            if (SECURITY_COUNCIL_MEMBERS[id] == addr) {
+                // approve cut upgrade notice period if needed
+                if (!securityCouncilApproves[id]) {
+                    securityCouncilApproves[id] = true;
+                    numberOfApprovalsFromSecurityCouncil += 1;
+                    emit ApproveCutUpgradeNoticePeriod(addr);
 
-                if (numberOfApprovalsFromSecurityCouncil >= SECURITY_COUNCIL_THRESHOLD) {
-                    if (approvedUpgradeNoticePeriod > 0) {
-                        approvedUpgradeNoticePeriod = 0;
-                        emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                    if (numberOfApprovalsFromSecurityCouncil >= SECURITY_COUNCIL_THRESHOLD) {
+                        if (approvedUpgradeNoticePeriod > 0) {
+                            approvedUpgradeNoticePeriod = 0;
+                            emit NoticePeriodChange(approvedUpgradeNoticePeriod);
+                        }
                     }
                 }
 
@@ -166,7 +169,6 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
         for (uint256 i = 0; i < signatures.length; ++i) {
             address recoveredAddress = Utils.recoverAddressFromEthSignature(signatures[i], messageHash);
-            require(recoveredAddress != address(0x00), "p4"); // invalid signature
             approveCutUpgradeNoticePeriod(recoveredAddress);
         }
     }
@@ -176,10 +178,17 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     function getUpgradeTargetsHash() internal returns (bytes32) {
         // Get the addresses of contracts that are being prepared for the upgrade.
         address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
-        (, bytes memory newTarget0) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 0));
-        (, bytes memory newTarget1) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 1));
-        (, bytes memory newTarget2) = gatekeeper.staticcall(abi.encodeWithSignature("nextTargets(uint256)", 2));
+        (bool success0, bytes memory newTarget0) = gatekeeper.staticcall(
+            abi.encodeWithSignature("nextTargets(uint256)", 0)
+        );
+        (bool success1, bytes memory newTarget1) = gatekeeper.staticcall(
+            abi.encodeWithSignature("nextTargets(uint256)", 1)
+        );
+        (bool success2, bytes memory newTarget2) = gatekeeper.staticcall(
+            abi.encodeWithSignature("nextTargets(uint256)", 2)
+        );
 
+        require(success0 && success1 && success2, "p5"); // failed to get new targets
         address newTargetAddress0 = abi.decode(newTarget0, (address));
         address newTargetAddress1 = abi.decode(newTarget1, (address));
         address newTargetAddress2 = abi.decode(newTarget2, (address));
