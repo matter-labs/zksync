@@ -1,4 +1,4 @@
-import { BigNumberish, ethers } from 'ethers';
+import { BigNumber, BigNumberish, ethers } from 'ethers';
 import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
 import { BatchBuilderInternalTx } from './batch-builder';
@@ -60,21 +60,6 @@ export class RemoteWallet extends AbstractWallet {
         );
         wallet.connect(provider);
         await wallet.verifyNetworks();
-
-        // Before creating the account, we should check that the private key is indeed managed remotely.
-        try {
-            wallet.syncSignerPubKeyHash();
-        } catch (e) {
-            // TODO: Catching general error is a bad idea, as a lot of things can throw an exception.
-            // Generally we should catch a concrete error stating that such a method is not supported, and throw an
-            // exception only in that case. And, probably, have a retry mechanism, so we don't create the wallet if it
-            // was just a WalletConnect glitch.
-            throw new Error(
-                "There was an attempt to create a wallet that manages user keys remotely, \
-                but the server doesn't seem to have required capabilities"
-            );
-        }
-
         return wallet;
     }
 
@@ -96,7 +81,9 @@ export class RemoteWallet extends AbstractWallet {
     }
 
     override async syncSignerPubKeyHash(): Promise<PubKeyHash> {
-        return await this.callExtSignerPubKeyHash();
+        let pubKeyHash = await this.callExtSignerPubKeyHash();
+        pubKeyHash = pubKeyHash.replace('0x', 'sync:');
+        return pubKeyHash;
     }
 
     // *********************
@@ -112,7 +99,7 @@ export class RemoteWallet extends AbstractWallet {
         const txsToSign = txs.map((tx) => {
             tx.tx.nonce = nonce;
             nonce += 1;
-            return tx.tx;
+            return { type: tx.type, ...tx.tx };
         });
         const signedTransactions = await this.callExtSignZkSyncBatch(txsToSign);
         // Each transaction will have its own Ethereum signature, if it's required.
@@ -133,7 +120,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([transfer]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'Transfer', ...transfer }]);
         return signed[0];
     }
 
@@ -161,7 +148,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([changePubKey]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'ChangePubKey', ...changePubKey }]);
         return signed[0];
     }
 
@@ -188,7 +175,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([withdraw]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'Withdraw', ...withdraw }]);
         return signed[0];
     }
 
@@ -217,7 +204,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([forcedExit]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'ForcedExit', ...forcedExit }]);
         return signed[0];
     }
 
@@ -245,7 +232,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<Order> {
-        return await this.callExtSignOrder(order);
+        return await this.callExtSignOrder({ type: 'Order', ...order });
     }
 
     override async signSyncSwap(swap: {
@@ -255,7 +242,7 @@ export class RemoteWallet extends AbstractWallet {
         nonce: number;
         fee: BigNumberish;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([swap]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'Swap', ...swap }]);
         return signed[0];
     }
 
@@ -279,7 +266,7 @@ export class RemoteWallet extends AbstractWallet {
         fee: BigNumberish;
         nonce: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([mintNFT]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'MintNFT', ...mintNFT }]);
         return signed[0];
     }
 
@@ -305,7 +292,7 @@ export class RemoteWallet extends AbstractWallet {
         validFrom?: number;
         validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signed = await this.callExtSignZkSyncBatch([withdrawNFT]);
+        const signed = await this.callExtSignZkSyncBatch([{ type: 'WithdrawNFT', ...withdrawNFT }]);
         return signed[0];
     }
 
@@ -369,7 +356,7 @@ export class RemoteWallet extends AbstractWallet {
     // Note: this method signature requires to specify fee in each transaction.
     // For details, see the comment on this method in `AbstractWallet` class.
     override async syncMultiTransfer(
-        transfers: {
+        _transfers: {
             to: Address;
             token: TokenLike;
             amount: BigNumberish;
@@ -379,6 +366,12 @@ export class RemoteWallet extends AbstractWallet {
             validUntil?: number;
         }[]
     ): Promise<Transaction[]> {
+        const transfers = _transfers.map((transfer) => {
+            return {
+                type: 'Transfer',
+                ...transfer
+            };
+        });
         const signed = await this.callExtSignZkSyncBatch(transfers);
         return submitSignedTransactionsBatch(this.provider, signed);
     }
@@ -386,6 +379,41 @@ export class RemoteWallet extends AbstractWallet {
     // ****************
     // Internal methods
     //
+
+    /**
+     *
+     * Makes all fields that represent amount to be of `string` type
+     * and all fields that represent tokens to be token ids i.e. of `number` type.
+     * Also, it renames `ethAddress` parameter to `to` for withdrawals.
+     *
+     * @param txs A list of transactions
+     *
+     * @returns A list of prepared transactions
+     */
+    protected prepareTxsBeforeSending(txs: any[]): any[] {
+        const amountFields = ['amount', 'fee'];
+        const tokenFields = ['token', 'feeToken', 'tokenSell', 'tokenBuy'];
+        return txs.map((tx) => {
+            for (const field of amountFields) {
+                if (field in tx) {
+                    tx[field] = BigNumber.from(tx[field]).toString();
+                }
+            }
+            for (const field of tokenFields) {
+                if (field in tx) {
+                    tx[field] = this.provider.tokenSet.resolveTokenId(tx[field]);
+                }
+            }
+            if ('amounts' in tx) {
+                tx.amounts = [BigNumber.from(tx.amounts[0]).toString(), BigNumber.from(tx.amounts[1]).toString()];
+            }
+            if ('ethAddress' in tx) {
+                tx.to = tx.ethAddress;
+                delete tx.ethAddress;
+            }
+            return tx;
+        });
+    }
 
     /**
      * Performs an RPC call to the custom `zkSync_signBatch` method.
@@ -401,10 +429,11 @@ export class RemoteWallet extends AbstractWallet {
      */
     protected async callExtSignZkSyncBatch(txs: any[]): Promise<SignedTransaction[]> {
         try {
+            const preparedTxs = this.prepareTxsBeforeSending(txs);
             // Response must be an array of signed transactions.
             // Transactions are flattened (ethereum signatures are on the same level as L2 signatures),
             // so we need to "unflat" each one.
-            const response: any[] = await this.web3Provider.send('zkSync_signBatch', [txs]);
+            const response: any[] = await this.web3Provider.send('zkSync_signBatch', [preparedTxs]);
 
             const transactions = response.map((tx) => {
                 const ethereumSignature = tx['ethereumSignature'];
@@ -424,7 +453,7 @@ export class RemoteWallet extends AbstractWallet {
     }
 
     /**
-     * Performs an RPC call to the custom `zkSync_signOrder` method.
+     * Performs an RPC call to the custom `zkSync_signBatch` method.
      *
      * @param txs An order data to be signed.
      *
@@ -432,8 +461,9 @@ export class RemoteWallet extends AbstractWallet {
      */
     protected async callExtSignOrder(order: any): Promise<Order> {
         try {
+            const preparedOrder = this.prepareTxsBeforeSending([order]);
             // For now, we assume that the same method will be used for both signing transactions and orders.
-            const signedOrder: any = await this.web3Provider.send('zkSync_signBatch', [order]);
+            const signedOrder: any = (await this.web3Provider.send('zkSync_signBatch', [preparedOrder]))[0];
 
             // Sanity check
             if (!signedOrder['signature']) {

@@ -139,7 +139,7 @@ export class Wallet extends AbstractWallet {
     }
 
     override syncSignerConnected(): boolean {
-        return this.signer !== null;
+        return this.signer != null;
     }
 
     override async syncSignerPubKeyHash(): Promise<PubKeyHash> {

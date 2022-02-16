@@ -10,7 +10,7 @@ on:
 jobs:
   publish-zksync:
     name: Publish zksync.js
-    uses: matter-labs/zksync-dev/.github/workflows/npm.publish.yml@devops/publish-npm-zksync
+    uses: matter-labs/zksync-dev/.github/workflows/npm.publish.yml@dev
     with:
       working-directory: sdk/zksync.js
       build-command: |
@@ -19,3 +19,4 @@ jobs:
       ref: ${{ github.event.inputs.ref }}
     secrets:
       notify-webhook: ${{ secrets.MATTERMOST_WEBHOOK }}
+      token: ${{ secrets.NPM_TOKEN }}
