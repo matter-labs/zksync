@@ -35,30 +35,29 @@ jobs:
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
 
+    - name: start-services
+      run: |
+        docker-compose -f docker-compose-runner.yml down
+        docker-compose -f docker-compose-runner.yml up --build -d zk
+
     - name: init
       run: |
-        curl https://sh.rustup.rs -sSf -o install.sh
-        chmod +x install.sh
-        ./install.sh -y
-        source $HOME/.cargo/env
-        apt-get install -y pkg-config
-        cargo sqlx --version || cargo install sqlx-cli
-        zk
-        zk run yarn
+        ci_run zk
+        ci_run zk run yarn
         cp etc/tokens/{test,localhost}.json
-        zk run verify-keys unpack
-        zk up
-        zk db basic-setup
+        ci_run zk run verify-keys unpack
+        ci_run zk up
+        ci_run zk db basic-setup
 
     - name: update-images
       run: |
-        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
-        zk docker push rust
+        ci_run docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        ci_run zk docker push rust
 
     - name: docker-down
       if: always()
       run: |
-        docker-compose down
+        docker-compose -f docker-compose-runner.yml down
 
   # Reminder: when disabling the deploy stage - comment the whole job out!
   # deploy:
