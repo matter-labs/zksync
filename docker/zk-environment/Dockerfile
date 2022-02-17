@@ -3,7 +3,7 @@ FROM debian:bullseye
 WORKDIR /usr/src/zksync
 
 # Install required dependencies
-RUN apt-get update; apt-get install -y make bash git openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq
+RUN apt-get update; apt-get install -y make bash git gnupg openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq
 
 #install docker engine
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
