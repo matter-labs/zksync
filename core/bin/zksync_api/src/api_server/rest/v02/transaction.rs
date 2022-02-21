@@ -42,6 +42,8 @@ impl ApiTransactionData {
             .access_storage()
             .await
             .map_err(Error::storage)?;
+
+        // 1. Try to find the already received/executed operation.
         if let Some(receipt) = storage
             .chain()
             .operations_ext_schema()
@@ -50,7 +52,9 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(receipt))
-        } else if let Some(op) = storage
+        }
+        // 2. Try to find the pending operation.
+        else if let Some(op) = storage
             .chain()
             .mempool_schema()
             .get_pending_operation_by_hash(tx_hash.into())
@@ -63,7 +67,9 @@ impl ApiTransactionData {
                 rollup_block: None,
                 id: op.serial_id,
             })))
-        } else {
+        }
+        // 3. No operation found, return nothing.
+        else {
             Ok(None)
         }
     }
