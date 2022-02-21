@@ -1,3 +1,4 @@
+use crate::H256;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryInto, str::FromStr};
@@ -8,6 +9,12 @@ use thiserror::Error;
 #[derive(Debug, Copy, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct TxHash {
     pub(crate) data: [u8; 32],
+}
+
+impl From<TxHash> for H256 {
+    fn from(tx: TxHash) -> Self {
+        H256::from_slice(&tx.data)
+    }
 }
 
 impl TxHash {

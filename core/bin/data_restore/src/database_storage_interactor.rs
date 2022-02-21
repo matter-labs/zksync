@@ -438,5 +438,6 @@ impl<'a> DatabaseStorageInteractor<'a> {
             .get_max_priority_op_serial_id()
             .await
             .expect("Failed to retrieve maximum priority op serial id")
+            .unwrap_or(0)
     }
 }

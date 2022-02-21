@@ -21,6 +21,7 @@ mod aggregated_committer;
 #[derive(Debug)]
 pub enum CommitRequest {
     PendingBlock((PendingBlock, AppliedUpdatesRequest)),
+    RemoveRevertedBlock(BlockNumber),
     SealIncompleteBlock((BlockCommitRequest, AppliedUpdatesRequest)),
     FinishBlock(BlockFinishRequest),
 }
@@ -56,6 +57,7 @@ async fn handle_new_commit_task(
     mut mempool_req_sender: Sender<MempoolBlocksRequest>,
     pool: ConnectionPool,
 ) {
+    vlog::info!("Run committer");
     while let Some(request) = rx_for_ops.next().await {
         match request {
             CommitRequest::SealIncompleteBlock((block_commit_request, applied_updates_req)) => {
@@ -73,8 +75,26 @@ async fn handle_new_commit_task(
             CommitRequest::FinishBlock(request) => {
                 finish_block(request, &pool).await;
             }
+            CommitRequest::RemoveRevertedBlock(block_number) => {
+                remove_reverted_block(block_number, &pool).await;
+            }
         }
     }
+}
+
+async fn remove_reverted_block(block_number: BlockNumber, pool: &ConnectionPool) {
+    let start = Instant::now();
+    let mut storage = pool
+        .access_storage()
+        .await
+        .expect("db connection fail for committer");
+    storage
+        .chain()
+        .mempool_schema()
+        .remove_reverted_block(block_number)
+        .await
+        .expect("Failed to remove reverted blocks");
+    metrics::histogram!("committer.remove_reverted_block", start.elapsed());
 }
 
 async fn save_pending_block(

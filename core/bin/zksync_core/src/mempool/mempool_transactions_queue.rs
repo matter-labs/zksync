@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use zksync_types::mempool::{RevertedTxVariant, SignedTxVariant};
+use zksync_types::{PriorityOp, SerialId};
 
 #[derive(Debug, Clone)]
 struct MempoolPendingTransaction {
@@ -44,14 +45,22 @@ pub struct MempoolTransactionsQueue {
     ready_txs: VecDeque<SignedTxVariant>,
     /// Transactions that are not ready yet because of the `valid_from` field.
     pending_txs: BinaryHeap<MempoolPendingTransaction>,
+
+    last_processed_priority_op: Option<SerialId>,
+    pub priority_ops: VecDeque<PriorityOp>,
 }
 
 impl MempoolTransactionsQueue {
-    pub fn new(reverted_txs: VecDeque<RevertedTxVariant>) -> Self {
+    pub fn new(
+        reverted_txs: VecDeque<RevertedTxVariant>,
+        last_processed_priority_op: Option<SerialId>,
+    ) -> Self {
         Self {
             reverted_txs,
             ready_txs: VecDeque::new(),
             pending_txs: BinaryHeap::new(),
+            last_processed_priority_op,
+            priority_ops: VecDeque::new(),
         }
     }
 
@@ -73,6 +82,39 @@ impl MempoolTransactionsQueue {
 
     pub fn push_front(&mut self, tx: SignedTxVariant) {
         self.ready_txs.push_front(tx);
+    }
+
+    pub fn pop_front_priority_op(&mut self) -> Option<PriorityOp> {
+        let op = self.priority_ops.pop_front();
+        if let Some(op) = &op {
+            self.last_processed_priority_op = Some(op.serial_id);
+        }
+        op
+    }
+
+    pub fn push_front_priority_op(&mut self, op: PriorityOp) {
+        self.priority_ops.push_front(op);
+    }
+
+    pub fn add_priority_ops(&mut self, mut ops: Vec<PriorityOp>) {
+        ops.sort_unstable_by_key(|key| key.serial_id);
+        for op in ops {
+            // Do not add old operations
+            if let Some(serial_id) = self.last_processed_priority_op {
+                if op.serial_id <= serial_id {
+                    continue;
+                }
+            }
+
+            // Add a new operation only if it is not already in the queue
+            if !self
+                .priority_ops
+                .iter()
+                .any(|pr_op| pr_op.serial_id == op.serial_id)
+            {
+                self.priority_ops.push_back(op);
+            }
+        }
     }
 
     pub fn add_tx_variant(&mut self, tx: SignedTxVariant) {
@@ -126,7 +168,9 @@ mod tests {
     use crate::mempool::Address;
     use chrono::Utc;
     use zksync_types::tx::{TimeRange, Transfer, Withdraw};
-    use zksync_types::{AccountId, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx};
+    use zksync_types::{
+        AccountId, Deposit, Nonce, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
+    };
 
     fn get_transfer_with_timestamps(valid_from: u64, valid_until: u64) -> SignedTxVariant {
         let transfer = Transfer::new(
@@ -169,11 +213,151 @@ mod tests {
     }
 
     #[test]
+    fn test_priority_queue() {
+        let mut transactions_queue = MempoolTransactionsQueue {
+            reverted_txs: VecDeque::new(),
+            ready_txs: VecDeque::new(),
+            pending_txs: BinaryHeap::new(),
+            last_processed_priority_op: None,
+            priority_ops: Default::default(),
+        };
+
+        transactions_queue.add_priority_ops(vec![
+            PriorityOp {
+                serial_id: 3,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 1,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 2,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+        ]);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 1);
+        transactions_queue.push_front_priority_op(op);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 1);
+        transactions_queue.add_priority_ops(vec![
+            PriorityOp {
+                serial_id: 1,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 2,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 4,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 6,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+            PriorityOp {
+                serial_id: 5,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: Default::default(),
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: Default::default(),
+                eth_block: 0,
+                eth_block_index: None,
+            },
+        ]);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 2);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 3);
+        transactions_queue.push_front_priority_op(op);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 3);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 4);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 5);
+        let op = transactions_queue.pop_front_priority_op().unwrap();
+        assert_eq!(op.serial_id, 6);
+    }
+
+    #[test]
     fn test_mempool_transactions_queue() {
         let mut transactions_queue = MempoolTransactionsQueue {
             reverted_txs: VecDeque::new(),
             ready_txs: VecDeque::new(),
             pending_txs: BinaryHeap::new(),
+            last_processed_priority_op: None,
+            priority_ops: Default::default(),
         };
 
         let withdraw0 = get_withdraw();

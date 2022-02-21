@@ -23,7 +23,8 @@ use super::{
     error::{Error, InvalidDataError},
     paginate_trait::Paginate,
 };
-use crate::core_api_client::CoreApiClient;
+
+use zksync_api_types::v02::transaction::{L1Transaction, TransactionData, TxInBlockStatus};
 
 #[async_trait::async_trait]
 impl Paginate<ApiEither<TokenId>> for StorageProcessor<'_> {
@@ -267,18 +268,72 @@ impl Paginate<AccountTxsRequest> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<PendingOpsRequest> for CoreApiClient {
+impl Paginate<PendingOpsRequest> for StorageProcessor<'_> {
     type OutputObj = Transaction;
     type OutputId = SerialId;
 
     async fn paginate(
         &mut self,
         query: &PaginationQuery<PendingOpsRequest>,
-    ) -> Result<Paginated<Transaction, SerialId>, Error> {
+    ) -> Result<Paginated<Transaction, Self::OutputId>, Error> {
+        let serial_id = match query.from.serial_id.inner {
+            Either::Left(serial_id) => serial_id,
+            // Right means the latest serial id
+            Either::Right(_) => {
+                if let Some(serial_id) = self
+                    .chain()
+                    .mempool_schema()
+                    .get_max_serial_id_pending_deposits(query.from.address)
+                    .await?
+                {
+                    serial_id
+                } else {
+                    return Ok(Paginated::new(
+                        Vec::new(),
+                        Default::default(),
+                        query.limit,
+                        query.direction,
+                        0,
+                    ));
+                }
+            }
+        };
         let result = self
-            .get_unconfirmed_ops(query)
+            .chain()
+            .mempool_schema()
+            .get_pending_deposits_for(query.from.address, serial_id, query.limit, query.direction)
             .await
-            .map_err(Error::core_api)?;
-        Ok(result)
+            .map_err(Error::storage)?;
+
+        let count = result.len() as u32;
+        let txs = result
+            .into_iter()
+            .map(|op| {
+                let tx_hash = op.tx_hash();
+                let tx = L1Transaction::from_pending_op(
+                    op.data.clone(),
+                    op.eth_hash,
+                    op.serial_id,
+                    tx_hash,
+                );
+                Transaction {
+                    tx_hash,
+                    block_number: None,
+                    op: TransactionData::L1(tx),
+                    status: TxInBlockStatus::Queued,
+                    fail_reason: None,
+                    created_at: None,
+                    batch_id: None,
+                }
+            })
+            .collect();
+
+        Ok(Paginated::new(
+            txs,
+            serial_id,
+            query.limit,
+            query.direction,
+            count,
+        ))
     }
 }

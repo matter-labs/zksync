@@ -36,7 +36,6 @@ impl RpcApp {
         let mut storage = self.access_storage().await?;
         let depositing = get_depositing(
             &mut storage,
-            &self.tx_sender.core_api_client,
             &self.tx_sender.tokens,
             address,
             self.confirmations_for_eth_event,

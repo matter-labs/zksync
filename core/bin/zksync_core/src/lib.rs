@@ -116,15 +116,21 @@ pub async fn run_core(
         eth_gateway.clone(),
         &config.contracts,
         &config.eth_watch,
+        mempool_tx_request_sender.clone(),
     );
 
     // Insert pending withdrawals into database (if required)
     let mut storage_processor = connection_pool.access_storage().await?;
 
     // Start state keeper and root hash calculator.
-    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await;
+    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(
+        &mut storage_processor,
+        config.chain.state_keeper.fee_account_addr,
+        &config.chain.state_keeper.block_chunk_sizes,
+    )
+    .await;
 
-    let (state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
+    let (mut state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
         state_keeper_init,
         config.chain.state_keeper.fee_account_addr,
         state_keeper_req_receiver,
@@ -135,6 +141,9 @@ pub async fn run_core(
         processed_tx_events_sender,
     );
     let root_hash_queue = state_keeper.root_hash_queue();
+    // Execute reverted blocks before start
+    state_keeper.execute_reverted_blocks().await;
+
     let state_keeper_task = start_state_keeper(state_keeper);
     let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
 
@@ -151,7 +160,6 @@ pub async fn run_core(
         connection_pool.clone(),
         mempool_tx_request_receiver,
         mempool_block_request_receiver,
-        eth_watch_req_sender.clone(),
         4,
         DEFAULT_CHANNEL_CAPACITY,
         config.chain.state_keeper.block_chunk_sizes.clone(),
@@ -160,8 +168,9 @@ pub async fn run_core(
     // Start token handler.
     let token_handler_task = run_token_handler(
         connection_pool.clone(),
-        eth_watch_req_sender.clone(),
+        eth_gateway.clone(),
         &config.token_handler,
+        eth_watch_req_sender.clone(),
     );
 
     // Start token handler.
@@ -185,11 +194,8 @@ pub async fn run_core(
     );
 
     // Start private API.
-    let private_api_task = start_private_core_api(
-        mempool_tx_request_sender,
-        eth_watch_req_sender,
-        config.api.private.clone(),
-    );
+    let private_api_task =
+        start_private_core_api(mempool_tx_request_sender, config.api.private.clone());
 
     let task_futures = vec![
         eth_watch_task,

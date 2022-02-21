@@ -313,7 +313,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         // Transform executed operations to be `ExecutedOperations`.
         let executed_ops = executed_ops
             .into_iter()
-            .filter_map(|stored_exec| stored_exec.into_executed_tx().ok())
+            .map(|stored_exec| stored_exec.into_executed_tx())
             .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
         executed_operations.extend(executed_ops);
 
@@ -1529,6 +1529,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .execute(transaction.conn())
             .await?;
 
+        sqlx::query!(
+            "DELETE FROM block_metadata WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
         transaction.commit().await?;
         metrics::histogram!("sql.chain.block.remove_blocks", start.elapsed());
         Ok(())
