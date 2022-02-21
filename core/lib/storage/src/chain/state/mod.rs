@@ -246,6 +246,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 )
                 .execute(self.0.conn())
                 .await?;
+                metrics::increment_counter!("new_accounts");
             }
             StorageAccountDiff::Delete(upd) => {
                 sqlx::query!(
