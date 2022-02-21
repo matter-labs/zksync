@@ -130,7 +130,7 @@ export async function testAccounts() {
 
 export async function loadtest(...args: string[]) {
     console.log(args);
-    await utils.spawn(`cargo run --release --bin loadtest -- ${args.join(' ')}`);
+    await utils.spawn(`cargo run --release --bin loadnext -- ${args.join(' ')}`);
 }
 
 export async function readVariable(address: string, contractName: string, variableName: string, file?: string) {

@@ -428,7 +428,7 @@ impl Web3RpcApp {
                             block_number: block_number.0,
                             block_index: Some(op.block_index),
                             from: op.priority_op.data.from_account(),
-                            to: op.priority_op.data.to_account(),
+                            to: Some(op.priority_op.data.to_account()),
                             nonce: op.priority_op.serial_id as u32,
                             tx_hash: H256::from_slice(op.priority_op.tx_hash().as_ref()),
                         },

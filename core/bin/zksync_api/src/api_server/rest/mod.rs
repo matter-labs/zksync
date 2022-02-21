@@ -86,7 +86,6 @@ pub fn start_server_thread_detached(
     contract_address: H160,
     fee_ticker: FeeTicker,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
-    private_url: String,
 ) -> JoinHandle<()> {
     let (handler, panic_sender) = spawn_panic_handler();
 
@@ -99,7 +98,7 @@ pub fn start_server_thread_detached(
                 // TODO remove this config ZKS-815
                 let config = ZkSyncConfig::from_env();
 
-                let api_v01 = ApiV01::new(connection_pool, contract_address, private_url, config);
+                let api_v01 = ApiV01::new(connection_pool, contract_address, config);
                 api_v01.spawn_network_status_updater(panic_sender);
 
                 start_server(api_v01, fee_ticker, sign_verifier, listen_addr).await;

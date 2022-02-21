@@ -79,12 +79,6 @@ async fn revert_blocks_in_storage(
     transaction
         .chain()
         .operations_schema()
-        .remove_executed_priority_operations(last_block)
-        .await?;
-    println!("`executed_priority_operations` table is cleaned");
-    transaction
-        .chain()
-        .operations_schema()
         .remove_aggregate_operations_and_bindings(last_block)
         .await?;
     println!("`aggregate_operations`, `eth_aggregated_ops_binding`, `eth_tx_hashes`, `eth_operations` tables are cleaned");
@@ -160,7 +154,7 @@ async fn revert_blocks_on_contract(
 ) -> anyhow::Result<()> {
     let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
     let data = client.encode_tx_data("revertBlocks", tx_arg);
-    let gas_limit = 200000 + 5000 * blocks.len();
+    let gas_limit = 200000 + 15000 * blocks.len();
     let signed_tx = client
         .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(gas_limit))))
         .await
@@ -168,10 +162,10 @@ async fn revert_blocks_on_contract(
     let receipt = send_raw_tx_and_wait_confirmation(client, signed_tx.raw_tx).await?;
     storage.ethereum_schema().get_next_nonce().await
         .expect("Ethereum tx has been sent but updating operator nonce in storage has failed. You need to update it manually");
-    ensure!(
-        receipt.status == Some(U64::from(1)),
-        "Tx to contract failed"
-    );
+    if receipt.status != Some(U64::from(1)) {
+        let reason = client.failure_reason(signed_tx.hash).await?;
+        anyhow::bail!("Tx to contract failed {:?}", reason);
+    }
 
     println!("Blocks were reverted on contract");
     Ok(())
@@ -218,7 +212,7 @@ struct Opt {
     #[structopt(subcommand)]
     command: Command,
     /// Private key of operator which will call the contract function.
-    #[structopt(long = "key", env = "REVERT_TOOL_OPERATOR_PRIVATE_KEY")]
+    #[structopt(long = "key", env = "ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY")]
     operator_private_key: String,
 }
 

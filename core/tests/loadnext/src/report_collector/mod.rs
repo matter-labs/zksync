@@ -43,14 +43,17 @@ pub enum LoadtestResult {
 /// queue uncontrollable growth.
 #[derive(Debug)]
 pub struct ReportCollector {
+    allowed_percent: u8,
     reports_stream: Receiver<Report>,
     metrics_collector: MetricsCollector,
     operations_results_collector: OperationResultsCollector,
 }
 
 impl ReportCollector {
-    pub fn new(reports_stream: Receiver<Report>) -> Self {
+    pub fn new(reports_stream: Receiver<Report>, allowed_percent: u8) -> Self {
+        assert!(allowed_percent < 100, "Allowed percent more than 100");
         Self {
+            allowed_percent,
             reports_stream,
             metrics_collector: MetricsCollector::new(),
             operations_results_collector: OperationResultsCollector::new(),
@@ -84,7 +87,10 @@ impl ReportCollector {
     }
 
     fn final_resolution(&self) -> LoadtestResult {
-        if self.operations_results_collector.failures() > 0 {
+        let failure_percent = (self.operations_results_collector.failures() as f64
+            / self.operations_results_collector.total() as f64)
+            * 100.0;
+        if failure_percent > self.allowed_percent as f64 {
             LoadtestResult::TestFailed
         } else {
             LoadtestResult::TestPassed

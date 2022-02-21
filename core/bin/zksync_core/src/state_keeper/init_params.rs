@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 // External uses
 // Workspace uses
 use zksync_types::{
-    block::PendingBlock as SendablePendingBlock, Account, AccountId, AccountTree, Address,
-    BlockNumber, TokenId, NFT,
+    block::{IncompleteBlock, PendingBlock as SendablePendingBlock},
+    Account, AccountId, AccountTree, Address, BlockNumber, TokenId, NFT,
 };
 
 use super::{
@@ -21,6 +21,7 @@ pub struct ZkSyncStateInitParams {
 
     pub pending_block: Option<SendablePendingBlock>,
     pub root_hash_jobs: Vec<BlockRootHashJob>,
+    pub reverted_blocks: VecDeque<IncompleteBlock>,
 }
 
 impl Default for ZkSyncStateInitParams {
@@ -40,10 +41,15 @@ impl ZkSyncStateInitParams {
 
             pending_block: None,
             root_hash_jobs: Vec::new(),
+            reverted_blocks: Default::default(),
         }
     }
 
-    pub async fn restore_from_db(storage: &mut zksync_storage::StorageProcessor<'_>) -> Self {
+    pub async fn restore_from_db(
+        storage: &mut zksync_storage::StorageProcessor<'_>,
+        fee_account_addr: Address,
+        available_chunk_sizes: &[usize],
+    ) -> Self {
         let (last_block_number, tree, acc_id_by_addr) = Self::load_account_tree(storage).await;
 
         let unprocessed_priority_op =
@@ -52,6 +58,12 @@ impl ZkSyncStateInitParams {
 
         let pending_block = Self::load_pending_block(storage, last_block_number).await;
         let root_hash_jobs = Self::load_root_hash_jobs(storage).await;
+        let fee_account_id = acc_id_by_addr
+            .get(&fee_account_addr)
+            .cloned()
+            .expect("Fee account should be present in the account tree");
+        let reverted_blocks =
+            Self::load_reverted_blocks(storage, fee_account_id, available_chunk_sizes).await;
 
         let init_params = Self {
             tree,
@@ -61,12 +73,15 @@ impl ZkSyncStateInitParams {
             unprocessed_priority_op,
             pending_block,
             root_hash_jobs,
+            reverted_blocks,
         };
 
         vlog::info!(
-            "Loaded committed state: last block number: {}, unprocessed priority op: {}",
+            "Loaded committed state: last block number: {}, unprocessed priority op: {} reverted_blocks {}",
             *init_params.last_block_number,
-            init_params.unprocessed_priority_op
+            init_params.unprocessed_priority_op,
+            init_params.reverted_blocks.len()
+
         );
         init_params
     }
@@ -83,6 +98,18 @@ impl ZkSyncStateInitParams {
         )
     }
 
+    async fn load_reverted_blocks(
+        storage: &mut zksync_storage::StorageProcessor<'_>,
+        fee_account_id: AccountId,
+        available_block_chunk_sizes: &[usize],
+    ) -> VecDeque<IncompleteBlock> {
+        storage
+            .chain()
+            .mempool_schema()
+            .get_reverted_blocks(available_block_chunk_sizes, fee_account_id)
+            .await
+            .unwrap()
+    }
     async fn load_pending_block(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         last_block_number: BlockNumber,

@@ -15,7 +15,7 @@ use zksync_api_types::{
         Toggle2FA, Toggle2FAResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
         TxInBlockStatus,
     },
-    PriorityOpLookupQuery, TxWithSignature,
+    TxWithSignature,
 };
 use zksync_types::{tx::TxHash, EthBlockId};
 
@@ -35,12 +35,15 @@ impl ApiTransactionData {
     }
 
     async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<Receipt>, Error> {
+        // Try to find in the DB.
         let mut storage = self
             .tx_sender
             .pool
             .access_storage()
             .await
             .map_err(Error::storage)?;
+
+        // 1. Try to find the already received/executed operation.
         if let Some(receipt) = storage
             .chain()
             .operations_ext_schema()
@@ -49,10 +52,12 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(receipt))
-        } else if let Some(op) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
+        }
+        // 2. Try to find the pending operation.
+        else if let Some(op) = storage
+            .chain()
+            .mempool_schema()
+            .get_pending_operation_by_hash(tx_hash.into())
             .await
             .map_err(Error::core_api)?
         {
@@ -62,7 +67,9 @@ impl ApiTransactionData {
                 rollup_block: None,
                 id: op.serial_id,
             })))
-        } else {
+        }
+        // 3. No operation found, return nothing.
+        else {
             Ok(None)
         }
     }
@@ -82,10 +89,10 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(data))
-        } else if let Some(op) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
+        } else if let Some(op) = storage
+            .chain()
+            .mempool_schema()
+            .get_pending_operation_by_hash(tx_hash.into())
             .await
             .map_err(Error::core_api)?
         {
@@ -269,15 +276,10 @@ mod tests {
             Json(Ok(()))
         }
 
-        async fn get_unconfirmed_op(_query: Json<PriorityOpLookupQuery>) -> Json<Option<()>> {
-            Json(None)
-        }
-
         let server = actix_test::start(move || {
             App::new()
                 .route("new_tx", web::post().to(send_tx))
                 .route("new_txs_batch", web::post().to(send_txs_batch))
-                .route("unconfirmed_op", web::post().to(get_unconfirmed_op))
         });
 
         let url = server.url("").trim_end_matches('/').to_owned();

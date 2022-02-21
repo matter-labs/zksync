@@ -43,6 +43,8 @@ pub struct LoadtestConfig {
     /// but you can re-use seed from previous run to reproduce the sequence of operations locally.
     /// Seed must be represented as a hexadecimal string.
     pub seed: Option<String>,
+    /// Allowed percent of failed transactions
+    pub allowed_percent: u8,
 }
 
 impl LoadtestConfig {
@@ -66,6 +68,7 @@ impl Default for LoadtestConfig {
             operations_per_account: 40,
             main_token: "DAI".into(),
             seed: None,
+            allowed_percent: 10,
         }
     }
 }
