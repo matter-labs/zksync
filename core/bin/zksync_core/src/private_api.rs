@@ -7,7 +7,7 @@
 //! All the incoming data is assumed to be correct and not double-checked
 //! for correctness.
 
-use crate::{eth_watch::EthWatchRequest, mempool::MempoolTransactionRequest};
+use crate::mempool::MempoolTransactionRequest;
 use actix_web::error::InternalError;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::{
@@ -15,21 +15,16 @@ use futures::{
     sink::SinkExt,
     StreamExt,
 };
-use serde::Deserialize;
-use std::{str::FromStr, thread};
+
+use std::thread;
 use tokio::task::JoinHandle;
-use zksync_api_types::{
-    v02::pagination::{ApiEither, PaginationDirection, PaginationQuery, PendingOpsRequest},
-    PriorityOpLookupQuery,
-};
 use zksync_config::configs::api::PrivateApiConfig;
-use zksync_types::{tx::TxEthSignature, AccountId, Address, SignedZkSyncTx};
+use zksync_types::{tx::TxEthSignature, SignedZkSyncTx};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
 struct AppState {
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
-    eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
 }
 
 /// Adds a new transaction into the mempool.
@@ -76,114 +71,9 @@ async fn new_txs_batch(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Obtains information about unconfirmed deposits known for a certain address.
-#[actix_web::get("/unconfirmed_deposits/{address}")]
-async fn unconfirmed_deposits(
-    data: web::Data<AppState>,
-    address: web::Path<Address>,
-) -> actix_web::Result<HttpResponse> {
-    let (sender, receiver) = oneshot::channel();
-    let item = EthWatchRequest::GetUnconfirmedDeposits {
-        address: *address,
-        resp: sender,
-    };
-    let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender.send(item).await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    let response = receiver.await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    Ok(HttpResponse::Ok().json(response))
-}
-
-#[derive(Debug, Deserialize)]
-struct PendingOpsFlattenRequest {
-    pub address: Address,
-    pub account_id: Option<AccountId>,
-    pub serial_id: String,
-    pub limit: u32,
-    pub direction: PaginationDirection,
-}
-
-/// Obtains information about unconfirmed operations known for a certain account.
-/// Pending deposits can be matched only with addresses,
-/// while pending full exits can be matched only with account ids.
-/// If the account isn't created yet it doesn't have an id
-/// but we can still find pending deposits for its address that is why account_id is Option.
-#[actix_web::get("/unconfirmed_ops")]
-async fn unconfirmed_ops(
-    data: web::Data<AppState>,
-    web::Query(params): web::Query<PendingOpsFlattenRequest>,
-) -> actix_web::Result<HttpResponse> {
-    let (sender, receiver) = oneshot::channel();
-    // Serializing enum query parameters doesn't work, so parse it separately.
-    let serial_id = ApiEither::from_str(&params.serial_id).map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-    let query = PaginationQuery {
-        from: PendingOpsRequest {
-            address: params.address,
-            account_id: params.account_id,
-            serial_id,
-        },
-        limit: params.limit,
-        direction: params.direction,
-    };
-    let item = EthWatchRequest::GetUnconfirmedOps {
-        query,
-        resp: sender,
-    };
-    let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender.send(item).await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    let response = receiver.await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    Ok(HttpResponse::Ok().json(response))
-}
-
-/// Returns information about unconfirmed operation.
-#[actix_web::post("/unconfirmed_op")]
-async fn unconfirmed_op(
-    data: web::Data<AppState>,
-    web::Json(query): web::Json<PriorityOpLookupQuery>,
-) -> actix_web::Result<HttpResponse> {
-    let (sender, receiver) = oneshot::channel();
-    let item = match query {
-        PriorityOpLookupQuery::ByEthHash(eth_hash) => EthWatchRequest::GetUnconfirmedOpByEthHash {
-            eth_hash,
-            resp: sender,
-        },
-        PriorityOpLookupQuery::BySyncHash(tx_hash) => EthWatchRequest::GetUnconfirmedOpByTxHash {
-            tx_hash,
-            resp: sender,
-        },
-        PriorityOpLookupQuery::ByAnyHash(hash) => {
-            EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp: sender }
-        }
-    };
-    let mut eth_watch_sender = data.eth_watch_req_sender.clone();
-    eth_watch_sender.send(item).await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    let response = receiver.await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    Ok(HttpResponse::Ok().json(response))
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn start_private_core_api(
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
-    eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
     config: PrivateApiConfig,
 ) -> JoinHandle<()> {
     let (panic_sender, mut panic_receiver) = mpsc::channel(1);
@@ -199,7 +89,6 @@ pub fn start_private_core_api(
                 HttpServer::new(move || {
                     let app_state = AppState {
                         mempool_tx_sender: mempool_tx_sender.clone(),
-                        eth_watch_req_sender: eth_watch_req_sender.clone(),
                     };
 
                     // By calling `register_data` instead of `data` we're avoiding double
@@ -210,9 +99,6 @@ pub fn start_private_core_api(
                         .app_data(web::JsonConfig::default().limit(2usize.pow(32)))
                         .service(new_tx)
                         .service(new_txs_batch)
-                        .service(unconfirmed_op)
-                        .service(unconfirmed_ops)
-                        .service(unconfirmed_deposits)
                 })
                 .bind(&config.bind_addr())
                 .expect("failed to bind")

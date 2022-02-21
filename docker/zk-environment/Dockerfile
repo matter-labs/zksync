@@ -14,6 +14,8 @@ RUN apt update; apt install -y docker-ce-cli
 RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
 RUN apt-get install -y nodejs
 RUN npm install -g yarn
+RUN npm install -g ts-node
+
 
 # Install required node packages
 RUN yarn global add aglio

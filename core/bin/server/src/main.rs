@@ -228,7 +228,7 @@ async fn run_server(components: &ComponentsToRun) {
                 ticker.clone(),
                 &JsonRpcConfig::from_env(),
                 &common_config,
-                private_config.url.clone(),
+                private_config.url,
                 eth_watch_config.confirmations_for_eth_event,
             ));
         }
@@ -240,7 +240,6 @@ async fn run_server(components: &ComponentsToRun) {
                 contracts_config.contract_addr,
                 ticker,
                 sign_check_sender,
-                private_config.url,
             );
         }
     }

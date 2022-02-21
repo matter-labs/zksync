@@ -89,10 +89,10 @@ impl ZkSyncPriorityOp {
         }
     }
 
-    pub fn to_account(&self) -> Option<Address> {
+    pub fn to_account(&self) -> Address {
         match self {
-            ZkSyncPriorityOp::Deposit(deposit) => Some(deposit.to),
-            ZkSyncPriorityOp::FullExit(full_exit) => Some(full_exit.eth_address),
+            ZkSyncPriorityOp::Deposit(deposit) => deposit.to,
+            ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address,
         }
     }
 
