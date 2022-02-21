@@ -9,7 +9,7 @@ on:
 
 jobs:
   lint:
-    runs-on: [self-hosted, CI-worker]
+    runs-on: [self-hosted, ci-runner]
 
     steps:
       - uses: actions/checkout@v2
@@ -37,7 +37,7 @@ jobs:
           ci_run zk lint --check
 
   unit-tests:
-    runs-on: [self-hosted, CI-worker]
+    runs-on: [self-hosted, ci-runner]
 
     steps:
       - uses: actions/checkout@v2
@@ -78,7 +78,7 @@ jobs:
         run: ci_run zk test server-rust
 
   integration:
-    runs-on: [self-hosted, FAST]
+    runs-on: [self-hosted, ci-runner]
 
     steps:
       - uses: actions/checkout@v2
@@ -138,7 +138,7 @@ jobs:
           ci_run cat dummy_prover.log
 
   circuit-tests:
-    runs-on: [self-hosted, CI-worker]
+    runs-on: [self-hosted, ci-runner]
 
     steps:
       - uses: actions/checkout@v2
@@ -147,6 +147,13 @@ jobs:
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
+          
+      - name: start-services
+        run: |
+          docker-compose -f docker-compose-runner.yml down
+          docker-compose -f docker-compose-runner.yml pull
+          docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          ci_run sccache --start-server
 
       - name: init
         run: |
@@ -155,10 +162,10 @@ jobs:
           ci_run zk run verify-keys unpack
 
       - name: circuit-tests
-        run: ci_run zk test crypto-rust
+        run: ci_run zk test circuit 20
 
   testkit:
-    runs-on: [self-hosted, CI-worker]
+    runs-on: [self-hosted, ci-runner]
 
     steps:
       - uses: actions/checkout@v2

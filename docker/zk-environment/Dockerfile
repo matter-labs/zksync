@@ -3,7 +3,12 @@ FROM debian:bullseye
 WORKDIR /usr/src/zksync
 
 # Install required dependencies
-RUN apt-get update; apt-get install -y make bash git openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq
+RUN apt-get update; apt-get install -y make bash git gnupg openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq
+
+#install docker engine
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
+RUN add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
+RUN apt update; apt install -y docker-ce-cli
 
 # Install node and yarn
 RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
@@ -36,4 +41,3 @@ ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
 ENV CI=1
 RUN cargo install sccache
 ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
-ENV SCCACHE_DIR=/usr/src/cache/sccache

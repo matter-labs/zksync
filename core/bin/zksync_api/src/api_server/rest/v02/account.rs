@@ -245,6 +245,7 @@ impl ApiAccountData {
             self.confirmations_for_eth_event,
         )
         .await?;
+
         let (committed, finalized) = if let Some(account_id) = account_id {
             let (finalized_state, committed_state) = transaction
                 .chain()

@@ -35,6 +35,7 @@ impl ApiTransactionData {
     }
 
     async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<Receipt>, Error> {
+        // Try to find in the DB.
         let mut storage = self
             .tx_sender
             .pool
