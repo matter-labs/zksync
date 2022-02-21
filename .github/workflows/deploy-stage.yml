@@ -38,15 +38,15 @@ jobs:
     - name: start-services
       run: |
         docker-compose -f docker-compose-runner.yml down
-        docker-compose -f docker-compose-runner.yml up --build -d zk
+        docker-compose -f docker-compose-runner.yml up -d zk postgres
 
     - name: init
       run: |
         ci_run zk
         ci_run zk run yarn
-        cp etc/tokens/{test,localhost}.json
+        ci_run cp etc/tokens/{test,localhost}.json
         ci_run zk run verify-keys unpack
-        ci_run zk up
+        # ci_run zk up
         ci_run zk db basic-setup
 
     - name: update-images
