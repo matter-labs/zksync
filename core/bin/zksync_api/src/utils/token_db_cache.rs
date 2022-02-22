@@ -22,6 +22,7 @@ impl TokenDBCache {
         Self::default()
     }
 
+    /// Performs case-insensitive token search.
     pub async fn get_token(
         &self,
         storage: &mut StorageProcessor<'_>,
@@ -29,7 +30,8 @@ impl TokenDBCache {
     ) -> anyhow::Result<Option<Token>> {
         let token_query = token_query.into();
         // Just return token from cache.
-        if let Some((token, update_time)) = self.cache.read().await.get(&token_query) {
+        if let Some((token, update_time)) = self.cache.read().await.get(&token_query.to_lowercase())
+        {
             if update_time.elapsed() < TOKEN_INVALIDATE_CACHE {
                 return Ok(Some(token.clone()));
             }
@@ -46,7 +48,7 @@ impl TokenDBCache {
             self.cache
                 .write()
                 .await
-                .insert(token_query, (token.clone(), Instant::now()));
+                .insert(token_query.to_lowercase(), (token.clone(), Instant::now()));
         }
 
         Ok(token)
