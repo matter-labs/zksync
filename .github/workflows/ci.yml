@@ -194,7 +194,7 @@ jobs:
         run: ci_run zk test integration testkit --offline
 
   revert-blocks:
-    runs-on: [self-hosted, FAST]
+    runs-on: [self-hosted, ci-runner]
 
     steps:
       - uses: actions/checkout@v2
