@@ -10,7 +10,7 @@ use web3::{
     Web3,
 };
 
-use zksync_contracts::{erc20_contract, governance_contract, zksync_contract};
+use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{
     Address, NewTokenEvent, Nonce, PriorityOp, RegisterNFTFactoryEvent, H160, U256,
@@ -62,7 +62,6 @@ pub trait EthClient {
     async fn get_auth_fact(&self, address: Address, nonce: Nonce) -> anyhow::Result<Vec<u8>>;
     async fn get_auth_fact_reset_time(&self, address: Address, nonce: Nonce)
         -> anyhow::Result<u64>;
-    async fn is_contract_erc20(&self, address: Address) -> bool;
 }
 
 pub struct EthHttpClient {
@@ -254,21 +253,6 @@ impl EthClient for EthHttpClient {
             .await
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
             .map(|res: U256| res.as_u64())
-    }
-
-    async fn is_contract_erc20(&self, address: Address) -> bool {
-        self.client
-            .call_contract_function::<U256, _, _, _>(
-                "balanceOf",
-                address,
-                None,
-                Options::default(),
-                None,
-                address,
-                erc20_contract(),
-            )
-            .await
-            .is_ok()
     }
 }
 

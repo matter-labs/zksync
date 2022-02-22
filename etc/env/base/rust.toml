@@ -25,7 +25,8 @@ loadtest=debug,\
 kube=debug,\
 dev_ticker=info,\
 block_sizes_test=info,\
-zksync_forced_exit_requests=info\
+zksync_forced_exit_requests=info,\
+loadnext=debug
 """
 
 # `RUST_BACKTRACE` variable

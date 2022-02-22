@@ -46,7 +46,7 @@ jobs:
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
-        
+
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
@@ -87,7 +87,7 @@ jobs:
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
-        
+
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
@@ -126,7 +126,7 @@ jobs:
 
       - name: integration-rust-sdk
         run: ci_run zk test i rust-sdk
-      
+
       - name: integration-withdrawal-helpers
         run: ci_run zk test i withdrawal-helpers
 
@@ -193,11 +193,75 @@ jobs:
       - name: integration-testkit
         run: ci_run zk test integration testkit --offline
 
+  revert-blocks:
+    runs-on: [self-hosted, ci-runner]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: setup-env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
+      - name: start-services
+        run: |
+          docker-compose -f docker-compose-runner.yml down
+          docker-compose -f docker-compose-runner.yml pull
+          docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          ci_run sccache --start-server
+
+      - name: init
+        run: |
+          ci_run ln -s /usr/src/keys/setup keys/setup
+          ci_run zk
+          ci_run zk dummy-prover enable --no-redeploy
+          ci_run zk init
+
+      - name: restart dev-liquidity-token-watcher and dev-ticker
+        run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
+
+      - name: run-services
+        run: |
+          ci_run zk server core &>server.log &
+          ci_run zk server api &>api.log &
+          ci_run sleep 10
+
+      - name: loadtest
+        run: |
+          ci_run cargo build --release --bin loadnext 
+          cd $ZKSYNC_HOME
+          docker-compose -f docker-compose-runner.yml exec -T -e ALLOWED_PERCENT=20 -e RUST_LOG=loadnext=debug -e ZKSYNC_RPC_ADDR=http://127.0.0.2:3030 -e WEB3_URL=http://geth:8545 -e ETH_NETWORK=localhost -e MASTER_WALLET_PK=74d8b3a188f7260f67698eb44da07397a298df5427df681ef68c45b34b61f998 -e ACCOUNTS_AMOUNT=5 -e OPERATIONS_PER_ACCOUNT=5 -e MAIN_TOKEN=DAI zk ./target/release/loadnext
+          docker-compose -f docker-compose-runner.yml exec -T -e ZKSYNC_REST_ADDR=http://127.0.0.2:3001  zk ts-node core/tests/check-block-root-hahes.ts
+
+
+      - name: stop-server
+        run: |
+          ci_run killall zksync_server
+
+      - name: revert-blocks
+        run: |
+          ci_run zk f cargo build --release --bin block_revert
+          ci_run zk f ./target/release/block_revert --last-correct-block=2 all
+      - name: check-server
+        run: |
+          ci_run zk server &>server.log &
+          ci_run sleep 30
+          docker-compose -f docker-compose-runner.yml exec -T -e ZKSYNC_REST_ADDR=http://127.0.0.2:3001  zk ts-node core/tests/check-block-root-hahes.ts
+
+
+      - name: Show logs
+        if: always()
+        run: |
+          ci_run cat server.log
+          ci_run cat api.log
+
+
   notify:
     if: always()
     name: Notify on failures
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests, integration, circuit-tests, testkit]
+    needs: [lint, unit-tests, integration, circuit-tests, testkit, revert-blocks]
     steps:
       -
         if: failure()
