@@ -328,7 +328,7 @@ impl Executor {
         // Prepare channels for the report collector.
         let (report_sender, report_receiver) = mpsc::channel(256);
 
-        let report_collector = ReportCollector::new(report_receiver);
+        let report_collector = ReportCollector::new(report_receiver, self.config.allowed_percent);
         let report_collector_future = tokio::spawn(report_collector.run());
 
         let config = &self.config;
