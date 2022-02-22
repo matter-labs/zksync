@@ -35,6 +35,7 @@ services:
       - /usr/src/cache:/usr/src/cache
       - /usr/src/keys:/usr/src/keys
       - /etc/sa_secret:/etc/sa_secret
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - IN_DOCKER=true
       - CACHE_DIR=/usr/src/cache
