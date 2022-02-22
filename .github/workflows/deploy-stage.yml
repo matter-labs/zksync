@@ -25,12 +25,38 @@ jobs:
   build-images:
     name: Build and Push Docker Images
     needs: [setup]
-    uses: ./.github/workflows/template-docker-build.yml
-    secrets:
-      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-    with:
-      image_tag: ${{ needs.setup.outputs.image_tag }}
+    runs-on: [self-hosted, ci-runner]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: setup-env
+      run: |
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
+
+    - name: start-services
+      run: |
+        docker-compose -f docker-compose-runner.yml down
+        docker-compose -f docker-compose-runner.yml up -d zk postgres
+
+    - name: init
+      run: |
+        ci_run zk
+        ci_run zk run yarn
+        ci_run cp etc/tokens/{test,localhost}.json
+        ci_run zk run verify-keys unpack
+        ci_run zk db basic-setup
+
+    - name: update-images
+      run: |
+        ci_run docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        ci_run zk docker push rust
+
+    - name: docker-down
+      if: always()
+      run: |
+        docker-compose -f docker-compose-runner.yml down
 
   # Reminder: when disabling the deploy stage - comment the whole job out!
   deploy:
