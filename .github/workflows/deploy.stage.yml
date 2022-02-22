@@ -14,7 +14,7 @@ concurrency: deploy-stage
 jobs:
   images:
     name: Build Docker Images
-    runs-on: [self-hosted, MAIN]
+    runs-on: [self-hosted, ci-runner]
     steps:
     - uses: actions/checkout@v2
     -
@@ -24,25 +24,28 @@ jobs:
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
     -
+      name: start-services
+      run: |
+        docker-compose -f docker-compose-runner.yml down
+        docker-compose -f docker-compose-runner.yml up -d zk postgres
+    -
       name: init
       run: |
-        cargo sqlx --version || cargo install sqlx-cli
-        zk
-        zk run yarn
-        cp etc/tokens/{test,localhost}.json
-        zk run verify-keys unpack
-        zk up
-        zk db basic-setup
+        ci_run zk
+        ci_run zk run yarn
+        ci_run cp etc/tokens/{test,localhost}.json
+        ci_run zk run verify-keys unpack
+        ci_run zk db basic-setup
     -
       name: update-images
       run: |
-        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
-        zk docker push rust
+        ci_run docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        ci_run zk docker push rust
     -
       name: docker-down
       if: always()
       run: |
-        docker-compose down
+        docker-compose -f docker-compose-runner.yml down
 
   setup:
     name: Setup
