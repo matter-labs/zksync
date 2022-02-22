@@ -47,3 +47,7 @@ go_to_env.sh
 core/lib/storage/.env
 
 .zcli-config.json
+
+# Perf/flamegraph files
+perf.data*
+flamegraph.svg
