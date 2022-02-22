@@ -12,13 +12,13 @@ on:
 jobs:
   setup:
     name: Setup
-    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@dev
+    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@breaking
     with:
       environment: ${{ github.event.inputs.environment }}
 
   update:
     name: Update
-    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@dev
+    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@breaking
     needs: [setup]
     with:
       environment: ${{ github.event.inputs.environment }}

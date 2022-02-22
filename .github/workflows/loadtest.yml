@@ -14,14 +14,14 @@ env:
 jobs:
   setup:
     name: Setup
-    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@dev
+    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@breaking
     with:
       environment: loadtest
       create-deployment: true
 
   update:
     name: Update
-    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@dev
+    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@breaking
     needs: [setup]
     with:
       ref: master
@@ -171,7 +171,7 @@ jobs:
 
   deploy:
     name: Deploy
-    uses: matter-labs/zksync-dev/.github/workflows/deploy.yml@dev
+    uses: matter-labs/zksync-dev/.github/workflows/deploy.yml@breaking
     needs: [setup, configmap]
     with:
       cluster: ${{ needs.setup.outputs.cluster }}
