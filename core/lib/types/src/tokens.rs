@@ -85,9 +85,25 @@ impl TokenLike {
     /// Checks if the token is Ethereum.
     pub fn is_eth(&self) -> bool {
         match self {
-            TokenLike::Symbol(symbol) => symbol == "ETH",
-            TokenLike::Address(address) => *address == Address::zero(),
-            TokenLike::Id(id) => **id == 0,
+            Self::Symbol(symbol) => {
+                // Case-insensitive comparison against `ETH`.
+                symbol
+                    .chars()
+                    .map(|c| c.to_ascii_lowercase())
+                    .eq("eth".chars())
+            }
+            Self::Address(address) => *address == Address::zero(),
+            Self::Id(id) => **id == 0,
+        }
+    }
+
+    /// Makes request case-insensitive (lowercase).
+    /// Used to compare queries against keys in the cache.
+    pub fn to_lowercase(&self) -> Self {
+        match self {
+            Self::Id(id) => Self::Id(*id),
+            Self::Address(address) => Self::Address(*address),
+            Self::Symbol(symbol) => Self::Symbol(symbol.to_lowercase()),
         }
     }
 }
@@ -366,6 +382,28 @@ mod tests {
             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                 ChangePubKeyType::CREATE2
             ))
+        );
+    }
+
+    #[test]
+    fn token_like_is_eth() {
+        let tokens = vec![
+            TokenLike::Address(Address::zero()),
+            TokenLike::Id(TokenId(0)),
+            TokenLike::Symbol("ETH".into()),
+            TokenLike::Symbol("eth".into()),
+        ];
+
+        for token in tokens {
+            assert!(token.is_eth());
+        }
+    }
+
+    #[test]
+    fn token_like_to_case_insensitive() {
+        assert_eq!(
+            TokenLike::Symbol("ETH".into()).to_lowercase(),
+            TokenLike::Symbol("eth".into())
         );
     }
 }
