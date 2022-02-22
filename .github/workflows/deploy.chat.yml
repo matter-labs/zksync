@@ -8,7 +8,7 @@ concurrency: deploy-chat-${{ github.event.inputs.environment }}
 jobs:
   setup:
     name: Setup
-    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@breaking
+    uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@dev
     with:
       find-latest-config: true
       environment: ${{ github.event.inputs.environment }}
@@ -17,7 +17,7 @@ jobs:
 
   update:
     name: Update
-    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@breaking
+    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@dev
     needs: [setup]
     with:
       ref: ${{ needs.setup.outputs.config-tag }}
@@ -29,7 +29,7 @@ jobs:
 
   deploy:
     name: Deploy
-    uses: matter-labs/zksync-dev/.github/workflows/deploy.yml@breaking
+    uses: matter-labs/zksync-dev/.github/workflows/deploy.yml@dev
     needs: [setup, update]
     with:
       cluster: ${{ needs.setup.outputs.cluster }}
