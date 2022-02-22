@@ -118,6 +118,14 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .expect("token by symbol not found");
     assert_eq!(token_b, token_b_by_symbol);
 
+    // Try case-insensitive search
+    let token_b_by_symbol_case_insensitive = TokensSchema(&mut storage)
+        .get_token(TokenLike::Symbol(token_b.symbol.to_lowercase()))
+        .await
+        .expect("get token query failed")
+        .expect("token by symbol not found");
+    assert_eq!(token_b, token_b_by_symbol_case_insensitive);
+
     let db_nft_token = TokensSchema(&mut storage)
         .get_token(TokenLike::Id(nft.id))
         .await

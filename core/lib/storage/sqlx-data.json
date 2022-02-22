@@ -5584,6 +5584,61 @@
       "nullable": []
     }
   },
+  "ba69c8315c69469b20ca6069708732c6ba2e3acee17dc3bde55622051746250c": {
+    "query": "\n                    SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n                    WHERE lower(symbol) = lower($1)\n                    LIMIT 1\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "kind: _",
+          "type_info": {
+            "Custom": {
+              "name": "token_kind",
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "baaaff359564c5d1094fcf2650d53cf9dcac5d50fc3a549c6cff53dd472350f7": {
     "query": "\n            SELECT * FROM ticker_price\n            WHERE token_id = $1\n            LIMIT 1\n            ",
     "describe": {
@@ -6275,61 +6330,6 @@
         false,
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "c55673eb654deef9816a03d81ac34767003f366ef28a6be49ad3a9509f21aa1a": {
-    "query": "\n                    SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n                    WHERE symbol = $1\n                    LIMIT 1\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 3,
-          "name": "kind: _",
-          "type_info": {
-            "Custom": {
-              "name": "token_kind",
-              "kind": {
-                "Enum": [
-                  "ERC20",
-                  "NFT",
-                  "None"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "ordinal": 4,
-          "name": "symbol",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
         false,
         false,
         false,
