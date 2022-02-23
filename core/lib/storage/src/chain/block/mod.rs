@@ -1,4 +1,6 @@
 // Built-in deps
+use num::rational::Ratio;
+use num::ToPrimitive;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External imports
 // Workspace imports
@@ -89,6 +91,26 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                             .await?;
                     }
                     // Store the executed operation in the corresponding schema.
+                    if let Some(op) = &tx.op {
+                        if let Some(data) = op.get_amount_info() {
+                            for (token, amount) in data {
+                                if let Ok(Some(price)) = transaction
+                                    .tokens_schema()
+                                    .get_historical_ticker_price(token)
+                                    .await
+                                {
+                                    let labels = vec![("token", format!("{}", token.0))];
+                                    let usd_amount = Ratio::from(amount) * price.usd_price;
+                                    metrics::gauge!(
+                                        "token_volume",
+                                        usd_amount.to_f64().unwrap(),
+                                        &labels
+                                    );
+                                }
+                            }
+                        }
+                    }
+
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(
                         *tx,
                         block_number,
@@ -102,11 +124,32 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         .await?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
+                    // Store the executed operation in the corresponding schema.
+                    if let Some(data) = prior_op.op.get_amount_info() {
+                        for (token, amount) in data {
+                            if let Ok(Some(price)) = transaction
+                                .tokens_schema()
+                                .get_historical_ticker_price(token)
+                                .await
+                            {
+                                let labels = vec![("token", format!("{}", token.0))];
+                                let usd_amount = Ratio::from(amount) * price.usd_price;
+                                metrics::gauge!(
+                                    "token_volume",
+                                    usd_amount.to_f64().unwrap(),
+                                    &labels
+                                );
+                            }
+                        }
+                    }
+
                     // For priority operation we should only store it in the Operations schema.
                     let new_priority_op = NewExecutedPriorityOperation::prepare_stored_priority_op(
                         *prior_op,
                         block_number,
                     );
+
+                    // Store the executed operation in the corresponding schema.
                     transaction
                         .chain()
                         .operations_schema()

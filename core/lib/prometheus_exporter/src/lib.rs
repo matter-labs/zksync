@@ -4,7 +4,7 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
-use zksync_storage::ConnectionPool;
+use zksync_storage::{ConnectionPool, QueryResult};
 use zksync_types::aggregated_operations::AggregatedActionType::*;
 
 const QUERY_INTERVAL: Duration = Duration::from_secs(30);

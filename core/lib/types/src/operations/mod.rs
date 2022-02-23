@@ -2,8 +2,9 @@
 
 use super::ZkSyncTx;
 use crate::ZkSyncPriorityOp;
+use num::BigUint;
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::AccountId;
+use zksync_basic_types::{AccountId, TokenId};
 use zksync_crypto::params::{CHUNK_BYTES, LEGACY_CHUNK_BYTES};
 
 mod change_pubkey_op;
@@ -69,6 +70,30 @@ impl ZkSyncOp {
             ZkSyncOp::Swap(_) => SwapOp::CHUNKS,
             ZkSyncOp::MintNFTOp(_) => MintNFTOp::CHUNKS,
             ZkSyncOp::WithdrawNFT(_) => WithdrawNFTOp::CHUNKS,
+        }
+    }
+
+    pub fn get_amount_info(&self) -> Option<Vec<(TokenId, BigUint)>> {
+        match self {
+            ZkSyncOp::Transfer(tx) => Some(vec![(tx.tx.token, tx.tx.amount.clone())]),
+            ZkSyncOp::Withdraw(tx) => Some(vec![(tx.tx.token, tx.tx.amount.clone())]),
+            ZkSyncOp::Close(_) => None,
+            ZkSyncOp::ChangePubKeyOffchain(_) => None,
+            ZkSyncOp::ForcedExit(_) => None,
+            ZkSyncOp::MintNFTOp(_) => None,
+            ZkSyncOp::Swap(tx) => Some(vec![
+                (tx.tx.orders.0.token_buy, tx.tx.amounts.0.clone()),
+                (tx.tx.orders.1.token_buy, tx.tx.amounts.1.clone()),
+            ]),
+            ZkSyncOp::Deposit(tx) => {
+                Some(vec![(tx.priority_op.token, tx.priority_op.amount.clone())])
+            }
+            ZkSyncOp::TransferToNew(tx) => Some(vec![(tx.tx.token, tx.tx.amount.clone())]),
+            ZkSyncOp::WithdrawNFT(_) => None,
+            ZkSyncOp::FullExit(tx) => tx
+                .withdraw_amount()
+                .map(|amount| vec![(tx.priority_op.token, amount)]),
+            ZkSyncOp::Noop(_) => None,
         }
     }
 
