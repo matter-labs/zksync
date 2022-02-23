@@ -7,13 +7,16 @@ ASM=dist/zksync-crypto-bundler_bg_asm.js
 which wasm-pack || cargo install wasm-pack
 
 # pack for bundler (!note this verion is used in the pkg.browser field)
-wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
+wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist-bundler
 # pack for browser
-wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist
+wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist-web
 # pack for node.js
-wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist
+wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist-nodejs
 
-rm dist/package.json dist/.gitignore
+cp dist-bundler/* dist-web/* dist-nodejs/* dist
+
+rm dist/package.json
+rm -r dist-bundler dist-web dist-nodejs
 
 if [ "$CI" == "1" ]; then
     exit 0
