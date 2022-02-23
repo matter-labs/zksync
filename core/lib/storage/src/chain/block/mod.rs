@@ -45,6 +45,22 @@ pub mod records;
 #[derive(Debug)]
 pub struct BlockSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
+pub async fn txs_volume_metrics(storage: &mut StorageProcessor<'_>, op: &ZkSyncOp) {
+    if let Some(data) = op.get_amount_info() {
+        for (token, amount) in data {
+            if let Ok(Some(price)) = storage
+                .tokens_schema()
+                .get_historical_ticker_price(token)
+                .await
+            {
+                let labels = vec![("token", format!("{}", token.0))];
+                let usd_amount = Ratio::from(amount) * price.usd_price;
+                metrics::gauge!("txs_volume", usd_amount.to_f64().unwrap(), &labels);
+            }
+        }
+    }
+}
+
 impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Given a block, stores its transactions in the database.
     pub async fn save_block_transactions(
@@ -92,23 +108,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     }
                     // Store the executed operation in the corresponding schema.
                     if let Some(op) = &tx.op {
-                        if let Some(data) = op.get_amount_info() {
-                            for (token, amount) in data {
-                                if let Ok(Some(price)) = transaction
-                                    .tokens_schema()
-                                    .get_historical_ticker_price(token)
-                                    .await
-                                {
-                                    let labels = vec![("token", format!("{}", token.0))];
-                                    let usd_amount = Ratio::from(amount) * price.usd_price;
-                                    metrics::gauge!(
-                                        "token_volume",
-                                        usd_amount.to_f64().unwrap(),
-                                        &labels
-                                    );
-                                }
-                            }
-                        }
+                        txs_volume_metrics(&mut transaction, op).await;
                     }
 
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(
@@ -125,23 +125,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
                     // Store the executed operation in the corresponding schema.
-                    if let Some(data) = prior_op.op.get_amount_info() {
-                        for (token, amount) in data {
-                            if let Ok(Some(price)) = transaction
-                                .tokens_schema()
-                                .get_historical_ticker_price(token)
-                                .await
-                            {
-                                let labels = vec![("token", format!("{}", token.0))];
-                                let usd_amount = Ratio::from(amount) * price.usd_price;
-                                metrics::gauge!(
-                                    "token_volume",
-                                    usd_amount.to_f64().unwrap(),
-                                    &labels
-                                );
-                            }
-                        }
-                    }
+                    txs_volume_metrics(&mut transaction, &prior_op.op).await;
 
                     // For priority operation we should only store it in the Operations schema.
                     let new_priority_op = NewExecutedPriorityOperation::prepare_stored_priority_op(
