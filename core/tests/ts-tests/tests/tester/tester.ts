@@ -31,7 +31,8 @@ export class Tester {
         public ethProvider: ethers.providers.Provider,
         public syncProvider: zksync.SyncProvider,
         public ethWallet: ethers.Wallet,
-        public syncWallet: zksync.Wallet
+        public syncWallet: zksync.Wallet,
+        public operatorWallet: zksync.Wallet
     ) {
         this.contract = new ethers.Contract(syncProvider.contractAddress.mainContract, zksyncAbi, ethWallet);
         this.runningFee = ethers.BigNumber.from(0);
@@ -56,7 +57,19 @@ export class Tester {
             "m/44'/60'/0'/0/0"
         ).connect(ethProvider);
         const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
-        return new Tester(network, ethProvider, syncProvider, ethWallet, syncWallet);
+
+        const operatorPrivateKey = process.env.ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY;
+        if (!operatorPrivateKey) {
+            throw new Error("Operator private key is not set in env or the variable name has changed");
+        }
+        const operatorEthWallet = new ethers.Wallet(operatorPrivateKey);
+        const operatorWallet = await zksync.Wallet.fromEthSigner(operatorEthWallet, syncProvider);
+        // Sanity check.
+        if (operatorWallet.address() != process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR) {
+            throw new Error("Operator private key doesn't correspond to the operator address from env");
+        }
+
+        return new Tester(network, ethProvider, syncProvider, ethWallet, syncWallet, operatorWallet);
     }
 
     static async createSyncProvider(network: Network, transport: 'WS' | 'HTTP', providerType: 'REST' | 'RPC') {
