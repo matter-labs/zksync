@@ -13,7 +13,7 @@ wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=di
 # pack for node.js
 wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist-nodejs
 
-cp dist-bundler/* dist-web/* dist-nodejs/* dist
+cp -n dist-bundler/* dist-web/* dist-nodejs/* dist
 
 rm dist/package.json
 rm -r dist-bundler dist-web dist-nodejs
