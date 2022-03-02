@@ -92,6 +92,7 @@ pub struct TransactionItem {
     pub sequence_number: Option<i64>,
     pub tx_hash: Vec<u8>,
     pub block_number: i64,
+    pub block_index: Option<i32>,
     pub op: Value,
     pub created_at: DateTime<Utc>,
     pub success: bool,

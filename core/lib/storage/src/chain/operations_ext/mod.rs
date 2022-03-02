@@ -176,6 +176,110 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(result)
     }
 
+    pub async fn tx_data_by_block_and_index_api_v02(
+        &mut self,
+        block_number: BlockNumber,
+        block_index: u64,
+    ) -> QueryResult<Option<TxData>> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        let data = {
+            let executed_tx: Option<StorageTxData> = sqlx::query_as!(
+                StorageTxData,
+                r#"
+                SELECT
+                    tx_hash,
+                    tx as op,
+                    block_number as "block_number?",
+                    block_index as "block_index?",
+                    created_at,
+                    success as "success?",
+                    fail_reason,
+                    Null::bytea as eth_hash,
+                    Null::bigint as priority_op_serialid,
+                    batch_id,
+                    eth_sign_data
+                FROM executed_transactions
+                WHERE block_number = $1 AND block_index = $2
+            "#,
+                block_number.0 as i32,
+                block_index as i32
+            )
+            .fetch_optional(transaction.conn())
+            .await?;
+
+            if let Some(data) = executed_tx {
+                Some(data)
+            } else {
+                let executed_operation: Option<StorageTxData> = sqlx::query_as!(
+                    StorageTxData,
+                    r#"
+                    SELECT
+                        tx_hash as "tx_hash!",
+                        operation as op,
+                        block_index as "block_index?",
+                        block_number as "block_number?",
+                        created_at,
+                        true as "success?",
+                        Null as fail_reason,
+                        eth_hash as "eth_hash?",
+                        priority_op_serialid as "priority_op_serialid?",
+                        Null::bigint as batch_id,
+                        Null::jsonb as eth_sign_data
+                    FROM executed_priority_operations
+                    WHERE block_number = $1
+                    AND block_index = $2
+                "#,
+                    block_number.0 as i64,
+                    block_index as i32
+                )
+                .fetch_optional(transaction.conn())
+                .await?;
+                executed_operation
+            }
+        };
+
+        let result = if let Some(data) = data {
+            let complete_withdrawals_tx_hash = if let Some(tx_type) = data.op.get("type") {
+                let tx_type = tx_type.as_str().unwrap();
+                if tx_type == "Withdraw" || tx_type == "ForcedExit" {
+                    transaction
+                        .chain()
+                        .operations_schema()
+                        .eth_tx_for_withdrawal(&TxHash::from_slice(&data.tx_hash).unwrap())
+                        .await?
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let is_block_finalized = if let Some(block_number) = data.block_number {
+                Some(
+                    transaction
+                        .chain()
+                        .block_schema()
+                        .is_block_finalized(BlockNumber(block_number as u32))
+                        .await?,
+                )
+            } else {
+                None
+            };
+
+            Some(StorageTxData::data_from_storage_data(
+                data,
+                is_block_finalized,
+                complete_withdrawals_tx_hash,
+            ))
+        } else {
+            None
+        };
+
+        transaction.commit().await?;
+        metrics::histogram!("sql.chain.operations_ext.tx_data_api_v02", start.elapsed());
+        Ok(result)
+    }
     pub async fn tx_data_api_v02(&mut self, hash: &[u8]) -> QueryResult<Option<TxData>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -188,6 +292,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         tx_hash,
                         tx as op,
                         block_number,
+                        block_index,
                         created_at,
                         success,
                         fail_reason,
@@ -202,6 +307,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         tx_hash,
                         operation as op,
                         block_number,
+                        block_index,
                         created_at,
                         true as success,
                         Null as fail_reason,
@@ -216,6 +322,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         decode(tx_hash, 'hex'),
                         tx as op,
                         Null::bigint as block_number,
+                        Null::int as block_index,
                         created_at,
                         Null::boolean as success,
                         Null as fail_reason,
@@ -237,6 +344,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     tx_hash as "tx_hash!",
                     op as "op!",
                     block_number as "block_number?",
+                    block_index as "block_index?",
                     created_at as "created_at!",
                     success as "success?",
                     fail_reason as "fail_reason?",

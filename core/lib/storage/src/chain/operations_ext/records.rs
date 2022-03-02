@@ -165,6 +165,7 @@ pub struct StorageTxReceipt {
 pub struct StorageTxData {
     pub tx_hash: Vec<u8>,
     pub block_number: Option<i64>,
+    pub block_index: Option<i32>,
     pub op: Value,
     pub success: Option<bool>,
     pub fail_reason: Option<String>,

@@ -318,6 +318,7 @@ impl Paginate<PendingOpsRequest> for StorageProcessor<'_> {
                 );
                 Transaction {
                     tx_hash,
+                    block_index: None,
                     block_number: None,
                     op: TransactionData::L1(tx),
                     status: TxInBlockStatus::Queued,

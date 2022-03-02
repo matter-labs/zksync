@@ -276,8 +276,10 @@ impl TransactionItem {
         } else {
             TransactionData::L2(serde_json::from_value(item.op).unwrap())
         };
+
         Transaction {
             tx_hash,
+            block_index: item.block_index.map(|i| i as u64),
             block_number,
             op,
             status,

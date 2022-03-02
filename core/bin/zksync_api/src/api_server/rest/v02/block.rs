@@ -7,6 +7,7 @@ use std::str::FromStr;
 use actix_web::{web, Scope};
 
 // Workspace uses
+use zksync_api_types::v02::transaction::TxData;
 use zksync_api_types::v02::{
     block::{BlockInfo, BlockStatus},
     pagination::{parse_query, ApiEither, BlockAndTxHash, Paginated, PaginationQuery},
@@ -126,6 +127,20 @@ impl ApiBlockData {
         storage.paginate_checked(&new_query).await
     }
 
+    async fn tx_data(
+        &self,
+        block_number: BlockNumber,
+        block_index: u64,
+    ) -> Result<Option<TxData>, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        Ok(storage
+            .chain()
+            .operations_ext_schema()
+            .tx_data_by_block_and_index_api_v02(block_number, block_index)
+            .await
+            .map_err(Error::storage)?)
+    }
+
     async fn get_last_committed_block_number(&self) -> QueryResult<BlockNumber> {
         let mut storage = self.pool.access_storage().await?;
         storage
@@ -175,6 +190,15 @@ async fn block_transactions(
     data.transaction_page(block_number, query).await.into()
 }
 
+async fn transaction_in_block(
+    data: web::Data<ApiBlockData>,
+    block_position: web::Path<BlockNumber>,
+    block_index: web::Path<u64>,
+) -> ApiResult<Option<TxData>> {
+    let res = api_try!(data.tx_data(*block_position, *block_index).await);
+    ApiResult::Ok(res)
+}
+
 pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
     let data = ApiBlockData::new(pool, cache);
 
@@ -185,6 +209,10 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
         .route(
             "{block_position}/transactions",
             web::get().to(block_transactions),
+        )
+        .route(
+            "{block_position}/transactions/{block_index}",
+            web::get().to(transaction_in_block),
         )
 }
 
