@@ -90,6 +90,68 @@
       ]
     }
   },
+  "0396b99500762375a8f21a7b2ade787b3506f1109a0830bd8e4988c9434b3e97": {
+    "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        block_index,\n                        success,\n                        fail_reason,\n                        created_at,\n                        batch_id,\n                        sequence_number\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        block_index as \"block_index?\",\n                        true as success,\n                        Null as fail_reason,\n                        created_at,\n                        Null::bigint as batch_id,\n                        sequence_number\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    block_index as \"block_index?\",\n                    success as \"success!\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\",\n                    batch_id as \"batch_id?\"\n                FROM everything\n                ORDER BY sequence_number DESC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "op!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "block_index?",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "fail_reason?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 7,
+          "name": "batch_id?",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
   "052bc740befe43cd3d8d915371cb055187d4ff4ebf019fe12c8dc85b296acc47": {
     "query": "SELECT tx_hash, tx FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
     "describe": {
@@ -5702,62 +5764,6 @@
         null,
         null,
         null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
-    }
-  },
-  "b4a6d5568ac2e4d27689277c120f1ca960cb210682bdb3f050cba82bc0168f53": {
-    "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        success,\n                        fail_reason,\n                        created_at,\n                        batch_id,\n                        sequence_number\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        true as success,\n                        Null as fail_reason,\n                        created_at,\n                        Null::bigint as batch_id,\n                        sequence_number\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    success as \"success!\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\",\n                    batch_id as \"batch_id?\"\n                FROM everything\n                ORDER BY sequence_number DESC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "op!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "batch_id?",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
         null,
         null,
         null,

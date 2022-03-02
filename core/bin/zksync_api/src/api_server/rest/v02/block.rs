@@ -192,10 +192,10 @@ async fn block_transactions(
 
 async fn transaction_in_block(
     data: web::Data<ApiBlockData>,
-    block_position: web::Path<BlockNumber>,
-    block_index: web::Path<u64>,
+    path: web::Path<(BlockNumber, u64)>,
 ) -> ApiResult<Option<TxData>> {
-    let res = api_try!(data.tx_data(*block_position, *block_index).await);
+    let (block_number, block_index) = *path;
+    let res = api_try!(data.tx_data(block_number, block_index).await);
     ApiResult::Ok(res)
 }
 
@@ -295,11 +295,31 @@ mod tests {
         assert_eq!(paginated.pagination.direction, PaginationDirection::Older);
         assert_eq!(paginated.pagination.from, tx_hash);
 
-        for (tx, expected_tx) in paginated.list.into_iter().zip(expected_txs) {
+        for (tx, expected_tx) in paginated.list.into_iter().zip(expected_txs.clone()) {
             assert_eq!(
                 tx.tx_hash.to_string().replace("sync-tx:", "0x"),
                 expected_tx.tx_hash
             );
+            assert_eq!(tx.created_at, Some(expected_tx.created_at));
+            assert_eq!(*tx.block_number.unwrap(), expected_tx.block_number as u32);
+            assert_eq!(tx.fail_reason, expected_tx.fail_reason);
+            if matches!(tx.op, TransactionData::L2(_)) {
+                assert_eq!(serde_json::to_value(tx.op).unwrap(), expected_tx.op);
+            }
+        }
+
+        for expected_tx in expected_txs {
+            if !expected_tx.success {
+                continue;
+            }
+            let response = client
+                .transaction_in_block(
+                    expected_tx.block_number as u32,
+                    expected_tx.block_index.unwrap() as u32,
+                )
+                .await?;
+            let tx: Option<TxData> = deserialize_response_result(response)?;
+            let tx = tx.unwrap().tx;
             assert_eq!(tx.created_at, Some(expected_tx.created_at));
             assert_eq!(*tx.block_number.unwrap(), expected_tx.block_number as u32);
             assert_eq!(tx.fail_reason, expected_tx.fail_reason);
