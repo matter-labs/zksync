@@ -279,7 +279,7 @@ impl TransactionItem {
 
         Transaction {
             tx_hash,
-            block_index: item.block_index.map(|i| i as u64),
+            block_index: item.block_index.map(|i| i as u32),
             block_number,
             op,
             status,

@@ -76,7 +76,7 @@ pub enum Receipt {
 pub struct Transaction {
     #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
-    pub block_index: Option<u64>,
+    pub block_index: Option<u32>,
     pub block_number: Option<BlockNumber>,
     pub op: TransactionData,
     pub status: TxInBlockStatus,

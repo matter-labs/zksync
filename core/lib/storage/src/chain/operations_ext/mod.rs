@@ -183,61 +183,64 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     ) -> QueryResult<Option<TxData>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        let data = {
-            let executed_tx: Option<StorageTxData> = sqlx::query_as!(
-                StorageTxData,
-                r#"
-                SELECT
-                    tx_hash,
-                    tx as op,
-                    block_number as "block_number?",
-                    block_index as "block_index?",
-                    created_at,
-                    success as "success?",
-                    fail_reason,
-                    Null::bytea as eth_hash,
-                    Null::bigint as priority_op_serialid,
-                    batch_id,
-                    eth_sign_data
-                FROM executed_transactions
-                WHERE block_number = $1 AND block_index = $2
-            "#,
-                block_number.0 as i32,
-                block_index as i32
-            )
-            .fetch_optional(transaction.conn())
-            .await?;
-
-            if let Some(data) = executed_tx {
-                Some(data)
-            } else {
-                let executed_operation: Option<StorageTxData> = sqlx::query_as!(
-                    StorageTxData,
-                    r#"
+        let data: Option<StorageTxData> = sqlx::query_as!(
+            StorageTxData,
+            r#"
+                WITH transaction AS (
                     SELECT
-                        tx_hash as "tx_hash!",
-                        operation as op,
-                        block_index as "block_index?",
-                        block_number as "block_number?",
+                        tx_hash,
+                        tx as op,
+                        block_number,
+                        block_index,
                         created_at,
-                        true as "success?",
+                        success,
+                        fail_reason,
+                        Null::bytea as eth_hash,
+                        Null::bigint as priority_op_serialid,
+                        batch_id,
+                        eth_sign_data
+                    FROM executed_transactions
+                    WHERE block_number = $1 AND block_index = $2
+                ), priority_op AS (
+                    SELECT
+                        tx_hash,
+                        operation as op,
+                        block_number,
+                        block_index,
+                        created_at,
+                        true as success,
                         Null as fail_reason,
-                        eth_hash as "eth_hash?",
-                        priority_op_serialid as "priority_op_serialid?",
+                        eth_hash,
+                        priority_op_serialid,
                         Null::bigint as batch_id,
                         Null::jsonb as eth_sign_data
                     FROM executed_priority_operations
-                    WHERE block_number = $1
-                    AND block_index = $2
-                "#,
-                    block_number.0 as i64,
-                    block_index as i32
+                    WHERE block_number = $1 AND block_index = $2
+                ), 
+                everything AS (
+                    SELECT * FROM transaction
+                    UNION ALL
+                    SELECT * FROM priority_op
                 )
-                .fetch_optional(transaction.conn())
-                .await?;
-                executed_operation
-            }
-        };
+                SELECT
+                    tx_hash as "tx_hash!",
+                    op as "op!",
+                    block_number as "block_number?",
+                    block_index as "block_index?",
+                    created_at as "created_at!",
+                    success as "success?",
+                    fail_reason as "fail_reason?",
+                    eth_hash as "eth_hash?",
+                    priority_op_serialid as "priority_op_serialid?",
+                    batch_id as "batch_id?",
+                    eth_sign_data as "eth_sign_data?"
+                FROM everything
+            "#,
+            block_number.0 as i32,
+            block_index as i32
+        )
+        .fetch_optional(transaction.conn())
+        .await?;
 
         let result = if let Some(data) = data {
             let complete_withdrawals_tx_hash = if let Some(tx_type) = data.op.get("type") {

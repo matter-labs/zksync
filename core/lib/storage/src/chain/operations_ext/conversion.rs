@@ -118,7 +118,7 @@ impl StorageTxData {
             };
             Transaction {
                 tx_hash,
-                block_index: data.block_index.map(|i| i as u64),
+                block_index: data.block_index.map(|i| i as u32),
                 block_number,
                 op,
                 status,
@@ -133,7 +133,7 @@ impl StorageTxData {
             );
             Transaction {
                 tx_hash,
-                block_index: data.block_index.map(|i| i as u64),
+                block_index: data.block_index.map(|i| i as u32),
                 block_number: None,
                 op: tx_data,
                 status: TxInBlockStatus::Queued,
