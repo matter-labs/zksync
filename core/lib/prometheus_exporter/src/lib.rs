@@ -61,29 +61,34 @@ async fn prometheus_exporter_iteration(connection_pool: ConnectionPool) -> Query
     Ok(())
 }
 
+/// Extract volumes from block
+fn get_volumes(block: &IncompleteBlock) -> HashMap<TokenId, BigUint> {
+    let mut volumes: HashMap<TokenId, BigUint> = HashMap::new();
+
+    // Iterator over tx amounts in the block.
+    let amounts_iter = block
+        .block_transactions
+        .iter()
+        .filter(|executed_op| executed_op.is_successful()) // Only process successful operations.
+        .filter_map(|executed_op| executed_op.get_executed_op()) // Obtain transaction.
+        .filter_map(|tx| tx.get_amount_info()) // Process transactions with amounts.
+        .flatten(); // Each transaction can have multiple amounts, process one by one.
+
+    for (token, amount) in amounts_iter {
+        volumes
+            .entry(token)
+            .and_modify(|volume| *volume = volume.clone().add(amount.clone()))
+            .or_insert(amount);
+    }
+    volumes
+}
+
+/// Send volume of all transactions in block in usd to prometheus
 pub async fn calculate_volume_for_block(
     storage: &mut StorageProcessor<'_>,
     block: &IncompleteBlock,
 ) {
-    let mut volumes: HashMap<TokenId, BigUint> = HashMap::new();
-    for executed_op in &block.block_transactions {
-        if let Some(tx) = executed_op.get_executed_op() {
-            if executed_op.is_successful() {
-                if let Some(data) = tx.get_amount_info() {
-                    for (token, amount) in data {
-                        let full_amount;
-                        if let Some(volume) = volumes.get(&token) {
-                            full_amount = volume.add(amount);
-                        } else {
-                            full_amount = amount;
-                        }
-                        volumes.insert(token, full_amount);
-                    }
-                }
-            }
-        }
-    }
-
+    let volumes = get_volumes(block);
     for (token, amount) in volumes.into_iter() {
         if let Ok(Some(price)) = storage
             .tokens_schema()

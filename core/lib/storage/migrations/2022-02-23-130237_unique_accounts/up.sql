@@ -8,7 +8,9 @@ as
 $$
 begin
     return query (
-        select count(distinct address) from tx_filters where tx_hash in (
+        select count(distinct address)
+        from tx_filters
+        where tx_hash in (
             select tx_hash
             from executed_transactions
             where success = true
@@ -17,6 +19,6 @@ begin
             select tx_hash
             from executed_priority_operations
             where created_at BETWEEN after AND before
-        )    );
+        ));
 end;
 $$;

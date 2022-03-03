@@ -72,7 +72,7 @@ impl ZkSyncOp {
             ZkSyncOp::WithdrawNFT(_) => WithdrawNFTOp::CHUNKS,
         }
     }
-
+    /// Get information about amounts in operation
     pub fn get_amount_info(&self) -> Option<Vec<(TokenId, BigUint)>> {
         match self {
             ZkSyncOp::Transfer(tx) => Some(vec![(tx.tx.token, tx.tx.amount.clone())]),
