@@ -17,7 +17,7 @@ use crate::chain::account::records::*;
 ///
 /// This enum allows one to process account updates in a generic way.
 #[derive(Debug)]
-pub enum StorageAccountDiff {
+pub(crate) enum StorageAccountDiff {
     BalanceUpdate(StorageAccountUpdate),
     Create(StorageAccountCreation),
     Delete(StorageAccountCreation),
@@ -118,14 +118,14 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
 
 impl StorageAccountDiff {
     /// Compares updates by `block number` then by `update_order_id` (which is number within block).
-    pub fn cmp_order(&self, other: &Self) -> Ordering {
+    pub(crate) fn cmp_order(&self, other: &Self) -> Ordering {
         self.block_number()
             .cmp(&other.block_number())
             .then(self.update_order_id().cmp(&other.update_order_id()))
     }
 
     /// Returns the index of the operation within block.
-    pub fn update_order_id(&self) -> i32 {
+    pub(crate) fn update_order_id(&self) -> i32 {
         match self {
             StorageAccountDiff::BalanceUpdate(StorageAccountUpdate {
                 update_order_id, ..
@@ -147,7 +147,7 @@ impl StorageAccountDiff {
     }
 
     /// Returns the block index to which the operation belongs.
-    pub fn block_number(&self) -> i64 {
+    pub(crate) fn block_number(&self) -> i64 {
         *match self {
             StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { block_number, .. }) => {
                 block_number

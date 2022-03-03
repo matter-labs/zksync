@@ -350,7 +350,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     }
 
     /// Returns mempool transaction as it is stored in the database.
-    pub async fn get_mempool_tx(&mut self, tx_hash: &[u8]) -> QueryResult<Option<MempoolTx>> {
+    async fn get_mempool_tx(&mut self, tx_hash: &[u8]) -> QueryResult<Option<MempoolTx>> {
         let start = Instant::now();
 
         let tx_hash = hex::encode(tx_hash);
