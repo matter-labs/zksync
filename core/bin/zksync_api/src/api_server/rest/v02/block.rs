@@ -7,11 +7,10 @@ use std::str::FromStr;
 use actix_web::{web, Scope};
 
 // Workspace uses
-use zksync_api_types::v02::transaction::TxData;
 use zksync_api_types::v02::{
     block::{BlockInfo, BlockStatus},
     pagination::{parse_query, ApiEither, BlockAndTxHash, Paginated, PaginationQuery},
-    transaction::{Transaction, TxHashSerializeWrapper},
+    transaction::{Transaction, TxData, TxHashSerializeWrapper},
 };
 use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records::StorageBlockDetails, ConnectionPool, QueryResult};

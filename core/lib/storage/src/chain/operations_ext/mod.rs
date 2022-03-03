@@ -149,17 +149,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await?;
 
         let result = if let Some(receipt) = receipt {
-            let is_block_finalized = if let Some(block_number) = receipt.block_number {
-                Some(
-                    transaction
-                        .chain()
-                        .block_schema()
-                        .is_block_finalized(BlockNumber(block_number as u32))
-                        .await?,
-                )
-            } else {
-                None
-            };
+            let is_block_finalized =
+                is_block_finalized(&mut transaction, receipt.block_number).await?;
+
             Some(StorageTxReceipt::receipt_from_storage_receipt(
                 receipt,
                 is_block_finalized,
@@ -243,38 +235,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await?;
 
         let result = if let Some(data) = data {
-            let complete_withdrawals_tx_hash = if let Some(tx_type) = data.op.get("type") {
-                let tx_type = tx_type.as_str().unwrap();
-                if tx_type == "Withdraw" || tx_type == "ForcedExit" {
-                    transaction
-                        .chain()
-                        .operations_schema()
-                        .eth_tx_for_withdrawal(&TxHash::from_slice(&data.tx_hash).unwrap())
-                        .await?
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            let is_block_finalized = if let Some(block_number) = data.block_number {
-                Some(
-                    transaction
-                        .chain()
-                        .block_schema()
-                        .is_block_finalized(BlockNumber(block_number as u32))
-                        .await?,
-                )
-            } else {
-                None
-            };
-
-            Some(StorageTxData::data_from_storage_data(
-                data,
-                is_block_finalized,
-                complete_withdrawals_tx_hash,
-            ))
+            Some(tx_data_from_storage(&mut transaction, data).await?)
         } else {
             None
         };
@@ -368,38 +329,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await?;
 
         let result = if let Some(data) = data {
-            let complete_withdrawals_tx_hash = if let Some(tx_type) = data.op.get("type") {
-                let tx_type = tx_type.as_str().unwrap();
-                if tx_type == "Withdraw" || tx_type == "ForcedExit" {
-                    transaction
-                        .chain()
-                        .operations_schema()
-                        .eth_tx_for_withdrawal(&TxHash::from_slice(&data.tx_hash).unwrap())
-                        .await?
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            let is_block_finalized = if let Some(block_number) = data.block_number {
-                Some(
-                    transaction
-                        .chain()
-                        .block_schema()
-                        .is_block_finalized(BlockNumber(block_number as u32))
-                        .await?,
-                )
-            } else {
-                None
-            };
-
-            Some(StorageTxData::data_from_storage_data(
-                data,
-                is_block_finalized,
-                complete_withdrawals_tx_hash,
-            ))
+            Some(tx_data_from_storage(&mut transaction, data).await?)
         } else {
             None
         };
@@ -1942,4 +1872,59 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await?;
         Ok(())
     }
+}
+
+async fn complete_withdrawals_tx_hash(
+    transaction: &mut StorageProcessor<'_>,
+    data: &StorageTxData,
+) -> QueryResult<Option<H256>> {
+    let result = if let Some(tx_type) = data.op.get("type") {
+        let tx_type = tx_type.as_str().unwrap();
+        if tx_type == "Withdraw" || tx_type == "ForcedExit" {
+            transaction
+                .chain()
+                .operations_schema()
+                .eth_tx_for_withdrawal(&TxHash::from_slice(&data.tx_hash).unwrap())
+                .await?
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    Ok(result)
+}
+
+async fn is_block_finalized(
+    transaction: &mut StorageProcessor<'_>,
+    block_number: Option<i64>,
+) -> QueryResult<Option<bool>> {
+    // We always use Option<i64> for block number in cases with this module.
+    // So it's much cleaner to keep this check here
+    if let Some(block_number) = block_number {
+        Ok(Some(
+            transaction
+                .chain()
+                .block_schema()
+                .is_block_finalized(BlockNumber(block_number as u32))
+                .await?,
+        ))
+    } else {
+        Ok(None)
+    }
+}
+
+async fn tx_data_from_storage(
+    transaction: &mut StorageProcessor<'_>,
+    data: StorageTxData,
+) -> QueryResult<TxData> {
+    let complete_withdrawals_tx_hash = complete_withdrawals_tx_hash(transaction, &data).await?;
+
+    let is_block_finalized = is_block_finalized(transaction, data.block_number).await?;
+
+    Ok(StorageTxData::data_from_storage_data(
+        data,
+        is_block_finalized,
+        complete_withdrawals_tx_hash,
+    ))
 }
