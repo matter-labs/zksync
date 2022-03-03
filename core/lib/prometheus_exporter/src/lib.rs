@@ -1,11 +1,17 @@
 //! This module handles metric export to the Prometheus server
 
 use metrics_exporter_prometheus::PrometheusBuilder;
+use num::rational::Ratio;
+use num::{BigUint, ToPrimitive};
+use std::collections::HashMap;
+use std::ops::Add;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
-use zksync_storage::{ConnectionPool, QueryResult};
+use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
 use zksync_types::aggregated_operations::AggregatedActionType::*;
+use zksync_types::block::IncompleteBlock;
+use zksync_types::TokenId;
 
 const QUERY_INTERVAL: Duration = Duration::from_secs(30);
 
@@ -53,6 +59,42 @@ async fn prometheus_exporter_iteration(connection_pool: ConnectionPool) -> Query
 
     transaction.commit().await?;
     Ok(())
+}
+
+pub async fn calculate_volume_for_block(
+    storage: &mut StorageProcessor<'_>,
+    block: &IncompleteBlock,
+) {
+    let mut volumes: HashMap<TokenId, BigUint> = HashMap::new();
+    for executed_op in &block.block_transactions {
+        if let Some(tx) = executed_op.get_executed_op() {
+            if executed_op.is_successful() {
+                if let Some(data) = tx.get_amount_info() {
+                    for (token, amount) in data {
+                        let full_amount;
+                        if let Some(volume) = volumes.get(&token) {
+                            full_amount = volume.add(amount);
+                        } else {
+                            full_amount = amount;
+                        }
+                        volumes.insert(token, full_amount);
+                    }
+                }
+            }
+        }
+    }
+
+    for (token, amount) in volumes.into_iter() {
+        if let Ok(Some(price)) = storage
+            .tokens_schema()
+            .get_historical_ticker_price(token)
+            .await
+        {
+            let labels = vec![("token", format!("{}", token.0))];
+            let usd_amount = Ratio::from(amount) * price.usd_price;
+            metrics::gauge!("txs_volume", usd_amount.to_f64().unwrap(), &labels);
+        }
+    }
 }
 
 pub fn run_prometheus_exporter(port: u16) -> JoinHandle<()> {

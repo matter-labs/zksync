@@ -6029,6 +6029,7 @@ dependencies = [
  "metrics-exporter-prometheus",
  "metrics-macros",
  "metrics-util",
+ "num",
  "tokio",
  "tracing",
  "vlog",
