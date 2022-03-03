@@ -280,9 +280,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         };
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain.operations_ext.tx_data_api_v02", start.elapsed());
+        metrics::histogram!(
+            "sql.chain.operations_ext.tx_data_by_block_and_index_api_v02",
+            start.elapsed()
+        );
         Ok(result)
     }
+
     pub async fn tx_data_api_v02(&mut self, hash: &[u8]) -> QueryResult<Option<TxData>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
