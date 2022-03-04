@@ -62,7 +62,7 @@ ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"
 thiserror = "1.0"
 structopt = "0.3"
-reqwest = { version = "0.11", features = ["blocking", "json"] }
+reqwest = { version = "0.11", features = ["json"] }
 tiny-keccak = "1.4.2"
 async-trait = "0.1"
 jsonwebtoken = "7"
