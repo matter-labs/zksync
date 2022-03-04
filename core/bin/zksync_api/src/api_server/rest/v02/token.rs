@@ -112,6 +112,17 @@ impl ApiTokenData {
     }
 
     async fn token(&self, token_like: TokenLike) -> Result<Token, Error> {
+        // Try to find the token in the cache first.
+        if let Some(token) = self
+            .tokens
+            .try_get_token_from_cache(token_like.clone())
+            .await
+        {
+            return Ok(token);
+        }
+
+        // Establish db connection and repeat the query, so the token is loaded
+        // from the db.
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
 
         let token = self
