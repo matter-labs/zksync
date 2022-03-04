@@ -20,14 +20,16 @@ pub struct CoinGeckoAPI {
 }
 
 impl CoinGeckoAPI {
-    pub fn new(client: reqwest::Client, base_url: Url) -> anyhow::Result<Self> {
+    pub async fn new(client: reqwest::Client, base_url: Url) -> anyhow::Result<Self> {
         let token_list_url = base_url
             .join("api/v3/coins/list?include_platform=true")
             .expect("failed to join URL path");
 
-        let token_list = reqwest::blocking::get(token_list_url)
+        let token_list = reqwest::get(token_list_url)
+            .await
             .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
-            .json::<CoinGeckoTokenList>()?;
+            .json::<CoinGeckoTokenList>()
+            .await?;
 
         let mut token_ids = HashMap::new();
         for token in token_list.0 {
@@ -160,7 +162,7 @@ mod tests {
     async fn test_coingecko_api() {
         let ticker_url = parse_env("FEE_TICKER_COINGECKO_BASE_URL");
         let client = reqwest::Client::new();
-        let api = CoinGeckoAPI::new(client, ticker_url).unwrap();
+        let api = CoinGeckoAPI::new(client, ticker_url).await.unwrap();
         let token = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
         api.get_price(&token)
             .await

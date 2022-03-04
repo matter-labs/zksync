@@ -230,13 +230,15 @@ pub fn run_updaters(
             tokio::spawn(ticker_api.keep_price_updated())
         }
 
-        TokenPriceSource::CoinGecko => {
+        TokenPriceSource::CoinGecko => tokio::spawn(async move {
             let token_price_api =
                 CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
+                    .await
                     .expect("failed to init CoinGecko client");
             let ticker_api = TickerApi::new(db_pool, token_price_api);
-            tokio::spawn(ticker_api.keep_price_updated())
-        }
+
+            ticker_api.keep_price_updated().await;
+        }),
     };
     tasks.push(price_updater);
     tasks

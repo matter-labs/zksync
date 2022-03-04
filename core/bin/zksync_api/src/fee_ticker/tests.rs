@@ -1,26 +1,17 @@
 use std::any::Any;
 
-use actix_web::{web, App, HttpResponse, HttpServer};
-
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::Utc;
 use futures::executor::block_on;
-use futures::future::{AbortHandle, Abortable};
 use std::str::FromStr;
-use std::thread::sleep;
-use tokio::time::Duration;
 use zksync_types::{Address, Token, TokenId, TokenKind, TokenPrice};
 use zksync_utils::{
-    big_decimal_to_ratio, ratio_to_big_decimal, ratio_to_scaled_u64, scaled_u64_to_ratio,
-    UnsignedRatioSerializeAsDecimal,
+    ratio_to_big_decimal, ratio_to_scaled_u64, scaled_u64_to_ratio, UnsignedRatioSerializeAsDecimal,
 };
 
 use crate::fee_ticker::{
-    ticker_api::{
-        coingecko::{CoinGeckoTokenInfo, CoinGeckoTokenList},
-        TokenPriceAPI,
-    },
+    ticker_api::TokenPriceAPI,
     validator::{cache::TokenInMemoryCache, FeeTokenValidator},
 };
 
@@ -220,48 +211,6 @@ impl TokenPriceAPI for ErrorTickerApi {
     async fn get_price(&self, _token: &Token) -> Result<TokenPrice, PriceError> {
         Err(PriceError::token_not_found("Wrong token"))
     }
-}
-
-fn run_server(token_address: Address) -> (String, AbortHandle) {
-    let mut url = None;
-    let mut server = None;
-    for i in 9000..9999 {
-        let new_url = format!("127.0.0.1:{}", i);
-        // Try to bind to some port, hope that 999 variants will be enough
-        if let Ok(ser) = HttpServer::new(move || {
-            App::new()
-                .service(
-                    web::resource("/api/v3/coins/DAI/market_chart").route(web::get().to(|| {
-                        sleep(Duration::from_secs(100));
-                        HttpResponse::MethodNotAllowed()
-                    })),
-                )
-                .service(web::resource("/api/v3/coins/list").to(move || {
-                    let mut platforms = HashMap::new();
-                    platforms.insert(
-                        String::from("ethereum"),
-                        serde_json::Value::String(serde_json::to_string(&token_address).unwrap()),
-                    );
-                    HttpResponse::Ok().json(CoinGeckoTokenList(vec![CoinGeckoTokenInfo {
-                        id: "dai".to_string(),
-                        platforms,
-                    }]))
-                }))
-        })
-        .bind(new_url.clone())
-        {
-            server = Some(ser);
-            url = Some(new_url);
-            break;
-        }
-    }
-
-    let server = server.expect("Could not bind to port from 9000 to 9999");
-    let (abort_handle, abort_registration) = AbortHandle::new_pair();
-    let future = Abortable::new(server.run(), abort_registration);
-    tokio::spawn(future);
-    let address = format!("http://{}/", &url.unwrap());
-    (address, abort_handle)
 }
 
 fn get_normal_and_subsidy_fee(
@@ -758,111 +707,4 @@ fn test_zero_price_token_fee() {
         vec![(TxFeeTypes::Transfer, Address::default())],
     ))
     .unwrap_err();
-}
-
-#[actix_rt::test]
-#[ignore]
-// It's ignore because we can't initialize coingecko in current way with block
-async fn test_error_coingecko_api() {
-    let token = Token {
-        id: TokenId(1),
-        address: Address::random(),
-        symbol: String::from("DAI"),
-        decimals: 18,
-        kind: TokenKind::ERC20,
-        is_nft: false,
-    };
-    let (address, handler) = run_server(token.address);
-    let client = reqwest::ClientBuilder::new()
-        .timeout(CONNECTION_TIMEOUT)
-        .connect_timeout(CONNECTION_TIMEOUT)
-        .build()
-        .expect("Failed to build reqwest::Client");
-    let coingecko = CoinGeckoAPI::new(client, address.parse().unwrap()).unwrap();
-    let validator = FeeTokenValidator::new(
-        TokenInMemoryCache::new(),
-        chrono::Duration::seconds(100),
-        BigDecimal::from(100),
-        Default::default(),
-    );
-    let connection_pool = ConnectionPool::new(Some(1));
-    {
-        let mut storage = connection_pool.access_storage().await.unwrap();
-        storage
-            .tokens_schema()
-            .store_token(token.clone())
-            .await
-            .unwrap();
-        storage
-            .tokens_schema()
-            .update_historical_ticker_price(
-                token.id,
-                TokenPrice {
-                    usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
-                    last_updated: chrono::offset::Utc::now(),
-                },
-            )
-            .await
-            .unwrap();
-    }
-    let _ticker_api = TickerApi::new(connection_pool, coingecko);
-
-    let config = get_test_ticker_config();
-    let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
-    for _ in 0..1000 {
-        ticker
-            .get_fee_from_ticker_in_wei(
-                TxFeeTypes::FastWithdraw,
-                token.id.into(),
-                Address::default(),
-            )
-            .await
-            .unwrap();
-        ticker
-            .get_token_price(token.id.into(), TokenPriceRequestType::USDForOneWei)
-            .await
-            .unwrap();
-    }
-    handler.abort();
-}
-
-#[tokio::test]
-#[ignore]
-async fn test_error_api() {
-    let validator = FeeTokenValidator::new(
-        TokenInMemoryCache::new(),
-        chrono::Duration::seconds(100),
-        BigDecimal::from(100),
-        Default::default(),
-    );
-    let connection_pool = ConnectionPool::new(Some(1));
-    connection_pool
-        .access_storage()
-        .await
-        .unwrap()
-        .tokens_schema()
-        .update_historical_ticker_price(
-            TokenId(1),
-            TokenPrice {
-                usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
-                last_updated: chrono::offset::Utc::now(),
-            },
-        )
-        .await
-        .unwrap();
-    let config = get_test_ticker_config();
-    let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
-
-    ticker
-        .get_fee_from_ticker_in_wei(
-            TxFeeTypes::FastWithdraw,
-            TokenId(1).into(),
-            Address::default(),
-        )
-        .await
-        .unwrap();
-    ticker
-        .get_token_price(TokenId(1).into(), TokenPriceRequestType::USDForOneWei)
-        .await
-        .unwrap();
 }
