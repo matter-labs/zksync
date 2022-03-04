@@ -88,7 +88,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                             .set_account_type(tx.account_id, new_account_type)
                             .await?;
                     }
-                    // Store the executed operation in the corresponding schema.
+
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(
                         *tx,
                         block_number,
@@ -102,11 +102,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         .await?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
+                    // Store the executed operation in the corresponding schema.
                     // For priority operation we should only store it in the Operations schema.
                     let new_priority_op = NewExecutedPriorityOperation::prepare_stored_priority_op(
                         *prior_op,
                         block_number,
                     );
+
+                    // Store the executed operation in the corresponding schema.
                     transaction
                         .chain()
                         .operations_schema()
@@ -940,7 +943,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     ///
     /// This method **does not** save block transactions.
     /// They are expected to be saved prior, during processing of previous pending blocks.
-    pub async fn save_incomplete_block(&mut self, block: IncompleteBlock) -> QueryResult<()> {
+    pub async fn save_incomplete_block(&mut self, block: &IncompleteBlock) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -1020,7 +1023,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             )
             .await?;
         BlockSchema(&mut transaction)
-            .save_incomplete_block(incomplete_block)
+            .save_incomplete_block(&incomplete_block)
             .await?;
         BlockSchema(&mut transaction)
             .finish_incomplete_block(full_block)
