@@ -196,7 +196,7 @@ async fn seal_incomplete_block(
     transaction
         .chain()
         .block_schema()
-        .save_incomplete_block(block)
+        .save_incomplete_block(&block)
         .await
         .expect("committer must commit the op into db");
 
@@ -218,6 +218,10 @@ async fn seal_incomplete_block(
         .await
         .expect("Unable to commit DB transaction");
 
+    // We do this outside of a transaction,
+    // because we want the incomplete block data to be available as soon as possible.
+    // If something happened to the metric count, it won't affect the block data
+    zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block).await;
     metrics::histogram!("committer.seal_incomplete_block", start.elapsed());
 }
 

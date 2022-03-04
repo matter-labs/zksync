@@ -1066,7 +1066,7 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
     }
     // Insert 1 incomplete block.
     BlockSchema(&mut storage)
-        .save_incomplete_block(gen_sample_incomplete_block(
+        .save_incomplete_block(&gen_sample_incomplete_block(
             BlockNumber(6),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -1402,7 +1402,7 @@ async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> Query
         "Pending block should be saved"
     );
 
-    schema.save_incomplete_block(incomplete_block).await?;
+    schema.save_incomplete_block(&incomplete_block).await?;
 
     // Pending block should be removed now.
     assert!(

@@ -99,6 +99,7 @@ impl ApiTransactionData {
             let tx_hash = op.tx_hash();
             let tx = Transaction {
                 tx_hash,
+                block_index: None,
                 block_number: None,
                 op: TransactionData::L1(L1Transaction::from_pending_op(
                     op.data,

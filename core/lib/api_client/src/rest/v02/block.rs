@@ -13,6 +13,15 @@ impl Client {
             .await
     }
 
+    pub async fn transaction_in_block(&self, block_number: u32, tx_index: u32) -> Result<Response> {
+        self.get_with_scope(
+            super::API_V02_SCOPE,
+            &format!("blocks/{}/transactions/{}", block_number, tx_index),
+        )
+        .send()
+        .await
+    }
+
     pub async fn block_transactions(
         &self,
         pagination_query: &PaginationQuery<ApiEither<TxHash>>,
