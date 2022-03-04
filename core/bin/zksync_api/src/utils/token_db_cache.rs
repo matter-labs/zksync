@@ -22,6 +22,28 @@ impl TokenDBCache {
         Self::default()
     }
 
+    /// Version of `get_token` that only attempts to find the token in the cache.
+    /// This method should be used in places that don't require the DB connection itself,
+    /// so taking a connection from the pool is avoided.
+    ///
+    /// It is expected that if lookup fails, `get_token` will be called instead.
+    /// On such an event, we will try to get the token from cache twise, but this scenario
+    /// is unlikely, since most of the time tokens *are* in the cache.
+    pub async fn try_get_token_from_cache(
+        &self,
+        token_query: impl Into<TokenLike>,
+    ) -> Option<Token> {
+        let token_query = token_query.into();
+        // Just return token from cache.
+        if let Some((token, update_time)) = self.cache.read().await.get(&token_query.to_lowercase())
+        {
+            if update_time.elapsed() < TOKEN_INVALIDATE_CACHE {
+                return Some(token.clone());
+            }
+        }
+        None
+    }
+
     /// Performs case-insensitive token search.
     pub async fn get_token(
         &self,

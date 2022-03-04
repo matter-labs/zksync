@@ -72,6 +72,17 @@ impl TokenCacheWrapper {
     pub async fn get_token(&self, token_like: TokenLike) -> anyhow::Result<Option<Token>> {
         match self {
             Self::DB(cache) => {
+                // Try to find the token in the cache first.
+                if let Some(token) = cache
+                    .inner
+                    .try_get_token_from_cache(token_like.clone())
+                    .await
+                {
+                    return Ok(Some(token));
+                }
+
+                // Establish db connection and repeat the query, so the token is loaded
+                // from the db.
                 cache
                     .inner
                     .get_token(&mut cache.pool.access_storage().await?, token_like)

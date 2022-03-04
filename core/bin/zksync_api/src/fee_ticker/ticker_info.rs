@@ -192,19 +192,32 @@ impl FeeTickerInfo for TickerInfo {
     /// Get last price from ticker
     async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
         let start = Instant::now();
-        let token = self
-            .token_db_cache
-            .get_token(
-                &mut self
+
+        let token = {
+            // Try to find the token in the cache first.
+            if let Some(token) = self
+                .token_db_cache
+                .try_get_token_from_cache(token.clone())
+                .await
+            {
+                token
+            } else {
+                // Establish db connection and repeat the query, so the token is loaded
+                // from the db.
+                let mut storage = self
                     .db
                     .access_storage()
                     .await
-                    .map_err(PriceError::db_error)?,
-                token.clone(),
-            )
-            .await
-            .map_err(PriceError::db_error)?
-            .ok_or_else(|| PriceError::token_not_found(format!("Token not found: {:?}", token)))?;
+                    .map_err(PriceError::db_error)?;
+                self.token_db_cache
+                    .get_token(&mut storage, token.clone())
+                    .await
+                    .map_err(PriceError::db_error)?
+                    .ok_or_else(|| {
+                        PriceError::token_not_found(format!("Token not found: {:?}", token))
+                    })?
+            }
+        };
 
         // TODO: remove hardcode for Matter Labs Trial Token (ZKS-63).
         if token.symbol == "MLTT" {
@@ -269,9 +282,21 @@ impl FeeTickerInfo for TickerInfo {
 
     async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
         let start = Instant::now();
+        // Try to find the token in the cache first.
+        if let Some(token) = self
+            .token_db_cache
+            .try_get_token_from_cache(token.clone())
+            .await
+        {
+            return Ok(token);
+        }
+
+        // Establish db connection and repeat the query, so the token is loaded
+        // from the db.
+        let mut storage = self.db.access_storage().await?;
         let result = self
             .token_db_cache
-            .get_token(&mut self.db.access_storage().await?, token.clone())
+            .get_token(&mut storage, token.clone())
             .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token));
         metrics::histogram!("ticker_info.get_token", start.elapsed());
