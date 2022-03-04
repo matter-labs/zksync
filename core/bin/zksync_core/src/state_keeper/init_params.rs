@@ -184,10 +184,7 @@ impl ZkSyncStateInitParams {
             .await
             .expect("Unable to load committed NFT tokens")
             .into_iter()
-            .map(|nft| {
-                let token: NFT = nft.into();
-                (token.id, token)
-            })
+            .map(|nft| (nft.id, nft))
             .collect()
     }
 

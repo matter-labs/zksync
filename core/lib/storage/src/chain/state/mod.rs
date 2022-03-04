@@ -197,7 +197,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn apply_storage_account_diff(
+    pub(crate) async fn apply_storage_account_diff(
         &mut self,
         acc_update: StorageAccountDiff,
     ) -> QueryResult<()> {
@@ -722,7 +722,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     pub async fn load_committed_nft_tokens(
         &mut self,
         block_number: Option<BlockNumber>,
-    ) -> QueryResult<Vec<StorageMintNFTUpdate>> {
+    ) -> QueryResult<Vec<NFT>> {
         let tokens = if let Some(block_number) = block_number {
             sqlx::query_as!(
                 StorageMintNFTUpdate,
@@ -730,13 +730,13 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 block_number.0 as i64
             )
             .fetch_all(self.0.conn())
-            .await
+            .await?
         } else {
             sqlx::query_as!(StorageMintNFTUpdate, "SELECT * FROM mint_nft_updates")
                 .fetch_all(self.0.conn())
-                .await
+                .await?
         };
-        Ok(tokens?)
+        Ok(tokens.into_iter().map(NFT::from).collect())
     }
 
     // Removes account balance updates for blocks with number greater than `last_block`

@@ -20,7 +20,9 @@
 //! Most of schema modules contain at least two files:
 //! - `mod.rs`, which contains the schema itself.
 //! - `records.rs`, which contains the representation of the associated database
-//!   tables as structures.
+//!   tables as structures. Note that in record types some fields can be marked
+//!   as `allow(dead_code)` -- the field may actually be unused, but it exists in
+//!   the database, so we need to deserialize it anyway.
 //!
 //! The latter ones usually don't contain any logic other than the structures
 //! declarations, and all the logic is contained in either schema (for most

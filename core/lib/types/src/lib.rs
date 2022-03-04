@@ -39,8 +39,6 @@
 pub mod account;
 pub mod aggregated_operations;
 pub mod block;
-pub mod config;
-pub mod error;
 pub mod ethereum;
 pub mod event;
 pub mod fee;

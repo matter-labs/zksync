@@ -5,7 +5,10 @@
 // Workspace deps
 use zksync_basic_types::*;
 // Local deps
-use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, Block, ZkSyncOp};
+use crate::{Block, ZkSyncOp};
+
+// HACK: hardcode some configuration options for now.
+const MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL: u64 = 20;
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -89,7 +92,6 @@ impl VerifyCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 10_000;
     pub const DEPOSIT_COST: u64 = 100;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
@@ -98,7 +100,7 @@ impl VerifyCost {
     pub const SWAP_COST: u64 = 0;
     pub const FULL_EXIT_COST: u64 = 30_000;
     pub const WITHDRAW_COST: u64 = 48_000;
-    pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
+    pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST;
     pub const MINT_NFT_COST: u64 = 0;
     pub const WITHDRAW_NFT_COST: u64 = 200_000;
 
