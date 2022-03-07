@@ -944,6 +944,21 @@ async fn get_logs() -> anyhow::Result<()> {
         assert_eq!(log.block_number.unwrap().as_u64(), 1);
     }
 
+    // Checks that request without `fromBlock` and `toBlock` is processed.
+    // `latest` should be assumed.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let req = Map::new();
+        join(
+            client.call_method("eth_getLogs", Params::Array(vec![Value::Object(req)])),
+            server,
+        )
+    };
+    let _ = fut
+        .await
+        .0
+        .expect("Request with `fromBlock` and `toBlock` omitted has failed");
+
     // Checks that address filter works correctly
     let mut addresses = Vec::new();
     {
