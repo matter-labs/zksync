@@ -123,6 +123,26 @@ describe(`No2FA tests`, () => {
         await tester.testWithdraw(hilda, token, TX_AMOUNT);
     });
 
+    step('Switching 2FA on & providing PubKeyHash should fail', async () => {
+        // Provide a PubKeyHash. Together with `enable: true` server is expected to return an error.
+        const randomPrivateKey = await crypto.privateKeyFromSeed(utils.randomBytes(32));
+        const randomPubKeyHash = await crypto.privateKeyToPubKeyHash(randomPrivateKey);
+        let thrown = false;
+        try {
+            await hildaWithEthSigner.toggle2FA(true, randomPubKeyHash);
+        } catch (e) {
+            thrown = true;
+        }
+        expect(thrown, "Request with 'enable: true' and PubKeyHash provided was processed by server").to.be.true;
+
+        // Account type should not change.
+        const expectedPubKeyHash = await crypto.privateKeyToPubKeyHash(zkPrivateKey);
+        const accountState = await hilda.getAccountState();
+        expect(accountState.accountType, 'Incorrect account type').to.be.eql({
+            No2FA: expectedPubKeyHash
+        });
+    });
+
     step('Test switching 2FA on', async () => {
         await hildaWithEthSigner.toggle2FA(true);
         const accountState = await hilda.getAccountState();

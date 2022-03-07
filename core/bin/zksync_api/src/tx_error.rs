@@ -57,4 +57,7 @@ pub enum Toggle2FAError {
 
     #[error("Can not change 2FA for a CREATE2 account")]
     CREATE2,
+
+    #[error("Request to enable 2FA should not have PubKeyHash field set")]
+    UnusedPubKeyHash,
 }
