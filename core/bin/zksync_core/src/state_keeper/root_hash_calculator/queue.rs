@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Notify};
 
 use zksync_types::{AccountUpdates, BlockNumber};
 
@@ -31,8 +31,12 @@ pub struct BlockRootHashJob {
 /// possible to process them.
 #[derive(Debug, Default, Clone)]
 pub struct BlockRootHashJobQueue {
+    /// Thread-safe shared queue.
     queue: Arc<Mutex<VecDeque<BlockRootHashJob>>>,
+    /// Queue size.
     size: Arc<AtomicUsize>,
+    /// New jobs notification channel. Used to wake up waiters when the new job was pushed to the queue.
+    notify: Arc<Notify>,
 }
 
 impl BlockRootHashJobQueue {
@@ -43,6 +47,7 @@ impl BlockRootHashJobQueue {
         Self {
             queue: Arc::new(Mutex::new(queue)),
             size: Arc::new(AtomicUsize::from(size)),
+            notify: Arc::new(Notify::new()),
         }
     }
 
@@ -51,23 +56,28 @@ impl BlockRootHashJobQueue {
         self.queue.lock().await.push_back(job);
         // Here and below: `Relaxed` is enough as don't rely on the value for any critical sections.
         self.size.fetch_add(1, Ordering::Relaxed);
+        self.notify.notify_one();
         metrics::increment_gauge!("block_root_hash_job_queue.size", 1.0);
     }
 
     /// Pops an element from the queue.
-    pub(crate) async fn pop(&mut self) -> Option<BlockRootHashJob> {
-        let result = self.queue.lock().await.pop_front();
-        if result.is_some() {
-            let old_value = self.size.fetch_sub(1, Ordering::Relaxed);
-            // This variant is logically impossible (we can't pop more elements than we added),
-            // but it's still preferable to check for underflows.
-            assert!(
-                old_value != 0,
-                "Underflow on job queue size in state keeper"
-            );
-            metrics::decrement_gauge!("block_root_hash_job_queue.size", 1.0);
+    pub(crate) async fn pop(&mut self) -> BlockRootHashJob {
+        loop {
+            if let Some(result) = self.queue.lock().await.pop_front() {
+                let old_value = self.size.fetch_sub(1, Ordering::Relaxed);
+                // This variant is logically impossible (we can't pop more elements than we added),
+                // but it's still preferable to check for underflows.
+                assert!(
+                    old_value != 0,
+                    "Underflow on job queue size in state keeper"
+                );
+                metrics::decrement_gauge!("block_root_hash_job_queue.size", 1.0);
+                return result;
+            }
+
+            // No job yet, wait for one to become available.
+            self.notify.notified().await;
         }
-        result
     }
 
     /// Returns the current size of the queue.
@@ -136,21 +146,50 @@ mod tests {
         assert_eq!(queue.size(), 2);
         assert!(queue.should_throttle());
 
-        let first_job = queue.pop().await.expect("Should pop element");
+        let first_job = queue.pop().await;
         assert_eq!(first_job.block, BlockNumber(1));
         assert_eq!(queue.size(), 1);
         assert!(!queue.should_throttle());
 
-        let second_job = queue.pop().await.expect("Should pop element");
+        let second_job = queue.pop().await;
         assert_eq!(second_job.block, BlockNumber(2));
         assert_eq!(queue.size(), 0);
         assert!(!queue.should_throttle());
+    }
 
-        assert!(queue.pop().await.is_none(), "No elements left");
-        assert_eq!(
-            queue.size(),
-            0,
-            "Size should not change after popping from empty"
-        );
+    /// Checks notifier logic.
+    #[tokio::test]
+    async fn queue_notifications() {
+        let mut queue = BlockRootHashJobQueue::new(std::iter::empty());
+        let mut queue2 = queue.clone();
+        assert_eq!(queue.size(), 0);
+
+        let task = tokio::spawn(async move {
+            let first = queue2.pop().await;
+            let second = queue2.pop().await;
+            assert_eq!(first.block, BlockNumber(1));
+            assert_eq!(second.block, BlockNumber(2));
+        });
+
+        // To create some time gap for the spawned task.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        queue
+            .push(BlockRootHashJob {
+                block: BlockNumber(1),
+                updates: Vec::new(),
+            })
+            .await;
+        queue
+            .push(BlockRootHashJob {
+                block: BlockNumber(2),
+                updates: Vec::new(),
+            })
+            .await;
+
+        let result = tokio::time::timeout(Duration::from_millis(100), task)
+            .await
+            .expect("Task time out");
+        assert!(result.is_ok(), "Spawned task failed");
     }
 }
