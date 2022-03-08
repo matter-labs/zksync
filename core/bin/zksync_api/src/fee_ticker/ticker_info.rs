@@ -94,15 +94,17 @@ pub struct TickerInfo {
     token_db_cache: TokenDBCache,
     price_cache: Arc<RwLock<HashMap<TokenId, TokenCacheEntry>>>,
     gas_price_cache: Arc<RwLock<Option<(BigUint, Instant)>>>,
+    with_cache: bool,
 }
 
 impl TickerInfo {
-    pub fn new(db: ConnectionPool) -> Self {
+    pub fn new(db: ConnectionPool, with_cache: bool) -> Self {
         Self {
             db,
             token_db_cache: Default::default(),
             price_cache: Default::default(),
             gas_price_cache: Default::default(),
+            with_cache,
         }
     }
 }
@@ -228,9 +230,11 @@ impl FeeTickerInfo for TickerInfo {
             });
         }
 
-        if let Some(cached_value) = self.get_stored_value(token.id).await {
-            metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "cached");
-            return Ok(cached_value);
+        if self.with_cache {
+            if let Some(cached_value) = self.get_stored_value(token.id).await {
+                metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "cached");
+                return Ok(cached_value);
+            }
         }
 
         let historical_price = self
@@ -239,8 +243,10 @@ impl FeeTickerInfo for TickerInfo {
             .map_err(|e| vlog::warn!("Failed to get historical ticker price: {}", e));
 
         if let Ok(Some(historical_price)) = historical_price {
-            self.update_cached_value(token.id, historical_price.clone())
-                .await;
+            if self.with_cache {
+                self.update_cached_value(token.id, historical_price.clone())
+                    .await;
+            }
             metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "historical");
             return Ok(historical_price);
         }
@@ -252,15 +258,16 @@ impl FeeTickerInfo for TickerInfo {
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
         let start = Instant::now();
-        let cached_value = self.gas_price_cache.read().await;
+        if self.with_cache {
+            let cached_value = self.gas_price_cache.read().await;
 
-        if let Some((cached_gas_price, cache_time)) = cached_value.as_ref() {
-            if cache_time.elapsed() < API_PRICE_EXPIRATION_TIME_SECS {
-                return Ok(cached_gas_price.clone());
+            if let Some((cached_gas_price, cache_time)) = cached_value.as_ref() {
+                if cache_time.elapsed() < API_PRICE_EXPIRATION_TIME_SECS {
+                    return Ok(cached_gas_price.clone());
+                }
             }
+            drop(cached_value);
         }
-
-        drop(cached_value);
 
         let mut storage = self
             .db
@@ -275,7 +282,10 @@ impl FeeTickerInfo for TickerInfo {
             .as_u64();
         let average_gas_price = BigUint::from(average_gas_price);
 
-        *self.gas_price_cache.write().await = Some((average_gas_price.clone(), Instant::now()));
+        if self.with_cache {
+            *self.gas_price_cache.write().await = Some((average_gas_price.clone(), Instant::now()));
+        }
+
         metrics::histogram!("ticker_info.get_gas_price_wei", start.elapsed());
         Ok(average_gas_price)
     }

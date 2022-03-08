@@ -26,3 +26,6 @@ scale_fee_percent=100
 # Please note, that the prices are scaled by 10^6
 # CPK price is 0.00001 USD
 subsidy_cpk_price_usd_scaled=10
+
+# Using cache for ticker info
+with_cache=false
