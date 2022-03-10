@@ -2,13 +2,12 @@
 use std::time::{Duration, Instant};
 // External uses
 use futures::channel::mpsc::{Receiver, Sender};
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 use zksync_crypto::Fr;
 use zksync_types::block::IncompleteBlock;
 // Workspace uses
-use crate::mempool::MempoolBlocksRequest;
 use zksync_config::ChainConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -52,22 +51,12 @@ pub struct ExecutedOpsNotify {
 
 const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
-async fn handle_new_commit_task(
-    mut rx_for_ops: Receiver<CommitRequest>,
-    mut mempool_req_sender: Sender<MempoolBlocksRequest>,
-    pool: ConnectionPool,
-) {
+async fn handle_new_commit_task(mut rx_for_ops: Receiver<CommitRequest>, pool: ConnectionPool) {
     vlog::info!("Run committer");
     while let Some(request) = rx_for_ops.next().await {
         match request {
             CommitRequest::SealIncompleteBlock((block_commit_request, applied_updates_req)) => {
-                seal_incomplete_block(
-                    block_commit_request,
-                    applied_updates_req,
-                    &pool,
-                    &mut mempool_req_sender,
-                )
-                .await;
+                seal_incomplete_block(block_commit_request, applied_updates_req, &pool).await;
             }
             CommitRequest::PendingBlock((pending_block, applied_updates_req)) => {
                 save_pending_block(pending_block, applied_updates_req, &pool).await;
@@ -147,13 +136,12 @@ async fn seal_incomplete_block(
     block_commit_request: BlockCommitRequest,
     applied_updates_request: AppliedUpdatesRequest,
     pool: &ConnectionPool,
-    mempool_req_sender: &mut Sender<MempoolBlocksRequest>,
 ) {
     let start = Instant::now();
     let BlockCommitRequest {
         block,
         block_metadata,
-        accounts_updated,
+        ..
     } = block_commit_request;
 
     let mut storage = pool
@@ -206,12 +194,6 @@ async fn seal_incomplete_block(
         .save_block_metadata(block_number, block_metadata)
         .await
         .expect("committer must commit block block metadata into db");
-
-    mempool_req_sender
-        .send(MempoolBlocksRequest::UpdateNonces(accounts_updated))
-        .await
-        .map_err(|e| vlog::warn!("Failed notify mempool about account updates: {}", e))
-        .unwrap_or_default();
 
     transaction
         .commit()
@@ -301,14 +283,9 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool, config: ChainConfig) {
 #[must_use]
 pub fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
-    mempool_req_sender: Sender<MempoolBlocksRequest>,
     pool: ConnectionPool,
     config: ChainConfig,
 ) -> JoinHandle<()> {
-    tokio::spawn(handle_new_commit_task(
-        rx_for_ops,
-        mempool_req_sender,
-        pool.clone(),
-    ));
+    tokio::spawn(handle_new_commit_task(rx_for_ops, pool.clone()));
     tokio::spawn(poll_for_new_proofs_task(pool, config))
 }

@@ -150,7 +150,6 @@ pub async fn run_core(
     // Start committer.
     let committer_task = run_committer(
         proposed_blocks_receiver,
-        mempool_block_request_sender.clone(),
         connection_pool.clone(),
         config.chain.clone(),
     );
