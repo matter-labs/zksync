@@ -242,6 +242,12 @@ impl TxSender {
             return Err(SubmitError::Toggle2FA(Toggle2FAError::CREATE2));
         }
 
+        // When 2FA is being enabled, supplied PubKeyHash is not used, so such a request
+        // is not valid.
+        if toggle_2fa.enable && toggle_2fa.pub_key_hash.is_some() {
+            return Err(SubmitError::Toggle2FA(Toggle2FAError::UnusedPubKeyHash));
+        }
+
         let new_type = if toggle_2fa.enable {
             EthAccountType::Owned
         } else {
