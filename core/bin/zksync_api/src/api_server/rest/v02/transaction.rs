@@ -2,6 +2,7 @@
 
 // Built-in uses
 
+use std::time::Instant;
 // External uses
 use actix_web::{
     web::{self, Json},
@@ -144,20 +145,27 @@ async fn tx_status(
     data: web::Data<ApiTransactionData>,
     tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<Receipt>> {
-    data.tx_status(*tx_hash).await.into()
+    let start = Instant::now();
+    let res = data.tx_status(*tx_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "tx_data");
+    res
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
     tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TxData>> {
-    data.tx_data(*tx_hash).await.into()
+    let start = Instant::now();
+    let res = data.tx_data(*tx_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "tx_data");
+    res
 }
 
 async fn submit_tx(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<TxWithSignature>,
 ) -> ApiResult<TxHashSerializeWrapper> {
+    let start = Instant::now();
     let tx_hash = data
         .tx_sender
         .submit_tx(body.tx, body.signature, None)
@@ -174,6 +182,7 @@ async fn submit_tx(
     }
 
     let tx_hash = tx_hash.map_err(Error::from);
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "submit_tx");
     tx_hash.map(TxHashSerializeWrapper).into()
 }
 
@@ -181,6 +190,7 @@ async fn submit_batch(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<IncomingTxBatch>,
 ) -> ApiResult<SubmitBatchResponse> {
+    let start = Instant::now();
     let response = data
         .tx_sender
         .submit_txs_batch(body.txs, body.signature, None)
@@ -197,6 +207,7 @@ async fn submit_batch(
     }
 
     let response = response.map_err(Error::from);
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "submit_batch");
     response.into()
 }
 
@@ -204,12 +215,14 @@ async fn toggle_2fa(
     data: web::Data<ApiTransactionData>,
     Json(toggle_2fa): Json<Toggle2FA>,
 ) -> ApiResult<Toggle2FAResponse> {
+    let start = Instant::now();
     let response = data
         .tx_sender
         .toggle_2fa(toggle_2fa)
         .await
         .map_err(Error::from);
 
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "toggle_2fa");
     response.into()
 }
 
@@ -217,7 +230,10 @@ async fn get_batch(
     data: web::Data<ApiTransactionData>,
     batch_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<ApiTxBatch>> {
-    data.get_batch(*batch_hash).await.into()
+    let start = Instant::now();
+    let res = data.get_batch(*batch_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "toggle_2fa");
+    res
 }
 
 pub fn api_scope(tx_sender: TxSender) -> Scope {

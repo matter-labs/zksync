@@ -36,6 +36,8 @@ async fn get_status(data: web::Data<Mutex<ApiStatusData>>) -> ApiResult<NetworkS
     // We have to get exclusive lock here, because if the data in cache we return the data fast  enough,
     // otherwise every new request will go to the database and do the same requests.
     // When we return exclusive locks on pending requests, they will be unlocked with the new status
+
+    let start = Instant::now();
     let mut data_mutex = data.lock().await;
     if let Some((status, last_update)) = &data_mutex.status {
         if last_update.elapsed() < STATUS_EXPIRATION {
@@ -44,6 +46,7 @@ async fn get_status(data: web::Data<Mutex<ApiStatusData>>) -> ApiResult<NetworkS
     }
     let network_status = api_try!(get_status_inner(&data_mutex.pool).await);
     data_mutex.status = Some((network_status.clone(), Instant::now()));
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_status");
     Ok(network_status).into()
 }
 

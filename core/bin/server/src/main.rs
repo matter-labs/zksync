@@ -50,6 +50,7 @@ pub enum Component {
 
     // Additional components
     Prometheus,
+    PrometheusPeriodicMetrics,
     RejectedTaskCleaner,
 }
 
@@ -69,6 +70,7 @@ impl FromStr for Component {
             "fetchers" => Ok(Component::Fetchers),
             "core" => Ok(Component::Core),
             "rejected-task-cleaner" => Ok(Component::RejectedTaskCleaner),
+            "prometheus-periodic-metrics" => Ok(Component::PrometheusPeriodicMetrics),
             other => Err(format!("{} is not a valid component name", other)),
         }
     }
@@ -91,6 +93,7 @@ impl Default for ComponentsToRun {
             Component::Core,
             Component::RejectedTaskCleaner,
             Component::Fetchers,
+            Component::PrometheusPeriodicMetrics,
         ])
     }
 }
@@ -116,7 +119,7 @@ struct Opt {
     /// comma-separated list of components to launch
     #[structopt(
         long,
-        default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner,fetchers"
+        default_value = "rest-api,web3-api,rpc-api,rpc-websocket-api,eth-sender,witness-generator,forced-exit,prometheus,core,rejected-task-cleaner,fetchers,prometheus-periodic-metrics"
     )]
     components: ComponentsToRun,
 }
@@ -273,9 +276,12 @@ async fn run_server(components: &ComponentsToRun) {
         // Run prometheus data exporter.
         let config = PrometheusConfig::from_env();
         let prometheus_task_handle = run_prometheus_exporter(config.port);
-        let counter_task_handle = run_operation_counter(connection_pool.clone());
         tasks.push(prometheus_task_handle);
-        tasks.push(counter_task_handle);
+        // We can run them only with active prometheus
+        if components.0.contains(&Component::PrometheusPeriodicMetrics) {
+            let counter_task_handle = run_operation_counter(connection_pool.clone());
+            tasks.push(counter_task_handle);
+        }
     }
 
     if components.0.contains(&Component::ForcedExit) {
