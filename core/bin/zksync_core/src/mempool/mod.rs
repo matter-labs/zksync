@@ -348,6 +348,7 @@ impl MempoolBlocksHandler {
         let start = std::time::Instant::now();
         // Try to exhaust the reverted transactions queue. Most of the time it
         // will be empty unless the server is restarted after reverting blocks.
+        // TODO remove it. We use another approach how to correctly revert blocks
         let (chunks_left, reverted_block) = self
             .select_reverted_operations(current_unprocessed_priority_op)
             .await;

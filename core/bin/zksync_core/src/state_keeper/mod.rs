@@ -1,9 +1,12 @@
 use std::collections::VecDeque;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 // External uses
+use futures::channel::mpsc::Receiver;
+use futures::channel::oneshot;
 use futures::{channel::mpsc, stream::StreamExt, SinkExt};
 use tokio::task::JoinHandle;
+use tokio::time;
 // Workspace uses
 use zksync_state::state::{OpSuccess, ZkSyncState};
 use zksync_types::{
@@ -23,6 +26,7 @@ use self::{
     types::{ApplyOutcome, StateKeeperConfig},
     utils::system_time_timestamp,
 };
+use crate::mempool::{GetBlockRequest, MempoolBlocksRequest};
 use crate::{
     committer::{BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
@@ -32,7 +36,7 @@ use crate::{
 pub use self::{
     init_params::ZkSyncStateInitParams,
     root_hash_calculator::{start_root_hash_calculator, BlockRootHashJobQueue},
-    types::StateKeeperRequest,
+    types::StateKeeperTestkitRequest,
 };
 
 mod init_params;
@@ -52,8 +56,8 @@ pub struct ZkSyncStateKeeper {
     pending_block: PendingBlock,
     config: StateKeeperConfig,
 
-    rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
+    tx_for_mempool: mpsc::Sender<MempoolBlocksRequest>,
     /// Channel used for sending queued transaction events. Required since state keeper
     /// has no access to the database.
     processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
@@ -75,8 +79,8 @@ impl ZkSyncStateKeeper {
     pub fn new(
         initial_state: ZkSyncStateInitParams,
         fee_account_address: Address,
-        rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
+        tx_for_mempool: mpsc::Sender<MempoolBlocksRequest>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
@@ -146,8 +150,8 @@ impl ZkSyncStateKeeper {
             pending_block,
             config,
 
-            rx_for_blocks,
             tx_for_commitments,
+            tx_for_mempool,
             processed_tx_events_sender,
 
             root_hash_queue,
@@ -156,11 +160,6 @@ impl ZkSyncStateKeeper {
         keeper.initialize(initial_state.pending_block);
 
         (keeper, root_hash_calculator)
-    }
-
-    /// Returns a copy of block root hash queue.
-    pub(crate) fn root_hash_queue(&self) -> BlockRootHashJobQueue {
-        self.root_hash_queue.clone()
     }
 
     // TODO (ZKS-821): We should get rid of this function and create state keeper in a ready-to-go state.
@@ -248,39 +247,63 @@ impl ZkSyncStateKeeper {
         }
     }
 
-    async fn run(mut self) {
-        while let Some(req) = self.rx_for_blocks.next().await {
+    // TODO (ZKS-821): Only used by testkit, should be removed.
+    async fn run_for_testkit(mut self, mut rx_for_blocks: Receiver<StateKeeperTestkitRequest>) {
+        while let Some(req) = rx_for_blocks.next().await {
             match req {
-                StateKeeperRequest::GetAccount(address, sender) => {
+                StateKeeperTestkitRequest::GetAccount(address, sender) => {
                     let account = self.state.get_account_by_address(&address);
                     sender.send(account).unwrap_or_default();
                 }
-                StateKeeperRequest::GetPendingBlockTimestamp(sender) => {
-                    sender
-                        .send(self.pending_block.timestamp)
-                        .unwrap_or_default();
-                }
-                // TODO (ZKS-821): Only used by block proposer, can be removed.
-                StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
-                    sender
-                        .send(self.pending_block.unprocessed_priority_op_current)
-                        .unwrap_or_default();
-                }
-                StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
-                    self.execute_proposed_block(proposed_block).await;
-                }
-                // TODO (ZKS-821): Only used by testkit, should be removed.
-                StateKeeperRequest::SealBlock => {
+                StateKeeperTestkitRequest::SealBlock => {
                     self.seal_pending_block().await;
                 }
-                // TODO (ZKS-821): Only used by testkit, should be removed.
-                StateKeeperRequest::GetCurrentState(sender) => {
+                StateKeeperTestkitRequest::GetCurrentState(sender) => {
                     sender.send(self.get_current_state()).unwrap_or_default();
+                }
+                StateKeeperTestkitRequest::ExecuteMiniBlock(block) => {
+                    self.execute_proposed_block(block).await;
                 }
             }
         }
     }
+    async fn run(mut self, miniblock_interval: Duration) {
+        let mut timer = time::interval(miniblock_interval);
+        loop {
+            timer.tick().await;
 
+            let start = Instant::now();
+
+            // `.throttle()` method will postpone the next miniblock iteration if currently we have too
+            // many blocks for which root hash is not yet calculated.
+            self.root_hash_queue.throttle().await;
+            metrics::histogram!("state_keeper.throttle", start.elapsed());
+
+            self.commit_new_tx_mini_batch().await;
+        }
+    }
+
+    async fn commit_new_tx_mini_batch(&mut self) {
+        let block_timestamp = self.pending_block.timestamp;
+        let proposed_block = self.propose_new_block(block_timestamp).await;
+
+        self.execute_proposed_block(proposed_block).await;
+    }
+
+    async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
+        let (response_sender, receiver) = oneshot::channel();
+        let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {
+            last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
+            block_timestamp,
+            response_sender,
+        });
+        self.tx_for_mempool
+            .send(mempool_req)
+            .await
+            .expect("mempool receiver dropped");
+
+        receiver.await.expect("Mempool new block request failed")
+    }
     async fn execute_incomplete_block(&mut self, block: IncompleteBlock) {
         let (before_priority_op, after_priority_op) = block.processed_priority_ops;
         self.pending_block = PendingBlock::new(
@@ -828,6 +851,6 @@ impl ZkSyncStateKeeper {
 }
 
 #[must_use]
-pub fn start_state_keeper(sk: ZkSyncStateKeeper) -> JoinHandle<()> {
-    tokio::spawn(sk.run())
+pub fn start_state_keeper(sk: ZkSyncStateKeeper, miniblock_interval: Duration) -> JoinHandle<()> {
+    tokio::spawn(sk.run(miniblock_interval))
 }

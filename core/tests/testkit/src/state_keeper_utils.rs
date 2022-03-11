@@ -3,12 +3,13 @@ use futures::{
     SinkExt,
 };
 use std::thread::JoinHandle;
+use std::time::Duration;
 use tokio::runtime::Runtime;
 use zksync_core::{
     committer::CommitRequest,
     state_keeper::{
-        start_root_hash_calculator, start_state_keeper, StateKeeperRequest, ZkSyncStateInitParams,
-        ZkSyncStateKeeper,
+        start_root_hash_calculator, start_state_keeper, StateKeeperTestkitRequest,
+        ZkSyncStateInitParams, ZkSyncStateKeeper,
     },
     tx_event_emitter::ProcessedOperations,
 };
@@ -19,19 +20,19 @@ use zksync_types::{
 use itertools::Itertools;
 
 pub async fn state_keeper_get_account(
-    mut sender: mpsc::Sender<StateKeeperRequest>,
+    mut sender: mpsc::Sender<StateKeeperTestkitRequest>,
     address: &Address,
 ) -> Option<(AccountId, Account)> {
     let resp = oneshot::channel();
     sender
-        .send(StateKeeperRequest::GetAccount(*address, resp.0))
+        .send(StateKeeperTestkitRequest::GetAccount(*address, resp.0))
         .await
         .expect("sk request send");
     resp.1.await.expect("sk account resp recv")
 }
 
 pub struct StateKeeperChannels {
-    pub requests: mpsc::Sender<StateKeeperRequest>,
+    pub requests: mpsc::Sender<StateKeeperTestkitRequest>,
     pub new_blocks: mpsc::Receiver<CommitRequest>,
     pub queued_txs_events: mpsc::Receiver<ProcessedOperations>,
 }
@@ -76,7 +77,7 @@ pub fn spawn_state_keeper(
     let sk_thread_handle = std::thread::spawn(move || {
         let main_runtime = Runtime::new().expect("main runtime start");
         main_runtime.block_on(async move {
-            let state_keeper_task = start_state_keeper(state_keeper);
+            let state_keeper_task = start_state_keeper(state_keeper, Duration);
             let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
             tokio::select! {
                 _ = stop_state_keeper_receiver => {},

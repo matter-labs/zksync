@@ -1,7 +1,6 @@
 use crate::register_factory_handler::run_register_factory_handler;
 use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
-    block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_watch::start_eth_watch,
     mempool::run_mempool_tasks,
@@ -18,7 +17,6 @@ use zksync_types::{tokens::get_genesis_token_list, Token, TokenId, TokenKind};
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
-pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
 pub mod mempool;
@@ -98,8 +96,6 @@ pub async fn run_core(
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let (proposed_blocks_sender, proposed_blocks_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
-    let (state_keeper_req_sender, state_keeper_req_receiver) =
-        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
     let (mempool_tx_request_sender, mempool_tx_request_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
@@ -133,18 +129,21 @@ pub async fn run_core(
     let (mut state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
         state_keeper_init,
         config.chain.state_keeper.fee_account_addr,
-        state_keeper_req_receiver,
         proposed_blocks_sender,
+        mempool_block_request_sender,
         config.chain.state_keeper.block_chunk_sizes.clone(),
         config.chain.state_keeper.miniblock_iterations as usize,
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
         processed_tx_events_sender,
     );
-    let root_hash_queue = state_keeper.root_hash_queue();
+
     // Execute reverted blocks before start
     state_keeper.execute_reverted_blocks().await;
 
-    let state_keeper_task = start_state_keeper(state_keeper);
+    let state_keeper_task = start_state_keeper(
+        state_keeper,
+        config.chain.state_keeper.miniblock_iteration_interval(),
+    );
     let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
 
     // Start committer.
@@ -184,14 +183,6 @@ pub async fn run_core(
         processed_tx_events_receiver,
     );
 
-    // Start block proposer.
-    let proposer_task = run_block_proposer_task(
-        config,
-        mempool_block_request_sender.clone(),
-        state_keeper_req_sender.clone(),
-        root_hash_queue,
-    );
-
     // Start private API.
     let private_api_task =
         start_private_core_api(mempool_tx_request_sender, config.api.private.clone());
@@ -202,7 +193,6 @@ pub async fn run_core(
         root_hash_calculator_task,
         committer_task,
         mempool_task,
-        proposer_task,
         token_handler_task,
         register_factory_task,
         tx_event_emitter_task,

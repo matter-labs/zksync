@@ -7,11 +7,9 @@ use zksync_types::{Account, AccountId, Address};
 use crate::{mempool::ProposedBlock, state_keeper::init_params::ZkSyncStateInitParams};
 
 #[derive(Debug)]
-pub enum StateKeeperRequest {
-    GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
-    GetPendingBlockTimestamp(oneshot::Sender<u64>),
-    GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
+pub enum StateKeeperTestkitRequest {
     ExecuteMiniBlock(ProposedBlock),
+    GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
     SealBlock,
     GetCurrentState(oneshot::Sender<ZkSyncStateInitParams>),
 }

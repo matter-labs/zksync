@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use zksync_core::{
     committer::CommitRequest,
     mempool::ProposedBlock,
-    state_keeper::{StateKeeperRequest, ZkSyncStateInitParams},
+    state_keeper::{StateKeeperTestkitRequest, ZkSyncStateInitParams},
     tx_event_emitter::ProcessedOperations,
 };
 use zksync_types::{
@@ -42,7 +42,7 @@ use zksync_types::tx::TimeRange;
 /// in order to execute unusual/failed transactions one should create it separately and commit to block
 /// using `execute_incorrect_tx`
 pub struct TestSetup {
-    pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    pub state_keeper_request_sender: mpsc::Sender<StateKeeperTestkitRequest>,
     pub proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
     pub processed_tx_events_receiver: mpsc::Receiver<ProcessedOperations>,
 
@@ -324,7 +324,7 @@ impl TestSetup {
         // Request miniblock execution.
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::ExecuteMiniBlock(block))
+            .send(StateKeeperTestkitRequest::ExecuteMiniBlock(block))
             .await
             .expect("sk receiver dropped");
 
@@ -405,7 +405,7 @@ impl TestSetup {
         // Request miniblock execution.
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::ExecuteMiniBlock(block))
+            .send(StateKeeperTestkitRequest::ExecuteMiniBlock(block))
             .await
             .expect("sk receiver dropped");
 
@@ -980,7 +980,7 @@ impl TestSetup {
     pub async fn execute_commit_block(&mut self) -> Block {
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::SealBlock)
+            .send(StateKeeperTestkitRequest::SealBlock)
             .await
             .expect("sk receiver dropped");
 
@@ -1004,7 +1004,7 @@ impl TestSetup {
     pub async fn execute_block(&mut self) -> Block {
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::SealBlock)
+            .send(StateKeeperTestkitRequest::SealBlock)
             .await
             .expect("sk receiver dropped");
 
@@ -1078,7 +1078,7 @@ impl TestSetup {
     ) -> Result<BlockExecutionResult, anyhow::Error> {
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::SealBlock)
+            .send(StateKeeperTestkitRequest::SealBlock)
             .await
             .expect("sk receiver dropped");
 
@@ -1199,7 +1199,7 @@ impl TestSetup {
     pub async fn get_current_state(&mut self) -> ZkSyncStateInitParams {
         let (sender, receiver) = oneshot::channel();
         self.state_keeper_request_sender
-            .send(StateKeeperRequest::GetCurrentState(sender))
+            .send(StateKeeperTestkitRequest::GetCurrentState(sender))
             .await
             .expect("sk request send");
         receiver.await.unwrap()

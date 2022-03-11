@@ -6178,35 +6178,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "zksync_testkit"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "ethabi",
- "futures 0.3.17",
- "itertools 0.9.0",
- "num",
- "serde",
- "serde_json",
- "structopt",
- "tokio",
- "vlog",
- "web3",
- "zksync_circuit",
- "zksync_config",
- "zksync_contracts",
- "zksync_core",
- "zksync_crypto",
- "zksync_data_restore",
- "zksync_eth_client",
- "zksync_eth_signer",
- "zksync_prover_utils",
- "zksync_test_account",
- "zksync_types",
- "zksync_utils",
-]
-
-[[package]]
 name = "zksync_types"
 version = "1.0.0"
 dependencies = [
