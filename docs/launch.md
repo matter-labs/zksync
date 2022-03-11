@@ -34,7 +34,7 @@ To completely reset the dev environment:
 - Repeat the setup procedure above
 
 If `zk init` has already been executed, and now you only need to start docker containers (e.g. after reboot),
-simplylaunch:
+simply launch:
 
 ```
 zk up
@@ -63,7 +63,7 @@ zk env <ENV_NAME>
 ```
 
 Default confiruration is `dev.env`, which is generated automatically
-from `dev.env.example` during `zk init` commandexecution.
+from `dev.env.example` during `zk init` command execution.
 
 ## Build and run server + prover locally for development
 
