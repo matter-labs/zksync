@@ -147,7 +147,7 @@ async fn tx_status(
 ) -> ApiResult<Option<Receipt>> {
     let start = Instant::now();
     let res = data.tx_status(*tx_hash).await.into();
-    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "tx_data");
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "tx_status");
     res
 }
 
@@ -232,7 +232,7 @@ async fn get_batch(
 ) -> ApiResult<Option<ApiTxBatch>> {
     let start = Instant::now();
     let res = data.get_batch(*batch_hash).await.into();
-    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "toggle_2fa");
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_batch");
     res
 }
 
