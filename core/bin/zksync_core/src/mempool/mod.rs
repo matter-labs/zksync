@@ -143,7 +143,7 @@ pub enum MempoolBlocksRequest {
 
 struct MempoolState {
     db_pool: ConnectionPool,
-    transactions_queue: MempoolTransactionsQueue,
+    // transactions_queue: MempoolTransactionsQueue,
 }
 
 impl MempoolState {
@@ -184,8 +184,17 @@ impl MempoolState {
             SignedTxVariant::Batch(batch) => self.chunks_for_batch(batch).await,
         }
     }
-    async fn restore_from_db(db_pool: ConnectionPool) -> Self {
-        let mut storage = db_pool.access_storage().await.expect("mempool db restore");
+
+    pub fn new(db_pool: ConnectionPool) -> Self {
+        Self { db_pool }
+    }
+
+    async fn get_transaction_queue(&self) -> MempoolTransactionsQueue {
+        let mut storage = self
+            .db_pool
+            .access_storage()
+            .await
+            .expect("mempool db restore");
         let mut transaction = storage
             .start_transaction()
             .await
@@ -200,12 +209,13 @@ impl MempoolState {
 
         // Remove any possible duplicates of already executed transactions
         // from the database.
-        transaction
-            .chain()
-            .mempool_schema()
-            .collect_garbage()
-            .await
-            .expect("Collecting garbage in the mempool schema failed");
+        //TODO move it to start somewhere
+        // transaction
+        //     .chain()
+        //     .mempool_schema()
+        //     .collect_garbage()
+        //     .await
+        //     .expect("Collecting garbage in the mempool schema failed");
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
@@ -241,27 +251,7 @@ impl MempoolState {
             "{} transactions were restored from the persistent mempool storage, reverted queue size: {}",
             mempool_size, reverted_queue_size
         );
-
-        drop(storage);
-        Self {
-            db_pool,
-            transactions_queue,
-        }
-    }
-
-    fn add_tx(&mut self, tx: SignedZkSyncTx) {
-        self.transactions_queue.add_tx_variant(tx.into());
-    }
-
-    fn add_ops(&mut self, ops: Vec<PriorityOp>) {
-        self.transactions_queue.add_priority_ops(ops)
-    }
-
-    fn add_batch(&mut self, batch: SignedTxsBatch) {
-        assert_ne!(batch.batch_id, 0, "Batch ID was not set");
-
-        self.transactions_queue
-            .add_tx_variant(SignedTxVariant::Batch(batch));
+        transactions_queue
     }
 }
 
@@ -275,6 +265,7 @@ impl MempoolBlocksHandler {
     async fn select_reverted_operations(
         &mut self,
         current_unprocessed_priority_op: u64,
+        transactions_queue: &mut MempoolTransactionsQueue,
     ) -> (usize, ProposedBlock) {
         let mut chunks_left = self.max_block_size_chunks;
         let mut proposed_block = ProposedBlock::new();
@@ -282,7 +273,7 @@ impl MempoolBlocksHandler {
 
         let mut mempool_state = self.mempool_state.write().await;
         // Peek into the reverted queue.
-        let reverted_tx = match mempool_state.transactions_queue.reverted_queue_front() {
+        let reverted_tx = match transactions_queue.reverted_queue_front() {
             Some(reverted_tx) => reverted_tx,
             None => return (chunks_left, proposed_block),
         };
@@ -291,15 +282,14 @@ impl MempoolBlocksHandler {
         let next_op_id = reverted_tx.next_priority_op_id;
         while next_serial_id < next_op_id {
             // Find the necessary serial id and skip the already processed
-            let priority_op =
-                iter::from_fn(|| mempool_state.transactions_queue.pop_front_priority_op())
-                    .find(|op| op.serial_id == next_serial_id)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "Operation not found in the priority queue {}",
-                            next_serial_id,
-                        )
-                    });
+            let priority_op = iter::from_fn(|| transactions_queue.pop_front_priority_op())
+                .find(|op| op.serial_id == next_serial_id)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Operation not found in the priority queue {}",
+                        next_serial_id,
+                    )
+                });
 
             // If the operation doesn't fit, return the proposed block.
             if priority_op.data.chunks() <= chunks_left {
@@ -311,7 +301,7 @@ impl MempoolBlocksHandler {
             }
         }
 
-        while let Some(reverted_tx) = mempool_state.transactions_queue.reverted_queue_front() {
+        while let Some(reverted_tx) = transactions_queue.reverted_queue_front() {
             // To prevent state keeper from executing priority operations
             // out of order, we finish the miniblock if the serial id counter
             // is greater than the current one. Such transactions will be included
@@ -327,10 +317,7 @@ impl MempoolBlocksHandler {
                 .unwrap();
             if required_chunks <= chunks_left {
                 chunks_left -= required_chunks;
-                let reverted_tx = mempool_state
-                    .transactions_queue
-                    .reverted_queue_pop_front()
-                    .unwrap();
+                let reverted_tx = transactions_queue.reverted_queue_pop_front().unwrap();
                 proposed_block.txs.push(reverted_tx.into_inner());
             } else {
                 break;
@@ -348,9 +335,12 @@ impl MempoolBlocksHandler {
         let start = std::time::Instant::now();
         // Try to exhaust the reverted transactions queue. Most of the time it
         // will be empty unless the server is restarted after reverting blocks.
+        let state = self.mempool_state.write().await;
+        let mut tx_queue = state.get_transaction_queue().await;
+        drop(state);
         // TODO remove it. We use another approach how to correctly revert blocks
         let (chunks_left, reverted_block) = self
-            .select_reverted_operations(current_unprocessed_priority_op)
+            .select_reverted_operations(current_unprocessed_priority_op, &mut tx_queue)
             .await;
         if !reverted_block.is_empty() {
             vlog::debug!(
@@ -360,12 +350,17 @@ impl MempoolBlocksHandler {
             return reverted_block;
         }
 
-        let (chunks_left, priority_ops) = self
-            .select_priority_ops(current_unprocessed_priority_op)
-            .await;
-        let (_chunks_left, txs) = self
-            .prepare_tx_for_block(chunks_left, block_timestamp)
-            .await;
+        let (chunks_left, priority_ops) = select_priority_ops(
+            self.max_block_size_chunks,
+            current_unprocessed_priority_op,
+            &mut tx_queue,
+        )
+        .await;
+
+        let state = self.mempool_state.write().await;
+        let (_chunks_left, txs) =
+            prepare_tx_for_block(chunks_left, block_timestamp, &mut tx_queue, &state).await;
+        drop(state);
 
         if !priority_ops.is_empty() {
             vlog::debug!("Proposed priority ops for block: {:?}", priority_ops);
@@ -398,69 +393,6 @@ impl MempoolBlocksHandler {
         ProposedBlock { priority_ops, txs }
     }
 
-    /// Returns: chunks left from max amount of chunks, ops selected
-    async fn select_priority_ops(
-        &self,
-        current_unprocessed_priority_op: u64,
-    ) -> (usize, Vec<PriorityOp>) {
-        let mut result = vec![];
-        let mut mempool_state = self.mempool_state.write().await;
-
-        let mut used_chunks = 0;
-        let mut current_priority_op = current_unprocessed_priority_op;
-        while let Some(op) = mempool_state.transactions_queue.pop_front_priority_op() {
-            // Since the transaction addition is asynchronous process and we are checking node many times,
-            // We can find some already processed priority ops
-            if op.serial_id < current_priority_op {
-                vlog::warn!("Already processed priority op was found in queue");
-                // We can skip already processed priority operations
-                continue;
-            }
-            assert_eq!(
-                current_priority_op, op.serial_id,
-                "Wrong order for priority ops"
-            );
-            if used_chunks + op.data.chunks() <= self.max_block_size_chunks {
-                used_chunks += op.data.chunks();
-                result.push(op);
-                current_priority_op += 1;
-            } else {
-                mempool_state.transactions_queue.push_front_priority_op(op);
-                break;
-            }
-        }
-        (self.max_block_size_chunks - used_chunks, result)
-    }
-
-    async fn prepare_tx_for_block(
-        &mut self,
-        mut chunks_left: usize,
-        block_timestamp: u64,
-    ) -> (usize, Vec<SignedTxVariant>) {
-        let mut mempool_state = self.mempool_state.write().await;
-
-        mempool_state
-            .transactions_queue
-            .prepare_new_ready_transactions(block_timestamp);
-
-        let mut txs_for_commit = Vec::new();
-
-        while let Some(tx) = mempool_state.transactions_queue.pop_front() {
-            // TODO DO not unwrap
-            let chunks_for_tx = mempool_state.required_chunks(&tx).await.unwrap();
-            if chunks_left >= chunks_for_tx {
-                txs_for_commit.push(tx);
-                chunks_left -= chunks_for_tx;
-            } else {
-                // Push the taken tx back, it does not fit.
-                mempool_state.transactions_queue.push_front(tx);
-                break;
-            }
-        }
-
-        (chunks_left, txs_for_commit)
-    }
-
     async fn run(mut self) {
         vlog::info!("Block mempool handler is running");
         while let Some(request) = self.requests.next().await {
@@ -482,6 +414,61 @@ impl MempoolBlocksHandler {
     }
 }
 
+/// Returns: chunks left from max amount of chunks, ops selected
+async fn select_priority_ops(
+    max_block_size_chunks: usize,
+    current_unprocessed_priority_op: u64,
+    transactions_queue: &mut MempoolTransactionsQueue,
+) -> (usize, Vec<PriorityOp>) {
+    let mut result = vec![];
+
+    let mut used_chunks = 0;
+    let mut current_priority_op = current_unprocessed_priority_op;
+    while let Some(op) = transactions_queue.pop_front_priority_op() {
+        // Since the transaction addition is asynchronous process and we are checking node many times,
+        // We can find some already processed priority ops
+        if op.serial_id < current_priority_op {
+            vlog::warn!("Already processed priority op was found in queue");
+            // We can skip already processed priority operations
+            continue;
+        }
+        assert_eq!(
+            current_priority_op, op.serial_id,
+            "Wrong order for priority ops"
+        );
+        if used_chunks + op.data.chunks() <= max_block_size_chunks {
+            used_chunks += op.data.chunks();
+            result.push(op);
+            current_priority_op += 1;
+        } else {
+            break;
+        }
+    }
+    (max_block_size_chunks - used_chunks, result)
+}
+async fn prepare_tx_for_block(
+    mut chunks_left: usize,
+    block_timestamp: u64,
+    transactions_queue: &mut MempoolTransactionsQueue,
+    mempool_state: &MempoolState,
+) -> (usize, Vec<SignedTxVariant>) {
+    transactions_queue.prepare_new_ready_transactions(block_timestamp);
+
+    let mut txs_for_commit = Vec::new();
+
+    while let Some(tx) = transactions_queue.pop_front() {
+        // TODO DO not unwrap
+        let chunks_for_tx = mempool_state.required_chunks(&tx).await.unwrap();
+        if chunks_left >= chunks_for_tx {
+            txs_for_commit.push(tx);
+            chunks_left -= chunks_for_tx;
+        } else {
+            break;
+        }
+    }
+
+    (chunks_left, txs_for_commit)
+}
 struct MempoolTransactionsHandler {
     db_pool: ConnectionPool,
     mempool_state: Arc<RwLock<MempoolState>>,
@@ -536,7 +523,7 @@ impl MempoolTransactionsHandler {
             ("token", tx.tx.token_id().to_string()),
         ];
         metrics::histogram!("process_tx", tx.elapsed(), &labels);
-        self.mempool_state.write().await.add_tx(tx);
+        // self.mempool_state.write().await.add_tx(tx);
 
         Ok(())
     }
@@ -586,11 +573,11 @@ impl MempoolTransactionsHandler {
             metrics::increment_counter!("process_tx_count", &labels);
         }
 
-        // Add to queue only confirmed priority operations
-        if confirmed {
-            self.mempool_state.write().await.add_ops(ops);
-        }
-
+        // // Add to queue only confirmed priority operations
+        // if confirmed {
+        //     self.mempool_state.write().await.add_ops(ops);
+        // }
+        //
         Ok(())
     }
 
@@ -643,7 +630,7 @@ impl MempoolTransactionsHandler {
 
         batch.batch_id = batch_id;
 
-        self.mempool_state.write().await.add_batch(batch);
+        // self.mempool_state.write().await.add_batch(batch);
         Ok(())
     }
 
@@ -678,37 +665,25 @@ pub fn run_mempool_tasks(
     block_chunk_sizes: Vec<usize>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        let mempool_state = Arc::new(RwLock::new(
-            MempoolState::restore_from_db(db_pool.clone()).await,
-        ));
+        let mempool_state = Arc::new(RwLock::new(MempoolState::new(db_pool.clone())));
         let max_block_size_chunks = *block_chunk_sizes
             .iter()
             .max()
             .expect("failed to find max block chunks size");
-        let mut tasks = vec![];
-        let (balancer, handlers) = Balancer::new(
-            MempoolTransactionsHandlerBuilder {
-                db_pool: db_pool.clone(),
-                mempool_state: mempool_state.clone(),
-                max_block_size_chunks,
-            },
-            tx_requests,
-            number_of_mempool_transaction_handlers,
-            channel_capacity,
-        );
-
-        for item in handlers.into_iter() {
-            tasks.push(tokio::spawn(item.run()));
-        }
-
-        tasks.push(tokio::spawn(balancer.run()));
+        let handler = MempoolTransactionsHandler {
+            db_pool: db_pool.clone(),
+            mempool_state: mempool_state.clone(),
+            requests: tx_requests,
+            max_block_size_chunks,
+        };
 
         let blocks_handler = MempoolBlocksHandler {
             mempool_state,
             requests: block_requests,
             max_block_size_chunks,
         };
-        tasks.push(tokio::spawn(blocks_handler.run()));
+
+        let tasks = vec![blocks_handler.run(), handler.run()];
         wait_for_tasks(tasks).await
     })
 }
