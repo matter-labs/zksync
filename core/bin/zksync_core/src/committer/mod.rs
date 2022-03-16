@@ -1,17 +1,15 @@
 // Built-in uses
 use std::time::{Duration, Instant};
 // External uses
-use futures::channel::mpsc::Receiver;
-use futures::StreamExt;
+use futures::{channel::mpsc::Receiver, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
-use zksync_crypto::Fr;
-use zksync_types::block::IncompleteBlock;
 // Workspace uses
 use zksync_config::ChainConfig;
+use zksync_crypto::Fr;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
+    block::{Block, BlockMetadata, ExecutedOperations, IncompleteBlock, PendingBlock},
     AccountUpdates, BlockNumber,
 };
 

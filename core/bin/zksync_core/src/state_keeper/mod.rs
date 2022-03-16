@@ -2,13 +2,15 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 // External uses
-use futures::channel::mpsc::Receiver;
-use futures::channel::oneshot;
-use futures::{channel::mpsc, stream::StreamExt, SinkExt};
+use futures::{
+    channel::{mpsc, oneshot},
+    stream::StreamExt,
+    SinkExt,
+};
 use tokio::task::JoinHandle;
 use tokio::time;
-use zksync_mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock};
 // Workspace uses
+use zksync_mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock};
 use zksync_state::state::{OpSuccess, ZkSyncState};
 use zksync_types::{
     block::{
@@ -246,8 +248,12 @@ impl ZkSyncStateKeeper {
         }
     }
 
-    // TODO (ZKS-821): Only used by testkit, should be removed.
-    async fn run_for_testkit(mut self, mut rx_for_blocks: Receiver<StateKeeperTestkitRequest>) {
+    // Run StateKeeper with manual generating and executing blocks and miniblocks
+    #[cfg(feature = "testkit")]
+    pub async fn run_for_testkit(
+        mut self,
+        mut rx_for_blocks: mpsc::Receiver<StateKeeperTestkitRequest>,
+    ) {
         while let Some(req) = rx_for_blocks.next().await {
             match req {
                 StateKeeperTestkitRequest::GetAccount(address, sender) => {
@@ -266,6 +272,8 @@ impl ZkSyncStateKeeper {
             }
         }
     }
+
+    // Generate and execute new miniblock every miniblock_interval
     async fn run(mut self, miniblock_interval: Duration) {
         let mut timer = time::interval(miniblock_interval);
         loop {
@@ -291,6 +299,8 @@ impl ZkSyncStateKeeper {
 
     async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
         let (response_sender, receiver) = oneshot::channel();
+
+        // This txs will be excluded as already executed.
         let tx_hashes = self
             .pending_block
             .failed_txs
@@ -310,6 +320,7 @@ impl ZkSyncStateKeeper {
             response_sender,
             executed_txs: tx_hashes,
         });
+
         self.tx_for_mempool
             .send(mempool_req)
             .await
@@ -317,6 +328,7 @@ impl ZkSyncStateKeeper {
 
         receiver.await.expect("Mempool new block request failed")
     }
+
     async fn execute_incomplete_block(&mut self, block: IncompleteBlock) {
         let (before_priority_op, after_priority_op) = block.processed_priority_ops;
         self.pending_block = PendingBlock::new(

@@ -260,12 +260,9 @@ mod tests {
         SharedData,
     };
     use crate::fee_ticker::validator::cache::TokenInMemoryCache;
-    use actix_web::App;
     use chrono::Utc;
-    use futures::channel::mpsc;
-    use futures::StreamExt;
-    use num::rational::Ratio;
-    use num::BigUint;
+    use futures::{channel::mpsc, StreamExt};
+    use num::{rational::Ratio, BigUint};
     use std::collections::HashMap;
     use std::str::FromStr;
     use tokio::task::JoinHandle;
@@ -502,8 +499,7 @@ mod tests {
         assert!(tx_data.is_none());
 
         server.stop().await;
-        // TODO Stop core server
-        // core_server.stop().await;
+        task.abort();
         Ok(())
     }
 }

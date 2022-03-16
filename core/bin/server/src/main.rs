@@ -153,7 +153,6 @@ async fn main() -> anyhow::Result<()> {
 async fn run_server(components: &ComponentsToRun) {
     let connection_pool = ConnectionPool::new(None);
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
-    let channel_size = 32768;
 
     let mut tasks = vec![];
 
@@ -191,7 +190,7 @@ async fn run_server(components: &ComponentsToRun) {
         }
 
         // Run signer
-        let (sign_check_sender, sign_check_receiver) = mpsc::channel(channel_size);
+        let (sign_check_sender, sign_check_receiver) = mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
         tasks.push(zksync_api::signature_checker::start_sign_checker(
             eth_gateway,
             sign_check_receiver,
@@ -258,7 +257,7 @@ async fn run_server(components: &ComponentsToRun) {
             tasks.push(run_mempool_tx_handler(
                 connection_pool.clone(),
                 mempool_tx_request_receiver,
-                chain_config.state_keeper.block_chunk_sizes.clone(),
+                chain_config.state_keeper.block_chunk_sizes,
             ));
             zksync_api::api_server::rest::start_server_thread_detached(
                 connection_pool.clone(),
@@ -346,7 +345,7 @@ pub fn run_forced_exit(connection_pool: ConnectionPool) -> Vec<JoinHandle<()>> {
     let mempool_task = run_mempool_tx_handler(
         connection_pool.clone(),
         mempool_tx_request_receiver,
-        chain_config.state_keeper.block_chunk_sizes.clone(),
+        chain_config.state_keeper.block_chunk_sizes,
     );
     let forced_exit_task = run_forced_exit_requests_actors(
         connection_pool,

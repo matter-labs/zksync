@@ -598,10 +598,7 @@ impl TxSender {
             .await
             .map_err(SubmitError::internal)?;
 
-        receiver
-            .await
-            .map_err(SubmitError::internal)?
-            .map_err(TxAddError::from)?;
+        receiver.await.map_err(SubmitError::internal)??;
 
         // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
         if let Some(fee_data_for_subsidy) = fee_data_for_subsidy {
@@ -887,10 +884,7 @@ impl TxSender {
             .await
             .map_err(SubmitError::communication_core_server)?;
 
-        receiver
-            .await
-            .map_err(SubmitError::internal)?
-            .map_err(TxAddError::from)?;
+        receiver.await.map_err(SubmitError::internal)??;
 
         let batch_hash = TxHash::batch_hash(&tx_hashes);
 

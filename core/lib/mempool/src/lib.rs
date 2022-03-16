@@ -540,6 +540,8 @@ impl MempoolTransactionsHandler {
     }
 }
 
+// During channel based nature, for better performance,
+// run independent mempool_tx_handler for each actor, e.g. for each API actor
 pub fn run_mempool_tx_handler(
     db_pool: ConnectionPool,
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,
@@ -551,8 +553,8 @@ pub fn run_mempool_tx_handler(
         .max()
         .expect("failed to find max block chunks size");
     let handler = MempoolTransactionsHandler {
-        db_pool: db_pool.clone(),
-        mempool_state: mempool_state.clone(),
+        db_pool,
+        mempool_state,
         requests: tx_requests,
         max_block_size_chunks,
     };
@@ -564,7 +566,7 @@ pub fn run_mempool_block_handler(
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,
     block_chunk_sizes: Vec<usize>,
 ) -> JoinHandle<()> {
-    let mempool_state = MempoolState::new(db_pool.clone());
+    let mempool_state = MempoolState::new(db_pool);
     let max_block_size_chunks = *block_chunk_sizes
         .iter()
         .max()

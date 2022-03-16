@@ -1,6 +1,8 @@
 use chrono::Utc;
-use futures::channel::{mpsc, oneshot};
-use futures::SinkExt;
+use futures::{
+    channel::{mpsc, oneshot},
+    SinkExt,
+};
 use num::Zero;
 
 use zksync_storage::{chain::operations_ext::records::TxReceiptResponse, ConnectionPool};

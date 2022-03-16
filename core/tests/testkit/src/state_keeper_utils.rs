@@ -3,13 +3,12 @@ use futures::{
     SinkExt,
 };
 use std::thread::JoinHandle;
-use std::time::Duration;
 use tokio::runtime::Runtime;
 use zksync_core::{
     committer::CommitRequest,
     state_keeper::{
-        start_root_hash_calculator, start_state_keeper, StateKeeperTestkitRequest,
-        ZkSyncStateInitParams, ZkSyncStateKeeper,
+        start_root_hash_calculator, StateKeeperTestkitRequest, ZkSyncStateInitParams,
+        ZkSyncStateKeeper,
     },
     tx_event_emitter::ProcessedOperations,
 };
@@ -18,7 +17,7 @@ use zksync_types::{
 };
 
 use itertools::Itertools;
-use zksync_mempool::{MempoolBlocksRequest, MempoolTransactionRequest};
+use zksync_mempool::MempoolBlocksRequest;
 
 pub async fn state_keeper_get_account(
     mut sender: mpsc::Sender<StateKeeperTestkitRequest>,
@@ -80,7 +79,8 @@ pub fn spawn_state_keeper(
     let sk_thread_handle = std::thread::spawn(move || {
         let main_runtime = Runtime::new().expect("main runtime start");
         main_runtime.block_on(async move {
-            let state_keeper_task = start_state_keeper(state_keeper, Duration::new(0, 200));
+            let state_keeper_task =
+                tokio::spawn(state_keeper.run_for_testkit(state_keeper_req_receiver));
             let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
             tokio::select! {
                 _ = stop_state_keeper_receiver => {},

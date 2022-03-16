@@ -29,6 +29,7 @@ pub(crate) struct MempoolTx {
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
     pub batch_id: i64,
+    #[allow(dead_code)]
     pub next_priority_op_serial_id: Option<i64>,
     #[allow(dead_code)]
     pub reverted: bool,

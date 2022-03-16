@@ -17,9 +17,8 @@ use tokio::task::JoinHandle;
 
 // Workspace uses
 use zksync_eth_client::EthereumGateway;
-use zksync_types::tx::error::TxAddError;
 use zksync_types::{
-    tx::{EthBatchSignData, EthSignData, TxEthSignature},
+    tx::{error::TxAddError, EthBatchSignData, EthSignData, TxEthSignature},
     Address, Order, SignedZkSyncTx, Token, ZkSyncTx,
 };
 // Local uses

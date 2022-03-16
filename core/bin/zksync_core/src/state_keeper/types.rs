@@ -7,7 +7,9 @@ use zksync_types::{Account, AccountId, Address};
 // Local uses
 use crate::state_keeper::init_params::ZkSyncStateInitParams;
 
+// Enum for manual control StateKeeper from testkit
 #[derive(Debug)]
+#[cfg(feature = "testkit")]
 pub enum StateKeeperTestkitRequest {
     ExecuteMiniBlock(ProposedBlock),
     GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
