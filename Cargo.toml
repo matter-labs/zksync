@@ -42,7 +42,7 @@ members = [
     # Test infrastructure
     "core/tests/flamegraph_target",
     "core/tests/test_account",
-#    "core/tests/testkit",
+    "core/tests/testkit",
     "core/tests/loadnext",
 
     # SDK section

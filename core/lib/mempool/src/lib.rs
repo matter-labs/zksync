@@ -14,8 +14,6 @@
 //! Communication with db:
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
-// Built-in deps
-use std::iter;
 // External uses
 use futures::{
     channel::{
@@ -25,14 +23,13 @@ use futures::{
     StreamExt,
 };
 
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use tokio::task::JoinHandle;
 
 // Workspace uses
 use zksync_balancer::BuildBalancedItem;
 
 use zksync_storage::ConnectionPool;
+use zksync_types::tx::error::TxAddError;
 use zksync_types::tx::TxHash;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
@@ -45,48 +42,6 @@ use crate::mempool_transactions_queue::MempoolTransactionsQueue;
 // use crate::wait_for_tasks;
 
 mod mempool_transactions_queue;
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
-pub enum TxAddError {
-    #[error("Tx nonce is too low.")]
-    NonceMismatch,
-
-    #[error("Tx is incorrect")]
-    IncorrectTx,
-
-    #[error("Transaction fee is too low")]
-    TxFeeTooLow,
-
-    #[error("Transactions batch summary fee is too low")]
-    TxBatchFeeTooLow,
-
-    #[error("EIP1271 signature could not be verified")]
-    EIP1271SignatureVerificationFail,
-
-    #[error("MissingEthSignature")]
-    MissingEthSignature,
-
-    #[error("Eth signature is incorrect")]
-    IncorrectEthSignature,
-
-    #[error("Change pubkey tx is not authorized onchain")]
-    ChangePkNotAuthorized,
-
-    #[error("Internal error")]
-    Other,
-
-    #[error("Database unavailable")]
-    DbError,
-
-    #[error("Transaction batch is empty")]
-    EmptyBatch,
-
-    #[error("Batch will not fit in any of supported block sizes")]
-    BatchTooBig,
-
-    #[error("The number of withdrawals in the batch is too big")]
-    BatchWithdrawalsOverload,
-}
 
 #[derive(Clone, Debug, Default)]
 pub struct ProposedBlock {
@@ -186,46 +141,51 @@ impl MempoolState {
         }
     }
 
+    async fn collect_garbage(&self) {
+        let mut storage = self.db_pool.access_storage().await.expect("Db error");
+        // Remove any possible duplicates of already executed transactions
+        // from the database.
+        storage
+            .chain()
+            .mempool_schema()
+            .collect_garbage()
+            .await
+            .expect("Db error");
+    }
+
     pub fn new(db_pool: ConnectionPool) -> Self {
         Self { db_pool }
     }
 
-    async fn get_transaction_queue(&self, executed_txs: &[TxHash]) -> MempoolTransactionsQueue {
+    async fn get_transaction_queue(
+        &self,
+        executed_txs: &[TxHash],
+    ) -> Result<MempoolTransactionsQueue, TxAddError> {
         let mut storage = self
             .db_pool
             .access_storage()
             .await
-            .expect("mempool db restore");
+            .map_err(|_| TxAddError::DbError)?;
         let mut transaction = storage
             .start_transaction()
             .await
-            .expect("mempool db transaction");
+            .map_err(|_| TxAddError::DbError)?;
 
         let priority_ops = transaction
             .chain()
             .mempool_schema()
             .get_confirmed_priority_ops()
             .await
-            .expect("Get priority ops failed");
-
-        // Remove any possible duplicates of already executed transactions
-        // from the database.
-        //TODO move it to start somewhere
-        transaction
-            .chain()
-            .mempool_schema()
-            .collect_garbage()
-            .await
-            .expect("Collecting garbage in the mempool schema failed");
+            .map_err(|_| TxAddError::DbError)?;
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
-        let (mempool_txs, reverted_txs) = transaction
+        let mempool_txs = transaction
             .chain()
             .mempool_schema()
             .load_txs(executed_txs)
             .await
-            .expect("Attempt to restore mempool txs from DB failed");
+            .map_err(|_| TxAddError::DbError)?;
 
         // Initialize the queue with reverted transactions loaded from the database.
         let serial_id = transaction
@@ -233,8 +193,8 @@ impl MempoolState {
             .operations_schema()
             .get_max_priority_op_serial_id()
             .await
-            .expect("Error in getting last priority op");
-        let mut transactions_queue = MempoolTransactionsQueue::new(reverted_txs, serial_id);
+            .map_err(|_| TxAddError::DbError)?;
+        let mut transactions_queue = MempoolTransactionsQueue::new(serial_id);
 
         transactions_queue.add_priority_ops(priority_ops);
 
@@ -245,9 +205,9 @@ impl MempoolState {
         transaction
             .commit()
             .await
-            .expect("mempool db transaction commit");
+            .map_err(|_| TxAddError::DbError)?;
 
-        transactions_queue
+        Ok(transactions_queue)
     }
 }
 
@@ -258,92 +218,19 @@ struct MempoolBlocksHandler {
 }
 
 impl MempoolBlocksHandler {
-    async fn select_reverted_operations(
-        &mut self,
-        current_unprocessed_priority_op: u64,
-        transactions_queue: &mut MempoolTransactionsQueue,
-    ) -> (usize, ProposedBlock) {
-        let mut chunks_left = self.max_block_size_chunks;
-        let mut proposed_block = ProposedBlock::new();
-        let mut next_serial_id = current_unprocessed_priority_op;
-
-        // Peek into the reverted queue.
-        let reverted_tx = match transactions_queue.reverted_queue_front() {
-            Some(reverted_tx) => reverted_tx,
-            None => return (chunks_left, proposed_block),
-        };
-        // First, fill the block with missing priority operations.
-        // Unlike transactions, they are requested from the Eth watch.
-        let next_op_id = reverted_tx.next_priority_op_id;
-        while next_serial_id < next_op_id {
-            // Find the necessary serial id and skip the already processed
-            let priority_op = iter::from_fn(|| transactions_queue.pop_front_priority_op())
-                .find(|op| op.serial_id == next_serial_id)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Operation not found in the priority queue {}",
-                        next_serial_id,
-                    )
-                });
-
-            // If the operation doesn't fit, return the proposed block.
-            if priority_op.data.chunks() <= chunks_left {
-                chunks_left -= priority_op.data.chunks();
-                proposed_block.priority_ops.push(priority_op);
-                next_serial_id += 1;
-            } else {
-                return (chunks_left, proposed_block);
-            }
-        }
-
-        while let Some(reverted_tx) = transactions_queue.reverted_queue_front() {
-            // To prevent state keeper from executing priority operations
-            // out of order, we finish the miniblock if the serial id counter
-            // is greater than the current one. Such transactions will be included
-            // on the next block proposer request.
-            if next_serial_id < reverted_tx.next_priority_op_id {
-                break;
-            }
-            // If the transaction fits into the block, pop it from the queue.
-            // TODO do not unwrap
-            let required_chunks = self
-                .mempool_state
-                .required_chunks(reverted_tx.as_ref())
-                .await
-                .unwrap();
-            if required_chunks <= chunks_left {
-                chunks_left -= required_chunks;
-                let reverted_tx = transactions_queue.reverted_queue_pop_front().unwrap();
-                proposed_block.txs.push(reverted_tx.into_inner());
-            } else {
-                break;
-            }
-        }
-
-        (chunks_left, proposed_block)
-    }
-
     async fn propose_new_block(
         &mut self,
         current_unprocessed_priority_op: u64,
         block_timestamp: u64,
         executed_txs: &[TxHash],
-    ) -> ProposedBlock {
+    ) -> Result<ProposedBlock, TxAddError> {
         let start = std::time::Instant::now();
         // Try to exhaust the reverted transactions queue. Most of the time it
         // will be empty unless the server is restarted after reverting blocks.
-        let mut tx_queue = self.mempool_state.get_transaction_queue(executed_txs).await;
-        // TODO remove it. We use another approach how to correctly revert blocks
-        let (chunks_left, reverted_block) = self
-            .select_reverted_operations(current_unprocessed_priority_op, &mut tx_queue)
-            .await;
-        if !reverted_block.is_empty() {
-            vlog::debug!(
-                "Proposing new block with reverted operations, chunks used: {}",
-                self.max_block_size_chunks - chunks_left
-            );
-            return reverted_block;
-        }
+        let mut tx_queue = self
+            .mempool_state
+            .get_transaction_queue(executed_txs)
+            .await?;
 
         let (chunks_left, priority_ops) = select_priority_ops(
             self.max_block_size_chunks,
@@ -358,7 +245,7 @@ impl MempoolBlocksHandler {
             &mut tx_queue,
             &self.mempool_state,
         )
-        .await;
+        .await?;
 
         if !priority_ops.is_empty() {
             vlog::debug!("Proposed priority ops for block: {:?}", priority_ops);
@@ -388,22 +275,26 @@ impl MempoolBlocksHandler {
                 metrics::histogram!("process_tx", tx.elapsed(), &labels);
             }
         }
-        ProposedBlock { priority_ops, txs }
+        Ok(ProposedBlock { priority_ops, txs })
     }
 
     async fn run(mut self) {
         vlog::info!("Block mempool handler is running");
+        // We have to clean garbage from mempool before running the block generator
+        self.mempool_state.collect_garbage().await;
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolBlocksRequest::GetBlock(block) => {
                     // Generate proposed block.
+                    // TODO maybe add some retries?
                     let proposed_block = self
                         .propose_new_block(
                             block.last_priority_op_number,
                             block.block_timestamp,
                             &block.executed_txs,
                         )
-                        .await;
+                        .await
+                        .expect("Problems with generating new block");
 
                     // Send the proposed block to the request initiator.
                     block
@@ -453,14 +344,13 @@ async fn prepare_tx_for_block(
     block_timestamp: u64,
     transactions_queue: &mut MempoolTransactionsQueue,
     mempool_state: &MempoolState,
-) -> (usize, Vec<SignedTxVariant>) {
+) -> Result<(usize, Vec<SignedTxVariant>), TxAddError> {
     transactions_queue.prepare_new_ready_transactions(block_timestamp);
 
     let mut txs_for_commit = Vec::new();
 
     while let Some(tx) = transactions_queue.pop_front() {
-        // TODO DO not unwrap
-        let chunks_for_tx = mempool_state.required_chunks(&tx).await.unwrap();
+        let chunks_for_tx = mempool_state.required_chunks(&tx).await?;
         if chunks_left >= chunks_for_tx {
             txs_for_commit.push(tx);
             chunks_left -= chunks_for_tx;
@@ -469,7 +359,7 @@ async fn prepare_tx_for_block(
         }
     }
 
-    (chunks_left, txs_for_commit)
+    Ok((chunks_left, txs_for_commit))
 }
 struct MempoolTransactionsHandler {
     db_pool: ConnectionPool,

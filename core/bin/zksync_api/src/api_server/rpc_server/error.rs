@@ -1,8 +1,9 @@
 // External uses
 use jsonrpc_core::ErrorCode;
+use zksync_types::tx::error::TxAddError;
 // Workspace uses
 // Local uses
-use crate::{api_server::tx_sender::SubmitError, tx_error::TxAddError};
+use crate::api_server::tx_sender::SubmitError;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RpcErrorCodes {

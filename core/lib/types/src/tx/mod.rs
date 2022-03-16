@@ -12,7 +12,7 @@ mod withdraw;
 mod withdraw_nft;
 mod zksync_tx;
 
-pub(crate) mod error;
+pub mod error;
 #[cfg(test)]
 mod tests;
 

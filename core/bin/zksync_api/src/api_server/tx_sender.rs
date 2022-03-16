@@ -46,11 +46,12 @@ use crate::{
         BatchRequest, OrderRequest, RequestData, Toggle2FARequest, TxRequest, VerifiedTx,
         VerifySignatureRequest,
     },
-    tx_error::{Toggle2FAError, TxAddError},
+    tx_error::Toggle2FAError,
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
 use zksync_config::configs::api::CommonApiConfig;
 use zksync_mempool::MempoolTransactionRequest;
+use zksync_types::tx::error::TxAddError;
 
 use super::rpc_server::types::RequestMetadata;
 use crate::fee_ticker::{FeeTicker, PriceError};

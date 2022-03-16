@@ -13,6 +13,7 @@ publish = false # We don't want to publish our tests.
 [dependencies]
 zksync_core = { path = "../../bin/zksync_core", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_mempool = { path = "../../lib/mempool", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_circuit = { path = "../../lib/circuit", version = "1.0" }

@@ -17,12 +17,13 @@ use tokio::task::JoinHandle;
 
 // Workspace uses
 use zksync_eth_client::EthereumGateway;
+use zksync_types::tx::error::TxAddError;
 use zksync_types::{
     tx::{EthBatchSignData, EthSignData, TxEthSignature},
     Address, Order, SignedZkSyncTx, Token, ZkSyncTx,
 };
 // Local uses
-use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
+use crate::eth_checker::EthereumChecker;
 use zksync_types::tx::TransactionError;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap

@@ -9,7 +9,6 @@ use num::{bigint::Sign, BigInt, BigUint, ToPrimitive, Zero};
 use std::collections::HashMap;
 use zksync_core::{
     committer::CommitRequest,
-    mempool::ProposedBlock,
     state_keeper::{StateKeeperTestkitRequest, ZkSyncStateInitParams},
     tx_event_emitter::ProcessedOperations,
 };
@@ -31,6 +30,7 @@ use crate::state_keeper_utils::*;
 use crate::types::*;
 
 use zksync_crypto::params::{NFT_STORAGE_ACCOUNT_ADDRESS, NFT_TOKEN_ID};
+use zksync_mempool::ProposedBlock;
 use zksync_types::tx::TimeRange;
 
 /// Used to create transactions between accounts and check for their validity.

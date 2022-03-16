@@ -1,10 +1,5 @@
 // Built-in deps
-use std::{
-    collections::VecDeque,
-    convert::{TryFrom, TryInto},
-    str::FromStr,
-    time::Instant,
-};
+use std::{collections::VecDeque, convert::TryFrom, str::FromStr, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
@@ -14,7 +9,7 @@ use zksync_api_types::v02::transaction::{
 };
 use zksync_types::{
     block::IncompleteBlock,
-    mempool::{RevertedTxVariant, SignedTxVariant},
+    mempool::SignedTxVariant,
     tx::{TxEthSignature, TxHash},
     AccountId, Address, BlockNumber, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
     PriorityOp, SerialId, SignedZkSyncTx, ZkSyncPriorityOp, H256,
@@ -43,7 +38,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     pub async fn load_txs(
         &mut self,
         executed_txs: &[TxHash],
-    ) -> QueryResult<(VecDeque<SignedTxVariant>, VecDeque<RevertedTxVariant>)> {
+    ) -> QueryResult<VecDeque<SignedTxVariant>> {
         let start = Instant::now();
         // Load the transactions from mempool along with corresponding batch IDs.
         let excluded_txs: Vec<String> = executed_txs.iter().map(|tx| tx.to_string()).collect();
@@ -76,45 +71,27 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         });
 
         let mut txs = Vec::new();
-        let mut reverted_txs = Vec::new();
 
         for (batch_id, group) in grouped_txs.into_iter() {
             if let Some(batch_id) = batch_id {
-                let mut group = group.peekable();
-                let next_priority_op_serial_id = group.peek().unwrap().next_priority_op_serial_id;
+                let group = group.peekable();
                 let deserialized_txs = group
                     .map(SignedZkSyncTx::try_from)
                     .collect::<Result<Vec<SignedZkSyncTx>, serde_json::Error>>()?;
                 let variant = SignedTxVariant::batch(deserialized_txs, batch_id, vec![]);
 
-                match next_priority_op_serial_id {
-                    Some(serial_id) => {
-                        reverted_txs.push(RevertedTxVariant::new(variant, serial_id.try_into()?));
-                    }
-                    None => txs.push(variant),
-                }
+                txs.push(variant);
             } else {
                 for mempool_tx in group {
-                    let next_priority_op_serial_id = mempool_tx.next_priority_op_serial_id;
                     let signed_tx = SignedZkSyncTx::try_from(mempool_tx)?;
                     let variant = SignedTxVariant::Tx(signed_tx);
-
-                    match next_priority_op_serial_id {
-                        Some(serial_id) => {
-                            reverted_txs
-                                .push(RevertedTxVariant::new(variant, serial_id.try_into()?));
-                        }
-                        None => txs.push(variant),
-                    }
+                    txs.push(variant);
                 }
             }
         }
 
         // Load signatures for batches.
-        for tx in txs
-            .iter_mut()
-            .chain(reverted_txs.iter_mut().map(AsMut::as_mut))
-        {
+        for tx in txs.iter_mut() {
             if let SignedTxVariant::Batch(batch) = tx {
                 let eth_signatures: Vec<TxEthSignature> = sqlx::query!(
                     "SELECT eth_signature FROM txs_batches_signatures
@@ -135,7 +112,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         }
 
         metrics::histogram!("sql.chain.mempool.load_txs", start.elapsed());
-        Ok((txs.into(), reverted_txs.into()))
+        Ok(txs.into())
     }
 
     pub async fn remove_reverted_block(&mut self, block_number: BlockNumber) -> QueryResult<()> {
@@ -385,15 +362,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// invoked periodically with a big interval (to prevent possible database bloating).
     pub async fn collect_garbage(&mut self) -> QueryResult<()> {
         let start = Instant::now();
-        let (queue, reverted_queue) = self.load_txs(&[]).await?;
-        let all_txs: Vec<_> = queue
-            .into_iter()
-            .chain(
-                reverted_queue
-                    .into_iter()
-                    .map(RevertedTxVariant::into_inner),
-            )
-            .collect();
+        let all_txs = self.load_txs(&[]).await?;
         let mut tx_hashes_to_remove = Vec::new();
 
         for tx in all_txs {

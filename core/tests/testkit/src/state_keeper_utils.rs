@@ -18,6 +18,7 @@ use zksync_types::{
 };
 
 use itertools::Itertools;
+use zksync_mempool::{MempoolBlocksRequest, MempoolTransactionRequest};
 
 pub async fn state_keeper_get_account(
     mut sender: mpsc::Sender<StateKeeperTestkitRequest>,
@@ -32,6 +33,7 @@ pub async fn state_keeper_get_account(
 }
 
 pub struct StateKeeperChannels {
+    pub mempool_receiver: mpsc::Receiver<MempoolBlocksRequest>,
     pub requests: mpsc::Sender<StateKeeperTestkitRequest>,
     pub new_blocks: mpsc::Receiver<CommitRequest>,
     pub queued_txs_events: mpsc::Receiver<ProcessedOperations>,
@@ -44,6 +46,7 @@ pub fn spawn_state_keeper(
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
+    let (mempool_req_sender, mempool_req_receiver) = mpsc::channel(256);
     let (processed_tx_events_sender, processed_tx_events_receiver) = mpsc::channel(256);
 
     let max_ops_in_block = 1000;
@@ -65,8 +68,8 @@ pub fn spawn_state_keeper(
     let (state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
         initial_state,
         *fee_account,
-        state_keeper_req_receiver,
         proposed_blocks_sender,
+        mempool_req_sender,
         block_chunks_sizes,
         max_miniblock_iterations,
         max_miniblock_iterations,
@@ -77,7 +80,7 @@ pub fn spawn_state_keeper(
     let sk_thread_handle = std::thread::spawn(move || {
         let main_runtime = Runtime::new().expect("main runtime start");
         main_runtime.block_on(async move {
-            let state_keeper_task = start_state_keeper(state_keeper, Duration);
+            let state_keeper_task = start_state_keeper(state_keeper, Duration::new(0, 200));
             let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
             tokio::select! {
                 _ = stop_state_keeper_receiver => {},
@@ -91,6 +94,7 @@ pub fn spawn_state_keeper(
         sk_thread_handle,
         stop_state_keeper_sender,
         StateKeeperChannels {
+            mempool_receiver: mempool_req_receiver,
             requests: state_keeper_req_sender,
             new_blocks: proposed_blocks_receiver,
             queued_txs_events: processed_tx_events_receiver,
