@@ -152,6 +152,7 @@ async fn main() -> anyhow::Result<()> {
 
 async fn run_server(components: &ComponentsToRun) {
     let connection_pool = ConnectionPool::new(None);
+    let read_only_connection_pool = ConnectionPool::new_readonly_pool(None);
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
 
     let mut tasks = vec![];
@@ -201,7 +202,7 @@ async fn run_server(components: &ComponentsToRun) {
         let chain_config = ChainConfig::from_env();
         let fee_ticker_config = TickerConfig::from_env();
         let ticker_info = Box::new(TickerInfo::new(
-            connection_pool.clone(),
+            read_only_connection_pool.clone(),
             fee_ticker_config.with_cache,
         ));
 
@@ -209,7 +210,7 @@ async fn run_server(components: &ComponentsToRun) {
             ticker_info,
             fee_ticker_config,
             chain_config.max_blocks_to_aggregate(),
-            connection_pool.clone(),
+            read_only_connection_pool.clone(),
         );
 
         if components.0.contains(&Component::RpcWebSocketApi) {
@@ -221,7 +222,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.block_chunk_sizes.clone(),
             ));
             tasks.push(zksync_api::api_server::rpc_subscriptions::start_ws_server(
-                connection_pool.clone(),
+                read_only_connection_pool.clone(),
                 sign_check_sender.clone(),
                 ticker.clone(),
                 &common_config,
@@ -241,7 +242,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.block_chunk_sizes.clone(),
             ));
             tasks.push(zksync_api::api_server::rpc_server::start_rpc_server(
-                connection_pool.clone(),
+                read_only_connection_pool.clone(),
                 sign_check_sender.clone(),
                 ticker.clone(),
                 &JsonRpcConfig::from_env(),
@@ -260,7 +261,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.block_chunk_sizes,
             ));
             zksync_api::api_server::rest::start_server_thread_detached(
-                connection_pool.clone(),
+                read_only_connection_pool.clone(),
                 RestApiConfig::from_env().bind_addr(),
                 contracts_config.contract_addr,
                 ticker,
@@ -299,7 +300,7 @@ async fn run_server(components: &ComponentsToRun) {
         tasks.push(prometheus_task_handle);
         // We can run them only with active prometheus
         if components.0.contains(&Component::PrometheusPeriodicMetrics) {
-            let counter_task_handle = run_operation_counter(connection_pool.clone());
+            let counter_task_handle = run_operation_counter(read_only_connection_pool.clone());
             tasks.push(counter_task_handle);
         }
     }

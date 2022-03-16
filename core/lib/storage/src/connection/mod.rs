@@ -8,7 +8,7 @@ use sqlx::{Connection, Error as SqlxError, PgConnection};
 use tokio::time;
 // Local imports
 // use self::recoverable_connection::RecoverableConnection;
-use crate::{get_database_url, StorageProcessor};
+use crate::{get_database_replica_url, get_database_url, StorageProcessor};
 use zksync_utils::parse_env;
 
 pub mod holder;
@@ -76,6 +76,17 @@ impl ConnectionPool {
         Self { pool }
     }
 
+    /// Establishes a pool of the connections to the replica of database and
+    /// creates a new `ConnectionPool` object.
+    /// pool_max_size - number of connections in pool, if not set env variable "DATABASE_POOL_SIZE" is going to be used.
+    pub fn new_readonly_pool(pool_max_size: Option<u32>) -> Self {
+        let database_url = get_database_replica_url();
+        let max_size = pool_max_size.unwrap_or_else(|| parse_env("DATABASE_POOL_SIZE"));
+
+        let pool = DbPool::create(database_url, max_size as usize);
+
+        Self { pool }
+    }
     /// Creates a `StorageProcessor` entity over a recoverable connection.
     /// Upon a database outage connection will block the thread until
     /// it will be able to recover the connection (or, if connection cannot
