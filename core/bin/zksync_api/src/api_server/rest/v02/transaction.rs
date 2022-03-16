@@ -252,27 +252,28 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fee_ticker::validator::cache::TokenInMemoryCache;
-    use crate::{
-        api_server::rest::v02::{
-            test_utils::{
-                deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
-                TestServerConfig, TestTransactions,
-            },
-            SharedData,
+    use crate::api_server::rest::v02::{
+        test_utils::{
+            deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier, TestServerConfig,
+            TestTransactions,
         },
-        core_api_client::CoreApiClient,
+        SharedData,
     };
+    use crate::fee_ticker::validator::cache::TokenInMemoryCache;
     use actix_web::App;
     use chrono::Utc;
+    use futures::channel::mpsc;
+    use futures::StreamExt;
     use num::rational::Ratio;
     use num::BigUint;
     use std::collections::HashMap;
     use std::str::FromStr;
+    use tokio::task::JoinHandle;
     use zksync_api_types::v02::{
         transaction::{L2Receipt, TxHashSerializeWrapper},
         ApiVersion,
     };
+    use zksync_mempool::MempoolTransactionRequest;
     use zksync_types::{
         tokens::{Token, TokenMarketVolume},
         tx::{
@@ -282,26 +283,26 @@ mod tests {
         Address, BlockNumber, SignedZkSyncTx, TokenId, TokenKind, TokenLike,
     };
 
-    fn submit_txs_loopback() -> (CoreApiClient, actix_test::TestServer) {
-        async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
-            Json(Ok(()))
-        }
+    fn submit_txs_loopback() -> (mpsc::Sender<MempoolTransactionRequest>, JoinHandle<()>) {
+        let (mempool_tx_request_sender, mut mempool_tx_request_receiver) = mpsc::channel(100);
 
-        async fn send_txs_batch(
-            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
-        ) -> Json<Result<(), ()>> {
-            Json(Ok(()))
-        }
-
-        let server = actix_test::start(move || {
-            App::new()
-                .route("new_tx", web::post().to(send_tx))
-                .route("new_txs_batch", web::post().to(send_txs_batch))
+        let task = tokio::spawn(async move {
+            while let Some(tx) = mempool_tx_request_receiver.next().await {
+                match tx {
+                    MempoolTransactionRequest::NewTx(_, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                    MempoolTransactionRequest::NewPriorityOps(_, _, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                    MempoolTransactionRequest::NewTxsBatch(_, _, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                }
+            }
         });
 
-        let url = server.url("").trim_end_matches('/').to_owned();
-
-        (CoreApiClient::new(url), server)
+        (mempool_tx_request_sender, task)
     }
 
     #[actix_rt::test]
@@ -310,7 +311,7 @@ mod tests {
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
     async fn transactions_scope() -> anyhow::Result<()> {
-        let (core_client, core_server) = submit_txs_loopback();
+        let (sender, task) = submit_txs_loopback();
 
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
@@ -349,12 +350,12 @@ mod tests {
 
         let (client, server) = cfg.start_server(
             move |cfg: &TestServerConfig| {
-                api_scope(TxSender::with_client(
-                    core_client.clone(),
+                api_scope(TxSender::new(
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
                     dummy_fee_ticker(&prices, Some(cache.clone())),
                     &cfg.config.api.common,
+                    sender.clone(),
                 ))
             },
             Some(shared_data),
@@ -501,7 +502,8 @@ mod tests {
         assert!(tx_data.is_none());
 
         server.stop().await;
-        core_server.stop().await;
+        // TODO Stop core server
+        // core_server.stop().await;
         Ok(())
     }
 }

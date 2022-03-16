@@ -109,6 +109,7 @@ mod tests {
     };
     use crate::fee_ticker::validator::cache::TokenInMemoryCache;
     use chrono::Utc;
+    use futures::channel::mpsc;
     use num::rational::Ratio;
     use num::BigUint;
     use std::collections::HashMap;
@@ -128,6 +129,8 @@ mod tests {
     )]
     async fn fee_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
+
+        let (mempool_tx_request_sender, _mempool_tx_request_receiver) = mpsc::channel(100);
 
         let shared_data = SharedData {
             net: cfg.config.chain.eth.network,
@@ -167,7 +170,7 @@ mod tests {
                     dummy_sign_verifier(),
                     dummy_fee_ticker(&prices, Some(cache.clone())),
                     &cfg.config.api.common,
-                    cfg.config.api.private.url.clone(),
+                    mempool_tx_request_sender.clone(),
                 ))
             },
             Some(shared_data),

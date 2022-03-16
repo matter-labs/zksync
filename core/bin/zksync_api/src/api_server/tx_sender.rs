@@ -147,22 +147,6 @@ impl TxSender {
         config: &CommonApiConfig,
         mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
-        Self::with_client(
-            connection_pool,
-            sign_verify_request_sender,
-            ticker,
-            config,
-            mempool_tx_sender,
-        )
-    }
-
-    pub(crate) fn with_client(
-        connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker: FeeTicker,
-        config: &CommonApiConfig,
-        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
-    ) -> Self {
         let max_number_of_transactions_per_batch =
             config.max_number_of_transactions_per_batch as usize;
         let max_number_of_authors_per_batch = config.max_number_of_authors_per_batch as usize;

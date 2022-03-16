@@ -157,11 +157,10 @@ impl MempoolTransactionsQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mempool::Address;
-    use chrono::Utc;
+    use vlog::sentry::types::Utc;
     use zksync_types::tx::{TimeRange, Transfer, Withdraw};
     use zksync_types::{
-        AccountId, Deposit, Nonce, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
+        AccountId, Address, Deposit, Nonce, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
     };
 
     fn get_transfer_with_timestamps(valid_from: u64, valid_until: u64) -> SignedTxVariant {
@@ -255,11 +254,6 @@ mod tests {
                 eth_block_index: None,
             },
         ]);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
-        assert_eq!(op.serial_id, 1);
-        transactions_queue.push_front_priority_op(op);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
-        assert_eq!(op.serial_id, 1);
         transactions_queue.add_priority_ops(vec![
             PriorityOp {
                 serial_id: 1,
@@ -328,10 +322,9 @@ mod tests {
             },
         ]);
         let op = transactions_queue.pop_front_priority_op().unwrap();
-        assert_eq!(op.serial_id, 2);
+        assert_eq!(op.serial_id, 1);
         let op = transactions_queue.pop_front_priority_op().unwrap();
-        assert_eq!(op.serial_id, 3);
-        transactions_queue.push_front_priority_op(op);
+        assert_eq!(op.serial_id, 2);
         let op = transactions_queue.pop_front_priority_op().unwrap();
         assert_eq!(op.serial_id, 3);
         let op = transactions_queue.pop_front_priority_op().unwrap();

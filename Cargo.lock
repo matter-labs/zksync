@@ -6012,6 +6012,7 @@ dependencies = [
 name = "zksync_mempool"
 version = "1.0.0"
 dependencies = [
+ "chrono",
  "futures 0.3.17",
  "metrics",
  "serde",

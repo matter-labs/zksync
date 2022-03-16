@@ -308,10 +308,6 @@ API_PROMETHEUS_PORT="3312"
             SocketAddr::new(bind_broadcast_addr, config.rest.port)
         );
         assert_eq!(
-            config.private.bind_addr(),
-            SocketAddr::new(bind_broadcast_addr, config.private.port)
-        );
-        assert_eq!(
             config.json_rpc.http_bind_addr(),
             SocketAddr::new(bind_broadcast_addr, config.json_rpc.http_port)
         );

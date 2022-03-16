@@ -21,3 +21,6 @@ futures = "0.3"
 thiserror = "1.0"
 tokio = { version = "1", features = ["full"] }
 metrics = "0.17"
+
+[dev-dependencies]
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
