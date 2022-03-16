@@ -2,6 +2,7 @@
 
 // Built-in uses
 use std::str::FromStr;
+use std::time::Instant;
 
 // External uses
 use actix_web::{web, Scope};
@@ -165,8 +166,11 @@ async fn block_pagination(
     data: web::Data<ApiBlockData>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<BlockInfo, BlockNumber>> {
+    let start = Instant::now();
     let query = api_try!(parse_query(query).map_err(Error::from));
-    data.block_page(query).await.into()
+    let res = data.block_page(query).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "block_pagination");
+    res
 }
 
 // TODO: take `block_position` as enum.
@@ -175,8 +179,11 @@ async fn block_by_position(
     data: web::Data<ApiBlockData>,
     block_position: web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>> {
+    let start = Instant::now();
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
-    data.block_info(block_number).await.into()
+    let res = data.block_info(block_number).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "block_by_position");
+    res
 }
 
 async fn block_transactions(
@@ -184,17 +191,22 @@ async fn block_transactions(
     block_position: web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
+    let start = Instant::now();
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
     let query = api_try!(parse_query(query).map_err(Error::from));
-    data.transaction_page(block_number, query).await.into()
+    let res = data.transaction_page(block_number, query).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "block_transactions");
+    res
 }
 
 async fn transaction_in_block(
     data: web::Data<ApiBlockData>,
     path: web::Path<(BlockNumber, u64)>,
 ) -> ApiResult<Option<TxData>> {
+    let start = Instant::now();
     let (block_number, block_index) = *path;
     let res = api_try!(data.tx_data(block_number, block_index).await);
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "transaction_in_block");
     ApiResult::Ok(res)
 }
 

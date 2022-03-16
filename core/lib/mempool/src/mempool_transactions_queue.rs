@@ -47,7 +47,7 @@ pub struct MempoolTransactionsQueue {
     pending_txs: BinaryHeap<MempoolPendingTransaction>,
 
     last_processed_priority_op: Option<SerialId>,
-    pub priority_ops: VecDeque<PriorityOp>,
+    priority_ops: VecDeque<PriorityOp>,
 }
 
 impl MempoolTransactionsQueue {
