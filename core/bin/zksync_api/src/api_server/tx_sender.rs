@@ -41,7 +41,6 @@ use zksync_utils::{
 // Local uses
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
-    core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TokenPriceRequestType},
     signature_checker::{
         BatchRequest, OrderRequest, RequestData, Toggle2FARequest, TxRequest, VerifiedTx,
@@ -51,6 +50,7 @@ use crate::{
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
 use zksync_config::configs::api::CommonApiConfig;
+use zksync_mempool::MempoolTransactionRequest;
 
 use super::rpc_server::types::RequestMetadata;
 use crate::fee_ticker::{FeeTicker, PriceError};
@@ -59,7 +59,7 @@ const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
 #[derive(Clone)]
 pub struct TxSender {
-    pub core_api_client: CoreApiClient,
+    pub mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     pub sign_verify_requests: mpsc::Sender<VerifySignatureRequest>,
     pub ticker: FeeTicker,
 
@@ -145,32 +145,30 @@ impl TxSender {
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker: FeeTicker,
         config: &CommonApiConfig,
-        private_url: String,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
-        let core_api_client = CoreApiClient::new(private_url);
-
         Self::with_client(
-            core_api_client,
             connection_pool,
             sign_verify_request_sender,
             ticker,
             config,
+            mempool_tx_sender,
         )
     }
 
     pub(crate) fn with_client(
-        core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker: FeeTicker,
         config: &CommonApiConfig,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
         let max_number_of_transactions_per_batch =
             config.max_number_of_transactions_per_batch as usize;
         let max_number_of_authors_per_batch = config.max_number_of_authors_per_batch as usize;
 
         Self {
-            core_api_client,
+            mempool_tx_sender,
             pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
             ticker,
@@ -601,12 +599,18 @@ impl TxSender {
                 .await?;
         }
 
-        // Send verified transactions to the mempool.
-        self.core_api_client
-            .send_tx(verified_tx)
+        let (sender, receiver) = oneshot::channel();
+        let item = MempoolTransactionRequest::NewTx(Box::new(verified_tx), sender);
+        let mut mempool_sender = self.mempool_tx_sender.clone();
+        mempool_sender
+            .send(item)
             .await
-            .map_err(SubmitError::communication_core_server)?
-            .map_err(SubmitError::TxAdd)?;
+            .map_err(SubmitError::internal)?;
+
+        receiver
+            .await
+            .map_err(SubmitError::internal)?
+            .map_err(TxAddError::from)?;
 
         // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
         if let Some(fee_data_for_subsidy) = fee_data_for_subsidy {
@@ -882,12 +886,20 @@ impl TxSender {
         verified_txs.extend(verified_batch.into_iter());
 
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
-        // Send verified transactions to the mempool.
-        self.core_api_client
-            .send_txs_batch(verified_txs, verified_signatures)
+
+        let (sender, receiver) = oneshot::channel();
+        let item =
+            MempoolTransactionRequest::NewTxsBatch(verified_txs, verified_signatures, sender);
+        let mut mempool_sender = self.mempool_tx_sender.clone();
+        mempool_sender
+            .send(item)
             .await
-            .map_err(SubmitError::communication_core_server)?
-            .map_err(SubmitError::TxAdd)?;
+            .map_err(SubmitError::communication_core_server)?;
+
+        receiver
+            .await
+            .map_err(SubmitError::internal)?
+            .map_err(TxAddError::from)?;
 
         let batch_hash = TxHash::batch_hash(&tx_hashes);
 

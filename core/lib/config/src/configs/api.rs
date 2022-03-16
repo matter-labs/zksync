@@ -22,8 +22,6 @@ pub struct ApiConfig {
     pub json_rpc: JsonRpcConfig,
     /// Configuration options for the web3 JSON RPC server.
     pub web3: Web3Config,
-    /// Configuration options for the private core API.
-    pub private: PrivateApiConfig,
     /// Configuration options for the prover server.
     pub prover: ProverApiConfig,
     /// Configuration options for the Prometheus exporter.
@@ -38,7 +36,6 @@ impl ApiConfig {
             rest: envy_load!("rest", "API_REST_"),
             json_rpc: envy_load!("json_rpc", "API_JSON_RPC_"),
             web3: envy_load!("web3", "API_WEB3_"),
-            private: envy_load!("private", "API_PRIVATE_"),
             prover: envy_load!("prover", "API_PROVER_"),
             prometheus: envy_load!("prometheus", "API_PROMETHEUS_"),
         }
@@ -79,11 +76,6 @@ impl Web3Config {
     }
 }
 
-impl PrivateApiConfig {
-    pub fn from_env() -> Self {
-        envy_load!("private", "API_PRIVATE_")
-    }
-}
 impl ProverApiConfig {
     pub fn from_env() -> Self {
         envy_load!("prover", "API_PROVER_")
@@ -148,20 +140,6 @@ pub struct ProverApiConfig {
 }
 
 impl ProverApiConfig {
-    pub fn bind_addr(&self) -> SocketAddr {
-        SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
-    }
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct PrivateApiConfig {
-    /// Port to which the API server is listening.
-    pub port: u16,
-    /// URL to access API server.
-    pub url: String,
-}
-
-impl PrivateApiConfig {
     pub fn bind_addr(&self) -> SocketAddr {
         SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
     }
@@ -266,10 +244,6 @@ mod tests {
                 max_block_range: 10,
                 chain_id: 240,
             },
-            private: PrivateApiConfig {
-                port: 8090,
-                url: "http://127.0.0.1:8090".into(),
-            },
             prover: ProverApiConfig {
                 port: 8088,
                 url: "http://127.0.0.1:8088".into(),
@@ -304,8 +278,6 @@ API_WEB3_PORT="3002"
 API_WEB3_URL="http://127.0.0.1:3002"
 API_WEB3_CHAIN_ID="240"
 API_WEB3_MAX_BLOCK_RANGE="10"
-API_PRIVATE_PORT="8090"
-API_PRIVATE_URL="http://127.0.0.1:8090"
 API_PROVER_PORT="8088"
 API_PROVER_URL="http://127.0.0.1:8088"
 API_PROVER_SECRET_AUTH="sample"

@@ -15,7 +15,7 @@
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
 // Built-in deps
-use std::{iter, sync::Arc};
+use std::iter;
 // External uses
 use futures::{
     channel::{
@@ -27,9 +27,7 @@ use futures::{
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use web3::types::H256;
 
 // Workspace uses
 use zksync_balancer::BuildBalancedItem;
@@ -43,8 +41,8 @@ use zksync_types::{
 };
 
 // Local uses
-use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
-use crate::wait_for_tasks;
+use crate::mempool_transactions_queue::MempoolTransactionsQueue;
+// use crate::wait_for_tasks;
 
 mod mempool_transactions_queue;
 
@@ -144,9 +142,9 @@ pub enum MempoolBlocksRequest {
     GetBlock(GetBlockRequest),
 }
 
+#[derive(Debug, Clone)]
 struct MempoolState {
     db_pool: ConnectionPool,
-    // transactions_queue: MempoolTransactionsQueue,
 }
 
 impl MempoolState {
@@ -254,7 +252,7 @@ impl MempoolState {
 }
 
 struct MempoolBlocksHandler {
-    mempool_state: Arc<RwLock<MempoolState>>,
+    mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolBlocksRequest>,
     max_block_size_chunks: usize,
 }
@@ -269,7 +267,6 @@ impl MempoolBlocksHandler {
         let mut proposed_block = ProposedBlock::new();
         let mut next_serial_id = current_unprocessed_priority_op;
 
-        let mempool_state = self.mempool_state.write().await;
         // Peek into the reverted queue.
         let reverted_tx = match transactions_queue.reverted_queue_front() {
             Some(reverted_tx) => reverted_tx,
@@ -309,7 +306,8 @@ impl MempoolBlocksHandler {
             }
             // If the transaction fits into the block, pop it from the queue.
             // TODO do not unwrap
-            let required_chunks = mempool_state
+            let required_chunks = self
+                .mempool_state
                 .required_chunks(reverted_tx.as_ref())
                 .await
                 .unwrap();
@@ -334,9 +332,7 @@ impl MempoolBlocksHandler {
         let start = std::time::Instant::now();
         // Try to exhaust the reverted transactions queue. Most of the time it
         // will be empty unless the server is restarted after reverting blocks.
-        let state = self.mempool_state.write().await;
-        let mut tx_queue = state.get_transaction_queue(executed_txs).await;
-        drop(state);
+        let mut tx_queue = self.mempool_state.get_transaction_queue(executed_txs).await;
         // TODO remove it. We use another approach how to correctly revert blocks
         let (chunks_left, reverted_block) = self
             .select_reverted_operations(current_unprocessed_priority_op, &mut tx_queue)
@@ -356,10 +352,13 @@ impl MempoolBlocksHandler {
         )
         .await;
 
-        let state = self.mempool_state.write().await;
-        let (_chunks_left, txs) =
-            prepare_tx_for_block(chunks_left, block_timestamp, &mut tx_queue, &state).await;
-        drop(state);
+        let (_chunks_left, txs) = prepare_tx_for_block(
+            chunks_left,
+            block_timestamp,
+            &mut tx_queue,
+            &self.mempool_state,
+        )
+        .await;
 
         if !priority_ops.is_empty() {
             vlog::debug!("Proposed priority ops for block: {:?}", priority_ops);
@@ -474,14 +473,14 @@ async fn prepare_tx_for_block(
 }
 struct MempoolTransactionsHandler {
     db_pool: ConnectionPool,
-    mempool_state: Arc<RwLock<MempoolState>>,
+    mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolTransactionRequest>,
     max_block_size_chunks: usize,
 }
 
 struct MempoolTransactionsHandlerBuilder {
     db_pool: ConnectionPool,
-    mempool_state: Arc<RwLock<MempoolState>>,
+    mempool_state: MempoolState,
     max_block_size_chunks: usize,
 }
 
@@ -600,14 +599,7 @@ impl MempoolTransactionsHandler {
             TxAddError::DbError
         })?;
 
-        if self
-            .mempool_state
-            .read()
-            .await
-            .chunks_for_batch(&batch)
-            .await?
-            > self.max_block_size_chunks
-        {
+        if self.mempool_state.chunks_for_batch(&batch).await? > self.max_block_size_chunks {
             return Err(TxAddError::BatchTooBig);
         }
 
@@ -658,36 +650,41 @@ impl MempoolTransactionsHandler {
     }
 }
 
-#[must_use]
-pub fn run_mempool_tasks(
+pub fn run_mempool_tx_handler(
     db_pool: ConnectionPool,
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,
+    block_chunk_sizes: Vec<usize>,
+) -> JoinHandle<()> {
+    let mempool_state = MempoolState::new(db_pool.clone());
+    let max_block_size_chunks = *block_chunk_sizes
+        .iter()
+        .max()
+        .expect("failed to find max block chunks size");
+    let handler = MempoolTransactionsHandler {
+        db_pool: db_pool.clone(),
+        mempool_state: mempool_state.clone(),
+        requests: tx_requests,
+        max_block_size_chunks,
+    };
+    tokio::spawn(handler.run())
+}
+
+pub fn run_mempool_block_handler(
+    db_pool: ConnectionPool,
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,
     block_chunk_sizes: Vec<usize>,
 ) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        let mempool_state = Arc::new(RwLock::new(MempoolState::new(db_pool.clone())));
-        let max_block_size_chunks = *block_chunk_sizes
-            .iter()
-            .max()
-            .expect("failed to find max block chunks size");
-        let handler = MempoolTransactionsHandler {
-            db_pool: db_pool.clone(),
-            mempool_state: mempool_state.clone(),
-            requests: tx_requests,
-            max_block_size_chunks,
-        };
+    let mempool_state = MempoolState::new(db_pool.clone());
+    let max_block_size_chunks = *block_chunk_sizes
+        .iter()
+        .max()
+        .expect("failed to find max block chunks size");
 
-        let blocks_handler = MempoolBlocksHandler {
-            mempool_state,
-            requests: block_requests,
-            max_block_size_chunks,
-        };
+    let blocks_handler = MempoolBlocksHandler {
+        mempool_state,
+        requests: block_requests,
+        max_block_size_chunks,
+    };
 
-        let tasks = vec![
-            tokio::spawn(blocks_handler.run()),
-            tokio::spawn(handler.run()),
-        ];
-        wait_for_tasks(tasks).await
-    })
+    tokio::spawn(blocks_handler.run())
 }

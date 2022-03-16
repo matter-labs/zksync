@@ -5686,6 +5686,7 @@ dependencies = [
  "zksync_eth_client",
  "zksync_eth_signer",
  "zksync_gateway_watcher",
+ "zksync_mempool",
  "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_test_account",
@@ -5816,6 +5817,7 @@ dependencies = [
  "zksync_eth_client",
  "zksync_eth_signer",
  "zksync_gateway_watcher",
+ "zksync_mempool",
  "zksync_notifier",
  "zksync_prometheus_exporter",
  "zksync_state",
@@ -5970,6 +5972,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "ethabi",
+ "futures 0.3.17",
  "hex",
  "log 0.4.14",
  "metrics",
@@ -5983,6 +5986,7 @@ dependencies = [
  "zksync_core",
  "zksync_crypto",
  "zksync_eth_signer",
+ "zksync_mempool",
  "zksync_storage",
  "zksync_test_account",
  "zksync_types",
@@ -6002,6 +6006,22 @@ dependencies = [
  "zksync_config",
  "zksync_eth_client",
  "zksync_utils",
+]
+
+[[package]]
+name = "zksync_mempool"
+version = "1.0.0"
+dependencies = [
+ "futures 0.3.17",
+ "metrics",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "vlog",
+ "zksync_balancer",
+ "zksync_storage",
+ "zksync_types",
 ]
 
 [[package]]
@@ -6112,6 +6132,7 @@ dependencies = [
  "zksync_eth_sender",
  "zksync_forced_exit_requests",
  "zksync_gateway_watcher",
+ "zksync_mempool",
  "zksync_prometheus_exporter",
  "zksync_prover",
  "zksync_storage",

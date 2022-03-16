@@ -29,7 +29,6 @@ pub enum CommitRequest {
 pub struct BlockCommitRequest {
     pub block: IncompleteBlock,
     pub block_metadata: BlockMetadata,
-    pub accounts_updated: AccountUpdates,
 }
 
 #[derive(Clone, Debug)]
@@ -141,7 +140,6 @@ async fn seal_incomplete_block(
     let BlockCommitRequest {
         block,
         block_metadata,
-        ..
     } = block_commit_request;
 
     let mut storage = pool

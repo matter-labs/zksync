@@ -4305,6 +4305,68 @@
       "nullable": []
     }
   },
+  "86ae541a53bd5bf92292c220de97a1940aa45aac2b759965b389308de0b36eb6": {
+    "query": "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (\n                SELECT u.hashes FROM UNNEST ($1::text[]) as u(hashes)\n            )\n\n            ORDER BY id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_sign_data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "batch_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "reverted",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "TextArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false
+      ]
+    }
+  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
@@ -4916,68 +4978,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "9aa790069ef1775116e440dd01c1f541c082684469df8a34556d5497fd698c2e": {
-    "query": "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (\n                SELECT u.hashes FROM UNNEST ($1::text[]) as u(hashes)\n            )\n\n            ORDER BY created_at",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tx_hash",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "tx",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_sign_data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 5,
-          "name": "batch_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 6,
-          "name": "next_priority_op_serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 7,
-          "name": "reverted",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "TextArray"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        true,
-        false
-      ]
     }
   },
   "9aeeb5e20f4f34d4b4e1987f1bf0a23ee931f12da071b134225069d32c1896de": {

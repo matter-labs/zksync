@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use thiserror::Error;
 use zksync_types::tx;
 
@@ -45,6 +46,28 @@ pub enum TxAddError {
 
     #[error("Too many Ethereum signatures provided")]
     EthSignaturesLimitExceeded,
+}
+
+impl From<zksync_mempool::TxAddError> for TxAddError {
+    fn from(error: zksync_mempool::TxAddError) -> Self {
+        // TODO
+        Self::NonceMismatch
+        // match error {
+        //     zksync_mempool::TxAddError::NonceMismatch => Self::NonceMismatch,
+        //     zksync_mempool::TxAddError::IncorrectTx => Self::IncorrectTx()
+        //     zksync_mempool::TxAddError::TxFeeTooLow => {}
+        //     zksync_mempool::TxAddError::TxBatchFeeTooLow => {}
+        //     zksync_mempool::TxAddError::EIP1271SignatureVerificationFail => {}
+        //     zksync_mempool::TxAddError::MissingEthSignature => {}
+        //     zksync_mempool::TxAddError::IncorrectEthSignature => {}
+        //     zksync_mempool::TxAddError::ChangePkNotAuthorized => {}
+        //     zksync_mempool::TxAddError::Other => {}
+        //     zksync_mempool::TxAddError::DbError => {}
+        //     zksync_mempool::TxAddError::EmptyBatch => {}
+        //     zksync_mempool::TxAddError::BatchTooBig => {}
+        //     zksync_mempool::TxAddError::BatchWithdrawalsOverload => {}
+        // }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]

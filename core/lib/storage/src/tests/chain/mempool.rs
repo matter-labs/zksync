@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Generates several different `SignedZkSyncTx` objects.
-fn franklin_txs() -> Vec<SignedZkSyncTx> {
+fn zksync_txs() -> Vec<SignedZkSyncTx> {
     let transfer_1 = Transfer::new(
         AccountId(42),
         Address::random(),
@@ -138,7 +138,7 @@ fn unwrap_tx(tx: SignedTxVariant) -> SignedZkSyncTx {
 #[db_test]
 async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage)
             .insert_tx(&tx.clone())
@@ -232,7 +232,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     const SPLIT_TXS_AT: usize = 2;
 
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage).insert_tx(&tx.clone()).await?;
     }
@@ -262,7 +262,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 #[db_test]
 async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage)
             .insert_tx(&tx.clone())

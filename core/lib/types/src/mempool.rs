@@ -29,7 +29,7 @@ impl From<SignedZkSyncTx> for SignedTxVariant {
 
 impl SignedTxVariant {
     pub fn batch(
-        mut txs: Vec<SignedZkSyncTx>,
+        txs: Vec<SignedZkSyncTx>,
         batch_id: i64,
         eth_signatures: Vec<TxEthSignature>,
     ) -> Self {

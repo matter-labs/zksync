@@ -3,8 +3,6 @@ use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
     committer::run_committer,
     eth_watch::start_eth_watch,
-    mempool::run_mempool_tasks,
-    private_api::start_private_core_api,
     state_keeper::{start_root_hash_calculator, start_state_keeper, ZkSyncStateKeeper},
     token_handler::run_token_handler,
 };
@@ -12,6 +10,7 @@ use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
 use zksync_config::{ChainConfig, ZkSyncConfig};
 use zksync_eth_client::EthereumGateway;
+use zksync_mempool::{run_mempool_block_handler, run_mempool_tx_handler};
 use zksync_storage::ConnectionPool;
 use zksync_types::{tokens::get_genesis_token_list, Token, TokenId, TokenKind};
 
@@ -19,8 +18,6 @@ const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
 pub mod committer;
 pub mod eth_watch;
-pub mod mempool;
-pub mod private_api;
 pub mod register_factory_handler;
 pub mod rejected_tx_cleaner;
 pub mod state_keeper;
@@ -154,10 +151,15 @@ pub async fn run_core(
     );
 
     // Start mempool.
-    let mempool_task = run_mempool_tasks(
+    let mempool_block_handler_task = run_mempool_block_handler(
+        connection_pool.clone(),
+        mempool_block_request_receiver,
+        config.chain.state_keeper.block_chunk_sizes.clone(),
+    );
+
+    let mempool_tx_handler_task = run_mempool_tx_handler(
         connection_pool.clone(),
         mempool_tx_request_receiver,
-        mempool_block_request_receiver,
         config.chain.state_keeper.block_chunk_sizes.clone(),
     );
 
@@ -181,20 +183,16 @@ pub async fn run_core(
         processed_tx_events_receiver,
     );
 
-    // Start private API.
-    let private_api_task =
-        start_private_core_api(mempool_tx_request_sender, config.api.private.clone());
-
     let task_futures = vec![
         eth_watch_task,
         state_keeper_task,
         root_hash_calculator_task,
         committer_task,
-        mempool_task,
         token_handler_task,
         register_factory_task,
         tx_event_emitter_task,
-        private_api_task,
+        mempool_block_handler_task,
+        mempool_tx_handler_task,
     ];
 
     Ok(task_futures)

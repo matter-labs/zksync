@@ -12,6 +12,7 @@ use jsonrpc_ws_server::RequestContext;
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
+use zksync_mempool::MempoolTransactionRequest;
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Address};
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
@@ -183,7 +184,7 @@ pub fn start_ws_server(
     common_config: &CommonApiConfig,
     config: &JsonRpcConfig,
     miniblock_iteration_interval: Duration,
-    private_url: String,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     confirmations_for_eth_event: u64,
 ) -> JoinHandle<()> {
     let addr = config.ws_bind_addr();
@@ -202,8 +203,8 @@ pub fn start_ws_server(
         sign_verify_request_sender,
         ticker,
         common_config,
-        private_url,
         confirmations_for_eth_event,
+        mempool_tx_sender,
     );
 
     let (handler, panic_sender) = spawn_panic_handler();

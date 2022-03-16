@@ -1,5 +1,6 @@
 use chrono::{DateTime, TimeZone, Utc};
 use ethabi::{Address, Hash};
+use futures::channel::mpsc;
 use std::{
     convert::TryFrom,
     ops::Sub,
@@ -20,8 +21,8 @@ use zksync_storage::ConnectionPool;
 use zksync_contracts::forced_exit_contract;
 use zksync_types::H160;
 
-use zksync_api::core_api_client::CoreApiClient;
 use zksync_core::eth_watch::{get_web3_block_number, WatcherMode};
+use zksync_mempool::MempoolTransactionRequest;
 use zksync_types::forced_exit_requests::FundsReceivedEvent;
 
 use super::prepare_forced_exit_sender::prepare_forced_exit_sender_account;
@@ -383,7 +384,7 @@ where
 }
 
 pub fn run_forced_exit_contract_watcher(
-    core_api_client: CoreApiClient,
+    sender: mpsc::Sender<MempoolTransactionRequest>,
     connection_pool: ConnectionPool,
     config: ForcedExitRequestsConfig,
     forced_exit_minimum_account_age_secs: u64,
@@ -402,18 +403,15 @@ pub fn run_forced_exit_contract_watcher(
 
         // It is fine to unwrap here, since without it there is not way we
         // can be sure that the forced exit sender will work properly
-        let id = prepare_forced_exit_sender_account(
-            connection_pool.clone(),
-            core_api_client.clone(),
-            &config,
-        )
-        .await
-        .unwrap();
+        let id =
+            prepare_forced_exit_sender_account(connection_pool.clone(), &config, sender.clone())
+                .await
+                .unwrap();
 
         let core_interaction_wrapper = MempoolCoreInteractionWrapper::new(
             forced_exit_minimum_account_age_secs,
-            core_api_client,
             connection_pool.clone(),
+            sender,
         );
         // It is ok to unwrap here, since if forced_exit_sender is not created, then
         // the watcher is meaningless

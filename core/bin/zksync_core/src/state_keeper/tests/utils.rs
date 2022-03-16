@@ -9,6 +9,7 @@ use zksync_crypto::{
     rand::{Rng, SeedableRng, XorShiftRng},
     PrivateKey,
 };
+use zksync_mempool::ProposedBlock;
 use zksync_types::block::{IncompleteBlock, PendingBlock};
 use zksync_types::tx::TimeRange;
 use zksync_types::{

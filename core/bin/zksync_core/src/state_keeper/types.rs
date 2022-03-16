@@ -2,9 +2,10 @@
 use futures::channel::oneshot;
 use itertools::Itertools;
 // Workspace uses
+use zksync_mempool::ProposedBlock;
 use zksync_types::{Account, AccountId, Address};
 // Local uses
-use crate::{mempool::ProposedBlock, state_keeper::init_params::ZkSyncStateInitParams};
+use crate::state_keeper::init_params::ZkSyncStateInitParams;
 
 #[derive(Debug)]
 pub enum StateKeeperTestkitRequest {

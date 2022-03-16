@@ -16,16 +16,16 @@ use zksync_witness_generator::run_prover_server;
 use tokio::task::JoinHandle;
 use zksync_config::configs::api::PrometheusConfig;
 use zksync_config::{
-    configs::api::{
-        CommonApiConfig, JsonRpcConfig, PrivateApiConfig, ProverApiConfig, RestApiConfig,
-        Web3Config,
-    },
+    configs::api::{CommonApiConfig, JsonRpcConfig, ProverApiConfig, RestApiConfig, Web3Config},
     ChainConfig, ContractsConfig, DBConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig,
     ForcedExitRequestsConfig, GatewayWatcherConfig, ProverConfig, TickerConfig, ZkSyncConfig,
 };
 use zksync_core::rejected_tx_cleaner::run_rejected_tx_cleaner;
+use zksync_mempool::run_mempool_tx_handler;
 use zksync_prometheus_exporter::{run_operation_counter, run_prometheus_exporter};
 use zksync_storage::ConnectionPool;
+
+const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ServerCommand {
@@ -194,7 +194,6 @@ async fn run_server(components: &ComponentsToRun) {
             sign_check_receiver,
         ));
 
-        let private_config = PrivateApiConfig::from_env();
         let contracts_config = ContractsConfig::from_env();
         let common_config = CommonApiConfig::from_env();
         let chain_config = ChainConfig::from_env();
@@ -212,6 +211,13 @@ async fn run_server(components: &ComponentsToRun) {
         );
 
         if components.0.contains(&Component::RpcWebSocketApi) {
+            let (mempool_tx_request_sender, mempool_tx_request_receiver) =
+                mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+            tasks.push(run_mempool_tx_handler(
+                connection_pool.clone(),
+                mempool_tx_request_receiver,
+                chain_config.state_keeper.block_chunk_sizes.clone(),
+            ));
             tasks.push(zksync_api::api_server::rpc_subscriptions::start_ws_server(
                 connection_pool.clone(),
                 sign_check_sender.clone(),
@@ -219,30 +225,45 @@ async fn run_server(components: &ComponentsToRun) {
                 &common_config,
                 &JsonRpcConfig::from_env(),
                 chain_config.state_keeper.miniblock_iteration_interval(),
-                private_config.url.clone(),
+                mempool_tx_request_sender,
                 eth_watch_config.confirmations_for_eth_event,
             ));
         }
 
         if components.0.contains(&Component::RpcApi) {
+            let (mempool_tx_request_sender, mempool_tx_request_receiver) =
+                mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+            tasks.push(run_mempool_tx_handler(
+                connection_pool.clone(),
+                mempool_tx_request_receiver,
+                chain_config.state_keeper.block_chunk_sizes.clone(),
+            ));
             tasks.push(zksync_api::api_server::rpc_server::start_rpc_server(
                 connection_pool.clone(),
                 sign_check_sender.clone(),
                 ticker.clone(),
                 &JsonRpcConfig::from_env(),
                 &common_config,
-                private_config.url,
+                mempool_tx_request_sender,
                 eth_watch_config.confirmations_for_eth_event,
             ));
         }
 
         if components.0.contains(&Component::RestApi) {
+            let (mempool_tx_request_sender, mempool_tx_request_receiver) =
+                mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+            tasks.push(run_mempool_tx_handler(
+                connection_pool.clone(),
+                mempool_tx_request_receiver,
+                chain_config.state_keeper.block_chunk_sizes.clone(),
+            ));
             zksync_api::api_server::rest::start_server_thread_detached(
                 connection_pool.clone(),
                 RestApiConfig::from_env().bind_addr(),
                 contracts_config.contract_addr,
                 ticker,
                 sign_check_sender,
+                mempool_tx_request_sender,
             );
         }
     }
@@ -279,7 +300,7 @@ async fn run_server(components: &ComponentsToRun) {
     }
 
     if components.0.contains(&Component::ForcedExit) {
-        tasks.push(run_forced_exit(connection_pool.clone()));
+        tasks.append(&mut run_forced_exit(connection_pool.clone()));
     }
 
     if components.0.contains(&Component::RejectedTaskCleaner) {
@@ -306,22 +327,30 @@ async fn run_server(components: &ComponentsToRun) {
     };
 }
 
-pub fn run_forced_exit(connection_pool: ConnectionPool) -> JoinHandle<()> {
+pub fn run_forced_exit(connection_pool: ConnectionPool) -> Vec<JoinHandle<()>> {
     vlog::info!("Starting the ForcedExitRequests actors");
     let config = ForcedExitRequestsConfig::from_env();
     let common_config = CommonApiConfig::from_env();
-    let private_api_config = PrivateApiConfig::from_env();
     let contract_config = ContractsConfig::from_env();
     let eth_client_config = ETHClientConfig::from_env();
+    let chain_config = ChainConfig::from_env();
 
-    run_forced_exit_requests_actors(
+    let (mempool_tx_request_sender, mempool_tx_request_receiver) =
+        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+    let mempool_task = run_mempool_tx_handler(
+        connection_pool.clone(),
+        mempool_tx_request_receiver,
+        chain_config.state_keeper.block_chunk_sizes.clone(),
+    );
+    let forced_exit_task = run_forced_exit_requests_actors(
         connection_pool,
-        private_api_config.url,
+        mempool_tx_request_sender,
         config,
         common_config,
         contract_config,
         eth_client_config.web3_url(),
-    )
+    );
+    vec![mempool_task, forced_exit_task]
 }
 
 pub fn run_witness_generator(connection_pool: ConnectionPool) -> JoinHandle<()> {

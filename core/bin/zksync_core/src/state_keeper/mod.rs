@@ -7,9 +7,9 @@ use futures::channel::oneshot;
 use futures::{channel::mpsc, stream::StreamExt, SinkExt};
 use tokio::task::JoinHandle;
 use tokio::time;
+use zksync_mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock};
 // Workspace uses
 use zksync_state::state::{OpSuccess, ZkSyncState};
-use zksync_types::tx::TxHash;
 use zksync_types::{
     block::{
         BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx, IncompleteBlock,
@@ -27,10 +27,8 @@ use self::{
     types::{ApplyOutcome, StateKeeperConfig},
     utils::system_time_timestamp,
 };
-use crate::mempool::{GetBlockRequest, MempoolBlocksRequest};
 use crate::{
     committer::{BlockCommitRequest, CommitRequest},
-    mempool::ProposedBlock,
     tx_event_emitter::ProcessedOperations,
 };
 
@@ -798,7 +796,6 @@ impl ZkSyncStateKeeper {
         let block_commit_request = BlockCommitRequest {
             block,
             block_metadata,
-            accounts_updated: self.pending_block.account_updates.clone(),
         };
         let applied_updates_request = self.pending_block.prepare_applied_updates_request();
         let root_hash_job = BlockRootHashJob {

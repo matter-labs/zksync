@@ -1,4 +1,6 @@
 use chrono::Utc;
+use futures::channel::{mpsc, oneshot};
+use futures::SinkExt;
 use num::Zero;
 
 use zksync_storage::{chain::operations_ext::records::TxReceiptResponse, ConnectionPool};
@@ -8,10 +10,8 @@ use zksync_types::{
     AccountId, Nonce,
 };
 
-use zksync_api::{
-    api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
-    core_api_client::CoreApiClient,
-};
+use zksync_api::api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker};
+use zksync_mempool::MempoolTransactionRequest;
 use zksync_types::SignedZkSyncTx;
 
 // We could use `db reset` and test the db the same way as in rust_api
@@ -45,22 +45,22 @@ pub trait CoreInteractionWrapper {
 
 #[derive(Clone)]
 pub struct MempoolCoreInteractionWrapper {
-    core_api_client: CoreApiClient,
     connection_pool: ConnectionPool,
     forced_exit_checker: ForcedExitChecker,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
 }
 
 impl MempoolCoreInteractionWrapper {
     pub fn new(
         forced_exit_minimum_account_age_secs: u64,
-        core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
         let forced_exit_checker = ForcedExitChecker::new(forced_exit_minimum_account_age_secs);
         Self {
-            core_api_client,
             connection_pool,
             forced_exit_checker,
+            mempool_tx_sender,
         }
     }
 }
@@ -142,8 +142,12 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
         let mut schema = storage.forced_exit_requests_schema();
 
         let hashes: Vec<TxHash> = txs.iter().map(|tx| tx.hash()).collect();
-        self.core_api_client.send_txs_batch(txs, vec![]).await??;
 
+        let (sender, receiver) = oneshot::channel();
+        let item = MempoolTransactionRequest::NewTxsBatch(txs, vec![], sender);
+        let mut mempool_sender = self.mempool_tx_sender.clone();
+        mempool_sender.send(item).await?;
+        receiver.await??;
         schema
             .set_fulfilled_by(request.id, Some(hashes.clone()))
             .await?;
