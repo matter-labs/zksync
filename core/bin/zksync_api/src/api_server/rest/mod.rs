@@ -12,6 +12,7 @@ use crate::signature_checker::VerifySignatureRequest;
 
 use super::tx_sender::TxSender;
 
+use crate::api_server::rest::network_status::SharedNetworkStatus;
 use crate::fee_ticker::FeeTicker;
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
@@ -19,6 +20,7 @@ use zksync_mempool::MempoolTransactionRequest;
 
 mod forced_exit_requests;
 mod helpers;
+pub mod network_status;
 mod v01;
 pub mod v02;
 
@@ -51,7 +53,7 @@ async fn start_server(
                 &api_v01.config.api.common,
                 mempool_tx_sender.clone(),
             );
-            v02::api_scope(tx_sender, &api_v01.config)
+            v02::api_scope(tx_sender, &api_v01.config, api_v01.network_status.clone())
         };
         App::new()
             .wrap(
@@ -101,7 +103,9 @@ pub fn start_server_thread_detached(
                 // TODO remove this config ZKS-815
                 let config = ZkSyncConfig::from_env();
 
-                let api_v01 = ApiV01::new(connection_pool, contract_address, config);
+                let network_status = SharedNetworkStatus::default();
+                let api_v01 =
+                    ApiV01::new(connection_pool, contract_address, config, network_status);
                 api_v01.spawn_network_status_updater(panic_sender);
 
                 start_server(
