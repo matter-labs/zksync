@@ -29,10 +29,11 @@ impl From<SignedZkSyncTx> for SignedTxVariant {
 
 impl SignedTxVariant {
     pub fn batch(
-        txs: Vec<SignedZkSyncTx>,
+        mut txs: Vec<SignedZkSyncTx>,
         batch_id: i64,
         eth_signatures: Vec<TxEthSignature>,
     ) -> Self {
+        // txs.sort_unstable_by_key(|tx1| tx1.nonce());
         Self::Batch(SignedTxsBatch {
             txs,
             batch_id,

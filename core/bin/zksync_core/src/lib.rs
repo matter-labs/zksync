@@ -158,8 +158,6 @@ pub async fn run_core(
         connection_pool.clone(),
         mempool_tx_request_receiver,
         mempool_block_request_receiver,
-        4,
-        DEFAULT_CHANNEL_CAPACITY,
         config.chain.state_keeper.block_chunk_sizes.clone(),
     );
 

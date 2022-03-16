@@ -9,6 +9,7 @@ use tokio::task::JoinHandle;
 use tokio::time;
 // Workspace uses
 use zksync_state::state::{OpSuccess, ZkSyncState};
+use zksync_types::tx::TxHash;
 use zksync_types::{
     block::{
         BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx, IncompleteBlock,
@@ -292,10 +293,24 @@ impl ZkSyncStateKeeper {
 
     async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
         let (response_sender, receiver) = oneshot::channel();
+        let tx_hashes = self
+            .pending_block
+            .failed_txs
+            .iter()
+            .map(|tx| tx.signed_tx.hash())
+            .chain(
+                self.pending_block
+                    .success_operations
+                    .iter()
+                    .filter_map(|op| op.get_executed_tx().map(|tx| tx.signed_tx.hash())),
+            )
+            .collect();
+
         let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {
             last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
             block_timestamp,
             response_sender,
+            executed_txs: tx_hashes,
         });
         self.tx_for_mempool
             .send(mempool_req)

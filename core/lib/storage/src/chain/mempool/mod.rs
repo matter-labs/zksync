@@ -42,13 +42,19 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Loads all the transactions stored in the mempool schema.
     pub async fn load_txs(
         &mut self,
+        executed_txs: &[TxHash],
     ) -> QueryResult<(VecDeque<SignedTxVariant>, VecDeque<RevertedTxVariant>)> {
         let start = Instant::now();
         // Load the transactions from mempool along with corresponding batch IDs.
+        let excluded_txs: Vec<String> = executed_txs.iter().map(|tx| tx.to_string()).collect();
         let txs: Vec<MempoolTx> = sqlx::query_as!(
             MempoolTx,
-            "SELECT * FROM mempool_txs WHERE reverted = false
-            ORDER BY created_at",
+            "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (
+                SELECT u.hashes FROM UNNEST ($1::text[]) as u(hashes)
+            )
+
+            ORDER BY id",
+            &excluded_txs
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -379,7 +385,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// invoked periodically with a big interval (to prevent possible database bloating).
     pub async fn collect_garbage(&mut self) -> QueryResult<()> {
         let start = Instant::now();
-        let (queue, reverted_queue) = self.load_txs().await?;
+        let (queue, reverted_queue) = self.load_txs(&[]).await?;
         let all_txs: Vec<_> = queue
             .into_iter()
             .chain(

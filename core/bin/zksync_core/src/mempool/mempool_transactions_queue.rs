@@ -80,20 +80,12 @@ impl MempoolTransactionsQueue {
         self.ready_txs.pop_front()
     }
 
-    pub fn push_front(&mut self, tx: SignedTxVariant) {
-        self.ready_txs.push_front(tx);
-    }
-
     pub fn pop_front_priority_op(&mut self) -> Option<PriorityOp> {
         let op = self.priority_ops.pop_front();
         if let Some(op) = &op {
             self.last_processed_priority_op = Some(op.serial_id);
         }
         op
-    }
-
-    pub fn push_front_priority_op(&mut self, op: PriorityOp) {
-        self.priority_ops.push_front(op);
     }
 
     pub fn add_priority_ops(&mut self, mut ops: Vec<PriorityOp>) {

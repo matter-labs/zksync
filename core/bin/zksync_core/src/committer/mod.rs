@@ -1,7 +1,7 @@
 // Built-in uses
 use std::time::{Duration, Instant};
 // External uses
-use futures::channel::mpsc::{Receiver, Sender};
+use futures::channel::mpsc::Receiver;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};

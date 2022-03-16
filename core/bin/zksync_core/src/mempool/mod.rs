@@ -29,11 +29,13 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use web3::types::H256;
 
 // Workspace uses
-use zksync_balancer::{Balancer, BuildBalancedItem};
+use zksync_balancer::BuildBalancedItem;
 
 use zksync_storage::ConnectionPool;
+use zksync_types::tx::TxHash;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
     tx::TxEthSignature,
@@ -108,6 +110,7 @@ impl ProposedBlock {
 pub struct GetBlockRequest {
     pub last_priority_op_number: u64,
     pub block_timestamp: u64,
+    pub executed_txs: Vec<TxHash>,
     pub response_sender: oneshot::Sender<ProposedBlock>,
 }
 
@@ -189,7 +192,7 @@ impl MempoolState {
         Self { db_pool }
     }
 
-    async fn get_transaction_queue(&self) -> MempoolTransactionsQueue {
+    async fn get_transaction_queue(&self, executed_txs: &[TxHash]) -> MempoolTransactionsQueue {
         let mut storage = self
             .db_pool
             .access_storage()
@@ -210,22 +213,21 @@ impl MempoolState {
         // Remove any possible duplicates of already executed transactions
         // from the database.
         //TODO move it to start somewhere
-        // transaction
-        //     .chain()
-        //     .mempool_schema()
-        //     .collect_garbage()
-        //     .await
-        //     .expect("Collecting garbage in the mempool schema failed");
+        transaction
+            .chain()
+            .mempool_schema()
+            .collect_garbage()
+            .await
+            .expect("Collecting garbage in the mempool schema failed");
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
         let (mempool_txs, reverted_txs) = transaction
             .chain()
             .mempool_schema()
-            .load_txs()
+            .load_txs(executed_txs)
             .await
             .expect("Attempt to restore mempool txs from DB failed");
-        let (mempool_size, reverted_queue_size) = (mempool_txs.len(), reverted_txs.len());
 
         // Initialize the queue with reverted transactions loaded from the database.
         let serial_id = transaction
@@ -247,10 +249,6 @@ impl MempoolState {
             .await
             .expect("mempool db transaction commit");
 
-        vlog::info!(
-            "{} transactions were restored from the persistent mempool storage, reverted queue size: {}",
-            mempool_size, reverted_queue_size
-        );
         transactions_queue
     }
 }
@@ -271,7 +269,7 @@ impl MempoolBlocksHandler {
         let mut proposed_block = ProposedBlock::new();
         let mut next_serial_id = current_unprocessed_priority_op;
 
-        let mut mempool_state = self.mempool_state.write().await;
+        let mempool_state = self.mempool_state.write().await;
         // Peek into the reverted queue.
         let reverted_tx = match transactions_queue.reverted_queue_front() {
             Some(reverted_tx) => reverted_tx,
@@ -331,12 +329,13 @@ impl MempoolBlocksHandler {
         &mut self,
         current_unprocessed_priority_op: u64,
         block_timestamp: u64,
+        executed_txs: &[TxHash],
     ) -> ProposedBlock {
         let start = std::time::Instant::now();
         // Try to exhaust the reverted transactions queue. Most of the time it
         // will be empty unless the server is restarted after reverting blocks.
         let state = self.mempool_state.write().await;
-        let mut tx_queue = state.get_transaction_queue().await;
+        let mut tx_queue = state.get_transaction_queue(executed_txs).await;
         drop(state);
         // TODO remove it. We use another approach how to correctly revert blocks
         let (chunks_left, reverted_block) = self
@@ -400,7 +399,11 @@ impl MempoolBlocksHandler {
                 MempoolBlocksRequest::GetBlock(block) => {
                     // Generate proposed block.
                     let proposed_block = self
-                        .propose_new_block(block.last_priority_op_number, block.block_timestamp)
+                        .propose_new_block(
+                            block.last_priority_op_number,
+                            block.block_timestamp,
+                            &block.executed_txs,
+                        )
                         .await;
 
                     // Send the proposed block to the request initiator.
@@ -660,8 +663,6 @@ pub fn run_mempool_tasks(
     db_pool: ConnectionPool,
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,
-    number_of_mempool_transaction_handlers: u8,
-    channel_capacity: usize,
     block_chunk_sizes: Vec<usize>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -683,7 +684,10 @@ pub fn run_mempool_tasks(
             max_block_size_chunks,
         };
 
-        let tasks = vec![blocks_handler.run(), handler.run()];
+        let tasks = vec![
+            tokio::spawn(blocks_handler.run()),
+            tokio::spawn(handler.run()),
+        ];
         wait_for_tasks(tasks).await
     })
 }

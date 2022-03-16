@@ -1578,66 +1578,6 @@
       "nullable": []
     }
   },
-  "281b2dfe511e0d38c09fb3e635511927ac7b4b81c6e27c748153aa041d691303": {
-    "query": "SELECT * FROM mempool_txs WHERE reverted = false\n            ORDER BY created_at",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tx_hash",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "tx",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_sign_data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 5,
-          "name": "batch_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 6,
-          "name": "next_priority_op_serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 7,
-          "name": "reverted",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        true,
-        false
-      ]
-    }
-  },
   "283d9869a56c60f851ee907cd36a70458b3b3f69a61670eeb0762f67c6ada1ed": {
     "query": "SELECT * FROM executed_transactions WHERE tx_hash = $1",
     "describe": {
@@ -4976,6 +4916,68 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "9aa790069ef1775116e440dd01c1f541c082684469df8a34556d5497fd698c2e": {
+    "query": "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (\n                SELECT u.hashes FROM UNNEST ($1::text[]) as u(hashes)\n            )\n\n            ORDER BY created_at",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_sign_data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "batch_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "reverted",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "TextArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false
+      ]
     }
   },
   "9aeeb5e20f4f34d4b4e1987f1bf0a23ee931f12da071b134225069d32c1896de": {
