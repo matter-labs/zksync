@@ -76,7 +76,10 @@ mod tests {
         };
         let mut status = SharedNetworkStatus::default();
         let (client, server) = cfg.start_server(
-            |cfg: &TestServerConfig| api_scope(status.clone()),
+            {
+                let status = status.clone();
+                move |_| api_scope(status.clone())
+            },
             Some(shared_data),
         );
 

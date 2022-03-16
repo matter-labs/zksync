@@ -281,6 +281,7 @@ async fn run_server(components: &ComponentsToRun) {
         tasks.append(
             &mut run_core(
                 connection_pool.clone(),
+                read_only_connection_pool.clone(),
                 &ZkSyncConfig::from_env(),
                 eth_gateway.clone(),
             )

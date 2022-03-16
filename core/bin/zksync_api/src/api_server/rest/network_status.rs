@@ -87,7 +87,7 @@ impl SharedNetworkStatus {
     pub fn start_updater_detached(
         mut self,
         panic_notify: mpsc::Sender<bool>,
-        mut connection_pool: ConnectionPool,
+        connection_pool: ConnectionPool,
     ) {
         std::thread::Builder::new()
             .name("rest-state-updater".to_string())
@@ -100,7 +100,7 @@ impl SharedNetworkStatus {
                     let mut timer = time::interval(Duration::from_millis(30000));
                     loop {
                         timer.tick().await;
-                        if let Err(_) = self.update(&mut connection_pool).await {
+                        if self.update(&connection_pool).await.is_err() {
                             vlog::error!("Can't update network status")
                         }
                     }

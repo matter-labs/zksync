@@ -25,6 +25,7 @@ pub mod token_handler;
 pub mod tx_event_emitter;
 
 mod genesis;
+mod private_api;
 
 /// Waits for any of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
@@ -88,6 +89,7 @@ pub async fn genesis_init(config: &ChainConfig) {
 /// - private Core API server.
 pub async fn run_core(
     connection_pool: ConnectionPool,
+    read_only_connection_pool: ConnectionPool,
     config: &ZkSyncConfig,
     eth_gateway: EthereumGateway,
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
@@ -101,6 +103,14 @@ pub async fn run_core(
 
     let (processed_tx_events_sender, processed_tx_events_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+
+    // Run health check api for core
+    let private_api_task = private_api::start_private_core_api(
+        connection_pool.clone(),
+        read_only_connection_pool,
+        eth_gateway.clone(),
+        config.api.private.clone(),
+    );
 
     // Start Ethereum Watcher.
     let eth_watch_task = start_eth_watch(
@@ -193,6 +203,7 @@ pub async fn run_core(
         tx_event_emitter_task,
         mempool_block_handler_task,
         mempool_tx_handler_task,
+        private_api_task,
     ];
 
     Ok(task_futures)

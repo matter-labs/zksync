@@ -4,4 +4,5 @@ export type Interface = {
     last_verified: number;
     total_transactions: number;
     outstanding_txs: number;
+    mempool_size: number;
 };
