@@ -100,8 +100,8 @@ pub enum SubmitError {
     #[error("Failed to toggle 2FA: {0}.")]
     Toggle2FA(#[from] Toggle2FAError),
 
-    #[error("Communication error with the core server: {0}.")]
-    CommunicationCoreServer(String),
+    #[error("Communication error with the memmpool: {0}.")]
+    MempoolCommunication(String),
     #[error("Price error {0}")]
     PriceError(#[from] PriceError),
     #[error("Internal error.")]
@@ -119,8 +119,8 @@ impl SubmitError {
         Self::Other(msg.to_string())
     }
 
-    pub fn communication_core_server(msg: impl Display) -> Self {
-        Self::CommunicationCoreServer(msg.to_string())
+    pub fn mempool_communication(msg: impl Display) -> Self {
+        Self::MempoolCommunication(msg.to_string())
     }
 
     pub fn invalid_params(msg: impl Display) -> Self {
@@ -882,7 +882,7 @@ impl TxSender {
         mempool_sender
             .send(item)
             .await
-            .map_err(SubmitError::communication_core_server)?;
+            .map_err(SubmitError::mempool_communication)?;
 
         receiver.await.map_err(SubmitError::internal)??;
 

@@ -35,6 +35,8 @@ pub struct MempoolSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Loads all the transactions stored in the mempool schema.
+    /// Exclude txs, which was already processed in the memory.
+    /// They may still be in the database with some probability
     pub async fn load_txs(
         &mut self,
         executed_txs: &[TxHash],

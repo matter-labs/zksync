@@ -26,6 +26,9 @@ pub enum PriorityOpLookupQuery {
     ByAnyHash(TxHash),
 }
 
+/// Status of core server.
+/// Server should have stable connection to the database (main and replica)
+/// and connection to the ethereum node
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CoreStatus {
     pub main_database_status: bool,

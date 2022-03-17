@@ -1,26 +1,24 @@
-//! Mempool is simple in memory buffer for transactions.
+//! Mempool is simple in buffer for transactions.
 //!
 //! Its role is to:
-//! 1) Getting txs from database.
-//! 2) When polled return vector of the transactions in the queue.
+//! 1) Storing txs to the database
+//! 2) Getting txs from database.
+//! 3) When polled return vector of the transactions in the queue.
+//!
+//! For better consistency, we always store all txs in the database and get them only if they are requested.
 //!
 //! Communication channel with other actors:
 //! Mempool does not push information to other actors, only accepts requests. (see `MempoolRequest`)
 
 // External uses
 use futures::{
-    channel::{
-        mpsc::{self, Receiver},
-        oneshot,
-    },
+    channel::{mpsc, oneshot},
     StreamExt,
 };
 
 use tokio::task::JoinHandle;
 
 // Workspace uses
-use zksync_balancer::BuildBalancedItem;
-
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::error::TxAddError;
 use zksync_types::tx::TxHash;
@@ -32,7 +30,6 @@ use zksync_types::{
 
 // Local uses
 use crate::mempool_transactions_queue::MempoolTransactionsQueue;
-// use crate::wait_for_tasks;
 
 mod mempool_transactions_queue;
 
@@ -332,6 +329,8 @@ async fn select_priority_ops(
     }
     (max_block_size_chunks - used_chunks, result)
 }
+
+/// Collect txs depending on the remaining block size
 async fn prepare_tx_for_block(
     mut chunks_left: usize,
     block_timestamp: u64,
@@ -354,33 +353,12 @@ async fn prepare_tx_for_block(
 
     Ok((chunks_left, txs_for_commit))
 }
+
 struct MempoolTransactionsHandler {
     db_pool: ConnectionPool,
     mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolTransactionRequest>,
     max_block_size_chunks: usize,
-}
-
-struct MempoolTransactionsHandlerBuilder {
-    db_pool: ConnectionPool,
-    mempool_state: MempoolState,
-    max_block_size_chunks: usize,
-}
-
-impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
-    for MempoolTransactionsHandlerBuilder
-{
-    fn build_with_receiver(
-        &self,
-        receiver: Receiver<MempoolTransactionRequest>,
-    ) -> MempoolTransactionsHandler {
-        MempoolTransactionsHandler {
-            db_pool: self.db_pool.clone(),
-            mempool_state: self.mempool_state.clone(),
-            requests: receiver,
-            max_block_size_chunks: self.max_block_size_chunks,
-        }
-    }
 }
 
 impl MempoolTransactionsHandler {
@@ -557,7 +535,7 @@ impl MempoolTransactionsHandler {
 }
 
 // During channel based nature, for better performance,
-// run independent mempool_tx_handler for each actor, e.g. for each API actor
+// you need to run independent mempool_tx_handler for each actor, e.g. for each API actor
 pub fn run_mempool_tx_handler(
     db_pool: ConnectionPool,
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,

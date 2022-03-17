@@ -78,7 +78,8 @@ impl ConnectionPool {
 
     /// Establishes a pool of the connections to the replica of database and
     /// creates a new `ConnectionPool` object.
-    /// pool_max_size - number of connections in pool, if not set env variable "DATABASE_POOL_SIZE" is going to be used.
+    /// pool_max_size - number of connections in pool,
+    /// if not set env variable "DATABASE_POOL_SIZE" is going to be used.
     pub fn new_readonly_pool(pool_max_size: Option<u32>) -> Self {
         let database_url = get_database_replica_url();
         let max_size = pool_max_size.unwrap_or_else(|| parse_env("DATABASE_POOL_SIZE"));

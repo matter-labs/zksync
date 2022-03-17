@@ -81,7 +81,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     }
 
     // Get current committed nonce, if not exist return verified. After reverting blocks this nonce
-    // could be less than actual. Use this function only for verifying lower boundaries of nonce
+    // could be less than actual. Use this function only for verifying the lower bounds of nonce.
     pub async fn current_nonce(&mut self, account_id: AccountId) -> QueryResult<Option<Nonce>> {
         let start = Instant::now();
 
@@ -109,6 +109,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         metrics::histogram!("sql.chain.account.current_nonce", start.elapsed());
         Ok(current_nonce.map(|v| Nonce(v as u32)))
     }
+
     /// Fetches account type from the database
     pub async fn account_type_by_id(
         &mut self,

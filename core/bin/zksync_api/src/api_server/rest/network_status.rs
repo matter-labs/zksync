@@ -23,7 +23,8 @@ pub struct NetworkStatus {
 #[derive(Debug, Default, Clone)]
 pub struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
-async fn check_core_status(core_address: String) -> anyhow::Result<CoreStatus> {
+/// Get healthcheck status from core server.
+async fn get_core_status(core_address: String) -> anyhow::Result<CoreStatus> {
     let client = reqwest::Client::new();
     Ok(client
         .get(format!("{}/status", core_address))
@@ -38,6 +39,8 @@ impl SharedNetworkStatus {
         (*self.0.as_ref().read().await).clone()
     }
 
+    /// Update shared network status. We use last_tx_seq_no as a checkpount
+    /// for faster calculating total number of transactions
     pub(crate) async fn update(
         &mut self,
         connection_pool: &ConnectionPool,
@@ -87,7 +90,7 @@ impl SharedNetworkStatus {
 
         transaction.commit().await.unwrap_or_default();
 
-        let core_status = check_core_status(core_address).await.ok();
+        let core_status = get_core_status(core_address).await.ok();
         let status = NetworkStatus {
             next_block_at_max: None,
             last_committed,
@@ -102,6 +105,7 @@ impl SharedNetworkStatus {
         *self.0.as_ref().write().await = status;
         Ok(last_seq_no)
     }
+
     pub fn start_updater_detached(
         mut self,
         panic_notify: mpsc::Sender<bool>,

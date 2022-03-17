@@ -300,7 +300,10 @@ impl ZkSyncStateKeeper {
     async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
         let (response_sender, receiver) = oneshot::channel();
 
-        // This txs will be excluded as already executed.
+        // These txs will be excluded from query result as already executed.
+        // Using these hashes we avoid the situation, when tx is still in mempool,
+        // but was executed in mempool
+
         let tx_hashes = self
             .pending_block
             .failed_txs

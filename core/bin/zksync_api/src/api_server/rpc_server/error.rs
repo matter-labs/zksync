@@ -87,7 +87,7 @@ impl From<SubmitError> for jsonrpc_core::Error {
                 message: inner.to_string(),
                 data: None,
             },
-            SubmitError::CommunicationCoreServer(reason) => Self {
+            SubmitError::MempoolCommunication(reason) => Self {
                 code: RpcErrorCodes::Other.into(),
                 message: "Error communicating core server".to_string(),
                 data: Some(reason.into()),

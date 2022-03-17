@@ -54,11 +54,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         // Simply go through the every account update, and update the corresponding table.
         // This may look scary, but every match arm is very simple by its nature.
-
         let update_order_ids =
             first_update_order_id..first_update_order_id + accounts_updated.len();
 
         let mut nonce_updates = HashMap::new();
+
         for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
             vlog::debug!(
                 "Committing state update for account {} in block {}",
