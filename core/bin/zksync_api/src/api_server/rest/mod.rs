@@ -18,6 +18,7 @@ use zksync_config::ZkSyncConfig;
 
 mod forced_exit_requests;
 mod helpers;
+pub mod network_status;
 mod v01;
 pub mod v02;
 
@@ -49,7 +50,7 @@ async fn start_server(
                 &api_v01.config.api.common,
                 api_v01.config.api.private.url.clone(),
             );
-            v02::api_scope(tx_sender, &api_v01.config)
+            v02::api_scope(tx_sender, &api_v01.config, api_v01.network_status.clone())
         };
         App::new()
             .wrap(

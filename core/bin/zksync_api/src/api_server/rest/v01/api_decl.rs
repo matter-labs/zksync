@@ -1,13 +1,11 @@
 //! Declaration of the API structure.
 
-use crate::api_server::rest::{
-    helpers::*,
-    v01::{caches::Caches, network_status::SharedNetworkStatus},
-};
+use crate::api_server::rest::{helpers::*, v01::caches::Caches};
 use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
 
+use crate::api_server::rest::network_status::SharedNetworkStatus;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::{
