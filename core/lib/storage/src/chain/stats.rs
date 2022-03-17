@@ -52,8 +52,8 @@ impl<'a, 'c> StatsSchema<'a, 'c> {
         Ok((
             (tx_res.count.unwrap_or_default() + prior_ops_res.count.unwrap_or_default()) as u32,
             max(
-                prior_ops_res.max.unwrap_or_default(),
-                tx_res.max.unwrap_or_default(),
+                prior_ops_res.max.unwrap_or(after_seq_no),
+                tx_res.max.unwrap_or(after_seq_no),
             ),
         ))
     }
