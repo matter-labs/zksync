@@ -27,6 +27,12 @@ async fn revert_blocks_in_storage(
     println!("`mempool_txs`, `executed_transactions` tables are updated");
     transaction
         .chain()
+        .state_schema()
+        .clean_current_nonce_table(last_block)
+        .await?;
+    println!("`committed_nonce` table is updated");
+    transaction
+        .chain()
         .block_schema()
         .remove_blocks(last_block)
         .await?;

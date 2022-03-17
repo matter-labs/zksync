@@ -913,19 +913,6 @@
       ]
     }
   },
-  "152ce07704066b1c5002831ca7187dbe14073b30f9e5f5db92f50a925621b86f": {
-    "query": "INSERT INTO committed_nonce (account_id, nonce) VALUES ($1, $2) \n                 ON CONFLICT (account_id) \n                 DO UPDATE \n                 SET nonce = $2\n                 ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -2212,6 +2199,20 @@
       "nullable": []
     }
   },
+  "3a7e35223c276d6b34493b6ec498d9926376bf0d7ec8b8adc7df07a302dcdc80": {
+    "query": "INSERT INTO committed_nonce (account_id, nonce, block_number) VALUES ($1, $2, $3) \n                 ON CONFLICT (account_id) \n                 DO UPDATE \n                 SET nonce = $2, block_number = $3\n                 ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "3e63555f8c8d341b2536bec02e1c60755888686fab50cad8dde060c3aca96f9b": {
     "query": "SELECT sequence_number FROM executed_transactions\n            WHERE tx_hash = $1",
     "describe": {
@@ -3132,6 +3133,18 @@
         false,
         false
       ]
+    }
+  },
+  "6134f8101d08e7be0c6c62c70237c1a28c782281367a4d6ad7a6b53ee02fdc52": {
+    "query": "DELETE FROM committed_nonce WHERE block_number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {

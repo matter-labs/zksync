@@ -198,15 +198,17 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         }
 
         // Update committed nonce
+        let block_number = i64::from(*block_number);
         for (account_id, nonce) in nonce_updates.iter() {
             sqlx::query!(
-                "INSERT INTO committed_nonce (account_id, nonce) VALUES ($1, $2) 
+                "INSERT INTO committed_nonce (account_id, nonce, block_number) VALUES ($1, $2, $3) 
                  ON CONFLICT (account_id) 
                  DO UPDATE 
-                 SET nonce = $2
+                 SET nonce = $2, block_number = $3
                  ",
                 account_id,
-                nonce
+                nonce,
+                block_number
             )
             .execute(transaction.conn())
             .await?;
@@ -215,6 +217,16 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.state.commit_state_update", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn clean_current_nonce_table(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM committed_nonce WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
         Ok(())
     }
 
