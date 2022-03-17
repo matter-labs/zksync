@@ -42,9 +42,13 @@ impl SharedNetworkStatus {
         &mut self,
         connection_pool: &ConnectionPool,
         core_address: String,
-    ) -> Result<(), anyhow::Error> {
+        last_tx_seq_no: i64,
+    ) -> Result<i64, anyhow::Error> {
         let mut storage = connection_pool.access_storage().await?;
         let mut transaction = storage.start_transaction().await?;
+        let NetworkStatus {
+            total_transactions, ..
+        } = self.read().await;
 
         let last_verified = transaction
             .chain()
@@ -60,12 +64,12 @@ impl SharedNetworkStatus {
             .await
             .unwrap_or(BlockNumber(0));
 
-        let total_transactions = transaction
+        let (total_new_transactions, last_seq_no) = transaction
             .chain()
             .stats_schema()
-            .count_total_transactions()
+            .count_total_transactions(last_tx_seq_no)
             .await
-            .unwrap_or(0);
+            .unwrap_or((0, 0));
 
         let mempool_size = transaction
             .chain()
@@ -88,7 +92,7 @@ impl SharedNetworkStatus {
             next_block_at_max: None,
             last_committed,
             last_verified,
-            total_transactions,
+            total_transactions: total_transactions + total_new_transactions,
             outstanding_txs,
             mempool_size,
             core_status,
@@ -96,7 +100,7 @@ impl SharedNetworkStatus {
 
         // save status to state
         *self.0.as_ref().write().await = status;
-        Ok(())
+        Ok(last_seq_no)
     }
     pub fn start_updater_detached(
         mut self,
@@ -113,14 +117,15 @@ impl SharedNetworkStatus {
 
                 let state_update_task = async move {
                     let mut timer = time::interval(Duration::from_millis(30000));
+                    let mut last_seq_no = 0;
                     loop {
                         timer.tick().await;
-                        if self
-                            .update(&connection_pool, core_address.clone())
+                        match self
+                            .update(&connection_pool, core_address.clone(), last_seq_no)
                             .await
-                            .is_err()
                         {
-                            vlog::error!("Can't update network status")
+                            Ok(seq_no) => last_seq_no = seq_no,
+                            Err(_) => vlog::error!("Can't update network status"),
                         }
                     }
                 };

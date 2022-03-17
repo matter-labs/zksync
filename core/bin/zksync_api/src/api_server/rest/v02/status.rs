@@ -28,11 +28,8 @@ impl ApiStatusData {
 // Server implementation
 
 async fn get_status(data: web::Data<ApiStatusData>) -> ApiResult<NetworkStatus> {
-    // We have to get exclusive lock here, because if the data in cache we return the data fast  enough,
-    // otherwise every new request will go to the database and do the same requests.
-    // When we return exclusive locks on pending requests, they will be unlocked with the new status
-
     let start = Instant::now();
+
     let status = data.status.read().await;
     let network_status = NetworkStatus {
         last_committed: status.last_committed,
@@ -96,10 +93,10 @@ mod tests {
                 .block_schema()
                 .get_last_verified_confirmed_block()
                 .await?;
-            let total_transactions = storage
+            let (total_transactions, _) = storage
                 .chain()
                 .stats_schema()
-                .count_total_transactions()
+                .count_total_transactions(0)
                 .await?;
             let mempool_size = storage.chain().mempool_schema().get_mempool_size().await?;
             NetworkStatus {
@@ -112,7 +109,7 @@ mod tests {
         };
 
         status
-            .update(&cfg.pool, "0.0.0.0".to_string())
+            .update(&cfg.pool, "0.0.0.0".to_string(), 0)
             .await
             .unwrap();
         let response = client.status().await?;
