@@ -126,6 +126,8 @@ jobs:
       -
         name: Setup loadtest database
         run: |
+          ls -l etc/env || /bin/true
+          cat etc/env/${ZKSYNC_ENV}.env | grep MNEMONIC || /bin/true
           zk
           zk run yarn
           zk run verify-keys unpack
