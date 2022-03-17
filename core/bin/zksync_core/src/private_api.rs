@@ -11,8 +11,8 @@ use std::thread;
 
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::{channel::mpsc, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
+use zksync_api_types::CoreStatus;
 
 use zksync_config::configs::api::PrivateApiConfig;
 use zksync_eth_client::EthereumGateway;
@@ -26,19 +26,12 @@ struct AppState {
     eth_client: EthereumGateway,
 }
 
-#[derive(Serialize, Deserialize)]
-struct CoreStatus {
-    main_database_status: bool,
-    replica_database_status: bool,
-    eth_status: bool,
-}
-
 /// Health check.
 /// The core actor should have a connection to main and replica database and have connection to eth
 #[actix_web::get("/status")]
 async fn status(data: web::Data<AppState>) -> actix_web::Result<HttpResponse> {
-    let main_database_connection_status = data.connection_pool.access_storage().await.is_ok();
-    let replica_database_connection_status = data
+    let main_database_status = data.connection_pool.access_storage().await.is_ok();
+    let replica_database_status = data
         .read_only_connection_pool
         .access_storage()
         .await
@@ -46,8 +39,8 @@ async fn status(data: web::Data<AppState>) -> actix_web::Result<HttpResponse> {
     let eth_status = data.eth_client.block_number().await.is_ok();
 
     let response = CoreStatus {
-        main_database_status: main_database_connection_status,
-        replica_database_status: replica_database_connection_status,
+        main_database_status,
+        replica_database_status,
         eth_status,
     };
 

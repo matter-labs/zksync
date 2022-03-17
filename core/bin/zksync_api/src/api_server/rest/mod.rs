@@ -91,6 +91,7 @@ pub fn start_server_thread_detached(
     fee_ticker: FeeTicker,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+    core_address: String,
 ) -> JoinHandle<()> {
     let (handler, panic_sender) = spawn_panic_handler();
 
@@ -106,7 +107,7 @@ pub fn start_server_thread_detached(
                 let network_status = SharedNetworkStatus::default();
                 let api_v01 =
                     ApiV01::new(connection_pool, contract_address, config, network_status);
-                api_v01.spawn_network_status_updater(panic_sender);
+                api_v01.spawn_network_status_updater(panic_sender, core_address);
 
                 start_server(
                     api_v01,

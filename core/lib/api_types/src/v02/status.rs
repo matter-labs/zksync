@@ -1,3 +1,4 @@
+use crate::CoreStatus;
 use serde::{Deserialize, Serialize};
 use zksync_types::BlockNumber;
 
@@ -8,4 +9,5 @@ pub struct NetworkStatus {
     pub finalized: BlockNumber,
     pub total_transactions: u32,
     pub mempool_size: u32,
+    pub core_status: Option<CoreStatus>,
 }

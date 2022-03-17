@@ -39,6 +39,7 @@ async fn get_status(data: web::Data<ApiStatusData>) -> ApiResult<NetworkStatus> 
         finalized: status.last_verified,
         total_transactions: status.total_transactions,
         mempool_size: status.mempool_size,
+        core_status: status.core_status.clone(),
     };
     metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_status");
     Ok(network_status).into()
@@ -106,10 +107,14 @@ mod tests {
                 finalized,
                 total_transactions,
                 mempool_size,
+                core_status: None,
             }
         };
 
-        status.update(&cfg.pool).await.unwrap();
+        status
+            .update(&cfg.pool, "0.0.0.0".to_string())
+            .await
+            .unwrap();
         let response = client.status().await?;
         let status: NetworkStatus = deserialize_response_result(response)?;
 

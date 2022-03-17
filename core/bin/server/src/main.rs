@@ -14,7 +14,7 @@ use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_witness_generator::run_prover_server;
 
 use tokio::task::JoinHandle;
-use zksync_config::configs::api::PrometheusConfig;
+use zksync_config::configs::api::{PrivateApiConfig, PrometheusConfig};
 use zksync_config::{
     configs::api::{CommonApiConfig, JsonRpcConfig, ProverApiConfig, RestApiConfig, Web3Config},
     ChainConfig, ContractsConfig, DBConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig,
@@ -260,6 +260,7 @@ async fn run_server(components: &ComponentsToRun) {
                 mempool_tx_request_receiver,
                 chain_config.state_keeper.block_chunk_sizes,
             ));
+            let private_config = PrivateApiConfig::from_env();
             zksync_api::api_server::rest::start_server_thread_detached(
                 read_only_connection_pool.clone(),
                 RestApiConfig::from_env().bind_addr(),
@@ -267,6 +268,7 @@ async fn run_server(components: &ComponentsToRun) {
                 ticker,
                 sign_check_sender,
                 mempool_tx_request_sender,
+                private_config.url,
             );
         }
     }

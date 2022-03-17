@@ -25,3 +25,10 @@ pub enum PriorityOpLookupQuery {
     /// Query priority operation using any of both hashes.
     ByAnyHash(TxHash),
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CoreStatus {
+    pub main_database_status: bool,
+    pub replica_database_status: bool,
+    pub eth_status: bool,
+}

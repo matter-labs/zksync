@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::{runtime::Runtime, time};
+use zksync_api_types::CoreStatus;
 use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
 use zksync_utils::panic_notify::ThreadPanicNotify;
@@ -16,10 +17,21 @@ pub struct NetworkStatus {
     pub total_transactions: u32,
     pub outstanding_txs: u32,
     pub mempool_size: u32,
+    pub core_status: Option<CoreStatus>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
+
+async fn check_core_status(core_address: String) -> anyhow::Result<CoreStatus> {
+    let client = reqwest::Client::new();
+    Ok(client
+        .get(format!("{}/status", core_address))
+        .send()
+        .await?
+        .json()
+        .await?)
+}
 
 impl SharedNetworkStatus {
     pub async fn read(&self) -> NetworkStatus {
@@ -29,9 +41,9 @@ impl SharedNetworkStatus {
     pub(crate) async fn update(
         &mut self,
         connection_pool: &ConnectionPool,
+        core_address: String,
     ) -> Result<(), anyhow::Error> {
         let mut storage = connection_pool.access_storage().await?;
-
         let mut transaction = storage.start_transaction().await?;
 
         let last_verified = transaction
@@ -69,6 +81,9 @@ impl SharedNetworkStatus {
             .await
             .unwrap_or(0);
 
+        transaction.commit().await.unwrap_or_default();
+
+        let core_status = check_core_status(core_address).await.ok();
         let status = NetworkStatus {
             next_block_at_max: None,
             last_committed,
@@ -76,9 +91,8 @@ impl SharedNetworkStatus {
             total_transactions,
             outstanding_txs,
             mempool_size,
+            core_status,
         };
-
-        transaction.commit().await.unwrap_or_default();
 
         // save status to state
         *self.0.as_ref().write().await = status;
@@ -88,6 +102,7 @@ impl SharedNetworkStatus {
         mut self,
         panic_notify: mpsc::Sender<bool>,
         connection_pool: ConnectionPool,
+        core_address: String,
     ) {
         std::thread::Builder::new()
             .name("rest-state-updater".to_string())
@@ -100,7 +115,11 @@ impl SharedNetworkStatus {
                     let mut timer = time::interval(Duration::from_millis(30000));
                     loop {
                         timer.tick().await;
-                        if self.update(&connection_pool).await.is_err() {
+                        if self
+                            .update(&connection_pool, core_address.clone())
+                            .await
+                            .is_err()
+                        {
                             vlog::error!("Can't update network status")
                         }
                     }
