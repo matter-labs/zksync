@@ -2048,24 +2048,6 @@
       ]
     }
   },
-  "3538961dd16f0eb374b50b33cae9a656426720c7fdf5d26ac406f44f47692e01": {
-    "query": "SELECT COUNT(*) FROM executed_transactions WHERE success = true",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "357d6ead6603c088c16ca1257981f85d316a31d6aee3f867f3646f0783f6fb43": {
     "query": "INSERT INTO data_restore_events_state (block_type, transaction_hash, block_num, contract_version) VALUES ($1, $2, $3, $4)",
     "describe": {
@@ -2882,24 +2864,6 @@
           "Int4",
           "Bytea"
         ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
-  "51f7701a34610b1661c5f21b6dd31ddb9fbc3efea4397096eed7ccb42ed21071": {
-    "query": "SELECT COUNT(*) FROM executed_priority_operations",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
       },
       "nullable": [
         null
@@ -7312,6 +7276,32 @@
       "nullable": []
     }
   },
+  "dcffee5aa023682041487570a86380abb389bda66891c4a602085ef7d4bb436a": {
+    "query": "SELECT COUNT(*), MAX(sequence_number) FROM executed_transactions \n                 WHERE success = true AND sequence_number > $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null
+      ]
+    }
+  },
   "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
     "query": "SELECT * from mempool_txs\n            WHERE tx_hash = $1",
     "describe": {
@@ -7994,6 +7984,32 @@
         null,
         null,
         false
+      ]
+    }
+  },
+  "ea5a6eeb9885d56b87a80e65d6965b2c58beaca5e0ee3d29b4ab9c3b4019249b": {
+    "query": "SELECT COUNT(*), MAX(sequence_number) FROM executed_priority_operations WHERE sequence_number > $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null
       ]
     }
   },

@@ -4,6 +4,7 @@ use actix_web::{
     Scope,
 };
 // Workspace uses
+use crate::api_server::rest::network_status::SharedNetworkStatus;
 use zksync_api_types::v02::ApiVersion;
 use zksync_config::ZkSyncConfig;
 use zksync_types::network::Network;
@@ -31,7 +32,11 @@ pub struct SharedData {
     pub api_version: ApiVersion,
 }
 
-pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope {
+pub(crate) fn api_scope(
+    tx_sender: TxSender,
+    zk_config: &ZkSyncConfig,
+    shared_network_status: SharedNetworkStatus,
+) -> Scope {
     let data = SharedData {
         net: zk_config.chain.eth.network,
         api_version: ApiVersion::V02,
@@ -49,7 +54,7 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
         ))
         .service(config::api_scope(zk_config))
         .service(fee::api_scope(tx_sender.clone()))
-        .service(status::api_scope(tx_sender.pool.clone()))
+        .service(status::api_scope(shared_network_status))
         .service(token::api_scope(
             zk_config,
             tx_sender.pool.clone(),
