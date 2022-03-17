@@ -913,6 +913,19 @@
       ]
     }
   },
+  "152ce07704066b1c5002831ca7187dbe14073b30f9e5f5db92f50a925621b86f": {
+    "query": "INSERT INTO committed_nonce (account_id, nonce) VALUES ($1, $2) \n                 ON CONFLICT (account_id) \n                 DO UPDATE \n                 SET nonce = $2\n                 ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -2456,6 +2469,26 @@
       },
       "nullable": [
         false,
+        false
+      ]
+    }
+  },
+  "48bdcd435f5374b030eb93cda0615b7c9f3a9e965ac717ac66ed68644faee92f": {
+    "query": "SELECT nonce FROM accounts WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "nonce",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
@@ -4667,6 +4700,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "903a4ea3096f5ede621b5b59940e4de856c3c09e8804eca973c288e0152355b3": {
+    "query": "SELECT nonce FROM committed_nonce WHERE account_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "nonce",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "924c04e90c91241f25e8ad84e6d274ff7769fbf11fa5ca54b0f848e701aaa03e": {

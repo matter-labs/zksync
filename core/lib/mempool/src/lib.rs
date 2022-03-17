@@ -1,18 +1,11 @@
 //! Mempool is simple in memory buffer for transactions.
 //!
 //! Its role is to:
-//! 1) Accept transactions from api, check signatures and basic nonce correctness(nonce not too small).
-//! To do nonce correctness check mempool stores mapping `AccountAddress -> Nonce`, this mapping is updated
-//! when new block is committed.
+//! 1) Getting txs from database.
 //! 2) When polled return vector of the transactions in the queue.
-//!
-//! Mempool is not persisted on disc, all transactions will be lost on node shutdown.
 //!
 //! Communication channel with other actors:
 //! Mempool does not push information to other actors, only accepts requests. (see `MempoolRequest`)
-//!
-//! Communication with db:
-//! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
 // External uses
 use futures::{
@@ -399,6 +392,19 @@ impl MempoolTransactionsHandler {
             TxAddError::DbError
         })?;
 
+        if tx.nonce()
+            < storage
+                .chain()
+                .account_schema()
+                // Close operation does not exist so we will never met this error
+                .current_nonce(tx.account_id().map_err(|_| TxAddError::Other)?)
+                .await
+                .map_err(|_| TxAddError::DbError)?
+                .unwrap_or_default()
+        {
+            return Err(TxAddError::NonceMismatch);
+        }
+
         storage
             .chain()
             .mempool_schema()
@@ -415,7 +421,6 @@ impl MempoolTransactionsHandler {
             ("token", tx.tx.token_id().to_string()),
         ];
         metrics::histogram!("process_tx", tx.elapsed(), &labels);
-        // self.mempool_state.write().await.add_tx(tx);
 
         Ok(())
     }
@@ -465,11 +470,6 @@ impl MempoolTransactionsHandler {
             metrics::increment_counter!("process_tx_count", &labels);
         }
 
-        // // Add to queue only confirmed priority operations
-        // if confirmed {
-        //     self.mempool_state.write().await.add_ops(ops);
-        // }
-        //
         Ok(())
     }
 
@@ -488,6 +488,23 @@ impl MempoolTransactionsHandler {
             vlog::error!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
+
+        for tx in txs.iter() {
+            // Correctness should be checked by `signature_checker`, thus
+            // `tx.check_correctness()` is not invoked here.
+            if tx.nonce()
+                < storage
+                    .chain()
+                    .account_schema()
+                    // Close operation does not exist so we will never met this error
+                    .current_nonce(tx.account_id().map_err(|_| TxAddError::Other)?)
+                    .await
+                    .map_err(|_| TxAddError::DbError)?
+                    .unwrap_or_default()
+            {
+                return Err(TxAddError::NonceMismatch);
+            }
+        }
 
         if self.mempool_state.chunks_for_batch(&batch).await? > self.max_block_size_chunks {
             return Err(TxAddError::BatchTooBig);
@@ -515,7 +532,6 @@ impl MempoolTransactionsHandler {
 
         batch.batch_id = batch_id;
 
-        // self.mempool_state.write().await.add_batch(batch);
         Ok(())
     }
 

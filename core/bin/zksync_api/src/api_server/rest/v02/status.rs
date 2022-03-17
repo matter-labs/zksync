@@ -39,7 +39,7 @@ async fn get_status(data: web::Data<ApiStatusData>) -> ApiResult<NetworkStatus> 
         finalized: status.last_verified,
         total_transactions: status.total_transactions,
         mempool_size: status.mempool_size,
-        core_status: status.core_status.clone(),
+        core_status: status.core_status,
     };
     metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_status");
     Ok(network_status).into()

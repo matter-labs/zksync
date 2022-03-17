@@ -58,6 +58,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         let update_order_ids =
             first_update_order_id..first_update_order_id + accounts_updated.len();
 
+        let mut nonce_updates = HashMap::new();
         for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
             vlog::debug!(
                 "Committing state update for account {} in block {}",
@@ -82,6 +83,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                    nonce_updates.insert(account_id, nonce);
                 }
                 AccountUpdate::Delete { ref address, nonce } => {
                     let account_id = i64::from(**id);
@@ -99,6 +101,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                    nonce_updates.insert(account_id, nonce);
                 }
                 AccountUpdate::UpdateBalance {
                     balance_update: (token, ref old_balance, ref new_balance),
@@ -130,6 +133,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                    nonce_updates.insert(account_id, new_nonce);
                 }
                 AccountUpdate::ChangePubKeyHash {
                     ref old_pub_key_hash,
@@ -153,6 +157,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                    nonce_updates.insert(account_id, new_nonce);
                 }
                 AccountUpdate::MintNFT { ref token, nonce } => {
                     let update_order_id = update_order_id as i32;
@@ -173,6 +178,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                         .execute(transaction.conn())
                         .await?;
+                    nonce_updates.insert(creator_account_id as i64, nonce);
                 }
                 AccountUpdate::RemoveNFT { ref token, .. } => {
                     let token_id = token.id.0 as i32;
@@ -189,6 +195,21 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .await?;
                 }
             }
+        }
+
+        // Update committed nonce
+        for (account_id, nonce) in nonce_updates.iter() {
+            sqlx::query!(
+                "INSERT INTO committed_nonce (account_id, nonce) VALUES ($1, $2) 
+                 ON CONFLICT (account_id) 
+                 DO UPDATE 
+                 SET nonce = $2
+                 ",
+                account_id,
+                nonce
+            )
+            .execute(transaction.conn())
+            .await?;
         }
 
         transaction.commit().await?;
