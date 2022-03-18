@@ -37,10 +37,10 @@ request to upcoming blocks. Complete **PriorityQueue** logic that handles **prio
 
 When a validator commits a block which contains **circuit operations** `deposit`, **deposit onchain operation** for this
 deposit is created to verify compliance with priority queue requests. If it succeeds than their count will be added to
-**priority requests** count for this block. If the block is verified, **deposit onchain operations** and **deposit
+**priority requests** count for this block. If the block is not verified, **deposit onchain operations** and **deposit
 priority request** are simply discarded.
 
-If the block is reverted **deposit onchain operations** are siply discarded.
+If the block is reverted **deposit onchain operations** are simply discarded.
 
 If ZKSync contract has entered Exodus mode and the block is unverified, the funds held by this blocks' **Deposit
 priority requests** are accrued to the owners' **root-chain balances** to make them possible to withdraw. This
