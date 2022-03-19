@@ -21,7 +21,5 @@
 !Cargo.lock
 !Cargo.toml
 !contracts/artifacts
-!infrastructure/explorer/index.html
-!infrastructure/explorer/dist
 !infrastructure/zk
 !sdk/zksync-rs
