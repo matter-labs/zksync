@@ -142,7 +142,7 @@ jobs:
   configmap:
     name: Update configMap
     runs-on: [self-hosted, deployer, "${{ needs.setup.outputs.cluster}}"]
-    needs: [setup-db]
+    needs: [setup, setup-db]
     container:
       image: dysnix/kubectl:v1.20-gcloud
       volumes:
