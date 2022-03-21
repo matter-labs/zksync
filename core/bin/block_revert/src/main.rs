@@ -28,7 +28,7 @@ async fn revert_blocks_in_storage(
     transaction
         .chain()
         .state_schema()
-        .clean_current_nonce_table(last_block)
+        .clear_current_nonce_table(last_block)
         .await?;
     println!("`committed_nonce` table is updated");
     transaction

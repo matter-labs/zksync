@@ -64,8 +64,8 @@ impl Default for LoadtestConfig {
             eth_network: "localhost".into(),
             master_wallet_pk: "74d8b3a188f7260f67698eb44da07397a298df5427df681ef68c45b34b61f998"
                 .into(),
-            accounts_amount: 20,
-            operations_per_account: 100,
+            accounts_amount: 80,
+            operations_per_account: 40,
             main_token: "DAI".into(),
             seed: None,
             allowed_percent: 10,

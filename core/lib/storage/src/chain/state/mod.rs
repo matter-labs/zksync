@@ -57,7 +57,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         let update_order_ids =
             first_update_order_id..first_update_order_id + accounts_updated.len();
 
-        let mut nonce_updates = HashMap::new();
+        let mut nonce_updates = HashMap::with_capacity(accounts_updated.len());
 
         for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
             vlog::debug!(
@@ -220,7 +220,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn clean_current_nonce_table(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+    pub async fn clear_current_nonce_table(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         sqlx::query!(
             "DELETE FROM committed_nonce WHERE block_number > $1",
             *last_block as i64

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use zksync_types::mempool::SignedTxVariant;
-use zksync_types::{PriorityOp, SerialId};
+use zksync_types::PriorityOp;
 
 #[derive(Debug, Clone)]
 struct MempoolPendingTransaction {
@@ -40,18 +40,25 @@ pub struct MempoolTransactionsQueue {
     /// Transactions that are not ready yet because of the `valid_from` field.
     pending_txs: BinaryHeap<MempoolPendingTransaction>,
 
-    last_processed_priority_op: Option<SerialId>,
     priority_ops: VecDeque<PriorityOp>,
 }
 
 impl MempoolTransactionsQueue {
-    pub fn new(last_processed_priority_op: Option<SerialId>) -> Self {
-        Self {
-            ready_txs: VecDeque::new(),
-            pending_txs: BinaryHeap::new(),
-            last_processed_priority_op,
-            priority_ops: VecDeque::new(),
+    pub fn new(
+        priority_ops: VecDeque<PriorityOp>,
+        transactions: VecDeque<SignedTxVariant>,
+    ) -> Self {
+        let mut res = Self {
+            ready_txs: Default::default(),
+            pending_txs: Default::default(),
+            priority_ops,
+        };
+        // Due to complexity of json structure in database for transactions it's easier and safer
+        // to add even not ready txs to mempool and prepare them before when it's needed.
+        for tx in transactions {
+            res.add_tx_variant(tx)
         }
+        res
     }
 
     pub fn pop_front(&mut self) -> Option<SignedTxVariant> {
@@ -59,31 +66,14 @@ impl MempoolTransactionsQueue {
     }
 
     pub fn pop_front_priority_op(&mut self) -> Option<PriorityOp> {
-        let op = self.priority_ops.pop_front();
-        if let Some(op) = &op {
-            self.last_processed_priority_op = Some(op.serial_id);
-        }
-        op
+        self.priority_ops.pop_front()
     }
 
+    #[allow(dead_code)]
     pub fn add_priority_ops(&mut self, mut ops: Vec<PriorityOp>) {
         ops.sort_unstable_by_key(|key| key.serial_id);
         for op in ops {
-            // Do not add old operations
-            if let Some(serial_id) = self.last_processed_priority_op {
-                if op.serial_id <= serial_id {
-                    continue;
-                }
-            }
-
-            // Add a new operation only if it is not already in the queue
-            if !self
-                .priority_ops
-                .iter()
-                .any(|pr_op| pr_op.serial_id == op.serial_id)
-            {
-                self.priority_ops.push_back(op);
-            }
+            self.priority_ops.push_back(op);
         }
     }
 
@@ -186,7 +176,6 @@ mod tests {
         let mut transactions_queue = MempoolTransactionsQueue {
             ready_txs: VecDeque::new(),
             pending_txs: BinaryHeap::new(),
-            last_processed_priority_op: None,
             priority_ops: Default::default(),
         };
 
@@ -317,7 +306,6 @@ mod tests {
         let mut transactions_queue = MempoolTransactionsQueue {
             ready_txs: VecDeque::new(),
             pending_txs: BinaryHeap::new(),
-            last_processed_priority_op: None,
             priority_ops: Default::default(),
         };
 

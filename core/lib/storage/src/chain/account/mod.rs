@@ -80,9 +80,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         Ok(())
     }
 
-    // Get current committed nonce, if not exist return verified. After reverting blocks this nonce
-    // could be less than actual. Use this function only for verifying the lower bounds of nonce.
-    pub async fn current_nonce(&mut self, account_id: AccountId) -> QueryResult<Option<Nonce>> {
+    /// Gets currently committed to the database nonce, if not exist return verified.
+    /// After reverting blocks this nonce could be less than actual.
+    /// Use this function only for verifying the lower bounds of a nonce.
+    pub async fn estimate_nonce(&mut self, account_id: AccountId) -> QueryResult<Option<Nonce>> {
         let start = Instant::now();
 
         let mut transaction = self.0.start_transaction().await?;

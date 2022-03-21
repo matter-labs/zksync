@@ -113,7 +113,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         let nonce = storage
             .chain()
             .account_schema()
-            .current_nonce(account_id)
+            .estimate_nonce(account_id)
             .await?
             .unwrap();
         assert_eq!(account.nonce, nonce)

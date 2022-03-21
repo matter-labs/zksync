@@ -34,9 +34,10 @@ pub mod records;
 pub struct MempoolSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> MempoolSchema<'a, 'c> {
-    /// Loads all the transactions stored in the mempool schema.
-    /// Exclude txs, which was already processed in the memory.
-    /// They may still be in the database with some probability
+    /// Loads all transactions stored in the mempool schema.
+    /// We want to exclude txs that have already been processed in memory,
+    /// due to asynchronous execution,
+    /// these txs may be executed in memory and not yet saved to the database
     pub async fn load_txs(
         &mut self,
         executed_txs: &[TxHash],
@@ -76,7 +77,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         for (batch_id, group) in grouped_txs.into_iter() {
             if let Some(batch_id) = batch_id {
-                let group = group.peekable();
                 let deserialized_txs = group
                     .map(SignedZkSyncTx::try_from)
                     .collect::<Result<Vec<SignedZkSyncTx>, serde_json::Error>>()?;
@@ -467,7 +467,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn get_confirmed_priority_ops(&mut self) -> QueryResult<Vec<PriorityOp>> {
+    pub async fn get_confirmed_priority_ops(&mut self) -> QueryResult<VecDeque<PriorityOp>> {
         let ops = sqlx::query_as!(
             MempoolPriorityOp,
             "SELECT serial_id,data,deadline_block,eth_hash,tx_hash,eth_block,eth_block_index,created_at FROM mempool_priority_operations WHERE confirmed AND reverted = false ORDER BY serial_id"

@@ -1,6 +1,6 @@
-//! Mempool is simple in buffer for transactions.
+//! Mempool is buffer for transactions.
 //!
-//! Its role is to:
+//! The role is:
 //! 1) Storing txs to the database
 //! 2) Getting txs from database.
 //! 3) When polled return vector of the transactions in the queue.
@@ -10,6 +10,8 @@
 //! Communication channel with other actors:
 //! Mempool does not push information to other actors, only accepts requests. (see `MempoolRequest`)
 
+use std::collections::HashSet;
+use std::time::Instant;
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -19,13 +21,13 @@ use futures::{
 use tokio::task::JoinHandle;
 
 // Workspace uses
-use zksync_storage::ConnectionPool;
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::tx::error::TxAddError;
 use zksync_types::tx::TxHash;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
     tx::TxEthSignature,
-    PriorityOp, SignedZkSyncTx, TransferOp, TransferToNewOp, ZkSyncTx,
+    Address, PriorityOp, SignedZkSyncTx, TransferOp, TransferToNewOp, ZkSyncTx,
 };
 
 // Local uses
@@ -93,8 +95,40 @@ struct MempoolState {
 }
 
 impl MempoolState {
+    async fn chunks_for_tx_with_cache(
+        &self,
+        tx: &ZkSyncTx,
+        storage: &mut StorageProcessor<'_>,
+        existed_accounts: &mut HashSet<Address>,
+    ) -> Result<usize, TxAddError> {
+        let start = Instant::now();
+        let res = match tx {
+            ZkSyncTx::Transfer(tx) => {
+                let exist = if existed_accounts.contains(&tx.to) {
+                    true
+                } else {
+                    storage
+                        .chain()
+                        .account_schema()
+                        .does_account_exist(tx.to)
+                        .await
+                        .map_err(|_| TxAddError::DbError)?
+                };
+                if exist {
+                    existed_accounts.insert(tx.to);
+                    TransferOp::CHUNKS
+                } else {
+                    TransferToNewOp::CHUNKS
+                }
+            }
+            _ => tx.min_chunks(),
+        };
+        metrics::histogram!("mempool_state.chunks_for_tx", start.elapsed(), "type" => "with_cache");
+        Ok(res)
+    }
     async fn chunks_for_tx(&self, tx: &ZkSyncTx) -> Result<usize, TxAddError> {
-        Ok(match tx {
+        let start = Instant::now();
+        let res = match tx {
             ZkSyncTx::Transfer(tx) => {
                 let exist = self
                     .db_pool
@@ -113,14 +147,26 @@ impl MempoolState {
                 }
             }
             _ => tx.min_chunks(),
-        })
+        };
+        metrics::histogram!("mempool_state.chunks_for_tx", start.elapsed(), "type" => "without_cache");
+        Ok(res)
     }
 
     async fn chunks_for_batch(&self, batch: &SignedTxsBatch) -> Result<usize, TxAddError> {
+        let start = Instant::now();
         let mut size = 0;
+        let mut storage = self
+            .db_pool
+            .access_storage()
+            .await
+            .map_err(|_| TxAddError::DbError)?;
+        let mut existed_accounts = HashSet::new();
         for tx in &batch.txs {
-            size += self.chunks_for_tx(&tx.tx).await?;
+            size += self
+                .chunks_for_tx_with_cache(&tx.tx, &mut storage, &mut existed_accounts)
+                .await?;
         }
+        metrics::histogram!("mempool_state.chunks_for_batch", start.elapsed());
         Ok(size)
     }
 
@@ -177,25 +223,7 @@ impl MempoolState {
             .await
             .map_err(|_| TxAddError::DbError)?;
 
-        // Initialize the queue with reverted transactions loaded from the database.
-        let serial_id = transaction
-            .chain()
-            .operations_schema()
-            .get_max_priority_op_serial_id()
-            .await
-            .map_err(|_| TxAddError::DbError)?;
-        let mut transactions_queue = MempoolTransactionsQueue::new(serial_id);
-
-        transactions_queue.add_priority_ops(priority_ops);
-
-        for tx in mempool_txs {
-            transactions_queue.add_tx_variant(tx);
-        }
-
-        transaction
-            .commit()
-            .await
-            .map_err(|_| TxAddError::DbError)?;
+        let transactions_queue = MempoolTransactionsQueue::new(priority_ops, mempool_txs);
 
         Ok(transactions_queue)
     }
@@ -208,6 +236,63 @@ struct MempoolBlocksHandler {
 }
 
 impl MempoolBlocksHandler {
+    /// Returns: chunks left from max amount of chunks, ops selected
+    async fn select_priority_ops(
+        max_block_size_chunks: usize,
+        current_unprocessed_priority_op: u64,
+        transactions_queue: &mut MempoolTransactionsQueue,
+    ) -> (usize, Vec<PriorityOp>) {
+        let mut result = vec![];
+
+        let mut used_chunks = 0;
+        let mut current_priority_op = current_unprocessed_priority_op;
+        while let Some(op) = transactions_queue.pop_front_priority_op() {
+            // Since the transaction addition is asynchronous process and we are checking node many times,
+            // We can find some already processed priority ops
+            if op.serial_id < current_priority_op {
+                vlog::warn!("Already processed priority op was found in queue");
+                // We can skip already processed priority operations
+                continue;
+            }
+            assert_eq!(
+                current_priority_op, op.serial_id,
+                "Wrong order for priority ops"
+            );
+            if used_chunks + op.data.chunks() <= max_block_size_chunks {
+                used_chunks += op.data.chunks();
+                result.push(op);
+                current_priority_op += 1;
+            } else {
+                break;
+            }
+        }
+        (max_block_size_chunks - used_chunks, result)
+    }
+
+    /// Collect txs depending on the remaining block size
+    async fn prepare_tx_for_block(
+        mut chunks_left: usize,
+        block_timestamp: u64,
+        transactions_queue: &mut MempoolTransactionsQueue,
+        mempool_state: &MempoolState,
+    ) -> Result<(usize, Vec<SignedTxVariant>), TxAddError> {
+        transactions_queue.prepare_new_ready_transactions(block_timestamp);
+
+        let mut txs_for_commit = Vec::new();
+
+        while let Some(tx) = transactions_queue.pop_front() {
+            let chunks_for_tx = mempool_state.required_chunks(&tx).await?;
+            if chunks_left >= chunks_for_tx {
+                txs_for_commit.push(tx);
+                chunks_left -= chunks_for_tx;
+            } else {
+                break;
+            }
+        }
+
+        Ok((chunks_left, txs_for_commit))
+    }
+
     async fn propose_new_block(
         &mut self,
         current_unprocessed_priority_op: u64,
@@ -222,14 +307,14 @@ impl MempoolBlocksHandler {
             .get_transaction_queue(executed_txs)
             .await?;
 
-        let (chunks_left, priority_ops) = select_priority_ops(
+        let (chunks_left, priority_ops) = Self::select_priority_ops(
             self.max_block_size_chunks,
             current_unprocessed_priority_op,
             &mut tx_queue,
         )
         .await;
 
-        let (_chunks_left, txs) = prepare_tx_for_block(
+        let (_chunks_left, txs) = Self::prepare_tx_for_block(
             chunks_left,
             block_timestamp,
             &mut tx_queue,
@@ -237,12 +322,15 @@ impl MempoolBlocksHandler {
         )
         .await?;
 
-        if !priority_ops.is_empty() {
-            vlog::debug!("Proposed priority ops for block: {:?}", priority_ops);
+        if !priority_ops.is_empty() || !txs.is_empty() {
+            vlog::debug!(
+                "Proposed {} priority ops and {} txs for the next miniblock; {} chunks left",
+                priority_ops.len(),
+                txs.len(),
+                chunks_left
+            );
         }
-        if !txs.is_empty() {
-            vlog::debug!("Proposed txs for block: {:?}", txs);
-        }
+
         metrics::histogram!("mempool.propose_new_block", start.elapsed());
 
         for pr_op in &priority_ops {
@@ -270,13 +358,14 @@ impl MempoolBlocksHandler {
 
     async fn run(mut self) {
         vlog::info!("Block mempool handler is running");
-        // We have to clean garbage from mempool before running the block generator
+        // We have to clean garbage from mempool before running the block generator.
+        // Remove any possible duplicates of already executed transactions
+        // from the database.
         self.mempool_state.collect_garbage().await;
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolBlocksRequest::GetBlock(block) => {
                     // Generate proposed block.
-                    // TODO maybe add some retries?
                     let proposed_block = self
                         .propose_new_block(
                             block.last_priority_op_number,
@@ -284,74 +373,17 @@ impl MempoolBlocksHandler {
                             &block.executed_txs,
                         )
                         .await
-                        .expect("Problems with generating new block");
+                        .expect("Unable to propose the new miniblock");
 
                     // Send the proposed block to the request initiator.
                     block
                         .response_sender
                         .send(proposed_block)
-                        .expect("mempool proposed block response send failed");
+                        .expect("Mempool request receiver dropped");
                 }
             }
         }
     }
-}
-
-/// Returns: chunks left from max amount of chunks, ops selected
-async fn select_priority_ops(
-    max_block_size_chunks: usize,
-    current_unprocessed_priority_op: u64,
-    transactions_queue: &mut MempoolTransactionsQueue,
-) -> (usize, Vec<PriorityOp>) {
-    let mut result = vec![];
-
-    let mut used_chunks = 0;
-    let mut current_priority_op = current_unprocessed_priority_op;
-    while let Some(op) = transactions_queue.pop_front_priority_op() {
-        // Since the transaction addition is asynchronous process and we are checking node many times,
-        // We can find some already processed priority ops
-        if op.serial_id < current_priority_op {
-            vlog::warn!("Already processed priority op was found in queue");
-            // We can skip already processed priority operations
-            continue;
-        }
-        assert_eq!(
-            current_priority_op, op.serial_id,
-            "Wrong order for priority ops"
-        );
-        if used_chunks + op.data.chunks() <= max_block_size_chunks {
-            used_chunks += op.data.chunks();
-            result.push(op);
-            current_priority_op += 1;
-        } else {
-            break;
-        }
-    }
-    (max_block_size_chunks - used_chunks, result)
-}
-
-/// Collect txs depending on the remaining block size
-async fn prepare_tx_for_block(
-    mut chunks_left: usize,
-    block_timestamp: u64,
-    transactions_queue: &mut MempoolTransactionsQueue,
-    mempool_state: &MempoolState,
-) -> Result<(usize, Vec<SignedTxVariant>), TxAddError> {
-    transactions_queue.prepare_new_ready_transactions(block_timestamp);
-
-    let mut txs_for_commit = Vec::new();
-
-    while let Some(tx) = transactions_queue.pop_front() {
-        let chunks_for_tx = mempool_state.required_chunks(&tx).await?;
-        if chunks_left >= chunks_for_tx {
-            txs_for_commit.push(tx);
-            chunks_left -= chunks_for_tx;
-        } else {
-            break;
-        }
-    }
-
-    Ok((chunks_left, txs_for_commit))
 }
 
 struct MempoolTransactionsHandler {
@@ -370,16 +402,16 @@ impl MempoolTransactionsHandler {
             TxAddError::DbError
         })?;
 
-        if tx.nonce()
-            < storage
-                .chain()
-                .account_schema()
-                // Close operation does not exist so we will never met this error
-                .current_nonce(tx.account_id().map_err(|_| TxAddError::Other)?)
-                .await
-                .map_err(|_| TxAddError::DbError)?
-                .unwrap_or_default()
-        {
+        let nonce = storage
+            .chain()
+            .account_schema()
+            // Close operation does not exist so we will never met this error
+            .estimate_nonce(tx.account_id().map_err(|_| TxAddError::Other)?)
+            .await
+            .map_err(|_| TxAddError::DbError)?
+            .unwrap_or_default();
+
+        if tx.nonce() < nonce {
             return Err(TxAddError::NonceMismatch);
         }
 
@@ -456,7 +488,7 @@ impl MempoolTransactionsHandler {
         txs: Vec<SignedZkSyncTx>,
         eth_signatures: Vec<TxEthSignature>,
     ) -> Result<(), TxAddError> {
-        let mut batch: SignedTxsBatch = SignedTxsBatch {
+        let batch: SignedTxsBatch = SignedTxsBatch {
             txs: txs.clone(),
             batch_id: 0, // Will be determined after inserting to the database
             eth_signatures: eth_signatures.clone(),
@@ -470,16 +502,16 @@ impl MempoolTransactionsHandler {
         for tx in txs.iter() {
             // Correctness should be checked by `signature_checker`, thus
             // `tx.check_correctness()` is not invoked here.
-            if tx.nonce()
-                < storage
-                    .chain()
-                    .account_schema()
-                    // Close operation does not exist so we will never met this error
-                    .current_nonce(tx.account_id().map_err(|_| TxAddError::Other)?)
-                    .await
-                    .map_err(|_| TxAddError::DbError)?
-                    .unwrap_or_default()
-            {
+            let nonce = storage
+                .chain()
+                .account_schema()
+                // Close operation does not exist so we will never met this error
+                .estimate_nonce(tx.account_id().map_err(|_| TxAddError::Other)?)
+                .await
+                .map_err(|_| TxAddError::DbError)?
+                .unwrap_or_default();
+
+            if tx.nonce() < nonce {
                 return Err(TxAddError::NonceMismatch);
             }
         }
@@ -498,7 +530,7 @@ impl MempoolTransactionsHandler {
             metrics::histogram!("process_tx", tx.elapsed(), &labels);
         }
 
-        let batch_id = storage
+        storage
             .chain()
             .mempool_schema()
             .insert_batch(&batch.txs, eth_signatures)
@@ -507,8 +539,6 @@ impl MempoolTransactionsHandler {
                 vlog::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
-
-        batch.batch_id = batch_id;
 
         Ok(())
     }
@@ -534,8 +564,9 @@ impl MempoolTransactionsHandler {
     }
 }
 
-// During channel based nature, for better performance,
+// Due channel based nature, for better performance,
 // you need to run independent mempool_tx_handler for each actor, e.g. for each API actor
+#[must_use]
 pub fn run_mempool_tx_handler(
     db_pool: ConnectionPool,
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,

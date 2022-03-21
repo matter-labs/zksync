@@ -286,25 +286,22 @@ impl ZkSyncStateKeeper {
             self.root_hash_queue.throttle().await;
             metrics::histogram!("state_keeper.throttle", start.elapsed());
 
-            self.commit_new_tx_mini_batch().await;
+            let block_timestamp = self.pending_block.timestamp;
+            let proposed_block = self.propose_new_block(block_timestamp).await;
+
+            self.execute_proposed_block(proposed_block).await;
         }
     }
 
-    async fn commit_new_tx_mini_batch(&mut self) {
-        let block_timestamp = self.pending_block.timestamp;
-        let proposed_block = self.propose_new_block(block_timestamp).await;
-
-        self.execute_proposed_block(proposed_block).await;
-    }
-
     async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
+        let start = Instant::now();
+
         let (response_sender, receiver) = oneshot::channel();
 
         // These txs will be excluded from query result as already executed.
-        // Using these hashes we avoid the situation, when tx is still in mempool,
-        // but was executed in mempool
-
-        let tx_hashes = self
+        // By giving these hashes to the mempool,
+        // we won't receive back transactions that we already executed in the current block,
+        let executed_txs = self
             .pending_block
             .failed_txs
             .iter()
@@ -321,7 +318,7 @@ impl ZkSyncStateKeeper {
             last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
             block_timestamp,
             response_sender,
-            executed_txs: tx_hashes,
+            executed_txs,
         });
 
         self.tx_for_mempool
@@ -329,7 +326,9 @@ impl ZkSyncStateKeeper {
             .await
             .expect("mempool receiver dropped");
 
-        receiver.await.expect("Mempool new block request failed")
+        let block = receiver.await.expect("Mempool new block request failed");
+        metrics::histogram!("state_keeper.propose_new_block", start.elapsed());
+        block
     }
 
     async fn execute_incomplete_block(&mut self, block: IncompleteBlock) {

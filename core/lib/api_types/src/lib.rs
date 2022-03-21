@@ -31,7 +31,7 @@ pub enum PriorityOpLookupQuery {
 /// and connection to the ethereum node
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CoreStatus {
-    pub main_database_status: bool,
-    pub replica_database_status: bool,
-    pub eth_status: bool,
+    pub main_database_available: bool,
+    pub replica_database_available: bool,
+    pub web3_available: bool,
 }

@@ -8,9 +8,11 @@
 //! for correctness.
 
 use std::thread;
+use std::time::{Duration, Instant};
 
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::{channel::mpsc, StreamExt};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use zksync_api_types::CoreStatus;
 
@@ -19,17 +21,30 @@ use zksync_eth_client::EthereumGateway;
 use zksync_storage::ConnectionPool;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
-#[derive(Debug, Clone)]
+const STATUS_INVALIDATION_PERIOD: Duration = Duration::from_secs(60);
+
+#[derive(Debug)]
 struct AppState {
     connection_pool: ConnectionPool,
     read_only_connection_pool: ConnectionPool,
     eth_client: EthereumGateway,
+    status_cache: RwLock<Option<(CoreStatus, Instant)>>,
 }
 
 /// Health check.
-/// The core actor should have a connection to main and replica database and have connection to eth
+/// The core actor is expected have connection to web3 and both main/replica databases
 #[actix_web::get("/status")]
 async fn status(data: web::Data<AppState>) -> actix_web::Result<HttpResponse> {
+    if let Some((status, data)) = data.status_cache.read().await.as_ref() {
+        if data.elapsed() < STATUS_INVALIDATION_PERIOD {
+            return Ok(HttpResponse::Ok().json(status.clone()));
+        }
+    }
+
+    // We need to get a lock here so we don't abuse the database and eth node connections
+    // with multiple requests from other API nodes when the cache has been invalidated.
+
+    let mut status = data.status_cache.write().await;
     let main_database_status = data.connection_pool.access_storage().await.is_ok();
     let replica_database_status = data
         .read_only_connection_pool
@@ -39,10 +54,11 @@ async fn status(data: web::Data<AppState>) -> actix_web::Result<HttpResponse> {
     let eth_status = data.eth_client.block_number().await.is_ok();
 
     let response = CoreStatus {
-        main_database_status,
-        replica_database_status,
-        eth_status,
+        main_database_available: main_database_status,
+        replica_database_available: replica_database_status,
+        web3_available: eth_status,
     };
+    *status = Some((response.clone(), Instant::now()));
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -68,6 +84,7 @@ pub fn start_private_core_api(
                         connection_pool: connection_pool.clone(),
                         read_only_connection_pool: read_only_connection_pool.clone(),
                         eth_client: eth_client.clone(),
+                        status_cache: Default::default(),
                     };
 
                     // By calling `register_data` instead of `data` we're avoiding double

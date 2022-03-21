@@ -33,7 +33,6 @@ impl SignedTxVariant {
         batch_id: i64,
         eth_signatures: Vec<TxEthSignature>,
     ) -> Self {
-        // txs.sort_unstable_by_key(|tx1| tx1.nonce());
         Self::Batch(SignedTxsBatch {
             txs,
             batch_id,
