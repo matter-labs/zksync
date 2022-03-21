@@ -53,3 +53,11 @@ basic_type!(
     EventId,
     u64
 );
+
+basic_type!(
+    /// Shared counter for L1 and L2  transactions
+    /// Due to the specific, that we store L1 and L2 transaction in different tables.
+    /// For correct ordering we have to introduce this counter
+    SequentialTxId,
+    u64
+);

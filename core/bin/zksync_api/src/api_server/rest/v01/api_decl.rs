@@ -111,16 +111,10 @@ impl ApiV01 {
     }
 
     // Spawns future updating SharedNetworkStatus in the current `actix::System`
-    pub fn spawn_network_status_updater(
-        &self,
-        panic_notify: mpsc::Sender<bool>,
-        core_address: String,
-    ) {
-        self.network_status.clone().start_updater_detached(
-            panic_notify,
-            self.connection_pool.clone(),
-            core_address,
-        );
+    pub fn spawn_network_status_updater(&self, panic_notify: mpsc::Sender<bool>) {
+        self.network_status
+            .clone()
+            .start_updater_detached(panic_notify, self.connection_pool.clone());
     }
 
     // cache access functions

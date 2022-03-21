@@ -72,7 +72,7 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
-        let mut status = SharedNetworkStatus::default();
+        let mut status = SharedNetworkStatus::new("0.0.0.0".to_string());
         let (client, server) = cfg.start_server(
             {
                 let status = status.clone();
@@ -108,10 +108,7 @@ mod tests {
             }
         };
 
-        status
-            .update(&cfg.pool, "0.0.0.0".to_string(), 0)
-            .await
-            .unwrap();
+        status.update(&cfg.pool, 0).await.unwrap();
         let response = client.status().await?;
         let status: NetworkStatus = deserialize_response_result(response)?;
 

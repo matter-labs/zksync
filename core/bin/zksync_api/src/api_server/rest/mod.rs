@@ -104,10 +104,10 @@ pub fn start_server_thread_detached(
                 // TODO remove this config ZKS-815
                 let config = ZkSyncConfig::from_env();
 
-                let network_status = SharedNetworkStatus::default();
+                let network_status = SharedNetworkStatus::new(core_address);
                 let api_v01 =
                     ApiV01::new(connection_pool, contract_address, config, network_status);
-                api_v01.spawn_network_status_updater(panic_sender, core_address);
+                api_v01.spawn_network_status_updater(panic_sender);
 
                 start_server(
                     api_v01,
