@@ -221,7 +221,11 @@ async fn seal_incomplete_block(
     // We do this outside of a transaction,
     // because we want the incomplete block data to be available as soon as possible.
     // If something happened to the metric count, it won't affect the block data
-    zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block).await;
+    if let Err(_) =
+        zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block).await
+    {
+        vlog::error!("Can't calculate volume metric")
+    }
     metrics::histogram!("committer.seal_incomplete_block", start.elapsed());
 }
 
