@@ -1,7 +1,6 @@
 //! Transactions part of API implementation.
 
 // Built-in uses
-
 use std::time::Instant;
 // External uses
 use actix_web::{

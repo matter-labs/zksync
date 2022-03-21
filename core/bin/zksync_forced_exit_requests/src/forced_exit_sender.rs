@@ -24,7 +24,7 @@ const PROCESSING_ATTEMPTS: u32 = 3;
 
 #[async_trait::async_trait]
 pub trait ForcedExitSender {
-    async fn process_request(&self, amount: BigUint, submission_time: DateTime<Utc>);
+    async fn process_request(&mut self, amount: BigUint, submission_time: DateTime<Utc>);
 }
 
 pub struct MempoolForcedExitSender<T: CoreInteractionWrapper> {
@@ -36,7 +36,7 @@ pub struct MempoolForcedExitSender<T: CoreInteractionWrapper> {
 
 #[async_trait::async_trait]
 impl<T: CoreInteractionWrapper + Sync + Send> ForcedExitSender for MempoolForcedExitSender<T> {
-    async fn process_request(&self, amount: BigUint, submission_time: DateTime<Utc>) {
+    async fn process_request(&mut self, amount: BigUint, submission_time: DateTime<Utc>) {
         let mut attempts: u32 = 0;
         // Typically this should not run any longer than 1 iteration
         // In case something bad happens we do not want the server crush because
@@ -222,7 +222,7 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
     }
 
     pub async fn try_process_request(
-        &self,
+        &mut self,
         amount: BigUint,
         submission_time: DateTime<Utc>,
     ) -> anyhow::Result<()> {
@@ -301,7 +301,7 @@ mod test {
             ..ForcedExitRequestsConfig::from_env()
         };
 
-        let forced_exit_sender = get_test_forced_exit_sender(Some(forced_exit_requests));
+        let mut forced_exit_sender = get_test_forced_exit_sender(Some(forced_exit_requests));
 
         add_request(
             &forced_exit_sender.core_interaction_wrapper.requests,

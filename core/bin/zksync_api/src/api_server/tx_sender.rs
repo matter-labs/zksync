@@ -100,7 +100,7 @@ pub enum SubmitError {
     #[error("Failed to toggle 2FA: {0}.")]
     Toggle2FA(#[from] Toggle2FAError),
 
-    #[error("Communication error with the memmpool: {0}.")]
+    #[error("Communication error with the mempool: {0}.")]
     MempoolCommunication(String),
     #[error("Price error {0}")]
     PriceError(#[from] PriceError),

@@ -526,7 +526,7 @@ mod test {
 
     #[async_trait::async_trait]
     impl ForcedExitSender for DummyForcedExitSender {
-        async fn process_request(&self, amount: BigUint, submission_time: DateTime<Utc>) {
+        async fn process_request(&mut self, amount: BigUint, submission_time: DateTime<Utc>) {
             let mut write_lock = self
                 .processed_requests
                 .lock()

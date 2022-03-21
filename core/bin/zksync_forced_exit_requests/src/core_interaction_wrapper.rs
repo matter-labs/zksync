@@ -33,7 +33,7 @@ pub trait CoreInteractionWrapper {
     async fn get_request_by_id(&self, id: i64) -> anyhow::Result<Option<ForcedExitRequest>>;
     async fn get_receipt(&self, tx_hash: TxHash) -> anyhow::Result<Option<TxReceiptResponse>>;
     async fn send_and_save_txs_batch(
-        &self,
+        &mut self,
         request: &ForcedExitRequest,
         txs: Vec<SignedZkSyncTx>,
     ) -> anyhow::Result<Vec<TxHash>>;
@@ -136,7 +136,7 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
     }
 
     async fn send_and_save_txs_batch(
-        &self,
+        &mut self,
         request: &ForcedExitRequest,
         txs: Vec<SignedZkSyncTx>,
     ) -> anyhow::Result<Vec<TxHash>> {
@@ -147,8 +147,7 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
 
         let (sender, receiver) = oneshot::channel();
         let item = MempoolTransactionRequest::NewTxsBatch(txs, vec![], sender);
-        let mut mempool_sender = self.mempool_tx_sender.clone();
-        mempool_sender.send(item).await?;
+        self.mempool_tx_sender.send(item).await?;
         receiver.await??;
         schema
             .set_fulfilled_by(request.id, Some(hashes.clone()))
