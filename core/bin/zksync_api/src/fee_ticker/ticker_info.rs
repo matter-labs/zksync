@@ -17,11 +17,11 @@ use num::BigUint;
 use tokio::sync::RwLock;
 // Workspace deps
 use zksync_storage::ConnectionPool;
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::{Address, Token, TokenId, TokenLike, TokenPrice};
 // Local deps
 use crate::fee_ticker::PriceError;
-use crate::utils::token_db_cache::TokenDBCache;
 
 const API_PRICE_EXPIRATION_TIME_SECS: Duration = Duration::from_secs(30 * 60);
 

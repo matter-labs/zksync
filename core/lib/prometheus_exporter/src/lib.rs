@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::aggregated_operations::AggregatedActionType::*;
 use zksync_types::block::IncompleteBlock;
 use zksync_types::TokenId;
@@ -87,9 +88,9 @@ fn get_volumes(block: &IncompleteBlock) -> HashMap<TokenId, BigUint> {
 pub async fn calculate_volume_for_block(
     storage: &mut StorageProcessor<'_>,
     block: &IncompleteBlock,
+    token_db_cache: &mut TokenDBCache,
 ) -> Result<(), anyhow::Error> {
     let start = Instant::now();
-    let tokens = storage.tokens_schema().load_tokens().await?;
     let volumes = get_volumes(block);
     for (token_id, amount) in volumes.into_iter() {
         if let Some(price) = storage
@@ -97,7 +98,7 @@ pub async fn calculate_volume_for_block(
             .get_historical_ticker_price(token_id)
             .await?
         {
-            let token = tokens.get(&token_id).unwrap();
+            let token = token_db_cache.get_token(storage, token_id).await?.unwrap();
             let labels = vec![("token", format!("{}", token.symbol))];
             let usd_amount = Ratio::from(amount)
                 / BigUint::from(10u32).pow(u32::from(token.decimals))

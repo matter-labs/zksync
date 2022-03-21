@@ -7,19 +7,19 @@ use zksync_storage::StorageProcessor;
 use zksync_types::tokens::TokenMarketVolume;
 use zksync_types::{Token, TokenId, TokenLike, NFT};
 
-// Make no more than (Number of tokens) queries per 5 minutes to database is a good result
-// for updating names for tokens.
-const TOKEN_INVALIDATE_CACHE: Duration = Duration::from_secs(5 * 60);
-
 #[derive(Debug, Clone, Default)]
 pub struct TokenDBCache {
     cache: Arc<RwLock<HashMap<TokenLike, (Token, Instant)>>>,
     nft_tokens: Arc<RwLock<HashMap<TokenId, NFT>>>,
+    token_invalidate_cache: Duration,
 }
 
 impl TokenDBCache {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(token_invalidate_cache: Duration) -> Self {
+        Self {
+            token_invalidate_cache,
+            ..Default::default()
+        }
     }
 
     /// Version of `get_token` that only attempts to find the token in the cache.
@@ -37,7 +37,7 @@ impl TokenDBCache {
         // Just return token from cache.
         if let Some((token, update_time)) = self.cache.read().await.get(&token_query.to_lowercase())
         {
-            if update_time.elapsed() < TOKEN_INVALIDATE_CACHE {
+            if update_time.elapsed() < self.token_invalidate_cache {
                 return Some(token.clone());
             }
         }
@@ -54,7 +54,7 @@ impl TokenDBCache {
         // Just return token from cache.
         if let Some((token, update_time)) = self.cache.read().await.get(&token_query.to_lowercase())
         {
-            if update_time.elapsed() < TOKEN_INVALIDATE_CACHE {
+            if update_time.elapsed() < self.token_invalidate_cache {
                 return Ok(Some(token.clone()));
             }
         }
@@ -108,6 +108,19 @@ impl TokenDBCache {
             return Ok(Some(token));
         }
         Ok(None)
+    }
+
+    pub async fn fill_token_cache(&mut self, storage: &mut StorageProcessor<'_>) {
+        let tokens = Self::get_all_tokens(storage).await.unwrap();
+        let mut cache = self.cache.write().await;
+        for token in tokens {
+            let symbol = TokenLike::Symbol(token.symbol.clone());
+            let token_id = TokenLike::Id(token.id);
+            let address = TokenLike::Address(token.address);
+            cache.insert(symbol.to_lowercase(), (token.clone(), Instant::now()));
+            cache.insert(token_id.to_lowercase(), (token.clone(), Instant::now()));
+            cache.insert(address.to_lowercase(), (token.clone(), Instant::now()));
+        }
     }
 
     pub async fn get_all_tokens(

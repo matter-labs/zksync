@@ -5689,6 +5689,7 @@ dependencies = [
  "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_test_account",
+ "zksync_token_db_cache",
  "zksync_types",
  "zksync_utils",
 ]
@@ -5820,6 +5821,7 @@ dependencies = [
  "zksync_prometheus_exporter",
  "zksync_state",
  "zksync_storage",
+ "zksync_token_db_cache",
  "zksync_types",
  "zksync_utils",
 ]
@@ -6034,6 +6036,7 @@ dependencies = [
  "tracing",
  "vlog",
  "zksync_storage",
+ "zksync_token_db_cache",
  "zksync_types",
 ]
 
@@ -6204,6 +6207,18 @@ dependencies = [
  "zksync_test_account",
  "zksync_types",
  "zksync_utils",
+]
+
+[[package]]
+name = "zksync_token_db_cache"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "futures 0.3.17",
+ "metrics",
+ "tokio",
+ "zksync_storage",
+ "zksync_types",
 ]
 
 [[package]]

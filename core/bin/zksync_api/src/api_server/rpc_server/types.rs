@@ -11,11 +11,9 @@ use zksync_api_types::v02::{
 };
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::StorageProcessor;
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{Account, AccountId, Address, Nonce, PubKeyHash, TokenId};
 use zksync_utils::BigUintSerdeWrapper;
-
-// Local uses
-use crate::utils::token_db_cache::TokenDBCache;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]

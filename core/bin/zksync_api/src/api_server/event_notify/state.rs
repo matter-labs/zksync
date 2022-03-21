@@ -1,10 +1,10 @@
 use crate::api_server::rpc_server::types::{BlockInfo, ResponseAccountState};
-use crate::utils::token_db_cache::TokenDBCache;
 use lru_cache::LruCache;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
 use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
 use zksync_storage::ConnectionPool;
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
@@ -26,7 +26,7 @@ impl NotifierState {
             cache_of_executed_priority_operations: LruCache::new(cache_capacity),
             cache_of_transaction_receipts: LruCache::new(cache_capacity),
             cache_of_blocks_info: LruCache::new(cache_capacity),
-            tokens_cache: TokenDBCache::new(),
+            tokens_cache: TokenDBCache::new(Duration::from_secs(5 * 60)),
             db_pool,
         }
     }

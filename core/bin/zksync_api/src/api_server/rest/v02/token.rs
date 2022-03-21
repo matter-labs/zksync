@@ -20,6 +20,7 @@ use zksync_api_types::v02::{
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{tx::TxHash, AccountId, Token, TokenId, TokenLike};
 
 // Local uses
@@ -31,7 +32,6 @@ use super::{
 use crate::{
     api_try,
     fee_ticker::{FeeTicker, PriceError, TokenPriceRequestType},
-    utils::token_db_cache::TokenDBCache,
 };
 
 /// Shared data between `api/v0.2/tokens` endpoints.
@@ -319,6 +319,7 @@ mod tests {
         test_utils::{deserialize_response_result, dummy_fee_ticker, TestServerConfig},
         SharedData,
     };
+    use std::time::Duration;
     use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
     use zksync_types::{Address, BlockNumber, ZkSyncTx};
 
@@ -365,7 +366,7 @@ mod tests {
                 api_scope(
                     &cfg.config,
                     cfg.pool.clone(),
-                    TokenDBCache::new(),
+                    TokenDBCache::new(Duration::from_secs(100)),
                     fee_ticker.clone(),
                 )
             },
