@@ -27,7 +27,7 @@ pub struct LogsHelper {
 }
 
 impl LogsHelper {
-    pub fn new() -> Self {
+    pub fn new(invalidate_token_cache_period: Duration) -> Self {
         let mut path = PathBuf::new();
         path.push(std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_string()));
         path.push("etc/web3-abi");
@@ -94,7 +94,7 @@ impl LogsHelper {
 
         Self {
             topic_by_event,
-            tokens: TokenDBCache::new(Duration::from_secs(5 * 60)),
+            tokens: TokenDBCache::new(invalidate_token_cache_period),
             zksync_proxy_address: H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap(),
             nft_factory_address: H160::from_str(NFT_FACTORY_ADDRESS).unwrap(),
         }

@@ -16,17 +16,20 @@ pub struct NotifierState {
     pub(super) cache_of_transaction_receipts: LruCache<Vec<u8>, TxReceiptResponse>,
     pub(super) cache_of_blocks_info: LruCache<BlockNumber, BlockInfo>,
     pub(super) tokens_cache: TokenDBCache,
-
     pub(super) db_pool: ConnectionPool,
 }
 
 impl NotifierState {
-    pub fn new(cache_capacity: usize, db_pool: ConnectionPool) -> Self {
+    pub fn new(
+        cache_capacity: usize,
+        db_pool: ConnectionPool,
+        token_cache_invalidate_period: Duration,
+    ) -> Self {
         Self {
             cache_of_executed_priority_operations: LruCache::new(cache_capacity),
             cache_of_transaction_receipts: LruCache::new(cache_capacity),
             cache_of_blocks_info: LruCache::new(cache_capacity),
-            tokens_cache: TokenDBCache::new(Duration::from_secs(5 * 60)),
+            tokens_cache: TokenDBCache::new(token_cache_invalidate_period),
             db_pool,
         }
     }

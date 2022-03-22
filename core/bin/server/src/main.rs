@@ -162,6 +162,7 @@ async fn run_server(components: &ComponentsToRun) {
         tasks.push(zksync_api::api_server::web3::start_rpc_server(
             connection_pool.clone(),
             &Web3Config::from_env(),
+            &CommonApiConfig::from_env(),
         ));
     }
 

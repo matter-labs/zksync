@@ -60,7 +60,7 @@ impl CallsHelper {
             .collect()
     }
 
-    pub fn new() -> Self {
+    pub fn new(invalidate_token_cache_period: Duration) -> Self {
         let mut path = PathBuf::new();
         path.push(std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_string()));
         path.push("etc/web3-abi");
@@ -87,7 +87,7 @@ impl CallsHelper {
         Self {
             erc20: erc20_function_by_selector,
             nft_factory: nft_factory_function_by_selector,
-            tokens: TokenDBCache::new(Duration::from_secs(5 * 60)),
+            tokens: TokenDBCache::new(invalidate_token_cache_period),
             zksync_proxy_address: H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap(),
             nft_factory_address: H160::from_str(NFT_FACTORY_ADDRESS).unwrap(),
         }

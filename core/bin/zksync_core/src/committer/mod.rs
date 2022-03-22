@@ -19,6 +19,10 @@ use zksync_types::{
 
 mod aggregated_committer;
 
+// In this component, the most interesting part of the database is decimals,
+// Usually we don't change them, so we can invalidate the cache once an hour.
+const TOKEN_INVALIDATE_CACHE: Duration = Duration::from_secs(60 * 60);
+
 #[derive(Debug)]
 pub enum CommitRequest {
     PendingBlock((PendingBlock, AppliedUpdatesRequest)),
@@ -59,7 +63,7 @@ async fn handle_new_commit_task(
     pool: ConnectionPool,
 ) {
     vlog::info!("Run committer");
-    let mut token_db_cache = TokenDBCache::new(Duration::from_secs(60 * 60));
+    let mut token_db_cache = TokenDBCache::new(TOKEN_INVALIDATE_CACHE);
     token_db_cache
         .fill_token_cache(&mut pool.access_storage().await.unwrap())
         .await;
@@ -228,11 +232,11 @@ async fn seal_incomplete_block(
     // We do this outside of a transaction,
     // because we want the incomplete block data to be available as soon as possible.
     // If something happened to the metric count, it won't affect the block data
-    if let Err(_) =
+    if let Err(err) =
         zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block, token_db_cache)
             .await
     {
-        vlog::error!("Can't calculate volume metric")
+        vlog::error!("Can't calculate volume metric: {:?}", err)
     }
     metrics::histogram!("committer.seal_incomplete_block", start.elapsed());
 }

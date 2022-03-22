@@ -99,7 +99,7 @@ pub async fn calculate_volume_for_block(
             .await?
         {
             let token = token_db_cache.get_token(storage, token_id).await?.unwrap();
-            let labels = vec![("token", format!("{}", token.symbol))];
+            let labels = vec![("token", token.symbol)];
             let usd_amount = Ratio::from(amount)
                 / BigUint::from(10u32).pow(u32::from(token.decimals))
                 * price.usd_price;

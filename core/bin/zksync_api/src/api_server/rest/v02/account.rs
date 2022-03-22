@@ -489,7 +489,6 @@ mod tests {
     };
     use num::BigUint;
     use serde::Deserialize;
-    use std::time::Duration;
     use zksync_api_client::rest::client::Client;
     use zksync_api_types::v02::{
         account::{DepositingAccountBalances, DepositingFunds},
@@ -533,7 +532,7 @@ mod tests {
                 move |cfg: &TestServerConfig| {
                     api_scope(
                         cfg.pool.clone(),
-                        TokenDBCache::new(Duration::from_secs(100)),
+                        TokenDBCache::new(cfg.config.api.common.invalidate_token_cache_period()),
                         cfg.config.eth_watch.confirmations_for_eth_event,
                     )
                 },

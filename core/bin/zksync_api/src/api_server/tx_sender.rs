@@ -175,7 +175,7 @@ impl TxSender {
             pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
             ticker,
-            tokens: TokenDBCache::new(std::time::Duration::from_secs(5 * 60)),
+            tokens: TokenDBCache::new(config.invalidate_token_cache_period()),
             forced_exit_checker: ForcedExitChecker::new(
                 config.forced_exit_minimum_account_age_secs,
             ),
