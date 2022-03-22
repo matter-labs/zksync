@@ -196,6 +196,7 @@ jobs:
       MAIN_TOKEN: "BAT"
       ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
       ETH_NETWORK: "rinkeby"
+      ALLOWED_PERCENT: 10
       RUST_LOG: info
     steps:
       - uses: actions/checkout@v2
