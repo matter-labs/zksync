@@ -610,6 +610,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Only verifies block commitments without any other processing
     function proveBlocks(StoredBlockInfo[] memory _committedBlocks, ProofInput memory _proof) external nonReentrant {
         requireActive();
+        require(_committedBlocks.length == _proof.commitments.length, "r"); // unequal length of blocks and proof.commitments
 
         uint32 currentTotalBlocksProven = totalBlocksProven;
         for (uint256 i = 0; i < _committedBlocks.length; ++i) {
@@ -642,7 +643,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
-    function activateExodusMode() external returns (bool) {
+    function activateExodusMode() external nonReentrant returns (bool) {
         if (exodusMode) {
             return false;
         }
