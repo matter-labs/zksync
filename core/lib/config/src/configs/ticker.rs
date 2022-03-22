@@ -40,8 +40,6 @@ pub struct TickerConfig {
     pub number_of_ticker_actors: u8,
     /// Subsidized price for ChangePubKey in cents scaled by SUBSIDY_USD_AMOUNTS_SCALE
     pub subsidy_cpk_price_usd_scaled: u64,
-    /// Use cache for ticker config
-    pub with_cache: bool,
 }
 
 impl TickerConfig {
@@ -82,7 +80,6 @@ mod tests {
             token_market_update_time: 120,
             number_of_ticker_actors: 4,
             subsidy_cpk_price_usd_scaled: 100,
-            with_cache: true,
         }
     }
 
@@ -102,7 +99,6 @@ FEE_TICKER_NUMBER_OF_TICKER_ACTORS="4"
 FEE_TICKER_SUBSIDIZED_TOKENS_LIMITS=156
 FEE_TICKER_SCALE_FEE_PERCENT=100
 FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED=100
-FEE_TICKER_WITH_CACHE="true"
         "#;
         set_env(config);
 
