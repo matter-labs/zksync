@@ -53,6 +53,7 @@ pub fn run_mempool_tx_handler(
     tokio::spawn(handler.run())
 }
 
+#[must_use]
 pub fn run_mempool_block_handler(
     db_pool: ConnectionPool,
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,

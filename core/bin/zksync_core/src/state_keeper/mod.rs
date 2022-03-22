@@ -300,7 +300,8 @@ impl ZkSyncStateKeeper {
 
         // These txs will be excluded from query result as already executed.
         // By giving these hashes to the mempool,
-        // we won't receive back transactions that we already executed in the current block,
+        // we won't receive back transactions that we already executed in the current block.
+
         let executed_txs = self
             .pending_block
             .failed_txs

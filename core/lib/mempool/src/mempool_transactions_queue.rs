@@ -79,7 +79,7 @@ impl MempoolTransactionsQueue {
         }
     }
 
-    pub(crate) fn add_l2_transaction(&mut self, tx: SignedTxVariant) {
+    fn add_l2_transaction(&mut self, tx: SignedTxVariant) {
         self.pending_l2_transactions
             .push(MempoolPendingTransaction {
                 valid_from: tx
@@ -201,12 +201,14 @@ impl MempoolTransactionsQueue {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use vlog::sentry::types::Utc;
+    use chrono::Utc;
+
     use zksync_types::tx::{TimeRange, Transfer, Withdraw};
     use zksync_types::{
         AccountId, Address, Deposit, Nonce, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
     };
+
+    use super::*;
 
     fn get_transfer_with_timestamps(valid_from: u64, valid_until: u64) -> SignedTxVariant {
         let transfer = Transfer::new(

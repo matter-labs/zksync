@@ -20,12 +20,12 @@ impl MempoolState {
         &self,
         tx: &ZkSyncTx,
         storage: &mut StorageProcessor<'_>,
-        existed_accounts: &mut HashSet<Address>,
+        existing_accounts: &mut HashSet<Address>,
     ) -> Result<usize, TxAddError> {
         let start = Instant::now();
         let res = match tx {
             ZkSyncTx::Transfer(tx) => {
-                let exist = if existed_accounts.contains(&tx.to) {
+                let exist = if existing_accounts.contains(&tx.to) {
                     true
                 } else {
                     storage
@@ -36,7 +36,7 @@ impl MempoolState {
                         .map_err(|_| TxAddError::DbError)?
                 };
                 if exist {
-                    existed_accounts.insert(tx.to);
+                    existing_accounts.insert(tx.to);
                     TransferOp::CHUNKS
                 } else {
                     TransferToNewOp::CHUNKS
@@ -81,10 +81,10 @@ impl MempoolState {
             .access_storage()
             .await
             .map_err(|_| TxAddError::DbError)?;
-        let mut existed_accounts = HashSet::new();
+        let mut existing_accounts = HashSet::new();
         for tx in &batch.txs {
             size += self
-                .chunks_for_tx_with_cache(&tx.tx, &mut storage, &mut existed_accounts)
+                .chunks_for_tx_with_cache(&tx.tx, &mut storage, &mut existing_accounts)
                 .await?;
         }
         metrics::histogram!("mempool_state.chunks_for_batch", start.elapsed());
