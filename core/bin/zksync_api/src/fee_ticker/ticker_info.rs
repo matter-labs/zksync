@@ -5,16 +5,13 @@
 #[cfg(test)]
 use std::any::Any;
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 // External deps
 use anyhow::format_err;
 use async_trait::async_trait;
 use chrono::Utc;
 use num::rational::Ratio;
 use num::BigUint;
-use tokio::sync::RwLock;
 // Workspace deps
 use zksync_storage::ConnectionPool;
 use zksync_types::aggregated_operations::AggregatedActionType;
@@ -22,26 +19,6 @@ use zksync_types::{Address, Token, TokenId, TokenLike, TokenPrice};
 // Local deps
 use crate::fee_ticker::PriceError;
 use crate::utils::token_db_cache::TokenDBCache;
-
-const API_PRICE_EXPIRATION_TIME_SECS: Duration = Duration::from_secs(30 * 60);
-
-#[derive(Debug, Clone)]
-struct TokenCacheEntry {
-    price: TokenPrice,
-}
-
-impl TokenCacheEntry {
-    fn new(price: TokenPrice) -> Self {
-        Self { price }
-    }
-
-    fn is_cache_entry_expired(&self) -> bool {
-        Utc::now()
-            .signed_duration_since(self.price.last_updated)
-            .num_seconds()
-            > API_PRICE_EXPIRATION_TIME_SECS.as_secs() as i64
-    }
-}
 
 pub trait FeeTickerClone {
     fn clone_box(&self) -> Box<dyn FeeTickerInfo>;
@@ -92,19 +69,13 @@ pub trait FeeTickerInfo: FeeTickerClone + Send + Sync + 'static {
 pub struct TickerInfo {
     db: ConnectionPool,
     token_db_cache: TokenDBCache,
-    price_cache: Arc<RwLock<HashMap<TokenId, TokenCacheEntry>>>,
-    gas_price_cache: Arc<RwLock<Option<(BigUint, Instant)>>>,
-    with_cache: bool,
 }
 
 impl TickerInfo {
-    pub fn new(db: ConnectionPool, with_cache: bool) -> Self {
+    pub fn new(db: ConnectionPool) -> Self {
         Self {
             db,
             token_db_cache: Default::default(),
-            price_cache: Default::default(),
-            gas_price_cache: Default::default(),
-            with_cache,
         }
     }
 }
@@ -230,24 +201,12 @@ impl FeeTickerInfo for TickerInfo {
             });
         }
 
-        if self.with_cache {
-            if let Some(cached_value) = self.get_stored_value(token.id).await {
-                metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "cached");
-                return Ok(cached_value);
-            }
-        }
-
         let historical_price = self
-            .get_historical_ticker_price(token.id)
+            .get_ticker_price(token.id)
             .await
             .map_err(|e| vlog::warn!("Failed to get historical ticker price: {}", e));
 
         if let Ok(Some(historical_price)) = historical_price {
-            if self.with_cache {
-                self.update_cached_value(token.id, historical_price.clone())
-                    .await;
-            }
-            metrics::histogram!("ticker_info.get_last_token_price", start.elapsed(), "type" => "historical");
             return Ok(historical_price);
         }
 
@@ -258,16 +217,6 @@ impl FeeTickerInfo for TickerInfo {
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
         let start = Instant::now();
-        if self.with_cache {
-            let cached_value = self.gas_price_cache.read().await;
-
-            if let Some((cached_gas_price, cache_time)) = cached_value.as_ref() {
-                if cache_time.elapsed() < API_PRICE_EXPIRATION_TIME_SECS {
-                    return Ok(cached_gas_price.clone());
-                }
-            }
-            drop(cached_value);
-        }
 
         let mut storage = self
             .db
@@ -281,10 +230,6 @@ impl FeeTickerInfo for TickerInfo {
             .unwrap_or_default()
             .as_u64();
         let average_gas_price = BigUint::from(average_gas_price);
-
-        if self.with_cache {
-            *self.gas_price_cache.write().await = Some((average_gas_price.clone(), Instant::now()));
-        }
 
         metrics::histogram!("ticker_info.get_gas_price_wei", start.elapsed());
         Ok(average_gas_price)
@@ -320,25 +265,7 @@ impl FeeTickerInfo for TickerInfo {
 }
 
 impl TickerInfo {
-    async fn update_cached_value(&self, token_id: TokenId, price: TokenPrice) {
-        self.price_cache
-            .write()
-            .await
-            .insert(token_id, TokenCacheEntry::new(price.clone()));
-    }
-
-    async fn get_stored_value(&self, token_id: TokenId) -> Option<TokenPrice> {
-        let price_cache = self.price_cache.read().await;
-
-        if let Some(cached_entry) = price_cache.get(&token_id) {
-            if !cached_entry.is_cache_entry_expired() {
-                return Some(cached_entry.price.clone());
-            }
-        }
-        None
-    }
-
-    async fn get_historical_ticker_price(
+    async fn get_ticker_price(
         &self,
         token_id: TokenId,
     ) -> Result<Option<TokenPrice>, anyhow::Error> {

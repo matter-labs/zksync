@@ -202,10 +202,7 @@ async fn run_server(components: &ComponentsToRun) {
         let common_config = CommonApiConfig::from_env();
         let chain_config = ChainConfig::from_env();
         let fee_ticker_config = TickerConfig::from_env();
-        let ticker_info = Box::new(TickerInfo::new(
-            connection_pool.clone(),
-            fee_ticker_config.with_cache,
-        ));
+        let ticker_info = Box::new(TickerInfo::new(connection_pool.clone()));
 
         let ticker = FeeTicker::new_with_default_validator(
             ticker_info,
