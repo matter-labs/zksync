@@ -299,32 +299,6 @@ mod tests {
         ]);
         transactions_queue.add_l1_transactions(vec![
             PriorityOp {
-                serial_id: 1,
-                data: ZkSyncPriorityOp::Deposit(Deposit {
-                    from: Default::default(),
-                    token: Default::default(),
-                    amount: Default::default(),
-                    to: Default::default(),
-                }),
-                deadline_block: 0,
-                eth_hash: Default::default(),
-                eth_block: 0,
-                eth_block_index: None,
-            },
-            PriorityOp {
-                serial_id: 2,
-                data: ZkSyncPriorityOp::Deposit(Deposit {
-                    from: Default::default(),
-                    token: Default::default(),
-                    amount: Default::default(),
-                    to: Default::default(),
-                }),
-                deadline_block: 0,
-                eth_hash: Default::default(),
-                eth_block: 0,
-                eth_block_index: None,
-            },
-            PriorityOp {
                 serial_id: 4,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),

@@ -9,7 +9,7 @@ export type Interface = {
 };
 
 export type CoreStatus = {
-    main_database_status: boolean;
-    replica_database_status: boolean;
-    eth_status: boolean;
+    main_database_available: boolean;
+    replica_database_available: boolean;
+    web3_available: boolean;
 };
