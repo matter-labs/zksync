@@ -13,51 +13,24 @@ use zksync_types::{
     aggregated_operations::AggregatedOperation,
     block::{ExecutedPriorityOp, ExecutedTx},
     tx::TxHash,
-    Action, ActionType, BlockNumber, Operation, PriorityOp, SignedZkSyncTx, ZkSyncOp, ZkSyncTx,
-    H256,
+    BlockNumber, PriorityOp, SignedZkSyncTx, ZkSyncOp, ZkSyncTx, H256,
 };
 // Local imports
 use crate::chain::operations::records::StoredAggregatedOperation;
 use crate::utils::affected_accounts;
 use crate::{
     chain::{
-        block::{records::TransactionItem, BlockSchema},
+        block::records::TransactionItem,
         operations::records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
-            StoredExecutedTransaction, StoredOperation,
+            StoredExecutedTransaction,
         },
     },
-    prover::ProverSchema,
-    QueryResult, StorageActionType, StorageProcessor,
+    QueryResult, StorageProcessor,
 };
 
-impl StoredOperation {
-    pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
-        let block_number = BlockNumber(self.block_number as u32);
-        let id = Some(self.id);
-
-        let action = if self.action_type == StorageActionType::from(ActionType::COMMIT) {
-            Action::Commit
-        } else if self.action_type == StorageActionType::from(ActionType::VERIFY) {
-            let proof = Box::new(ProverSchema(conn).load_proof(block_number).await?);
-            Action::Verify {
-                proof: proof.expect("No proof for verify action").into(),
-            }
-        } else {
-            unreachable!("Incorrect action type in db");
-        };
-
-        let block = BlockSchema(conn)
-            .get_block(block_number)
-            .await?
-            .expect("Block for action does not exist");
-
-        Ok(Operation { id, action, block })
-    }
-}
-
 impl StoredExecutedTransaction {
-    pub fn into_executed_tx(self) -> ExecutedTx {
+    pub(crate) fn into_executed_tx(self) -> ExecutedTx {
         let tx: ZkSyncTx = serde_json::from_value(self.tx).expect("Unparsable ZkSyncTx in db");
         let franklin_op: Option<ZkSyncOp> =
             serde_json::from_value(self.operation).expect("Unparsable ZkSyncOp in db");
@@ -105,7 +78,7 @@ impl StoredExecutedPriorityOperation {
 }
 
 impl NewExecutedPriorityOperation {
-    pub fn prepare_stored_priority_op(
+    pub(crate) fn prepare_stored_priority_op(
         exec_prior_op: ExecutedPriorityOp,
         block: BlockNumber,
     ) -> Self {
@@ -156,7 +129,7 @@ impl NewExecutedPriorityOperation {
 }
 
 impl NewExecutedTransaction {
-    pub async fn prepare_stored_tx(
+    pub(crate) async fn prepare_stored_tx(
         exec_tx: ExecutedTx,
         block: BlockNumber,
         storage: &mut StorageProcessor<'_>,
@@ -244,7 +217,7 @@ impl NewExecutedTransaction {
 }
 
 impl StoredAggregatedOperation {
-    pub fn into_aggregated_op(self) -> (i64, AggregatedOperation) {
+    pub(crate) fn into_aggregated_op(self) -> (i64, AggregatedOperation) {
         (
             self.id,
             serde_json::from_value(self.arguments)
@@ -254,7 +227,10 @@ impl StoredAggregatedOperation {
 }
 
 impl TransactionItem {
-    pub fn transaction_from_item(item: TransactionItem, is_block_finalized: bool) -> Transaction {
+    pub(crate) fn transaction_from_item(
+        item: TransactionItem,
+        is_block_finalized: bool,
+    ) -> Transaction {
         let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
         let block_number = Some(BlockNumber(item.block_number as u32));
         let status = if item.success {
@@ -276,8 +252,10 @@ impl TransactionItem {
         } else {
             TransactionData::L2(serde_json::from_value(item.op).unwrap())
         };
+
         Transaction {
             tx_hash,
+            block_index: item.block_index.map(|i| i as u32),
             block_number,
             op,
             status,

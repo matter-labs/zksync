@@ -1,10 +1,10 @@
+use zksync_mempool::ProposedBlock;
 use zksync_types::gas_counter::{GasCounter, VerifyCost, TX_GAS_LIMIT};
 use zksync_types::{
     mempool::SignedTxVariant, mempool::SignedTxsBatch, AccountId, ExecutedOperations, TokenId,
 };
 
 use super::utils::*;
-use crate::mempool::ProposedBlock;
 
 /// Checks if processing withdrawal fails because the gas limit is reached.
 /// This sends 46 withdrawals (very inefficient, but all constants in GasCounter are hardcoded, so we can't do much here).

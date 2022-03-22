@@ -18,7 +18,7 @@ fn test_create_incorrect_state_keeper() {
     const FAST_ITERATIONS: usize = 100;
 
     let (events_sender, _events_receiver) = mpsc::channel(CHANNEL_SIZE);
-    let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
+    let (request_tx, _request_rx) = mpsc::channel(CHANNEL_SIZE);
     let (response_tx, _response_rx) = mpsc::channel(CHANNEL_SIZE);
 
     let fee_collector = Account::default_with_address(&H160::random());
@@ -30,7 +30,7 @@ fn test_create_incorrect_state_keeper() {
     ZkSyncStateKeeper::new(
         init_params,
         fee_collector.address,
-        request_rx,
+        request_tx,
         response_tx,
         vec![1, 2, 2], // `available_block_chunk_sizes` must be strictly increasing.
         MAX_ITERATIONS,

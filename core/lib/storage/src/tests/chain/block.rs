@@ -109,6 +109,15 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?;
     assert_eq!((block, &state), (BlockNumber(3), &accounts_block_3));
 
+    for (account_id, account) in state {
+        let nonce = storage
+            .chain()
+            .account_schema()
+            .estimate_nonce(account_id)
+            .await?
+            .unwrap();
+        assert_eq!(account.nonce, nonce)
+    }
     // Add proofs for the first two blocks.
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
@@ -1066,7 +1075,7 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
     }
     // Insert 1 incomplete block.
     BlockSchema(&mut storage)
-        .save_incomplete_block(gen_sample_incomplete_block(
+        .save_incomplete_block(&gen_sample_incomplete_block(
             BlockNumber(6),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -1402,7 +1411,7 @@ async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> Query
         "Pending block should be saved"
     );
 
-    schema.save_incomplete_block(incomplete_block).await?;
+    schema.save_incomplete_block(&incomplete_block).await?;
 
     // Pending block should be removed now.
     assert!(

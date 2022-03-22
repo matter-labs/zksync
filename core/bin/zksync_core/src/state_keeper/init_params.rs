@@ -56,8 +56,9 @@ impl ZkSyncStateInitParams {
             Self::unprocessed_priority_op_id(storage, last_block_number).await;
         let nfts = Self::load_nft_tokens(storage, last_block_number).await;
 
-        let pending_block = Self::load_pending_block(storage, last_block_number).await;
         let root_hash_jobs = Self::load_root_hash_jobs(storage).await;
+        let pending_block =
+            Self::load_pending_block(storage, last_block_number, root_hash_jobs.len()).await;
         let fee_account_id = acc_id_by_addr
             .get(&fee_account_addr)
             .cloned()
@@ -113,6 +114,7 @@ impl ZkSyncStateInitParams {
     async fn load_pending_block(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         last_block_number: BlockNumber,
+        incomplete_blocks_num: usize,
     ) -> Option<SendablePendingBlock> {
         let pending_block = storage
             .chain()
@@ -132,7 +134,10 @@ impl ZkSyncStateInitParams {
 
         // We've checked that pending block is greater than the last committed block,
         // but it must be greater exactly by 1.
-        assert_eq!(*pending_block.number, *last_block_number + 1);
+        assert_eq!(
+            *pending_block.number,
+            *last_block_number + incomplete_blocks_num as u32 + 1
+        );
 
         Some(pending_block)
     }
@@ -184,10 +189,7 @@ impl ZkSyncStateInitParams {
             .await
             .expect("Unable to load committed NFT tokens")
             .into_iter()
-            .map(|nft| {
-                let token: NFT = nft.into();
-                (token.id, token)
-            })
+            .map(|nft| (nft.id, nft))
             .collect()
     }
 

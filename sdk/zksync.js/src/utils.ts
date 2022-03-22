@@ -502,11 +502,12 @@ export async function verifyERC1271Signature(
     address: string,
     message: Uint8Array,
     signature: string,
-    signerOrProvider: ethers.Signer | ethers.providers.Provider
+    signerOrProvider: ethers.Signer | ethers.providers.Provider,
+    messagePrefixed: boolean = true
 ): Promise<boolean> {
     const EIP1271_SUCCESS_VALUE = '0x1626ba7e';
 
-    const signMessage = getSignedBytesFromMessage(message, true);
+    const signMessage = getSignedBytesFromMessage(message, messagePrefixed);
     const signMessageHash = utils.keccak256(signMessage);
 
     const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, signerOrProvider);
@@ -516,12 +517,14 @@ export async function verifyERC1271Signature(
 
 export async function getEthSignatureType(
     _provider: ethers.providers.Provider,
-    message: string,
+    message: utils.BytesLike | string,
     signature: string,
     address: string
 ): Promise<EthSignerType> {
-    const messageNoPrefix = getSignedBytesFromMessage(message, false);
-    const messageWithPrefix = getSignedBytesFromMessage(message, true);
+    const messageBytes = typeof message === 'string' ? utils.toUtf8Bytes(message) : utils.arrayify(message);
+
+    const messageNoPrefix = getSignedBytesFromMessage(messageBytes, false);
+    const messageWithPrefix = getSignedBytesFromMessage(messageBytes, true);
 
     const prefixedECDSASigner = utils.recoverAddress(utils.keccak256(messageWithPrefix), signature);
     if (prefixedECDSASigner.toLowerCase() === address.toLowerCase()) {

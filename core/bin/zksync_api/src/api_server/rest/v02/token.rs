@@ -2,6 +2,7 @@
 
 // Built-in uses
 use std::str::FromStr;
+use std::time::Instant;
 
 // External uses
 use actix_web::{
@@ -19,6 +20,7 @@ use zksync_api_types::v02::{
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{tx::TxHash, AccountId, Token, TokenId, TokenLike};
 
 // Local uses
@@ -30,7 +32,6 @@ use super::{
 use crate::{
     api_try,
     fee_ticker::{FeeTicker, PriceError, TokenPriceRequestType},
-    utils::token_db_cache::TokenDBCache,
 };
 
 /// Shared data between `api/v0.2/tokens` endpoints.
@@ -112,6 +113,17 @@ impl ApiTokenData {
     }
 
     async fn token(&self, token_like: TokenLike) -> Result<Token, Error> {
+        // Try to find the token in the cache first.
+        if let Some(token) = self
+            .tokens
+            .try_get_token_from_cache(token_like.clone())
+            .await
+        {
+            return Ok(token);
+        }
+
+        // Establish db connection and repeat the query, so the token is loaded
+        // from the db.
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
 
         let token = self
@@ -182,16 +194,22 @@ async fn token_pagination(
     data: web::Data<ApiTokenData>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<ApiToken, TokenId>> {
+    let start = Instant::now();
     let query = api_try!(parse_query(query).map_err(Error::from));
-    data.token_page(query).await.into()
+    let res = data.token_page(query).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "token_pagination");
+    res
 }
 
 async fn token_info(
     data: web::Data<ApiTokenData>,
     token_like_string: web::Path<String>,
 ) -> ApiResult<ApiToken> {
+    let start = Instant::now();
     let token_like = TokenLike::parse(&token_like_string);
-    data.api_token(token_like).await.into()
+    let res = data.api_token(token_like).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "token_info");
+    res
 }
 
 // TODO: take `currency` as enum.
@@ -200,12 +218,14 @@ async fn token_price(
     data: web::Data<ApiTokenData>,
     path: web::Path<(String, String)>,
 ) -> ApiResult<TokenPrice> {
+    let start = Instant::now();
     let (token_like_string, currency) = path.into_inner();
     let first_token = TokenLike::parse(&token_like_string);
 
     let price = api_try!(data.token_price_in(first_token.clone(), &currency).await);
     let token = api_try!(data.token(first_token).await);
 
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_token_price");
     ApiResult::Ok(TokenPrice {
         token_id: token.id,
         token_symbol: token.symbol,
@@ -219,6 +239,7 @@ async fn get_nft(
     data: web::Data<ApiTokenData>,
     id: web::Path<TokenId>,
 ) -> ApiResult<Option<ApiNFT>> {
+    let start = Instant::now();
     if id.0 < MIN_NFT_TOKEN_ID {
         return Error::from(InvalidDataError::InvalidNFTTokenId).into();
     }
@@ -228,6 +249,7 @@ async fn get_nft(
         .get_nft_with_factories(*id)
         .await
         .map_err(Error::storage));
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_nft");
     ApiResult::Ok(nft)
 }
 
@@ -235,6 +257,7 @@ async fn get_nft_owner(
     data: web::Data<ApiTokenData>,
     id: web::Path<TokenId>,
 ) -> ApiResult<Option<AccountId>> {
+    let start = Instant::now();
     if id.0 < MIN_NFT_TOKEN_ID {
         return Error::from(InvalidDataError::InvalidNFTTokenId).into();
     }
@@ -245,6 +268,7 @@ async fn get_nft_owner(
         .get_nft_owner(*id)
         .await
         .map_err(Error::storage));
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_nft_owner");
     ApiResult::Ok(owner_id)
 }
 
@@ -252,6 +276,7 @@ async fn get_nft_id_by_tx_hash(
     data: web::Data<ApiTokenData>,
     tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TokenId>> {
+    let start = Instant::now();
     let mut storage = api_try!(data.pool.access_storage().await.map_err(Error::storage));
     let nft_id = api_try!(storage
         .chain()
@@ -259,6 +284,7 @@ async fn get_nft_id_by_tx_hash(
         .get_nft_id_by_tx_hash(*tx_hash)
         .await
         .map_err(Error::storage));
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_nft_id_by_tx_hash");
     ApiResult::Ok(nft_id)
 }
 
@@ -339,7 +365,7 @@ mod tests {
                 api_scope(
                     &cfg.config,
                     cfg.pool.clone(),
-                    TokenDBCache::new(),
+                    TokenDBCache::new(cfg.config.api.common.invalidate_token_cache_period()),
                     fee_ticker.clone(),
                 )
             },

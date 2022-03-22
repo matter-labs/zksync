@@ -52,10 +52,10 @@ impl TickerConfig {
     }
 
     /// Returns the token price source type and the corresponding API URL.
-    pub fn price_source(&self) -> (TokenPriceSource, &str) {
+    pub fn price_source(&self) -> (TokenPriceSource, String) {
         let url = match self.token_price_source {
-            TokenPriceSource::CoinGecko => self.coingecko_base_url.as_ref(),
-            TokenPriceSource::CoinMarketCap => self.coinmarketcap_base_url.as_ref(),
+            TokenPriceSource::CoinGecko => self.coingecko_base_url.clone(),
+            TokenPriceSource::CoinMarketCap => self.coinmarketcap_base_url.clone(),
         };
         (self.token_price_source, url)
     }
@@ -120,13 +120,13 @@ FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED=100
         config.token_price_source = TokenPriceSource::CoinGecko;
         assert_eq!(
             config.price_source(),
-            (TokenPriceSource::CoinGecko, COINGECKO_URL)
+            (TokenPriceSource::CoinGecko, COINGECKO_URL.into())
         );
 
         config.token_price_source = TokenPriceSource::CoinMarketCap;
         assert_eq!(
             config.price_source(),
-            (TokenPriceSource::CoinMarketCap, COINMARKETCAP_URL)
+            (TokenPriceSource::CoinMarketCap, COINMARKETCAP_URL.into())
         );
     }
 }

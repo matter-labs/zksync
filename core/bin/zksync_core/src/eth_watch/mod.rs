@@ -24,11 +24,11 @@ use web3::types::BlockNumber;
 use zksync_config::{ContractsConfig, ETHWatchConfig};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
+use zksync_mempool::MempoolTransactionRequest;
 use zksync_types::{NewTokenEvent, PriorityOp, RegisterNFTFactoryEvent, SerialId};
 
 // Local deps
 use self::{client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops};
-use crate::mempool::MempoolTransactionRequest;
 
 mod client;
 mod eth_state;

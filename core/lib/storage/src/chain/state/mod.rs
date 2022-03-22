@@ -54,9 +54,10 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         // Simply go through the every account update, and update the corresponding table.
         // This may look scary, but every match arm is very simple by its nature.
-
         let update_order_ids =
             first_update_order_id..first_update_order_id + accounts_updated.len();
+
+        let mut nonce_updates = HashMap::with_capacity(accounts_updated.len());
 
         for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
             vlog::debug!(
@@ -82,6 +83,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                    nonce_updates.insert(account_id, nonce);
                 }
                 AccountUpdate::Delete { ref address, nonce } => {
                     let account_id = i64::from(**id);
@@ -99,6 +101,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                    nonce_updates.insert(account_id, nonce);
                 }
                 AccountUpdate::UpdateBalance {
                     balance_update: (token, ref old_balance, ref new_balance),
@@ -130,6 +133,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                    nonce_updates.insert(account_id, new_nonce);
                 }
                 AccountUpdate::ChangePubKeyHash {
                     ref old_pub_key_hash,
@@ -153,6 +157,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                    nonce_updates.insert(account_id, new_nonce);
                 }
                 AccountUpdate::MintNFT { ref token, nonce } => {
                     let update_order_id = update_order_id as i32;
@@ -173,6 +178,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                         .execute(transaction.conn())
                         .await?;
+                    nonce_updates.insert(creator_account_id as i64, nonce);
                 }
                 AccountUpdate::RemoveNFT { ref token, .. } => {
                     let token_id = token.id.0 as i32;
@@ -191,13 +197,40 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             }
         }
 
+        // Update committed nonce
+        let block_number = i64::from(*block_number);
+        for (account_id, nonce) in nonce_updates.iter() {
+            sqlx::query!(
+                "INSERT INTO committed_nonce (account_id, nonce, block_number) VALUES ($1, $2, $3) 
+                 ON CONFLICT (account_id) 
+                 DO UPDATE 
+                 SET nonce = $2, block_number = $3
+                 ",
+                account_id,
+                nonce,
+                block_number
+            )
+            .execute(transaction.conn())
+            .await?;
+        }
+
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.state.commit_state_update", start.elapsed());
         Ok(())
     }
 
-    pub async fn apply_storage_account_diff(
+    pub async fn clear_current_nonce_table(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM committed_nonce WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn apply_storage_account_diff(
         &mut self,
         acc_update: StorageAccountDiff,
     ) -> QueryResult<()> {
@@ -246,6 +279,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 )
                 .execute(self.0.conn())
                 .await?;
+                metrics::increment_counter!("new_accounts");
             }
             StorageAccountDiff::Delete(upd) => {
                 sqlx::query!(
@@ -721,7 +755,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     pub async fn load_committed_nft_tokens(
         &mut self,
         block_number: Option<BlockNumber>,
-    ) -> QueryResult<Vec<StorageMintNFTUpdate>> {
+    ) -> QueryResult<Vec<NFT>> {
         let tokens = if let Some(block_number) = block_number {
             sqlx::query_as!(
                 StorageMintNFTUpdate,
@@ -729,13 +763,13 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 block_number.0 as i64
             )
             .fetch_all(self.0.conn())
-            .await
+            .await?
         } else {
             sqlx::query_as!(StorageMintNFTUpdate, "SELECT * FROM mint_nft_updates")
                 .fetch_all(self.0.conn())
-                .await
+                .await?
         };
-        Ok(tokens?)
+        Ok(tokens.into_iter().map(NFT::from).collect())
     }
 
     // Removes account balance updates for blocks with number greater than `last_block`

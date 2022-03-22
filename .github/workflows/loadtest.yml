@@ -77,7 +77,7 @@ jobs:
         run: |
           mkdir -p etc/env/
           kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env
-          kubectl get secret -n ${ZKSYNC_ENV} secretenv-zksync -o go-template='{{range $k, $v := .data}}{{ printf "%s=%s\n" $k ($v | base64decode) }}{{end}}' \
+          kubectl get secret -n ${ZKSYNC_ENV} secretenv-zksync -o go-template='{{range $k, $v := .data}}{{ printf "%s=\"%s\"\n" $k ($v | base64decode) }}{{end}}' \
             >> etc/env/${ZKSYNC_ENV}.env
       -
         uses: actions/upload-artifact@v2
@@ -142,7 +142,7 @@ jobs:
   configmap:
     name: Update configMap
     runs-on: [self-hosted, deployer, "${{ needs.setup.outputs.cluster}}"]
-    needs: [setup-db]
+    needs: [setup, setup-db]
     container:
       image: dysnix/kubectl:v1.20-gcloud
       volumes:
@@ -196,6 +196,7 @@ jobs:
       MAIN_TOKEN: "BAT"
       ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
       ETH_NETWORK: "rinkeby"
+      ALLOWED_PERCENT: 10
       RUST_LOG: info
     steps:
       - uses: actions/checkout@v2

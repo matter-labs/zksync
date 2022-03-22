@@ -344,6 +344,7 @@ impl DatabaseInterface for Database {
         Ok(())
     }
 }
+
 impl Database {
     async fn set_metrics(&self, blocks: &[Block], stage: String) {
         for block in blocks {

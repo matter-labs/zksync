@@ -197,7 +197,7 @@ impl ApiError for SubmitError {
             Self::IncorrectTx(_) => ErrorCode::IncorrectTx,
             Self::TxAdd(_) => ErrorCode::TxAddError,
             Self::InappropriateFeeToken => ErrorCode::InappropriateFeeToken,
-            Self::CommunicationCoreServer(_) => ErrorCode::CommunicationCoreServer,
+            Self::MempoolCommunication(_) => ErrorCode::CommunicationCoreServer,
             Self::Internal(_) => ErrorCode::InternalError,
             Self::Toggle2FA(_) => ErrorCode::Toggle2FAError,
             Self::Other(_) => ErrorCode::Other,

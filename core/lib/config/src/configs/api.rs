@@ -3,6 +3,7 @@ use num::{rational::Ratio, BigUint};
 use serde::Deserialize;
 /// Built-in uses
 use std::net::SocketAddr;
+use std::time::Duration;
 use zksync_utils::scaled_u64_to_ratio;
 // Workspace uses
 use zksync_types::AccountId;
@@ -48,6 +49,10 @@ impl ApiConfig {
 impl CommonApiConfig {
     pub fn max_subsidy_usd(&self) -> Ratio<BigUint> {
         scaled_u64_to_ratio(self.max_subsidy_usd_scaled)
+    }
+
+    pub fn invalidate_token_cache_period(&self) -> Duration {
+        Duration::from_secs(self.invalidate_token_cache_period_sec)
     }
 
     pub fn from_env() -> Self {
@@ -119,6 +124,9 @@ pub struct CommonApiConfig {
 
     /// The name of current subsidy. It is needed to conveniently fetch historical data regarding subsidies for different partners
     pub subsidy_name: String,
+
+    /// The interval of updating tokens from database
+    pub invalidate_token_cache_period_sec: u64,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -244,6 +252,7 @@ mod tests {
                 subsidized_ips: vec!["127.0.0.1".to_owned()],
                 max_subsidy_usd_scaled: 20000,
                 subsidy_name: String::from("PartnerName"),
+                invalidate_token_cache_period_sec: 10,
             },
             admin: AdminApiConfig {
                 port: 8080,
@@ -291,6 +300,7 @@ API_COMMON_MAX_SUBSIDY_USD_SCALED=20000
 API_COMMON_SUBSIDY_NAME=PartnerName
 API_COMMON_MAX_NUMBER_OF_TRANSACTIONS_PER_BATCH=200
 API_COMMON_MAX_NUMBER_OF_AUTHORS_PER_BATCH=10
+API_COMMON_INVALIDATE_TOKEN_CACHE_PERIOD_SEC="10"
 API_ADMIN_PORT="8080"
 API_ADMIN_URL="http://127.0.0.1:8080"
 API_ADMIN_SECRET_AUTH="sample"

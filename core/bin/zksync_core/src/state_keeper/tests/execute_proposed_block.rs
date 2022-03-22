@@ -1,11 +1,11 @@
 use chrono::Utc;
+use zksync_mempool::ProposedBlock;
 use zksync_types::{
     mempool::SignedTxVariant, AccountId, BlockNumber, Nonce, SignedZkSyncTx, TokenId, Transfer,
     ZkSyncTx,
 };
 
 use super::utils::*;
-use crate::mempool::ProposedBlock;
 
 /// Checks if executing a proposed_block with just enough chunks is done correctly
 /// and checks if number of chunks left is correct after each operation.

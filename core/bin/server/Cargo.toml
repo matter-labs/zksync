@@ -20,6 +20,8 @@ zksync_forced_exit_requests = { path = "../zksync_forced_exit_requests", version
 
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
+
+zksync_mempool = { path = "../../lib/mempool", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 zksync_gateway_watcher = { path = "../../lib/gateway_watcher", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }

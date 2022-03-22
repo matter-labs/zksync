@@ -2,6 +2,7 @@
 
 // Built-in uses
 use std::str::FromStr;
+use std::time::Instant;
 
 // External uses
 use actix_web::{web, Scope};
@@ -10,7 +11,7 @@ use actix_web::{web, Scope};
 use zksync_api_types::v02::{
     block::{BlockInfo, BlockStatus},
     pagination::{parse_query, ApiEither, BlockAndTxHash, Paginated, PaginationQuery},
-    transaction::{Transaction, TxHashSerializeWrapper},
+    transaction::{Transaction, TxData, TxHashSerializeWrapper},
 };
 use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records::StorageBlockDetails, ConnectionPool, QueryResult};
@@ -126,6 +127,20 @@ impl ApiBlockData {
         storage.paginate_checked(&new_query).await
     }
 
+    async fn tx_data(
+        &self,
+        block_number: BlockNumber,
+        block_index: u64,
+    ) -> Result<Option<TxData>, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        Ok(storage
+            .chain()
+            .operations_ext_schema()
+            .tx_data_by_block_and_index_api_v02(block_number, block_index)
+            .await
+            .map_err(Error::storage)?)
+    }
+
     async fn get_last_committed_block_number(&self) -> QueryResult<BlockNumber> {
         let mut storage = self.pool.access_storage().await?;
         storage
@@ -151,8 +166,11 @@ async fn block_pagination(
     data: web::Data<ApiBlockData>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<BlockInfo, BlockNumber>> {
+    let start = Instant::now();
     let query = api_try!(parse_query(query).map_err(Error::from));
-    data.block_page(query).await.into()
+    let res = data.block_page(query).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "block_pagination");
+    res
 }
 
 // TODO: take `block_position` as enum.
@@ -161,8 +179,11 @@ async fn block_by_position(
     data: web::Data<ApiBlockData>,
     block_position: web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>> {
+    let start = Instant::now();
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
-    data.block_info(block_number).await.into()
+    let res = data.block_info(block_number).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "block_by_position");
+    res
 }
 
 async fn block_transactions(
@@ -170,9 +191,23 @@ async fn block_transactions(
     block_position: web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
+    let start = Instant::now();
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
     let query = api_try!(parse_query(query).map_err(Error::from));
-    data.transaction_page(block_number, query).await.into()
+    let res = data.transaction_page(block_number, query).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "block_transactions");
+    res
+}
+
+async fn transaction_in_block(
+    data: web::Data<ApiBlockData>,
+    path: web::Path<(BlockNumber, u64)>,
+) -> ApiResult<Option<TxData>> {
+    let start = Instant::now();
+    let (block_number, block_index) = *path;
+    let res = api_try!(data.tx_data(block_number, block_index).await);
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "transaction_in_block");
+    ApiResult::Ok(res)
 }
 
 pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
@@ -185,6 +220,10 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
         .route(
             "{block_position}/transactions",
             web::get().to(block_transactions),
+        )
+        .route(
+            "{block_position}/transactions/{block_index}",
+            web::get().to(transaction_in_block),
         )
 }
 
@@ -267,11 +306,31 @@ mod tests {
         assert_eq!(paginated.pagination.direction, PaginationDirection::Older);
         assert_eq!(paginated.pagination.from, tx_hash);
 
-        for (tx, expected_tx) in paginated.list.into_iter().zip(expected_txs) {
+        for (tx, expected_tx) in paginated.list.into_iter().zip(expected_txs.clone()) {
             assert_eq!(
                 tx.tx_hash.to_string().replace("sync-tx:", "0x"),
                 expected_tx.tx_hash
             );
+            assert_eq!(tx.created_at, Some(expected_tx.created_at));
+            assert_eq!(*tx.block_number.unwrap(), expected_tx.block_number as u32);
+            assert_eq!(tx.fail_reason, expected_tx.fail_reason);
+            if matches!(tx.op, TransactionData::L2(_)) {
+                assert_eq!(serde_json::to_value(tx.op).unwrap(), expected_tx.op);
+            }
+        }
+
+        for expected_tx in expected_txs {
+            if !expected_tx.success {
+                continue;
+            }
+            let response = client
+                .transaction_in_block(
+                    expected_tx.block_number as u32,
+                    expected_tx.block_index.unwrap() as u32,
+                )
+                .await?;
+            let tx: Option<TxData> = deserialize_response_result(response)?;
+            let tx = tx.unwrap().tx;
             assert_eq!(tx.created_at, Some(expected_tx.created_at));
             assert_eq!(*tx.block_number.unwrap(), expected_tx.block_number as u32);
             assert_eq!(tx.fail_reason, expected_tx.fail_reason);
