@@ -1,6 +1,8 @@
+use crate::MempoolState;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use zksync_types::mempool::SignedTxVariant;
+use zksync_types::tx::error::TxAddError;
 use zksync_types::PriorityOp;
 
 #[derive(Debug, Clone)]
@@ -34,70 +36,71 @@ impl PartialOrd for MempoolPendingTransaction {
 }
 
 #[derive(Debug, Clone)]
-pub struct MempoolTransactionsQueue {
+pub(crate) struct MempoolTransactionsQueue {
     /// Transactions ready for execution.
-    ready_txs: VecDeque<SignedTxVariant>,
+    ready_l2_transactions: VecDeque<SignedTxVariant>,
     /// Transactions that are not ready yet because of the `valid_from` field.
-    pending_txs: BinaryHeap<MempoolPendingTransaction>,
+    pending_l2_transactions: BinaryHeap<MempoolPendingTransaction>,
 
-    priority_ops: VecDeque<PriorityOp>,
+    l1_transactions: VecDeque<PriorityOp>,
 }
 
 impl MempoolTransactionsQueue {
-    pub fn new(
-        priority_ops: VecDeque<PriorityOp>,
-        transactions: VecDeque<SignedTxVariant>,
+    pub(crate) fn new(
+        l1_transactions: VecDeque<PriorityOp>,
+        l2_transactions: VecDeque<SignedTxVariant>,
     ) -> Self {
         let mut res = Self {
-            ready_txs: Default::default(),
-            pending_txs: Default::default(),
-            priority_ops,
+            ready_l2_transactions: Default::default(),
+            pending_l2_transactions: Default::default(),
+            l1_transactions,
         };
         // Due to complexity of json structure in database for transactions it's easier and safer
         // to add even not ready txs to mempool and prepare them before when it's needed.
-        for tx in transactions {
-            res.add_tx_variant(tx)
+        for tx in l2_transactions {
+            res.add_l2_transaction(tx)
         }
         res
     }
 
-    pub fn pop_front(&mut self) -> Option<SignedTxVariant> {
-        self.ready_txs.pop_front()
+    fn pop_l2_transactions_front(&mut self) -> Option<SignedTxVariant> {
+        self.ready_l2_transactions.pop_front()
     }
 
-    pub fn pop_front_priority_op(&mut self) -> Option<PriorityOp> {
-        self.priority_ops.pop_front()
+    fn pop_front_l1_transactions(&mut self) -> Option<PriorityOp> {
+        self.l1_transactions.pop_front()
     }
 
     #[allow(dead_code)]
-    pub fn add_priority_ops(&mut self, mut ops: Vec<PriorityOp>) {
+    fn add_l1_transactions(&mut self, mut ops: Vec<PriorityOp>) {
         ops.sort_unstable_by_key(|key| key.serial_id);
         for op in ops {
-            self.priority_ops.push_back(op);
+            self.l1_transactions.push_back(op);
         }
     }
 
-    pub fn add_tx_variant(&mut self, tx: SignedTxVariant) {
-        self.pending_txs.push(MempoolPendingTransaction {
-            valid_from: tx
-                .get_transactions()
-                .into_iter()
-                .map(|tx| tx.tx.valid_from())
-                .max()
-                .unwrap_or(0),
-            tx,
-        });
+    pub(crate) fn add_l2_transaction(&mut self, tx: SignedTxVariant) {
+        self.pending_l2_transactions
+            .push(MempoolPendingTransaction {
+                valid_from: tx
+                    .get_transactions()
+                    .into_iter()
+                    .map(|tx| tx.tx.valid_from())
+                    .max()
+                    .unwrap_or(0),
+                tx,
+            });
     }
 
-    pub fn prepare_new_ready_transactions(&mut self, block_timestamp: u64) {
+    fn prepare_new_ready_l2_transactions(&mut self, block_timestamp: u64) {
         // Move some pending transactions to the ready_txs queue
-        let mut ready_pending_transactions = {
-            let mut ready_pending_transactions = Vec::new();
+        let mut ready_pending_l2_operations = {
+            let mut ready_pending_l2_operations = Vec::new();
 
-            while let Some(pending_tx) = self.pending_txs.peek() {
+            while let Some(pending_tx) = self.pending_l2_transactions.peek() {
                 if pending_tx.valid_from <= block_timestamp {
-                    ready_pending_transactions.push(pending_tx.tx.clone());
-                    self.pending_txs.pop();
+                    ready_pending_l2_operations.push(pending_tx.tx.clone());
+                    self.pending_l2_transactions.pop();
                 } else {
                     break;
                 }
@@ -105,7 +108,7 @@ impl MempoolTransactionsQueue {
 
             // Now transactions should be sorted by the nonce (transaction natural order)
             // According to our convention in batch `fee transaction` would be the last one, so we would use nonce from it as a key for sort
-            ready_pending_transactions.sort_by_key(|tx| match tx {
+            ready_pending_l2_operations.sort_by_key(|tx| match tx {
                 SignedTxVariant::Tx(tx) => tx.tx.nonce(),
                 SignedTxVariant::Batch(batch) => batch
                     .txs
@@ -115,10 +118,84 @@ impl MempoolTransactionsQueue {
                     .nonce(),
             });
 
-            VecDeque::<SignedTxVariant>::from(ready_pending_transactions)
+            VecDeque::<SignedTxVariant>::from(ready_pending_l2_operations)
         };
 
-        self.ready_txs.append(&mut ready_pending_transactions);
+        self.ready_l2_transactions
+            .append(&mut ready_pending_l2_operations);
+    }
+
+    /// Collect txs depending on desired chunks and execution time
+    pub(crate) async fn select_transactions(
+        &mut self,
+        chunks: usize,
+        current_unprocessed_priority_op: u64,
+        block_timestamp: u64,
+        mempool_state: &MempoolState,
+    ) -> Result<(Vec<SignedTxVariant>, Vec<PriorityOp>, usize), TxAddError> {
+        let (chunks_left, priority_ops) =
+            self.select_l1_transactions(chunks, current_unprocessed_priority_op);
+
+        let (chunks_left, executed_txs) = self
+            .select_l2_transactions(chunks_left, block_timestamp, mempool_state)
+            .await?;
+
+        Ok((executed_txs, priority_ops, chunks_left))
+    }
+
+    /// Returns: chunks left from max amount of chunks, ops selected
+    fn select_l1_transactions(
+        &mut self,
+        max_block_size_chunks: usize,
+        current_unprocessed_l1_tx: u64,
+    ) -> (usize, Vec<PriorityOp>) {
+        let mut result = vec![];
+
+        let mut used_chunks = 0;
+        let mut current_l1_tx = current_unprocessed_l1_tx;
+        while let Some(tx) = self.pop_front_l1_transactions() {
+            // Since the transaction addition is asynchronous process and we are checking node many times,
+            // We can find some already processed priority ops
+            if tx.serial_id < current_l1_tx {
+                vlog::warn!("Already processed priority op was found in queue");
+                // We can skip already processed priority operations
+                continue;
+            }
+            assert_eq!(current_l1_tx, tx.serial_id, "Wrong order for priority ops");
+            if used_chunks + tx.data.chunks() <= max_block_size_chunks {
+                used_chunks += tx.data.chunks();
+                result.push(tx);
+                current_l1_tx += 1;
+            } else {
+                // We don't push back transactions because the transaction queue is used only once
+                break;
+            }
+        }
+        (max_block_size_chunks - used_chunks, result)
+    }
+
+    /// Collect txs depending on the remaining chunks size
+    async fn select_l2_transactions(
+        &mut self,
+        mut chunks_left: usize,
+        block_timestamp: u64,
+        mempool_state: &MempoolState,
+    ) -> Result<(usize, Vec<SignedTxVariant>), TxAddError> {
+        self.prepare_new_ready_l2_transactions(block_timestamp);
+
+        let mut txs_for_commit = Vec::new();
+
+        while let Some(tx) = self.pop_l2_transactions_front() {
+            let chunks_for_tx = mempool_state.required_chunks(&tx).await?;
+            if chunks_left >= chunks_for_tx {
+                txs_for_commit.push(tx);
+                chunks_left -= chunks_for_tx;
+            } else {
+                // We don't push back transactions because the transaction queue is used only once
+                break;
+            }
+        }
+        Ok((chunks_left, txs_for_commit))
     }
 }
 
@@ -174,12 +251,12 @@ mod tests {
     #[test]
     fn test_priority_queue() {
         let mut transactions_queue = MempoolTransactionsQueue {
-            ready_txs: VecDeque::new(),
-            pending_txs: BinaryHeap::new(),
-            priority_ops: Default::default(),
+            ready_l2_transactions: VecDeque::new(),
+            pending_l2_transactions: BinaryHeap::new(),
+            l1_transactions: Default::default(),
         };
 
-        transactions_queue.add_priority_ops(vec![
+        transactions_queue.add_l1_transactions(vec![
             PriorityOp {
                 serial_id: 3,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
@@ -220,7 +297,7 @@ mod tests {
                 eth_block_index: None,
             },
         ]);
-        transactions_queue.add_priority_ops(vec![
+        transactions_queue.add_l1_transactions(vec![
             PriorityOp {
                 serial_id: 1,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
@@ -287,26 +364,26 @@ mod tests {
                 eth_block_index: None,
             },
         ]);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
+        let op = transactions_queue.pop_front_l1_transactions().unwrap();
         assert_eq!(op.serial_id, 1);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
+        let op = transactions_queue.pop_front_l1_transactions().unwrap();
         assert_eq!(op.serial_id, 2);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
+        let op = transactions_queue.pop_front_l1_transactions().unwrap();
         assert_eq!(op.serial_id, 3);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
+        let op = transactions_queue.pop_front_l1_transactions().unwrap();
         assert_eq!(op.serial_id, 4);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
+        let op = transactions_queue.pop_front_l1_transactions().unwrap();
         assert_eq!(op.serial_id, 5);
-        let op = transactions_queue.pop_front_priority_op().unwrap();
+        let op = transactions_queue.pop_front_l1_transactions().unwrap();
         assert_eq!(op.serial_id, 6);
     }
 
     #[test]
     fn test_mempool_transactions_queue() {
         let mut transactions_queue = MempoolTransactionsQueue {
-            ready_txs: VecDeque::new(),
-            pending_txs: BinaryHeap::new(),
-            priority_ops: Default::default(),
+            ready_l2_transactions: VecDeque::new(),
+            pending_l2_transactions: BinaryHeap::new(),
+            l1_transactions: Default::default(),
         };
 
         let withdraw0 = get_withdraw();
@@ -315,36 +392,52 @@ mod tests {
 
         // Insert transactions to the mempool transcations queue
         {
-            transactions_queue.add_tx_variant(withdraw0.clone());
-            assert_eq!(transactions_queue.pending_txs.peek().unwrap().valid_from, 0);
+            transactions_queue.add_l2_transaction(withdraw0.clone());
+            assert_eq!(
+                transactions_queue
+                    .pending_l2_transactions
+                    .peek()
+                    .unwrap()
+                    .valid_from,
+                0
+            );
 
             // Some "random" order for trancsactions
-            transactions_queue.add_tx_variant(transfer2.clone());
-            transactions_queue.add_tx_variant(transfer1.clone());
+            transactions_queue.add_l2_transaction(transfer2.clone());
+            transactions_queue.add_l2_transaction(transfer1.clone());
         }
 
         // At first we should have only one transaction ready
         {
-            transactions_queue.prepare_new_ready_transactions(3);
+            transactions_queue.prepare_new_ready_l2_transactions(3);
 
-            assert_eq!(transactions_queue.ready_txs.len(), 1);
-            assert_eq!(transactions_queue.ready_txs[0].hashes(), withdraw0.hashes());
+            assert_eq!(transactions_queue.ready_l2_transactions.len(), 1);
+            assert_eq!(
+                transactions_queue.ready_l2_transactions[0].hashes(),
+                withdraw0.hashes()
+            );
         }
 
         // One more transaction is ready
         {
-            transactions_queue.prepare_new_ready_transactions(9);
+            transactions_queue.prepare_new_ready_l2_transactions(9);
 
-            assert_eq!(transactions_queue.ready_txs.len(), 2);
-            assert_eq!(transactions_queue.ready_txs[1].hashes(), transfer1.hashes());
+            assert_eq!(transactions_queue.ready_l2_transactions.len(), 2);
+            assert_eq!(
+                transactions_queue.ready_l2_transactions[1].hashes(),
+                transfer1.hashes()
+            );
         }
 
         // The last one is ready
         {
-            transactions_queue.prepare_new_ready_transactions(10);
+            transactions_queue.prepare_new_ready_l2_transactions(10);
 
-            assert_eq!(transactions_queue.ready_txs.len(), 3);
-            assert_eq!(transactions_queue.ready_txs[2].hashes(), transfer2.hashes());
+            assert_eq!(transactions_queue.ready_l2_transactions.len(), 3);
+            assert_eq!(
+                transactions_queue.ready_l2_transactions[2].hashes(),
+                transfer2.hashes()
+            );
         }
     }
 }
