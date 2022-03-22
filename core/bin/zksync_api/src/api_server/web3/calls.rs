@@ -3,20 +3,22 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Duration;
 // External uses
 use ethabi::{encode, Contract, Function, Token as AbiToken};
 use jsonrpc_core::{Error, ErrorCode, Result};
 use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_storage::StorageProcessor;
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{TokenId, TokenKind, NFT};
+
 // Local uses
 use super::{
     converter::u256_from_biguint,
     types::{H160, U256},
     NFT_FACTORY_ADDRESS, ZKSYNC_PROXY_ADDRESS,
 };
-use crate::utils::token_db_cache::TokenDBCache;
 
 type Selector = [u8; 4];
 
@@ -58,7 +60,7 @@ impl CallsHelper {
             .collect()
     }
 
-    pub fn new() -> Self {
+    pub fn new(invalidate_token_cache_period: Duration) -> Self {
         let mut path = PathBuf::new();
         path.push(std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_string()));
         path.push("etc/web3-abi");
@@ -85,7 +87,7 @@ impl CallsHelper {
         Self {
             erc20: erc20_function_by_selector,
             nft_factory: nft_factory_function_by_selector,
-            tokens: TokenDBCache::new(),
+            tokens: TokenDBCache::new(invalidate_token_cache_period),
             zksync_proxy_address: H160::from_str(ZKSYNC_PROXY_ADDRESS).unwrap(),
             nft_factory_address: H160::from_str(NFT_FACTORY_ADDRESS).unwrap(),
         }

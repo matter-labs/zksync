@@ -6,6 +6,7 @@ use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 use zksync_crypto::Fr;
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::block::IncompleteBlock;
 // Workspace uses
 use crate::mempool::MempoolBlocksRequest;
@@ -17,6 +18,10 @@ use zksync_types::{
 };
 
 mod aggregated_committer;
+
+// In this component, the most interesting part of the database is decimals,
+// Usually we don't change them, so we can invalidate the cache once an hour.
+const TOKEN_INVALIDATE_CACHE: Duration = Duration::from_secs(60 * 60);
 
 #[derive(Debug)]
 pub enum CommitRequest {
@@ -58,6 +63,10 @@ async fn handle_new_commit_task(
     pool: ConnectionPool,
 ) {
     vlog::info!("Run committer");
+    let mut token_db_cache = TokenDBCache::new(TOKEN_INVALIDATE_CACHE);
+    token_db_cache
+        .fill_token_cache(&mut pool.access_storage().await.unwrap())
+        .await;
     while let Some(request) = rx_for_ops.next().await {
         match request {
             CommitRequest::SealIncompleteBlock((block_commit_request, applied_updates_req)) => {
@@ -66,6 +75,7 @@ async fn handle_new_commit_task(
                     applied_updates_req,
                     &pool,
                     &mut mempool_req_sender,
+                    &mut token_db_cache,
                 )
                 .await;
             }
@@ -148,6 +158,7 @@ async fn seal_incomplete_block(
     applied_updates_request: AppliedUpdatesRequest,
     pool: &ConnectionPool,
     mempool_req_sender: &mut Sender<MempoolBlocksRequest>,
+    token_db_cache: &mut TokenDBCache,
 ) {
     let start = Instant::now();
     let BlockCommitRequest {
@@ -221,7 +232,12 @@ async fn seal_incomplete_block(
     // We do this outside of a transaction,
     // because we want the incomplete block data to be available as soon as possible.
     // If something happened to the metric count, it won't affect the block data
-    zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block).await;
+    if let Err(err) =
+        zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block, token_db_cache)
+            .await
+    {
+        vlog::error!("Can't calculate volume metric: {:?}", err)
+    }
     metrics::histogram!("committer.seal_incomplete_block", start.elapsed());
 }
 

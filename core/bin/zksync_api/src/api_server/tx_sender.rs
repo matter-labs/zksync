@@ -27,6 +27,7 @@ use zksync_api_types::{
 };
 use zksync_storage::misc::records::Subsidy;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{
     tx::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
@@ -48,7 +49,7 @@ use crate::{
         VerifySignatureRequest,
     },
     tx_error::{Toggle2FAError, TxAddError},
-    utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
+    utils::block_details_cache::BlockDetailsCache,
 };
 use zksync_config::configs::api::CommonApiConfig;
 
@@ -174,7 +175,7 @@ impl TxSender {
             pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
             ticker,
-            tokens: TokenDBCache::new(),
+            tokens: TokenDBCache::new(config.invalidate_token_cache_period()),
             forced_exit_checker: ForcedExitChecker::new(
                 config.forced_exit_minimum_account_age_secs,
             ),

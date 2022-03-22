@@ -18,6 +18,7 @@ members = [
     "core/bin/zksync_forced_exit_requests",
 
     # Libraries
+    "core/lib/token_db_cache",
     "core/lib/circuit",
     "core/lib/eth_client",
     "core/lib/eth_signer",

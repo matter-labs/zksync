@@ -5,10 +5,11 @@ use num::rational::Ratio;
 use num::{BigUint, ToPrimitive};
 use std::collections::HashMap;
 use std::ops::Add;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::aggregated_operations::AggregatedActionType::*;
 use zksync_types::block::IncompleteBlock;
 use zksync_types::TokenId;
@@ -87,19 +88,26 @@ fn get_volumes(block: &IncompleteBlock) -> HashMap<TokenId, BigUint> {
 pub async fn calculate_volume_for_block(
     storage: &mut StorageProcessor<'_>,
     block: &IncompleteBlock,
-) {
+    token_db_cache: &mut TokenDBCache,
+) -> Result<(), anyhow::Error> {
+    let start = Instant::now();
     let volumes = get_volumes(block);
-    for (token, amount) in volumes.into_iter() {
-        if let Ok(Some(price)) = storage
+    for (token_id, amount) in volumes.into_iter() {
+        if let Some(price) = storage
             .tokens_schema()
-            .get_historical_ticker_price(token)
-            .await
+            .get_historical_ticker_price(token_id)
+            .await?
         {
-            let labels = vec![("token", format!("{}", token.0))];
-            let usd_amount = Ratio::from(amount) * price.usd_price;
-            metrics::gauge!("txs_volume", usd_amount.to_f64().unwrap(), &labels);
+            let token = token_db_cache.get_token(storage, token_id).await?.unwrap();
+            let labels = vec![("token", token.symbol)];
+            let usd_amount = Ratio::from(amount)
+                / BigUint::from(10u32).pow(u32::from(token.decimals))
+                * price.usd_price;
+            metrics::increment_gauge!("txs_volume", usd_amount.to_f64().unwrap(), &labels);
         }
     }
+    metrics::histogram!("calculate_metric",  start.elapsed(), "type" => "volume_for_block");
+    Ok(())
 }
 
 pub fn run_prometheus_exporter(port: u16) -> JoinHandle<()> {
