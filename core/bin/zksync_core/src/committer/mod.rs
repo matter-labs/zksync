@@ -4,16 +4,22 @@ use std::time::{Duration, Instant};
 use futures::{channel::mpsc::Receiver, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
+
 // Workspace uses
 use zksync_config::ChainConfig;
 use zksync_crypto::Fr;
 use zksync_storage::ConnectionPool;
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{
     block::{Block, BlockMetadata, ExecutedOperations, IncompleteBlock, PendingBlock},
     AccountUpdates, BlockNumber,
 };
 
 mod aggregated_committer;
+
+// In this component, the most interesting part of the database is decimals,
+// Usually we don't change them, so we can invalidate the cache once an hour.
+const TOKEN_INVALIDATE_CACHE: Duration = Duration::from_secs(60 * 60);
 
 #[derive(Debug)]
 pub enum CommitRequest {
@@ -50,10 +56,20 @@ const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 async fn handle_new_commit_task(mut rx_for_ops: Receiver<CommitRequest>, pool: ConnectionPool) {
     vlog::info!("Run committer");
+    let mut token_db_cache = TokenDBCache::new(TOKEN_INVALIDATE_CACHE);
+    token_db_cache
+        .fill_token_cache(&mut pool.access_storage().await.unwrap())
+        .await;
     while let Some(request) = rx_for_ops.next().await {
         match request {
             CommitRequest::SealIncompleteBlock((block_commit_request, applied_updates_req)) => {
-                seal_incomplete_block(block_commit_request, applied_updates_req, &pool).await;
+                seal_incomplete_block(
+                    block_commit_request,
+                    applied_updates_req,
+                    &pool,
+                    &mut token_db_cache,
+                )
+                .await;
             }
             CommitRequest::PendingBlock((pending_block, applied_updates_req)) => {
                 save_pending_block(pending_block, applied_updates_req, &pool).await;
@@ -133,6 +149,7 @@ async fn seal_incomplete_block(
     block_commit_request: BlockCommitRequest,
     applied_updates_request: AppliedUpdatesRequest,
     pool: &ConnectionPool,
+    token_db_cache: &mut TokenDBCache,
 ) {
     let start = Instant::now();
     let BlockCommitRequest {
@@ -199,7 +216,12 @@ async fn seal_incomplete_block(
     // We do this outside of a transaction,
     // because we want the incomplete block data to be available as soon as possible.
     // If something happened to the metric count, it won't affect the block data
-    zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block).await;
+    if let Err(err) =
+        zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block, token_db_cache)
+            .await
+    {
+        vlog::error!("Can't calculate volume metric: {:?}", err)
+    }
     metrics::histogram!("committer.seal_incomplete_block", start.elapsed());
 }
 

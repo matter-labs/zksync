@@ -2,11 +2,10 @@
 use std::{collections::HashMap, sync::Arc};
 #[cfg(test)]
 use tokio::sync::Mutex;
+use zksync_token_db_cache::TokenDBCache;
 
 use zksync_storage::ConnectionPool;
 use zksync_types::{tokens::TokenMarketVolume, Token, TokenId, TokenLike};
-
-use crate::utils::token_db_cache::TokenDBCache;
 
 #[derive(Debug, Clone)]
 pub(crate) enum TokenCacheWrapper {

@@ -196,6 +196,7 @@ pub fn start_ws_server(
         event_sub_receiver,
         common_config.caches_size,
         miniblock_iteration_interval,
+        common_config,
     );
 
     let req_rpc_app = super::rpc_server::RpcApp::new(

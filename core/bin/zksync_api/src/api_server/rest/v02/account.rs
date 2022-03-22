@@ -18,6 +18,7 @@ use zksync_api_types::v02::{
 };
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId, TokenLike};
 
 // Local uses
@@ -26,10 +27,7 @@ use super::{
     paginate_trait::Paginate,
     response::ApiResult,
 };
-use crate::{
-    api_server::helpers::get_depositing, api_try, fee_ticker::PriceError,
-    utils::token_db_cache::TokenDBCache,
-};
+use crate::{api_server::helpers::get_depositing, api_try, fee_ticker::PriceError};
 
 /// Shared data between `api/v02/accounts` endpoints.
 #[derive(Clone)]
@@ -534,7 +532,7 @@ mod tests {
                 move |cfg: &TestServerConfig| {
                     api_scope(
                         cfg.pool.clone(),
-                        TokenDBCache::new(),
+                        TokenDBCache::new(cfg.config.api.common.invalidate_token_cache_period()),
                         cfg.config.eth_watch.confirmations_for_eth_event,
                     )
                 },

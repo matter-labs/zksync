@@ -13,6 +13,7 @@ publish = false # We don't want to publish our binaries.
 [dependencies]
 zksync_types = { path = "../types", version = "1.0" }
 zksync_storage = { path = "../storage", version = "1.0" }
+zksync_token_db_cache = { path = "../token_db_cache", version = "1.0" }
 
 vlog = { path = "../../lib/vlog", version = "1.0" }
 tracing = "0.1.22"
