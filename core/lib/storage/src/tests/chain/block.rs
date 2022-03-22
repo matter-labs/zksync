@@ -109,6 +109,15 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?;
     assert_eq!((block, &state), (BlockNumber(3), &accounts_block_3));
 
+    for (account_id, account) in state {
+        let nonce = storage
+            .chain()
+            .account_schema()
+            .estimate_nonce(account_id)
+            .await?
+            .unwrap();
+        assert_eq!(account.nonce, nonce)
+    }
     // Add proofs for the first two blocks.
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(

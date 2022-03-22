@@ -5,7 +5,9 @@ use num::{BigUint, Zero};
 use sqlx::{types::BigDecimal, Acquire};
 // Workspace imports
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
-use zksync_types::{Account, AccountId, AccountUpdates, Address, BlockNumber, PubKeyHash, TokenId};
+use zksync_types::{
+    Account, AccountId, AccountUpdates, Address, BlockNumber, Nonce, PubKeyHash, TokenId,
+};
 // Local imports
 use self::records::*;
 use crate::chain::block::BlockSchema;
@@ -76,6 +78,37 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.state.set_account_type", start.elapsed());
         Ok(())
+    }
+
+    /// Gets currently committed to the database nonce, if not exist return verified.
+    /// After reverting blocks this nonce could be less than actual.
+    /// Use this function only for verifying the lower bounds of a nonce.
+    pub async fn estimate_nonce(&mut self, account_id: AccountId) -> QueryResult<Option<Nonce>> {
+        let start = Instant::now();
+
+        let mut transaction = self.0.start_transaction().await?;
+
+        let committed_nonce = sqlx::query!(
+            "SELECT nonce FROM committed_nonce WHERE account_id = $1",
+            i64::from(*account_id)
+        )
+        .fetch_optional(transaction.conn())
+        .await?;
+
+        let current_nonce = if let Some(nonce) = committed_nonce {
+            Some(nonce.nonce)
+        } else {
+            let verified_nonce = sqlx::query!(
+                "SELECT nonce FROM accounts WHERE id = $1",
+                i64::from(*account_id)
+            )
+            .fetch_optional(transaction.conn())
+            .await?;
+            verified_nonce.map(|nonce| nonce.nonce)
+        };
+
+        metrics::histogram!("sql.chain.account.current_nonce", start.elapsed());
+        Ok(current_nonce.map(|v| Nonce(v as u32)))
     }
 
     /// Fetches account type from the database

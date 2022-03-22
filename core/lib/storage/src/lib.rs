@@ -114,6 +114,11 @@ pub const MAX_BLOCK_NUMBER: BlockNumber = BlockNumber(u32::MAX);
 pub const MAX_BLOCK_INDEX: u32 = i32::MAX as u32;
 
 /// Obtains the database URL from the environment variable.
+pub fn get_database_replica_url() -> String {
+    env::var("DATABASE_REPLICA_URL").unwrap_or_else(|_| get_database_url())
+}
+
+/// Obtains the database URL from the environment variable.
 pub fn get_database_url() -> String {
     env::var("DATABASE_URL").expect("DATABASE_URL must be set")
 }

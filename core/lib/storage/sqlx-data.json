@@ -1578,66 +1578,6 @@
       "nullable": []
     }
   },
-  "281b2dfe511e0d38c09fb3e635511927ac7b4b81c6e27c748153aa041d691303": {
-    "query": "SELECT * FROM mempool_txs WHERE reverted = false\n            ORDER BY created_at",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tx_hash",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "tx",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_sign_data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 5,
-          "name": "batch_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 6,
-          "name": "next_priority_op_serial_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 7,
-          "name": "reverted",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        true,
-        false
-      ]
-    }
-  },
   "283d9869a56c60f851ee907cd36a70458b3b3f69a61670eeb0762f67c6ada1ed": {
     "query": "SELECT * FROM executed_transactions WHERE tx_hash = $1",
     "describe": {
@@ -2259,6 +2199,20 @@
       "nullable": []
     }
   },
+  "3a7e35223c276d6b34493b6ec498d9926376bf0d7ec8b8adc7df07a302dcdc80": {
+    "query": "INSERT INTO committed_nonce (account_id, nonce, block_number) VALUES ($1, $2, $3) \n                 ON CONFLICT (account_id) \n                 DO UPDATE \n                 SET nonce = $2, block_number = $3\n                 ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "3e63555f8c8d341b2536bec02e1c60755888686fab50cad8dde060c3aca96f9b": {
     "query": "SELECT sequence_number FROM executed_transactions\n            WHERE tx_hash = $1",
     "describe": {
@@ -2498,6 +2452,26 @@
       },
       "nullable": [
         false,
+        false
+      ]
+    }
+  },
+  "48bdcd435f5374b030eb93cda0615b7c9f3a9e965ac717ac66ed68644faee92f": {
+    "query": "SELECT nonce FROM accounts WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "nonce",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
@@ -3159,6 +3133,18 @@
         false,
         false
       ]
+    }
+  },
+  "6134f8101d08e7be0c6c62c70237c1a28c782281367a4d6ad7a6b53ee02fdc52": {
+    "query": "DELETE FROM committed_nonce WHERE block_number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {
@@ -4329,6 +4315,68 @@
       "nullable": []
     }
   },
+  "86ae541a53bd5bf92292c220de97a1940aa45aac2b759965b389308de0b36eb6": {
+    "query": "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (\n                SELECT u.hashes FROM UNNEST ($1::text[]) as u(hashes)\n            )\n\n            ORDER BY id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_sign_data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "batch_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "next_priority_op_serial_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "reverted",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "TextArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false
+      ]
+    }
+  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
@@ -4629,6 +4677,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "903a4ea3096f5ede621b5b59940e4de856c3c09e8804eca973c288e0152355b3": {
+    "query": "SELECT nonce FROM committed_nonce WHERE account_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "nonce",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "924c04e90c91241f25e8ad84e6d274ff7769fbf11fa5ca54b0f848e701aaa03e": {

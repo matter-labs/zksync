@@ -35,7 +35,7 @@ pub struct SharedData {
 pub(crate) fn api_scope(
     tx_sender: TxSender,
     zk_config: &ZkSyncConfig,
-    shared_network_status: SharedNetworkStatus,
+    network_status: SharedNetworkStatus,
 ) -> Scope {
     let data = SharedData {
         net: zk_config.chain.eth.network,
@@ -54,7 +54,7 @@ pub(crate) fn api_scope(
         ))
         .service(config::api_scope(zk_config))
         .service(fee::api_scope(tx_sender.clone()))
-        .service(status::api_scope(shared_network_status))
+        .service(status::api_scope(network_status))
         .service(token::api_scope(
             zk_config,
             tx_sender.pool.clone(),

@@ -4,8 +4,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::{runtime::Runtime, time};
+use zksync_api_types::CoreStatus;
 use zksync_storage::ConnectionPool;
-use zksync_types::BlockNumber;
+use zksync_types::{BlockNumber, SequentialTxId};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -16,21 +17,49 @@ pub struct NetworkStatus {
     pub total_transactions: u32,
     pub outstanding_txs: u32,
     pub mempool_size: u32,
+    pub core_status: Option<CoreStatus>,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
+#[derive(Debug, Clone)]
+pub struct SharedNetworkStatus {
+    status: Arc<RwLock<NetworkStatus>>,
+    core_status_address: String,
+    core_client: reqwest::Client,
+}
 
 impl SharedNetworkStatus {
-    pub async fn read(&self) -> NetworkStatus {
-        (*self.0.as_ref().read().await).clone()
+    pub fn new(core_address: String) -> Self {
+        let core_client = reqwest::Client::new();
+        let core_status_address = format!("{}/status", core_address);
+        Self {
+            status: Default::default(),
+            core_status_address,
+            core_client,
+        }
     }
 
+    pub async fn read(&self) -> NetworkStatus {
+        (*self.status.as_ref().read().await).clone()
+    }
+
+    /// Get healthcheck status from core server.
+    async fn get_core_status(&self) -> anyhow::Result<CoreStatus> {
+        Ok(self
+            .core_client
+            .get(&self.core_status_address)
+            .send()
+            .await?
+            .json()
+            .await?)
+    }
+
+    /// Updates shared network status. We use last_tx_id as a checkpoint
+    /// to calculate total number of transactions faster
     pub(crate) async fn update(
         &mut self,
         connection_pool: &ConnectionPool,
-        last_tx_seq_no: i64,
-    ) -> Result<i64, anyhow::Error> {
+        last_tx_id: SequentialTxId,
+    ) -> Result<SequentialTxId, anyhow::Error> {
         let mut storage = connection_pool.access_storage().await?;
         let mut transaction = storage.start_transaction().await?;
         let NetworkStatus {
@@ -51,12 +80,12 @@ impl SharedNetworkStatus {
             .await
             .unwrap_or(BlockNumber(0));
 
-        let (total_new_transactions, last_seq_no) = transaction
+        let (total_new_transactions, last_tx_id) = transaction
             .chain()
             .stats_schema()
-            .count_total_transactions(last_tx_seq_no)
+            .count_total_transactions(last_tx_id)
             .await
-            .unwrap_or((0, 0));
+            .unwrap_or((0, SequentialTxId(0)));
 
         let mempool_size = transaction
             .chain()
@@ -74,6 +103,7 @@ impl SharedNetworkStatus {
 
         transaction.commit().await.unwrap_or_default();
 
+        let core_status = self.get_core_status().await.ok();
         let status = NetworkStatus {
             next_block_at_max: None,
             last_committed,
@@ -81,12 +111,14 @@ impl SharedNetworkStatus {
             total_transactions: total_transactions + total_new_transactions,
             outstanding_txs,
             mempool_size,
+            core_status,
         };
 
         // save status to state
-        *self.0.as_ref().write().await = status;
-        Ok(last_seq_no)
+        *self.status.as_ref().write().await = status;
+        Ok(last_tx_id)
     }
+
     pub fn start_updater_detached(
         mut self,
         panic_notify: mpsc::Sender<bool>,
@@ -101,11 +133,11 @@ impl SharedNetworkStatus {
 
                 let state_update_task = async move {
                     let mut timer = time::interval(Duration::from_millis(30000));
-                    let mut last_seq_no = 0;
+                    let mut last_tx_id = SequentialTxId(0);
                     loop {
                         timer.tick().await;
-                        match self.update(&connection_pool, last_seq_no).await {
-                            Ok(seq_no) => last_seq_no = seq_no,
+                        match self.update(&connection_pool, last_tx_id).await {
+                            Ok(tx_id) => last_tx_id = tx_id,
                             Err(_) => vlog::error!("Can't update network status"),
                         }
                     }

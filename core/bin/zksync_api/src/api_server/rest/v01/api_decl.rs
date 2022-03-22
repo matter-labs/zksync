@@ -35,11 +35,12 @@ impl ApiV01 {
         connection_pool: ConnectionPool,
         contract_address: H160,
         config: ZkSyncConfig,
+        network_status: SharedNetworkStatus,
     ) -> Self {
         Self {
             caches: Caches::new(config.api.common.caches_size),
             connection_pool,
-            network_status: SharedNetworkStatus::default(),
+            network_status,
             contract_address: format!("{:?}", contract_address),
             config,
         }
