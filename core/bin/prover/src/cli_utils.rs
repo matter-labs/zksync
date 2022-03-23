@@ -42,7 +42,7 @@ where
     let api_client = api_client_from_env();
     let prover = PROVER::create_from_config(prover_config);
 
-    let _sentry_guard = vlog::init();
+    let _vlog_guard = vlog::init();
 
     vlog::info!("creating prover, worker name: {}", worker_name);
 
