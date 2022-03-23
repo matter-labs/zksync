@@ -254,7 +254,7 @@ impl DatabaseInterface for Database {
         &self,
         connection: &mut StorageProcessor<'_>,
         block: BlockNumber,
-        tree_cache: serde_json::Value,
+        tree_cache: String,
     ) -> anyhow::Result<()> {
         connection
             .chain()

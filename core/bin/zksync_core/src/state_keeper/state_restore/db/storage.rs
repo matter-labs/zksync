@@ -102,8 +102,8 @@ impl<'a, 'b> StateRestoreDb for StateRestoreStorage<'a, 'b> {
         block: BlockNumber,
         account_tree_cache: SparseMerkleTreeSerializableCacheBN256,
     ) {
-        let encoded_tree_cache =
-            serde_json::to_value(account_tree_cache).expect("Unable to encode account tree cache");
+        let encoded_tree_cache = serde_json::to_string(&account_tree_cache)
+            .expect("Unable to encode account tree cache");
         self.storage
             .chain()
             .block_schema()
