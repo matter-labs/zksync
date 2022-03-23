@@ -262,6 +262,11 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             *self.start_block,
             *self.block_step
         );
+
+        // Initialize counters for cache hits/misses.
+        metrics::register_counter!("witness_generator.cache_access", "type" => "hit");
+        metrics::register_counter!("witness_generator.cache_access", "type" => "miss");
+
         let mut current_block = self.start_block;
         loop {
             sleep(self.rounds_interval).await;
