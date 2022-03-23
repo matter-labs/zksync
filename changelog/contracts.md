@@ -4,7 +4,7 @@ All notable changes to the contracts will be documented in this file.
 
 ## 2022-02-27
 
-**Version 9** is scheduled for upgrade.
+**Version 8** is scheduled for upgrade.
 
 ### Added
 
