@@ -611,9 +611,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function proveBlocks(StoredBlockInfo[] memory _committedBlocks, ProofInput memory _proof) external nonReentrant {
         requireActive();
         require(_committedBlocks.length == _proof.commitments.length, "r"); // unequal length of blocks and proof.commitments
-
+        
+        uint256 i;
         uint32 currentTotalBlocksProven = totalBlocksProven;
-        for (uint256 i = 0; i < _committedBlocks.length; ++i) {
+        while(hashStoredBlockInfo(_committedBlocks[i]) != storedBlockHashes[currentTotalBlocksProven + 1]){
+            ++i;
+        }
+        for (; i < _committedBlocks.length; ++i) {
             require(hashStoredBlockInfo(_committedBlocks[i]) == storedBlockHashes[currentTotalBlocksProven + 1], "o1");
             ++currentTotalBlocksProven;
 
