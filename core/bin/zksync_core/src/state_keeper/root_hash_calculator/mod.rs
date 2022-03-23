@@ -94,7 +94,7 @@ impl RootHashCalculator {
 
         metrics::histogram!("root_hash_calculator.process_job", start.elapsed());
         metrics::gauge!(
-            "last_process_block",
+            "last_processed_block",
             job.block.0 as f64,
             "stage" => "root_hash_calculator"
         );

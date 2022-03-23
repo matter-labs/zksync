@@ -232,6 +232,12 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         metrics::histogram!("witness_generator", start.elapsed(), "stage" => "store_witness");
 
         metrics::histogram!("witness_generator", fn_start.elapsed(), "stage" => "prepare_witness_and_save_it");
+
+        metrics::gauge!(
+            "last_processed_block",
+            block.block_number.0 as f64,
+            "stage" => "witness_generator"
+        );
         Ok(())
     }
 
