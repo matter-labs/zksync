@@ -127,11 +127,11 @@ struct Opt {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
-    let mut _sentry_guard = None;
+    let mut _vlog_guard = None;
     let server_mode = if opt.genesis {
         ServerCommand::Genesis
     } else {
-        _sentry_guard = vlog::init();
+        _vlog_guard = Some(vlog::init());
         ServerCommand::Launch
     };
 
