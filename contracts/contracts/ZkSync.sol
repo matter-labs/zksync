@@ -614,6 +614,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         
         uint256 i;
         uint32 currentTotalBlocksProven = totalBlocksProven;
+        
+        // Ignoring the _committedBlocks which are already proved.
         while(hashStoredBlockInfo(_committedBlocks[i]) != storedBlockHashes[currentTotalBlocksProven + 1]){
             ++i;
         }
