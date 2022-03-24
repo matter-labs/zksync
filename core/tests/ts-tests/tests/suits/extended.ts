@@ -181,6 +181,31 @@ describe(`Extended tests`, () => {
         ).to.be.true;
     });
 
+    it('should force-exit operator account without problems', async () => {
+        // In this test, we run ForcedExit on the operator account.
+        // It should not cause any problems and disrupt operator work, since operator doesn't use its L2 balance.
+        // This is done after checking fees as the part of this workflow, and not at the very end of the whole
+        // test run (inclusing other suits).
+        // Running after checking fees is required, since we don't update the running fee.
+
+        // Operator account may not exist in L2, so we transfer some funds there to create it first.
+        // It can also be considered a part of test -- it should not cause problems as well.
+        const transfer = await alice.syncTransfer({
+            to: tester.operatorWallet.address(),
+            token,
+            amount: TX_AMOUNT
+        });
+        const transferReceipt = await transfer.awaitReceipt();
+        expect(transferReceipt.success, 'Transfer to operator failed').to.be.true;
+        const forcedExit = await alice.syncForcedExit({
+            target: tester.operatorWallet.address(),
+            token
+        });
+        // We want the tx to be verified to ensure that block can be created and sent to L1.
+        const forcedExitReceipt = await forcedExit.awaitVerifyReceipt();
+        expect(forcedExitReceipt.success, 'ForcedExit of operator account failed').to.be.true;
+    });
+
     it('should fail trying to send tx with wrong signature', async () => {
         await tester.testWrongSignature(alice, bob, token, TX_AMOUNT, providerType);
     });

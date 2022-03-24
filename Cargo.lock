@@ -5086,6 +5086,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-appender"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9965507e507f12c8901432a33e31131222abac31edd90cabbcf85cf544b7127a"
+dependencies = [
+ "chrono",
+ "crossbeam-channel 0.5.1",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-attributes"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5326,6 +5337,7 @@ version = "1.0.0"
 dependencies = [
  "sentry",
  "tracing",
+ "tracing-appender",
  "tracing-subscriber",
 ]
 
@@ -5686,9 +5698,11 @@ dependencies = [
  "zksync_eth_client",
  "zksync_eth_signer",
  "zksync_gateway_watcher",
+ "zksync_mempool",
  "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_test_account",
+ "zksync_token_db_cache",
  "zksync_types",
  "zksync_utils",
 ]
@@ -5816,10 +5830,12 @@ dependencies = [
  "zksync_eth_client",
  "zksync_eth_signer",
  "zksync_gateway_watcher",
+ "zksync_mempool",
  "zksync_notifier",
  "zksync_prometheus_exporter",
  "zksync_state",
  "zksync_storage",
+ "zksync_token_db_cache",
  "zksync_types",
  "zksync_utils",
 ]
@@ -5970,6 +5986,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "ethabi",
+ "futures 0.3.17",
  "hex",
  "log 0.4.14",
  "metrics",
@@ -5983,6 +6000,7 @@ dependencies = [
  "zksync_core",
  "zksync_crypto",
  "zksync_eth_signer",
+ "zksync_mempool",
  "zksync_storage",
  "zksync_test_account",
  "zksync_types",
@@ -6002,6 +6020,23 @@ dependencies = [
  "zksync_config",
  "zksync_eth_client",
  "zksync_utils",
+]
+
+[[package]]
+name = "zksync_mempool"
+version = "1.0.0"
+dependencies = [
+ "chrono",
+ "futures 0.3.17",
+ "metrics",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "vlog",
+ "zksync_balancer",
+ "zksync_storage",
+ "zksync_types",
 ]
 
 [[package]]
@@ -6029,10 +6064,12 @@ dependencies = [
  "metrics-exporter-prometheus",
  "metrics-macros",
  "metrics-util",
+ "num",
  "tokio",
  "tracing",
  "vlog",
  "zksync_storage",
+ "zksync_token_db_cache",
  "zksync_types",
 ]
 
@@ -6111,6 +6148,7 @@ dependencies = [
  "zksync_eth_sender",
  "zksync_forced_exit_requests",
  "zksync_gateway_watcher",
+ "zksync_mempool",
  "zksync_prometheus_exporter",
  "zksync_prover",
  "zksync_storage",
@@ -6199,10 +6237,23 @@ dependencies = [
  "zksync_data_restore",
  "zksync_eth_client",
  "zksync_eth_signer",
+ "zksync_mempool",
  "zksync_prover_utils",
  "zksync_test_account",
  "zksync_types",
  "zksync_utils",
+]
+
+[[package]]
+name = "zksync_token_db_cache"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "futures 0.3.17",
+ "metrics",
+ "tokio",
+ "zksync_storage",
+ "zksync_types",
 ]
 
 [[package]]

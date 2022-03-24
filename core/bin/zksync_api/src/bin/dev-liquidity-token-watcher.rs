@@ -103,7 +103,6 @@ async fn handle_graphql(
     params: web::Json<GrqaphqlQuery>,
     volume_storage: web::Data<VolumeStorage>,
 ) -> Result<HttpResponse> {
-    // TODO https://linear.app/matterlabs/issue/ZKS-413/support-full-version-of-graphql-for-tokenvalidator
     let query_parser = Regex::new(r#"\{token\(id:\s"(?P<address>.*?)"\).*"#).expect("Right regexp");
     let caps = query_parser.captures(&params.query).unwrap();
     let address = &caps["address"].to_ascii_lowercase();

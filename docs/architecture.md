@@ -90,7 +90,6 @@ This section provides an overview on folders / sub-projects that exist in this r
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
 - `/infrastructure`: Application that aren't naturally a part of zkSync core, but are related to it.
   - `/explorer`: A blockchain explorer for zkSync network.
-  - `/zcli`: A command-line interface and development wallet for zkSync network.
 - `/keys`: Verification keys for `circuit` module.
 - `/sdk`: Implementation of client libraries for zkSync network in different programming languages.
   - `/zksync-crypto`: zkSync network cryptographic primitives, which can be compiled to WASM.

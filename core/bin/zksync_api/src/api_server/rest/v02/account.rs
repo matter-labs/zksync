@@ -3,6 +3,7 @@
 // Built-in uses
 use std::collections::BTreeMap;
 use std::str::FromStr;
+use std::time::Instant;
 
 // External uses
 use actix_web::{web, Scope};
@@ -17,6 +18,7 @@ use zksync_api_types::v02::{
 };
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId, TokenLike};
 
 // Local uses
@@ -25,10 +27,7 @@ use super::{
     paginate_trait::Paginate,
     response::ApiResult,
 };
-use crate::{
-    api_server::helpers::get_depositing, api_try, fee_ticker::PriceError,
-    utils::token_db_cache::TokenDBCache,
-};
+use crate::{api_server::helpers::get_depositing, api_try, fee_ticker::PriceError};
 
 /// Shared data between `api/v02/accounts` endpoints.
 #[derive(Clone)]
@@ -353,39 +352,48 @@ async fn account_committed_info(
     data: web::Data<ApiAccountData>,
     account_id_or_address: web::Path<String>,
 ) -> ApiResult<Option<Account>> {
+    let start = Instant::now();
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    if let Some(account_id) = account_id {
+    let res = if let Some(account_id) = account_id {
         data.account_committed_info(account_id).await.into()
     } else {
         ApiResult::Ok(None)
-    }
+    };
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_committed_info");
+    res
 }
 
 async fn account_finalized_info(
     data: web::Data<ApiAccountData>,
     account_id_or_address: web::Path<String>,
 ) -> ApiResult<Option<Account>> {
+    let start = Instant::now();
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    if let Some(account_id) = account_id {
+    let res = if let Some(account_id) = account_id {
         data.account_finalized_info(account_id).await.into()
     } else {
         ApiResult::Ok(None)
-    }
+    };
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_finalized_info");
+    res
 }
 
 async fn account_full_info(
     data: web::Data<ApiAccountData>,
     account_id_or_address: web::Path<String>,
 ) -> ApiResult<AccountState> {
+    let start = Instant::now();
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(
         data.get_address_by_address_or_id(address_or_id.clone())
             .await
     );
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    data.account_full_info(address, account_id).await.into()
+    let res = data.account_full_info(address, account_id).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_full_info");
+    res
 }
 
 async fn account_txs(
@@ -393,6 +401,7 @@ async fn account_txs(
     account_id_or_address: web::Path<String>,
     web::Query(query): web::Query<IncomingAccountTxsQuery>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
+    let start = Instant::now();
     let pagination = api_try!(parse_query(PaginationQuery {
         from: query.from,
         limit: query.limit,
@@ -414,9 +423,12 @@ async fn account_txs(
 
     let token_like = query.token.map(|token| TokenLike::parse(&token));
 
-    data.account_txs(pagination, address, token_like, second_address)
+    let res = data
+        .account_txs(pagination, address, token_like, second_address)
         .await
-        .into()
+        .into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_txs");
+    res
 }
 
 async fn account_pending_txs(
@@ -424,6 +436,7 @@ async fn account_pending_txs(
     account_id_or_address: web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, SerialId>> {
+    let start = Instant::now();
     let query = api_try!(parse_query(query).map_err(Error::from));
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(
@@ -431,9 +444,12 @@ async fn account_pending_txs(
             .await
     );
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    data.account_pending_txs(query, address, account_id)
+    let res = data
+        .account_pending_txs(query, address, account_id)
         .await
-        .into()
+        .into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_pending_txs");
+    res
 }
 
 pub fn api_scope(
@@ -516,7 +532,7 @@ mod tests {
                 move |cfg: &TestServerConfig| {
                     api_scope(
                         cfg.pool.clone(),
-                        TokenDBCache::new(),
+                        TokenDBCache::new(cfg.config.api.common.invalidate_token_cache_period()),
                         cfg.config.eth_watch.confirmations_for_eth_event,
                     )
                 },

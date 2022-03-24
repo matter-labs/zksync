@@ -27,6 +27,7 @@ use zksync_api_types::{
 };
 use zksync_storage::misc::records::Subsidy;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{
     tx::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
@@ -41,16 +42,17 @@ use zksync_utils::{
 // Local uses
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
-    core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TokenPriceRequestType},
     signature_checker::{
         BatchRequest, OrderRequest, RequestData, Toggle2FARequest, TxRequest, VerifiedTx,
         VerifySignatureRequest,
     },
-    tx_error::{Toggle2FAError, TxAddError},
-    utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
+    tx_error::Toggle2FAError,
+    utils::block_details_cache::BlockDetailsCache,
 };
 use zksync_config::configs::api::CommonApiConfig;
+use zksync_mempool::MempoolTransactionRequest;
+use zksync_types::tx::error::TxAddError;
 
 use super::rpc_server::types::RequestMetadata;
 use crate::fee_ticker::{FeeTicker, PriceError};
@@ -59,7 +61,7 @@ const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
 #[derive(Clone)]
 pub struct TxSender {
-    pub core_api_client: CoreApiClient,
+    pub mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     pub sign_verify_requests: mpsc::Sender<VerifySignatureRequest>,
     pub ticker: FeeTicker,
 
@@ -99,8 +101,8 @@ pub enum SubmitError {
     #[error("Failed to toggle 2FA: {0}.")]
     Toggle2FA(#[from] Toggle2FAError),
 
-    #[error("Communication error with the core server: {0}.")]
-    CommunicationCoreServer(String),
+    #[error("Communication error with the mempool: {0}.")]
+    MempoolCommunication(String),
     #[error("Price error {0}")]
     PriceError(#[from] PriceError),
     #[error("Internal error.")]
@@ -118,8 +120,8 @@ impl SubmitError {
         Self::Other(msg.to_string())
     }
 
-    pub fn communication_core_server(msg: impl Display) -> Self {
-        Self::CommunicationCoreServer(msg.to_string())
+    pub fn mempool_communication(msg: impl Display) -> Self {
+        Self::MempoolCommunication(msg.to_string())
     }
 
     pub fn invalid_params(msg: impl Display) -> Self {
@@ -145,36 +147,18 @@ impl TxSender {
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker: FeeTicker,
         config: &CommonApiConfig,
-        private_url: String,
-    ) -> Self {
-        let core_api_client = CoreApiClient::new(private_url);
-
-        Self::with_client(
-            core_api_client,
-            connection_pool,
-            sign_verify_request_sender,
-            ticker,
-            config,
-        )
-    }
-
-    pub(crate) fn with_client(
-        core_api_client: CoreApiClient,
-        connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker: FeeTicker,
-        config: &CommonApiConfig,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
         let max_number_of_transactions_per_batch =
             config.max_number_of_transactions_per_batch as usize;
         let max_number_of_authors_per_batch = config.max_number_of_authors_per_batch as usize;
 
         Self {
-            core_api_client,
+            mempool_tx_sender,
             pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
             ticker,
-            tokens: TokenDBCache::new(),
+            tokens: TokenDBCache::new(config.invalidate_token_cache_period()),
             forced_exit_checker: ForcedExitChecker::new(
                 config.forced_exit_minimum_account_age_secs,
             ),
@@ -240,6 +224,12 @@ impl TxSender {
 
         if matches!(current_type, EthAccountType::CREATE2) {
             return Err(SubmitError::Toggle2FA(Toggle2FAError::CREATE2));
+        }
+
+        // When 2FA is being enabled, supplied PubKeyHash is not used, so such a request
+        // is not valid.
+        if toggle_2fa.enable && toggle_2fa.pub_key_hash.is_some() {
+            return Err(SubmitError::Toggle2FA(Toggle2FAError::UnusedPubKeyHash));
         }
 
         let new_type = if toggle_2fa.enable {
@@ -601,12 +591,15 @@ impl TxSender {
                 .await?;
         }
 
-        // Send verified transactions to the mempool.
-        self.core_api_client
-            .send_tx(verified_tx)
+        let (sender, receiver) = oneshot::channel();
+        let item = MempoolTransactionRequest::NewTx(Box::new(verified_tx), sender);
+        let mut mempool_sender = self.mempool_tx_sender.clone();
+        mempool_sender
+            .send(item)
             .await
-            .map_err(SubmitError::communication_core_server)?
-            .map_err(SubmitError::TxAdd)?;
+            .map_err(SubmitError::internal)?;
+
+        receiver.await.map_err(SubmitError::internal)??;
 
         // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
         if let Some(fee_data_for_subsidy) = fee_data_for_subsidy {
@@ -882,12 +875,17 @@ impl TxSender {
         verified_txs.extend(verified_batch.into_iter());
 
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
-        // Send verified transactions to the mempool.
-        self.core_api_client
-            .send_txs_batch(verified_txs, verified_signatures)
+
+        let (sender, receiver) = oneshot::channel();
+        let item =
+            MempoolTransactionRequest::NewTxsBatch(verified_txs, verified_signatures, sender);
+        let mut mempool_sender = self.mempool_tx_sender.clone();
+        mempool_sender
+            .send(item)
             .await
-            .map_err(SubmitError::communication_core_server)?
-            .map_err(SubmitError::TxAdd)?;
+            .map_err(SubmitError::mempool_communication)?;
+
+        receiver.await.map_err(SubmitError::internal)??;
 
         let batch_hash = TxHash::batch_hash(&tx_hashes);
 
@@ -992,6 +990,14 @@ impl TxSender {
         &self,
         token_id: impl Into<TokenLike>,
     ) -> Result<Token, SubmitError> {
+        let token_id = token_id.into();
+        // Try to find the token in the cache first.
+        if let Some(token) = self.tokens.try_get_token_from_cache(token_id.clone()).await {
+            return Ok(token);
+        }
+
+        // Establish db connection and repeat the query, so the token is loaded
+        // from the db.
         let mut storage = self
             .pool
             .access_storage()

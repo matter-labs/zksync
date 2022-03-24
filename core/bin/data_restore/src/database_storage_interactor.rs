@@ -381,11 +381,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         }
     }
 
-    pub async fn update_tree_cache(
-        &mut self,
-        block_number: BlockNumber,
-        tree_cache: serde_json::Value,
-    ) {
+    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: String) {
         let mut transaction = self
             .storage
             .start_transaction()

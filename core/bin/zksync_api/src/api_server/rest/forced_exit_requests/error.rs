@@ -101,7 +101,7 @@ impl SumbitErrorCode {
             SubmitError::IncorrectTx(_) => Self::IncorrectTx,
             SubmitError::TxAdd(_) => Self::TxAdd,
             SubmitError::InappropriateFeeToken => Self::InappropriateFeeToken,
-            SubmitError::CommunicationCoreServer(_) => Self::CommunicationCoreServer,
+            SubmitError::MempoolCommunication(_) => Self::CommunicationCoreServer,
             SubmitError::Internal(_) => Self::Internal,
             SubmitError::Other(_) => Self::Other,
             SubmitError::Toggle2FA(_) => Self::Other,

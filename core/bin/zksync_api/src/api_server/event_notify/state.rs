@@ -1,10 +1,10 @@
 use crate::api_server::rpc_server::types::{BlockInfo, ResponseAccountState};
-use crate::utils::token_db_cache::TokenDBCache;
 use lru_cache::LruCache;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
 use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
 use zksync_storage::ConnectionPool;
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
@@ -16,17 +16,20 @@ pub struct NotifierState {
     pub(super) cache_of_transaction_receipts: LruCache<Vec<u8>, TxReceiptResponse>,
     pub(super) cache_of_blocks_info: LruCache<BlockNumber, BlockInfo>,
     pub(super) tokens_cache: TokenDBCache,
-
     pub(super) db_pool: ConnectionPool,
 }
 
 impl NotifierState {
-    pub fn new(cache_capacity: usize, db_pool: ConnectionPool) -> Self {
+    pub fn new(
+        cache_capacity: usize,
+        db_pool: ConnectionPool,
+        token_cache_invalidate_period: Duration,
+    ) -> Self {
         Self {
             cache_of_executed_priority_operations: LruCache::new(cache_capacity),
             cache_of_transaction_receipts: LruCache::new(cache_capacity),
             cache_of_blocks_info: LruCache::new(cache_capacity),
-            tokens_cache: TokenDBCache::new(),
+            tokens_cache: TokenDBCache::new(token_cache_invalidate_period),
             db_pool,
         }
     }

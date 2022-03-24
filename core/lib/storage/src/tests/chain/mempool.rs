@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Generates several different `SignedZkSyncTx` objects.
-fn franklin_txs() -> Vec<SignedZkSyncTx> {
+fn zksync_txs() -> Vec<SignedZkSyncTx> {
     let transfer_1 = Transfer::new(
         AccountId(42),
         Address::random(),
@@ -138,7 +138,7 @@ fn unwrap_tx(tx: SignedTxVariant) -> SignedZkSyncTx {
 #[db_test]
 async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage)
             .insert_tx(&tx.clone())
@@ -147,8 +147,8 @@ async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Load the txs and check that they match the expected list.
-    let (txs_from_db, _) = MempoolSchema(&mut storage)
-        .load_txs()
+    let txs_from_db = MempoolSchema(&mut storage)
+        .load_txs(&[])
         .await
         .expect("Can't load txs");
     assert_eq!(txs_from_db.len(), txs.len());
@@ -204,7 +204,7 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         .await?;
 
     // Load the txs and check that they match the expected list.
-    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
+    let txs_from_db = MempoolSchema(&mut storage).load_txs(&[]).await?;
     assert_eq!(txs_from_db.len(), elements_count);
 
     assert!(matches!(txs_from_db[0], SignedTxVariant::Tx(_)));
@@ -232,7 +232,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     const SPLIT_TXS_AT: usize = 2;
 
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage).insert_tx(&tx.clone()).await?;
     }
@@ -248,7 +248,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Load the txs and check that they match the expected list.
-    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
+    let txs_from_db = MempoolSchema(&mut storage).load_txs(&[]).await?;
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
@@ -262,7 +262,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 #[db_test]
 async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage)
             .insert_tx(&tx.clone())
@@ -299,7 +299,7 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let retained_hashes: Vec<_> = txs[1..].iter().map(|tx| tx.hash()).collect();
 
     // Load the txs and check that they match the expected list.
-    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
+    let txs_from_db = MempoolSchema(&mut storage).load_txs(&[]).await?;
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {

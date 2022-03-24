@@ -11,7 +11,7 @@ use zksync_types::{PriorityOp, SignedZkSyncTx, H256};
 // Local imports
 
 #[derive(Debug, FromRow)]
-pub struct RevertedBlock {
+pub(crate) struct RevertedBlock {
     pub number: i64,
     // These values should not change after re-applying the reverted block.
     pub unprocessed_priority_op_before: i64,
@@ -20,14 +20,18 @@ pub struct RevertedBlock {
 }
 
 #[derive(Debug, FromRow)]
-pub struct MempoolTx {
+pub(crate) struct MempoolTx {
+    #[allow(dead_code)]
     pub id: i64,
+    #[allow(dead_code)]
     pub tx_hash: String,
     pub tx: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
     pub batch_id: i64,
+    #[allow(dead_code)]
     pub next_priority_op_serial_id: Option<i64>,
+    #[allow(dead_code)]
     pub reverted: bool,
 }
 
@@ -47,16 +51,19 @@ impl TryFrom<MempoolTx> for SignedZkSyncTx {
 }
 
 #[derive(Debug, FromRow, PartialEq)]
-pub struct QueuedBatchTx {
+pub(crate) struct QueuedBatchTx {
     pub tx_hash: String,
     pub created_at: DateTime<Utc>,
 }
+
 #[derive(Debug, FromRow)]
-pub struct MempoolPriorityOp {
+pub(crate) struct MempoolPriorityOp {
     pub serial_id: i64,
+    #[allow(dead_code)]
     pub tx_hash: String,
     pub eth_hash: Vec<u8>,
     pub data: serde_json::Value,
+    #[allow(dead_code)]
     pub created_at: DateTime<Utc>,
     pub eth_block: i64,
     pub eth_block_index: Option<i32>,

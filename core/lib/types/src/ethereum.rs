@@ -1,52 +1,13 @@
 //! Common primitives for the Ethereum network interaction.
 // Built-in deps
-use std::{convert::TryFrom, fmt, str::FromStr};
 // External uses
-use ethabi::{decode, ParamType};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 // Local uses
 use crate::aggregated_operations::{AggregatedActionType, AggregatedOperation};
-use zksync_basic_types::{Log, H256, U256};
+use zksync_basic_types::{H256, U256};
 
 /// Numerical identifier of the Ethereum operation.
 pub type EthOpId = i64;
-
-/// Type of the transactions sent to the Ethereum network.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum OperationType {
-    /// Commit action (`commitBlock` method of the smart contract).
-    Commit,
-    /// Verify action (`verifyBlock` method of the smart contract).
-    Verify,
-    /// Withdraw action (`completeWithdrawals` method of the smart contract).
-    Withdraw,
-}
-
-impl fmt::Display for OperationType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Commit => write!(f, "commit"),
-            Self::Verify => write!(f, "verify"),
-            Self::Withdraw => write!(f, "withdraw"),
-        }
-    }
-}
-
-impl FromStr for OperationType {
-    type Err = UnknownOperationType;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let op = match s {
-            "commit" => Self::Commit,
-            "verify" => Self::Verify,
-            "withdraw" => Self::Withdraw,
-            _ => return Err(UnknownOperationType(String::from(s))),
-        };
-
-        Ok(op)
-    }
-}
 
 /// Stored Ethereum operation.
 #[derive(Debug, Clone)]
@@ -115,57 +76,6 @@ pub struct InsertedOperationResponse {
     /// Nonce assigned for the Ethereum operation. Meant to be used for all the
     /// transactions sent within one particular Ethereum operation.
     pub nonce: U256,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompleteWithdrawalsTx {
-    pub tx_hash: H256,
-    pub pending_withdrawals_queue_start_index: u32,
-    pub pending_withdrawals_queue_end_index: u32,
-}
-
-impl TryFrom<Log> for CompleteWithdrawalsTx {
-    type Error = CompleteWithdrawalsTxParseError;
-
-    fn try_from(event: Log) -> Result<CompleteWithdrawalsTx, CompleteWithdrawalsTxParseError> {
-        let mut decoded_event = decode(
-            &[
-                ParamType::Uint(32), // queueStartIndex
-                ParamType::Uint(32), // queueEndIndex
-            ],
-            &event.data.0,
-        )?;
-
-        Ok(CompleteWithdrawalsTx {
-            tx_hash: event
-                .transaction_hash
-                .ok_or(CompleteWithdrawalsTxParseError::TransactionHashMissing)?,
-            pending_withdrawals_queue_start_index: decoded_event
-                .remove(0)
-                .into_uint()
-                .as_ref()
-                .map(U256::as_u32)
-                .ok_or(CompleteWithdrawalsTxParseError::PendingWithdrawalsQueueStartConversion)?,
-            pending_withdrawals_queue_end_index: decoded_event
-                .remove(0)
-                .into_uint()
-                .as_ref()
-                .map(U256::as_u32)
-                .ok_or(CompleteWithdrawalsTxParseError::PendingWithdrawalsQueueEndConversion)?,
-        })
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum CompleteWithdrawalsTxParseError {
-    #[error("Cannot decode event data due to ETH abi error: {0}")]
-    DecodeEventData(#[from] ethabi::Error),
-    #[error("Cannot get a hash for a complete withdrawal transaction")]
-    TransactionHashMissing,
-    #[error("pending_withdrawals_queue_start_index value conversion failed")]
-    PendingWithdrawalsQueueStartConversion,
-    #[error("pending_withdrawals_queue_end_index value conversion failed")]
-    PendingWithdrawalsQueueEndConversion,
 }
 
 #[derive(Debug, Error, PartialEq)]

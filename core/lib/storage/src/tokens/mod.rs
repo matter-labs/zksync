@@ -404,6 +404,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Given the numeric token ID, symbol or address, returns token.
     pub async fn get_token(&mut self, token_like: TokenLike) -> QueryResult<Option<Token>> {
         let start = Instant::now();
+
         let db_token = match token_like {
             TokenLike::Id(token_id) => {
                 sqlx::query_as!(
@@ -432,11 +433,17 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                 .await?
             }
             TokenLike::Symbol(token_symbol) => {
+                // Note: for address and symbol queries we use `lower(...) = lower(...)` syntax, which means
+                // that we need to do a full scan over the table in order to achieve case-insensitive search.
+                // Luckily, we
+                // 1) don't have too much tokens.
+                // 2) most tokens requests will be handled by `TokenDbCache` anyway,
+                // so it shouldn't be a problem.
                 sqlx::query_as!(
                     DbToken,
                     r#"
                     SELECT id, address, decimals, kind as "kind: _", symbol FROM tokens
-                    WHERE symbol = $1
+                    WHERE lower(symbol) = lower($1)
                     LIMIT 1
                     "#,
                     token_symbol

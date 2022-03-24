@@ -7,73 +7,66 @@
 //! All the incoming data is assumed to be correct and not double-checked
 //! for correctness.
 
-use crate::mempool::MempoolTransactionRequest;
-use actix_web::error::InternalError;
-use actix_web::{web, App, HttpResponse, HttpServer};
-use futures::{
-    channel::{mpsc, oneshot},
-    sink::SinkExt,
-    StreamExt,
-};
-
 use std::thread;
+use std::time::{Duration, Instant};
+
+use actix_web::{web, App, HttpResponse, HttpServer};
+use futures::{channel::mpsc, StreamExt};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use zksync_api_types::CoreStatus;
+
 use zksync_config::configs::api::PrivateApiConfig;
-use zksync_types::{tx::TxEthSignature, SignedZkSyncTx};
+use zksync_eth_client::EthereumGateway;
+use zksync_storage::ConnectionPool;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
-#[derive(Debug, Clone)]
+const STATUS_INVALIDATION_PERIOD: Duration = Duration::from_secs(60);
+
+#[derive(Debug)]
 struct AppState {
-    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+    connection_pool: ConnectionPool,
+    read_only_connection_pool: ConnectionPool,
+    eth_client: EthereumGateway,
+    status_cache: RwLock<Option<(CoreStatus, Instant)>>,
 }
 
-/// Adds a new transaction into the mempool.
-/// Returns a JSON representation of `Result<(), TxAddError>`.
-/// Expects transaction to be checked on the API side.
-#[actix_web::post("/new_tx")]
-async fn new_tx(
-    data: web::Data<AppState>,
-    web::Json(tx): web::Json<SignedZkSyncTx>,
-) -> actix_web::Result<HttpResponse> {
-    let (sender, receiver) = oneshot::channel();
-    let item = MempoolTransactionRequest::NewTx(Box::new(tx), sender);
-    let mut mempool_sender = data.mempool_tx_sender.clone();
-    mempool_sender.send(item).await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
+/// Health check.
+/// The core actor is expected have connection to web3 and both main/replica databases
+#[actix_web::get("/status")]
+async fn status(data: web::Data<AppState>) -> actix_web::Result<HttpResponse> {
+    if let Some((status, data)) = data.status_cache.read().await.as_ref() {
+        if data.elapsed() < STATUS_INVALIDATION_PERIOD {
+            return Ok(HttpResponse::Ok().json(status.clone()));
+        }
+    }
 
-    let response = receiver.await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
+    // We need to get a lock here so we don't abuse the database and eth node connections
+    // with multiple requests from other API nodes when the cache has been invalidated.
+
+    let mut status = data.status_cache.write().await;
+    let main_database_status = data.connection_pool.access_storage().await.is_ok();
+    let replica_database_status = data
+        .read_only_connection_pool
+        .access_storage()
+        .await
+        .is_ok();
+    let eth_status = data.eth_client.block_number().await.is_ok();
+
+    let response = CoreStatus {
+        main_database_available: main_database_status,
+        replica_database_available: replica_database_status,
+        web3_available: eth_status,
+    };
+    *status = Some((response.clone(), Instant::now()));
 
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Adds a new transactions batch into the mempool.
-/// Returns a JSON representation of `Result<(), TxAddError>`.
-/// Expects transaction to be checked on the API side.
-#[actix_web::post("/new_txs_batch")]
-async fn new_txs_batch(
-    data: web::Data<AppState>,
-    web::Json((txs, eth_signatures)): web::Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
-) -> actix_web::Result<HttpResponse> {
-    let (sender, receiver) = oneshot::channel();
-    let item = MempoolTransactionRequest::NewTxsBatch(txs, eth_signatures, sender);
-    let mut mempool_sender = data.mempool_tx_sender.clone();
-    mempool_sender.send(item).await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    let response = receiver.await.map_err(|err| {
-        InternalError::from_response(err, HttpResponse::InternalServerError().finish())
-    })?;
-
-    Ok(HttpResponse::Ok().json(response))
-}
-
-#[allow(clippy::too_many_arguments)]
 pub fn start_private_core_api(
-    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+    connection_pool: ConnectionPool,
+    read_only_connection_pool: ConnectionPool,
+    eth_client: EthereumGateway,
     config: PrivateApiConfig,
 ) -> JoinHandle<()> {
     let (panic_sender, mut panic_receiver) = mpsc::channel(1);
@@ -88,7 +81,10 @@ pub fn start_private_core_api(
                 // Start HTTP server.
                 HttpServer::new(move || {
                     let app_state = AppState {
-                        mempool_tx_sender: mempool_tx_sender.clone(),
+                        connection_pool: connection_pool.clone(),
+                        read_only_connection_pool: read_only_connection_pool.clone(),
+                        eth_client: eth_client.clone(),
+                        status_cache: Default::default(),
                     };
 
                     // By calling `register_data` instead of `data` we're avoiding double
@@ -97,8 +93,7 @@ pub fn start_private_core_api(
                         .wrap(actix_web::middleware::Logger::default())
                         .app_data(web::Data::new(app_state))
                         .app_data(web::JsonConfig::default().limit(2usize.pow(32)))
-                        .service(new_tx)
-                        .service(new_txs_batch)
+                        .service(status)
                 })
                 .bind(&config.bind_addr())
                 .expect("failed to bind")

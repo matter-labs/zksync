@@ -233,6 +233,13 @@ describe('ZkSync REST API V0.2 tests', () => {
         const secondToken = await provider.tokenInfo(1);
         expect(tokens.list[0]).to.be.eql(firstToken);
         expect(tokens.list[1]).to.be.eql(secondToken);
+
+        // Case insensitivity check.
+        const ethToken1 = await provider.tokenInfo('ETH');
+        const ethToken2 = await provider.tokenInfo('eth');
+        expect(tokens.list[0]).to.be.eql(ethToken1);
+        expect(tokens.list[0]).to.be.eql(ethToken2);
+
         const firstTokenUSDPrice = await provider.getTokenPrice(0);
         const secondTokenUSDPrice = await provider.getTokenPrice(1);
         const expectedPrice = firstTokenUSDPrice / secondTokenUSDPrice;

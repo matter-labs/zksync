@@ -23,7 +23,7 @@ pub struct StorageBlock {
 }
 
 #[derive(Debug, FromRow)]
-pub struct StorageIncompleteBlock {
+pub(crate) struct StorageIncompleteBlock {
     pub number: i64,
     pub fee_account_id: i64,
     pub unprocessed_prior_op_before: i64,
@@ -35,12 +35,12 @@ pub struct StorageIncompleteBlock {
 }
 
 #[derive(Debug, FromRow)]
-pub struct StorageRootHash {
+pub(crate) struct StorageRootHash {
     pub root_hash: Vec<u8>,
 }
 
 #[derive(Debug, FromRow)]
-pub struct StoragePendingBlock {
+pub(crate) struct StoragePendingBlock {
     pub number: i64,
     pub chunks_left: i64,
     pub unprocessed_priority_op_before: i64,
@@ -75,9 +75,10 @@ pub struct StorageBlockDetails {
     pub verified_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct BlockTransactionItem {
     pub tx_hash: String,
+    pub block_index: Option<i32>,
     pub block_number: i64,
     pub op: Value,
     pub success: bool,
@@ -87,11 +88,12 @@ pub struct BlockTransactionItem {
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
-pub struct TransactionItem {
+pub(crate) struct TransactionItem {
     // Number from a sequence consisting of priority operations and transactions
     pub sequence_number: Option<i64>,
     pub tx_hash: Vec<u8>,
     pub block_number: i64,
+    pub block_index: Option<i32>,
     pub op: Value,
     pub created_at: DateTime<Utc>,
     pub success: bool,
@@ -133,7 +135,8 @@ impl From<StorageBlockDetails> for BlockDetails {
 }
 
 #[derive(Debug, FromRow)]
-pub struct StorageBlockMetadata {
+pub(crate) struct StorageBlockMetadata {
+    #[allow(dead_code)]
     pub block_number: i64,
     pub fast_processing: bool,
 }

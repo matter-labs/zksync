@@ -13,7 +13,7 @@ use zksync_types::{
 use super::records::{StorageTxData, StorageTxReceipt};
 
 impl StorageTxReceipt {
-    pub fn receipt_from_storage_receipt(
+    pub(super) fn receipt_from_storage_receipt(
         receipt: StorageTxReceipt,
         is_block_finalized: Option<bool>,
     ) -> Receipt {
@@ -58,7 +58,7 @@ impl StorageTxReceipt {
 }
 
 impl StorageTxData {
-    pub fn tx_data_from_zksync_tx(
+    pub(super) fn tx_data_from_zksync_tx(
         tx: ZkSyncTx,
         complete_withdrawals_tx_hash: Option<H256>,
     ) -> TransactionData {
@@ -84,7 +84,7 @@ impl StorageTxData {
         TransactionData::L2(tx)
     }
 
-    pub fn data_from_storage_data(
+    pub(super) fn data_from_storage_data(
         data: StorageTxData,
         is_block_finalized: Option<bool>,
         complete_withdrawals_tx_hash: Option<H256>,
@@ -118,6 +118,7 @@ impl StorageTxData {
             };
             Transaction {
                 tx_hash,
+                block_index: data.block_index.map(|i| i as u32),
                 block_number,
                 op,
                 status,
@@ -132,6 +133,7 @@ impl StorageTxData {
             );
             Transaction {
                 tx_hash,
+                block_index: data.block_index.map(|i| i as u32),
                 block_number: None,
                 op: tx_data,
                 status: TxInBlockStatus::Queued,

@@ -53,3 +53,20 @@ Get block transactions
             + pagination (PaginationFromHash, required)
             + list (array[Transaction.InBlock], required)
         + error (Error, required, nullable)
+
+## api/v0.2/blocks/blockNumber/transactions/blockIndex [/blocks/{blockNumber}/transactions/{blockIndex}]
+
++ Parameters
+    + `blockNumber`: 1 (required, BlockNumber) - An integer block number
+    + `blockIndex`: 0 (required, BlockIndex) - An integer index tx in block
+
+### Get transaction in block [GET]
+Get transaction in block
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (object, required{{isResultNullable}})
+            + Transaction.InBlock
+        + error (Error, required, nullable)

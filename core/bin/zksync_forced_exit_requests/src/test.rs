@@ -119,7 +119,7 @@ impl CoreInteractionWrapper for MockCoreInteractionWrapper {
     }
 
     async fn send_and_save_txs_batch(
-        &self,
+        &mut self,
         request: &ForcedExitRequest,
         mut txs: Vec<SignedZkSyncTx>,
     ) -> anyhow::Result<Vec<TxHash>> {

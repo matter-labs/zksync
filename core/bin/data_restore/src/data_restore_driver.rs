@@ -259,7 +259,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         interactor
             .update_tree_cache(
                 self.tree_state.block_number,
-                serde_json::to_value(tree_cache).expect("failed to serialize tree cache"),
+                serde_json::to_string(&tree_cache).expect("failed to serialize tree cache"),
             )
             .await;
     }
