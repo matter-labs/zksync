@@ -192,7 +192,7 @@ async fn gas_price_test() {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address, genesis_state(&fee_account.address));
 
-    let genesis_root = genesis_state(&fee_account.address).tree.root_hash();
+    let genesis_root = genesis_state(&fee_account.address).state.root_hash();
 
     let contracts = deploy_contracts(false, genesis_root);
 

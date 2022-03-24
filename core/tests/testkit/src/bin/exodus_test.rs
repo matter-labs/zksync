@@ -413,7 +413,7 @@ async fn exit_test() {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address, genesis_state(&fee_account.address));
 
-    let initial_root_hash = genesis_state(&fee_account.address).tree.root_hash();
+    let initial_root_hash = genesis_state(&fee_account.address).state.root_hash();
 
     let deploy_timer = Instant::now();
     info!("deploying contracts");
