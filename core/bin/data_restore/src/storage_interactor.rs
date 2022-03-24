@@ -196,15 +196,15 @@ impl StorageInteractor<'_> {
         storage_interact!(self.get_cached_tree_state())
     }
 
-    /// Saves the tree cache in the database.
+    /// Deletes the latest tree cache in the database and saves the new one.
     ///
     /// # Arguments
     ///
     /// * `block_number` - The corresponding block number
     /// * `tree_cache` - Merkle tree cache
     ///
-    pub async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: String) {
-        storage_interact!(self.store_tree_cache(block_number, tree_cache))
+    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: String) {
+        storage_interact!(self.update_tree_cache(block_number, tree_cache))
     }
 
     /// Retrieves the maximum serial id of a priority requests

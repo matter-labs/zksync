@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 // External deps
 use web3::{
     contract::Contract,
@@ -246,15 +248,16 @@ impl<T: Transport> DataRestoreDriver<T> {
         self.tree_state = tree_state;
     }
 
-    async fn store_tree_cache(&mut self, interactor: &mut StorageInteractor<'_>) {
+    async fn update_tree_cache(&mut self, interactor: &mut StorageInteractor<'_>) {
         vlog::info!(
-            "Storing the tree cache, block number: {}",
+            "Updating the tree cache, block number: {}",
             self.tree_state.block_number
         );
+
         self.tree_state.state.root_hash();
         let tree_cache = self.tree_state.state.get_balance_tree().get_internals();
         interactor
-            .store_tree_cache(
+            .update_tree_cache(
                 self.tree_state.block_number,
                 serde_json::to_string(&tree_cache).expect("failed to serialize tree cache"),
             )
@@ -283,6 +286,8 @@ impl<T: Transport> DataRestoreDriver<T> {
                 cache.nfts,
             )
         } else {
+            vlog::info!("Building tree from scratch");
+
             let tree_state = transaction.get_tree_state().await;
             TreeState::load(
                 tree_state.last_block_number,
@@ -295,6 +300,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             StorageUpdateState::Events => {
                 // Update operations
                 let new_ops_blocks = self.update_operations_state(&mut transaction).await;
+
                 // Update tree
                 self.update_tree_state(&mut transaction, new_ops_blocks)
                     .await;
@@ -324,8 +330,9 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         let is_finished = self.finite_mode && (total_verified_blocks == *last_verified_block);
         // Save tree cache if necessary.
-        if is_finished && !is_cached {
-            self.store_tree_cache(interactor).await;
+        if !is_cached {
+            vlog::info!("Saving tree cache for future re-uses");
+            self.update_tree_cache(interactor).await;
         }
         is_finished
     }
@@ -358,6 +365,9 @@ impl<T: Transport> DataRestoreDriver<T> {
                     // to keep the `state_keeper` consistent with the `eth_sender`.
                     transaction.update_eth_state().await;
 
+                    // We update tree cache for each load of updates to allow fast restart.
+                    self.update_tree_cache(&mut transaction).await;
+
                     transaction.commit().await;
 
                     vlog::info!(
@@ -387,11 +397,6 @@ impl<T: Transport> DataRestoreDriver<T> {
                         if self.final_hash.is_some() && !final_hash_was_found {
                             panic!("Final hash was not met during the state restoring process");
                         }
-
-                        // We've restored all the blocks, our job is done. Store the tree cache for
-                        // consequent usage.
-                        self.store_tree_cache(interactor).await;
-
                         break;
                     }
                 }
@@ -518,6 +523,10 @@ impl<T: Transport> DataRestoreDriver<T> {
         let mut blocks = Vec::new();
 
         let mut last_event_tx_hash = None;
+        // The HashMap from block_num to the RollupOpsBlock data for the tx represented by last_event_tx_hash.
+        // It is used as a cache to reuse the fetched data.
+        let mut last_tx_blocks = HashMap::new();
+
         // TODO (ZKS-722): either due to Ethereum node lag or unknown
         // bug in the events state, we have to additionally filter out
         // already processed rollup blocks.
@@ -529,18 +538,29 @@ impl<T: Transport> DataRestoreDriver<T> {
         {
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.
-            // These blocks go one after the other, and checking only the last transaction hash is safe
-            if let Some(tx) = last_event_tx_hash {
-                if tx == event.transaction_hash {
-                    continue;
-                }
+            // These blocks go one after the other, and checking only the last transaction hash is safe.
+
+            // If the previous tx hash does not exist or it is not equal to the current one, we should
+            // re-fetch the blocks for the new tx hash.
+            if !last_event_tx_hash
+                .map(|tx| tx == event.transaction_hash)
+                .unwrap_or_default()
+            {
+                let blocks = RollupOpsBlock::get_rollup_ops_blocks(&self.web3, event)
+                    .await
+                    .expect("Cant get new operation blocks from events");
+
+                last_tx_blocks = blocks
+                    .into_iter()
+                    .map(|block| (block.block_num, block))
+                    .collect();
+                last_event_tx_hash = Some(event.transaction_hash);
             }
 
-            let block = RollupOpsBlock::get_rollup_ops_blocks(&self.web3, event)
-                .await
-                .expect("Cant get new operation blocks from events");
-            blocks.extend(block);
-            last_event_tx_hash = Some(event.transaction_hash);
+            let rollup_block = last_tx_blocks
+                .remove(&event.block_num)
+                .expect("Block not found");
+            blocks.push(rollup_block);
         }
 
         blocks
