@@ -397,6 +397,7 @@ impl<T: Transport> DataRestoreDriver<T> {
                         if self.final_hash.is_some() && !final_hash_was_found {
                             panic!("Final hash was not met during the state restoring process");
                         }
+                        break;
                     }
                 }
             }
