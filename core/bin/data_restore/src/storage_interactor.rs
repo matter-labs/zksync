@@ -203,11 +203,7 @@ impl StorageInteractor<'_> {
     /// * `block_number` - The corresponding block number
     /// * `tree_cache` - Merkle tree cache
     ///
-    pub async fn store_tree_cache(
-        &mut self,
-        block_number: BlockNumber,
-        tree_cache: serde_json::Value,
-    ) {
+    pub async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: String) {
         storage_interact!(self.store_tree_cache(block_number, tree_cache))
     }
 

@@ -153,13 +153,11 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 metrics::histogram!("witness_generator", start.elapsed(), "stage" => "recreate_tree_from_cache");
 
                 let start = Instant::now();
-                let account_tree_cache = circuit_account_tree.get_internals();
+                let tree_cache = serde_json::to_string(&circuit_account_tree.get_internals())?;
+                metrics::histogram!("tree_cache_size", tree_cache.len() as f64);
+
                 self.database
-                    .store_account_tree_cache(
-                        &mut storage,
-                        block,
-                        serde_json::to_value(account_tree_cache)?,
-                    )
+                    .store_account_tree_cache(&mut storage, block, tree_cache)
                     .await?;
                 metrics::histogram!("witness_generator", start.elapsed(), "stage" => "store_cache");
             } else {
@@ -180,7 +178,8 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             metrics::histogram!("witness_generator", start.elapsed(), "stage" => "recreate_tree_from_scratch");
 
             let start = Instant::now();
-            let tree_cache = serde_json::to_value(circuit_account_tree.get_internals())?;
+            let tree_cache = serde_json::to_string(&circuit_account_tree.get_internals())?;
+            metrics::histogram!("tree_cache_size", tree_cache.len() as f64);
             metrics::histogram!("witness_generator", start.elapsed(), "stage" => "serialize_cache");
 
             let start = Instant::now();
@@ -232,6 +231,12 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         metrics::histogram!("witness_generator", start.elapsed(), "stage" => "store_witness");
 
         metrics::histogram!("witness_generator", fn_start.elapsed(), "stage" => "prepare_witness_and_save_it");
+
+        metrics::gauge!(
+            "last_processed_block",
+            block.block_number.0 as f64,
+            "stage" => "witness_generator"
+        );
         Ok(())
     }
 
@@ -257,6 +262,11 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             *self.start_block,
             *self.block_step
         );
+
+        // Initialize counters for cache hits/misses.
+        metrics::register_counter!("witness_generator.cache_access", "type" => "hit");
+        metrics::register_counter!("witness_generator.cache_access", "type" => "miss");
+
         let mut current_block = self.start_block;
         loop {
             sleep(self.rounds_interval).await;

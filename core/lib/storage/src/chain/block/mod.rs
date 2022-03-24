@@ -1161,19 +1161,18 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Stores account tree cache for a block
+    /// Stores account tree cache for a block.
+    /// Expects `tree_cache` to be a valid encoded JSON.
     pub async fn store_account_tree_cache(
         &mut self,
         block: BlockNumber,
-        tree_cache: serde_json::Value,
+        tree_cache: String,
     ) -> QueryResult<()> {
         let start = Instant::now();
         if *block == 0 {
             return Ok(());
         }
 
-        let tree_cache_str =
-            serde_json::to_string(&tree_cache).expect("Failed to serialize Account Tree Cache");
         sqlx::query!(
             "
             INSERT INTO account_tree_cache (block, tree_cache)
@@ -1182,7 +1181,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             DO NOTHING
             ",
             *block as i64,
-            tree_cache_str,
+            tree_cache,
         )
         .execute(self.0.conn())
         .await?;

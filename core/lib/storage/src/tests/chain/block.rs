@@ -1284,7 +1284,10 @@ async fn test_remove_new_account_tree_cache(mut storage: StorageProcessor<'_>) -
             ))
             .await?;
         BlockSchema(&mut storage)
-            .store_account_tree_cache(BlockNumber(block_number), serde_json::Value::default())
+            .store_account_tree_cache(
+                BlockNumber(block_number),
+                serde_json::Value::default().to_string(),
+            )
             .await?;
     }
 
@@ -1370,7 +1373,10 @@ async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -
             ))
             .await?;
         BlockSchema(&mut storage)
-            .store_account_tree_cache(BlockNumber(block_number), serde_json::Value::default())
+            .store_account_tree_cache(
+                BlockNumber(block_number),
+                serde_json::Value::default().to_string(),
+            )
             .await?;
     }
 
