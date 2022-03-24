@@ -105,9 +105,14 @@ impl ZkSyncStateKeeper {
         for job in &initial_state.root_hash_jobs {
             // Ensure that all jobs are sequential and there are no gaps.
             assert_eq!(
-                job.block, last_block + 1,
-                "Unexpected incomplete block number. Started from block {}, got unexpected block {} instead of expected {}, root hash jobs queue: {:?}",
-                initial_state.last_block_number, job.block, last_block + 1, &initial_state.root_hash_jobs
+                job.block,
+                last_block + 1,
+                "Unexpected incomplete block number. Started from block {}, \
+                got unexpected block {} instead of expected {}, root hash jobs queue: {:?}",
+                initial_state.last_block_number,
+                job.block,
+                last_block + 1,
+                &initial_state.root_hash_jobs
             );
             last_block = job.block;
 

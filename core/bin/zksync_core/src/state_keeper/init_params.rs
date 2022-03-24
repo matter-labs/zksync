@@ -52,8 +52,7 @@ impl ZkSyncStateInitParams {
     ) -> Self {
         let (last_block_number, tree, acc_id_by_addr) = Self::load_account_tree(storage).await;
 
-        let unprocessed_priority_op =
-            Self::unprocessed_priority_op_id(storage, last_block_number).await;
+        let unprocessed_priority_op = Self::unprocessed_priority_op_id(storage).await;
         let nfts = Self::load_nft_tokens(storage, last_block_number).await;
 
         let root_hash_jobs = Self::load_root_hash_jobs(storage).await;
@@ -193,17 +192,12 @@ impl ZkSyncStateInitParams {
             .collect()
     }
 
-    async fn unprocessed_priority_op_id(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-        block_number: BlockNumber,
-    ) -> u64 {
+    async fn unprocessed_priority_op_id(storage: &mut zksync_storage::StorageProcessor<'_>) -> u64 {
         storage
             .chain()
             .block_schema()
-            .get_block(block_number)
+            .next_expected_serial_id()
             .await
             .expect("Unable to load the last block to get unprocessed priority operation")
-            .map(|block| block.processed_priority_ops.1)
-            .unwrap_or(0)
     }
 }

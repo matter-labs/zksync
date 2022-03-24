@@ -1417,6 +1417,13 @@ async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> Query
         "Pending block should be saved"
     );
 
+    // Pending block doesn't change next expected serial ID.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        0,
+        "There should be no serial ID"
+    );
+
     schema.save_incomplete_block(&incomplete_block).await?;
 
     // Pending block should be removed now.
@@ -1429,6 +1436,13 @@ async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> Query
     assert!(
         schema.get_block(block_number).await?.is_none(),
         "Block should not exist"
+    );
+
+    // Next expected serial ID should be loaded from incomplete block.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        1,
+        "Serial ID should be loaded from the incomplete blocks table"
     );
 
     // Finish the block and ensure it's created correctly.
@@ -1444,6 +1458,13 @@ async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> Query
     assert_eq!(
         block_from_storage.new_root_hash,
         complete_block.new_root_hash
+    );
+
+    // Next expected serial ID should be loaded from complete block.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        1,
+        "Serial ID should be loaded from the complete blocks table"
     );
 
     Ok(())
