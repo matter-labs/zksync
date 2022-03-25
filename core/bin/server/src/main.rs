@@ -259,7 +259,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.block_chunk_sizes,
             ));
             let private_config = PrivateApiConfig::from_env();
-            zksync_api::api_server::rest::start_server_thread_detached(
+            tasks.push(zksync_api::api_server::rest::start_server_thread_detached(
                 read_only_connection_pool.clone(),
                 RestApiConfig::from_env().bind_addr(),
                 contracts_config.contract_addr,
@@ -267,7 +267,7 @@ async fn run_server(components: &ComponentsToRun) {
                 sign_check_sender,
                 mempool_tx_request_sender,
                 private_config.url,
-            );
+            ));
         }
     }
 

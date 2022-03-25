@@ -98,9 +98,8 @@ pub fn start_server_thread_detached(
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
-
             actix_rt::System::new().block_on(async move {
+                let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
                 // TODO remove this config ZKS-815
                 let config = ZkSyncConfig::from_env();
 
