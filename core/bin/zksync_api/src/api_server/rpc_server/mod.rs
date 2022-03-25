@@ -254,6 +254,7 @@ impl RpcApp {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
