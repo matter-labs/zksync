@@ -1,9 +1,10 @@
 use std::collections::{HashMap, VecDeque};
 // External uses
 // Workspace uses
+use zksync_state::state::ZkSyncState;
 use zksync_types::{
     block::{IncompleteBlock, PendingBlock as SendablePendingBlock},
-    Account, AccountId, AccountTree, Address, BlockNumber, TokenId, NFT,
+    AccountId, AccountTree, Address, BlockNumber, TokenId, NFT,
 };
 
 use super::{
@@ -13,14 +14,25 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub struct ZkSyncStateInitParams {
-    pub tree: AccountTree,
-    pub acc_id_by_addr: HashMap<Address, AccountId>,
-    pub nfts: HashMap<TokenId, NFT>,
+    /// Restored zkSync state.
+    /// Corresponds to the latest **completed** block.
+    /// This state is used for two purposes: to initialize State Keeper (where we will
+    /// update it to match the latest **incomplete** block), and to initialize Root Hash
+    /// Calculator (where we'll be updating it from this point to the most relevant state,
+    /// yielding completed blocks).
+    pub state: ZkSyncState,
+    /// Block number to which `state` corresponds to`.
     pub last_block_number: BlockNumber,
+    /// ID of the next priority operation.
+    /// Corresponds to the latest observable state, including incomplete blocks.
     pub unprocessed_priority_op: u64,
-
+    /// Partially created block we should start with. May not exist if there were no
+    /// new transactions since the last block was sealed and before the restart of the server.
     pub pending_block: Option<SendablePendingBlock>,
+    /// Data on the incomplete blocks that were created by the state keeper, but not yet processed
+    /// by the root hash calculator.
     pub root_hash_jobs: Vec<BlockRootHashJob>,
+    /// Reverted blocks that we should process first (normally empty).
     pub reverted_blocks: VecDeque<IncompleteBlock>,
 }
 
@@ -32,10 +44,12 @@ impl Default for ZkSyncStateInitParams {
 
 impl ZkSyncStateInitParams {
     pub fn new() -> Self {
+        let tree = AccountTree::new(zksync_crypto::params::account_tree_depth());
+        let acc_id_by_addr = HashMap::new();
+        let nfts = HashMap::new();
+
         Self {
-            tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
-            acc_id_by_addr: HashMap::new(),
-            nfts: HashMap::new(),
+            state: ZkSyncState::new(tree, acc_id_by_addr, nfts),
             last_block_number: BlockNumber(0),
             unprocessed_priority_op: 0,
 
@@ -52,8 +66,7 @@ impl ZkSyncStateInitParams {
     ) -> Self {
         let (last_block_number, tree, acc_id_by_addr) = Self::load_account_tree(storage).await;
 
-        let unprocessed_priority_op =
-            Self::unprocessed_priority_op_id(storage, last_block_number).await;
+        let unprocessed_priority_op = Self::unprocessed_priority_op_id(storage).await;
         let nfts = Self::load_nft_tokens(storage, last_block_number).await;
 
         let root_hash_jobs = Self::load_root_hash_jobs(storage).await;
@@ -67,9 +80,7 @@ impl ZkSyncStateInitParams {
             Self::load_reverted_blocks(storage, fee_account_id, available_chunk_sizes).await;
 
         let init_params = Self {
-            tree,
-            acc_id_by_addr,
-            nfts,
+            state: ZkSyncState::new(tree, acc_id_by_addr, nfts),
             last_block_number,
             unprocessed_priority_op,
             pending_block,
@@ -111,6 +122,7 @@ impl ZkSyncStateInitParams {
             .await
             .unwrap()
     }
+
     async fn load_pending_block(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         last_block_number: BlockNumber,
@@ -173,11 +185,6 @@ impl ZkSyncStateInitParams {
         }
     }
 
-    pub fn insert_account(&mut self, id: AccountId, acc: Account) {
-        self.acc_id_by_addr.insert(acc.address, id);
-        self.tree.insert(*id, acc);
-    }
-
     async fn load_nft_tokens(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
@@ -193,17 +200,12 @@ impl ZkSyncStateInitParams {
             .collect()
     }
 
-    async fn unprocessed_priority_op_id(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-        block_number: BlockNumber,
-    ) -> u64 {
+    async fn unprocessed_priority_op_id(storage: &mut zksync_storage::StorageProcessor<'_>) -> u64 {
         storage
             .chain()
             .block_schema()
-            .get_block(block_number)
+            .next_expected_serial_id()
             .await
             .expect("Unable to load the last block to get unprocessed priority operation")
-            .map(|block| block.processed_priority_ops.1)
-            .unwrap_or(0)
     }
 }

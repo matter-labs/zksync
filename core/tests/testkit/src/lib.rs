@@ -25,9 +25,11 @@ pub mod types;
 pub fn genesis_state(fee_account_address: &Address) -> ZkSyncStateInitParams {
     let operator_account = Account::default_with_address(fee_account_address);
     let mut params = ZkSyncStateInitParams::new();
-    params.insert_account(AccountId(0), operator_account);
+    params.state.insert_account(AccountId(0), operator_account);
     let mut nft_storage = Account::default_with_address(&NFT_STORAGE_ACCOUNT_ADDRESS);
     nft_storage.set_balance(NFT_TOKEN_ID, BigUint::from(MIN_NFT_TOKEN_ID));
-    params.insert_account(NFT_STORAGE_ACCOUNT_ID, nft_storage);
+    params
+        .state
+        .insert_account(NFT_STORAGE_ACCOUNT_ID, nft_storage);
     params
 }

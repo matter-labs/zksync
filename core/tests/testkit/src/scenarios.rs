@@ -31,7 +31,7 @@ pub async fn perform_basic_tests() {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account_address, genesis_state(&fee_account_address));
 
-    let initial_root = genesis_state(&fee_account.address).tree.root_hash();
+    let initial_root = genesis_state(&fee_account.address).state.root_hash();
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
@@ -122,11 +122,17 @@ pub async fn perform_basic_tests() {
     assert!(operations_num > 0);
     assert_eq!(operations_num, expected_operations_num);
 
+    let acc_state_from_test_setup = test_setup
+        .get_accounts_state()
+        .await
+        .into_iter()
+        .map(|(id, acc)| (id.0, acc))
+        .collect();
     verify_restore(
         &testkit_config,
         &contracts,
         fee_account_address,
-        test_setup.get_accounts_state().await,
+        acc_state_from_test_setup,
         tokens,
         test_setup.last_committed_block.new_root_hash,
     )

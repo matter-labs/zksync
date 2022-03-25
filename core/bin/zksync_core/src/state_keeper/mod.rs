@@ -93,21 +93,22 @@ impl ZkSyncStateKeeper {
         //    separately below.
         // 2. For root hash calculator (`rhc_state`). It will require the state at *last finished block*, so it can keep
         //    working on calculating root hashes for incomplete blocks that we had before the restart.
-        let mut sk_state = ZkSyncState::new(
-            initial_state.tree,
-            initial_state.acc_id_by_addr,
-            initial_state.nfts,
-        );
-        let rhc_state = sk_state.clone();
+        let mut sk_state = initial_state.state.clone();
+        let rhc_state = initial_state.state.clone();
 
         // Update the state keeper copy of state.
         let mut last_block = initial_state.last_block_number;
         for job in &initial_state.root_hash_jobs {
             // Ensure that all jobs are sequential and there are no gaps.
             assert_eq!(
-                job.block, last_block + 1,
-                "Unexpected incomplete block number. Started from block {}, got unexpected block {} instead of expected {}, root hash jobs queue: {:?}",
-                initial_state.last_block_number, job.block, last_block + 1, &initial_state.root_hash_jobs
+                job.block,
+                last_block + 1,
+                "Unexpected incomplete block number. Started from block {}, \
+                got unexpected block {} instead of expected {}, root hash jobs queue: {:?}",
+                initial_state.last_block_number,
+                job.block,
+                last_block + 1,
+                &initial_state.root_hash_jobs
             );
             last_block = job.block;
 
@@ -875,9 +876,7 @@ impl ZkSyncStateKeeper {
 
     pub fn get_current_state(&self) -> ZkSyncStateInitParams {
         ZkSyncStateInitParams {
-            tree: self.state.get_balance_tree(),
-            acc_id_by_addr: self.state.get_account_addresses(),
-            nfts: self.state.nfts.clone(),
+            state: self.state.clone(),
             last_block_number: self.pending_block.number - 1,
             unprocessed_priority_op: self.pending_block.unprocessed_priority_op_current,
 
