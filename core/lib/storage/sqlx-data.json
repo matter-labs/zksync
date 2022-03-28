@@ -355,6 +355,11 @@
           "ordinal": 1,
           "name": "tree_cache",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tree_cache_binary",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -364,7 +369,8 @@
       },
       "nullable": [
         false,
-        false
+        true,
+        true
       ]
     }
   },
@@ -2521,6 +2527,11 @@
           "ordinal": 1,
           "name": "tree_cache",
           "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tree_cache_binary",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -2528,7 +2539,8 @@
       },
       "nullable": [
         false,
-        false
+        true,
+        true
       ]
     }
   },
@@ -6841,6 +6853,19 @@
         null,
         null
       ]
+    }
+  },
+  "cf01f8cc48db73ecb9cb466d26f36eb81441c614cfb48ddcb468ff8d8256ea3b": {
+    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache_binary)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea"
+        ]
+      },
+      "nullable": []
     }
   },
   "d106212871e6b0266259fa0f819ab51c1e58ec799a45b618a4ec4d67d00f49be": {
