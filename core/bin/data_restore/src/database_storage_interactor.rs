@@ -350,7 +350,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         let tree_cache = self
             .storage
             .chain()
-            .block_schema()
+            .tree_cache_schema_json()
             .get_account_tree_cache_block(last_block)
             .await
             .expect("Failed to query the database for the tree cache");
@@ -390,7 +390,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
 
         transaction
             .chain()
-            .block_schema()
+            .tree_cache_schema_json()
             .remove_old_account_tree_cache(block_number)
             .await
             .expect("Failed to remove old tree cache");
@@ -399,7 +399,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         // since on conflict it does nothing.
         transaction
             .chain()
-            .block_schema()
+            .tree_cache_schema_json()
             .store_account_tree_cache(block_number, tree_cache)
             .await
             .expect("Failed to store new tree cache");
