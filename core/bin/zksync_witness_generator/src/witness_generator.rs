@@ -4,6 +4,7 @@ use std::{thread, time};
 // External
 use futures::channel::mpsc;
 use tokio::time::sleep;
+use zksync_crypto::merkle_tree::parallel_smt::SparseMerkleTreeSerializableCacheBN256;
 // Workspace deps
 use crate::database_interface::DatabaseInterface;
 use zksync_circuit::serialization::ProverData;
@@ -122,7 +123,9 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             for (id, account) in accounts {
                 circuit_account_tree.insert(*id, account.into());
             }
-            circuit_account_tree.set_internals(serde_json::from_value(account_tree_cache)?);
+            circuit_account_tree.set_internals(
+                SparseMerkleTreeSerializableCacheBN256::decode_bincode(&account_tree_cache),
+            );
             if block != cached_block {
                 // There is no relevant cache, so we have to use some outdated cache and update the tree.
                 metrics::increment_counter!("witness_generator.cache_access", "type" => "miss");
@@ -153,7 +156,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 metrics::histogram!("witness_generator", start.elapsed(), "stage" => "recreate_tree_from_cache");
 
                 let start = Instant::now();
-                let tree_cache = serde_json::to_string(&circuit_account_tree.get_internals())?;
+                let tree_cache = circuit_account_tree.get_internals().encode_bincode();
                 metrics::histogram!("tree_cache_size", tree_cache.len() as f64);
 
                 self.database
@@ -178,7 +181,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             metrics::histogram!("witness_generator", start.elapsed(), "stage" => "recreate_tree_from_scratch");
 
             let start = Instant::now();
-            let tree_cache = serde_json::to_string(&circuit_account_tree.get_internals())?;
+            let tree_cache = circuit_account_tree.get_internals().encode_bincode();
             metrics::histogram!("tree_cache_size", tree_cache.len() as f64);
             metrics::histogram!("witness_generator", start.elapsed(), "stage" => "serialize_cache");
 

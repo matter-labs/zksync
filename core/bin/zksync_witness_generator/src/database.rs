@@ -141,10 +141,10 @@ impl DatabaseInterface for Database {
     async fn load_account_tree_cache(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<Option<(BlockNumber, serde_json::Value)>> {
+    ) -> anyhow::Result<Option<(BlockNumber, Vec<u8>)>> {
         let tree_cache = connection
             .chain()
-            .block_schema()
+            .tree_cache_schema_bincode()
             .get_account_tree_cache()
             .await?;
 
@@ -254,17 +254,17 @@ impl DatabaseInterface for Database {
         &self,
         connection: &mut StorageProcessor<'_>,
         block: BlockNumber,
-        tree_cache: String,
+        tree_cache: Vec<u8>,
     ) -> anyhow::Result<()> {
         connection
             .chain()
-            .block_schema()
+            .tree_cache_schema_bincode()
             .store_account_tree_cache(block, tree_cache)
             .await?;
 
         connection
             .chain()
-            .block_schema()
+            .tree_cache_schema_bincode()
             .remove_old_account_tree_cache(block - NUMBER_OF_STORED_ACCOUNT_TREE_CACHE)
             .await?;
 
