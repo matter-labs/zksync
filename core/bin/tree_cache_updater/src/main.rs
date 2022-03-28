@@ -1,4 +1,5 @@
 use structopt::StructOpt;
+use zksync_config::DBConfig;
 use zksync_crypto::merkle_tree::parallel_smt::SparseMerkleTreeSerializableCacheBN256;
 use zksync_storage::StorageProcessor;
 use zksync_types::BlockNumber;
@@ -32,6 +33,27 @@ async fn main() -> anyhow::Result<()> {
 
     let min_block = std::cmp::max(max_block.0.saturating_sub(opt.max_blocks as u32), 1); // We can't go below the 1st block.
 
+    println!(
+        "I'm going to convert caches for blocks from {} to {}",
+        min_block, max_block.0
+    );
+    if opt.clear_old {
+        println!("Also, all the old JSON caches will be removed completely from the database");
+    }
+
+    println!("Database URL is {}", DBConfig::from_env().url);
+    println!("Proceed? [y/n]");
+
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+
+    if input.trim().to_lowercase() == "y" {
+        println!("OK. Starting!");
+    } else {
+        println!("Quitting");
+        return Ok(());
+    }
+
     // Go through the suggested blocks range. For each block in this range, if the cachce exists, we will load it, convert to the bincode cache,
     // and store to the binary schema.
     for block in min_block..(max_block.0) {
@@ -49,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
                 .store_account_tree_cache(BlockNumber(block), binary_cache)
                 .await?;
         }
+        println!("Block {} processed", block);
     }
 
     // We've processed all the blocks. Now, if user requested, we'll remove all the old caches.
@@ -59,9 +82,12 @@ async fn main() -> anyhow::Result<()> {
             .tree_cache_schema_json()
             .remove_new_account_tree_cache(BlockNumber(0))
             .await?;
+        println!("Old caches removed");
     }
 
     transaction.commit().await?;
+
+    println!("Done");
 
     Ok(())
 }
