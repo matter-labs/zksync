@@ -1,20 +1,23 @@
+use chrono::{DateTime, Utc};
 use num::BigUint;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 use zksync_basic_types::{AccountId, Address};
+use zksync_crypto::params::ETH_TOKEN_ID;
 
 use crate::{
     operations::{ChangePubKeyOp, MintNFTOp},
     tx::{
-        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, MintNFT, Swap, Transfer,
-        TxEthSignature, TxHash, Withdraw, WithdrawNFT,
+        error::{CloseOperationsDisabled, TransactionError},
+        ChangePubKey, Close, ForcedExit, MintNFT, Swap, TimeRange, Transfer, TxEthSignature,
+        TxHash, TxSignature, Withdraw, WithdrawNFT,
     },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
     WithdrawNFTOp, WithdrawOp,
 };
-use zksync_crypto::params::ETH_TOKEN_ID;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
@@ -32,6 +35,15 @@ pub struct SignedZkSyncTx {
     /// which user should have signed with their private key.
     /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<EthSignData>,
+
+    #[serde(default = "Utc::now")]
+    pub created_at: DateTime<Utc>,
+}
+
+impl SignedZkSyncTx {
+    pub fn elapsed(&self) -> Duration {
+        (Utc::now() - self.created_at).to_std().unwrap_or_default()
+    }
 }
 
 /// A set of L2 transaction supported by the zkSync network.
@@ -102,6 +114,7 @@ impl From<ZkSyncTx> for SignedZkSyncTx {
         Self {
             tx,
             eth_sign_data: None,
+            created_at: Utc::now(),
         }
     }
 }
@@ -138,6 +151,39 @@ impl ZkSyncTx {
         }
     }
 
+    pub fn from_account(&self) -> Address {
+        self.account()
+    }
+
+    pub fn to_account(&self) -> Option<Address> {
+        match self {
+            ZkSyncTx::Transfer(tx) => Some(tx.to),
+            ZkSyncTx::Withdraw(tx) => Some(tx.to),
+            ZkSyncTx::Close(tx) => Some(tx.account),
+            ZkSyncTx::ChangePubKey(tx) => Some(Address::from(tx.new_pk_hash.data)),
+            ZkSyncTx::ForcedExit(tx) => Some(tx.target),
+            ZkSyncTx::Swap(tx) => Some(tx.submitter_address),
+            ZkSyncTx::MintNFT(tx) => Some(tx.recipient),
+            ZkSyncTx::WithdrawNFT(tx) => Some(tx.to),
+        }
+    }
+
+    pub fn tokens(&self) -> Vec<TokenId> {
+        let mut tokens = match self {
+            ZkSyncTx::Transfer(tx) => vec![tx.token],
+            ZkSyncTx::Withdraw(tx) => vec![tx.token],
+            ZkSyncTx::Close(_) => vec![TokenId(0)],
+            ZkSyncTx::ChangePubKey(tx) => vec![tx.fee_token],
+            ZkSyncTx::ForcedExit(tx) => vec![tx.token],
+            ZkSyncTx::Swap(tx) => vec![tx.fee_token, tx.orders.0.token_buy, tx.orders.0.token_sell],
+            ZkSyncTx::MintNFT(tx) => vec![tx.fee_token],
+            ZkSyncTx::WithdrawNFT(tx) => vec![tx.token, tx.fee_token],
+        };
+        tokens.sort();
+        tokens.dedup();
+        tokens
+    }
+
     pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ZkSyncTx::Transfer(tx) => Ok(tx.account_id),
@@ -162,6 +208,19 @@ impl ZkSyncTx {
             ZkSyncTx::MintNFT(tx) => tx.nonce,
             ZkSyncTx::Swap(tx) => tx.nonce,
             ZkSyncTx::WithdrawNFT(tx) => tx.nonce,
+        }
+    }
+
+    pub fn signature(&self) -> TxSignature {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.signature.clone(),
+            ZkSyncTx::Withdraw(tx) => tx.signature.clone(),
+            ZkSyncTx::Close(tx) => tx.signature.clone(),
+            ZkSyncTx::ChangePubKey(tx) => tx.signature.clone(),
+            ZkSyncTx::ForcedExit(tx) => tx.signature.clone(),
+            ZkSyncTx::MintNFT(tx) => tx.signature.clone(),
+            ZkSyncTx::Swap(tx) => tx.signature.clone(),
+            ZkSyncTx::WithdrawNFT(tx) => tx.signature.clone(),
         }
     }
 
@@ -197,17 +256,18 @@ impl ZkSyncTx {
     ///
     /// Note that this method doesn't check whether transaction will succeed, so transaction
     /// can fail even if this method returned `true` (i.e., if account didn't have enough balance).
-    pub fn check_correctness(&mut self) -> bool {
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
         match self {
-            ZkSyncTx::Transfer(tx) => tx.check_correctness(),
-            ZkSyncTx::Withdraw(tx) => tx.check_correctness(),
-            ZkSyncTx::Close(tx) => tx.check_correctness(),
-            ZkSyncTx::ChangePubKey(tx) => tx.check_correctness(),
-            ZkSyncTx::ForcedExit(tx) => tx.check_correctness(),
-            ZkSyncTx::MintNFT(tx) => tx.check_correctness(),
-            ZkSyncTx::Swap(tx) => tx.check_correctness(),
-            ZkSyncTx::WithdrawNFT(tx) => tx.check_correctness(),
+            ZkSyncTx::Transfer(tx) => tx.check_correctness()?,
+            ZkSyncTx::Withdraw(tx) => tx.check_correctness()?,
+            ZkSyncTx::Close(tx) => tx.check_correctness()?,
+            ZkSyncTx::ChangePubKey(tx) => tx.check_correctness()?,
+            ZkSyncTx::ForcedExit(tx) => tx.check_correctness()?,
+            ZkSyncTx::MintNFT(tx) => tx.check_correctness()?,
+            ZkSyncTx::Swap(tx) => tx.check_correctness()?,
+            ZkSyncTx::WithdrawNFT(tx) => tx.check_correctness()?,
         }
+        Ok(())
     }
 
     /// Returns a message that user has to sign to send the transaction.
@@ -409,17 +469,44 @@ impl ZkSyncTx {
         }
     }
 
+    /// Returns the time range of this transaction.
+    pub fn time_range(&self) -> TimeRange {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::ForcedExit(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Close(tx) => tx.time_range,
+            ZkSyncTx::MintNFT(_) => Default::default(),
+            ZkSyncTx::Swap(tx) => tx.time_range(),
+            ZkSyncTx::WithdrawNFT(tx) => tx.time_range,
+        }
+    }
+
     /// Returns the unix format timestamp of the first moment when transaction execution is valid.
     pub fn valid_from(&self) -> u64 {
         match self {
             ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default().valid_from,
-            ZkSyncTx::ForcedExit(tx) => tx.time_range.valid_from,
+            ZkSyncTx::ForcedExit(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::Close(tx) => tx.time_range.valid_from,
             ZkSyncTx::Swap(tx) => tx.valid_from(),
             ZkSyncTx::MintNFT(_) => 0,
             ZkSyncTx::WithdrawNFT(tx) => tx.time_range.valid_from,
+        }
+    }
+
+    pub fn variance_name(&self) -> String {
+        match self {
+            ZkSyncTx::Transfer(_) => "Transfer".to_string(),
+            ZkSyncTx::Withdraw(_) => "Withdraw".to_string(),
+            ZkSyncTx::Close(_) => "Close".to_string(),
+            ZkSyncTx::ChangePubKey(_) => "ChangePubKey".to_string(),
+            ZkSyncTx::ForcedExit(_) => "ForcedExit".to_string(),
+            ZkSyncTx::MintNFT(_) => "MintNFT".to_string(),
+            ZkSyncTx::Swap(_) => "Swap".to_string(),
+            ZkSyncTx::WithdrawNFT(_) => "WithdrawNFT".to_string(),
         }
     }
 }

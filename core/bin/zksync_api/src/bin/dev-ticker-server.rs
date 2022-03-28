@@ -42,7 +42,7 @@ macro_rules! make_sloppy {
                 stringify!($f),
                 duration.as_millis()
             );
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
 
             let resp = $f(query, data).await;
             resp
@@ -59,10 +59,13 @@ async fn handle_coinmarketcap_token_price_query(
         "ETH" => BigDecimal::from(200),
         "wBTC" => BigDecimal::from(9000),
         "BAT" => BigDecimal::try_from(0.2).unwrap(),
+        // Even though these tokens have their base price equal to
+        // the default one, we still keep them here so that in the future it would
+        // be easier to change the default price without affecting the important tokens
         "DAI" => BigDecimal::from(1),
         "tGLM" => BigDecimal::from(1),
         "GLM" => BigDecimal::from(1),
-        _ => BigDecimal::from(0),
+        _ => BigDecimal::from(1),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
 
@@ -88,6 +91,9 @@ async fn handle_coinmarketcap_token_price_query(
 #[derive(Debug, Deserialize)]
 struct Token {
     pub address: Address,
+    // While never used directly, it is better to keep this field here so that it is easy to know what fields are
+    // available for the test tokens.
+    #[allow(dead_code)]
     pub decimals: u8,
     pub symbol: String,
 }
@@ -172,7 +178,7 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
         .collect();
     if sloppy_mode {
         web::scope("/")
-            .data(data)
+            .app_data(web::Data::new(data))
             .route(
                 "/cryptocurrency/quotes/latest",
                 web::get().to(make_sloppy!(handle_coinmarketcap_token_price_query)),
@@ -187,7 +193,7 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
             )
     } else {
         web::scope("/")
-            .data(data)
+            .app_data(web::Data::new(data))
             .route(
                 "/cryptocurrency/quotes/latest",
                 web::get().to(handle_coinmarketcap_token_price_query),
@@ -226,12 +232,12 @@ fn main() {
         vlog::info!("Fee ticker server will run in a sloppy mode.");
     }
 
-    let mut runtime = actix_rt::System::new("dev-ticker");
+    let runtime = actix_rt::System::new();
     runtime.block_on(async move {
         HttpServer::new(move || {
             App::new()
+                .wrap(Cors::default().allow_any_origin().max_age(3600))
                 .wrap(middleware::Logger::default())
-                .wrap(Cors::new().send_wildcard().max_age(3600).finish())
                 .service(main_scope(opts.sloppy))
         })
         .bind("0.0.0.0:9876")

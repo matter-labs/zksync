@@ -1,15 +1,20 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
+use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
-use zksync_types::{AccountId, Address, BlockNumber, Nonce, PubKeyHash, TokenId};
-use zksync_utils::BigUintSerdeWrapper;
+use zksync_types::{
+    AccountId, Address, BlockNumber, Nonce, PriorityOp, PubKeyHash, TokenId, ZkSyncPriorityOp,
+};
+use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
+use super::pagination::PaginationDirection;
 use super::token::NFT;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountState {
+    pub depositing: DepositingAccountBalances,
     pub committed: Option<Account>,
     pub finalized: Option<Account>,
 }
@@ -39,4 +44,74 @@ pub enum AccountAddressOrId {
 pub enum EthAccountType {
     Owned,
     CREATE2,
+    No2FA(Option<PubKeyHash>),
+}
+
+/// Information about ongoing deposits for certain recipient address.
+///
+/// Please note that since this response is based on the events that are
+/// currently awaiting confirmations, this information is approximate:
+/// blocks on Ethereum can be reverted, and final list of executed deposits
+/// can differ from this estimation.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OngoingDepositsResp {
+    pub deposits: Vec<OngoingDeposit>,
+}
+
+/// Flattened `PriorityOp` object representing a deposit operation.
+/// Used in the `OngoingDepositsResp`.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OngoingDeposit {
+    pub received_on_block: u64,
+    pub token_id: TokenId,
+    pub amount: u128,
+}
+
+impl OngoingDeposit {
+    pub fn new(priority_op: PriorityOp) -> Self {
+        let (token_id, amount) = match priority_op.data {
+            ZkSyncPriorityOp::Deposit(deposit) => (
+                deposit.token,
+                deposit
+                    .amount
+                    .to_u128()
+                    .expect("Deposit amount should be less then u128::max()"),
+            ),
+            other => {
+                panic!("Incorrect input for OngoingDeposit: {:?}", other);
+            }
+        };
+
+        Self {
+            received_on_block: priority_op.eth_block,
+            token_id,
+            amount,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositingFunds {
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub amount: BigUint,
+    pub expected_accept_block: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositingAccountBalances {
+    pub balances: HashMap<String, DepositingFunds>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomingAccountTxsQuery {
+    pub from: String,
+    pub limit: u32,
+    pub direction: PaginationDirection,
+    pub token: Option<String>,
+    pub second_account: Option<String>,
 }

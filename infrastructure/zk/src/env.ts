@@ -36,7 +36,7 @@ export function set(env: string) {
         throw new Error(envFile + ' not found');
     }
     if (!fs.existsSync(envDir)) {
-        throw new Error(envFile + ' not found');
+        throw new Error(envDir + ' not found');
     }
 
     fs.writeFileSync('etc/env/current', env);
@@ -99,6 +99,11 @@ export async function load() {
     process.env.ENV_DIR = envDir;
     dotenv.config({ path: envFile });
     load_docker();
+
+    // This suppresses the warning that looks like: "Warning: Accessing non-existent property 'INVALID_ALT_NUMBER'...".
+    // This warning is spawned from the `antlr4`, which is a dep of old `solidity-parser` library.
+    // Old version of `solidity-parser` is still widely used, and currently we can't get rid of it fully.
+    process.env.NODE_OPTIONS = '--no-warnings';
 }
 
 // replaces an env variable in current .env file

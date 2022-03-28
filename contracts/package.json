@@ -12,16 +12,16 @@
     "@types/chai": "^4.2.14",
     "@types/mocha": "^8.0.3",
     "argparse": "^1.0.10",
-    "axios": "^0.21.1",
+    "axios": "^0.21.2",
     "chai": "^4.2.0",
     "chalk": "^4.1.0",
     "commander": "^6.0.0",
     "ethereum-waffle": "^3.0.0",
     "ethereumjs-abi": "^0.6.8",
-    "ethers": "^5.0.0",
+    "ethers": "^5.4.4",
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
-    "handlebars": "^4.7.6",
+    "handlebars": "^4.7.7",
     "hardhat": "^2.0.8",
     "hardhat-contract-sizer": "^2.0.2",
     "hardhat-typechain": "^0.3.3",
@@ -55,9 +55,10 @@
     "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
     "submit-hash-regenesis": "ts-node scripts/submit-hash-regenesis.ts",
     "submit-regenesis-upgrade": "ts-node scripts/submit-regenesis-upgrade.ts",
-    "read-variable": "ts-node scripts/read-variable.ts"
+    "read-variable": "ts-node scripts/read-variable.ts",
+    "verify-deployed-contract": "ts-node scripts/verify-deployed-contract.ts"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "3.4.0-solc-0.7"
+    "@openzeppelin/contracts": "3.4.2"
   }
 }

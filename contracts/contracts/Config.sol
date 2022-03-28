@@ -60,7 +60,7 @@ contract Config {
     /// @dev Expiration delta for priority request to be satisfied (in seconds)
     /// @dev NOTE: Priority expiration should be > (EXPECT_VERIFICATION_IN * BLOCK_PERIOD)
     /// @dev otherwise incorrect block with priority op could not be reverted.
-    uint256 internal constant PRIORITY_EXPIRATION_PERIOD = 3 days;
+    uint256 internal constant PRIORITY_EXPIRATION_PERIOD = 14 days;
 
     /// @dev Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 internal constant PRIORITY_EXPIRATION =
@@ -72,7 +72,7 @@ contract Config {
     uint64 internal constant MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY = 6;
 
     /// @dev Reserved time for users to send full exit priority operation in case of an upgrade (in seconds)
-    uint256 internal constant MASS_FULL_EXIT_PERIOD = 9 days;
+    uint256 internal constant MASS_FULL_EXIT_PERIOD = 5 days;
 
     /// @dev Reserved time for users to withdraw funds from full exit priority operation in case of an upgrade (in seconds)
     uint256 internal constant TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT = 2 days;

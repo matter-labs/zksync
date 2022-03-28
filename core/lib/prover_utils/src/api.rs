@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::BlockNumber;
 use zksync_circuit::serialization::ProverData;
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
+use zksync_types::BlockNumber;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProverInputRequest {
@@ -24,6 +24,7 @@ pub struct ProverInputResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum JobRequestData {
     BlockProof(
         ProverData,

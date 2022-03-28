@@ -22,16 +22,14 @@ impl ProverConfig for DummyProverConfig {
 
 #[derive(Debug)]
 pub struct DummyProver {
-    config: DummyProverConfig,
     precomputed_proofs: PrecomputedSampleProofs,
 }
 
 impl ProverImpl for DummyProver {
     type Config = DummyProverConfig;
 
-    fn create_from_config(config: Self::Config) -> Self {
+    fn create_from_config(_config: Self::Config) -> Self {
         Self {
-            config,
             precomputed_proofs: load_precomputed_proofs()
                 .expect("Failed to load precomputed proofs"),
         }

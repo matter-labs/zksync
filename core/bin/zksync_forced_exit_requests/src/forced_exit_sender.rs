@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use num::BigUint;
 use tokio::time;
 
-use zksync_config::ZkSyncConfig;
+use zksync_config::ForcedExitRequestsConfig;
 
 use zksync_types::{
     forced_exit_requests::ForcedExitRequest, tx::TimeRange, tx::TxHash, AccountId, Address, Nonce,
@@ -24,19 +24,19 @@ const PROCESSING_ATTEMPTS: u32 = 3;
 
 #[async_trait::async_trait]
 pub trait ForcedExitSender {
-    async fn process_request(&self, amount: BigUint, submission_time: DateTime<Utc>);
+    async fn process_request(&mut self, amount: BigUint, submission_time: DateTime<Utc>);
 }
 
 pub struct MempoolForcedExitSender<T: CoreInteractionWrapper> {
     core_interaction_wrapper: T,
-    config: ZkSyncConfig,
+    config: ForcedExitRequestsConfig,
     forced_exit_sender_account_id: AccountId,
     sender_private_key: PrivateKey<Engine>,
 }
 
 #[async_trait::async_trait]
 impl<T: CoreInteractionWrapper + Sync + Send> ForcedExitSender for MempoolForcedExitSender<T> {
-    async fn process_request(&self, amount: BigUint, submission_time: DateTime<Utc>) {
+    async fn process_request(&mut self, amount: BigUint, submission_time: DateTime<Utc>) {
         let mut attempts: u32 = 0;
         // Typically this should not run any longer than 1 iteration
         // In case something bad happens we do not want the server crush because
@@ -63,11 +63,11 @@ impl<T: CoreInteractionWrapper + Sync + Send> ForcedExitSender for MempoolForced
 impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
     pub fn new(
         core_interaction_wrapper: T,
-        config: ZkSyncConfig,
+        config: ForcedExitRequestsConfig,
         forced_exit_sender_account_id: AccountId,
     ) -> Self {
-        let sender_private_key = hex::decode(&config.forced_exit_requests.sender_private_key[2..])
-            .expect("Decoding private key failed");
+        let sender_private_key =
+            hex::decode(&config.sender_private_key[2..]).expect("Decoding private key failed");
         let sender_private_key =
             read_signing_key(&sender_private_key).expect("Reading private key failed");
 
@@ -99,6 +99,7 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
         SignedZkSyncTx {
             tx: ZkSyncTx::ForcedExit(Box::new(tx)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         }
     }
 
@@ -221,14 +222,11 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
     }
 
     pub async fn try_process_request(
-        &self,
+        &mut self,
         amount: BigUint,
         submission_time: DateTime<Utc>,
     ) -> anyhow::Result<()> {
-        let (id, amount) = utils::extract_id_from_amount(
-            amount,
-            self.config.forced_exit_requests.digits_in_id as u32,
-        );
+        let (id, amount) = utils::extract_id_from_amount(amount, self.config.digits_in_id as u32);
 
         let fe_request = self.core_interaction_wrapper.get_request_by_id(id).await?;
 
@@ -280,11 +278,11 @@ mod test {
     const TEST_ACCOUNT_FORCED_EXIT_SENDER_ID: u32 = 12;
 
     fn get_test_forced_exit_sender(
-        config: Option<ZkSyncConfig>,
+        config: Option<ForcedExitRequestsConfig>,
     ) -> MempoolForcedExitSender<MockCoreInteractionWrapper> {
         let core_interaction_wrapper = MockCoreInteractionWrapper::default();
 
-        let config = config.unwrap_or_else(ZkSyncConfig::from_env);
+        let config = config.unwrap_or_else(ForcedExitRequestsConfig::from_env);
 
         MempoolForcedExitSender::new(
             core_interaction_wrapper,
@@ -297,18 +295,13 @@ mod test {
     async fn test_forced_exit_sender() {
         let day = chrono::Duration::days(1);
 
-        let config = ZkSyncConfig::from_env();
         let forced_exit_requests = ForcedExitRequestsConfig {
             // There must be 10 digits in id
             digits_in_id: 10,
-            ..config.forced_exit_requests
-        };
-        let config = ZkSyncConfig {
-            forced_exit_requests,
-            ..config
+            ..ForcedExitRequestsConfig::from_env()
         };
 
-        let forced_exit_sender = get_test_forced_exit_sender(Some(config));
+        let mut forced_exit_sender = get_test_forced_exit_sender(Some(forced_exit_requests));
 
         add_request(
             &forced_exit_sender.core_interaction_wrapper.requests,

@@ -11,12 +11,13 @@ use crate::api_server::{
         v01::{api_decl::ApiV01, types::*},
     },
 };
+use actix_web::error::InternalError;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use chrono::Duration;
 use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
-use zksync_types::{Address, BlockNumber, Token, TokenId};
+use zksync_types::{Address, BlockNumber, Token, TokenId, TokenKind};
 
 /// Helper macro which wraps the serializable object into `Ok(HttpResponse::Ok().json(...))`.
 macro_rules! ok_json {
@@ -29,14 +30,14 @@ impl ApiV01 {
     pub async fn testnet_config(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let contract_address = self_.contract_address.clone();
-        metrics::histogram!("api.v01.testnet_config", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "testnet_config");
         ok_json!(TestnetConfigResponse { contract_address })
     }
 
     pub async fn status(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let result = ok_json!(self_.network_status.read().await);
-        metrics::histogram!("api.v01.status", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "status");
         result
     }
 
@@ -52,7 +53,7 @@ impl ApiV01 {
         let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
         vec_tokens.sort_by_key(|t| t.id);
 
-        metrics::histogram!("api.v01.tokens", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tokens");
         ok_json!(vec_tokens)
     }
 
@@ -76,7 +77,7 @@ impl ApiV01 {
         // But ETH is always allowed to pay fee, and in all cases it should be on the list.
 
         if tokens.get(&TokenId(0)).is_none() {
-            let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
+            let eth = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
             tokens.insert(eth.id, eth);
         }
 
@@ -84,18 +85,19 @@ impl ApiV01 {
 
         tokens.sort_by_key(|t| t.id);
 
-        metrics::histogram!("api.v01.tokens_acceptable_for_fees", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tokens_acceptable_for_fees");
         ok_json!(tokens)
     }
 
     pub async fn tx_history(
         self_: web::Data<Self>,
-        web::Path((address, mut offset, mut limit)): web::Path<(Address, u64, u64)>,
+        path: web::Path<(Address, u64, u64)>,
     ) -> ActixResult<HttpResponse> {
+        let (address, mut offset, mut limit) = path.into_inner();
         let start = Instant::now();
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
 
         let tokens = self_
@@ -112,13 +114,16 @@ impl ApiV01 {
                     offset,
                     limit,
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // Fetch ongoing deposits, since they must be reported within the transactions history.
         let mut ongoing_ops = self_
-            .api_client
-            .get_unconfirmed_deposits(address)
+            .access_storage()
+            .await?
+            .chain()
+            .mempool_schema()
+            .get_pending_deposits(address)
             .await
             .map_err(|err| {
                 vlog::warn!(
@@ -128,7 +133,7 @@ impl ApiV01 {
                     offset,
                     limit,
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // Sort operations by block number from smaller (older) to greater (newer).
@@ -173,20 +178,20 @@ impl ApiV01 {
                     offset,
                     limit,
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // Append ongoing operations to the end of the end of the list, as the history
         // goes from oldest tx to the newest tx.
         transactions_history.append(&mut ongoing_transactions_history);
 
-        metrics::histogram!("api.v01.tx_history", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tx_history");
         ok_json!(transactions_history)
     }
 
     pub async fn tx_history_older_than(
         self_: web::Data<Self>,
-        web::Path(address): web::Path<Address>,
+        address: web::Path<Address>,
         web::Query(query): web::Query<TxHistoryQuery>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
@@ -195,12 +200,12 @@ impl ApiV01 {
 
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
         let mut storage = self_.access_storage().await?;
         let mut transaction = storage.start_transaction().await.map_err(Self::db_error)?;
 
-        let tx_id = parse_tx_id(&tx_id, &mut transaction).await?;
+        let tx_id = parse_tx_id(tx_id, &mut transaction).await?;
 
         let direction = SearchDirection::Older;
         let transactions_history = transaction
@@ -216,18 +221,18 @@ impl ApiV01 {
                     tx_id,
                     limit,
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         transaction.commit().await.map_err(Self::db_error)?;
 
-        metrics::histogram!("api.v01.tx_history_older_than", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tx_history_older_than");
         ok_json!(transactions_history)
     }
 
     pub async fn tx_history_newer_than(
         self_: web::Data<Self>,
-        web::Path(address): web::Path<Address>,
+        address: web::Path<Address>,
         web::Query(query): web::Query<TxHistoryQuery>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
@@ -236,13 +241,13 @@ impl ApiV01 {
 
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
 
         let direction = SearchDirection::Newer;
         let mut transactions_history = {
             let mut storage = self_.access_storage().await?;
-            let tx_id = parse_tx_id(&tx_id, &mut storage).await?;
+            let tx_id = parse_tx_id(tx_id, &mut storage).await?;
             storage
                 .chain()
                 .operations_ext_schema()
@@ -256,7 +261,7 @@ impl ApiV01 {
                         tx_id,
                         limit,
                     );
-                    HttpResponse::InternalServerError().finish()
+                    InternalError::from_response(err, HttpResponse::InternalServerError().finish())
                 })?
         };
 
@@ -265,11 +270,12 @@ impl ApiV01 {
         if limit > 0 {
             // We've got some free space, so load unconfirmed operations to
             // fill the rest of the limit.
-
             // Fetch ongoing deposits, since they must be reported within the transactions history.
-            let mut ongoing_ops = self_
-                .api_client
-                .get_unconfirmed_deposits(address)
+            let mut storage = self_.access_storage().await?;
+            let mut ongoing_ops = storage
+                .chain()
+                .mempool_schema()
+                .get_pending_deposits(*address)
                 .await
                 .map_err(|err| {
                     vlog::warn!(
@@ -279,28 +285,22 @@ impl ApiV01 {
                         tx_id,
                         limit,
                     );
-                    HttpResponse::InternalServerError().finish()
+                    InternalError::from_response(err, HttpResponse::InternalServerError().finish())
                 })?;
 
             // Sort operations by block number from smaller (older) to greater (newer).
             ongoing_ops.sort_by(|lhs, rhs| rhs.eth_block.cmp(&lhs.eth_block));
 
-            let tokens = self_
-                .access_storage()
-                .await?
-                .tokens_schema()
-                .load_tokens()
-                .await
-                .map_err(|err| {
-                    vlog::warn!(
-                        "Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                        err,
-                        address,
-                        tx_id,
-                        limit,
-                    );
-                    HttpResponse::InternalServerError().finish()
-                })?;
+            let tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                    err,
+                    address,
+                    tx_id,
+                    limit,
+                );
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+            })?;
             // Collect the unconfirmed priority operations with respect to the
             // `limit` parameters.
             let mut txs: Vec<_> = ongoing_ops
@@ -315,34 +315,34 @@ impl ApiV01 {
             transactions_history.append(&mut txs);
         }
 
-        metrics::histogram!("api.v01.tx_history_newer_than", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tx_history_newer_than");
         ok_json!(transactions_history)
     }
 
     pub async fn executed_tx_by_hash(
         self_: web::Data<Self>,
-        web::Path(tx_hash_hex): web::Path<String>,
+        tx_hash_hex: web::Path<String>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         if tx_hash_hex.len() < 2 {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
         let transaction_hash =
-            hex::decode(&tx_hash_hex[2..]).map_err(|_| HttpResponse::BadRequest().finish())?;
+            hex::decode(&tx_hash_hex[2..]).map_err(actix_web::error::ErrorBadRequest)?;
 
         let tx_receipt = self_.get_tx_receipt(transaction_hash).await?;
 
-        metrics::histogram!("api.v01.executed_tx_by_hash", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "executed_tx_by_hash");
         ok_json!(tx_receipt)
     }
 
     pub async fn tx_by_hash(
         self_: web::Data<Self>,
-        web::Path(hash_hex_with_prefix): web::Path<String>,
+        hash_hex_with_prefix: web::Path<String>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
-        let hash = try_parse_hash(&hash_hex_with_prefix)
-            .map_err(|_| HttpResponse::BadRequest().finish())?;
+        let hash =
+            try_parse_hash(&hash_hex_with_prefix).map_err(actix_web::error::ErrorBadRequest)?;
 
         let mut res = self_
             .access_storage()
@@ -357,7 +357,7 @@ impl ApiV01 {
                     err,
                     hex::encode(&hash)
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // If storage returns Some, return the result.
@@ -375,7 +375,7 @@ impl ApiV01 {
                     err,
                     hex::encode(&hash)
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         // If eth watcher has a priority op with given hash, transform it
@@ -389,40 +389,41 @@ impl ApiV01 {
                 .await
                 .map_err(|err| {
                     vlog::warn!("Internal Server Error: '{}';", err);
-                    HttpResponse::InternalServerError().finish()
+                    InternalError::from_response(err, HttpResponse::InternalServerError().finish())
                 })?;
 
             res = deposit_op_to_tx_by_hash(&tokens, &priority_op);
         }
 
-        metrics::histogram!("api.v01.tx_by_hash", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "tx_by_hash");
         ok_json!(res)
     }
 
     pub async fn priority_op(
         self_: web::Data<Self>,
-        web::Path(pq_id): web::Path<u32>,
+        pq_id: web::Path<u32>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
-        let receipt = self_.get_priority_op_receipt(pq_id).await?;
-        metrics::histogram!("api.v01.priority_op", start.elapsed());
+        let receipt = self_.get_priority_op_receipt(*pq_id).await?;
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "priority_op");
         ok_json!(receipt)
     }
 
     pub async fn block_tx(
         self_: web::Data<Self>,
-        web::Path((block_id, tx_id)): web::Path<(BlockNumber, u32)>,
+        path: web::Path<(BlockNumber, u32)>,
     ) -> ActixResult<HttpResponse> {
+        let (block_id, tx_id) = path.into_inner();
         let start = Instant::now();
         let exec_ops = self_.get_block_executed_ops(block_id).await?;
 
         let result = if let Some(exec_op) = exec_ops.get(tx_id as usize) {
             ok_json!(exec_op.clone())
         } else {
-            Err(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish())
         };
 
-        metrics::histogram!("api.v01.block_tx", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "block_tx");
         result
     }
 
@@ -435,7 +436,7 @@ impl ApiV01 {
         let max_block = block_query.max_block.unwrap_or(999_999_999);
         let limit = block_query.limit.unwrap_or(20);
         if limit > 100 {
-            return Err(HttpResponse::BadRequest().finish().into());
+            return Ok(HttpResponse::BadRequest().finish());
         }
         let mut storage = self_.access_storage().await?;
 
@@ -451,31 +452,31 @@ impl ApiV01 {
                     max_block,
                     limit
                 );
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
-        metrics::histogram!("api.v01.blocks", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "blocks");
         ok_json!(resp)
     }
 
     pub async fn block_by_id(
         self_: web::Data<Self>,
-        web::Path(block_id): web::Path<BlockNumber>,
+        block_id: web::Path<BlockNumber>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
-        let block = self_.get_block_info(block_id).await?;
+        let block = self_.get_block_info(*block_id).await?;
         let result = if let Some(block) = block {
             ok_json!(block)
         } else {
-            Err(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish())
         };
-        metrics::histogram!("api.v01.block_by_id", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "block_by_id");
         result
     }
 
     pub async fn block_transactions(
         self_: web::Data<Self>,
-        web::Path(block_id): web::Path<BlockNumber>,
+        block_id: web::Path<BlockNumber>,
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let mut storage = self_.access_storage().await?;
@@ -483,14 +484,14 @@ impl ApiV01 {
         let txs = storage
             .chain()
             .block_schema()
-            .get_block_transactions(block_id)
+            .get_block_transactions(*block_id)
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
-        metrics::histogram!("api.v01.block_transactions", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "block_transactions");
         ok_json!(txs)
     }
 
@@ -504,10 +505,10 @@ impl ApiV01 {
         let result = if let Some(block) = block {
             ok_json!(block)
         } else {
-            Err(HttpResponse::NotFound().finish().into())
+            Ok(HttpResponse::NotFound().finish())
         };
 
-        metrics::histogram!("api.v01.explorer_search", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "explorer_search");
         result
     }
 
@@ -519,13 +520,19 @@ impl ApiV01 {
             .block_schema()
             .get_last_saved_block()
             .await
-            .expect("Database error");
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}';", err,);
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+            })?;
         let block = storage
             .chain()
             .block_schema()
             .get_block(block_number)
             .await
-            .expect("Database error")
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}';", err);
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
+            })?
             .expect("Should exist");
         let state_keeper_config = &self_.config.chain.state_keeper;
         let average_proof_generating_time = Duration::minutes(30);
@@ -538,7 +545,7 @@ impl ApiV01 {
             fast: fast.timestamp() as u64,
         };
 
-        metrics::histogram!("api.v01.withdrawal_processing_time", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "withdrawal_processing_time");
         ok_json!(processing_time)
     }
 }

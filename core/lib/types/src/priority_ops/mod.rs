@@ -82,21 +82,49 @@ impl ZkSyncPriorityOp {
         }
     }
 
+    pub fn from_account(&self) -> Address {
+        match self {
+            ZkSyncPriorityOp::Deposit(deposit) => deposit.from,
+            ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address,
+        }
+    }
+
+    pub fn to_account(&self) -> Address {
+        match self {
+            ZkSyncPriorityOp::Deposit(deposit) => deposit.to,
+            ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address,
+        }
+    }
+
+    pub fn affected_accounts(&self) -> Vec<Address> {
+        let mut accounts = match self {
+            ZkSyncPriorityOp::Deposit(deposit) => vec![deposit.from, deposit.to],
+            ZkSyncPriorityOp::FullExit(full_exit) => vec![full_exit.eth_address],
+        };
+        accounts.sort();
+        accounts.dedup();
+        accounts
+    }
+
     /// Parses legacy priority operation from the Ethereum logs.
     pub fn legacy_parse_from_priority_queue_logs(
         pub_data: &[u8],
         op_type_id: u8,
         sender: Address,
+        with_tx_type: bool,
     ) -> Result<Self, LogParseError> {
         // see contracts/contracts/Operations.sol
         match op_type_id {
             DepositOp::OP_CODE => {
-                let pub_data_left = pub_data;
+                let mut pub_data_left = pub_data;
 
-                if pub_data_left.len() < TX_TYPE_BIT_WIDTH / 8 {
-                    return Err(LogParseError::PubdataLengthMismatch);
+                if with_tx_type {
+                    if pub_data_left.len() < TX_TYPE_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (_, _pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
+                    pub_data_left = _pub_data_left;
                 }
-                let (_, pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
 
                 // account_id
                 if pub_data_left.len() < ACCOUNT_ID_BIT_WIDTH / 8 {
@@ -144,10 +172,15 @@ impl ZkSyncPriorityOp {
                 }))
             }
             FullExitOp::OP_CODE => {
-                if pub_data.len() < TX_TYPE_BIT_WIDTH / 8 {
-                    return Err(LogParseError::PubdataLengthMismatch);
+                let mut pub_data_left = pub_data;
+
+                if with_tx_type {
+                    if pub_data_left.len() < TX_TYPE_BIT_WIDTH / 8 {
+                        return Err(LogParseError::PubdataLengthMismatch);
+                    }
+                    let (_, _pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
+                    pub_data_left = _pub_data_left;
                 }
-                let (_, pub_data_left) = pub_data.split_at(TX_TYPE_BIT_WIDTH / 8);
 
                 // account_id
                 let (account_id, pub_data_left) = {
@@ -336,12 +369,19 @@ impl ZkSyncPriorityOp {
                 data.extend_from_slice(&[0u8; 4]);
                 data.extend_from_slice(&deposit.token.to_be_bytes());
                 data.extend_from_slice(&deposit.amount.to_u128().unwrap().to_be_bytes());
-                data.extend_from_slice(&deposit.to.as_bytes());
+                data.extend_from_slice(deposit.to.as_bytes());
                 deposits_data.push(data);
             }
         }
         deposits_data.resize(n as usize, Vec::new());
         (n, deposits_data)
+    }
+
+    pub fn variance_name(&self) -> String {
+        match self {
+            ZkSyncPriorityOp::Deposit(_) => "Deposit".to_string(),
+            ZkSyncPriorityOp::FullExit(_) => "FullExit".to_string(),
+        }
     }
 }
 
@@ -399,14 +439,25 @@ impl TryFrom<Log> for PriorityOp {
                     ZkSyncPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type, sender);
 
                 // If parsing was unsuccessful it was probably because of the legacy pub data
-                match result {
-                    Ok(op) => op,
-                    _ => ZkSyncPriorityOp::legacy_parse_from_priority_queue_logs(
-                        &op_pubdata,
-                        op_type,
-                        sender,
-                    )?,
-                }
+                result
+                    .or_else(|_| {
+                        // First, try parsing it with a tx type specified.
+                        ZkSyncPriorityOp::legacy_parse_from_priority_queue_logs(
+                            &op_pubdata,
+                            op_type,
+                            sender,
+                            true,
+                        )
+                    })
+                    .or_else(|_| {
+                        // The last attempt without tx type.
+                        ZkSyncPriorityOp::legacy_parse_from_priority_queue_logs(
+                            &op_pubdata,
+                            op_type,
+                            sender,
+                            false,
+                        )
+                    })?
             },
             deadline_block: dec_ev
                 .remove(0)
@@ -434,10 +485,11 @@ impl PriorityOp {
     }
 
     pub fn tx_hash(&self) -> TxHash {
-        let mut bytes = Vec::with_capacity(48);
+        let mut bytes = Vec::with_capacity(56);
         bytes.extend_from_slice(self.eth_hash.as_bytes());
         bytes.extend_from_slice(&self.eth_block.to_be_bytes());
         bytes.extend_from_slice(&self.eth_block_index.unwrap_or(0).to_be_bytes());
+        bytes.extend_from_slice(&self.serial_id.to_be_bytes());
 
         let hash = sha256(&bytes);
         let mut out = [0u8; 32];

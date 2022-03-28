@@ -3,7 +3,7 @@ use zksync_api_types::v02::{
     pagination::{ApiEither, PaginationQuery},
     Response,
 };
-use zksync_types::{TokenId, TokenLike};
+use zksync_types::{tx::TxHash, TokenId, TokenLike};
 
 impl Client {
     pub async fn token_pagination(
@@ -35,5 +35,20 @@ impl Client {
         self.get_with_scope(super::API_V02_SCOPE, &format!("tokens/nft/{}", id))
             .send()
             .await
+    }
+
+    pub async fn nft_owner_by_id(&self, id: TokenId) -> Result<Response> {
+        self.get_with_scope(super::API_V02_SCOPE, &format!("tokens/nft/{}/owner", id))
+            .send()
+            .await
+    }
+
+    pub async fn nft_id_by_tx_hash(&self, tx_hash: TxHash) -> Result<Response> {
+        self.get_with_scope(
+            super::API_V02_SCOPE,
+            &format!("tokens/nft_id_by_tx_hash/{}", tx_hash.to_string()),
+        )
+        .send()
+        .await
     }
 }

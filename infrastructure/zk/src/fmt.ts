@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as utils from './utils';
 
-const EXTENSIONS = ['ts', 'md', 'sol', 'js', 'vue'];
+const EXTENSIONS = ['ts', 'md', 'sol', 'js'];
 const CONFIG_PATH = 'etc/prettier-config';
 
 export async function prettier(extension: string, check: boolean = false) {
@@ -38,10 +38,10 @@ export const command = new Command('fmt')
                 await prettier(extension, cmd.check);
             }
         } else {
-            for (const ext of EXTENSIONS) {
-                await prettier(ext, cmd.check);
-            }
-            await rustfmt(cmd.check);
+            // Run all the checks in parallel.
+            const promises = EXTENSIONS.map((ext) => prettier(ext, cmd.check));
+            promises.push(rustfmt(cmd.check));
+            await Promise.all(promises);
         }
     });
 

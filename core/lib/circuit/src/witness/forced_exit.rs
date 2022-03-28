@@ -62,7 +62,7 @@ impl Witness for ForcedExitWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, forced_exit: &ForcedExitOp) -> Self {
         let (valid_from, valid_until) = {
-            let time_range = forced_exit.tx.time_range;
+            let time_range = forced_exit.tx.time_range.unwrap_or_default();
             (time_range.valid_from, time_range.valid_until)
         };
 

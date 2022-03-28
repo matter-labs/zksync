@@ -96,7 +96,6 @@ export async function all() {
     await api();
     await apiDocs();
     await withdrawalHelpers();
-    await zcli();
     await rustSDK();
     // have to kill server before running data-restore
     await utils.spawn('killall zksync_server');
@@ -115,10 +114,6 @@ export async function apiDocs() {
 
 export async function api() {
     await utils.spawn('yarn ts-tests api-test');
-}
-
-export async function zcli() {
-    await utils.spawn('yarn zcli test');
 }
 
 export async function server() {
@@ -176,11 +171,11 @@ export async function testkit(command: string, timeout: number) {
     if (command.includes('block_sizes_test ')) {
         await utils.spawn(`cargo run --release --bin ${command}`);
     } else if (command == 'fast') {
-        // await utils.spawn('cargo run --bin testkit_tests --release');
+        await utils.spawn('cargo run --bin testkit_tests --release');
         await utils.spawn('cargo run --bin gas_price_test --release');
-        // await utils.spawn('cargo run --bin revert_blocks_test --release');
-        // await utils.spawn('cargo run --bin migration_test --release');
-        // await utils.spawn('cargo run --bin exodus_test --release');
+        await utils.spawn('cargo run --bin revert_blocks_test --release');
+        await utils.spawn('cargo run --bin migration_test --release');
+        await utils.spawn('cargo run --bin exodus_test --release');
     } else {
         await utils.spawn(`cargo run --bin ${command} --release`);
     }
@@ -206,14 +201,6 @@ command
         } else {
             await all();
         }
-    });
-
-command
-    .command('zcli')
-    .description('run zcli integration tests')
-    .option('--with-server')
-    .action(async (cmd: Command) => {
-        cmd.withServer ? await withServer(zcli, 240) : await zcli();
     });
 
 command

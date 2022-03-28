@@ -1,41 +1,43 @@
 use num::BigUint;
 use std::time::Duration;
-use zksync_config::ZkSyncConfig;
+use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, ConnectionPool, StorageProcessor,
 };
 
-use zksync_api::core_api_client::CoreApiClient;
 use zksync_types::{
     tx::{ChangePubKeyType, TimeRange, TxHash},
     AccountId, Address, PubKeyHash, ZkSyncTx, H256,
 };
 
-use zksync_types::{Nonce, SignedZkSyncTx, TokenId};
+use zksync_types::{Nonce, TokenId};
 
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
 
+use futures::channel::{mpsc, oneshot};
+use futures::SinkExt;
 use tokio::time;
 
+use zksync_mempool::MempoolTransactionRequest;
 use zksync_test_account::{ZkSyncAccount, ZkSyncETHAccountData};
 
 use super::utils::{read_signing_key, Engine};
 
 pub async fn prepare_forced_exit_sender_account(
     connection_pool: ConnectionPool,
-    api_client: CoreApiClient,
-    config: &ZkSyncConfig,
+    config: &ForcedExitRequestsConfig,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
 ) -> anyhow::Result<AccountId> {
     let mut storage = connection_pool
         .access_storage()
         .await
         .expect("forced_exit_requests: Failed to get the connection to storage");
 
-    let sender_sk = hex::decode(&config.forced_exit_requests.sender_private_key[2..])
+    let sender_sk = hex::decode(&config.sender_private_key[2..])
         .expect("Failed to decode forced_exit_sender sk");
     let sender_sk = read_signing_key(&sender_sk).expect("Failed to read forced exit sender sk");
-    let sender_address = config.forced_exit_requests.sender_account_address;
-    let sender_eth_private_key = config.forced_exit_requests.sender_eth_private_key;
+    let sender_address = config.sender_account_address;
+    let sender_eth_private_key = config.sender_eth_private_key;
 
     let is_sender_prepared =
         check_forced_exit_sender_prepared(&mut storage, &sender_sk, sender_address)
@@ -57,7 +59,7 @@ pub async fn prepare_forced_exit_sender_account(
     register_signing_key(
         &mut storage,
         id,
-        api_client,
+        mempool_tx_sender,
         sender_address,
         sender_eth_private_key,
         sender_sk,
@@ -170,7 +172,7 @@ pub async fn wait_for_change_pub_key_tx(
 pub async fn register_signing_key(
     storage: &mut StorageProcessor<'_>,
     sender_id: AccountId,
-    api_client: CoreApiClient,
+    mut mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     sender_address: Address,
     sender_eth_private_key: H256,
     sender_sk: PrivateKey<Engine>,
@@ -200,14 +202,17 @@ pub async fn register_signing_key(
     let tx = ZkSyncTx::ChangePubKey(Box::new(cpk));
     let tx_hash = tx.hash();
 
-    api_client
-        .send_tx(SignedZkSyncTx {
-            tx,
-            eth_sign_data: None,
-        })
+    let (sender, receiver) = oneshot::channel();
+    let item = MempoolTransactionRequest::NewTx(Box::new(tx.into()), sender);
+
+    mempool_tx_sender
+        .send(item)
         .await
-        .expect("Failed to send CPK transaction")
-        .expect("Failed to send");
+        .expect("Failed to send CPK transaction");
+    receiver
+        .await
+        .expect("Failed to receive result")
+        .expect("Failed to change pub key");
 
     wait_for_change_pub_key_tx(storage, tx_hash)
         .await

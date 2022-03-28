@@ -14,7 +14,7 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use zksync_config::{ETHSenderConfig, ZkSyncConfig};
+use zksync_config::ETHSenderConfig;
 use zksync_eth_client::{EthereumGateway, SignedCallResult};
 use zksync_storage::ConnectionPool;
 use zksync_types::ethereum::ETHOperation;
@@ -189,7 +189,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         let mut last_used_block = 0;
         loop {
             // We perform a loading routine every X seconds.
-            tokio::time::delay_for(self.options.sender.tx_poll_period()).await;
+            tokio::time::sleep(self.options.sender.tx_poll_period()).await;
             // If we received an error when loading a new operation, we can't do anything about it and should panic.
             if let Err(error) = self.load_new_operations().await {
                 vlog::error!("Unable to restore operations from the database: {}", error);
@@ -331,7 +331,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             // This metric is needed to track how much time is spent in backoff mode
             // and trigger grafana alerts
             metrics::histogram!("eth_sender.backoff_mode", RATE_LIMIT_BACKOFF_PERIOD);
-            time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
+            time::sleep(RATE_LIMIT_BACKOFF_PERIOD).await;
         }
     }
 
@@ -494,7 +494,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
                     // operations out of order.
                     if !self
                         .db
-                        .is_previous_operation_confirmed(&mut transaction, &op)
+                        .is_previous_operation_confirmed(&mut transaction, op)
                         .await?
                     {
                         vlog::info!("ETH Operation <id: {}> is confirmed ahead of time, considering it pending for now", op.id);
@@ -798,12 +798,12 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 pub fn run_eth_sender(
     pool: ConnectionPool,
     eth_gateway: EthereumGateway,
-    options: ZkSyncConfig,
+    options: ETHSenderConfig,
 ) -> JoinHandle<()> {
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(options.eth_sender, db, eth_gateway).await;
+        let eth_sender = ETHSender::new(options, db, eth_gateway).await;
 
         eth_sender.run().await
     })

@@ -33,7 +33,6 @@ impl UniswapTokenWatcher {
     }
     async fn get_market_volume(&mut self, address: Address) -> anyhow::Result<BigDecimal> {
         // Uniswap has graphql API, using full graphql client for one query is overkill for current task
-        // TODO https://linear.app/matterlabs/issue/ZKS-413/support-full-version-of-graphql-for-tokenvalidator
         let start = Instant::now();
 
         let query = format!("{{token(id: \"{:#x}\"){{untrackedVolumeUSD}}}}", address);

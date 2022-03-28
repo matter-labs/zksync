@@ -3,11 +3,11 @@ use chrono::Utc;
 // Workspace imports
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_types::{
-    block::Block,
+    block::{Block, ExecutedOperations},
     mempool::SignedTxVariant,
     priority_ops::FullExit,
     tx::{ChangePubKey, Transfer, TxHash, Withdraw},
-    AccountId, Address, BlockNumber, ExecutedPriorityOp, FullExitOp, Nonce, PriorityOp,
+    AccountId, Address, BlockNumber, ExecutedPriorityOp, ExecutedTx, FullExitOp, Nonce, PriorityOp,
     SignedZkSyncTx, TokenId, ZkSyncOp, ZkSyncPriorityOp, ZkSyncTx, H256,
 };
 // Local imports
@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Generates several different `SignedZkSyncTx` objects.
-fn franklin_txs() -> Vec<SignedZkSyncTx> {
+fn zksync_txs() -> Vec<SignedZkSyncTx> {
     let transfer_1 = Transfer::new(
         AccountId(42),
         Address::random(),
@@ -91,6 +91,7 @@ fn franklin_txs() -> Vec<SignedZkSyncTx> {
             SignedZkSyncTx {
                 tx: tx.clone(),
                 eth_sign_data: Some(gen_eth_sign_data(test_message)),
+                created_at: Utc::now(),
             }
         })
         .collect()
@@ -119,6 +120,7 @@ fn gen_transfers(n: usize) -> Vec<SignedZkSyncTx> {
             SignedZkSyncTx {
                 tx: ZkSyncTx::Transfer(Box::new(transfer)),
                 eth_sign_data: Some(gen_eth_sign_data(test_message)),
+                created_at: Utc::now(),
             }
         })
         .collect()
@@ -136,7 +138,7 @@ fn unwrap_tx(tx: SignedTxVariant) -> SignedZkSyncTx {
 #[db_test]
 async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage)
             .insert_tx(&tx.clone())
@@ -145,8 +147,8 @@ async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Load the txs and check that they match the expected list.
-    let (txs_from_db, _) = MempoolSchema(&mut storage)
-        .load_txs()
+    let txs_from_db = MempoolSchema(&mut storage)
+        .load_txs(&[])
         .await
         .expect("Can't load txs");
     assert_eq!(txs_from_db.len(), txs.len());
@@ -202,7 +204,7 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         .await?;
 
     // Load the txs and check that they match the expected list.
-    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
+    let txs_from_db = MempoolSchema(&mut storage).load_txs(&[]).await?;
     assert_eq!(txs_from_db.len(), elements_count);
 
     assert!(matches!(txs_from_db[0], SignedTxVariant::Tx(_)));
@@ -210,11 +212,11 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     // Try to load the batches with the signature.
     match &txs_from_db[2] {
         SignedTxVariant::Batch(batch) => assert_eq!(batch.eth_signatures, batch_1_signature),
-        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions"),
+        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions 1"),
     };
     match &txs_from_db[3] {
         SignedTxVariant::Batch(batch) => assert_eq!(batch.eth_signatures, batch_2_signatures),
-        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions"),
+        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions 2"),
     };
     assert!(matches!(txs_from_db[4], SignedTxVariant::Tx(_)));
     assert!(matches!(txs_from_db[5], SignedTxVariant::Tx(_)));
@@ -230,7 +232,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     const SPLIT_TXS_AT: usize = 2;
 
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage).insert_tx(&tx.clone()).await?;
     }
@@ -246,7 +248,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Load the txs and check that they match the expected list.
-    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
+    let txs_from_db = MempoolSchema(&mut storage).load_txs(&[]).await?;
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
@@ -260,7 +262,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 #[db_test]
 async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Insert several txs into the mempool schema.
-    let txs = franklin_txs();
+    let txs = zksync_txs();
     for tx in &txs {
         MempoolSchema(&mut storage)
             .insert_tx(&tx.clone())
@@ -284,6 +286,8 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
         batch_id: None,
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
     OperationsSchema(&mut storage)
         .store_executed_tx(executed_tx)
@@ -295,7 +299,7 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let retained_hashes: Vec<_> = txs[1..].iter().map(|tx| tx.hash()).collect();
 
     // Load the txs and check that they match the expected list.
-    let (txs_from_db, _) = MempoolSchema(&mut storage).load_txs().await?;
+    let txs_from_db = MempoolSchema(&mut storage).load_txs(&[]).await?;
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
@@ -313,9 +317,11 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
     // Make sure that the mempool responds that these transactions are missing.
     for tx in &txs {
         let tx_hash = tx.hash();
-
         assert!(!MempoolSchema(&mut storage).contains_tx(tx_hash).await?);
-        assert!(MempoolSchema(&mut storage).get_tx(tx_hash).await?.is_none());
+        assert!(MempoolSchema(&mut storage)
+            .get_tx(tx_hash.as_ref())
+            .await?
+            .is_none());
     }
 
     // Submit transactions.
@@ -338,7 +344,7 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
         assert!(MempoolSchema(&mut storage).contains_tx(tx_hash).await?);
         assert_eq!(
             MempoolSchema(&mut storage)
-                .get_tx(tx_hash)
+                .get_tx(tx_hash.as_ref())
                 .await?
                 .as_ref()
                 .unwrap()
@@ -381,24 +387,6 @@ async fn test_get_batch_info_from_mempool(mut storage: StorageProcessor<'_>) -> 
 async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let txs = gen_transfers(5);
 
-    // Save the last block.
-    storage
-        .chain()
-        .block_schema()
-        .save_block(Block {
-            block_number: BlockNumber(3),
-            new_root_hash: Default::default(),
-            fee_account: AccountId(0),
-            block_transactions: Vec::new(),
-            processed_priority_ops: (0u64, 1), // Next priority operation serial id is 1.
-            block_chunks_size: 0usize,
-            commit_gas_limit: Default::default(),
-            verify_gas_limit: Default::default(),
-            block_commitment: Default::default(),
-            timestamp: 0u64,
-        })
-        .await?;
-
     // Save priority operation with serial id 1.
     let priority_op = FullExit {
         account_id: AccountId(0),
@@ -416,7 +404,7 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
             eth_block_index: None,
         },
         op: ZkSyncOp::FullExit(Box::new(FullExitOp {
-            priority_op,
+            priority_op: priority_op.clone(),
             withdraw_amount: None,
             creator_account_id: None,
             creator_address: None,
@@ -438,25 +426,31 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
     // Insert 5 executed transactions.
     for block_number in 1..=5 {
         let tx_data = txs.get(block_number - 1).unwrap();
-        let executed_tx = NewExecutedTransaction {
-            block_number: block_number as i64,
-            tx_hash: tx_data.hash().as_ref().to_vec(),
-            tx: serde_json::to_value(&tx_data.tx).unwrap(),
-            operation: Default::default(),
-            from_account: Default::default(),
-            to_account: None,
+        let executed_tx = ExecutedOperations::Tx(Box::new(ExecutedTx {
+            signed_tx: tx_data.clone(),
             success: true,
+            op: None,
             fail_reason: None,
-            block_index: None,
-            primary_account_address: Default::default(),
-            nonce: Default::default(),
-            created_at: chrono::Utc::now(),
-            eth_sign_data: None,
+            block_index: Some(0),
+            created_at: Utc::now(),
             batch_id: None,
-        };
+        }));
 
-        OperationsSchema(&mut storage)
-            .store_executed_tx(executed_tx)
+        storage
+            .chain()
+            .block_schema()
+            .save_full_block(Block {
+                block_number: BlockNumber(block_number as u32),
+                new_root_hash: Default::default(),
+                fee_account: AccountId(0),
+                block_transactions: vec![executed_tx],
+                processed_priority_ops: (0u64, 1), // Next priority operation serial id is 1.
+                block_chunks_size: 0usize,
+                commit_gas_limit: Default::default(),
+                verify_gas_limit: Default::default(),
+                block_commitment: Default::default(),
+                timestamp: block_number as u64,
+            })
             .await?;
     }
 
@@ -466,10 +460,14 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
         .await?;
 
     // Check that the first 3 txs are executed and 2 last are in mempool.
-    let (mempool_txs, reverted_txs) = storage.chain().mempool_schema().load_txs().await?;
+    let blocks = storage
+        .chain()
+        .mempool_schema()
+        .get_reverted_blocks(&[380], AccountId(1))
+        .await?;
     // No transactions in the mempool apart from the reverted ones.
-    assert!(mempool_txs.is_empty());
-    assert_eq!(reverted_txs.len(), 2);
+    // assert!(mempool_txs.is_empty());
+    assert_eq!(blocks.len(), 2);
     for block_number in 1..=5 {
         let tx_hash = txs.get(block_number - 1).unwrap().hash();
         let tx_in_executed = OperationsSchema(&mut storage)
@@ -483,11 +481,34 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
         }
     }
     // The order of priority operations is preserved.
-    let mut reverted_iter = reverted_txs.iter();
+    let mut reverted_iter = blocks.iter();
     // Block number 4.
-    assert_eq!(reverted_iter.next().unwrap().next_priority_op_id, 1u64);
-    // Block number 5.
-    assert_eq!(reverted_iter.next().unwrap().next_priority_op_id, 2u64);
+    let block = reverted_iter.next().unwrap();
+    assert_eq!(block.block_number, BlockNumber(4));
+    assert_eq!(block.processed_priority_ops, (0, 1));
+    assert_eq!(block.timestamp, 4u64);
+    assert_eq!(block.block_transactions.len(), 1);
 
+    let tx_data = txs.get(3).unwrap();
+    let block_tx = &block.block_transactions[0];
+    assert_eq!(block_tx.account_id(), tx_data.tx.account_id());
+    assert_eq!(block_tx.token_id(), tx_data.tx.token_id());
+    assert_eq!(block_tx.variance_name(), tx_data.tx.variance_name());
+
+    // Block number 5.
+    let block = reverted_iter.next().unwrap();
+    assert_eq!(block.block_number, BlockNumber(5));
+    assert_eq!(block.processed_priority_ops, (0, 1));
+    assert_eq!(block.timestamp, 5u64);
+    assert_eq!(block.block_transactions.len(), 2);
+    let tx_data = txs.get(4).unwrap();
+    let block_tx = &block.block_transactions[0];
+    assert_eq!(block_tx.account_id(), tx_data.tx.account_id());
+    assert_eq!(block_tx.token_id(), tx_data.tx.token_id());
+    assert_eq!(block_tx.variance_name(), tx_data.tx.variance_name());
+    let block_tx = &block.block_transactions[1];
+    assert_eq!(block_tx.account_id().unwrap(), priority_op.account_id);
+    assert_eq!(block_tx.token_id(), priority_op.token);
+    assert_eq!(block_tx.variance_name(), "FullExit");
     Ok(())
 }

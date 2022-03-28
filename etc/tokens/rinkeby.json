@@ -104,7 +104,19 @@
   {
     "address": "0xc3904a7c3A95bc265066Bb5BfC4D6664B2174774",
     "decimals": 0,
-    "symbol": "NEM",
-    "name": "Dec0"
+    "symbol": "XEM",
+    "name": "XEM"
+  },
+  {
+    "address": "0x2e055eee18284513b993db7568a592679ab13188",
+    "decimals": 18,
+    "symbol": "DAI",
+    "name": "DAI"
+  },
+  {
+    "address": "0xfe1b6abc39e46cec54d275efb4b29b33be176c2a",
+    "decimals": 18,
+    "symbol": "PHNX",
+    "name": "PHNX"
   }
 ]

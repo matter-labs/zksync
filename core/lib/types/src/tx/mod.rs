@@ -12,7 +12,7 @@ mod withdraw;
 mod withdraw_nft;
 mod zksync_tx;
 
-mod error;
+pub mod error;
 #[cfg(test)]
 mod tests;
 
@@ -24,6 +24,7 @@ pub use self::{
         ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
         ChangePubKeyType,
     },
+    error::TransactionError,
     forced_exit::ForcedExit,
     mint_nft::{calculate_token_address, calculate_token_data, calculate_token_hash, MintNFT},
     swap::{Order, Swap},

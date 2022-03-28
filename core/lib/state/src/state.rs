@@ -1,17 +1,18 @@
 use num::BigUint;
 use std::collections::{HashMap, HashSet};
 
-use zksync_crypto::{params, params::NFT_STORAGE_ACCOUNT_ID, Fr};
+use zksync_crypto::{merkle_tree::TreeMemoryUsage, params, params::NFT_STORAGE_ACCOUNT_ID, Fr};
 use zksync_types::{
     helpers::reverse_updates,
     operations::{TransferOp, TransferToNewOp, ZkSyncOp},
     Account, AccountId, AccountMap, AccountTree, AccountUpdate, AccountUpdates, Address,
-    BlockNumber, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx, NFT,
+    SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx, NFT,
 };
 
 use crate::{
     error::{OpError, TxBatchError},
     handler::{error::CloseOpError, TxHandler},
+    tx_ext::TxCheck,
 };
 
 #[derive(Debug)]
@@ -29,9 +30,6 @@ pub struct ZkSyncState {
     account_id_by_address: HashMap<Address, AccountId>,
 
     pub nfts: HashMap<TokenId, NFT>,
-
-    /// Current block number
-    pub block_number: BlockNumber,
 
     next_free_id: AccountId,
 }
@@ -70,14 +68,13 @@ impl ZkSyncState {
         let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,
-            block_number: BlockNumber(0),
             account_id_by_address: HashMap::new(),
             next_free_id: AccountId(0),
             nfts: HashMap::new(),
         }
     }
 
-    pub fn from_acc_map(accounts: AccountMap, current_block: BlockNumber) -> Self {
+    pub fn from_acc_map(accounts: AccountMap) -> Self {
         let mut empty = Self::empty();
 
         let mut next_free_id = 0;
@@ -88,7 +85,6 @@ impl ZkSyncState {
         }
         empty.next_free_id = AccountId(next_free_id as u32);
 
-        empty.block_number = current_block;
         for (id, account) in accounts {
             empty.insert_account(id, account);
         }
@@ -98,7 +94,6 @@ impl ZkSyncState {
     pub fn new(
         balance_tree: AccountTree,
         account_id_by_address: HashMap<Address, AccountId>,
-        current_block: BlockNumber,
         nfts: HashMap<TokenId, NFT>,
     ) -> Self {
         let mut next_free_id = 0;
@@ -110,11 +105,14 @@ impl ZkSyncState {
 
         Self {
             balance_tree,
-            block_number: current_block,
             account_id_by_address,
             next_free_id: AccountId(next_free_id as u32),
             nfts,
         }
+    }
+
+    pub fn tree_memory_stats(&self) -> TreeMemoryUsage {
+        self.balance_tree.memory_stats()
     }
 
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {
@@ -140,17 +138,12 @@ impl ZkSyncState {
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
-
-        let mut account = self.balance_tree.get(*account_id).cloned();
-        if account == Some(Account::default()) {
-            account = None;
-        }
-
-        vlog::trace!(
-            "Get account (id {}) execution time: {}ms",
-            *account_id,
-            start.elapsed().as_millis()
-        );
+        let account = self
+            .balance_tree
+            .get(*account_id)
+            .filter(|acc| !acc.is_default())
+            .cloned();
+        metrics::histogram!("state.get_account", start.elapsed());
 
         account
     }
@@ -287,10 +280,10 @@ impl ZkSyncState {
                     account.nonce = new_nonce;
                     self.insert_account(account_id, account);
                 }
-                AccountUpdate::MintNFT { token } => {
+                AccountUpdate::MintNFT { token, .. } => {
                     self.nfts.insert(token.id, token);
                 }
-                AccountUpdate::RemoveNFT { token } => {
+                AccountUpdate::RemoveNFT { token, .. } => {
                     self.nfts.remove(&token.id);
                 }
             }
@@ -300,11 +293,12 @@ impl ZkSyncState {
     pub fn execute_txs_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
+        block_timestamp: u64,
     ) -> Vec<Result<OpSuccess, TxBatchError>> {
         let mut successes = Vec::new();
 
         for (id, tx) in txs.iter().enumerate() {
-            match self.execute_tx(tx.tx.clone()) {
+            match self.execute_tx(tx.tx.clone(), block_timestamp) {
                 Ok(success) => {
                     successes.push(Ok(success));
                 }
@@ -338,7 +332,9 @@ impl ZkSyncState {
         successes
     }
 
-    pub fn execute_tx(&mut self, tx: ZkSyncTx) -> Result<OpSuccess, OpError> {
+    pub fn execute_tx(&mut self, tx: ZkSyncTx, block_timestamp: u64) -> Result<OpSuccess, OpError> {
+        tx.check_timestamp(block_timestamp)?;
+
         match tx {
             ZkSyncTx::Transfer(tx) => Ok(self.apply_tx(*tx)?),
             ZkSyncTx::Withdraw(tx) => Ok(self.apply_tx(*tx)?),
@@ -508,10 +504,10 @@ impl ZkSyncState {
 
                     self.insert_account(*account_id, account);
                 }
-                AccountUpdate::MintNFT { token } => {
+                AccountUpdate::MintNFT { token, .. } => {
                     self.nfts.insert(token.id, token.clone());
                 }
-                AccountUpdate::RemoveNFT { token } => {
+                AccountUpdate::RemoveNFT { token, .. } => {
                     self.nfts.remove(&token.id);
                 }
             }
@@ -531,6 +527,7 @@ impl ZkSyncState {
 mod tests {
     use super::*;
     use crate::tests::{AccountState::*, PlasmaTestBuilder};
+    use vlog::sentry::types::Utc;
     use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
     use zksync_types::{
         tx::{Transfer, Withdraw},
@@ -573,10 +570,12 @@ mod tests {
         let signed_zk_sync_tx1 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw1)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let signed_zk_sync_tx2 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         tb.test_txs_batch_fail(
             &[signed_zk_sync_tx1, signed_zk_sync_tx2],
@@ -627,10 +626,12 @@ mod tests {
         let signed_zk_sync_tx1 = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(transfer_1)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let signed_zk_sync_tx2 = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(transfer_2)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         tb.test_txs_batch_fail(
             &[signed_zk_sync_tx1, signed_zk_sync_tx2],
@@ -674,10 +675,12 @@ mod tests {
         let signed_zk_sync_tx1 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw1)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let signed_zk_sync_tx2 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
             eth_sign_data: None,
+            created_at: Utc::now(),
         };
         let expected_updates = vec![
             (
@@ -923,7 +926,7 @@ mod tests {
         // Delete 1, update balance of 0, create account 1
         // Reverse updates
 
-        let initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
+        let initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default());
 
         let updates = vec![
             (
@@ -1000,8 +1003,7 @@ mod tests {
             random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
         }
 
-        let mut initial_plasma_state =
-            ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
+        let mut initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default());
         assert_eq!(*initial_plasma_state.next_free_id, 0);
         let updates = vec![
             (
@@ -1064,12 +1066,7 @@ mod tests {
         account_id_by_address.insert(random_addresses[3], AccountId(8));
         account_id_by_address.insert(random_addresses[4], AccountId(9));
 
-        let state = ZkSyncState::new(
-            balance_tree,
-            account_id_by_address,
-            BlockNumber(5),
-            HashMap::new(),
-        );
+        let state = ZkSyncState::new(balance_tree, account_id_by_address, HashMap::new());
         assert_eq!(*state.next_free_id, 10);
     }
 
@@ -1094,7 +1091,7 @@ mod tests {
             AccountId(1),
             Account::default_with_address(&random_addresses[0]),
         );
-        let mut plasma_state = ZkSyncState::from_acc_map(account_map, BlockNumber(0));
+        let mut plasma_state = ZkSyncState::from_acc_map(account_map);
         plasma_state.insert_account(
             AccountId(3),
             Account::default_with_address(&random_addresses[2]),
@@ -1110,7 +1107,7 @@ mod tests {
         for _ in 0..10 {
             random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
         }
-        let mut plasma_state = ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
+        let mut plasma_state = ZkSyncState::from_acc_map(AccountMap::default());
 
         plasma_state.insert_account(
             AccountId(0),
@@ -1149,7 +1146,7 @@ mod tests {
             AccountId(2),
             Account::default_with_address(&random_addresses[2]),
         );
-        let plasma_state = ZkSyncState::from_acc_map(account_map, BlockNumber(0));
+        let plasma_state = ZkSyncState::from_acc_map(account_map);
         assert_eq!(*plasma_state.next_free_id, 6);
     }
 }

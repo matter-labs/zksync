@@ -2,6 +2,7 @@
 
 // Built-in uses
 
+use std::time::Instant;
 // External uses
 use actix_web::{web, Scope};
 use serde::{Deserialize, Serialize};
@@ -41,14 +42,17 @@ impl ApiConfigData {
 // Server implementation
 
 async fn config_endpoint(data: web::Data<ApiConfigData>) -> ApiResult<ApiConfigData> {
-    ApiResult::Ok(*data.into_inner())
+    let start = Instant::now();
+    let res = ApiResult::Ok(*data.into_inner());
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "config_endpoint");
+    res
 }
 
 pub fn api_scope(config: &ZkSyncConfig) -> Scope {
     let data = ApiConfigData::new(config);
 
     web::scope("config")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route("", web::get().to(config_endpoint))
 }
 

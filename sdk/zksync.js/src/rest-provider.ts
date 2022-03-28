@@ -3,20 +3,32 @@ import { BigNumber } from 'ethers';
 import { SyncProvider } from './provider-interface';
 import * as types from './types';
 import { sleep, TokenSet } from './utils';
+import { Network } from './types';
 
-export async function getDefaultRestProvider(network: types.Network): Promise<RestProvider> {
+export async function getDefaultRestProvider(
+    network: types.Network,
+    pollIntervalMilliSecs?: number
+): Promise<RestProvider> {
     if (network === 'localhost') {
-        return await RestProvider.newProvider('http://127.0.0.1:3001/api/v0.2');
+        return await RestProvider.newProvider('http://127.0.0.1:3001/api/v0.2', pollIntervalMilliSecs, network);
     } else if (network === 'ropsten') {
-        return await RestProvider.newProvider('https://ropsten-api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider('https://ropsten-api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
     } else if (network === 'rinkeby') {
-        return await RestProvider.newProvider('https://rinkeby-api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider('https://rinkeby-api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
     } else if (network === 'ropsten-beta') {
-        return await RestProvider.newProvider('https://ropsten-beta-api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider(
+            'https://ropsten-beta-api.zksync.io/api/v0.2',
+            pollIntervalMilliSecs,
+            network
+        );
     } else if (network === 'rinkeby-beta') {
-        return await RestProvider.newProvider('https://rinkeby-beta-api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider(
+            'https://rinkeby-beta-api.zksync.io/api/v0.2',
+            pollIntervalMilliSecs,
+            network
+        );
     } else if (network === 'mainnet') {
-        return await RestProvider.newProvider('https://api.zksync.io/api/v0.2');
+        return await RestProvider.newProvider('https://api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
     } else {
         throw new Error(`Ethereum network ${network} is not supported`);
     }
@@ -59,7 +71,8 @@ export class RestProvider extends SyncProvider {
 
     static async newProvider(
         address: string = 'http://127.0.0.1:3001/api/v0.2',
-        pollIntervalMilliSecs?: number
+        pollIntervalMilliSecs?: number,
+        network?: Network
     ): Promise<RestProvider> {
         const provider = new RestProvider(address);
         if (pollIntervalMilliSecs) {
@@ -67,6 +80,7 @@ export class RestProvider extends SyncProvider {
         }
         provider.contractAddress = await provider.getContractAddress();
         provider.tokenSet = new TokenSet(await provider.getTokens());
+        provider.network = network;
         return provider;
     }
 
@@ -108,6 +122,15 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.accountInfoDetailed(idOrAddress, infoType));
     }
 
+    async toggle2FADetailed(data: types.Toggle2FARequest): Promise<Response<types.Toggle2FAResponse>> {
+        return await this.post(`${this.address}/transactions/toggle2FA`, data);
+    }
+
+    async toggle2FA(data: types.Toggle2FARequest): Promise<boolean> {
+        const response = this.parseResponse(await this.toggle2FADetailed(data));
+        return response.success;
+    }
+
     async accountFullInfoDetailed(idOrAddress: number | types.Address): Promise<Response<types.ApiAccountFullInfo>> {
         return await this.get(`${this.address}/accounts/${idOrAddress}`);
     }
@@ -118,19 +141,27 @@ export class RestProvider extends SyncProvider {
 
     async accountTxsDetailed(
         idOrAddress: number | types.Address,
-        paginationQuery: types.PaginationQuery<string>
+        paginationQuery: types.PaginationQuery<string>,
+        token?: types.TokenLike,
+        secondIdOrAddress?: number | types.Address
     ): Promise<Response<types.Paginated<types.ApiTransaction, string>>> {
-        return await this.get(
+        let url =
             `${this.address}/accounts/${idOrAddress}/transactions?from=${paginationQuery.from}` +
-                `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`
-        );
+            `&limit=${paginationQuery.limit}&direction=${paginationQuery.direction}`;
+        if (token) url += `&token=${token}`;
+        if (secondIdOrAddress) url += `&secondAccount=${secondIdOrAddress}`;
+        return await this.get(url);
     }
 
     async accountTxs(
         idOrAddress: number | types.Address,
-        paginationQuery: types.PaginationQuery<string>
+        paginationQuery: types.PaginationQuery<string>,
+        token?: types.TokenLike,
+        secondIdOrAddress?: number | types.Address
     ): Promise<types.Paginated<types.ApiTransaction, string>> {
-        return this.parseResponse(await this.accountTxsDetailed(idOrAddress, paginationQuery));
+        return this.parseResponse(
+            await this.accountTxsDetailed(idOrAddress, paginationQuery, token, secondIdOrAddress)
+        );
     }
 
     async accountPendingTxsDetailed(
@@ -306,26 +337,23 @@ export class RestProvider extends SyncProvider {
         return this.parseResponse(await this.tokenPaginationDetailed(paginationQuery));
     }
 
-    async tokenByIdOrAddressDetailed(idOrAddress: number | types.TokenAddress): Promise<Response<types.TokenInfo>> {
-        return await this.get(`${this.address}/tokens/${idOrAddress}`);
+    async tokenInfoDetailed(tokenLike: types.TokenLike): Promise<Response<types.TokenInfo>> {
+        return await this.get(`${this.address}/tokens/${tokenLike}`);
     }
 
-    async tokenByIdOrAddress(idOrAddress: number | types.TokenAddress): Promise<types.TokenInfo> {
-        return this.parseResponse(await this.tokenByIdOrAddressDetailed(idOrAddress));
+    async tokenInfo(tokenLike: types.TokenLike): Promise<types.TokenInfo> {
+        return this.parseResponse(await this.tokenInfoDetailed(tokenLike));
     }
 
     async tokenPriceInfoDetailed(
-        idOrAddress: number | types.TokenAddress,
+        tokenLike: types.TokenLike,
         tokenIdOrUsd: number | 'usd'
     ): Promise<Response<types.TokenPriceInfo>> {
-        return await this.get(`${this.address}/tokens/${idOrAddress}/priceIn/${tokenIdOrUsd}`);
+        return await this.get(`${this.address}/tokens/${tokenLike}/priceIn/${tokenIdOrUsd}`);
     }
 
-    async tokenPriceInfo(
-        idOrAddress: number | types.TokenAddress,
-        tokenIdOrUsd: number | 'usd'
-    ): Promise<types.TokenPriceInfo> {
-        return this.parseResponse(await this.tokenPriceInfoDetailed(idOrAddress, tokenIdOrUsd));
+    async tokenPriceInfo(tokenLike: types.TokenLike, tokenIdOrUsd: number | 'usd'): Promise<types.TokenPriceInfo> {
+        return this.parseResponse(await this.tokenPriceInfoDetailed(tokenLike, tokenIdOrUsd));
     }
 
     async submitTxNewDetailed(tx: types.L2Tx, signature?: types.TxEthSignatureVariant): Promise<Response<string>> {
@@ -410,6 +438,22 @@ export class RestProvider extends SyncProvider {
         return nft;
     }
 
+    async getNFTOwnerDetailed(id: number): Promise<Response<number>> {
+        return await this.get(`${this.address}/tokens/nft/${id}/owner`);
+    }
+
+    async getNFTOwner(id: number): Promise<number> {
+        return this.parseResponse(await this.getNFTOwnerDetailed(id));
+    }
+
+    async getNFTIdByTxHashDetailed(txHash: string): Promise<Response<number>> {
+        return await this.get(`${this.address}/tokens/nft_id_by_tx_hash/${txHash}`);
+    }
+
+    async getNFTIdByTxHash(txHash: string): Promise<number> {
+        return this.parseResponse(await this.getNFTIdByTxHashDetailed(txHash));
+    }
+
     async notifyAnyTransaction(hash: string, action: 'COMMIT' | 'VERIFY'): Promise<types.ApiTxReceipt> {
         while (true) {
             let transactionStatus = await this.txStatus(hash);
@@ -457,7 +501,7 @@ export class RestProvider extends SyncProvider {
         };
     }
 
-    async getTokens(limit?: number): Promise<types.Tokens> {
+    async getTokens(limit?: number): Promise<types.ExtendedTokens> {
         let tokens = {};
         let tmpId = 0;
         limit = limit ? limit : RestProvider.MAX_LIMIT;
@@ -473,7 +517,8 @@ export class RestProvider extends SyncProvider {
                     address: token.address,
                     id: token.id,
                     symbol: token.symbol,
-                    decimals: token.decimals
+                    decimals: token.decimals,
+                    enabledForFees: token.enabledForFees
                 };
             }
             tmpId += limit;
@@ -482,7 +527,7 @@ export class RestProvider extends SyncProvider {
         return tokens;
     }
 
-    async getState(address: types.Address): Promise<types.AccountStateRest> {
+    async getState(address: types.Address): Promise<types.AccountState> {
         const fullInfo = await this.accountFullInfo(address);
         const defaultInfo = {
             balances: {},
@@ -497,6 +542,7 @@ export class RestProvider extends SyncProvider {
                 address,
                 id: fullInfo.committed.accountId,
                 accountType: fullInfo.committed.accountType,
+                depositing: fullInfo.depositing,
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
@@ -517,6 +563,7 @@ export class RestProvider extends SyncProvider {
                 address,
                 id: fullInfo.committed.accountId,
                 accountType: fullInfo.committed.accountType,
+                depositing: fullInfo.depositing,
                 committed: {
                     balances: fullInfo.committed.balances,
                     nonce: fullInfo.committed.nonce,
@@ -529,6 +576,7 @@ export class RestProvider extends SyncProvider {
         } else {
             return {
                 address,
+                depositing: fullInfo.depositing,
                 committed: defaultInfo,
                 verified: defaultInfo
             };
@@ -555,7 +603,7 @@ export class RestProvider extends SyncProvider {
 
     async getTokenPrice(tokenLike: types.TokenLike): Promise<number> {
         const price = await this.tokenPriceInfo(tokenLike, 'usd');
-        return price.price.toNumber();
+        return parseFloat(price.price);
     }
 
     async getTxReceipt(txHash: string): Promise<types.TransactionReceipt> {

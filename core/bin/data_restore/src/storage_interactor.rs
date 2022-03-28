@@ -7,14 +7,16 @@ use zksync_storage::data_restore::records::{
 };
 use zksync_types::{
     block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
-    Token, TokenId, TokenInfo, NFT,
+    PriorityOp, SerialId, Token, TokenId, TokenInfo, NFT,
 };
 
 use crate::{
     contract::ZkSyncContractVersion,
     data_restore_driver::StorageUpdateState,
+    database_storage_interactor::DatabaseStorageInteractor,
     events::{BlockEvent, EventType},
     events_state::EventsState,
+    inmemory_storage_interactor::InMemoryStorageInteractor,
     rollup_ops::RollupOpsBlock,
 };
 
@@ -32,15 +34,48 @@ pub struct CachedTreeState {
     pub nfts: HashMap<TokenId, NFT>,
 }
 
-#[async_trait::async_trait]
-pub trait StorageInteractor {
+#[allow(clippy::large_enum_variant)]
+pub enum StorageInteractor<'a> {
+    Database(DatabaseStorageInteractor<'a>),
+    InMemory(InMemoryStorageInteractor),
+}
+
+macro_rules! storage_interact {
+    ($obj:ident.$method:ident($($args:ident),*)) => {
+        match $obj {
+            StorageInteractor::Database(db) => db.$method($($args),*).await,
+            StorageInteractor::InMemory(db) => db.$method($($args),*).await,
+        }
+    }
+}
+
+impl StorageInteractor<'_> {
+    pub async fn start_transaction<'c: 'b, 'b>(&'c mut self) -> StorageInteractor<'b> {
+        match self {
+            StorageInteractor::Database(db) => {
+                let transaction = db.start_transaction().await;
+                StorageInteractor::Database(transaction)
+            }
+            StorageInteractor::InMemory(db) => {
+                let transaction = db.start_transaction().await;
+                StorageInteractor::InMemory(transaction)
+            }
+        }
+    }
+
+    pub async fn commit(self) {
+        storage_interact!(self.commit())
+    }
+
     /// Saves Rollup operations blocks in storage
     ///
     /// # Arguments
     ///
     /// * `blocks` - Rollup operations blocks
     ///
-    async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]);
+    pub async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]) {
+        storage_interact!(self.save_rollup_ops(blocks))
+    }
 
     /// Updates stored tree state: saves block transactions in storage, stores blocks and account updates
     ///
@@ -49,7 +84,28 @@ pub trait StorageInteractor {
     /// * `block` - Rollup block
     /// * `accounts_updated` - accounts updates
     ///
-    async fn update_tree_state(&mut self, block: Block, accounts_updated: AccountUpdates);
+    pub async fn update_tree_state(&mut self, block: Block, accounts_updated: AccountUpdates) {
+        storage_interact!(self.update_tree_state(block, accounts_updated))
+    }
+
+    /// Saves the priority operations metadata in storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `priority_op_data` - Priority operations.
+    ///
+    /// # Returns
+    ///
+    /// Ids of operations with no corresponding block in storage yet.
+    /// These should not be removed from the events state until the next
+    /// Ethereum block range.
+    ///
+    pub async fn apply_priority_op_data(
+        &mut self,
+        priority_op_data: impl Iterator<Item = &PriorityOp>,
+    ) -> Vec<SerialId> {
+        storage_interact!(self.apply_priority_op_data(priority_op_data))
+    }
 
     /// Store token to the storage  
     /// # Arguments
@@ -57,22 +113,32 @@ pub trait StorageInteractor {
     /// * `token` - Token that added when deploying contract
     /// * `token_id` - Id for token in our system
     ///
-    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId);
+    pub async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
+        storage_interact!(self.store_token(token, token_id))
+    }
 
     /// Saves Rollup contract events in storage (includes block events, new tokens and last watched eth block number)
     ///
     /// # Arguments
     ///
-    /// * `eveblock_eventsnts` - Rollup contract block events descriptions
+    /// * `block_events` - Rollup contract block events descriptions
     /// * `tokens` - Tokens that had been added to system
     /// * `last_watched_eth_block_number` - Last watched ethereum block
     ///
-    async fn save_events_state(
+    pub async fn save_events_state(
         &mut self,
         block_events: &[BlockEvent],
         tokens: &[NewTokenEvent],
+        priority_op_data: &[PriorityOp],
         last_watched_eth_block_number: u64,
-    );
+    ) {
+        storage_interact!(self.save_events_state(
+            block_events,
+            tokens,
+            priority_op_data,
+            last_watched_eth_block_number
+        ))
+    }
 
     /// Saves genesis accounts state in storage
     ///
@@ -80,7 +146,12 @@ pub trait StorageInteractor {
     ///
     /// * `genesis_updates` - Genesis account updates
     ///
-    async fn save_genesis_tree_state(&mut self, genesis_updates: &[(AccountId, AccountUpdate)]);
+    pub async fn save_genesis_tree_state(
+        &mut self,
+        genesis_updates: &[(AccountId, AccountUpdate)],
+    ) {
+        storage_interact!(self.save_genesis_tree_state(genesis_updates))
+    }
 
     /// Saves special NFT token in storage
     ///
@@ -88,37 +159,58 @@ pub trait StorageInteractor {
     ///
     /// * `token` - Special token to be stored
     ///
-    async fn save_special_token(&mut self, token: Token);
+    pub async fn save_special_token(&mut self, token: Token) {
+        storage_interact!(self.save_special_token(token))
+    }
 
     /// Returns Rollup contract events state from storage
-    async fn get_block_events_state_from_storage(&mut self) -> EventsState;
+    pub async fn get_block_events_state_from_storage(&mut self) -> EventsState {
+        storage_interact!(self.get_block_events_state_from_storage())
+    }
 
     /// Returns the current Rollup block, tree accounts map, unprocessed priority ops and the last fee acc from storage
-    async fn get_tree_state(&mut self) -> StoredTreeState;
+    pub async fn get_tree_state(&mut self) -> StoredTreeState {
+        storage_interact!(self.get_tree_state())
+    }
 
     /// Returns Rollup operations blocks from storage
-    async fn get_ops_blocks_from_storage(&mut self) -> Vec<RollupOpsBlock>;
+    pub async fn get_ops_blocks_from_storage(&mut self) -> Vec<RollupOpsBlock> {
+        storage_interact!(self.get_ops_blocks_from_storage())
+    }
 
     /// Updates the `eth_stats` table with the currently last available committed/verified blocks
     /// data for `eth_sender` module to operate correctly.
-    async fn update_eth_state(&mut self);
+    pub async fn update_eth_state(&mut self) {
+        storage_interact!(self.update_eth_state())
+    }
 
     /// Returns last recovery state update step from storage
-    async fn get_storage_state(&mut self) -> StorageUpdateState;
+    pub async fn get_storage_state(&mut self) -> StorageUpdateState {
+        storage_interact!(self.get_storage_state())
+    }
 
     /// Returns cached tree state from storage. It's expected to be valid
     /// after completing `finite` restore mode and may be used to speed up the
     /// `continue` mode.
-    async fn get_cached_tree_state(&mut self) -> Option<CachedTreeState>;
+    pub async fn get_cached_tree_state(&mut self) -> Option<CachedTreeState> {
+        storage_interact!(self.get_cached_tree_state())
+    }
 
-    /// Saves the tree cache in the database.
+    /// Deletes the latest tree cache in the database and saves the new one.
     ///
     /// # Arguments
     ///
     /// * `block_number` - The corresponding block number
     /// * `tree_cache` - Merkle tree cache
     ///
-    async fn store_tree_cache(&mut self, block_number: BlockNumber, tree_cache: serde_json::Value);
+    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: String) {
+        storage_interact!(self.update_tree_cache(block_number, tree_cache))
+    }
+
+    /// Retrieves the maximum serial id of a priority requests
+    pub async fn get_max_priority_op_serial_id(&mut self) -> SerialId {
+        storage_interact!(self.get_max_priority_op_serial_id())
+    }
 }
 
 /// Returns Rollup contract event from its stored representation

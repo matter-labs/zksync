@@ -47,7 +47,6 @@ pub async fn run_event_server(config: ZkSyncConfig) {
     let server = HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
-            .wrap(vlog::actix_middleware())
             .route("/", web::get().to(ws_index))
     })
     .bind(config.event_listener.ws_bind_addr())

@@ -3,13 +3,14 @@
 // Built-in uses
 use std::collections::BTreeMap;
 use std::str::FromStr;
+use std::time::Instant;
 
 // External uses
 use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_types::v02::{
-    account::{Account, AccountAddressOrId, AccountState},
+    account::{Account, AccountAddressOrId, AccountState, IncomingAccountTxsQuery},
     pagination::{
         parse_query, AccountTxsRequest, ApiEither, Paginated, PaginationQuery, PendingOpsRequest,
     },
@@ -17,7 +18,8 @@ use zksync_api_types::v02::{
 };
 use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
+use zksync_token_db_cache::TokenDBCache;
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId, TokenLike};
 
 // Local uses
 use super::{
@@ -25,25 +27,22 @@ use super::{
     paginate_trait::Paginate,
     response::ApiResult,
 };
-use crate::{
-    api_try, core_api_client::CoreApiClient, fee_ticker::PriceError,
-    utils::token_db_cache::TokenDBCache,
-};
+use crate::{api_server::helpers::get_depositing, api_try, fee_ticker::PriceError};
 
 /// Shared data between `api/v02/accounts` endpoints.
 #[derive(Clone)]
 struct ApiAccountData {
     pool: ConnectionPool,
     tokens: TokenDBCache,
-    core_api_client: CoreApiClient,
+    confirmations_for_eth_event: u64,
 }
 
 impl ApiAccountData {
-    fn new(pool: ConnectionPool, tokens: TokenDBCache, core_api_client: CoreApiClient) -> Self {
+    fn new(pool: ConnectionPool, tokens: TokenDBCache, confirmations_for_eth_event: u64) -> Self {
         Self {
             pool,
             tokens,
-            core_api_client,
+            confirmations_for_eth_event,
         }
     }
 
@@ -230,44 +229,63 @@ impl ApiAccountData {
         result
     }
 
-    async fn account_full_info(&self, account_id: AccountId) -> Result<AccountState, Error> {
+    async fn account_full_info(
+        &self,
+        address: Address,
+        account_id: Option<AccountId>,
+    ) -> Result<AccountState, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
-        let (finalized_state, committed_state) = transaction
-            .chain()
-            .account_schema()
-            .last_committed_state_for_account(account_id)
-            .await
-            .map_err(Error::storage)?;
-        let finalized = if let Some(account) = finalized_state.1 {
-            Some(
-                self.api_account(
-                    account,
-                    account_id,
-                    BlockNumber(finalized_state.0 as u32),
-                    &mut transaction,
-                )
-                .await?,
-            )
-        } else {
-            None
-        };
-        let committed = if let Some(account) = committed_state {
-            let last_block = transaction
+
+        let depositing = get_depositing(
+            &mut transaction,
+            &self.tokens,
+            address,
+            self.confirmations_for_eth_event,
+        )
+        .await?;
+
+        let (committed, finalized) = if let Some(account_id) = account_id {
+            let (finalized_state, committed_state) = transaction
                 .chain()
                 .account_schema()
-                .last_committed_block_with_update_for_acc(account_id)
+                .last_committed_state_for_account(account_id)
                 .await
                 .map_err(Error::storage)?;
-            Some(
-                self.api_account(account, account_id, last_block, &mut transaction)
+            let finalized = if let Some(account) = finalized_state.1 {
+                Some(
+                    self.api_account(
+                        account,
+                        account_id,
+                        BlockNumber(finalized_state.0 as u32),
+                        &mut transaction,
+                    )
                     .await?,
-            )
+                )
+            } else {
+                None
+            };
+            let committed = if let Some(account) = committed_state {
+                let last_block = transaction
+                    .chain()
+                    .account_schema()
+                    .last_committed_block_with_update_for_acc(account_id)
+                    .await
+                    .map_err(Error::storage)?;
+                Some(
+                    self.api_account(account, account_id, last_block, &mut transaction)
+                        .await?,
+                )
+            } else {
+                None
+            };
+            (committed, finalized)
         } else {
-            None
+            (None, None)
         };
         transaction.commit().await.map_err(Error::storage)?;
         Ok(AccountState {
+            depositing,
             committed,
             finalized,
         })
@@ -277,12 +295,28 @@ impl ApiAccountData {
         &self,
         query: PaginationQuery<ApiEither<TxHash>>,
         address: Address,
+        token_like: Option<TokenLike>,
+        second_address: Option<Address>,
     ) -> Result<Paginated<Transaction, TxHashSerializeWrapper>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let token = if let Some(token_like) = token_like {
+            Some(
+                self.tokens
+                    .get_token(&mut storage, token_like.clone())
+                    .await
+                    .map_err(Error::storage)?
+                    .ok_or_else(|| Error::from(PriceError::token_not_found(token_like)))?
+                    .id,
+            )
+        } else {
+            None
+        };
         let new_query = PaginationQuery {
             from: AccountTxsRequest {
-                address,
                 tx_hash: query.from,
+                address,
+                token,
+                second_address,
             },
             limit: query.limit,
             direction: query.direction,
@@ -309,69 +343,100 @@ impl ApiAccountData {
             limit: query.limit,
             direction: query.direction,
         };
-        let mut client = self.core_api_client.clone();
-        client.paginate_checked(&new_query).await
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        storage.paginate_checked(&new_query).await
     }
 }
 
 async fn account_committed_info(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
 ) -> ApiResult<Option<Account>> {
+    let start = Instant::now();
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    if let Some(account_id) = account_id {
+    let res = if let Some(account_id) = account_id {
         data.account_committed_info(account_id).await.into()
     } else {
         ApiResult::Ok(None)
-    }
+    };
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_committed_info");
+    res
 }
 
 async fn account_finalized_info(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
 ) -> ApiResult<Option<Account>> {
+    let start = Instant::now();
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    if let Some(account_id) = account_id {
+    let res = if let Some(account_id) = account_id {
         data.account_finalized_info(account_id).await.into()
     } else {
         ApiResult::Ok(None)
-    }
+    };
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_finalized_info");
+    res
 }
 
 async fn account_full_info(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
 ) -> ApiResult<AccountState> {
+    let start = Instant::now();
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
+    let address = api_try!(
+        data.get_address_by_address_or_id(address_or_id.clone())
+            .await
+    );
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    if let Some(account_id) = account_id {
-        data.account_full_info(account_id).await.into()
-    } else {
-        ApiResult::Ok(AccountState {
-            committed: None,
-            finalized: None,
-        })
-    }
+    let res = data.account_full_info(address, account_id).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_full_info");
+    res
 }
 
 async fn account_txs(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
-    web::Query(query): web::Query<PaginationQuery<String>>,
+    account_id_or_address: web::Path<String>,
+    web::Query(query): web::Query<IncomingAccountTxsQuery>,
 ) -> ApiResult<Paginated<Transaction, TxHashSerializeWrapper>> {
-    let query = api_try!(parse_query(query).map_err(Error::from));
+    let start = Instant::now();
+    let pagination = api_try!(parse_query(PaginationQuery {
+        from: query.from,
+        limit: query.limit,
+        direction: query.direction
+    })
+    .map_err(Error::from));
+
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(data.get_address_by_address_or_id(address_or_id).await);
-    data.account_txs(query, address).await.into()
+
+    let second_address = if let Some(second_account) = query.second_account {
+        let address_or_id = api_try!(data.parse_account_id_or_address(&second_account));
+        Some(api_try!(
+            data.get_address_by_address_or_id(address_or_id).await
+        ))
+    } else {
+        None
+    };
+
+    let token_like = query.token.map(|token| TokenLike::parse(&token));
+
+    let res = data
+        .account_txs(pagination, address, token_like, second_address)
+        .await
+        .into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_txs");
+    res
 }
 
 async fn account_pending_txs(
     data: web::Data<ApiAccountData>,
-    web::Path(account_id_or_address): web::Path<String>,
+    account_id_or_address: web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<String>>,
 ) -> ApiResult<Paginated<Transaction, SerialId>> {
+    let start = Instant::now();
     let query = api_try!(parse_query(query).map_err(Error::from));
     let address_or_id = api_try!(data.parse_account_id_or_address(&account_id_or_address));
     let address = api_try!(
@@ -379,20 +444,23 @@ async fn account_pending_txs(
             .await
     );
     let account_id = api_try!(data.get_id_by_address_or_id(address_or_id).await);
-    data.account_pending_txs(query, address, account_id)
+    let res = data
+        .account_pending_txs(query, address, account_id)
         .await
-        .into()
+        .into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "account_pending_txs");
+    res
 }
 
 pub fn api_scope(
     pool: ConnectionPool,
     tokens: TokenDBCache,
-    core_api_client: CoreApiClient,
+    confirmations_for_eth_event: u64,
 ) -> Scope {
-    let data = ApiAccountData::new(pool, tokens, core_api_client);
+    let data = ApiAccountData::new(pool, tokens, confirmations_for_eth_event);
 
     web::scope("accounts")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route(
             "{account_id_or_address}/committed",
             web::get().to(account_committed_info),
@@ -419,36 +487,22 @@ mod tests {
         test_utils::{deserialize_response_result, TestServerConfig},
         SharedData,
     };
-    use actix_web::{web::Json, App};
-    use chrono::Utc;
+    use num::BigUint;
     use serde::Deserialize;
-    use serde_json::json;
-    use std::sync::Arc;
-    use tokio::sync::Mutex;
     use zksync_api_client::rest::client::Client;
     use zksync_api_types::v02::{
-        pagination::{PaginationDirection, PaginationQuery, PendingOpsRequest},
+        account::{DepositingAccountBalances, DepositingFunds},
+        pagination::{PaginationDirection, PaginationQuery},
         transaction::{L1Transaction, TransactionData},
         ApiVersion,
     };
     use zksync_storage::StorageProcessor;
-    use zksync_types::{AccountId, Address, H256};
+    use zksync_types::{AccountId, Address, Deposit, PriorityOp, TokenId, ZkSyncPriorityOp, H256};
 
-    type PendingOpsHandle = Arc<Mutex<serde_json::Value>>;
-
-    fn create_pending_ops_handle() -> PendingOpsHandle {
-        Arc::new(Mutex::new(json!({
-            "list": [],
-            "pagination": {
-                "from": 1,
-                "limit": 1,
-                "direction": "newer",
-                "count": 0
-            }
-        })))
-    }
-
+    // While the values of the PendingOpsFlattenRequest's fields are never directly
+    // used in the tests, we still need them to specify the JSON format of the `unconfirmed_ops` endpoint input in tests.
     #[derive(Debug, Deserialize)]
+    #[allow(dead_code)]
     struct PendingOpsFlattenRequest {
         pub address: Address,
         pub account_id: Option<AccountId>,
@@ -457,42 +511,16 @@ mod tests {
         pub direction: PaginationDirection,
     }
 
-    fn get_unconfirmed_ops_loopback(
-        ops_handle: PendingOpsHandle,
-    ) -> (CoreApiClient, actix_web::test::TestServer) {
-        async fn get_ops(
-            data: web::Data<PendingOpsHandle>,
-            web::Query(_query): web::Query<PendingOpsFlattenRequest>,
-        ) -> Json<serde_json::Value> {
-            Json(data.lock().await.clone())
-        }
-
-        let server = actix_web::test::start(move || {
-            App::new().service(
-                web::scope("unconfirmed_ops")
-                    .data(ops_handle.clone())
-                    .route("", web::get().to(get_ops)),
-            )
-        });
-
-        let url = server.url("").trim_end_matches('/').to_owned();
-        (CoreApiClient::new(url), server)
-    }
-
     struct TestServer {
-        core_server: actix_web::test::TestServer,
-        api_server: actix_web::test::TestServer,
+        api_server: actix_test::TestServer,
         pool: ConnectionPool,
-        pending_ops: PendingOpsHandle,
+        confirmations_for_eth_event: u64,
     }
 
     impl TestServer {
         async fn new() -> anyhow::Result<(Client, Self)> {
             let cfg = TestServerConfig::default();
             cfg.fill_database().await?;
-
-            let pending_ops = create_pending_ops_handle();
-            let (core_client, core_server) = get_unconfirmed_ops_loopback(pending_ops.clone());
 
             let pool = cfg.pool.clone();
 
@@ -502,7 +530,11 @@ mod tests {
             };
             let (api_client, api_server) = cfg.start_server(
                 move |cfg: &TestServerConfig| {
-                    api_scope(cfg.pool.clone(), TokenDBCache::new(), core_client.clone())
+                    api_scope(
+                        cfg.pool.clone(),
+                        TokenDBCache::new(cfg.config.api.common.invalidate_token_cache_period()),
+                        cfg.config.eth_watch.confirmations_for_eth_event,
+                    )
                 },
                 Some(shared_data),
             );
@@ -510,10 +542,9 @@ mod tests {
             Ok((
                 api_client,
                 Self {
-                    core_server,
                     api_server,
                     pool,
-                    pending_ops,
+                    confirmations_for_eth_event: cfg.config.eth_watch.confirmations_for_eth_event,
                 },
             ))
         }
@@ -541,31 +572,7 @@ mod tests {
 
         async fn stop(self) {
             self.api_server.stop().await;
-            self.core_server.stop().await;
         }
-    }
-
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
-    async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
-        let (client, server) = get_unconfirmed_ops_loopback(create_pending_ops_handle());
-        client
-            .get_unconfirmed_ops(&PaginationQuery {
-                from: PendingOpsRequest {
-                    address: Address::default(),
-                    account_id: Some(AccountId::default()),
-                    serial_id: ApiEither::from(0),
-                },
-                limit: 0,
-                direction: PaginationDirection::Newer,
-            })
-            .await?;
-
-        server.stop().await;
-        Ok(())
     }
 
     #[actix_rt::test]
@@ -603,6 +610,68 @@ mod tests {
             .await?;
         let account_finalized_info: Option<Account> = deserialize_response_result(response)?;
 
+        {
+            let mut storage = server.pool.access_storage().await?;
+            storage
+                .chain()
+                .mempool_schema()
+                .insert_priority_ops(
+                    &[
+                        PriorityOp {
+                            serial_id: 10,
+                            data: ZkSyncPriorityOp::Deposit(Deposit {
+                                from: Default::default(),
+                                token: TokenId(0),
+                                amount: BigUint::from(100500u64),
+                                to: address,
+                            }),
+                            deadline_block: 0,
+                            eth_hash: H256::from_slice(&[0u8; 32]),
+                            eth_block: 25,
+                            eth_block_index: Some(1),
+                        },
+                        PriorityOp {
+                            serial_id: 11,
+                            data: ZkSyncPriorityOp::Deposit(Deposit {
+                                from: Default::default(),
+                                token: TokenId(0),
+                                amount: BigUint::from(100500u64),
+                                to: address,
+                            }),
+                            deadline_block: 0,
+                            eth_hash: H256::from_slice(&[0u8; 32]),
+                            eth_block: 25,
+                            eth_block_index: Some(1),
+                        },
+                        PriorityOp {
+                            serial_id: 12,
+                            data: ZkSyncPriorityOp::Deposit(Deposit {
+                                from: Default::default(),
+                                token: TokenId(0),
+                                amount: BigUint::from(100500u64),
+                                to: address,
+                            }),
+                            deadline_block: 0,
+                            eth_hash: H256::from_slice(&[0u8; 32]),
+                            eth_block: 25,
+                            eth_block_index: Some(1),
+                        },
+                    ],
+                    false,
+                )
+                .await?;
+        }
+        let balances = vec![(
+            String::from("ETH"),
+            DepositingFunds {
+                amount: BigUint::from(301500u32),
+                expected_accept_block: 25 + server.confirmations_for_eth_event,
+            },
+        )]
+        .into_iter()
+        .collect();
+        let expected_depositing = DepositingAccountBalances { balances };
+
         let response = client.account_full_info(&format!("{:?}", address)).await?;
         let account_full_info: AccountState = deserialize_response_result(response)?;
         assert_eq!(
@@ -610,6 +679,7 @@ mod tests {
             Some(account_committed_info_by_id)
         );
         assert_eq!(account_full_info.finalized, account_finalized_info);
+        assert_eq!(account_full_info.depositing, expected_depositing);
 
         let query = PaginationQuery {
             from: ApiEither::from(tx_hash),
@@ -619,49 +689,21 @@ mod tests {
         let response = client.account_txs(&query, &account_id.to_string()).await?;
         let txs: Paginated<Transaction, TxHash> = deserialize_response_result(response)?;
         assert_eq!(txs.list[0].tx_hash, tx_hash);
-        // Provide unconfirmed pending ops.
-        *server.pending_ops.lock().await = json!({
-            "list": [
-                {
-                    "txHash": TxHash::from_slice(&[0u8; 32]),
-                    "blockNumber": Option::<BlockNumber>::None,
-                    "op": {
-                        "type": "Deposit",
-                        "from": Address::default(),
-                        "tokenId": 0,
-                        "amount": "100500",
-                        "to": address,
-                        "accountId": Option::<AccountId>::None,
-                        "ethHash": H256::from_slice(&[0u8; 32]),
-                        "id": 10,
-                        "txHash": TxHash::from_slice(&[0u8; 32])
-                    },
-                    "status": "queued",
-                    "failReason": Option::<String>::None,
-                    "createdAt": Utc::now()
-                }
-            ],
-            "pagination": {
-                "from": 1,
-                "limit": 1,
-                "count": 1,
-                "direction": "newer"
-            }
-        });
 
         let query = PaginationQuery {
-            from: ApiEither::from(1),
-            limit: 1,
-            direction: PaginationDirection::Newer,
+            from: ApiEither::from_str("latest").unwrap(),
+            limit: 2,
+            direction: PaginationDirection::Older,
         };
         let response = client
             .account_pending_txs(&query, &account_id.to_string())
             .await?;
         let txs: Paginated<Transaction, SerialId> = deserialize_response_result(response)?;
+        assert_eq!(txs.list.len(), 2);
         match &txs.list[0].op {
             TransactionData::L1(tx) => match tx {
                 L1Transaction::Deposit(deposit) => {
-                    assert_eq!(deposit.id, 10);
+                    assert_eq!(deposit.id, 12);
                 }
                 _ => panic!("should return deposit"),
             },

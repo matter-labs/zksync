@@ -83,6 +83,10 @@ interface Parameters {
     l2Signature: string;
     ethereumSignature: string;
     nftId: number;
+    toggle2FASignature: string;
+    toggle2FATimestamp: number;
+    toggle2FAPubKeyHash: string;
+    mintNFTTxHash: string;
 }
 
 async function getHashesAndSignatures() {
@@ -124,9 +128,15 @@ async function getHashesAndSignatures() {
         contentHash: ethers.utils.randomBytes(32),
         feeToken: 'ETH'
     });
+    const mintNFTTxHash = mintHandle.txHash;
     await mintHandle.awaitVerifyReceipt();
     const state = await syncWallet.getAccountState();
     const nftId = Object.values(state.verified.nfts)[0].id;
+
+    const toggle2FAObject = await syncWallet.getToggle2FA(false, await syncWallet.signer?.pubKeyHash());
+    const toggle2FASignature = (toggle2FAObject.signature as zksync.types.TxEthSignature).signature;
+    const toggle2FATimestamp = toggle2FAObject.timestamp;
+    const toggle2FAPubKeyHash = toggle2FAObject.pubKeyHash!;
 
     let result: Parameters = {
         txHash,
@@ -136,7 +146,11 @@ async function getHashesAndSignatures() {
         pubKey,
         l2Signature,
         ethereumSignature,
-        nftId
+        nftId,
+        toggle2FASignature,
+        toggle2FATimestamp,
+        toggle2FAPubKeyHash,
+        mintNFTTxHash
     };
     return result;
 }

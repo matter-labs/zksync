@@ -1,4 +1,5 @@
 // External imports
+use chrono::{DateTime, Utc};
 use sqlx::{types::BigDecimal, FromRow};
 // Workspace imports
 // Local imports
@@ -13,6 +14,22 @@ pub struct StorageETHOperation {
     pub final_hash: Option<Vec<u8>>,
     pub last_deadline_block: i64,
     pub last_used_gas_price: BigDecimal,
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, FromRow, PartialEq)]
+pub struct ETHOperationData {
+    pub id: i64,
+    pub nonce: i64,
+    pub confirmed: bool,
+    pub raw_tx: Vec<u8>,
+    pub op_type: String,
+    pub final_hash: Option<Vec<u8>>,
+    pub last_deadline_block: i64,
+    pub last_used_gas_price: BigDecimal,
+    pub agg_op_id: Option<i64>,
+    pub arguments: Option<serde_json::Value>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, FromRow, PartialEq)]

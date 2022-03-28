@@ -1,12 +1,10 @@
-use crate::{
-    helpers::{is_fee_amount_packable, pack_fee_amount},
-    AccountId, Nonce, TxFeeTypes,
-};
-
-use crate::account::PubKeyHash;
 use num::{BigUint, Zero};
+use std::fmt::{Display, Formatter};
+
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
 use zksync_basic_types::{Address, TokenId, H256};
 use zksync_crypto::{
     params::{max_account_id, max_processable_token, CURRENT_TX_VERSION},
@@ -15,10 +13,17 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{PackedEthSignature, TimeRange, TxSignature, VerifiedSignatureCache};
-use crate::tx::version::TxVersion;
+use crate::tx::error::{
+    FEE_AMOUNT_IS_NOT_PACKABLE, INVALID_AUTH_DATA, WRONG_ACCOUNT_ID, WRONG_FEE_ERROR,
+    WRONG_SIGNATURE, WRONG_TIME_RANGE, WRONG_TOKEN_FOR_PAYING_FEE,
+};
 use crate::{
+    account::PubKeyHash,
+    helpers::{is_fee_amount_packable, pack_fee_amount},
     tokens::ChangePubKeyFeeTypeArg,
-    tx::error::{ChangePubkeySignedDataError, TransactionSignatureError},
+    tx::error::ChangePubkeySignedDataError,
+    tx::version::TxVersion,
+    AccountId, Nonce, TxFeeTypes,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
@@ -218,7 +223,7 @@ impl ChangePubKey {
         time_range: TimeRange,
         eth_signature: Option<PackedEthSignature>,
         private_key: &PrivateKey,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             account_id,
             account,
@@ -231,9 +236,7 @@ impl ChangePubKey {
             eth_signature,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 
@@ -260,7 +263,7 @@ impl ChangePubKey {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
         out.extend_from_slice(&(self.fee_token.0 as u16).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -281,7 +284,7 @@ impl ChangePubKey {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -387,32 +390,6 @@ impl ChangePubKey {
         }
     }
 
-    /// Verifies the transaction correctness:
-    ///
-    /// - Ethereum signature (if set) must correspond to the account address.
-    /// - zkSync signature must correspond to the `new_pk_hash` field of the transaction.
-    /// - `account_id` field must be within supported range.
-    /// - `fee_token` field must be within supported range.
-    /// - `fee` field must represent a packable value.
-    pub fn check_correctness(&self) -> bool {
-        let mut valid = self.is_eth_auth_data_valid()
-            && self.account_id <= max_account_id()
-            && self.fee_token <= max_processable_token()
-            && is_fee_amount_packable(&self.fee)
-            && self
-                .time_range
-                .map(|t| t.check_correctness())
-                .unwrap_or(true);
-        if valid {
-            if let Some((pub_key_hash, _)) = self.verify_signature() {
-                valid = pub_key_hash == self.new_pk_hash;
-            } else {
-                valid = false;
-            }
-        }
-        valid
-    }
-
     pub fn is_ecdsa(&self) -> bool {
         if let Some(auth_data) = &self.eth_auth_data {
             auth_data.is_ecdsa()
@@ -459,12 +436,88 @@ impl ChangePubKey {
             ChangePubKeyFeeTypeArg::ContractsV4Version(auth_data.get_fee_type())
         } else {
             ChangePubKeyFeeTypeArg::PreContracts4Version {
-                onchain_pubkey_auth: self.eth_auth_data.is_none(),
+                onchain_pubkey_auth: self.eth_signature.is_none(),
             }
         }
     }
 
     pub fn get_fee_type(&self) -> TxFeeTypes {
         TxFeeTypes::ChangePubKey(self.get_change_pubkey_fee_type())
+    }
+
+    /// Helper method to remove cache and test transaction behavior without the signature cache.
+    #[doc(hidden)]
+    pub fn wipe_signer_cache(&mut self) {
+        self.cached_signer = VerifiedSignatureCache::NotCached;
+    }
+
+    /// Verifies the transaction correctness:
+    ///
+    /// - Ethereum signature (if set) must correspond to the account address.
+    /// - zkSync signature must correspond to the `new_pk_hash` field of the transaction.
+    /// - `account_id` field must be within supported range.
+    /// - `fee_token` field must be within supported range.
+    /// - `fee` field must represent a packable value.
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        if !self.is_eth_auth_data_valid() {
+            return Err(TransactionError::InvalidAuthData);
+        }
+        if self.fee > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongFee);
+        }
+        if self.account_id > max_account_id() {
+            return Err(TransactionError::WrongAccountId);
+        }
+
+        if self.fee_token > max_processable_token() {
+            return Err(TransactionError::WrongFeeToken);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+
+        if !self
+            .time_range
+            .map(|r| r.check_correctness())
+            .unwrap_or(true)
+        {
+            return Err(TransactionError::WrongTimeRange);
+        }
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if let Some((pub_key_hash, _)) = &signer {
+            if *pub_key_hash != self.new_pk_hash {
+                return Err(TransactionError::WrongSignature);
+            }
+        } else {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    InvalidAuthData,
+    WrongFee,
+    FeeNotPackable,
+    WrongAccountId,
+    WrongFeeToken,
+    WrongTimeRange,
+    WrongSignature,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongFee => WRONG_FEE_ERROR,
+            TransactionError::FeeNotPackable => FEE_AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongAccountId => WRONG_ACCOUNT_ID,
+            TransactionError::WrongTimeRange => WRONG_TIME_RANGE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+            TransactionError::WrongFeeToken => WRONG_TOKEN_FOR_PAYING_FEE,
+            TransactionError::InvalidAuthData => INVALID_AUTH_DATA,
+        };
+        write!(f, "{}", error)
     }
 }

@@ -1,11 +1,8 @@
-use crate::{
-    helpers::{is_fee_amount_packable, pack_fee_amount},
-    AccountId, Nonce, TokenId,
-};
 use num::{BigUint, Zero};
-
-use crate::{account::PubKeyHash, Engine};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use thiserror::Error;
+
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
@@ -14,8 +11,17 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
+use crate::tx::error::{
+    FEE_AMOUNT_IS_NOT_PACKABLE, WRONG_ACCOUNT_ID, WRONG_FEE_ERROR, WRONG_SIGNATURE,
+    WRONG_TIME_RANGE, WRONG_TOKEN, WRONG_TOKEN_FOR_PAYING_FEE,
+};
 use crate::tx::version::TxVersion;
-use crate::tx::{error::TransactionSignatureError, TimeRange};
+use crate::tx::TimeRange;
+use crate::{account::PubKeyHash, Engine};
+use crate::{
+    helpers::{is_fee_amount_packable, pack_fee_amount},
+    AccountId, Nonce, TokenId,
+};
 
 /// `ForcedExit` transaction is used to withdraw funds from an unowned
 /// account to its corresponding L1 address.
@@ -47,8 +53,9 @@ pub struct ForcedExit {
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
     /// Time range when the transaction is valid
-    #[serde(flatten, default)]
-    pub time_range: TimeRange,
+    /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
+    #[serde(flatten)]
+    pub time_range: Option<TimeRange>,
 }
 
 impl ForcedExit {
@@ -74,7 +81,7 @@ impl ForcedExit {
             token,
             fee,
             nonce,
-            time_range,
+            time_range: Some(time_range),
             signature: signature.clone().unwrap_or_default(),
             cached_signer: VerifiedSignatureCache::NotCached,
         };
@@ -94,7 +101,7 @@ impl ForcedExit {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             initiator_account_id,
             target,
@@ -105,9 +112,7 @@ impl ForcedExit {
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 
@@ -116,11 +121,11 @@ impl ForcedExit {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
-        out.extend_from_slice(&self.target.as_bytes());
+        out.extend_from_slice(self.target.as_bytes());
         out.extend_from_slice(&(self.token.0 as u16).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.time_range.as_be_bytes());
+        out.extend_from_slice(&self.time_range.unwrap_or_default().as_be_bytes());
         out
     }
 
@@ -134,36 +139,12 @@ impl ForcedExit {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
-        out.extend_from_slice(&self.target.as_bytes());
+        out.extend_from_slice(self.target.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.time_range.as_be_bytes());
+        out.extend_from_slice(&self.time_range.unwrap_or_default().as_be_bytes());
         out
-    }
-
-    /// Verifies the transaction correctness:
-    ///
-    /// - `initiator_account_id` field must be within supported range.
-    /// - `token` field must be within supported range.
-    /// - `fee` field must represent a packable value.
-    /// - zkSync signature must correspond to the PubKeyHash of the account.
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = is_fee_amount_packable(&self.fee)
-            && self.initiator_account_id <= max_account_id()
-            && self.token <= max_fungible_token_id()
-            && self.time_range.check_correctness();
-
-        if valid {
-            if self.fee != BigUint::zero() {
-                // Fee can only be paid in processable tokens
-                valid = self.token <= max_processable_token();
-            }
-            let signer = self.verify_signature();
-            valid = valid && signer.is_some();
-            self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        }
-        valid
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
@@ -216,5 +197,78 @@ impl ForcedExit {
         let mut message = self.get_ethereum_sign_message_part(token_symbol, decimals);
         message.push_str(format!("\nNonce: {}", self.nonce).as_str());
         message
+    }
+
+    /// Helper method to remove cache and test transaction behavior without the signature cache.
+    #[doc(hidden)]
+    pub fn wipe_signer_cache(&mut self) {
+        self.cached_signer = VerifiedSignatureCache::NotCached;
+    }
+
+    /// Verifies the transaction correctness:
+    ///
+    /// - `initiator_account_id` field must be within supported range.
+    /// - `token` field must be within supported range.
+    /// - `fee` field must represent a packable value.
+    /// - zkSync signature must correspond to the PubKeyHash of the account.
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        if self.fee > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongFee);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+        if self.initiator_account_id > max_account_id() {
+            return Err(TransactionError::WrongInitiatorAccountId);
+        }
+
+        if self.token > max_fungible_token_id() {
+            return Err(TransactionError::WrongToken);
+        }
+        if !self
+            .time_range
+            .map(|r| r.check_correctness())
+            .unwrap_or(true)
+        {
+            return Err(TransactionError::WrongTimeRange);
+        }
+
+        // Fee can only be paid in processable tokens
+        if self.fee != BigUint::zero() && self.token > max_processable_token() {
+            return Err(TransactionError::WrongTokenForPayingFee);
+        }
+
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if signer.is_none() {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    WrongFee,
+    FeeNotPackable,
+    WrongInitiatorAccountId,
+    WrongToken,
+    WrongTimeRange,
+    WrongSignature,
+    WrongTokenForPayingFee,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongFee => WRONG_FEE_ERROR,
+            TransactionError::FeeNotPackable => FEE_AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongToken => WRONG_TOKEN,
+            TransactionError::WrongTimeRange => WRONG_TIME_RANGE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+            TransactionError::WrongTokenForPayingFee => WRONG_TOKEN_FOR_PAYING_FEE,
+            TransactionError::WrongInitiatorAccountId => WRONG_ACCOUNT_ID,
+        };
+        write!(f, "{}", error)
     }
 }

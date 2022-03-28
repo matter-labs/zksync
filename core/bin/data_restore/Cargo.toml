@@ -19,14 +19,14 @@ vlog = { path = "../../lib/vlog", version = "1.0" }
 num = { version = "0.3.1", features = ["serde"] }
 tiny-keccak = "1.4.2"
 ethabi = "14.0.0"
-web3 = "0.15.0"
+web3 = "0.16.0"
 hex = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.0"
 anyhow = "1.0"
 structopt = "0.3.20"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 
 zksync_state = { path = "../../lib/state", version = "1.0" }
@@ -38,6 +38,6 @@ zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 
 [dev-dependencies]
-jsonrpc-core = "16.0.0"
+jsonrpc-core = "17.0.0"
 db_test_macro = { path = "../../lib/storage/db_test_macro" }
 futures = "0.3.5"

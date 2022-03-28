@@ -21,14 +21,14 @@ impl AccountLifespan {
         command: &TxCommand,
     ) -> Result<ReportLabel, ClientError> {
         match command.command_type {
-            TxType::ChangePubKey => self.execute_change_pubkey(&command).await,
+            TxType::ChangePubKey => self.execute_change_pubkey(command).await,
             TxType::TransferToExisting | TxType::TransferToNew => {
-                self.execute_transfer(&command).await
+                self.execute_transfer(command).await
             }
             TxType::WithdrawToOther | TxType::WithdrawToSelf => {
-                self.execute_withdraw(&command).await
+                self.execute_withdraw(command).await
             }
-            TxType::Deposit => self.execute_deposit(&command).await,
+            TxType::Deposit => self.execute_deposit(command).await,
             TxType::FullExit => self.execute_full_exit().await,
         }
     }
@@ -89,9 +89,18 @@ impl AccountLifespan {
             .is_erc20_deposit_approved(self.main_token.id)
             .await?;
         if !deposits_allowed {
-            ethereum
+            let approve_tx_hash = ethereum
                 .approve_erc20_token_deposits(self.main_token.id)
                 .await?;
+            // Before submitting the deposit, wait for the approve transaction confirmation.
+            match ethereum.wait_for_tx(approve_tx_hash).await {
+                Ok(receipt) => {
+                    if receipt.status != Some(1.into()) {
+                        return Ok(ReportLabel::skipped("Approve transaction failed"));
+                    }
+                }
+                Err(reason) => return Ok(ReportLabel::skipped(&reason.to_string())),
+            }
         }
 
         // Convert BigUint into U256. We won't ever use values above `u128::max_value()`, but just in case we'll ever

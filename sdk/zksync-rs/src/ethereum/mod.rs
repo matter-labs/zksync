@@ -55,6 +55,7 @@ pub struct EthereumProvider<S: EthereumSigner> {
     eth_client: ETHDirectClient<S>,
     erc20_abi: ethabi::Contract,
     confirmation_timeout: Duration,
+    poll_time: Duration,
 }
 
 impl<S: EthereumSigner> EthereumProvider<S> {
@@ -96,7 +97,8 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             eth_client,
             erc20_abi,
             tokens_cache,
-            confirmation_timeout: Duration::from_secs(10),
+            confirmation_timeout: Duration::from_secs(30),
+            poll_time: Duration::from_millis(1000),
         })
     }
 
@@ -475,14 +477,20 @@ impl<S: EthereumSigner> EthereumProvider<S> {
     }
 
     /// Sets the timeout to wait for transactions to appear in the Ethereum network.
-    /// By default it is set to 10 seconds.
+    /// By default it is set to 30 seconds.
     pub fn set_confirmation_timeout(&mut self, timeout: Duration) {
         self.confirmation_timeout = timeout;
     }
 
+    /// Sets the time to poll for transactions to appear in the Ethereum network.
+    /// By default it is set to 1 second.
+    pub fn set_poll_time(&mut self, time: Duration) {
+        self.poll_time = time;
+    }
+
     /// Waits until the transaction is confirmed by the Ethereum blockchain.
     pub async fn wait_for_tx(&self, tx_hash: H256) -> Result<TransactionReceipt, ClientError> {
-        let mut poller = tokio::time::interval(Duration::from_millis(100));
+        let mut poller = tokio::time::interval(self.poll_time);
 
         let start = Instant::now();
         loop {

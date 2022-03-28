@@ -8,10 +8,11 @@ use num::{BigUint, Zero};
 use once_cell::sync::Lazy;
 use parity_crypto::publickey::{Generator, Random};
 // Workspace imports
-use zksync_crypto::params::MIN_NFT_TOKEN_ID;
+use zksync_crypto::params::{max_account_id, MIN_NFT_TOKEN_ID};
 use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
 use zksync_crypto::{ff::PrimeField, rand::Rng, Fr};
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
+use zksync_types::block::{IncompleteBlock, PendingBlock};
 use zksync_types::{
     account::Account,
     aggregated_operations::{
@@ -45,7 +46,7 @@ pub const BLOCK_SIZE_CHUNKS: usize = 100;
 pub fn gen_acc_random_updates<R: Rng>(
     rng: &mut R,
 ) -> impl Iterator<Item = (AccountId, AccountUpdate)> {
-    let id: AccountId = AccountId(rng.gen());
+    let id: AccountId = AccountId(rng.gen::<u32>() % max_account_id().0);
     let balance = u128::from(rng.gen::<u64>());
     let nonce = Nonce(rng.gen());
     let pub_key_hash = PubKeyHash { data: rng.gen() };
@@ -90,22 +91,29 @@ pub fn gen_acc_random_updates<R: Rng>(
 }
 
 /// Generates one nft.
-pub fn generate_nft(
+pub fn generate_nft<R: Rng>(
     account_id: AccountId,
     account: &Account,
     number: u32,
+    rng: &mut R,
 ) -> Vec<(AccountId, AccountUpdate)> {
     let nft = NFT::new(
         TokenId(MIN_NFT_TOKEN_ID + number),
         number,
         account_id,
         account.address,
-        Address::random(),
+        Address::from(rng.gen::<[u8; 20]>()),
         None,
-        H256::random(),
+        H256::from(rng.gen::<[u8; 32]>()),
     );
     vec![
-        (account_id, AccountUpdate::MintNFT { token: nft }),
+        (
+            account_id,
+            AccountUpdate::MintNFT {
+                token: nft,
+                nonce: account.nonce,
+            },
+        ),
         (
             account_id,
             AccountUpdate::UpdateBalance {
@@ -125,7 +133,7 @@ pub fn gen_eth_sign_data(message: String) -> EthSignData {
     let keypair = Random.generate();
     let private_key = keypair.secret();
 
-    let signature = PackedEthSignature::sign(private_key.deref(), &message.as_bytes()).unwrap();
+    let signature = PackedEthSignature::sign(private_key.deref(), message.as_bytes()).unwrap();
 
     EthSignData {
         signature: TxEthSignature::EthereumSignature(signature),
@@ -176,6 +184,38 @@ pub fn gen_sample_block(
         commit_gas_limit: 1_000_000.into(),
         verify_gas_limit: 1_500_000.into(),
         block_commitment: H256::zero(),
+        timestamp: 0,
+    }
+}
+
+pub fn gen_sample_incomplete_block(
+    block_number: BlockNumber,
+    block_chunks_size: usize,
+    txs: Vec<ExecutedOperations>,
+) -> IncompleteBlock {
+    IncompleteBlock {
+        block_number,
+        fee_account: AccountId(0),
+        block_transactions: txs,
+        processed_priority_ops: (0, 1),
+        block_chunks_size,
+        commit_gas_limit: 1_000_000.into(),
+        verify_gas_limit: 1_500_000.into(),
+        timestamp: 0,
+    }
+}
+
+pub fn gen_sample_pending_block(
+    block_number: BlockNumber,
+    txs: Vec<ExecutedOperations>,
+) -> PendingBlock {
+    PendingBlock {
+        number: block_number,
+        chunks_left: 1,
+        unprocessed_priority_op_before: 0,
+        pending_block_iteration: 1,
+        success_operations: txs,
+        failed_txs: Vec::new(),
         timestamp: 0,
     }
 }

@@ -6,7 +6,7 @@ use std::time::Duration;
 // External uses
 use chrono::Utc;
 use tokio::sync::RwLock;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 // Workspace uses
 use zksync_crypto::params::account_tree_depth;
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
@@ -68,7 +68,7 @@ impl MockDatabase {
     }
 
     pub async fn wait_for_stale_job_stale_idle() {
-        delay_for(Duration::from_secs(10)).await;
+        sleep(Duration::from_secs(10)).await;
     }
 
     pub async fn add_block(&self, block: Block) {
@@ -343,13 +343,11 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _: &mut StorageProcessor<'_>,
         block: BlockNumber,
-        tree_cache: serde_json::Value,
+        tree_cache: String,
     ) -> anyhow::Result<()> {
         if *block == 0 {
             return Ok(());
         }
-        let tree_cache =
-            serde_json::to_string(&tree_cache).expect("Failed to serialize Account Tree Cache");
 
         let mut account_tree_cache = self.account_tree_cache.write().await;
         *account_tree_cache = AccountTreeCache {

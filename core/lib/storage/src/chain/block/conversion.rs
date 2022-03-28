@@ -13,58 +13,36 @@ use zksync_types::{
     aggregated_operations::AggregatedOperation,
     block::{ExecutedPriorityOp, ExecutedTx},
     tx::TxHash,
-    Action, ActionType, BlockNumber, Operation, PriorityOp, SignedZkSyncTx, ZkSyncOp, ZkSyncTx,
-    H256,
+    BlockNumber, PriorityOp, SignedZkSyncTx, ZkSyncOp, ZkSyncTx, H256,
 };
 // Local imports
 use crate::chain::operations::records::StoredAggregatedOperation;
+use crate::utils::affected_accounts;
 use crate::{
     chain::{
-        block::{records::TransactionItem, BlockSchema},
+        block::records::TransactionItem,
         operations::records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
-            StoredExecutedTransaction, StoredOperation,
+            StoredExecutedTransaction,
         },
     },
-    prover::ProverSchema,
-    QueryResult, StorageActionType, StorageProcessor,
+    QueryResult, StorageProcessor,
 };
 
-impl StoredOperation {
-    pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
-        let block_number = BlockNumber(self.block_number as u32);
-        let id = Some(self.id);
-
-        let action = if self.action_type == StorageActionType::from(ActionType::COMMIT) {
-            Action::Commit
-        } else if self.action_type == StorageActionType::from(ActionType::VERIFY) {
-            let proof = Box::new(ProverSchema(conn).load_proof(block_number).await?);
-            Action::Verify {
-                proof: proof.expect("No proof for verify action").into(),
-            }
-        } else {
-            unreachable!("Incorrect action type in db");
-        };
-
-        let block = BlockSchema(conn)
-            .get_block(block_number)
-            .await?
-            .expect("Block for action does not exist");
-
-        Ok(Operation { id, action, block })
-    }
-}
-
 impl StoredExecutedTransaction {
-    pub fn into_executed_tx(self) -> Result<ExecutedTx, anyhow::Error> {
+    pub(crate) fn into_executed_tx(self) -> ExecutedTx {
         let tx: ZkSyncTx = serde_json::from_value(self.tx).expect("Unparsable ZkSyncTx in db");
         let franklin_op: Option<ZkSyncOp> =
             serde_json::from_value(self.operation).expect("Unparsable ZkSyncOp in db");
         let eth_sign_data = self
             .eth_sign_data
             .map(|value| serde_json::from_value(value).expect("Unparsable EthSignData"));
-        Ok(ExecutedTx {
-            signed_tx: SignedZkSyncTx { tx, eth_sign_data },
+        ExecutedTx {
+            signed_tx: SignedZkSyncTx {
+                tx,
+                eth_sign_data,
+                created_at: self.created_at,
+            },
             success: self.success,
             op: franklin_op,
             fail_reason: self.fail_reason,
@@ -73,7 +51,7 @@ impl StoredExecutedTransaction {
                 .map(|val| u32::try_from(val).expect("Invalid block index")),
             created_at: self.created_at,
             batch_id: self.batch_id,
-        })
+        }
     }
 }
 
@@ -100,7 +78,7 @@ impl StoredExecutedPriorityOperation {
 }
 
 impl NewExecutedPriorityOperation {
-    pub fn prepare_stored_priority_op(
+    pub(crate) fn prepare_stored_priority_op(
         exec_prior_op: ExecutedPriorityOp,
         block: BlockNumber,
     ) -> Self {
@@ -119,6 +97,15 @@ impl NewExecutedPriorityOperation {
             ),
         };
 
+        let affected_accounts = exec_prior_op
+            .priority_op
+            .data
+            .affected_accounts()
+            .into_iter()
+            .map(|address| address.as_bytes().to_vec())
+            .collect();
+        let token = exec_prior_op.priority_op.data.token_id().0 as i32;
+
         Self {
             block_number: i64::from(*block),
             block_index: exec_prior_op.block_index as i32,
@@ -135,12 +122,18 @@ impl NewExecutedPriorityOperation {
                 .eth_block_index
                 .map(|index| index as i64),
             tx_hash,
+            affected_accounts,
+            token,
         }
     }
 }
 
 impl NewExecutedTransaction {
-    pub fn prepare_stored_tx(exec_tx: ExecutedTx, block: BlockNumber) -> Self {
+    pub(crate) async fn prepare_stored_tx(
+        exec_tx: ExecutedTx,
+        block: BlockNumber,
+        storage: &mut StorageProcessor<'_>,
+    ) -> QueryResult<Self> {
         fn cut_prefix(input: &str) -> String {
             if let Some(input) = input.strip_prefix("0x") {
                 input.into()
@@ -174,7 +167,7 @@ impl NewExecutedTransaction {
                 ),
                 ZkSyncTx::MintNFT(_) => (
                     serde_json::from_value(tx["creatorAddress"].clone()).unwrap(),
-                    serde_json::from_value(tx["recipientAddress"].clone()).unwrap(),
+                    serde_json::from_value(tx["recipient"].clone()).unwrap(),
                 ),
                 ZkSyncTx::Swap(_) => (
                     serde_json::from_value(tx["submitterAddress"].clone()).unwrap(),
@@ -190,7 +183,19 @@ impl NewExecutedTransaction {
             serde_json::to_value(sign_data).expect("Failed to encode EthSignData")
         });
 
-        Self {
+        let affected_accounts = affected_accounts(&exec_tx.signed_tx.tx, storage)
+            .await?
+            .into_iter()
+            .map(|address| address.as_bytes().to_vec())
+            .collect();
+        let used_tokens = exec_tx
+            .signed_tx
+            .tx
+            .tokens()
+            .into_iter()
+            .map(|id| id.0 as i32)
+            .collect();
+        Ok(Self {
             block_number: i64::from(*block),
             tx_hash: exec_tx.signed_tx.hash().as_ref().to_vec(),
             from_account,
@@ -205,12 +210,14 @@ impl NewExecutedTransaction {
             created_at: exec_tx.created_at,
             eth_sign_data,
             batch_id: exec_tx.batch_id,
-        }
+            affected_accounts,
+            used_tokens,
+        })
     }
 }
 
 impl StoredAggregatedOperation {
-    pub fn into_aggregated_op(self) -> (i64, AggregatedOperation) {
+    pub(crate) fn into_aggregated_op(self) -> (i64, AggregatedOperation) {
         (
             self.id,
             serde_json::from_value(self.arguments)
@@ -220,7 +227,10 @@ impl StoredAggregatedOperation {
 }
 
 impl TransactionItem {
-    pub fn transaction_from_item(item: TransactionItem, is_block_finalized: bool) -> Transaction {
+    pub(crate) fn transaction_from_item(
+        item: TransactionItem,
+        is_block_finalized: bool,
+    ) -> Transaction {
         let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
         let block_number = Some(BlockNumber(item.block_number as u32));
         let status = if item.success {
@@ -242,13 +252,16 @@ impl TransactionItem {
         } else {
             TransactionData::L2(serde_json::from_value(item.op).unwrap())
         };
+
         Transaction {
             tx_hash,
+            block_index: item.block_index.map(|i| i as u32),
             block_number,
             op,
             status,
             fail_reason: item.fail_reason,
             created_at: Some(item.created_at),
+            batch_id: item.batch_id.map(|id| id as u32),
         }
     }
 }

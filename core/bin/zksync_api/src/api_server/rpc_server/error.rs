@@ -1,8 +1,9 @@
 // External uses
 use jsonrpc_core::ErrorCode;
+use zksync_types::tx::error::TxAddError;
 // Workspace uses
 // Local uses
-use crate::{api_server::tx_sender::SubmitError, tx_error::TxAddError};
+use crate::api_server::tx_sender::SubmitError;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RpcErrorCodes {
@@ -20,13 +21,14 @@ pub enum RpcErrorCodes {
     AccountCloseDisabled = 301,
     OperationsLimitReached = 302,
     UnsupportedFastProcessing = 303,
+    Toggle2FA = 304,
 }
 
 impl From<TxAddError> for RpcErrorCodes {
     fn from(error: TxAddError) -> Self {
         match error {
             TxAddError::NonceMismatch => Self::NonceMismatch,
-            TxAddError::IncorrectTx => Self::IncorrectTx,
+            TxAddError::IncorrectTx(_) => Self::IncorrectTx,
             TxAddError::TxFeeTooLow => Self::FeeTooLow,
             TxAddError::TxBatchFeeTooLow => Self::FeeTooLow,
             TxAddError::MissingEthSignature => Self::MissingEthSignature,
@@ -75,12 +77,17 @@ impl From<SubmitError> for jsonrpc_core::Error {
                 message: inner.to_string(),
                 data: None,
             },
+            SubmitError::Toggle2FA(inner) => Self {
+                code: RpcErrorCodes::Toggle2FA.into(),
+                message: inner.to_string(),
+                data: None,
+            },
             SubmitError::InappropriateFeeToken => Self {
                 code: RpcErrorCodes::InappropriateFeeToken.into(),
                 message: inner.to_string(),
                 data: None,
             },
-            SubmitError::CommunicationCoreServer(reason) => Self {
+            SubmitError::MempoolCommunication(reason) => Self {
                 code: RpcErrorCodes::Other.into(),
                 message: "Error communicating core server".to_string(),
                 data: Some(reason.into()),
@@ -93,6 +100,11 @@ impl From<SubmitError> for jsonrpc_core::Error {
             SubmitError::Other(message) => Self {
                 code: ErrorCode::InternalError,
                 message,
+                data: None,
+            },
+            SubmitError::PriceError(error) => Self {
+                code: ErrorCode::InternalError,
+                message: error.to_string(),
                 data: None,
             },
         }

@@ -7,9 +7,11 @@ use futures::{
 };
 use num::{bigint::Sign, BigInt, BigUint, ToPrimitive, Zero};
 use std::collections::HashMap;
-use zksync_core::committer::{BlockCommitRequest, CommitRequest};
-use zksync_core::mempool::ProposedBlock;
-use zksync_core::state_keeper::{StateKeeperRequest, ZkSyncStateInitParams};
+use zksync_core::{
+    committer::CommitRequest,
+    state_keeper::{StateKeeperTestkitRequest, ZkSyncStateInitParams},
+    tx_event_emitter::ProcessedOperations,
+};
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation},
     block::Block,
@@ -28,6 +30,7 @@ use crate::state_keeper_utils::*;
 use crate::types::*;
 
 use zksync_crypto::params::{NFT_STORAGE_ACCOUNT_ADDRESS, NFT_TOKEN_ID};
+use zksync_mempool::ProposedBlock;
 use zksync_types::tx::TimeRange;
 
 /// Used to create transactions between accounts and check for their validity.
@@ -39,8 +42,9 @@ use zksync_types::tx::TimeRange;
 /// in order to execute unusual/failed transactions one should create it separately and commit to block
 /// using `execute_incorrect_tx`
 pub struct TestSetup {
-    pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    pub state_keeper_request_sender: mpsc::Sender<StateKeeperTestkitRequest>,
     pub proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
+    pub processed_tx_events_receiver: mpsc::Receiver<ProcessedOperations>,
 
     pub accounts: AccountSet,
     pub tokens: HashMap<TokenId, Address>,
@@ -87,11 +91,12 @@ impl TestSetup {
         Self {
             state_keeper_request_sender: sk_channels.requests,
             proposed_blocks_receiver: sk_channels.new_blocks,
+            processed_tx_events_receiver: sk_channels.queued_txs_events,
             accounts,
             tokens,
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
-            current_state_root: None,
+            current_state_root: Some(initial_root),
             last_committed_block: last_block.unwrap_or_else(|| {
                 Block::new(
                     BlockNumber(0),
@@ -292,10 +297,9 @@ impl TestSetup {
         let mut gas_fee = BigUint::from(0u32);
 
         for r in &receipts {
-            let current_fee =
-                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
-                    .await
-                    .expect("Failed to get transaction fee");
+            let current_fee = get_executed_tx_fee(&self.commit_account.main_contract_eth_client, r)
+                .await
+                .expect("Failed to get transaction fee");
 
             gas_fee += current_fee;
         }
@@ -320,7 +324,7 @@ impl TestSetup {
         // Request miniblock execution.
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::ExecuteMiniBlock(block))
+            .send(StateKeeperTestkitRequest::ExecuteMiniBlock(block))
             .await
             .expect("sk receiver dropped");
 
@@ -375,10 +379,9 @@ impl TestSetup {
         let mut gas_fee = BigUint::from(0u32);
 
         for r in &receipts {
-            let current_fee =
-                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
-                    .await
-                    .expect("Failed to get transaction fee");
+            let current_fee = get_executed_tx_fee(&self.commit_account.main_contract_eth_client, r)
+                .await
+                .expect("Failed to get transaction fee");
 
             gas_fee += current_fee;
         }
@@ -402,7 +405,7 @@ impl TestSetup {
         // Request miniblock execution.
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::ExecuteMiniBlock(block))
+            .send(StateKeeperTestkitRequest::ExecuteMiniBlock(block))
             .await
             .expect("sk receiver dropped");
 
@@ -558,6 +561,7 @@ impl TestSetup {
             .await
             .expect("can't change pubkey, account does not exist")
             .0;
+
         self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
         let tx = self
@@ -902,16 +906,40 @@ impl TestSetup {
         self.execute_tx(forced_exit).await;
     }
 
-    /// Waits for `CommitRequest::Block` to appear on proposed blocks receiver, ignoring
-    /// the pending blocks.
-    async fn await_for_block_commit_request(&mut self) -> BlockCommitRequest {
+    /// Looks for the block updates receiver in order to receive a fully formed block.
+    /// This function ignores the pending blocks.
+    async fn await_for_block_commit(&mut self) -> Block {
+        let mut incomplete_block = None;
         while let Some(new_block_event) = self.proposed_blocks_receiver.next().await {
             match new_block_event {
-                CommitRequest::Block((new_block, _)) => {
-                    return new_block;
+                CommitRequest::SealIncompleteBlock((new_block_request, _)) => {
+                    assert!(
+                        incomplete_block.is_none(),
+                        "Received more than 1 incomplete block. Current {:?}, new: {:?}",
+                        incomplete_block,
+                        new_block_request
+                    );
+                    incomplete_block = Some(new_block_request.block);
+                }
+                CommitRequest::FinishBlock(block_finish_request) => {
+                    let incomplete_block = incomplete_block.unwrap_or_else(|| {
+                        panic!(
+                            "Received FinishBlock request before the block was sealed: {:?}",
+                            block_finish_request
+                        );
+                    });
+
+                    return Block::from_incomplete(
+                        incomplete_block,
+                        self.current_state_root.unwrap(),
+                        block_finish_request.root_hash,
+                    );
                 }
                 CommitRequest::PendingBlock(_) => {
                     // Pending blocks are ignored.
+                }
+                CommitRequest::RemoveRevertedBlock(_) => {
+                    // Remove reverted blocks are ignored
                 }
             }
         }
@@ -927,13 +955,22 @@ impl TestSetup {
             .await
             .expect("StateKeeper sender dropped");
         match new_block_event {
-            CommitRequest::Block((new_block, _)) => {
+            CommitRequest::SealIncompleteBlock((new_block, _)) => {
                 panic!(
-                    "Expected pending block, got full block proposed. Block: {:?}",
+                    "Expected pending block, got incomplete block proposed. Block: {:?}",
                     new_block
                 );
             }
+            CommitRequest::FinishBlock(block_finish_request) => {
+                panic!(
+                    "Expected pending block, got finish block request for block: {}",
+                    block_finish_request.block_number
+                );
+            }
             CommitRequest::PendingBlock(_) => {
+                // Nothing to be done.
+            }
+            CommitRequest::RemoveRevertedBlock(_) => {
                 // Nothing to be done.
             }
         }
@@ -943,12 +980,12 @@ impl TestSetup {
     pub async fn execute_commit_block(&mut self) -> Block {
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::SealBlock)
+            .send(StateKeeperTestkitRequest::SealBlock)
             .await
             .expect("sk receiver dropped");
 
-        let new_block = self.await_for_block_commit_request().await.block;
-        // self.current_state_root = Some(new_block.new_root_hash);
+        let new_block = self.await_for_block_commit().await;
+        self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
@@ -967,11 +1004,11 @@ impl TestSetup {
     pub async fn execute_block(&mut self) -> Block {
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::SealBlock)
+            .send(StateKeeperTestkitRequest::SealBlock)
             .await
             .expect("sk receiver dropped");
 
-        self.await_for_block_commit_request().await.block
+        self.await_for_block_commit().await
     }
 
     pub async fn commit_blocks(&mut self, blocks: &[Block]) -> ETHExecResult {
@@ -1041,11 +1078,11 @@ impl TestSetup {
     ) -> Result<BlockExecutionResult, anyhow::Error> {
         self.state_keeper_request_sender
             .clone()
-            .send(StateKeeperRequest::SealBlock)
+            .send(StateKeeperTestkitRequest::SealBlock)
             .await
             .expect("sk receiver dropped");
 
-        let new_block = self.await_for_block_commit_request().await.block;
+        let new_block = self.await_for_block_commit().await;
         self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
@@ -1162,7 +1199,7 @@ impl TestSetup {
     pub async fn get_current_state(&mut self) -> ZkSyncStateInitParams {
         let (sender, receiver) = oneshot::channel();
         self.state_keeper_request_sender
-            .send(StateKeeperRequest::GetCurrentState(sender))
+            .send(StateKeeperTestkitRequest::GetCurrentState(sender))
             .await
             .expect("sk request send");
         receiver.await.unwrap()
@@ -1222,7 +1259,8 @@ impl TestSetup {
     }
 
     pub async fn revert_blocks(&self, blocks: &[Block]) -> Result<(), anyhow::Error> {
-        self.commit_account.revert_blocks(blocks).await?;
+        let result = self.commit_account.revert_blocks(blocks).await?;
+        result.expect_success();
         Ok(())
     }
 

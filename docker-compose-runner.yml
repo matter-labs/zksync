@@ -8,7 +8,7 @@ services:
   geth:
     image: "matterlabs/geth:latest"
     environment:
-      - PLUGIN_CONFIG
+      - PLUGIN_CONFIG=fast
 
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
@@ -34,8 +34,13 @@ services:
       - .:/usr/src/zksync
       - /usr/src/cache:/usr/src/cache
       - /usr/src/keys:/usr/src/keys
+      - /etc/sa_secret:/etc/sa_secret
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - IN_DOCKER=true
       - CACHE_DIR=/usr/src/cache
       - SCCACHE_CACHE_SIZE=50g
+      - SCCACHE_GCS_BUCKET=sccache-zksync-ci
+      - SCCACHE_GCS_KEY_PATH=/etc/sa_secret/sa_key.json
+      - SCCACHE_GCS_RW_MODE=READ_WRITE
       - CI=1

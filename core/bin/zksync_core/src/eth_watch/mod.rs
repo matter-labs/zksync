@@ -14,27 +14,18 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
+use thiserror::Error;
 
 pub use client::{get_web3_block_number, EthHttpClient};
 use itertools::Itertools;
 use tokio::{task::JoinHandle, time};
-use web3::types::{Address, BlockNumber};
+use web3::types::BlockNumber;
 
-// Workspace deps
-use zksync_api_types::{
-    v02::{
-        pagination::{Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest},
-        transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
-    },
-    Either,
-};
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ContractsConfig, ETHWatchConfig};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
-use zksync_types::{
-    tx::TxHash, NewTokenEvent, Nonce, PriorityOp, PubKeyHash, RegisterNFTFactoryEvent,
-    ZkSyncPriorityOp, H256,
-};
+use zksync_mempool::MempoolTransactionRequest;
+use zksync_types::{NewTokenEvent, PriorityOp, RegisterNFTFactoryEvent, SerialId};
 
 // Local deps
 use self::{client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops};
@@ -68,35 +59,6 @@ pub enum WatcherMode {
 #[derive(Debug)]
 pub enum EthWatchRequest {
     PollETHNode,
-    GetPriorityOpBySerialId {
-        serial_id: u64,
-        resp: oneshot::Sender<Option<PriorityOp>>,
-    },
-    GetPriorityQueueOps {
-        op_start_id: u64,
-        max_chunks: usize,
-        resp: oneshot::Sender<Vec<PriorityOp>>,
-    },
-    GetUnconfirmedDeposits {
-        address: Address,
-        resp: oneshot::Sender<Vec<PriorityOp>>,
-    },
-    GetUnconfirmedOps {
-        query: PaginationQuery<PendingOpsRequest>,
-        resp: oneshot::Sender<Paginated<Transaction, u64>>,
-    },
-    GetUnconfirmedOpByEthHash {
-        eth_hash: H256,
-        resp: oneshot::Sender<Option<PriorityOp>>,
-    },
-    GetUnconfirmedOpByTxHash {
-        tx_hash: TxHash,
-        resp: oneshot::Sender<Option<PriorityOp>>,
-    },
-    GetUnconfirmedOpByAnyHash {
-        hash: TxHash,
-        resp: oneshot::Sender<Option<PriorityOp>>,
-    },
     GetNewTokens {
         last_eth_block: Option<u64>,
         resp: oneshot::Sender<Vec<NewTokenEvent>>,
@@ -105,16 +67,19 @@ pub enum EthWatchRequest {
         last_eth_block: Option<u64>,
         resp: oneshot::Sender<Vec<RegisterNFTFactoryEvent>>,
     },
-    IsPubkeyChangeAuthorized {
-        address: Address,
-        nonce: Nonce,
-        pubkey_hash: PubKeyHash,
-        resp: oneshot::Sender<bool>,
-    },
+}
+
+#[derive(Debug, Error)]
+#[error("A priority op log is missing: last processed id is {0}, next is {1}")]
+struct MissingPriorityOpError(SerialId, SerialId);
+
+fn is_missing_priority_op_error(error: &anyhow::Error) -> bool {
+    error.is::<MissingPriorityOpError>()
 }
 
 pub struct EthWatch<W: EthClient> {
     client: W,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     eth_state: ETHState,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
@@ -122,9 +87,14 @@ pub struct EthWatch<W: EthClient> {
 }
 
 impl<W: EthClient> EthWatch<W> {
-    pub fn new(client: W, number_of_confirmations_for_event: u64) -> Self {
+    pub fn new(
+        client: W,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+        number_of_confirmations_for_event: u64,
+    ) -> Self {
         Self {
             client,
+            mempool_tx_sender,
             eth_state: ETHState::default(),
             mode: WatcherMode::Working,
             number_of_confirmations_for_event,
@@ -164,31 +134,43 @@ impl<W: EthClient> EthWatch<W> {
         // Note that we don't have to add `number_of_confirmations_for_event` here, because the check function takes
         // care of it on its own. Here we calculate "how many blocks should we watch", and the offsets with respect
         // to the `number_of_confirmations_for_event` are calculated by `update_eth_state`.
-        let block_difference =
-            last_ethereum_block.saturating_sub(self.eth_state.last_ethereum_block());
+        let mut next_priority_op_id = self.eth_state.next_priority_op_id();
+        let previous_ethereum_block = self.eth_state.last_ethereum_block();
+        let block_difference = last_ethereum_block.saturating_sub(previous_ethereum_block);
 
         let updated_state = self
             .update_eth_state(last_ethereum_block, block_difference)
             .await?;
 
+        // It's assumed that for the current state all priority operations have consecutive ids,
+        // i.e. there're no gaps. Thus, there're two opportunities for missing them: either
+        // we're missing last operations from the previous ethereum blocks range or there's a gap
+        // in the updated state.
+
         // Extend the existing priority operations with the new ones.
         let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
 
-        for (serial_id, op) in updated_state.priority_queue() {
-            priority_queue.insert(*serial_id, op.clone());
-        }
-
-        // Check for gaps in priority queue. If some event is missing we skip this `ETHState` update.
-        let mut priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
-        priority_op_ids.sort_unstable();
-        for i in 0..priority_op_ids.len().saturating_sub(1) {
-            let gap = priority_op_ids[i + 1] - priority_op_ids[i];
-            anyhow::ensure!(
-                gap == 1,
-                "Gap in priority op queue: gap={}, priority_op_before_gap={}",
-                gap,
-                priority_op_ids[i]
-            );
+        // Iterate through new priority operations sorted by their serial id.
+        for (serial_id, op) in updated_state
+            .priority_queue()
+            .iter()
+            .sorted_by_key(|(id, _)| **id)
+        {
+            if *serial_id > next_priority_op_id {
+                // Updated state misses some logs for new priority operations.
+                // We have to revert the block range back. This will only move the watcher
+                // backwards for a single time since `last_ethereum_block` and its backup will
+                // be equal.
+                self.eth_state.reset_last_ethereum_block();
+                return Err(anyhow::Error::from(MissingPriorityOpError(
+                    next_priority_op_id,
+                    *serial_id,
+                )));
+            } else {
+                // Next serial id matched the expected one.
+                priority_queue.insert(*serial_id, op.clone());
+                next_priority_op_id = next_priority_op_id.max(*serial_id + 1);
+            }
         }
 
         // Extend the existing token events with the new ones.
@@ -211,6 +193,7 @@ impl<W: EthClient> EthWatch<W> {
 
         let new_state = ETHState::new(
             last_ethereum_block,
+            previous_ethereum_block,
             updated_state.unconfirmed_queue().to_vec(),
             priority_queue,
             new_tokens,
@@ -242,16 +225,19 @@ impl<W: EthClient> EthWatch<W> {
             new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
         let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
-        let priority_queue: HashMap<u64, _> = self
+        let priority_queue = self
             .client
             .get_priority_op_events(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
-            .await?
-            .into_iter()
+            .await?;
+        let priority_queue_map: HashMap<u64, _> = priority_queue
+            .iter()
+            .cloned()
             .map(|priority_op| (priority_op.serial_id, priority_op.into()))
             .collect();
+
         let new_tokens = self
             .client
             .get_new_tokens_events(
@@ -259,6 +245,7 @@ impl<W: EthClient> EthWatch<W> {
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
+
         let new_register_nft_factory_events = self
             .client
             .get_new_register_nft_factory_events(
@@ -267,7 +254,7 @@ impl<W: EthClient> EthWatch<W> {
             )
             .await?;
 
-        let mut new_priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
+        let mut new_priority_op_ids: Vec<_> = priority_queue_map.keys().cloned().collect();
         new_priority_op_ids.sort_unstable();
         vlog::debug!(
             "Updating eth state: block_range=[{},{}], new_priority_ops={:?}",
@@ -276,19 +263,36 @@ impl<W: EthClient> EthWatch<W> {
             new_priority_op_ids
         );
 
-        let mut new_priority_op_ids: Vec<_> = priority_queue.keys().cloned().collect();
-        new_priority_op_ids.sort_unstable();
-        vlog::debug!(
-            "Updating eth state: block_range=[{},{}], new_priority_ops={:?}",
-            previous_block_with_accepted_events,
-            new_block_with_accepted_events,
-            new_priority_op_ids
-        );
+        // Add unconfirmed priority ops to queue
+        let (sender, receiver) = oneshot::channel();
+        self.mempool_tx_sender
+            .send(MempoolTransactionRequest::NewPriorityOps(
+                unconfirmed_queue.clone(),
+                false,
+                sender,
+            ))
+            .await?;
 
+        // TODO maybe retry? It can be the only problem is database
+        receiver.await.expect("Mempool actor was dropped")?;
+        // Add confirmed priority ops to queue
+        let (sender, receiver) = oneshot::channel();
+        self.mempool_tx_sender
+            .send(MempoolTransactionRequest::NewPriorityOps(
+                priority_queue,
+                true,
+                sender,
+            ))
+            .await?;
+
+        // TODO maybe retry? It can be the only problem is database
+        receiver.await.expect("Mempool actor was dropped")?;
+        // The backup block number is not used.
         let state = ETHState::new(
             current_ethereum_block,
+            current_ethereum_block,
             unconfirmed_queue,
-            priority_queue,
+            priority_queue_map,
             new_tokens,
             new_register_nft_factory_events,
         );
@@ -323,157 +327,6 @@ impl<W: EthClient> EthWatch<W> {
         }
 
         new_tokens
-    }
-
-    fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {
-        let mut result = Vec::new();
-
-        let mut used_chunks = 0;
-        let mut current_priority_op = first_serial_id;
-
-        while let Some(op) = self.eth_state.priority_queue().get(&current_priority_op) {
-            if used_chunks + op.as_ref().data.chunks() <= max_chunks {
-                result.push(op.as_ref().clone());
-                used_chunks += op.as_ref().data.chunks();
-                current_priority_op += 1;
-            } else {
-                break;
-            }
-        }
-
-        result
-    }
-
-    async fn is_new_pubkey_hash_authorized(
-        &self,
-        address: Address,
-        nonce: Nonce,
-        pub_key_hash: &PubKeyHash,
-    ) -> anyhow::Result<bool> {
-        let auth_fact_reset_time = self.client.get_auth_fact_reset_time(address, nonce).await?;
-        if auth_fact_reset_time != 0 {
-            return Ok(false);
-        }
-        let auth_fact = self.client.get_auth_fact(address, nonce).await?;
-        Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
-    }
-
-    fn find_ongoing_op_by_eth_hash(&self, eth_hash: H256) -> Option<PriorityOp> {
-        self.eth_state
-            .unconfirmed_queue()
-            .iter()
-            .find(|op| op.eth_hash == eth_hash)
-            .cloned()
-    }
-
-    fn find_ongoing_op_by_tx_hash(&self, tx_hash: TxHash) -> Option<PriorityOp> {
-        self.eth_state
-            .unconfirmed_queue()
-            .iter()
-            .find(|op| op.tx_hash() == tx_hash)
-            .cloned()
-    }
-
-    fn find_ongoing_op_by_any_hash(&self, hash: TxHash) -> Option<PriorityOp> {
-        self.eth_state
-            .unconfirmed_queue()
-            .iter()
-            .find(|op| op.tx_hash() == hash || op.eth_hash.as_ref() == hash.as_ref())
-            .cloned()
-    }
-
-    fn get_ongoing_deposits_for(&self, address: Address) -> Vec<PriorityOp> {
-        self.eth_state
-            .unconfirmed_queue()
-            .iter()
-            .filter(|op| match &op.data {
-                ZkSyncPriorityOp::Deposit(deposit) => {
-                    // Address may be set to either sender or recipient.
-                    deposit.from == address || deposit.to == address
-                }
-                _ => false,
-            })
-            .cloned()
-            .collect()
-    }
-
-    fn get_ongoing_ops_for(
-        &self,
-        query: PaginationQuery<PendingOpsRequest>,
-    ) -> Paginated<Transaction, u64> {
-        let all_ops = self
-            .eth_state
-            .unconfirmed_queue()
-            .iter()
-            .filter(|op| match &op.data {
-                ZkSyncPriorityOp::Deposit(deposit) => {
-                    // Address may be set to recipient.
-                    deposit.to == query.from.address
-                }
-                ZkSyncPriorityOp::FullExit(full_exit) => query
-                    .from
-                    .account_id
-                    .map(|account_id| account_id == full_exit.account_id)
-                    .unwrap_or(false),
-            });
-        let count = all_ops.clone().count();
-        let from_serial_id = match query.from.serial_id.inner {
-            Either::Left(id) => id,
-            Either::Right(_) => {
-                if let Some(op) = all_ops.clone().max_by_key(|op| op.serial_id) {
-                    op.serial_id
-                } else {
-                    return Paginated::new(
-                        Vec::new(),
-                        Default::default(),
-                        query.limit,
-                        query.direction,
-                        0,
-                    );
-                }
-            }
-        };
-        let ops: Vec<PriorityOp> = match query.direction {
-            PaginationDirection::Newer => all_ops
-                .sorted_by_key(|op| op.serial_id)
-                .filter(|op| op.serial_id >= from_serial_id)
-                .take(query.limit as usize)
-                .cloned()
-                .collect(),
-            PaginationDirection::Older => all_ops
-                .sorted_by(|a, b| b.serial_id.cmp(&a.serial_id))
-                .filter(|op| op.serial_id <= from_serial_id)
-                .take(query.limit as usize)
-                .cloned()
-                .collect(),
-        };
-        let txs: Vec<Transaction> = ops
-            .into_iter()
-            .map(|op| {
-                let tx_hash = op.tx_hash();
-                let tx = L1Transaction::from_pending_op(
-                    op.data.clone(),
-                    op.eth_hash,
-                    op.serial_id,
-                    tx_hash,
-                );
-                Transaction {
-                    tx_hash,
-                    block_number: None,
-                    op: TransactionData::L1(tx),
-                    status: TxInBlockStatus::Queued,
-                    fail_reason: None,
-                    created_at: None,
-                }
-            })
-            .collect();
-        Paginated::new(
-            txs,
-            from_serial_id,
-            query.limit,
-            query.direction,
-            count as u32,
-        )
     }
 
     async fn poll_eth_node(&mut self) -> anyhow::Result<()> {
@@ -535,7 +388,7 @@ impl<W: EthClient> EthWatch<W> {
                         RATE_LIMIT_DELAY.as_secs()
                     );
 
-                    time::delay_for(RATE_LIMIT_DELAY).await;
+                    time::sleep(RATE_LIMIT_DELAY).await;
                 }
             }
         };
@@ -565,40 +418,16 @@ impl<W: EthClient> EthWatch<W> {
                                 Entering the backoff mode"
                             );
                             self.enter_backoff_mode();
+                        } else if is_missing_priority_op_error(&error) {
+                            vlog::warn!("{}\nEntering the backoff mode", error);
+                            // Wait for some time and try to fetch new logs again.
+                            self.enter_backoff_mode();
                         } else {
                             // Some unexpected kind of error, we won't shutdown the node because of it,
                             // but rather expect node administrators to handle the situation.
                             vlog::error!("Failed to process new blocks {}", error);
                         }
                     }
-                }
-                EthWatchRequest::GetPriorityQueueOps {
-                    op_start_id,
-                    max_chunks,
-                    resp,
-                } => {
-                    resp.send(self.get_priority_requests(op_start_id, max_chunks))
-                        .unwrap_or_default();
-                }
-                EthWatchRequest::GetUnconfirmedDeposits { address, resp } => {
-                    let deposits_for_address = self.get_ongoing_deposits_for(address);
-                    resp.send(deposits_for_address).ok();
-                }
-                EthWatchRequest::GetUnconfirmedOps { query, resp } => {
-                    let unconfirmed_ops = self.get_ongoing_ops_for(query);
-                    resp.send(unconfirmed_ops).ok();
-                }
-                EthWatchRequest::GetUnconfirmedOpByEthHash { eth_hash, resp } => {
-                    let unconfirmed_op = self.find_ongoing_op_by_eth_hash(eth_hash);
-                    resp.send(unconfirmed_op).unwrap_or_default();
-                }
-                EthWatchRequest::GetUnconfirmedOpByTxHash { tx_hash, resp } => {
-                    let unconfirmed_op = self.find_ongoing_op_by_tx_hash(tx_hash);
-                    resp.send(unconfirmed_op).unwrap_or_default();
-                }
-                EthWatchRequest::GetUnconfirmedOpByAnyHash { hash, resp } => {
-                    let unconfirmed_op = self.find_ongoing_op_by_any_hash(hash);
-                    resp.send(unconfirmed_op).unwrap_or_default();
                 }
                 EthWatchRequest::GetNewTokens {
                     last_eth_block,
@@ -613,27 +442,6 @@ impl<W: EthClient> EthWatch<W> {
                     resp.send(self.get_register_factory_event(last_eth_block))
                         .ok();
                 }
-                EthWatchRequest::IsPubkeyChangeAuthorized {
-                    address,
-                    nonce,
-                    pubkey_hash,
-                    resp,
-                } => {
-                    let authorized = self
-                        .is_new_pubkey_hash_authorized(address, nonce, &pubkey_hash)
-                        .await
-                        .unwrap_or(false);
-                    resp.send(authorized).unwrap_or_default();
-                }
-                EthWatchRequest::GetPriorityOpBySerialId { serial_id, resp } => {
-                    resp.send(
-                        self.eth_state
-                            .priority_queue()
-                            .get(&serial_id)
-                            .map(|received_op| received_op.as_ref().clone()),
-                    )
-                    .unwrap_or_default();
-                }
             }
         }
     }
@@ -644,22 +452,25 @@ pub fn start_eth_watch(
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     eth_gateway: EthereumGateway,
-    config_options: &ZkSyncConfig,
+    contract_config: &ContractsConfig,
+    eth_watcher_config: &ETHWatchConfig,
+    mempool_req_sender: mpsc::Sender<MempoolTransactionRequest>,
 ) -> JoinHandle<()> {
     let eth_client = EthHttpClient::new(
         eth_gateway,
-        config_options.contracts.contract_addr,
-        config_options.contracts.governance_addr,
+        contract_config.contract_addr,
+        contract_config.governance_addr,
     );
 
     let eth_watch = EthWatch::new(
         eth_client,
-        config_options.eth_watch.confirmations_for_eth_event,
+        mempool_req_sender,
+        eth_watcher_config.confirmations_for_eth_event,
     );
 
     tokio::spawn(eth_watch.run(eth_req_receiver));
 
-    let poll_interval = config_options.eth_watch.poll_interval();
+    let poll_interval = eth_watcher_config.poll_interval();
     tokio::spawn(async move {
         let mut timer = time::interval(poll_interval);
 

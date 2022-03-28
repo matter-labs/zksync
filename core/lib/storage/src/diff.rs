@@ -17,7 +17,7 @@ use crate::chain::account::records::*;
 ///
 /// This enum allows one to process account updates in a generic way.
 #[derive(Debug)]
-pub enum StorageAccountDiff {
+pub(crate) enum StorageAccountDiff {
     BalanceUpdate(StorageAccountUpdate),
     Create(StorageAccountCreation),
     Delete(StorageAccountCreation),
@@ -76,14 +76,14 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
                 AccountId(upd.account_id as u32),
                 AccountUpdate::Create {
                     nonce: Nonce(upd.nonce as u32),
-                    address: Address::from_slice(&upd.address.as_slice()),
+                    address: Address::from_slice(upd.address.as_slice()),
                 },
             ),
             StorageAccountDiff::Delete(upd) => (
                 AccountId(upd.account_id as u32),
                 AccountUpdate::Delete {
                     nonce: Nonce(upd.nonce as u32),
-                    address: Address::from_slice(&upd.address.as_slice()),
+                    address: Address::from_slice(upd.address.as_slice()),
                 },
             ),
             StorageAccountDiff::ChangePubKey(upd) => (
@@ -104,11 +104,12 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
                         TokenId(upd.token_id as u32),
                         upd.serial_id as u32,
                         AccountId(upd.creator_account_id as u32),
-                        Address::from_slice(&upd.creator_address.as_slice()),
-                        Address::from_slice(&upd.address.as_slice()),
+                        Address::from_slice(upd.creator_address.as_slice()),
+                        Address::from_slice(upd.address.as_slice()),
                         Some(upd.symbol),
-                        H256::from_slice(&upd.content_hash.as_slice()),
+                        H256::from_slice(upd.content_hash.as_slice()),
                     ),
+                    nonce: Nonce(upd.nonce as u32),
                 },
             ),
         }
@@ -117,14 +118,14 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
 
 impl StorageAccountDiff {
     /// Compares updates by `block number` then by `update_order_id` (which is number within block).
-    pub fn cmp_order(&self, other: &Self) -> Ordering {
+    pub(crate) fn cmp_order(&self, other: &Self) -> Ordering {
         self.block_number()
             .cmp(&other.block_number())
             .then(self.update_order_id().cmp(&other.update_order_id()))
     }
 
     /// Returns the index of the operation within block.
-    pub fn update_order_id(&self) -> i32 {
+    pub(crate) fn update_order_id(&self) -> i32 {
         match self {
             StorageAccountDiff::BalanceUpdate(StorageAccountUpdate {
                 update_order_id, ..
@@ -146,7 +147,7 @@ impl StorageAccountDiff {
     }
 
     /// Returns the block index to which the operation belongs.
-    pub fn block_number(&self) -> i64 {
+    pub(crate) fn block_number(&self) -> i64 {
         *match self {
             StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { block_number, .. }) => {
                 block_number

@@ -2,7 +2,6 @@
 use std::time::Instant;
 // External imports
 use anyhow::format_err;
-use sqlx::Done;
 // Workspace imports
 use zksync_types::BlockNumber;
 // Local imports
@@ -10,6 +9,7 @@ use self::records::{StorageProverJobQueue, StoredAggregatedProof, StoredProof};
 use crate::chain::operations::OperationsSchema;
 use crate::prover::records::StorageBlockWitness;
 use crate::{QueryResult, StorageProcessor};
+use chrono::{TimeZone, Utc};
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::prover::{ProverJob, ProverJobStatus, ProverJobType};
@@ -46,6 +46,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         job_priority: i32,
         job_type: ProverJobType,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
         "
           WITH job_values as (
@@ -62,18 +63,23 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             i64::from(*last_block),
             job_data,
         ).execute(self.0.conn()).await?;
+
+        metrics::histogram!("sql", start.elapsed(), "prover" => "add_prover_job_to_job_queue");
         Ok(())
     }
 
     pub async fn mark_stale_jobs_as_idle(&mut self) -> QueryResult<()> {
-        sqlx::query!(
+        let start = Instant::now();
+        let result = sqlx::query!(
             "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')
-            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
+            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds' RETURNING id",
             ProverJobStatus::Idle.to_number(),
             ProverJobStatus::InProgress.to_number(),
         )
-        .execute(self.0.conn())
+        .fetch_all(self.0.conn())
         .await?;
+        metrics::counter!("stale_jobs", result.len() as u64);
+        metrics::histogram!("sql", start.elapsed(), "prover" => "mark_stale_jobs_as_idle");
         Ok(())
     }
 
@@ -197,12 +203,42 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
-        transaction.commit().await?;
 
+        transaction
+            .prover_schema()
+            .set_block_processing_metrics(block_number, block_number, "single_proof".to_string())
+            .await?;
+        transaction.commit().await?;
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_proof");
         Ok(())
     }
 
+    // Set metrics about stages in block processing
+    async fn set_block_processing_metrics(
+        &mut self,
+        first_block: BlockNumber,
+        last_block: BlockNumber,
+        stage: String,
+    ) -> QueryResult<()> {
+        for block_number in first_block.0..=last_block.0 {
+            let block = self
+                .0
+                .chain()
+                .block_schema()
+                .get_storage_block(block_number.into())
+                .await?;
+            if let Some(block) = block {
+                let time = Utc.timestamp(block.timestamp.unwrap_or_default(), 0);
+                // It's almost impossible situation, but it could be triggered in tests
+                let duration = (Utc::now() - time).to_std().unwrap_or_default();
+                let labels = vec![("stage", stage.clone())];
+                metrics::histogram!("process_block", duration, &labels);
+            } else {
+                vlog::error!("Block for proof doesn't exist")
+            }
+        }
+        Ok(())
+    }
     /// Stores the aggregated proof for blocks.
     pub async fn store_aggregated_proof(
         &mut self,
@@ -238,6 +274,10 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
+        transaction
+            .prover_schema()
+            .set_block_processing_metrics(first_block, last_block, "aggregated_proof".to_string())
+            .await?;
         transaction.commit().await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_aggregated_proof");
@@ -330,6 +370,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         &mut self,
         action_type: ProverJobType,
     ) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
         let last_block = sqlx::query!(
             "SELECT max(last_block) from prover_job_queue
             WHERE job_type = $1",
@@ -363,6 +404,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             }
         };
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "get_last_block_prover_job_queue");
         Ok(result)
     }
 

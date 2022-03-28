@@ -1,14 +1,15 @@
 use crate::{v02::block::BlockStatus, TxWithSignature};
+use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use zksync_types::{
     tx::{
-        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer, TxHash,
-        Withdraw, WithdrawNFT,
+        ChangePubKey, Close, EthBatchSignatures, ForcedExit, MintNFT, Swap, Transfer,
+        TxEthSignature, TxHash, Withdraw, WithdrawNFT,
     },
-    AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
-    H256,
+    AccountId, Address, BlockNumber, EthBlockId, PubKeyHash, SerialId, TokenId, ZkSyncOp,
+    ZkSyncPriorityOp, H256,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, ZeroPrefixHexSerde};
 
@@ -75,11 +76,13 @@ pub enum Receipt {
 pub struct Transaction {
     #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
+    pub block_index: Option<u32>,
     pub block_number: Option<BlockNumber>,
     pub op: TransactionData,
     pub status: TxInBlockStatus,
     pub fail_reason: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
+    pub batch_id: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -245,4 +248,51 @@ pub struct ApiTxBatch {
 pub struct BatchStatus {
     pub updated_at: DateTime<Utc>,
     pub last_state: TxInBlockStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Toggle2FA {
+    pub enable: bool,
+    #[serde(with = "ts_milliseconds")]
+    pub timestamp: DateTime<Utc>,
+    pub account_id: AccountId,
+    pub signature: TxEthSignature,
+    // If supplied, only transaction signed with this pubkey hash will not
+    // have their Ethereum signature checked
+    pub pub_key_hash: Option<PubKeyHash>,
+}
+
+impl Toggle2FA {
+    // Even though the function returns constant value, it is made for consistency
+    // with Order and transactions
+    pub fn get_ethereum_sign_message(&self) -> String {
+        let message = if self.enable {
+            format!(
+                "By signing this message, you are opting into Two-factor Authentication protection by the zkSync Server.\n\
+                Transactions now require signatures by both your L1 and L2 private key.\n\
+                Timestamp: {}",
+                self.timestamp.timestamp_millis()
+            )
+        } else {
+            format!(
+                "You are opting out of Two-factor Authentication protection by the zkSync Server.\n\
+                Transactions now only require signatures by your L2 private key.\n\
+                BY SIGNING THIS MESSAGE, YOU ARE TRUSTING YOUR WALLET CLIENT TO KEEP YOUR L2 PRIVATE KEY SAFE!\n\
+                Timestamp: {}", 
+                self.timestamp.timestamp_millis()
+            )
+        };
+
+        if let Some(hash) = self.pub_key_hash {
+            format!("{}\nPubKeyHash: {}", message, hash.as_hex())
+        } else {
+            message
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Toggle2FAResponse {
+    pub success: bool,
 }

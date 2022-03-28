@@ -91,7 +91,7 @@ impl AccountLifespan {
                         return;
                     }
                     // We will wait and try again.
-                    tokio::time::delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
         }
@@ -199,7 +199,7 @@ impl AccountLifespan {
             (ExpectedOutcome::ApiRequestFailed, Ok(_handle)) => {
                 // Transaction got accepted, but should have not been.
                 let error = "Tx/batch was accepted, but should have not been";
-                return Ok(ReportLabel::failed(&error));
+                return Ok(ReportLabel::failed(error));
             }
             (_, Ok(handle)) => {
                 // Transaction should have been accepted by API and it was; now wait for the commitment.
@@ -212,7 +212,7 @@ impl AccountLifespan {
             (_, Err(_error)) => {
                 // Transaction was expected to be accepted, but was rejected.
                 let error = "Tx/batch should have been accepted, but got rejected";
-                return Ok(ReportLabel::failed(&error));
+                return Ok(ReportLabel::failed(error));
             }
         };
 

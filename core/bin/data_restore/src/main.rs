@@ -10,7 +10,8 @@ use web3::Web3;
 use zksync_data_restore::contract::ZkSyncDeployedContract;
 use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
-    database_storage_interactor::DatabaseStorageInteractor, END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
+    database_storage_interactor::DatabaseStorageInteractor, storage_interactor::StorageInteractor,
+    END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
 use zksync_types::network::Network;
 
@@ -81,7 +82,7 @@ impl ContractsConfig {
 #[tokio::main]
 async fn main() {
     vlog::info!("Restoring zkSync state from the contract");
-    let _sentry_guard = vlog::init();
+    let _vlog_guard = vlog::init();
     let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ETHClientConfig::from_env();
 
@@ -120,7 +121,7 @@ async fn main() {
         contract,
     );
 
-    let mut interactor = DatabaseStorageInteractor::new(storage);
+    let mut interactor = StorageInteractor::Database(DatabaseStorageInteractor::new(storage));
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
@@ -128,7 +129,7 @@ async fn main() {
         add_tokens_to_storage(&mut interactor, &config.eth_network.to_string()).await;
 
         driver
-            .set_genesis_state(&mut interactor, config.genesis_tx_hash)
+            .set_genesis_state_from_eth(&mut interactor, config.genesis_tx_hash)
             .await;
     }
 

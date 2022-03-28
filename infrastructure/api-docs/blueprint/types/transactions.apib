@@ -5,6 +5,7 @@
 - status: rejected (TxState, required)
 - failReason: Nonce mismatch (string, required, nullable)
 - createdAt: `2018-12-12T01:02:03.123456789` (string, required, nullable)
+- batchId: 155 (number, required, nullable)
 
 ## Transaction.Signed (object)
 - tx (Transaction.InBlock, required)
@@ -252,3 +253,14 @@
 ## TxWithSignature (object)
 - tx (Transaction.Incoming, required)
 - signature (TxEthSignatureVariant, required)
+
+## Toggle2FAEthereumSignature
+- type: `EthereumSignature` (string, fixed)
+- signature: `{{toggle2FASignature}}` (string, required)
+
+## Toggle2FAEthSignature (enum)
+- (Toggle2FAEthereumSignature)
+- (EIP1271Signature)
+
+## Toggle2FAResult (object)
+- success: true (boolean, required)

@@ -1,17 +1,18 @@
 // Built-in deps
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 // External imports
 // Workspace imports
 use zksync_types::{
     aggregated_operations::{
         AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
     },
-    AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp,
+    AccountId, AccountUpdate, BlockNumber, PriorityOp, SerialId, Token, TokenKind, ZkSyncOp,
 };
 // Local imports
 use self::records::{
     NewBlockEvent, NewRollupOpsBlock, NewStorageState, NewTokenEvent, StoredBlockEvent,
-    StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState,
+    StoredLastWatchedEthBlockNumber, StoredPriorityOpData, StoredRollupOpsBlock,
+    StoredStorageState,
 };
 
 use crate::chain::operations::OperationsSchema;
@@ -107,7 +108,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             timestamp, previous_block_root_hash, contract_version
             FROM data_restore_rollup_blocks AS blocks
             JOIN (
-                SELECT block_num, array_agg(operation) as ops
+                SELECT block_num, array_agg(operation ORDER BY id) as ops
                 FROM data_restore_rollup_block_ops
                 GROUP BY block_num
             ) ops
@@ -180,6 +181,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         block_events: &[NewBlockEvent],
         token_events: &[NewTokenEvent],
+        priority_op_data: &[PriorityOp],
         last_watched_eth_number: &str,
     ) -> QueryResult<()> {
         let start = Instant::now();
@@ -193,7 +195,13 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             // The only way to know decimals is to query ERC20 contract 'decimals' function
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
-            let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
+            let token = Token::new(
+                id,
+                address,
+                &format!("ERC20-{}", *id),
+                decimals,
+                TokenKind::ERC20,
+            );
             let try_insert_token = TokensSchema(&mut transaction).store_token(token).await;
 
             if let Err(StoreTokenError::Other(anyhow_err)) = try_insert_token {
@@ -207,11 +215,97 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         DataRestoreSchema(&mut transaction)
             .update_storage_state(new_state)
             .await?;
+        DataRestoreSchema(&mut transaction)
+            .save_priority_op_data(priority_op_data)
+            .await?;
 
         transaction.commit().await?;
 
         metrics::histogram!("sql.data_restore.save_events_state", start.elapsed());
         Ok(())
+    }
+
+    pub async fn save_priority_op_data(
+        &mut self,
+        priority_op_data: &[PriorityOp],
+    ) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
+
+        sqlx::query!("DELETE FROM data_restore_priority_op_data")
+            .execute(transaction.conn())
+            .await?;
+
+        for op in priority_op_data {
+            let serial_id = op.serial_id;
+            let op = serde_json::to_value(op).expect("Failed to serialize priority operation");
+
+            sqlx::query!(
+                "INSERT INTO data_restore_priority_op_data VALUES ($1, $2)",
+                serial_id as i64,
+                op
+            )
+            .execute(transaction.conn())
+            .await?;
+        }
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn get_priority_op_data(&mut self) -> QueryResult<HashMap<SerialId, PriorityOp>> {
+        let priority_op_data = sqlx::query_as!(
+            StoredPriorityOpData,
+            "SELECT * FROM data_restore_priority_op_data"
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        Ok(priority_op_data
+            .into_iter()
+            .map(|op| {
+                (
+                    op.serial_id as u64,
+                    serde_json::from_value(op.op)
+                        .expect("Failed to deserialize priority operation"),
+                )
+            })
+            .collect())
+    }
+
+    pub async fn update_executed_priority_operations(
+        &mut self,
+        priority_op_data: impl Iterator<Item = &PriorityOp>,
+    ) -> QueryResult<Vec<SerialId>> {
+        let mut not_updated = Vec::new();
+        let mut transaction = self.0.start_transaction().await?;
+
+        for priority_op in priority_op_data {
+            let serial_id = priority_op.serial_id;
+            let tx_hash = priority_op.tx_hash().as_ref().to_vec();
+            let eth_hash = priority_op.eth_hash.as_bytes().to_vec();
+            let eth_block = priority_op.eth_block as i64;
+            let eth_block_index = priority_op.eth_block_index.map(|i| i as i64);
+
+            let result = sqlx::query!(
+                "UPDATE executed_priority_operations 
+                SET tx_hash = $1, eth_hash = $2, eth_block = $3, eth_block_index = $4
+                WHERE priority_op_serialid = $5",
+                tx_hash,
+                eth_hash,
+                eth_block,
+                eth_block_index,
+                serial_id as i64
+            )
+            .execute(transaction.conn())
+            .await?;
+
+            if result.rows_affected() == 0 {
+                not_updated.push(serial_id)
+            }
+        }
+
+        transaction.commit().await?;
+        Ok(not_updated)
     }
 
     pub async fn save_rollup_ops(

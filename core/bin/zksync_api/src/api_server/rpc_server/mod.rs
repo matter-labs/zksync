@@ -2,15 +2,13 @@
 use std::time::Instant;
 
 // External uses
-use futures::{
-    channel::{mpsc, oneshot},
-    SinkExt,
-};
+use futures::channel::mpsc;
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
+use tokio::task::JoinHandle;
 
 // Workspace uses
-use zksync_config::ZkSyncConfig;
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
 use zksync_storage::{
     chain::{
         block::records::StorageBlockDetails, operations::records::StoredExecutedPriorityOperation,
@@ -18,18 +16,14 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, BlockNumber, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BlockNumber};
+use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 // Local uses
-use crate::{
-    fee_ticker::{PriceError, ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
-    signature_checker::VerifySignatureRequest,
-    utils::shared_lru_cache::AsyncLruCache,
-};
-use bigdecimal::BigDecimal;
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use crate::{signature_checker::VerifySignatureRequest, utils::shared_lru_cache::AsyncLruCache};
 
 pub mod error;
+mod ip_insert_middleware;
 mod rpc_impl;
 mod rpc_trait;
 pub mod types;
@@ -37,11 +31,12 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use crate::fee_ticker::FeeTicker;
+use ip_insert_middleware::IpInsertMiddleWare;
+use zksync_mempool::MempoolTransactionRequest;
 
 #[derive(Clone)]
 pub struct RpcApp {
-    runtime_handle: tokio::runtime::Handle,
-
     cache_of_executed_priority_operations: AsyncLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_transaction_receipts: AsyncLruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_complete_withdrawal_tx_hashes: AsyncLruCache<TxHash, String>,
@@ -55,25 +50,22 @@ impl RpcApp {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config: &ZkSyncConfig,
+        ticker: FeeTicker,
+        config: &CommonApiConfig,
+        confirmations_for_eth_event: u64,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
-        let runtime_handle = tokio::runtime::Handle::try_current()
-            .expect("RpcApp must be created from the context of Tokio Runtime");
-
-        let api_requests_caches_size = config.api.common.caches_size;
-        let confirmations_for_eth_event = config.eth_watch.confirmations_for_eth_event;
+        let api_requests_caches_size = config.caches_size;
 
         let tx_sender = TxSender::new(
             connection_pool,
             sign_verify_request_sender,
-            ticker_request_sender,
+            ticker,
             config,
+            mempool_tx_sender,
         );
 
         RpcApp {
-            runtime_handle,
-
             cache_of_executed_priority_operations: AsyncLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: AsyncLruCache::new(api_requests_caches_size),
             cache_of_complete_withdrawal_tx_hashes: AsyncLruCache::new(api_requests_caches_size),
@@ -96,51 +88,6 @@ impl RpcApp {
             .access_storage()
             .await
             .map_err(|_| Error::internal_error())
-    }
-
-    /// Async version of `get_ongoing_deposits` which does not use old futures as a return type.
-    async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
-        let start = Instant::now();
-        let confirmations_for_eth_event = self.confirmations_for_eth_event;
-
-        let ongoing_ops = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_deposits(address)
-            .await
-            .map_err(|_| Error::internal_error())?;
-
-        let mut max_block_number = 0;
-
-        // Transform operations into `OngoingDeposit` and find the maximum block number in a
-        // single pass.
-        let deposits: Vec<_> = ongoing_ops
-            .into_iter()
-            .map(|op| {
-                if op.eth_block > max_block_number {
-                    max_block_number = op.eth_block;
-                }
-
-                OngoingDeposit::new(op)
-            })
-            .collect();
-
-        let estimated_deposits_approval_block = if !deposits.is_empty() {
-            // We have to wait `confirmations_for_eth_event` blocks after the most
-            // recent deposit operation.
-            Some(max_block_number + confirmations_for_eth_event)
-        } else {
-            // No ongoing deposits => no estimated block.
-            None
-        };
-
-        metrics::histogram!("api.rpc.get_ongoing_deposits", start.elapsed());
-        Ok(OngoingDepositsResp {
-            address,
-            deposits,
-            confirmations_for_eth_event,
-            estimated_deposits_approval_block,
-        })
     }
 
     // cache access functions
@@ -176,7 +123,7 @@ impl RpcApp {
             executed_op
         };
 
-        metrics::histogram!("api.rpc.get_executed_priority_operation", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint_name" => "get_executed_priority_operation");
         Ok(res)
     }
 
@@ -188,7 +135,7 @@ impl RpcApp {
             .get(&self.tx_sender.pool, BlockNumber(block_number as u32))
             .await
             .map_err(|_| Error::internal_error())?;
-        metrics::histogram!("api.rpc.get_block_info", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint_name" => "get_block_info");
         Ok(res)
     }
 
@@ -227,102 +174,8 @@ impl RpcApp {
             tx_receipt
         };
 
-        metrics::histogram!("api.rpc.get_tx_receipt", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint_name" => "get_tx_receipt");
         Ok(res)
-    }
-
-    async fn token_allowed_for_fees(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        token: TokenLike,
-    ) -> Result<bool> {
-        let (sender, receiver) = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::IsTokenAllowed {
-                token: token.clone(),
-                response: sender,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        receiver
-            .await
-            .expect("ticker answer sender dropped")
-            .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-                Error::internal_error()
-            })
-    }
-
-    async fn ticker_batch_fee_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<ResponseBatchFee> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetBatchTxFee {
-                transactions,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
-            Error::internal_error()
-        })
-    }
-
-    async fn ticker_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<ResponseFee> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTxFee {
-                tx_type,
-                address,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            vlog::warn!(
-                "Internal Server Error: '{}'; input: {:?}, {:?}",
-                err,
-                tx_type,
-                token,
-            );
-            Error::internal_error()
-        })
-    }
-
-    async fn ticker_price_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        token: TokenLike,
-        req_type: TokenPriceRequestType,
-    ) -> Result<BigDecimal> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTokenPrice {
-                token: token.clone(),
-                response: req.0,
-                req_type,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| match err {
-            PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
-            _ => {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-                Error::internal_error()
-            }
-        })
     }
 
     async fn get_account_state(&self, address: Address) -> Result<AccountStateInfo> {
@@ -360,7 +213,7 @@ impl RpcApp {
             .await?;
         };
 
-        metrics::histogram!("api.rpc.get_account_state", start.elapsed());
+        metrics::histogram!("api", start.elapsed(), "type" => "rpc", "endpoint_name" => "get_account_state");
         Ok(result)
     }
 
@@ -401,38 +254,46 @@ impl RpcApp {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-    ticker_request_sender: mpsc::Sender<TickerRequest>,
-    panic_notify: mpsc::Sender<bool>,
-    config: &ZkSyncConfig,
-) {
-    let addr = config.api.json_rpc.http_bind_addr();
-
+    ticker: FeeTicker,
+    config: &JsonRpcConfig,
+    common_api_config: &CommonApiConfig,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+    confirmations_for_eth_event: u64,
+) -> JoinHandle<()> {
+    let addr = config.http_bind_addr();
     let rpc_app = RpcApp::new(
         connection_pool,
         sign_verify_request_sender,
-        ticker_request_sender,
-        &config,
+        ticker,
+        common_api_config,
+        confirmations_for_eth_event,
+        mempool_tx_sender,
     );
+
+    let (handler, panic_sender) = spawn_panic_handler();
     std::thread::spawn(move || {
-        let _panic_sentinel = ThreadPanicNotify(panic_notify);
+        let _panic_sentinel = ThreadPanicNotify(panic_sender);
         let mut io = IoHandler::new();
         rpc_app.extend(&mut io);
 
         let server = ServerBuilder::new(io)
             .threads(super::THREADS_PER_SERVER)
+            .request_middleware(IpInsertMiddleWare {})
             .start_http(&addr)
             .unwrap();
         server.wait();
     });
+    handler
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use serde::{Deserialize, Serialize};
+    use zksync_types::TxFeeTypes;
 
     #[test]
     fn tx_fee_type_serialization() {

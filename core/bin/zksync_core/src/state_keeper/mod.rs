@@ -1,461 +1,175 @@
-use std::collections::{HashMap, VecDeque};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::collections::VecDeque;
+use std::time::{Duration, Instant};
+
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
     stream::StreamExt,
     SinkExt,
 };
-use itertools::Itertools;
 use tokio::task::JoinHandle;
+use tokio::time;
 // Workspace uses
-use zksync_crypto::{
-    ff::{self, PrimeField, PrimeFieldRepr},
-    params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
-};
-use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
-use zksync_storage::ConnectionPool;
+use zksync_mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock};
+use zksync_state::state::{OpSuccess, ZkSyncState};
 use zksync_types::{
     block::{
-        Block, BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
+        BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx, IncompleteBlock,
         PendingBlock as SendablePendingBlock,
     },
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
-    tx::{TxHash, ZkSyncTx},
-    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
-    PriorityOp, SignedZkSyncTx, Token, TokenId, H256, NFT,
+    tx::ZkSyncTx,
+    Address, PriorityOp, SignedZkSyncTx,
 };
 // Local uses
-use crate::{
-    committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
-    mempool::ProposedBlock,
+use self::{
+    pending_block::PendingBlock,
+    root_hash_calculator::{BlockRootHashJob, RootHashCalculator},
+    types::{ApplyOutcome, StateKeeperConfig},
+    utils::system_time_timestamp,
 };
-use zksync_state::error::{OpError, TxBatchError};
+use crate::{
+    committer::{BlockCommitRequest, CommitRequest},
+    tx_event_emitter::ProcessedOperations,
+};
+
+pub use self::{
+    init_params::ZkSyncStateInitParams,
+    root_hash_calculator::{start_root_hash_calculator, BlockRootHashJobQueue},
+    types::StateKeeperTestkitRequest,
+};
+
+mod init_params;
+mod pending_block;
+mod root_hash_calculator;
+mod state_restore;
+mod types;
+mod utils;
 
 #[cfg(test)]
 mod tests;
-
-pub enum ExecutedOpId {
-    Transaction(TxHash),
-    PriorityOp(u64),
-}
-
-pub enum StateKeeperRequest {
-    GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
-    GetPendingBlockTimestamp(oneshot::Sender<u64>),
-    GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
-    ExecuteMiniBlock(ProposedBlock),
-    SealBlock,
-    GetCurrentState(oneshot::Sender<ZkSyncStateInitParams>),
-}
-
-#[derive(Debug, Clone)]
-struct PendingBlock {
-    success_operations: Vec<ExecutedOperations>,
-    failed_txs: Vec<ExecutedTx>,
-    account_updates: AccountUpdates,
-    chunks_left: usize,
-    pending_op_block_index: u32,
-    unprocessed_priority_op_before: u64,
-    pending_block_iteration: usize,
-    gas_counter: GasCounter,
-    /// Option denoting if this block should be generated faster than usual.
-    fast_processing_required: bool,
-    /// Fee should be applied only when sealing the block (because of corresponding logic in the circuit)
-    collected_fees: Vec<CollectedFee>,
-    /// Number of stored account updates in the db (from `account_updates` field)
-    stored_account_updates: usize,
-    previous_block_root_hash: H256,
-    timestamp: u64,
-}
-
-impl PendingBlock {
-    fn new(
-        unprocessed_priority_op_before: u64,
-        available_chunks_sizes: &[usize],
-        previous_block_root_hash: H256,
-        timestamp: u64,
-    ) -> Self {
-        // TransferOp chunks are subtracted to reserve space for last transfer.
-        let chunks_left = *available_chunks_sizes
-            .iter()
-            .max()
-            .expect("Expected at least one block chunks size");
-        Self {
-            success_operations: Vec::new(),
-            failed_txs: Vec::new(),
-            account_updates: Vec::new(),
-            chunks_left,
-            pending_op_block_index: 0,
-            unprocessed_priority_op_before,
-            pending_block_iteration: 0,
-            gas_counter: GasCounter::new(),
-            fast_processing_required: false,
-            collected_fees: Vec::new(),
-            stored_account_updates: 0,
-            previous_block_root_hash,
-            timestamp,
-        }
-    }
-}
-
-pub fn system_time_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("failed to get system time")
-        .as_secs()
-}
 
 /// Responsible for tx processing and block forming.
 pub struct ZkSyncStateKeeper {
     /// Current plasma state
     state: ZkSyncState,
-
-    fee_account_id: AccountId,
-    current_unprocessed_priority_op: u64,
-
     pending_block: PendingBlock,
+    config: StateKeeperConfig,
 
-    rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
+    tx_for_mempool: mpsc::Sender<MempoolBlocksRequest>,
+    /// Channel used for sending queued transaction events. Required since state keeper
+    /// has no access to the database.
+    processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
 
-    available_block_chunk_sizes: Vec<usize>,
-    max_miniblock_iterations: usize,
-    fast_miniblock_iterations: usize,
+    /// Queue for root hash calculator.
+    /// Contains blocks that were sealed but for which root hash has not been calculated yet.
+    root_hash_queue: BlockRootHashJobQueue,
 
-    // Two fields below are for optimization: we don't want to overwrite all the block contents over and over.
-    // With these fields we'll be able save the diff between two pending block states only.
-    /// Amount of succeeded transactions in the pending block at the last pending block synchronization step.
-    success_txs_pending_len: usize,
-    /// Amount of failed transactions in the pending block at the last pending block synchronization step.
-    failed_txs_pending_len: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct ZkSyncStateInitParams {
-    pub tree: AccountTree,
-    pub acc_id_by_addr: HashMap<Address, AccountId>,
-    pub nfts: HashMap<TokenId, NFT>,
-    pub last_block_number: BlockNumber,
-    pub unprocessed_priority_op: u64,
-}
-
-impl Default for ZkSyncStateInitParams {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ZkSyncStateInitParams {
-    pub fn new() -> Self {
-        Self {
-            tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
-            acc_id_by_addr: HashMap::new(),
-            nfts: HashMap::new(),
-            last_block_number: BlockNumber(0),
-            unprocessed_priority_op: 0,
-        }
-    }
-
-    pub async fn get_pending_block(
-        &self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Option<SendablePendingBlock> {
-        let pending_block = storage
-            .chain()
-            .block_schema()
-            .load_pending_block()
-            .await
-            .unwrap_or_default()?;
-
-        if pending_block.number <= self.last_block_number {
-            // If after generating several pending block node generated
-            // full blocks, they may be sealed on the first iteration
-            // and stored pending block will be outdated.
-            // Thus, if the stored pending block has the lower number than
-            // last committed one, we just ignore it.
-            return None;
-        }
-
-        // We've checked that pending block is greater than the last committed block,
-        // but it must be greater exactly by 1.
-        assert_eq!(*pending_block.number, *self.last_block_number + 1);
-
-        Some(pending_block)
-    }
-
-    pub async fn restore_from_db(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<Self, anyhow::Error> {
-        let mut init_params = Self::new();
-        init_params.load_from_db(storage).await?;
-
-        Ok(init_params)
-    }
-
-    async fn load_account_tree(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<BlockNumber, anyhow::Error> {
-        let (last_cached_block_number, accounts) = if let Some((block, _)) = storage
-            .chain()
-            .block_schema()
-            .get_account_tree_cache()
-            .await?
-        {
-            storage
-                .chain()
-                .state_schema()
-                .load_committed_state(Some(block))
-                .await?
-        } else {
-            storage.chain().state_schema().load_verified_state().await?
-        };
-
-        for (id, account) in accounts {
-            self.insert_account(id, account);
-        }
-
-        if let Some(account_tree_cache) = storage
-            .chain()
-            .block_schema()
-            .get_account_tree_cache_block(last_cached_block_number)
-            .await?
-        {
-            self.tree
-                .set_internals(serde_json::from_value(account_tree_cache)?);
-        } else {
-            self.tree.root_hash();
-            let account_tree_cache = self.tree.get_internals();
-            storage
-                .chain()
-                .block_schema()
-                .store_account_tree_cache(
-                    last_cached_block_number,
-                    serde_json::to_value(account_tree_cache)?,
-                )
-                .await?;
-        }
-
-        let (block_number, accounts) = storage
-            .chain()
-            .state_schema()
-            .load_committed_state(None)
-            .await
-            .map_err(|e| anyhow::format_err!("couldn't load committed state: {}", e))?;
-
-        if block_number != last_cached_block_number {
-            if let Some((_, account_updates)) = storage
-                .chain()
-                .state_schema()
-                .load_state_diff(last_cached_block_number, Some(block_number))
-                .await?
-            {
-                let mut updated_accounts = account_updates
-                    .into_iter()
-                    .map(|(id, _)| id)
-                    .collect::<Vec<_>>();
-                updated_accounts.sort_unstable();
-                updated_accounts.dedup();
-                for idx in updated_accounts {
-                    if let Some(acc) = accounts.get(&idx).cloned() {
-                        self.insert_account(idx, acc);
-                    } else {
-                        self.remove_account(idx);
-                    }
-                }
-            }
-        }
-
-        // We have to load actual number of the last committed block, since above we load the block number from state,
-        // and in case of empty block being sealed (that may happen because of bug).
-        // Note that if this block is greater than the `block_number`, it means that some empty blocks were committed,
-        // so the root hash has not changed and we don't need to update the tree in order to get the right root hash.
-        let last_actually_committed_block_number = storage
-            .chain()
-            .block_schema()
-            .get_last_saved_block()
-            .await?;
-
-        let block_number = std::cmp::max(last_actually_committed_block_number, block_number);
-
-        if *block_number != 0 {
-            let storage_root_hash = storage
-                .chain()
-                .block_schema()
-                .get_block(block_number)
-                .await?
-                .expect("restored block must exist");
-            assert_eq!(
-                storage_root_hash.new_root_hash,
-                self.tree.root_hash(),
-                "restored root_hash is different"
-            );
-        }
-
-        Ok(block_number)
-    }
-
-    async fn load_from_db(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), anyhow::Error> {
-        let block_number = self.load_account_tree(storage).await?;
-        self.last_block_number = block_number;
-        self.unprocessed_priority_op =
-            Self::unprocessed_priority_op_id(storage, block_number).await?;
-        self.nfts = Self::load_nft_tokens(storage, block_number).await?;
-
-        vlog::info!(
-            "Loaded committed state: last block number: {}, unprocessed priority op: {}",
-            *self.last_block_number,
-            self.unprocessed_priority_op
-        );
-        Ok(())
-    }
-
-    pub async fn load_state_diff(
-        &mut self,
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), anyhow::Error> {
-        let state_diff = storage
-            .chain()
-            .state_schema()
-            .load_state_diff(self.last_block_number, None)
-            .await
-            .map_err(|e| anyhow::format_err!("failed to load committed state: {}", e))?;
-
-        if let Some((block_number, updates)) = state_diff {
-            for (id, update) in updates.into_iter() {
-                let updated_account = Account::apply_update(self.remove_account(id), update);
-                if let Some(account) = updated_account {
-                    self.insert_account(id, account);
-                }
-            }
-            self.unprocessed_priority_op =
-                Self::unprocessed_priority_op_id(storage, block_number).await?;
-            self.last_block_number = block_number;
-        }
-        Ok(())
-    }
-
-    pub fn insert_account(&mut self, id: AccountId, acc: Account) {
-        self.acc_id_by_addr.insert(acc.address, id);
-        self.tree.insert(*id, acc);
-    }
-
-    pub fn remove_account(&mut self, id: AccountId) -> Option<Account> {
-        if let Some(acc) = self.tree.remove(*id) {
-            self.acc_id_by_addr.remove(&acc.address);
-            Some(acc)
-        } else {
-            None
-        }
-    }
-
-    async fn load_nft_tokens(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-        block_number: BlockNumber,
-    ) -> anyhow::Result<HashMap<TokenId, NFT>> {
-        let nfts = storage
-            .chain()
-            .state_schema()
-            .load_committed_nft_tokens(Some(block_number))
-            .await?
-            .into_iter()
-            .map(|nft| {
-                let token: NFT = nft.into();
-                (token.id, token)
-            })
-            .collect();
-        Ok(nfts)
-    }
-
-    async fn unprocessed_priority_op_id(
-        storage: &mut zksync_storage::StorageProcessor<'_>,
-        block_number: BlockNumber,
-    ) -> Result<u64, anyhow::Error> {
-        let block = storage
-            .chain()
-            .block_schema()
-            .get_block(block_number)
-            .await?;
-
-        if let Some(block) = block {
-            Ok(block.processed_priority_ops.1)
-        } else {
-            Ok(0)
-        }
-    }
+    /// Queue of reverted blocks
+    /// They will be executed before the start of the StateKeeper
+    reverted_blocks: VecDeque<IncompleteBlock>,
 }
 
 impl ZkSyncStateKeeper {
+    /// Creates `ZkSyncStateKeeper` and `RootHashCalculator` objects.
+    /// Both objects are logically parts of the same block processing workflow, so it doesn't make much sense
+    /// to create them separately.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         initial_state: ZkSyncStateInitParams,
         fee_account_address: Address,
-        rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
+        tx_for_mempool: mpsc::Sender<MempoolBlocksRequest>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
-    ) -> Self {
-        assert!(!available_block_chunk_sizes.is_empty());
+        processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
+    ) -> (Self, RootHashCalculator) {
+        // We need two copies of state:
+        // 1. For state keeper itself (`sk_state`). We will apply all the updates from incomplete blocks on it in order
+        //    to get the state right before the pending block. Transactions from the pending block will be executed
+        //    separately below.
+        // 2. For root hash calculator (`rhc_state`). It will require the state at *last finished block*, so it can keep
+        //    working on calculating root hashes for incomplete blocks that we had before the restart.
+        let mut sk_state = initial_state.state.clone();
+        let rhc_state = initial_state.state.clone();
 
-        let is_sorted = available_block_chunk_sizes
-            .iter()
-            .tuple_windows()
-            .all(|(a, b)| a < b);
-        assert!(is_sorted);
+        // Update the state keeper copy of state.
+        let mut last_block = initial_state.last_block_number;
+        for job in &initial_state.root_hash_jobs {
+            // Ensure that all jobs are sequential and there are no gaps.
+            assert_eq!(
+                job.block,
+                last_block + 1,
+                "Unexpected incomplete block number. Started from block {}, \
+                got unexpected block {} instead of expected {}, root hash jobs queue: {:?}",
+                initial_state.last_block_number,
+                job.block,
+                last_block + 1,
+                &initial_state.root_hash_jobs
+            );
+            last_block = job.block;
 
-        let state = ZkSyncState::new(
-            initial_state.tree,
-            initial_state.acc_id_by_addr,
-            initial_state.last_block_number + 1,
-            initial_state.nfts,
+            sk_state.apply_account_updates(job.updates.clone());
+        }
+
+        // Create and fill the queue for root hash calculator.
+        let root_hash_queue = BlockRootHashJobQueue::new(initial_state.root_hash_jobs);
+        let root_hash_calculator = RootHashCalculator::new(
+            rhc_state,
+            root_hash_queue.clone(),
+            tx_for_commitments.clone(),
+            initial_state.last_block_number,
         );
 
-        let (fee_account_id, _) = state
+        let (fee_account_id, _) = sk_state
             .get_account_by_address(&fee_account_address)
             .expect("Fee account should be present in the account tree");
-        // Keeper starts with the NEXT block
-        // we leave space for last tx
-        let mut be_bytes = [0u8; 32];
-        state
-            .root_hash()
-            .into_repr()
-            .write_be(be_bytes.as_mut())
-            .expect("Write commit bytes");
-        let previous_root_hash = H256::from(be_bytes);
-        let keeper = ZkSyncStateKeeper {
-            state,
+
+        let config = StateKeeperConfig::new(
             fee_account_id,
-            current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
-            rx_for_blocks,
-            tx_for_commitments,
-            pending_block: PendingBlock::new(
-                initial_state.unprocessed_priority_op,
-                &available_block_chunk_sizes,
-                previous_root_hash,
-                system_time_timestamp(),
-            ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
+        );
 
-            success_txs_pending_len: 0,
-            failed_txs_pending_len: 0,
+        let pending_block = {
+            // Keeper starts with the NEXT block
+            let current_block = last_block + 1;
+
+            PendingBlock::new(
+                current_block,
+                initial_state.unprocessed_priority_op,
+                config.max_block_size(),
+                system_time_timestamp(),
+            )
         };
 
-        let root = keeper.state.root_hash();
-        vlog::info!("created state keeper, root hash = {}", root);
+        let mut keeper = ZkSyncStateKeeper {
+            state: sk_state,
+            pending_block,
+            config,
 
-        keeper
+            tx_for_commitments,
+            tx_for_mempool,
+            processed_tx_events_sender,
+
+            root_hash_queue,
+            reverted_blocks: initial_state.reverted_blocks.clone(),
+        };
+        keeper.initialize(initial_state.pending_block);
+
+        (keeper, root_hash_calculator)
     }
 
-    pub async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
+    // TODO (ZKS-821): We should get rid of this function and create state keeper in a ready-to-go state.
+    // Currently we partially initialize state keeper, and then finalize initialization when it's actually started
+    // which is not a good practice.
+    fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
         let start = Instant::now();
+
         if let Some(pending_block) = pending_block {
             // Transform executed operations into non-executed, so they will be executed again.
             // Since it's a pending block, the state updates were not actually applied in the
@@ -465,32 +179,63 @@ impl ZkSyncStateKeeper {
             // `apply_txs_batch` to preserve the original execution order. Otherwise there may
             // be a state corruption, if e.g. `Deposit` will be executed before `TransferToNew`
             // and account IDs will change.
+
+            // Sanity check: ensure that we start from a "clean" state.
+            if !self.pending_block.is_empty() {
+                panic!("State keeper was initialized from a dirty state. Pending block was expected to \
+                       be empty, but got this instead: \n \
+                       Block number: {} \n \
+                       Pending block state: {:?}",
+                    self.pending_block.number, self.pending_block
+                );
+            }
+
+            // We have to take the timestamp from the pending block, since otherwise already executed
+            // transactions may fail because of invalid `valid_from` timestamp.
+            self.pending_block.timestamp = pending_block.timestamp;
+            self.pending_block.failed_txs = pending_block.failed_txs.clone();
+
             let mut txs_count = 0;
             let mut priority_op_count = 0;
-            for operation in pending_block.success_operations {
+            let success_operations_count = pending_block.success_operations.len();
+            for operation in pending_block.success_operations.clone() {
                 match operation {
                     ExecutedOperations::Tx(tx) => {
                         self.apply_tx(&tx.signed_tx)
-                            .expect("Tx from the restored pending block was not executed");
+                            .assert_included("Tx from the restored pending block was not executed");
                         txs_count += 1;
                     }
                     ExecutedOperations::PriorityOp(op) => {
-                        self.apply_priority_op(op.priority_op)
-                            .expect("Priority op from the restored pending block was not executed");
+                        self.apply_priority_op(&op.priority_op).assert_included(
+                            "Priority op from the restored pending block was not executed",
+                        );
                         priority_op_count += 1;
                     }
                 }
             }
+
+            // After we executed transactions, we may renew counters for already sent operations.
+            // These updates were already processed, as we've loaded the block from the database.
             self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
+
+            // Sanity check: every transaction we applied should succeed, since we already stored it in the database
+            // as successfully executed.
+            if success_operations_count != self.pending_block.success_operations.len() {
+                panic!(
+                    "After execution of pending block some transactions unexpectedly failed:\n \
+                    Block number: {} \n \
+                    Initial pending block state: {:?}\n \
+                    Pending block state: {:?}",
+                    self.pending_block.number, pending_block, self.pending_block
+                );
+            }
 
             vlog::info!(
                 "Executed restored proposed block: {} transactions, {} priority operations, {} failed transactions",
                 txs_count,
                 priority_op_count,
-                pending_block.failed_txs.len()
+                self.pending_block.failed_txs.len()
             );
-            self.pending_block.failed_txs = pending_block.failed_txs;
-            self.pending_block.timestamp = pending_block.timestamp;
         } else {
             vlog::info!("There is no pending block to restore");
         }
@@ -498,132 +243,134 @@ impl ZkSyncStateKeeper {
         metrics::histogram!("state_keeper.initialize", start.elapsed());
     }
 
-    pub async fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
-        let start = Instant::now();
-        let mut storage = pool
-            .access_storage()
-            .await
-            .expect("db connection failed for statekeeper");
-        let mut transaction = storage
-            .start_transaction()
-            .await
-            .expect("unable to create db transaction in statekeeper");
-
-        let (last_committed, mut accounts) = transaction
-            .chain()
-            .state_schema()
-            .load_committed_state(None)
-            .await
-            .expect("db failed");
-
-        assert!(
-            *last_committed == 0 && accounts.is_empty(),
-            "db should be empty"
-        );
-
-        vlog::info!("Adding special token");
-        transaction
-            .tokens_schema()
-            .store_token(Token {
-                id: NFT_TOKEN_ID,
-                symbol: "SPECIAL".to_string(),
-                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
-                decimals: 18,
-                is_nft: true, // TODO: ZKS-635
-            })
-            .await
-            .expect("failed to store special token");
-        vlog::info!("Special token added");
-
-        let fee_account = Account::default_with_address(fee_account_address);
-        let db_create_fee_account = AccountUpdate::Create {
-            address: *fee_account_address,
-            nonce: fee_account.nonce,
-        };
-        accounts.insert(AccountId(0), fee_account);
-
-        let (mut special_account, db_create_special_account) =
-            Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
-        special_account.set_balance(NFT_TOKEN_ID, num::BigUint::from(MIN_NFT_TOKEN_ID));
-        let db_set_special_account_balance = AccountUpdate::UpdateBalance {
-            old_nonce: special_account.nonce,
-            new_nonce: special_account.nonce,
-            balance_update: (
-                NFT_TOKEN_ID,
-                num::BigUint::from(0u64),
-                num::BigUint::from(MIN_NFT_TOKEN_ID),
-            ),
-        };
-        accounts.insert(NFT_STORAGE_ACCOUNT_ID, special_account);
-
-        transaction
-            .chain()
-            .state_schema()
-            .commit_state_update(
-                BlockNumber(0),
-                &[
-                    (AccountId(0), db_create_fee_account),
-                    db_create_special_account[0].clone(),
-                    (NFT_STORAGE_ACCOUNT_ID, db_set_special_account_balance),
-                ],
-                0,
-            )
-            .await
-            .expect("db fail");
-        transaction
-            .chain()
-            .state_schema()
-            .apply_state_update(BlockNumber(0))
-            .await
-            .expect("db fail");
-
-        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
-        let root_hash = state.root_hash();
-        transaction
-            .chain()
-            .block_schema()
-            .save_genesis_block(root_hash)
-            .await
-            .expect("db fail");
-
-        transaction
-            .commit()
-            .await
-            .expect("Unable to commit transaction in statekeeper");
-        vlog::info!("Genesis block created, state: {}", state.root_hash());
-        println!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
-        metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
+    pub async fn execute_reverted_blocks(&mut self) {
+        while let Some(block) = self.reverted_blocks.pop_front() {
+            self.execute_incomplete_block(block).await;
+        }
     }
 
-    async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
-        self.initialize(pending_block).await;
-
-        while let Some(req) = self.rx_for_blocks.next().await {
+    // Run StateKeeper with manual generating and executing blocks and miniblocks
+    #[cfg(feature = "testkit")]
+    pub async fn run_for_testkit(
+        mut self,
+        mut rx_for_blocks: mpsc::Receiver<StateKeeperTestkitRequest>,
+    ) {
+        while let Some(req) = rx_for_blocks.next().await {
             match req {
-                StateKeeperRequest::GetAccount(addr, sender) => {
-                    sender.send(self.account(&addr)).unwrap_or_default();
+                StateKeeperTestkitRequest::GetAccount(address, sender) => {
+                    let account = self.state.get_account_by_address(&address);
+                    sender.send(account).unwrap_or_default();
                 }
-                StateKeeperRequest::GetPendingBlockTimestamp(sender) => {
-                    sender
-                        .send(self.pending_block.timestamp)
-                        .unwrap_or_default();
-                }
-                StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
-                    sender
-                        .send(self.current_unprocessed_priority_op)
-                        .unwrap_or_default();
-                }
-                StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
-                    self.execute_proposed_block(proposed_block).await;
-                }
-                StateKeeperRequest::SealBlock => {
+                StateKeeperTestkitRequest::SealBlock => {
                     self.seal_pending_block().await;
                 }
-                StateKeeperRequest::GetCurrentState(sender) => {
+                StateKeeperTestkitRequest::GetCurrentState(sender) => {
                     sender.send(self.get_current_state()).unwrap_or_default();
+                }
+                StateKeeperTestkitRequest::ExecuteMiniBlock(block) => {
+                    self.execute_proposed_block(block).await;
                 }
             }
         }
+    }
+
+    // Generate and execute new miniblock every miniblock_interval
+    async fn run(mut self, miniblock_interval: Duration) {
+        let mut timer = time::interval(miniblock_interval);
+        let mut last_iteration = Instant::now();
+        loop {
+            timer.tick().await;
+
+            let start = Instant::now();
+
+            // `.throttle()` method will postpone the next miniblock iteration if currently we have too
+            // many blocks for which root hash is not yet calculated.
+            self.root_hash_queue.throttle().await;
+            metrics::histogram!("state_keeper.throttle", start.elapsed());
+
+            let block_timestamp = self.pending_block.timestamp;
+            let proposed_block = self.propose_new_block(block_timestamp).await;
+            metrics::histogram!("miniblock_size", proposed_block.size() as f64);
+
+            // Report timings between two miniblocks.
+            metrics::histogram!("miniblock_interval", last_iteration.elapsed());
+            last_iteration = Instant::now();
+
+            self.execute_proposed_block(proposed_block).await;
+        }
+    }
+
+    async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
+        let start = Instant::now();
+
+        let (response_sender, receiver) = oneshot::channel();
+
+        // These txs will be excluded from query result as already executed.
+        // By giving these hashes to the mempool,
+        // we won't receive back transactions that we already executed in the current block.
+
+        let executed_txs = self
+            .pending_block
+            .failed_txs
+            .iter()
+            .map(|tx| tx.signed_tx.hash())
+            .chain(
+                self.pending_block
+                    .success_operations
+                    .iter()
+                    .filter_map(|op| op.get_executed_tx().map(|tx| tx.signed_tx.hash())),
+            )
+            .collect();
+
+        let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {
+            last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
+            block_timestamp,
+            response_sender,
+            executed_txs,
+        });
+
+        self.tx_for_mempool
+            .send(mempool_req)
+            .await
+            .expect("mempool receiver dropped");
+
+        let block = receiver.await.expect("Mempool new block request failed");
+        metrics::histogram!("state_keeper.propose_new_block", start.elapsed());
+        block
+    }
+
+    async fn execute_incomplete_block(&mut self, block: IncompleteBlock) {
+        let (before_priority_op, after_priority_op) = block.processed_priority_ops;
+        self.pending_block = PendingBlock::new(
+            block.block_number,
+            before_priority_op,
+            self.config.max_block_size(),
+            block.timestamp,
+        );
+
+        for tx in block.block_transactions {
+            match tx {
+                ExecutedOperations::Tx(tx) => {
+                    if let ApplyOutcome::NotIncluded = self.apply_tx(&tx.signed_tx) {
+                        // It's not necessary to include all txs because we can change the rules, cause of some bugs.
+                        // However, it's not a common situation in most of the cases it should be applied as is
+                        vlog::error!("The transaction was not included in a block when a block recovery was performed: {:?}", &tx.signed_tx)
+                    }
+                }
+                ExecutedOperations::PriorityOp(op) => self
+                    .apply_priority_op(&op.priority_op)
+                    .assert_included("Should be applied"),
+            }
+        }
+        assert_eq!(
+            self.pending_block.unprocessed_priority_op_current, after_priority_op,
+            "Unexpected executed priority operations amount after applying reverted blocks."
+        );
+        self.seal_pending_block().await;
+        self.tx_for_commitments
+            .send(CommitRequest::RemoveRevertedBlock(block.block_number))
+            .await
+            .expect("committer receiver dropped");
     }
 
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
@@ -643,11 +390,11 @@ impl ZkSyncStateKeeper {
             .into_iter()
             .collect::<VecDeque<_>>();
         while let Some(priority_op) = priority_op_queue.pop_front() {
-            match self.apply_priority_op(priority_op) {
-                Ok(exec_op) => {
+            match self.apply_priority_op(&priority_op) {
+                ApplyOutcome::Included(exec_op) => {
                     executed_ops.push(exec_op);
                 }
-                Err(priority_op) => {
+                ApplyOutcome::NotIncluded => {
                     self.seal_pending_block().await;
 
                     priority_op_queue.push_front(priority_op);
@@ -660,10 +407,10 @@ impl ZkSyncStateKeeper {
             match &variant {
                 SignedTxVariant::Tx(tx) => {
                     match self.apply_tx(tx) {
-                        Ok(exec_op) => {
+                        ApplyOutcome::Included(exec_op) => {
                             executed_ops.push(exec_op);
                         }
-                        Err(_) => {
+                        ApplyOutcome::NotIncluded => {
                             // We could not execute the tx due to either of block size limit
                             // or the withdraw operations limit, so we seal this block and
                             // the last transaction will go to the next block instead.
@@ -675,10 +422,10 @@ impl ZkSyncStateKeeper {
                 }
                 SignedTxVariant::Batch(batch) => {
                     match self.apply_batch(&batch.txs, batch.batch_id) {
-                        Ok(mut ops) => {
+                        ApplyOutcome::Included(mut ops) => {
                             executed_ops.append(&mut ops);
                         }
-                        Err(_) => {
+                        ApplyOutcome::NotIncluded => {
                             // We could not execute the batch tx due to either of block size limit
                             // or the withdraw operations limit, so we seal this block and
                             // the last transaction will go to the next block instead.
@@ -691,24 +438,37 @@ impl ZkSyncStateKeeper {
             }
         }
 
-        if !self.pending_block.success_operations.is_empty() {
-            self.pending_block.pending_block_iteration += 1;
+        // TODO (ZKS-821): We can store events in `committer` (as it's already responsible for applying results of
+        // the block execution), there is no need in additional actor for that.
+        if !executed_ops.is_empty() {
+            let _ = self
+                .processed_tx_events_sender
+                .send(ProcessedOperations {
+                    block_number: self.pending_block.number,
+                    executed_ops,
+                })
+                .await;
         }
+
+        // Iteration is complete, increment it in the pending block.
+        self.pending_block.increment_iteration();
 
         // If pending block contains withdrawals we seal it faster
         let max_miniblock_iterations = if self.pending_block.fast_processing_required {
-            self.fast_miniblock_iterations
+            self.config.fast_miniblock_iterations
         } else {
-            self.max_miniblock_iterations
+            self.config.max_miniblock_iterations
         };
-        if self.pending_block.chunks_left == 0
-            || self.pending_block.pending_block_iteration > max_miniblock_iterations
-        {
+
+        // Check whether we should seal this block and start processing the next one, or we just need
+        // to persist the pending block.
+        if self.pending_block.should_seal(max_miniblock_iterations) {
             self.seal_pending_block().await;
         } else {
-            // We've already incremented the pending block iteration, so this iteration will count towards
-            // reaching the block commitment timeout.
-            // However, we don't want to pointlessly save the same block again and again.
+            // State keeper may process empty blocks (or blocks containing rejected transactions only), and it's an
+            // important part of its logic: timeout for sealing the block is expressed in the amount of processing
+            // iterations. If enough iterations pases, block should be sealed even if it's not full. However, we don't
+            // want to notify any external actor and write to the database if this iteration was "empty".
             if !empty_proposed_block {
                 self.store_pending_block().await;
             }
@@ -718,14 +478,11 @@ impl ZkSyncStateKeeper {
     }
 
     // Err if there is no space in current block
-    fn apply_priority_op(
-        &mut self,
-        priority_op: PriorityOp,
-    ) -> Result<ExecutedOperations, PriorityOp> {
+    fn apply_priority_op(&mut self, priority_op: &PriorityOp) -> ApplyOutcome<ExecutedOperations> {
         let start = Instant::now();
         let chunks_needed = priority_op.data.chunks();
         if self.pending_block.chunks_left < chunks_needed {
-            return Err(priority_op);
+            return ApplyOutcome::NotIncluded;
         }
 
         // Check if adding this transaction to the block won't make the contract operations
@@ -733,6 +490,8 @@ impl ZkSyncStateKeeper {
         let non_executed_op = self
             .state
             .priority_op_to_zksync_op(priority_op.data.clone());
+
+        #[allow(clippy::question_mark)] // False positive, we aren't returning `Result`.
         if self
             .pending_block
             .gas_counter
@@ -741,97 +500,39 @@ impl ZkSyncStateKeeper {
         {
             // We've reached the gas limit, seal the block.
             // This transaction will go into the next one.
-            return Err(priority_op);
+            return ApplyOutcome::NotIncluded;
         }
 
         let OpSuccess {
             fee,
-            mut updates,
+            updates,
             executed_op,
         } = self.state.execute_priority_op(priority_op.data.clone());
-
-        self.pending_block.chunks_left -= chunks_needed;
-        self.pending_block.account_updates.append(&mut updates);
-        if let Some(fee) = fee {
-            self.pending_block.collected_fees.push(fee);
-        }
         let block_index = self.pending_block.pending_op_block_index;
-        self.pending_block.pending_op_block_index += 1;
 
         let exec_result = ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
             op: executed_op,
-            priority_op,
+            priority_op: priority_op.clone(),
             block_index,
             created_at: chrono::Utc::now(),
         }));
-        self.pending_block
-            .success_operations
-            .push(exec_result.clone());
-        self.current_unprocessed_priority_op += 1;
+
+        self.pending_block.add_successful_execution(
+            chunks_needed,
+            updates,
+            fee,
+            exec_result.clone(),
+        );
 
         metrics::histogram!("state_keeper.apply_priority_op", start.elapsed());
-        Ok(exec_result)
-    }
-
-    /// Checks that block timestamp is valid for the execution of the transaction.
-    /// Returns a corresponding error if the transaction can't be executed in the block because of an invalid timestamp.
-    fn check_transaction_timestamps(
-        &mut self,
-        tx: ZkSyncTx,
-        block_timestamp: u64,
-    ) -> Result<(), OpError> {
-        let time_range = match tx {
-            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::ForcedExit(tx) => tx.time_range,
-            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
-            ZkSyncTx::Close(tx) => tx.time_range,
-            ZkSyncTx::MintNFT(_) => Default::default(),
-            ZkSyncTx::Swap(tx) => tx.time_range(),
-            ZkSyncTx::WithdrawNFT(tx) => tx.time_range,
-        };
-        if !time_range.is_valid(block_timestamp) {
-            return Err(OpError::TimestampError);
-        }
-        Ok(())
-    }
-
-    fn execute_txs_batch(
-        &mut self,
-        txs: &[SignedZkSyncTx],
-        block_timestamp: u64,
-    ) -> Vec<Result<OpSuccess, TxBatchError>> {
-        for (id, tx) in txs.iter().enumerate() {
-            if let Err(error) = self.check_transaction_timestamps(tx.tx.clone(), block_timestamp) {
-                // Create the same error for each transaction.
-                let errors = (0..txs.len())
-                    .map(|_| {
-                        Err(TxBatchError {
-                            failed_tx_index: id + 1,
-                            reason: error.clone(),
-                        })
-                    })
-                    .collect();
-
-                // Stop execution and return an error.
-                return errors;
-            }
-        }
-
-        self.state.execute_txs_batch(txs)
-    }
-
-    fn execute_tx(&mut self, tx: ZkSyncTx, block_timestamp: u64) -> Result<OpSuccess, OpError> {
-        self.check_transaction_timestamps(tx.clone(), block_timestamp)?;
-
-        self.state.execute_tx(tx)
+        ApplyOutcome::Included(exec_result)
     }
 
     fn apply_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
         batch_id: i64,
-    ) -> Result<Vec<ExecutedOperations>, ()> {
+    ) -> ApplyOutcome<Vec<ExecutedOperations>> {
         metrics::gauge!("tx_batch_size", txs.len() as f64);
         let start = Instant::now();
 
@@ -840,7 +541,7 @@ impl ZkSyncStateKeeper {
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
-            return Err(());
+            return ApplyOutcome::NotIncluded;
         }
 
         let ops: Vec<_> = txs
@@ -869,37 +570,33 @@ impl ZkSyncStateKeeper {
                 executed_operations.push(exec_result);
             }
             metrics::histogram!("state_keeper.apply_batch", start.elapsed());
-            return Ok(executed_operations);
+            return ApplyOutcome::Included(executed_operations);
         }
 
         // If we can't add the tx to the block due to the gas limit, we return this tx,
         // seal the block and execute it again.
         if !self.pending_block.gas_counter.can_include(&ops) {
-            return Err(());
+            return ApplyOutcome::NotIncluded;
         }
 
-        let all_updates = self.execute_txs_batch(txs, self.pending_block.timestamp);
+        let all_updates = self
+            .state
+            .execute_txs_batch(txs, self.pending_block.timestamp);
 
         for (tx, tx_updates) in txs.iter().zip(all_updates) {
             match tx_updates {
                 Ok(OpSuccess {
                     fee,
-                    mut updates,
+                    updates,
                     executed_op,
                 }) => {
                     self.pending_block
                         .gas_counter
                         .add_op(&executed_op)
                         .expect("We have already checked that we can include this tx");
+                    let chunks_used = executed_op.chunks();
 
-                    self.pending_block.chunks_left -= executed_op.chunks();
-                    self.pending_block.account_updates.append(&mut updates);
-                    if let Some(fee) = fee {
-                        self.pending_block.collected_fees.push(fee);
-                    }
                     let block_index = self.pending_block.pending_op_block_index;
-                    self.pending_block.pending_op_block_index += 1;
-
                     let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
                         signed_tx: tx.clone(),
                         success: true,
@@ -909,13 +606,25 @@ impl ZkSyncStateKeeper {
                         created_at: chrono::Utc::now(),
                         batch_id: Some(batch_id),
                     }));
-                    self.pending_block
-                        .success_operations
-                        .push(exec_result.clone());
+
+                    self.pending_block.add_successful_execution(
+                        chunks_used,
+                        updates,
+                        fee,
+                        exec_result.clone(),
+                    );
+
                     executed_operations.push(exec_result);
                 }
                 Err(e) => {
                     vlog::warn!("Failed to execute transaction: {:?}, {}", tx, e);
+
+                    let labels = vec![
+                        ("stage", "state".to_string()),
+                        ("error", e.reason.to_string()),
+                    ];
+                    metrics::increment_counter!("rejected_txs", &labels);
+
                     let failed_tx = ExecutedTx {
                         signed_tx: tx.clone(),
                         success: false,
@@ -933,17 +642,17 @@ impl ZkSyncStateKeeper {
         }
 
         metrics::histogram!("state_keeper.apply_batch", start.elapsed());
-        Ok(executed_operations)
+        ApplyOutcome::Included(executed_operations)
     }
 
-    fn apply_tx(&mut self, tx: &SignedZkSyncTx) -> Result<ExecutedOperations, ()> {
+    fn apply_tx(&mut self, tx: &SignedZkSyncTx) -> ApplyOutcome<ExecutedOperations> {
         let start = Instant::now();
-        let chunks_needed = self.state.chunks_for_tx(&tx);
+        let chunks_needed = self.state.chunks_for_tx(tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
-            return Err(());
+            return ApplyOutcome::NotIncluded;
         }
 
         // Check if adding this transaction to the block won't make the contract operations
@@ -959,7 +668,7 @@ impl ZkSyncStateKeeper {
             {
                 // We've reached the gas limit, seal the block.
                 // This transaction will go into the next one.
-                return Err(());
+                return ApplyOutcome::NotIncluded;
             }
         }
 
@@ -970,12 +679,14 @@ impl ZkSyncStateKeeper {
             }
         }
 
-        let tx_updates = self.execute_tx(tx.tx.clone(), self.pending_block.timestamp);
+        let tx_updates = self
+            .state
+            .execute_tx(tx.tx.clone(), self.pending_block.timestamp);
 
         let exec_result = match tx_updates {
             Ok(OpSuccess {
                 fee,
-                mut updates,
+                updates,
                 executed_op,
             }) => {
                 self.pending_block
@@ -983,14 +694,7 @@ impl ZkSyncStateKeeper {
                     .add_op(&executed_op)
                     .expect("We have already checked that we can include this tx");
 
-                self.pending_block.chunks_left -= chunks_needed;
-                self.pending_block.account_updates.append(&mut updates);
-                if let Some(fee) = fee {
-                    self.pending_block.collected_fees.push(fee);
-                }
                 let block_index = self.pending_block.pending_op_block_index;
-                self.pending_block.pending_op_block_index += 1;
-
                 let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
                     signed_tx: tx.clone(),
                     success: true,
@@ -1000,9 +704,14 @@ impl ZkSyncStateKeeper {
                     created_at: chrono::Utc::now(),
                     batch_id: None,
                 }));
-                self.pending_block
-                    .success_operations
-                    .push(exec_result.clone());
+
+                self.pending_block.add_successful_execution(
+                    chunks_needed,
+                    updates,
+                    fee,
+                    exec_result.clone(),
+                );
+
                 exec_result
             }
             Err(e) => {
@@ -1016,101 +725,127 @@ impl ZkSyncStateKeeper {
                     created_at: chrono::Utc::now(),
                     batch_id: None,
                 };
+                let labels = vec![("stage", "state".to_string()), ("error", e.to_string())];
+                metrics::increment_counter!("rejected_txs", &labels);
                 self.pending_block.failed_txs.push(failed_tx.clone());
                 ExecutedOperations::Tx(Box::new(failed_tx))
             }
         };
 
         metrics::histogram!("state_keeper.apply_tx", start.elapsed());
-        Ok(exec_result)
+        ApplyOutcome::Included(exec_result)
     }
 
     /// Finalizes the pending block, transforming it into a full block.
     async fn seal_pending_block(&mut self) {
         let start = Instant::now();
 
+        // Before sealing the block, we need to store the pending block in order to
+        // save all the new transactions to the database.
+        // Even though it will be removed once the seal request is processed, having a consistent
+        // and predictable flow (before we store the sealed block header, the state is always updated)
+        // is good for stability right now. It can be optimized if it'd be proven inefficient enough
+        // in the future though (we can only save the updates, not the pending block header).
+        self.store_pending_block().await;
+
         // Apply fees of pending block
-        let fee_updates = self
-            .state
-            .collect_fee(&self.pending_block.collected_fees, self.fee_account_id);
+        let fee_updates = self.state.collect_fee(
+            &self.pending_block.collected_fees,
+            self.config.fee_account_id,
+        );
         self.pending_block
             .account_updates
             .extend(fee_updates.into_iter());
 
-        let mut pending_block = std::mem::replace(
-            &mut self.pending_block,
-            PendingBlock::new(
-                self.current_unprocessed_priority_op,
-                &self.available_block_chunk_sizes,
-                H256::default(),
-                system_time_timestamp(),
-            ),
+        // TODO (ZKS-821): Currently the logic of this procedure is obscure and error-prone.
+        // I've met multiple bugs trying to adapt it because it works at the same time with the "old"
+        // pending block and "new" pending block. Actions "create block to be sealed" and "update pending block"
+        // should be spearated.
+        let current_block = self.pending_block.number;
+        let next_unprocessed_priority_op = self.pending_block.unprocessed_priority_op_current;
+        let new_pending_block = PendingBlock::new(
+            self.pending_block.number + 1,
+            next_unprocessed_priority_op,
+            self.config.max_block_size(),
+            system_time_timestamp(),
         );
-        // Once block is sealed, we refresh the counters for the next block.
-        self.success_txs_pending_len = 0;
-        self.failed_txs_pending_len = 0;
 
-        let mut block_transactions = pending_block.success_operations;
+        let mut block_transactions = self.pending_block.success_operations.clone(); // TODO (ZKS-821): Avoid cloning.
         block_transactions.extend(
-            pending_block
+            self.pending_block
                 .failed_txs
-                .into_iter()
+                .iter()
+                .cloned() // TODO (ZKS-821): Avoid cloning.
                 .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
         );
 
-        let commit_gas_limit = pending_block.gas_counter.commit_gas_limit();
-        let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
+        let commit_gas_limit = self.pending_block.gas_counter.commit_gas_limit();
+        let verify_gas_limit = self.pending_block.gas_counter.verify_gas_limit();
 
-        let block = Block::new_from_available_block_sizes(
-            self.state.block_number,
-            self.state.root_hash(),
-            self.fee_account_id,
+        let block = IncompleteBlock::new_from_available_block_sizes(
+            self.pending_block.number,
+            self.config.fee_account_id,
             block_transactions,
             (
-                pending_block.unprocessed_priority_op_before,
-                self.current_unprocessed_priority_op,
+                self.pending_block.unprocessed_priority_op_before,
+                self.pending_block.unprocessed_priority_op_current,
             ),
-            &self.available_block_chunk_sizes,
+            &self.config.available_block_chunk_sizes,
             commit_gas_limit,
             verify_gas_limit,
-            pending_block.previous_block_root_hash,
-            pending_block.timestamp,
+            self.pending_block.timestamp,
         );
 
-        self.pending_block.previous_block_root_hash = block.get_eth_encoded_root();
-
+        // Update the fields of the new pending block.
         let block_metadata = BlockMetadata {
-            fast_processing: pending_block.fast_processing_required,
+            fast_processing: self.pending_block.fast_processing_required,
         };
+
+        for tx in &block.block_transactions {
+            let labels = vec![
+                ("stage", "seal_block".to_string()),
+                ("name", tx.variance_name()),
+                ("token", tx.token_id().to_string()),
+            ];
+            metrics::histogram!("process_tx", tx.elapsed(), &labels);
+        }
+        metrics::histogram!(
+            "process_block",
+            block.elapsed(),
+            "stage" => "seal"
+        );
 
         let block_commit_request = BlockCommitRequest {
             block,
             block_metadata,
-            accounts_updated: pending_block.account_updates.clone(),
         };
-        let first_update_order_id = pending_block.stored_account_updates;
-        let account_updates = pending_block.account_updates[first_update_order_id..].to_vec();
-        let applied_updates_request = AppliedUpdatesRequest {
-            account_updates,
-            first_update_order_id,
+        let applied_updates_request = self.pending_block.prepare_applied_updates_request();
+        let root_hash_job = BlockRootHashJob {
+            block: current_block,
+            updates: self.pending_block.account_updates.clone(),
         };
-        pending_block.stored_account_updates = pending_block.account_updates.len();
-        *self.state.block_number += 1;
 
         vlog::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
             *block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),
-            pending_block.chunks_left,
-            pending_block.pending_block_iteration
+            self.pending_block.chunks_left,
+            self.pending_block.pending_block_iteration
+        );
+        metrics::gauge!(
+            "last_processed_block",
+            block_commit_request.block.block_number.0 as f64,
+            "stage" => "state_keeper"
         );
 
-        let commit_request = CommitRequest::Block((block_commit_request, applied_updates_request));
+        let commit_request =
+            CommitRequest::SealIncompleteBlock((block_commit_request, applied_updates_request));
+        self.pending_block = new_pending_block;
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
-
+        self.root_hash_queue.push(root_hash_job).await;
         metrics::histogram!("state_keeper.seal_pending_block", start.elapsed());
     }
 
@@ -1119,39 +854,8 @@ impl ZkSyncStateKeeper {
     async fn store_pending_block(&mut self) {
         let start = Instant::now();
 
-        // We want include only the newly appeared transactions, since the older ones are already persisted in the
-        // database.
-        // This is a required optimization, since otherwise time to process the pending block may grow without any
-        // limits if we'll be spammed by incorrect transactions (we don't have a limit for an amount of rejected
-        // transactions in the block).
-        let new_success_operations =
-            self.pending_block.success_operations[self.success_txs_pending_len..].to_vec();
-        let new_failed_operations =
-            self.pending_block.failed_txs[self.failed_txs_pending_len..].to_vec();
-
-        self.success_txs_pending_len = self.pending_block.success_operations.len();
-        self.failed_txs_pending_len = self.pending_block.failed_txs.len();
-
-        // Create a pending block object to send.
-        // Note that failed operations are not included, as per any operation failure
-        // the full block is created immediately.
-        let pending_block = SendablePendingBlock {
-            number: self.state.block_number,
-            chunks_left: self.pending_block.chunks_left,
-            unprocessed_priority_op_before: self.pending_block.unprocessed_priority_op_before,
-            pending_block_iteration: self.pending_block.pending_block_iteration,
-            success_operations: new_success_operations,
-            failed_txs: new_failed_operations,
-            previous_block_root_hash: self.pending_block.previous_block_root_hash,
-            timestamp: self.pending_block.timestamp,
-        };
-        let first_update_order_id = self.pending_block.stored_account_updates;
-        let account_updates = self.pending_block.account_updates[first_update_order_id..].to_vec();
-        let applied_updates_request = AppliedUpdatesRequest {
-            account_updates,
-            first_update_order_id,
-        };
-        self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
+        let pending_block = self.pending_block.prepare_for_storing();
+        let applied_updates_request = self.pending_block.prepare_applied_updates_request();
 
         vlog::debug!(
             "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",
@@ -1170,23 +874,20 @@ impl ZkSyncStateKeeper {
         metrics::histogram!("state_keeper.store_pending_block", start.elapsed());
     }
 
-    fn account(&self, address: &Address) -> Option<(AccountId, Account)> {
-        self.state.get_account_by_address(address)
-    }
     pub fn get_current_state(&self) -> ZkSyncStateInitParams {
         ZkSyncStateInitParams {
-            tree: self.state.get_balance_tree(),
-            acc_id_by_addr: self.state.get_account_addresses(),
-            nfts: self.state.nfts.clone(),
-            last_block_number: self.state.block_number - 1,
-            unprocessed_priority_op: self.current_unprocessed_priority_op,
+            state: self.state.clone(),
+            last_block_number: self.pending_block.number - 1,
+            unprocessed_priority_op: self.pending_block.unprocessed_priority_op_current,
+
+            pending_block: None,
+            root_hash_jobs: Vec::new(),
+            reverted_blocks: self.reverted_blocks.clone(),
         }
     }
 }
+
 #[must_use]
-pub fn start_state_keeper(
-    sk: ZkSyncStateKeeper,
-    pending_block: Option<SendablePendingBlock>,
-) -> JoinHandle<()> {
-    tokio::spawn(sk.run(pending_block))
+pub fn start_state_keeper(sk: ZkSyncStateKeeper, miniblock_interval: Duration) -> JoinHandle<()> {
+    tokio::spawn(sk.run(miniblock_interval))
 }

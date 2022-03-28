@@ -9,21 +9,19 @@ use zksync_api_types::{
     },
     Either,
 };
-use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
-    block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
+    block::{Block, BlockMetadata, ExecutedOperations, IncompleteBlock, PendingBlock},
     event::block::BlockStatus,
-    AccountId, BlockNumber, Fr, ZkSyncOp,
+    AccountId, BlockNumber, Fr, ZkSyncOp, H256, U256,
 };
 // Local imports
 use self::records::{
     AccountTreeCache, BlockTransactionItem, StorageBlock, StorageBlockDetails,
-    StorageBlockMetadata, StoragePendingBlock, TransactionItem,
+    StorageBlockMetadata, StoragePendingBlock, StorageRootHash, TransactionItem,
 };
 use crate::{
-    chain::account::records::EthAccountType,
     chain::operations::{
         records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
@@ -31,6 +29,7 @@ use crate::{
         },
         OperationsSchema,
     },
+    chain::{account::records::EthAccountType, block::records::StorageIncompleteBlock},
     QueryResult, StorageProcessor,
 };
 
@@ -68,14 +67,34 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         } else {
                             EthAccountType::Owned
                         };
+
+                        let current_type = transaction
+                            .chain()
+                            .account_schema()
+                            .account_type_by_id(tx.account_id)
+                            .await?;
+
+                        let new_account_type = match (current_type, account_type) {
+                            // You can not change No2FA to Owned here
+                            (Some(EthAccountType::No2FA(hash)), EthAccountType::Owned) => {
+                                EthAccountType::No2FA(hash)
+                            }
+                            _ => account_type,
+                        };
+
                         transaction
                             .chain()
                             .account_schema()
-                            .set_account_type(tx.account_id, account_type)
+                            .set_account_type(tx.account_id, new_account_type)
                             .await?;
                     }
-                    // Store the executed operation in the corresponding schema.
-                    let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block_number);
+
+                    let new_tx = NewExecutedTransaction::prepare_stored_tx(
+                        *tx,
+                        block_number,
+                        &mut transaction,
+                    )
+                    .await?;
                     transaction
                         .chain()
                         .operations_schema()
@@ -83,11 +102,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         .await?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
+                    // Store the executed operation in the corresponding schema.
                     // For priority operation we should only store it in the Operations schema.
                     let new_priority_op = NewExecutedPriorityOperation::prepare_stored_priority_op(
                         *prior_op,
                         block_number,
                     );
+
+                    // Store the executed operation in the corresponding schema.
                     transaction
                         .chain()
                         .operations_schema()
@@ -103,7 +125,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     // Helper method for retrieving blocks from the database.
-    async fn get_storage_block(&mut self, block: BlockNumber) -> QueryResult<Option<StorageBlock>> {
+    pub async fn get_storage_block(
+        &mut self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<StorageBlock>> {
         let start = Instant::now();
         let block = sqlx::query_as!(
             StorageBlock,
@@ -214,9 +239,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         '0x' || encode(tx_hash, 'hex') as tx_hash,
                         tx as op,
                         block_number,
+                        block_index,
                         success,
                         fail_reason,
-                        created_at
+                        created_at,
+                        batch_id,
+                        sequence_number
                     FROM executed_transactions
                     WHERE block_number = $1
                 ), priority_ops AS (
@@ -224,9 +252,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         '0x' || encode(eth_hash, 'hex') as tx_hash,
                         operation as op,
                         block_number,
+                        block_index as "block_index?",
                         true as success,
                         Null as fail_reason,
-                        created_at
+                        created_at,
+                        Null::bigint as batch_id,
+                        sequence_number
                     FROM executed_priority_operations
                     WHERE block_number = $1
                 ), everything AS (
@@ -238,11 +269,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     tx_hash as "tx_hash!",
                     block_number as "block_number!",
                     op as "op!",
+                    block_index as "block_index?",
                     success as "success!",
                     fail_reason as "fail_reason?",
-                    created_at as "created_at!"
+                    created_at as "created_at!",
+                    batch_id as "batch_id?"
                 FROM everything
-                ORDER BY created_at DESC
+                ORDER BY sequence_number DESC
             "#,
             i64::from(*block)
         )
@@ -286,7 +319,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         // Transform executed operations to be `ExecutedOperations`.
         let executed_ops = executed_ops
             .into_iter()
-            .filter_map(|stored_exec| stored_exec.into_executed_tx().ok())
+            .map(|stored_exec| stored_exec.into_executed_tx())
             .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
         executed_operations.extend(executed_ops);
 
@@ -605,6 +638,24 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
+    /// Returns the number of existing incomplete block.
+    /// Returns `None` if there are no incomplte blocks in the database.
+    ///
+    /// Note: Used only for testing.
+    #[cfg(test)]
+    pub(crate) async fn get_last_incomplete_block_number(
+        &mut self,
+    ) -> QueryResult<Option<BlockNumber>> {
+        let start = Instant::now();
+        let result = sqlx::query!("SELECT max(number) FROM incomplete_blocks")
+            .fetch_one(self.0.conn())
+            .await?
+            .max
+            .map(|block| BlockNumber(block as u32));
+        metrics::histogram!("sql.chain.block.get_last_incomplete_block", start.elapsed());
+        Ok(result)
+    }
+
     /// Returns the number of last block which commit is confirmed on Ethereum.
     pub async fn get_last_committed_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
@@ -633,6 +684,22 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     /// Returns the number of last block for which proof has been confirmed on Ethereum.
+    pub async fn get_last_proven_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
+            .get_last_block_by_aggregated_action(
+                AggregatedActionType::PublishProofBlocksOnchain,
+                Some(true),
+            )
+            .await;
+        metrics::histogram!(
+            "sql.chain.block.get_last_proven_confirmed_block",
+            start.elapsed()
+        );
+        result
+    }
+
+    /// Returns the number of last block for which executed operations has been confirmed on Ethereum .
     /// Essentially, it's number of last block for which updates were applied to the chain state.
     pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
@@ -654,6 +721,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .get_last_verified_confirmed_block()
             .await?;
         Ok(block_number <= last_finalized_block)
+    }
+
+    pub async fn pending_block_chunks_left(&mut self) -> QueryResult<Option<usize>> {
+        let start = Instant::now();
+        let maybe_block_chunks = sqlx::query!(
+            "SELECT chunks_left FROM pending_block
+            LIMIT 1"
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.chain.block.pending_block_chunks_left", start.elapsed());
+
+        Ok(maybe_block_chunks.map(|val| val.chunks_left as usize))
     }
 
     /// Helper method for retrieving pending blocks from the database.
@@ -702,8 +782,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             }
         }
 
-        let previous_block_root_hash = H256::from_slice(&block.previous_root_hash);
-
         let result = PendingBlock {
             number: BlockNumber(block.number as u32),
             chunks_left: block.chunks_left as usize,
@@ -711,7 +789,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             pending_block_iteration: block.pending_block_iteration as usize,
             success_operations,
             failed_txs,
-            previous_block_root_hash,
             timestamp: block.timestamp.unwrap_or_else(|| {
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -745,19 +822,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             chunks_left: pending_block.chunks_left as i64,
             unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
             pending_block_iteration: pending_block.pending_block_iteration as i64,
-            previous_root_hash: pending_block.previous_block_root_hash.as_bytes().to_vec(),
+            previous_root_hash: Vec::new(), // Not used anywhere, left here for the backward compatibility.
             timestamp: Some(pending_block.timestamp as i64),
         };
 
         // Store the pending block header.
         sqlx::query!("
-            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, timestamp)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (number)
             DO UPDATE
-              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5, timestamp = $6
+              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, timestamp = $5
             ",
-            storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration, storage_block.previous_root_hash,
+            storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration,
             storage_block.timestamp
         ).execute(transaction.conn())
         .await?;
@@ -783,6 +860,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns the number of rejected_txs in executed_txs
+    pub async fn count_rejected_txs(&mut self) -> QueryResult<i64> {
+        let start = Instant::now();
+        let count = sqlx::query!(
+            r#"SELECT count(*) as "count!" FROM executed_transactions WHERE success = false"#,
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .count;
+
+        metrics::histogram!("sql.chain.block.count_rejected_txs", start.elapsed());
+        Ok(count)
+    }
     /// Returns the number of aggregated operations with the given `action_type` and `is_confirmed` status.
     pub async fn count_aggregated_operations(
         &mut self,
@@ -803,54 +893,26 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(count)
     }
 
-    pub async fn save_block(&mut self, block: Block) -> QueryResult<()> {
+    /// Stores completed block into the database.
+    ///
+    /// This method assumes that `Block` was created from the corresponding `IncompleteBlock`
+    /// object from the DB, and doesn't do any checks regarding that.
+    pub async fn finish_incomplete_block(&mut self, block: Block) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
-        let number = i64::from(*block.block_number);
-        let root_hash = block.new_root_hash.to_bytes();
-        let fee_account_id = i64::from(*block.fee_account);
-        let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
-        let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
-        let block_size = block.block_chunks_size as i64;
-        let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
-        let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
-        let commitment = block.block_commitment.as_bytes().to_vec();
-        let timestamp = Some(block.timestamp as i64);
-
-        BlockSchema(&mut transaction)
-            .save_block_transactions(block.block_number, block.block_transactions)
-            .await?;
-
-        // Notify about queued and rejected transactions right away without
-        // waiting for the block commit.
-        transaction
-            .event_schema()
-            .store_executed_transaction_event(block.block_number)
-            .await?;
-
         let new_block = StorageBlock {
-            number,
-            root_hash,
-            fee_account_id,
-            unprocessed_prior_op_before,
-            unprocessed_prior_op_after,
-            block_size,
-            commit_gas_limit,
-            verify_gas_limit,
-            commitment,
-            timestamp,
+            number: i64::from(*block.block_number),
+            root_hash: block.new_root_hash.to_bytes(),
+            fee_account_id: i64::from(*block.fee_account),
+            unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
+            unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
+            block_size: block.block_chunks_size as i64,
+            commit_gas_limit: block.commit_gas_limit.as_u64() as i64,
+            verify_gas_limit: block.verify_gas_limit.as_u64() as i64,
+            commitment: block.block_commitment.as_bytes().to_vec(),
+            timestamp: Some(block.timestamp as i64),
         };
-
-        // Remove pending block (as it's now completed).
-        sqlx::query!(
-            "
-            DELETE FROM pending_block WHERE number = $1
-            ",
-            new_block.number
-        )
-        .execute(transaction.conn())
-        .await?;
 
         // Save new completed block.
         sqlx::query!("
@@ -863,10 +925,239 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         ).execute(transaction.conn())
         .await?;
 
+        // Remove incomplete block from which this block was created.
+        sqlx::query!(
+            "DELETE FROM incomplete_blocks WHERE number = $1",
+            new_block.number
+        )
+        .execute(transaction.conn())
+        .await?;
+
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.save_block", start.elapsed());
         Ok(())
+    }
+
+    /// Saves incomplete block to the database.
+    ///
+    /// This method **does not** save block transactions.
+    /// They are expected to be saved prior, during processing of previous pending blocks.
+    pub async fn save_incomplete_block(&mut self, block: &IncompleteBlock) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let number = i64::from(*block.block_number);
+        let fee_account_id = i64::from(*block.fee_account);
+        let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
+        let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
+        let block_size = block.block_chunks_size as i64;
+        let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
+        let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
+        let timestamp = Some(block.timestamp as i64);
+
+        let new_block = StorageIncompleteBlock {
+            number,
+            fee_account_id,
+            unprocessed_prior_op_before,
+            unprocessed_prior_op_after,
+            block_size,
+            commit_gas_limit,
+            verify_gas_limit,
+            timestamp,
+        };
+
+        // Remove pending block, as it's now sealed.
+        // Note that the block is NOT completed yet: root hash calculation should still happen.
+        sqlx::query!(
+            "
+            DELETE FROM pending_block WHERE number = $1
+            ",
+            new_block.number
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        // Save this block.
+        sqlx::query!("
+            INSERT INTO incomplete_blocks (number, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit,  timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ",
+            new_block.number, new_block.fee_account_id, new_block.unprocessed_prior_op_before,
+            new_block.unprocessed_prior_op_after, new_block.block_size, new_block.commit_gas_limit, new_block.verify_gas_limit,
+            new_block.timestamp,
+        ).execute(transaction.conn())
+        .await?;
+
+        transaction.commit().await?;
+
+        metrics::histogram!("sql.chain.block.save_incomplete_block", start.elapsed());
+        Ok(())
+    }
+
+    /// This method saves block transactions, and then does both `save_incomplete_block`
+    /// and `save_block` for a `Block` object.
+    ///
+    /// It is an alternative for calling two mentioned methods separately that has several use cases:
+    /// - In some contexts, root hash for the block is known immediately (e.g. data restore).
+    /// - In most DB/API tests, the process of block sealing doesn't really matter: these tests check the behavior
+    ///   of blocks that are already stored in the DB, not *how* they are stored.
+    pub async fn save_full_block(&mut self, block: Block) -> anyhow::Result<()> {
+        let full_block = block.clone();
+        let incomplete_block = IncompleteBlock::new(
+            block.block_number,
+            block.fee_account,
+            block.block_transactions,
+            block.processed_priority_ops,
+            block.block_chunks_size,
+            block.commit_gas_limit,
+            block.verify_gas_limit,
+            block.timestamp,
+        );
+        let mut transaction = self.0.start_transaction().await?;
+
+        BlockSchema(&mut transaction)
+            .save_block_transactions(
+                full_block.block_number,
+                full_block.block_transactions.clone(),
+            )
+            .await?;
+        BlockSchema(&mut transaction)
+            .save_incomplete_block(&incomplete_block)
+            .await?;
+        BlockSchema(&mut transaction)
+            .finish_incomplete_block(full_block)
+            .await?;
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
+    /// Returns the ID of the next expected priority operation.
+    /// Performs a lookup in both incomplete and complete block tables.
+    pub async fn next_expected_serial_id(&mut self) -> QueryResult<u64> {
+        let start = Instant::now();
+
+        let next_expected_serial_id = sqlx::query!(
+            "SELECT GREATEST(
+                (SELECT MAX(unprocessed_prior_op_after) FROM incomplete_blocks),
+                (SELECT MAX(unprocessed_prior_op_after) FROM blocks)
+            )",
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .greatest
+        .map(|val| val as u64)
+        .unwrap_or_default();
+
+        metrics::histogram!("sql.chain.block.next_expected_serial_id", start.elapsed());
+        Ok(next_expected_serial_id)
+    }
+
+    /// Returns the range of existing incomplete blocks.
+    ///
+    /// Returned range is *inclusive*, meaning that both returned blocks (if they were returned)
+    /// exist in the database, and represent minimum and maximum existing blocks correspondingly.
+    pub async fn incomplete_blocks_range(
+        &mut self,
+    ) -> QueryResult<Option<(BlockNumber, BlockNumber)>> {
+        let start = Instant::now();
+
+        let raw_numbers = sqlx::query!(
+            "
+                SELECT min(number), max(number)
+                FROM incomplete_blocks
+            ",
+        )
+        .fetch_one(self.0.conn())
+        .await?;
+
+        let block_numbers = match (raw_numbers.min, raw_numbers.max) {
+            (Some(min), Some(max)) => Some((BlockNumber(min as u32), BlockNumber(max as u32))),
+            (None, None) => None,
+            _ => {
+                panic!("Inconsistent results for min/max query: {:?}", raw_numbers);
+            }
+        };
+
+        metrics::histogram!("sql.chain.block.incomplete_blocks_range", start.elapsed());
+        Ok(block_numbers)
+    }
+
+    // Helper method for retrieving incomplete blocks from the database.
+    async fn get_storage_incomplete_block(
+        &mut self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<StorageIncompleteBlock>> {
+        let start = Instant::now();
+        let block = sqlx::query_as!(
+            StorageIncompleteBlock,
+            "SELECT * FROM incomplete_blocks WHERE number = $1",
+            i64::from(*block)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.block.get_storage_incomplete_block",
+            start.elapsed()
+        );
+
+        Ok(block)
+    }
+
+    /// Given the block number, attempts to retrieve data to complete it from the database.
+    /// Returns `None` if the block with provided number does not exist yet.
+    ///
+    /// Data to complete consists of `IncompleteBlock` object and the root hash of the previous block.
+    pub async fn get_data_to_complete_block(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<(Option<IncompleteBlock>, Option<Fr>)> {
+        let start = Instant::now();
+        // Load block header.
+        let stored_block =
+            if let Some(block) = self.get_storage_incomplete_block(block_number).await? {
+                block
+            } else {
+                return Ok((None, None));
+            };
+
+        // Load transactions for this block.
+        let block_transactions = self.get_block_executed_ops(block_number).await?;
+
+        // Return the obtained block in the expected format.
+        let block = Some(IncompleteBlock::new(
+            block_number,
+            AccountId(stored_block.fee_account_id as u32),
+            block_transactions,
+            (
+                stored_block.unprocessed_prior_op_before as u64,
+                stored_block.unprocessed_prior_op_after as u64,
+            ),
+            stored_block.block_size as usize,
+            U256::from(stored_block.commit_gas_limit as u64),
+            U256::from(stored_block.verify_gas_limit as u64),
+            stored_block.timestamp.unwrap_or_default() as u64,
+        ));
+
+        // Load previous block root hash.
+        let prev_block_number = block_number - 1;
+        let previous_root_hash = sqlx::query_as!(
+            StorageRootHash,
+            "SELECT root_hash FROM blocks WHERE number = $1",
+            i64::from(*prev_block_number)
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|entry| FeConvert::from_bytes(&entry.root_hash).expect("Unparsable root hash"));
+
+        metrics::histogram!(
+            "sql.chain.block.get_data_to_complete_block",
+            start.elapsed()
+        );
+
+        Ok((block, previous_root_hash))
     }
 
     pub async fn save_block_metadata(
@@ -891,26 +1182,27 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Stores account tree cache for a block
+    /// Stores account tree cache for a block.
+    /// Expects `tree_cache` to be a valid encoded JSON.
     pub async fn store_account_tree_cache(
         &mut self,
         block: BlockNumber,
-        tree_cache: serde_json::Value,
+        tree_cache: String,
     ) -> QueryResult<()> {
         let start = Instant::now();
         if *block == 0 {
             return Ok(());
         }
 
-        let tree_cache_str =
-            serde_json::to_string(&tree_cache).expect("Failed to serialize Account Tree Cache");
         sqlx::query!(
             "
             INSERT INTO account_tree_cache (block, tree_cache)
             VALUES ($1, $2)
+            ON CONFLICT (block)
+            DO NOTHING
             ",
             *block as i64,
-            tree_cache_str,
+            tree_cache,
         )
         .execute(self.0.conn())
         .await?;
@@ -919,7 +1211,28 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Gets stored account tree cache for a block
+    /// Gets the number of the latest block that has a stored cache.
+    /// Returns `None` if there are no caches in the database.
+    pub async fn get_last_block_with_account_tree_cache(
+        &mut self,
+    ) -> QueryResult<Option<BlockNumber>> {
+        let start = Instant::now();
+
+        let last_block_with_cache = sqlx::query!("SELECT MAX(block) FROM account_tree_cache")
+            .fetch_one(self.0.conn())
+            .await?
+            .max;
+
+        metrics::histogram!(
+            "sql.chain.block.get_last_block_with_account_tree_cache",
+            start.elapsed()
+        );
+        Ok(last_block_with_cache.map(|block| BlockNumber(block as u32)))
+    }
+
+    /// Gets the latest stored account tree cache.
+    /// Returns `None` if there are no caches in the database.
+    /// Returns the block number and associated cache otherwise.
     pub async fn get_account_tree_cache(
         &mut self,
     ) -> QueryResult<Option<(BlockNumber, serde_json::Value)>> {
@@ -945,7 +1258,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         }))
     }
 
-    /// Gets stored account tree cache for a block
+    /// Gets stored account tree cache for a certain block.
+    /// Returns `None` if there is no cache for requested block.
     pub async fn get_account_tree_cache_block(
         &mut self,
         block: BlockNumber,
@@ -972,20 +1286,27 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub async fn save_genesis_block(&mut self, root_hash: Fr) -> QueryResult<()> {
-        let block = Block {
+        let mut transaction = self.0.start_transaction().await?;
+
+        let full_block = Block {
             block_number: BlockNumber(0),
-            new_root_hash: root_hash,
             fee_account: AccountId(0),
             block_transactions: Vec::new(),
             processed_priority_ops: (0, 0),
             block_chunks_size: 0,
             commit_gas_limit: 0u32.into(),
             verify_gas_limit: 0u32.into(),
-            block_commitment: H256::zero(),
             timestamp: 0,
+            new_root_hash: root_hash,
+            block_commitment: H256::zero(),
         };
 
-        Ok(self.save_block(block).await?)
+        BlockSchema(&mut transaction)
+            .save_full_block(full_block)
+            .await?;
+        transaction.commit().await?;
+
+        Ok(())
     }
 
     /// Retrieves both L1 and L2 operations stored in the block for the given pagination query
@@ -1011,20 +1332,20 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 }
             }
         };
-        let created_at_and_block = transaction
+        let sequence_number = transaction
             .chain()
             .operations_ext_schema()
-            .get_tx_created_at_and_block_number(tx_hash)
+            .get_tx_sequence_number_for_block(tx_hash, query.from.block_number)
             .await?;
-        let block_txs = if let Some((time_from, block_number)) = created_at_and_block {
-            if block_number == query.from.block_number {
-                let raw_txs: Vec<TransactionItem> = match query.direction {
-                    PaginationDirection::Newer => {
-                        sqlx::query_as!(
-                            TransactionItem,
-                            r#"
+        let block_txs = if let Some(sequence_number) = sequence_number {
+            let raw_txs: Vec<TransactionItem> = match query.direction {
+                PaginationDirection::Newer => {
+                    sqlx::query_as!(
+                        TransactionItem,
+                        r#"
                                 WITH transactions AS (
                                     SELECT
+                                        sequence_number,
                                         tx_hash,
                                         tx as op,
                                         block_number,
@@ -1033,11 +1354,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         fail_reason,
                                         Null::bytea as eth_hash,
                                         Null::bigint as priority_op_serialid,
-                                        block_index
+                                        block_index,
+                                        batch_id
                                     FROM executed_transactions
-                                    WHERE block_number = $1 AND created_at >= $2
+                                    WHERE block_number = $1 AND sequence_number >= $2
                                 ), priority_ops AS (
                                     SELECT
+                                        sequence_number,
                                         tx_hash,
                                         operation as op,
                                         block_number,
@@ -1046,40 +1369,45 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         Null as fail_reason,
                                         eth_hash,
                                         priority_op_serialid,
-                                        block_index
+                                        block_index,
+                                        Null::bigint as batch_id
                                     FROM executed_priority_operations
-                                    WHERE block_number = $1 AND created_at >= $2
+                                    WHERE block_number = $1 AND sequence_number >= $2
                                 ), everything AS (
                                     SELECT * FROM transactions
                                     UNION ALL
                                     SELECT * FROM priority_ops
                                 )
                                 SELECT
+                                    sequence_number,
                                     tx_hash as "tx_hash!",
                                     block_number as "block_number!",
+                                    block_index as "block_index?",
                                     op as "op!",
                                     created_at as "created_at!",
                                     success as "success!",
                                     fail_reason as "fail_reason?",
                                     eth_hash as "eth_hash?",
-                                    priority_op_serialid as "priority_op_serialid?"
+                                    priority_op_serialid as "priority_op_serialid?",
+                                    batch_id as "batch_id?"
                                 FROM everything
-                                ORDER BY created_at ASC, block_index ASC
+                                ORDER BY sequence_number ASC
                                 LIMIT $3
                             "#,
-                            i64::from(*block_number),
-                            time_from,
-                            i64::from(query.limit),
-                        )
-                        .fetch_all(transaction.conn())
-                        .await?
-                    }
-                    PaginationDirection::Older => {
-                        sqlx::query_as!(
-                            TransactionItem,
-                            r#"
+                        i64::from(*query.from.block_number),
+                        sequence_number,
+                        i64::from(query.limit),
+                    )
+                    .fetch_all(transaction.conn())
+                    .await?
+                }
+                PaginationDirection::Older => {
+                    sqlx::query_as!(
+                        TransactionItem,
+                        r#"
                                 WITH transactions AS (
                                     SELECT
+                                        sequence_number,
                                         tx_hash,
                                         tx as op,
                                         block_number,
@@ -1088,11 +1416,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         fail_reason,
                                         Null::bytea as eth_hash,
                                         Null::bigint as priority_op_serialid,
-                                        block_index
+                                        block_index,
+                                        batch_id
                                     FROM executed_transactions
-                                    WHERE block_number = $1 AND created_at <= $2
+                                    WHERE block_number = $1 AND sequence_number <= $2
                                 ), priority_ops AS (
                                     SELECT
+                                        sequence_number,
                                         tx_hash,
                                         operation as op,
                                         block_number,
@@ -1101,48 +1431,49 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                                         Null as fail_reason,
                                         eth_hash,
                                         priority_op_serialid,
-                                        block_index
+                                        block_index,
+                                        Null::bigint as batch_id
                                     FROM executed_priority_operations
-                                    WHERE block_number = $1 AND created_at <= $2
+                                    WHERE block_number = $1 AND sequence_number <= $2
                                 ), everything AS (
                                     SELECT * FROM transactions
                                     UNION ALL
                                     SELECT * FROM priority_ops
                                 )
                                 SELECT
+                                    sequence_number,
                                     tx_hash as "tx_hash!",
                                     block_number as "block_number!",
+                                    block_index as "block_index?",
                                     op as "op!",
                                     created_at as "created_at!",
                                     success as "success!",
                                     fail_reason as "fail_reason?",
                                     eth_hash as "eth_hash?",
-                                    priority_op_serialid as "priority_op_serialid?"
+                                    priority_op_serialid as "priority_op_serialid?",
+                                    batch_id as "batch_id?"
                                 FROM everything
-                                ORDER BY created_at DESC, block_index DESC
+                                ORDER BY sequence_number DESC 
                                 LIMIT $3
                             "#,
-                            i64::from(*block_number),
-                            time_from,
-                            i64::from(query.limit),
-                        )
-                        .fetch_all(transaction.conn())
-                        .await?
-                    }
-                };
-                let is_block_finalized = transaction
-                    .chain()
-                    .block_schema()
-                    .is_block_finalized(block_number)
-                    .await?;
-                let txs: Vec<Transaction> = raw_txs
-                    .into_iter()
-                    .map(|tx| TransactionItem::transaction_from_item(tx, is_block_finalized))
-                    .collect();
-                Some(txs)
-            } else {
-                None
-            }
+                        i64::from(*query.from.block_number),
+                        sequence_number,
+                        i64::from(query.limit),
+                    )
+                    .fetch_all(transaction.conn())
+                    .await?
+                }
+            };
+            let is_block_finalized = transaction
+                .chain()
+                .block_schema()
+                .is_block_finalized(query.from.block_number)
+                .await?;
+            let txs: Vec<Transaction> = raw_txs
+                .into_iter()
+                .map(|tx| TransactionItem::transaction_from_item(tx, is_block_finalized))
+                .collect();
+            Some(txs)
         } else {
             None
         };
@@ -1191,11 +1522,23 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
+        // We should retrieve last committed block for which an aggregated operation was created.
+        // Events for blocks are created by `eth_sender` after sending transaction to L1, so until then there is
+        // no event and no need to create a `revert` one.
+        // If aggregated operation was created, but was not sent to L1, that's also not a problem: event schema
+        // ignores events for non-exist
+        //
+        // TODO (ZKS-856): `get_last_committed_block` returns the last block for which *an aggregated operation*
+        // is created. Currently, it seems that events are created by eth sender after confirming an L1 transaction.
+        // We need to check that if aggregated operation was created, but not sent or not confirmed, this will not
+        // result in extra events being created.
+        // Please, update the comment above after resolving this TODO to match the new logic.
         let last_committed_block = transaction
             .chain()
             .block_schema()
             .get_last_committed_block()
             .await?;
+
         for block_number in *last_block..=*last_committed_block {
             transaction
                 .event_schema()
@@ -1203,10 +1546,23 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 .await?;
         }
 
+        sqlx::query!(
+            "DELETE FROM incomplete_blocks WHERE number > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+
         sqlx::query!("DELETE FROM blocks WHERE number > $1", *last_block as i64)
             .execute(transaction.conn())
             .await?;
 
+        sqlx::query!(
+            "DELETE FROM block_metadata WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
         transaction.commit().await?;
         metrics::histogram!("sql.chain.block.remove_blocks", start.elapsed());
         Ok(())
@@ -1310,5 +1666,56 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             start.elapsed()
         );
         Ok(())
+    }
+
+    pub async fn get_block_number_by_hash(
+        &mut self,
+        hash: &[u8],
+    ) -> QueryResult<Option<BlockNumber>> {
+        let start = Instant::now();
+        let record = sqlx::query!("SELECT number FROM blocks where root_hash = $1", hash)
+            .fetch_optional(self.0.conn())
+            .await?;
+        let block_number = record.map(|r| BlockNumber(r.number as u32));
+
+        metrics::histogram!("sql.chain.block.get_block_number_by_hash", start.elapsed());
+        Ok(block_number)
+    }
+
+    pub async fn get_block_transactions_hashes(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<Vec<Vec<u8>>> {
+        let start = Instant::now();
+        let records = sqlx::query!(
+            r#"
+                WITH transactions AS (
+                    SELECT tx_hash, sequence_number
+                    FROM executed_transactions
+                    WHERE block_number = $1
+                ), priority_ops AS (
+                    SELECT tx_hash, sequence_number
+                    FROM executed_priority_operations
+                    WHERE block_number = $1
+                ), everything AS (
+                    SELECT * FROM transactions
+                    UNION ALL
+                    SELECT * FROM priority_ops
+                )
+                SELECT tx_hash as "tx_hash!"
+                FROM everything
+                ORDER BY sequence_number
+            "#,
+            i64::from(*block_number)
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+        let hashes = records.into_iter().map(|record| record.tx_hash).collect();
+
+        metrics::histogram!(
+            "sql.chain.block.get_block_transactions_hashes",
+            start.elapsed()
+        );
+        Ok(hashes)
     }
 }

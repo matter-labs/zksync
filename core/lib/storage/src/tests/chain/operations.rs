@@ -1,8 +1,12 @@
 // External imports
 use chrono::{Duration, Utc};
 // Workspace imports
-use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber};
+use zksync_types::{
+    aggregated_operations::AggregatedActionType, Address, BlockNumber, Deposit, SequentialTxId,
+    ZkSyncPriorityOp, H256,
+};
 // Local imports
+use crate::chain::mempool::MempoolSchema;
 use crate::{
     chain::{
         block::BlockSchema,
@@ -60,6 +64,8 @@ async fn executed_operations(mut storage: StorageProcessor<'_>) -> QueryResult<(
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
         batch_id: Some(10),
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
 
     OperationsSchema(&mut storage)
@@ -106,6 +112,8 @@ async fn executed_priority_operations(mut storage: StorageProcessor<'_>) -> Quer
         created_at: chrono::Utc::now(),
         tx_hash: Default::default(),
         eth_block_index: Some(1),
+        affected_accounts: Default::default(),
+        token: Default::default(),
     };
     OperationsSchema(&mut storage)
         .store_executed_priority_op(executed_tx.clone())
@@ -151,6 +159,8 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
         batch_id: None,
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
 
     let executed_priority_op = NewExecutedPriorityOperation {
@@ -166,6 +176,8 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         created_at: chrono::Utc::now(),
         tx_hash: Default::default(),
         eth_block_index: Some(1),
+        affected_accounts: Default::default(),
+        token: Default::default(),
     };
 
     // Save the same operations twice.
@@ -222,6 +234,8 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
         batch_id: None,
+        affected_accounts: Vec::new(),
+        used_tokens: Vec::new(),
     };
 
     // Save the failed operation.
@@ -287,7 +301,7 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
     let timestamp_1 = Utc::now() - Duration::weeks(1);
     let executed_tx_1 = NewExecutedTransaction {
         block_number: BLOCK_NUMBER,
-        tx_hash: vec![0x12, 0xAD, 0xBE, 0xEF],
+        tx_hash: vec![1, 2, 3, 4],
         tx: Default::default(),
         operation: Default::default(),
         from_account: Default::default(),
@@ -300,17 +314,24 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         created_at: timestamp_1,
         eth_sign_data: None,
         batch_id: None,
+        affected_accounts: vec![Address::zero().as_bytes().to_vec()],
+        used_tokens: vec![0],
     };
     let timestamp_2 = timestamp_1 - Duration::weeks(1);
     let mut executed_tx_2 = executed_tx_1.clone();
     // Set new timestamp and different tx_hash since it's a PK.
     executed_tx_2.created_at = timestamp_2;
     executed_tx_2.tx_hash = vec![0, 11, 21, 5];
-    // Successful one.
+
     let mut executed_tx_3 = executed_tx_1.clone();
-    executed_tx_3.success = true;
-    executed_tx_3.tx_hash = vec![1, 1, 2, 30];
-    executed_tx_3.created_at = timestamp_2 - Duration::weeks(1);
+    executed_tx_3.success = false;
+    executed_tx_3.tx_hash = vec![10, 2, 4, 30];
+    executed_tx_3.created_at = timestamp_2;
+    // Successful one.
+    let mut executed_tx_4 = executed_tx_1.clone();
+    executed_tx_4.success = true;
+    executed_tx_4.tx_hash = vec![1, 1, 2, 30];
+    executed_tx_4.created_at = timestamp_2 - Duration::weeks(1);
     // Store them.
     storage
         .chain()
@@ -327,6 +348,11 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .operations_schema()
         .store_executed_tx(executed_tx_3)
         .await?;
+    storage
+        .chain()
+        .operations_schema()
+        .store_executed_tx(executed_tx_4)
+        .await?;
     // First check, no transactions removed.
     storage
         .chain()
@@ -339,8 +365,16 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .stats_schema()
         .count_outstanding_proofs(block_number)
         .await?;
-    assert_eq!(count, 3);
-    // Second transaction should be removed.
+
+    let count_tx_filters = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(Default::default(), None, None)
+        .await?;
+    assert_eq!(count, 4);
+    assert_eq!(count_tx_filters, 4);
+
+    // Second and third transaction should be removed.
     storage
         .chain()
         .operations_schema()
@@ -351,7 +385,13 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .stats_schema()
         .count_outstanding_proofs(block_number)
         .await?;
+    let count_tx_filters = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(Default::default(), None, None)
+        .await?;
     assert_eq!(count, 2);
+    assert_eq!(count_tx_filters, 2);
     // Finally, no rejected transactions remain.
     storage
         .chain()
@@ -363,14 +403,26 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .stats_schema()
         .count_outstanding_proofs(block_number)
         .await?;
-    assert_eq!(count, 1);
-    // The last one is indeed succesful.
-    let count = storage
+    let count_tx_filters = storage
         .chain()
-        .stats_schema()
-        .count_total_transactions()
+        .operations_ext_schema()
+        .get_account_transactions_count(Default::default(), None, None)
         .await?;
     assert_eq!(count, 1);
+    assert_eq!(count_tx_filters, 1);
+    // The last one is indeed succesful.
+    let (count, _) = storage
+        .chain()
+        .stats_schema()
+        .count_total_transactions(SequentialTxId(0))
+        .await?;
+    let count_tx_filters = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_count(Default::default(), None, None)
+        .await?;
+    assert_eq!(count, 1);
+    assert_eq!(count_tx_filters, 1);
 
     Ok(())
 }
@@ -391,6 +443,8 @@ async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<(
         created_at: chrono::Utc::now(),
         tx_hash: vec![0xBB, 0xBB, 0xBB, 0xBB],
         eth_block_index: Some(1),
+        affected_accounts: Default::default(),
+        token: Default::default(),
     };
     // Store executed priority op and try to get it by `eth_hash`.
     storage
@@ -429,16 +483,24 @@ async fn test_remove_executed_priority_operations(
         let executed_priority_op = NewExecutedPriorityOperation {
             block_number,
             block_index: 1,
-            operation: Default::default(),
-            from_account: Default::default(),
-            to_account: Default::default(),
+            operation: serde_json::to_value(ZkSyncPriorityOp::Deposit(Deposit {
+                from: Address::zero(),
+                token: Default::default(),
+                amount: Default::default(),
+                to: Address::zero(),
+            }))
+            .unwrap(),
+            from_account: Address::zero().as_bytes().to_vec(),
+            to_account: Address::zero().as_bytes().to_vec(),
             priority_op_serialid: block_number,
             deadline_block: 100,
-            eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            eth_hash: H256::zero().as_bytes().to_vec(),
             eth_block: 10,
             created_at: chrono::Utc::now(),
             eth_block_index: Some(1),
-            tx_hash: Default::default(),
+            tx_hash: H256::zero().as_bytes().to_vec(),
+            affected_accounts: Default::default(),
+            token: Default::default(),
         };
         OperationsSchema(&mut storage)
             .store_executed_priority_op(executed_priority_op)
@@ -447,7 +509,7 @@ async fn test_remove_executed_priority_operations(
 
     // Remove priority operation with block numbers greater than 3.
     OperationsSchema(&mut storage)
-        .remove_executed_priority_operations(BlockNumber(3))
+        .return_executed_priority_operations_to_mempool(BlockNumber(3))
         .await?;
 
     // Check that priority operation from the 3rd block is present and from the 4th is not.
@@ -461,6 +523,10 @@ async fn test_remove_executed_priority_operations(
         .await?;
     assert!(block4_txs.is_empty());
 
+    let mempool_txs = MempoolSchema(&mut storage)
+        .get_confirmed_priority_ops()
+        .await?;
+    assert_eq!(mempool_txs.len(), 2);
     Ok(())
 }
 

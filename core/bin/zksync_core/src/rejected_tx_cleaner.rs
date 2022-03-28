@@ -10,13 +10,13 @@
 use tokio::{task::JoinHandle, time};
 
 // Workspace deps
-use zksync_config::ZkSyncConfig;
+use zksync_config::DBConfig;
 use zksync_storage::ConnectionPool;
 
 #[must_use]
-pub fn run_rejected_tx_cleaner(config: &ZkSyncConfig, db_pool: ConnectionPool) -> JoinHandle<()> {
-    let max_age = config.db.rejected_transactions_max_age();
-    let interval = config.db.rejected_transactions_cleaner_interval();
+pub fn run_rejected_tx_cleaner(config: &DBConfig, db_pool: ConnectionPool) -> JoinHandle<()> {
+    let max_age = chrono::Duration::from_std(config.rejected_transactions_max_age()).unwrap();
+    let interval = config.rejected_transactions_cleaner_interval();
     let mut timer = time::interval(interval);
 
     tokio::spawn(async move {
@@ -25,12 +25,14 @@ pub fn run_rejected_tx_cleaner(config: &ZkSyncConfig, db_pool: ConnectionPool) -
                 .access_storage()
                 .await
                 .expect("transactions cleaner couldn't access the database");
-            storage
+            if let Err(e) = storage
                 .chain()
                 .operations_schema()
                 .remove_rejected_transactions(max_age)
                 .await
-                .expect("failed to delete rejected transactions from the database");
+            {
+                vlog::error!("Can't delete rejected transactions {:?}", e);
+            }
             timer.tick().await;
         }
     })

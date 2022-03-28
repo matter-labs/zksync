@@ -1,7 +1,7 @@
 //! Transactions part of API implementation.
 
 // Built-in uses
-
+use std::time::Instant;
 // External uses
 use actix_web::{
     web::{self, Json},
@@ -12,15 +12,16 @@ use actix_web::{
 use zksync_api_types::{
     v02::transaction::{
         ApiTxBatch, IncomingTxBatch, L1Receipt, L1Transaction, Receipt, SubmitBatchResponse,
-        Transaction, TransactionData, TxData, TxHashSerializeWrapper, TxInBlockStatus,
+        Toggle2FA, Toggle2FAResponse, Transaction, TransactionData, TxData, TxHashSerializeWrapper,
+        TxInBlockStatus,
     },
-    PriorityOpLookupQuery, TxWithSignature,
+    TxWithSignature,
 };
 use zksync_types::{tx::TxHash, EthBlockId};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
-use crate::api_server::tx_sender::TxSender;
+use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 /// Shared data between `api/v0.2/transactions` endpoints.
 #[derive(Clone)]
@@ -34,12 +35,15 @@ impl ApiTransactionData {
     }
 
     async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<Receipt>, Error> {
+        // Try to find in the DB.
         let mut storage = self
             .tx_sender
             .pool
             .access_storage()
             .await
             .map_err(Error::storage)?;
+
+        // 1. Try to find the already received/executed operation.
         if let Some(receipt) = storage
             .chain()
             .operations_ext_schema()
@@ -48,10 +52,12 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(receipt))
-        } else if let Some(op) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
+        }
+        // 2. Try to find the pending operation.
+        else if let Some(op) = storage
+            .chain()
+            .mempool_schema()
+            .get_pending_operation_by_hash(tx_hash.into())
             .await
             .map_err(Error::core_api)?
         {
@@ -61,7 +67,9 @@ impl ApiTransactionData {
                 rollup_block: None,
                 id: op.serial_id,
             })))
-        } else {
+        }
+        // 3. No operation found, return nothing.
+        else {
             Ok(None)
         }
     }
@@ -81,16 +89,17 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             Ok(Some(data))
-        } else if let Some(op) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(PriorityOpLookupQuery::ByAnyHash(tx_hash))
+        } else if let Some(op) = storage
+            .chain()
+            .mempool_schema()
+            .get_pending_operation_by_hash(tx_hash.into())
             .await
             .map_err(Error::core_api)?
         {
             let tx_hash = op.tx_hash();
             let tx = Transaction {
                 tx_hash,
+                block_index: None,
                 block_number: None,
                 op: TransactionData::L1(L1Transaction::from_pending_op(
                     op.data,
@@ -101,6 +110,7 @@ impl ApiTransactionData {
                 status: TxInBlockStatus::Queued,
                 fail_reason: None,
                 created_at: None,
+                batch_id: None,
             };
 
             Ok(Some(TxData {
@@ -132,28 +142,46 @@ impl ApiTransactionData {
 
 async fn tx_status(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<TxHash>,
+    tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<Receipt>> {
-    data.tx_status(tx_hash).await.into()
+    let start = Instant::now();
+    let res = data.tx_status(*tx_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "tx_status");
+    res
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<TxHash>,
+    tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TxData>> {
-    data.tx_data(tx_hash).await.into()
+    let start = Instant::now();
+    let res = data.tx_data(*tx_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "tx_data");
+    res
 }
 
 async fn submit_tx(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<TxWithSignature>,
 ) -> ApiResult<TxHashSerializeWrapper> {
+    let start = Instant::now();
     let tx_hash = data
         .tx_sender
-        .submit_tx(body.tx, body.signature)
-        .await
-        .map_err(Error::from);
+        .submit_tx(body.tx, body.signature, None)
+        .await;
 
+    if let Err(err) = &tx_hash {
+        let err_label = match err {
+            SubmitError::IncorrectTx(err) => err.clone(),
+            SubmitError::TxAdd(err) => err.to_string(),
+            _ => "other".to_string(),
+        };
+        let labels = vec![("stage", "api".to_string()), ("error", err_label)];
+        metrics::increment_counter!("rejected_txs", &labels);
+    }
+
+    let tx_hash = tx_hash.map_err(Error::from);
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "submit_tx");
     tx_hash.map(TxHashSerializeWrapper).into()
 }
 
@@ -161,86 +189,116 @@ async fn submit_batch(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<IncomingTxBatch>,
 ) -> ApiResult<SubmitBatchResponse> {
+    let start = Instant::now();
     let response = data
         .tx_sender
-        .submit_txs_batch(body.txs, body.signature)
+        .submit_txs_batch(body.txs, body.signature, None)
+        .await;
+
+    if let Err(err) = &response {
+        let err_label = match err {
+            SubmitError::IncorrectTx(err) => err.clone(),
+            SubmitError::TxAdd(err) => err.to_string(),
+            _ => "other".to_string(),
+        };
+        let labels = vec![("stage", "api".to_string()), ("error", err_label)];
+        metrics::increment_counter!("rejected_txs", &labels);
+    }
+
+    let response = response.map_err(Error::from);
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "submit_batch");
+    response.into()
+}
+
+async fn toggle_2fa(
+    data: web::Data<ApiTransactionData>,
+    Json(toggle_2fa): Json<Toggle2FA>,
+) -> ApiResult<Toggle2FAResponse> {
+    let start = Instant::now();
+    let response = data
+        .tx_sender
+        .toggle_2fa(toggle_2fa)
         .await
         .map_err(Error::from);
+
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "toggle_2fa");
     response.into()
 }
 
 async fn get_batch(
     data: web::Data<ApiTransactionData>,
-    web::Path(batch_hash): web::Path<TxHash>,
+    batch_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<ApiTxBatch>> {
-    data.get_batch(batch_hash).await.into()
+    let start = Instant::now();
+    let res = data.get_batch(*batch_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_batch");
+    res
 }
 
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
     web::scope("transactions")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route("", web::post().to(submit_tx))
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))
         .route("/batches", web::post().to(submit_batch))
         .route("/batches/{batch_hash}", web::get().to(get_batch))
+        .route("/toggle2FA", web::post().to(toggle_2fa))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        api_server::rest::v02::{
-            test_utils::{
-                deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
-                TestServerConfig, TestTransactions,
-            },
-            SharedData,
+    use crate::api_server::rest::v02::{
+        test_utils::{
+            deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier, TestServerConfig,
+            TestTransactions,
         },
-        core_api_client::CoreApiClient,
+        SharedData,
     };
-    use actix_web::App;
+    use crate::fee_ticker::validator::cache::TokenInMemoryCache;
+    use chrono::Utc;
+    use futures::{channel::mpsc, StreamExt};
+    use num::{rational::Ratio, BigUint};
+    use std::collections::HashMap;
     use std::str::FromStr;
+    use tokio::task::JoinHandle;
     use zksync_api_types::v02::{
         transaction::{L2Receipt, TxHashSerializeWrapper},
         ApiVersion,
     };
+    use zksync_mempool::MempoolTransactionRequest;
     use zksync_types::{
-        tokens::Token,
+        tokens::{Token, TokenMarketVolume},
         tx::{
             EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature,
             TxEthSignatureVariant,
         },
-        BlockNumber, SignedZkSyncTx, TokenId,
+        Address, BlockNumber, SignedZkSyncTx, TokenId, TokenKind, TokenLike,
     };
 
-    fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
-        async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
-            Json(Ok(()))
-        }
+    fn submit_txs_loopback() -> (mpsc::Sender<MempoolTransactionRequest>, JoinHandle<()>) {
+        let (mempool_tx_request_sender, mut mempool_tx_request_receiver) = mpsc::channel(100);
 
-        async fn send_txs_batch(
-            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
-        ) -> Json<Result<(), ()>> {
-            Json(Ok(()))
-        }
-
-        async fn get_unconfirmed_op(_query: Json<PriorityOpLookupQuery>) -> Json<Option<()>> {
-            Json(None)
-        }
-
-        let server = actix_web::test::start(move || {
-            App::new()
-                .route("new_tx", web::post().to(send_tx))
-                .route("new_txs_batch", web::post().to(send_txs_batch))
-                .route("unconfirmed_op", web::post().to(get_unconfirmed_op))
+        let task = tokio::spawn(async move {
+            while let Some(tx) = mempool_tx_request_receiver.next().await {
+                match tx {
+                    MempoolTransactionRequest::NewTx(_, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                    MempoolTransactionRequest::NewPriorityOps(_, _, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                    MempoolTransactionRequest::NewTxsBatch(_, _, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                }
+            }
         });
 
-        let url = server.url("").trim_end_matches('/').to_owned();
-
-        (CoreApiClient::new(url), server)
+        (mempool_tx_request_sender, task)
     }
 
     #[actix_rt::test]
@@ -249,7 +307,7 @@ mod tests {
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
     async fn transactions_scope() -> anyhow::Result<()> {
-        let (core_client, core_server) = submit_txs_loopback();
+        let (sender, task) = submit_txs_loopback();
 
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
@@ -258,14 +316,42 @@ mod tests {
             net: cfg.config.chain.eth.network,
             api_version: ApiVersion::V02,
         };
+
+        let mut tokens = HashMap::new();
+        tokens.insert(
+            TokenLike::Id(TokenId(0)),
+            Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20),
+        );
+        let mut market = HashMap::new();
+        market.insert(
+            TokenId(0),
+            TokenMarketVolume {
+                market_volume: Ratio::from_integer(BigUint::from(400u32)),
+                last_updated: Utc::now(),
+            },
+        );
+        let cache = TokenInMemoryCache::new()
+            .with_tokens(tokens)
+            .with_market(market);
+
+        let prices = vec![
+            (TokenLike::Id(TokenId(0)), 10500_u64.into()),
+            (TokenLike::Id(TokenId(1)), 10500_u64.into()),
+            (TokenLike::Id(TokenId(2)), 10500_u64.into()),
+            (TokenLike::Id(TokenId(3)), 10500_u64.into()),
+            (TokenLike::Symbol(String::from("PHNX")), 10_u64.into()),
+            (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
+            (Address::default().into(), 100000_u64.into()),
+        ];
+
         let (client, server) = cfg.start_server(
             move |cfg: &TestServerConfig| {
-                api_scope(TxSender::with_client(
-                    core_client.clone(),
+                api_scope(TxSender::new(
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
-                    dummy_fee_ticker(&[]),
-                    &cfg.config,
+                    dummy_fee_ticker(&prices, Some(cache.clone())),
+                    &cfg.config.api.common,
+                    sender.clone(),
                 ))
             },
             Some(shared_data),
@@ -279,7 +365,7 @@ mod tests {
         assert_eq!(tx.hash(), tx_hash);
 
         let TestTransactions { acc, txs } = TestServerConfig::gen_zk_txs(1_00);
-        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
+        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
         let (good_batch, expected_tx_hashes): (Vec<_>, Vec<_>) = txs
             .into_iter()
             .map(|(tx, _op)| {
@@ -331,6 +417,7 @@ mod tests {
                 .map(|tx| SignedZkSyncTx {
                     tx: tx.tx,
                     eth_sign_data: None,
+                    created_at: Utc::now(),
                 })
                 .collect();
             storage
@@ -385,6 +472,7 @@ mod tests {
                 .insert_tx(&SignedZkSyncTx {
                     tx,
                     eth_sign_data: None,
+                    created_at: Utc::now(),
                 })
                 .await?;
 
@@ -410,7 +498,7 @@ mod tests {
         assert!(tx_data.is_none());
 
         server.stop().await;
-        core_server.stop().await;
+        task.abort();
         Ok(())
     }
 }

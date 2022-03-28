@@ -14,7 +14,9 @@ import {
     TransactionReceipt,
     TxEthSignature,
     TxEthSignatureVariant,
-    NFTInfo
+    NFTInfo,
+    Toggle2FARequest,
+    Toggle2FAResponse
 } from './types';
 import { isTokenETH, sleep, TokenSet } from './utils';
 import {
@@ -28,45 +30,65 @@ import {
 
 import { SyncProvider } from './provider-interface';
 
-export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
+export async function getDefaultProvider(
+    network: Network,
+    transport: 'WS' | 'HTTP' = 'HTTP',
+    pollIntervalMilliSecs?: number
+): Promise<Provider> {
     if (transport === 'WS') {
         console.warn('Websocket support will be removed in future. Use HTTP transport instead.');
     }
     if (network === 'localhost') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('ws://127.0.0.1:3031');
+            return await Provider.newWebsocketProvider('ws://127.0.0.1:3031', network);
         } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('http://127.0.0.1:3030');
+            return await Provider.newHttpProvider('http://127.0.0.1:3030', pollIntervalMilliSecs, network);
         }
     } else if (network === 'ropsten') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://ropsten-api.zksync.io/jsrpc-ws');
+            return await Provider.newWebsocketProvider('wss://ropsten-api.zksync.io/jsrpc-ws', network);
         } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('https://ropsten-api.zksync.io/jsrpc');
+            return await Provider.newHttpProvider(
+                'https://ropsten-api.zksync.io/jsrpc',
+                pollIntervalMilliSecs,
+                network
+            );
         }
     } else if (network === 'rinkeby') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://rinkeby-api.zksync.io/jsrpc-ws');
+            return await Provider.newWebsocketProvider('wss://rinkeby-api.zksync.io/jsrpc-ws', network);
         } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('https://rinkeby-api.zksync.io/jsrpc');
+            return await Provider.newHttpProvider(
+                'https://rinkeby-api.zksync.io/jsrpc',
+                pollIntervalMilliSecs,
+                network
+            );
         }
     } else if (network === 'ropsten-beta') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://ropsten-beta-api.zksync.io/jsrpc-ws');
+            return await Provider.newWebsocketProvider('wss://ropsten-beta-api.zksync.io/jsrpc-ws', network);
         } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('https://ropsten-beta-api.zksync.io/jsrpc');
+            return await Provider.newHttpProvider(
+                'https://ropsten-beta-api.zksync.io/jsrpc',
+                pollIntervalMilliSecs,
+                network
+            );
         }
     } else if (network === 'rinkeby-beta') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://rinkeby-beta-api.zksync.io/jsrpc-ws');
+            return await Provider.newWebsocketProvider('wss://rinkeby-beta-api.zksync.io/jsrpc-ws', network);
         } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('https://rinkeby-beta-api.zksync.io/jsrpc');
+            return await Provider.newHttpProvider(
+                'https://rinkeby-beta-api.zksync.io/jsrpc',
+                pollIntervalMilliSecs,
+                network
+            );
         }
     } else if (network === 'mainnet') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://api.zksync.io/jsrpc-ws');
+            return await Provider.newWebsocketProvider('wss://api.zksync.io/jsrpc-ws', network);
         } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('https://api.zksync.io/jsrpc');
+            return await Provider.newHttpProvider('https://api.zksync.io/jsrpc', pollIntervalMilliSecs, network);
         }
     } else {
         throw new Error(`Ethereum network ${network} is not supported`);
@@ -82,18 +104,20 @@ export class Provider extends SyncProvider {
     /**
      * @deprecated Websocket support will be removed in future. Use HTTP transport instead.
      */
-    static async newWebsocketProvider(address: string): Promise<Provider> {
+    static async newWebsocketProvider(address: string, network?: Network): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);
         const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
         provider.contractAddress = contractsAndTokens[0];
         provider.tokenSet = new TokenSet(contractsAndTokens[1]);
+        provider.network = network;
         return provider;
     }
 
     static async newHttpProvider(
         address: string = 'http://127.0.0.1:3030',
-        pollIntervalMilliSecs?: number
+        pollIntervalMilliSecs?: number,
+        network?: Network
     ): Promise<Provider> {
         const transport = new HTTPTransport(address);
         const provider = new Provider(transport);
@@ -103,6 +127,7 @@ export class Provider extends SyncProvider {
         const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
         provider.contractAddress = contractsAndTokens[0];
         provider.tokenSet = new TokenSet(contractsAndTokens[1]);
+        provider.network = network;
         return provider;
     }
 
@@ -110,13 +135,14 @@ export class Provider extends SyncProvider {
      * Provides some hardcoded values the `Provider` responsible for
      * without communicating with the network
      */
-    static async newMockProvider(network: string, ethPrivateKey: Uint8Array, getTokens: Function): Promise<Provider> {
+    static async newMockProvider(network: Network, ethPrivateKey: Uint8Array, getTokens: Function): Promise<Provider> {
         const transport = new DummyTransport(network, ethPrivateKey, getTokens);
         const provider = new Provider(transport);
 
         const contractsAndTokens = await Promise.all([provider.getContractAddress(), provider.getTokens()]);
         provider.contractAddress = contractsAndTokens[0];
         provider.tokenSet = new TokenSet(contractsAndTokens[1]);
+        provider.network = network;
         return provider;
     }
 
@@ -182,6 +208,10 @@ export class Provider extends SyncProvider {
         }
 
         return nft;
+    }
+
+    async getNFTOwner(id: number): Promise<number> {
+        return await this.transport.request('get_nft_owner', [id]);
     }
 
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {
@@ -267,7 +297,16 @@ export class Provider extends SyncProvider {
         return parseFloat(tokenPrice);
     }
 
-    async disconnect() {
+    async toggle2FA(toggle2FA: Toggle2FARequest): Promise<boolean> {
+        const result: Toggle2FAResponse = await this.transport.request('toggle_2fa', [toggle2FA]);
+        return result.success;
+    }
+
+    async getNFTIdByTxHash(txHash: string): Promise<number> {
+        return await this.transport.request('get_nft_id_by_tx_hash', [txHash]);
+    }
+
+    override async disconnect() {
         return await this.transport.disconnect();
     }
 }

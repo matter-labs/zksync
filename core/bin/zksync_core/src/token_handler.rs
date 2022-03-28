@@ -14,29 +14,34 @@ use futures::{
 };
 use tokio::task::JoinHandle;
 // Workspace uses
-use zksync_config::{TokenHandlerConfig, ZkSyncConfig};
+use zksync_config::TokenHandlerConfig;
 use zksync_notifier::Notifier;
 use zksync_storage::{tokens::StoreTokenError, ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{NewTokenEvent, Token, TokenInfo},
-    Address, TokenId,
+    Address, TokenId, TokenKind, U256,
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;
+use web3::contract::Options;
+use zksync_contracts::erc20_contract;
+use zksync_eth_client::EthereumGateway;
 
 struct TokenHandler {
     connection_pool: ConnectionPool,
     poll_interval: std::time::Duration,
-    eth_watch_req: mpsc::Sender<EthWatchRequest>,
+    eth_watcher_req: mpsc::Sender<EthWatchRequest>,
+    eth_client: EthereumGateway,
     token_list: HashMap<Address, TokenInfo>,
     last_eth_block: Option<u64>,
     notifier: Option<Notifier>,
 }
 
 impl TokenHandler {
-    async fn new(
+    fn new(
         connection_pool: ConnectionPool,
-        eth_watch_req: mpsc::Sender<EthWatchRequest>,
+        eth_watcher_req: mpsc::Sender<EthWatchRequest>,
+        eth_client: EthereumGateway,
         config: TokenHandlerConfig,
     ) -> Self {
         let poll_interval = config.poll_interval();
@@ -51,17 +56,18 @@ impl TokenHandler {
 
         Self {
             connection_pool,
-            eth_watch_req,
+            eth_client,
             token_list,
             poll_interval,
             notifier,
             last_eth_block: None, // TODO: Maybe load last viewed Ethereum block number for TokenHandler from DB (ZKS-518).
+            eth_watcher_req,
         }
     }
 
     async fn load_new_token_events(&self) -> Vec<NewTokenEvent> {
         let (sender, receiver) = oneshot::channel();
-        self.eth_watch_req
+        self.eth_watcher_req
             .clone()
             .send(EthWatchRequest::GetNewTokens {
                 last_eth_block: self.last_eth_block,
@@ -73,6 +79,21 @@ impl TokenHandler {
         receiver.await.expect("Err response from eth watch")
     }
 
+    async fn is_contract_erc20(&self, address: Address) -> bool {
+        self.eth_client
+            .call_contract_function::<U256, _, _, _>(
+                "balanceOf",
+                address,
+                None,
+                Options::default(),
+                None,
+                address,
+                erc20_contract(),
+            )
+            .await
+            .is_ok()
+    }
+
     async fn save_new_tokens(
         &self,
         storage: &mut StorageProcessor<'_>,
@@ -81,7 +102,7 @@ impl TokenHandler {
         let mut transaction = storage.start_transaction().await?;
         let mut token_schema = transaction.tokens_schema();
 
-        let last_token_id = TokenId(token_schema.get_count().await?);
+        let last_token_id = TokenId(token_schema.get_max_token_id().await?);
         let mut new_tokens = Vec::new();
 
         for token_event in tokens {
@@ -94,6 +115,13 @@ impl TokenHandler {
             let default_symbol = format!("ERC20-{}", token_event.id);
             let default_decimals = 18;
 
+            let is_erc20 = self.is_contract_erc20(token_event.address).await;
+            let token_kind = if is_erc20 {
+                TokenKind::ERC20
+            } else {
+                TokenKind::None
+            };
+
             let token_from_list = {
                 let token_info = self.token_list.get(&token_event.address).cloned();
 
@@ -103,6 +131,7 @@ impl TokenHandler {
                         token_info.address,
                         &token_info.symbol,
                         token_info.decimals,
+                        token_kind,
                     ))
                 } else {
                     None
@@ -123,6 +152,7 @@ impl TokenHandler {
                                 token_from_list.address,
                                 &default_symbol,
                                 token_from_list.decimals,
+                                token_kind,
                             );
                             let try_insert_token = token_schema.store_token(token.clone()).await;
                             match try_insert_token {
@@ -145,6 +175,7 @@ impl TokenHandler {
                         token_event.address,
                         &default_symbol,
                         default_decimals,
+                        token_kind,
                     );
                     let try_insert_token = token_schema.store_token(token.clone()).await;
                     match try_insert_token {
@@ -209,13 +240,14 @@ impl TokenHandler {
 #[must_use]
 pub fn run_token_handler(
     db_pool: ConnectionPool,
-    eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    config: &ZkSyncConfig,
+    eth_client: EthereumGateway,
+    config: &TokenHandlerConfig,
+    eth_watcher_req: mpsc::Sender<EthWatchRequest>,
 ) -> JoinHandle<()> {
     let config = config.clone();
     tokio::spawn(async move {
         let mut token_handler =
-            TokenHandler::new(db_pool, eth_watch_req, config.token_handler.clone()).await;
+            TokenHandler::new(db_pool, eth_watcher_req, eth_client, config.clone());
 
         token_handler.run().await
     })

@@ -43,7 +43,7 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
     }
 
     // JSON RPC request
-    async request(method: string, params = null): Promise<any> {
+    async request(method: string, params = null, config?: any): Promise<any> {
         const request = {
             id: 1,
             jsonrpc: '2.0',
@@ -51,7 +51,7 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
             params
         };
 
-        const response = await Axios.post(this.address, request).then((resp) => {
+        const response = await Axios.post(this.address, request, config).then((resp) => {
             return resp.data;
         });
 
@@ -106,11 +106,16 @@ export class WSTransport extends AbstractJSONRPCTransport {
         return transport;
     }
 
-    subscriptionsSupported(): boolean {
+    override subscriptionsSupported(): boolean {
         return true;
     }
 
-    async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
+    override async subscribe(
+        subMethod: string,
+        subParams,
+        unsubMethod: string,
+        cb: (data: any) => void
+    ): Promise<Subscription> {
         const req = { jsonrpc: '2.0', method: subMethod, params: subParams };
         const sub = await this.ws.sendRequest(req);
 

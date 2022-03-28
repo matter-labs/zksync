@@ -106,28 +106,28 @@ pub fn unpack_fee_amount(data: &[u8]) -> Option<BigUint> {
 /// Returns the closest possible packable token amount.
 /// Returned amount is always less or equal to the provided amount.
 pub fn closest_packable_fee_amount(amount: &BigUint) -> BigUint {
-    let fee_packed = pack_fee_amount(&amount);
+    let fee_packed = pack_fee_amount(amount);
     unpack_fee_amount(&fee_packed).expect("fee repacking")
 }
 
 /// Returns the closest possible packable token amount.
 /// Returned amount is always greater or equal to the provided amount.
 pub fn closest_greater_or_eq_packable_fee_amount(amount: &BigUint) -> BigUint {
-    let fee_packed = pack_fee_amount_up(&amount);
+    let fee_packed = pack_fee_amount_up(amount);
     unpack_fee_amount(&fee_packed).expect("fee repacking")
 }
 
 /// Returns the closest possible packable fee amount.
 /// Returned amount is always less or equal to the provided amount.
 pub fn closest_packable_token_amount(amount: &BigUint) -> BigUint {
-    let fee_packed = pack_token_amount(&amount);
+    let fee_packed = pack_token_amount(amount);
     unpack_token_amount(&fee_packed).expect("token amount repacking")
 }
 
 /// Returns the closest possible packable fee amount.
 /// Returned amount is always greater or equal to the provided amount.
 pub fn closest_greater_or_eq_packable_token_amount(amount: &BigUint) -> BigUint {
-    let fee_packed = pack_token_amount_up(&amount);
+    let fee_packed = pack_token_amount_up(amount);
     unpack_token_amount(&fee_packed).expect("token amount repacking")
 }
 
@@ -140,7 +140,7 @@ mod test {
 
     #[test]
     fn test_roundtrip() {
-        let zero = BigUint::from_u32(1).unwrap();
+        let zero = BigUint::from_u32(0).unwrap();
         let one = BigUint::from_u32(1).unwrap();
         {
             let round_trip_zero = unpack_token_amount(&pack_token_amount(&zero));

@@ -17,12 +17,12 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
         ParamType::Uint(32), // uint32 _feeAccount,
     ]);
     let stored_block = ParamType::Tuple(vec![
-        (ParamType::Uint(32)),       // uint32 blockNumber
-        (ParamType::Uint(64)),       // uint32 priorityOperations
-        (ParamType::FixedBytes(32)), // bytes32  pendingOnchainOperationsHash
-        (ParamType::Uint(256)),      // uint256 timestamp
-        (ParamType::FixedBytes(32)), // bytes32 stateHash
-        (ParamType::FixedBytes(32)), // bytes32 commitment
+        ParamType::Uint(32),       // uint32 blockNumber
+        ParamType::Uint(64),       // uint32 priorityOperations
+        ParamType::FixedBytes(32), // bytes32  pendingOnchainOperationsHash
+        ParamType::Uint(256),      // uint256 timestamp
+        ParamType::FixedBytes(32), // bytes32 stateHash
+        ParamType::FixedBytes(32), // bytes32 commitment
     ]);
     ethabi::decode(
         vec![stored_block, ParamType::Array(Box::new(commit_operation))].as_slice(),
@@ -66,7 +66,7 @@ pub(super) fn rollup_ops_blocks_from_bytes_inner(
             if let ethabi::Token::FixedBytes(root_hash) =
                 &prev_stored[previous_block_root_hash_argument_id]
             {
-                H256::from_slice(&root_hash)
+                H256::from_slice(root_hash)
             } else {
                 panic!("can't parse root hash param: {:#?}", prev_stored);
             }
@@ -107,7 +107,7 @@ pub(super) fn rollup_ops_blocks_from_bytes_inner(
                         contract_version: None,
                     });
 
-                    previous_block_root_hash = H256::from_slice(&root_hash);
+                    previous_block_root_hash = H256::from_slice(root_hash);
                 } else {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::NotFound,

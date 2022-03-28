@@ -3,9 +3,9 @@
 ## api/v0.2/blocks [/blocks{?from,limit,direction}]
 
 + Parameters
-    + from (required, "latest" | number, `latest`) ... From which transaction to show
+    + from (required, "latest" | number, `latest`) ... The number of the block from which to show or `latest`
     + limit (required, number, `2`) ... The limit of transactions to be shown
-    + direction (required, "newer" | "older", `older`) ... newer or older than the id of the `from`
+    + direction (required, "newer" | "older", `older`) ... Newer or older than the ID of the `from`
 
 ### Get blocks range [GET]
 Get blocks range
@@ -22,7 +22,7 @@ Get blocks range
 ## api/v0.2/blocks/:block_number [/blocks/{blockNumber}]
 
 + Parameters
-    + `blockNumber`: `lastCommitted` (required, BlockNumber) - a number of the block or `lastCommitted` for getting the last committed block or `lastFinalized` for getting the last finalized block
+    + `blockNumber`: `lastCommitted` (required, BlockNumber) - An integer block number, `lastCommitted` or `lastFinalized`
 
 ### Get block details [GET]
 Get block details
@@ -37,10 +37,10 @@ Get block details
 ## api/v0.2/blocks/blockNumber/transactions [/blocks/{blockNumber}/transactions{?from,limit,direction}]
 
 + Parameters
-    + `blockNumber`: `lastCommitted` (required, BlockNumber) - a number of the block or `lastCommitted` for getting the last committed block or `lastFinalized` for getting the last finalized block
-    + from (required, "latest" | string, `latest`) ... From which transaction to show
+    + `blockNumber`: `lastCommitted` (required, BlockNumber) - An integer block number, `lastCommitted` or `lastFinalized`
+    + from (required, "latest" | string, `latest`) ... The hash of the transaction from which to show or `latest`
     + limit (required, number, `2`) ... The limit of transactions to be shown
-    + direction (required, "newer" | "older", `older`) ... newer or older than the id of the `from`
+    + direction (required, "newer" | "older", `older`) ... Newer or older than the ID of the `from`
 
 ### Get block transactions [GET]
 Get block transactions
@@ -52,4 +52,21 @@ Get block transactions
         + result (object, required{{isResultNullable}})
             + pagination (PaginationFromHash, required)
             + list (array[Transaction.InBlock], required)
+        + error (Error, required, nullable)
+
+## api/v0.2/blocks/blockNumber/transactions/blockIndex [/blocks/{blockNumber}/transactions/{blockIndex}]
+
++ Parameters
+    + `blockNumber`: 1 (required, BlockNumber) - An integer block number
+    + `blockIndex`: 0 (required, BlockIndex) - An integer index tx in block
+
+### Get transaction in block [GET]
+Get transaction in block
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (object, required{{isResultNullable}})
+            + Transaction.InBlock
         + error (Error, required, nullable)

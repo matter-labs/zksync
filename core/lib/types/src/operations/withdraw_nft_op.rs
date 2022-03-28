@@ -31,9 +31,9 @@ impl WithdrawNFTOp {
         let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.tx.account_id.to_be_bytes());
         data.extend_from_slice(&self.creator_id.to_be_bytes());
-        data.extend_from_slice(&self.creator_address.as_bytes());
+        data.extend_from_slice(self.creator_address.as_bytes());
         data.extend_from_slice(&self.serial_id.to_be_bytes());
-        data.extend_from_slice(&self.content_hash.as_bytes());
+        data.extend_from_slice(self.content_hash.as_bytes());
         data.extend_from_slice(self.tx.to.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&self.tx.fee_token.to_be_bytes());

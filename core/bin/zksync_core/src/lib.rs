@@ -1,34 +1,31 @@
 use crate::register_factory_handler::run_register_factory_handler;
 use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
-    block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_watch::start_eth_watch,
-    mempool::run_mempool_tasks,
-    private_api::start_private_core_api,
-    rejected_tx_cleaner::run_rejected_tx_cleaner,
-    state_keeper::{start_state_keeper, ZkSyncStateKeeper},
+    state_keeper::{start_root_hash_calculator, start_state_keeper, ZkSyncStateKeeper},
     token_handler::run_token_handler,
 };
 use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ChainConfig, ZkSyncConfig};
 use zksync_eth_client::EthereumGateway;
-use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
+use zksync_mempool::{run_mempool_block_handler, run_mempool_tx_handler};
 use zksync_storage::ConnectionPool;
-use zksync_types::{tokens::get_genesis_token_list, Token, TokenId};
+use zksync_types::{tokens::get_genesis_token_list, Token, TokenId, TokenKind};
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
-pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
-pub mod mempool;
-pub mod private_api;
 pub mod register_factory_handler;
 pub mod rejected_tx_cleaner;
 pub mod state_keeper;
 pub mod token_handler;
+pub mod tx_event_emitter;
+
+mod genesis;
+mod private_api;
 
 /// Waits for any of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
@@ -50,17 +47,13 @@ pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
 }
 
 /// Inserts the initial information about zkSync tokens into the database.
-pub async fn genesis_init(config: &ZkSyncConfig) {
+pub async fn genesis_init(config: &ChainConfig) {
     let pool = ConnectionPool::new(Some(1));
 
     vlog::info!("Generating genesis block.");
-    ZkSyncStateKeeper::create_genesis_block(
-        pool.clone(),
-        &config.chain.state_keeper.fee_account_addr,
-    )
-    .await;
+    genesis::create_genesis_block(pool.clone(), &config.state_keeper.fee_account_addr).await;
     vlog::info!("Adding initial tokens to db");
-    let genesis_tokens = get_genesis_token_list(&config.chain.eth.network.to_string())
+    let genesis_tokens = get_genesis_token_list(&config.eth.network.to_string())
         .expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
         vlog::info!(
@@ -74,13 +67,13 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
             .await
             .expect("failed to access db")
             .tokens_schema()
-            .store_token(Token {
-                id: TokenId(id as u32),
-                symbol: token.symbol,
-                address: token.address,
-                decimals: token.decimals,
-                is_nft: false,
-            })
+            .store_token(Token::new(
+                TokenId(id as u32),
+                token.address,
+                &token.symbol,
+                token.decimals,
+                TokenKind::ERC20,
+            ))
             .await
             .expect("failed to store token");
     }
@@ -96,13 +89,11 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
 /// - private Core API server.
 pub async fn run_core(
     connection_pool: ConnectionPool,
-    panic_notify: mpsc::Sender<bool>,
-    eth_gateway: EthereumGateway,
+    read_only_connection_pool: ConnectionPool,
     config: &ZkSyncConfig,
+    eth_gateway: EthereumGateway,
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let (proposed_blocks_sender, proposed_blocks_receiver) =
-        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
-    let (state_keeper_req_sender, state_keeper_req_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
     let (mempool_tx_request_sender, mempool_tx_request_receiver) =
@@ -110,100 +101,110 @@ pub async fn run_core(
     let (mempool_block_request_sender, mempool_block_request_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
 
+    let (processed_tx_events_sender, processed_tx_events_receiver) =
+        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+
+    // Run health check api for core
+    let private_api_task = private_api::start_private_core_api(
+        connection_pool.clone(),
+        read_only_connection_pool,
+        eth_gateway.clone(),
+        config.api.private.clone(),
+    );
+
     // Start Ethereum Watcher.
     let eth_watch_task = start_eth_watch(
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
         eth_gateway.clone(),
-        &config,
+        &config.contracts,
+        &config.eth_watch,
+        mempool_tx_request_sender.clone(),
     );
 
     // Insert pending withdrawals into database (if required)
     let mut storage_processor = connection_pool.access_storage().await?;
 
-    // Start State Keeper.
-    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await?;
-    let pending_block = state_keeper_init
-        .get_pending_block(&mut storage_processor)
-        .await;
+    // Start state keeper and root hash calculator.
+    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(
+        &mut storage_processor,
+        config.chain.state_keeper.fee_account_addr,
+        &config.chain.state_keeper.block_chunk_sizes,
+    )
+    .await;
 
-    let state_keeper = ZkSyncStateKeeper::new(
+    let (mut state_keeper, root_hash_calculator) = ZkSyncStateKeeper::new(
         state_keeper_init,
         config.chain.state_keeper.fee_account_addr,
-        state_keeper_req_receiver,
         proposed_blocks_sender,
+        mempool_block_request_sender,
         config.chain.state_keeper.block_chunk_sizes.clone(),
         config.chain.state_keeper.miniblock_iterations as usize,
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
+        processed_tx_events_sender,
     );
-    let state_keeper_task = start_state_keeper(state_keeper, pending_block);
+
+    // Execute reverted blocks before start
+    state_keeper.execute_reverted_blocks().await;
+
+    let state_keeper_task = start_state_keeper(
+        state_keeper,
+        config.chain.state_keeper.miniblock_iteration_interval(),
+    );
+    let root_hash_calculator_task = start_root_hash_calculator(root_hash_calculator);
 
     // Start committer.
     let committer_task = run_committer(
         proposed_blocks_receiver,
-        mempool_block_request_sender.clone(),
         connection_pool.clone(),
-        &config,
+        config.chain.clone(),
     );
 
     // Start mempool.
-    let mempool_task = run_mempool_tasks(
+    let mempool_block_handler_task = run_mempool_block_handler(
         connection_pool.clone(),
-        mempool_tx_request_receiver,
         mempool_block_request_receiver,
-        eth_watch_req_sender.clone(),
-        &config,
-        4,
-        DEFAULT_CHANNEL_CAPACITY,
+        config.chain.state_keeper.block_chunk_sizes.clone(),
     );
 
-    let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config);
+    let mempool_tx_handler_task = run_mempool_tx_handler(
+        connection_pool.clone(),
+        mempool_tx_request_receiver,
+        config.chain.state_keeper.block_chunk_sizes.clone(),
+    );
 
     // Start token handler.
     let token_handler_task = run_token_handler(
         connection_pool.clone(),
+        eth_gateway.clone(),
+        &config.token_handler,
         eth_watch_req_sender.clone(),
-        &config,
     );
 
     // Start token handler.
     let register_factory_task = run_register_factory_handler(
         connection_pool.clone(),
         eth_watch_req_sender.clone(),
-        &config,
-    );
-    // Start rejected transactions cleaner task.
-    let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
-
-    // Start block proposer.
-    let proposer_task = run_block_proposer_task(
-        &config,
-        mempool_block_request_sender.clone(),
-        state_keeper_req_sender.clone(),
+        config.token_handler.clone(),
     );
 
-    // Start private API.
-    start_private_core_api(
-        panic_notify.clone(),
-        mempool_tx_request_sender,
-        eth_watch_req_sender,
-        config.api.private.clone(),
+    let tx_event_emitter_task = tx_event_emitter::run_tx_event_emitter_task(
+        connection_pool.clone(),
+        processed_tx_events_receiver,
     );
 
-    let mut task_futures = vec![
+    let task_futures = vec![
         eth_watch_task,
         state_keeper_task,
+        root_hash_calculator_task,
         committer_task,
-        mempool_task,
-        proposer_task,
-        rejected_tx_cleaner_task,
         token_handler_task,
         register_factory_task,
+        tx_event_emitter_task,
+        mempool_block_handler_task,
+        mempool_tx_handler_task,
+        private_api_task,
     ];
-
-    if let Some(task) = gateway_watcher_task_opt {
-        task_futures.push(task);
-    }
 
     Ok(task_futures)
 }

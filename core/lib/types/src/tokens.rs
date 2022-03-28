@@ -85,15 +85,31 @@ impl TokenLike {
     /// Checks if the token is Ethereum.
     pub fn is_eth(&self) -> bool {
         match self {
-            TokenLike::Symbol(symbol) => symbol == "ETH",
-            TokenLike::Address(address) => *address == Address::zero(),
-            TokenLike::Id(id) => **id == 0,
+            Self::Symbol(symbol) => {
+                // Case-insensitive comparison against `ETH`.
+                symbol
+                    .chars()
+                    .map(|c| c.to_ascii_lowercase())
+                    .eq("eth".chars())
+            }
+            Self::Address(address) => *address == Address::zero(),
+            Self::Id(id) => **id == 0,
+        }
+    }
+
+    /// Makes request case-insensitive (lowercase).
+    /// Used to compare queries against keys in the cache.
+    pub fn to_lowercase(&self) -> Self {
+        match self {
+            Self::Id(id) => Self::Id(*id),
+            Self::Address(address) => Self::Address(*address),
+            Self::Symbol(symbol) => Self::Symbol(symbol.to_lowercase()),
         }
     }
 }
 
 /// Token supported in zkSync protocol
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Token {
     /// id is used for tx signature and serialization
     pub id: TokenId,
@@ -103,17 +119,32 @@ pub struct Token {
     pub symbol: String,
     /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
     pub decimals: u8,
+    pub kind: TokenKind,
     pub is_nft: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub enum TokenKind {
+    ERC20,
+    NFT,
+    None,
+}
+
+impl Default for TokenKind {
+    fn default() -> Self {
+        Self::ERC20
+    }
+}
+
 impl Token {
-    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8) -> Self {
+    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8, kind: TokenKind) -> Self {
         Self {
             id,
             address,
             symbol: symbol.to_string(),
             decimals,
-            is_nft: false,
+            kind,
+            is_nft: matches!(kind, TokenKind::NFT),
         }
     }
 
@@ -123,6 +154,7 @@ impl Token {
             address: Default::default(),
             symbol: symbol.to_string(),
             decimals: 0,
+            kind: TokenKind::NFT,
             is_nft: true,
         }
     }
@@ -350,6 +382,28 @@ mod tests {
             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                 ChangePubKeyType::CREATE2
             ))
+        );
+    }
+
+    #[test]
+    fn token_like_is_eth() {
+        let tokens = vec![
+            TokenLike::Address(Address::zero()),
+            TokenLike::Id(TokenId(0)),
+            TokenLike::Symbol("ETH".into()),
+            TokenLike::Symbol("eth".into()),
+        ];
+
+        for token in tokens {
+            assert!(token.is_eth());
+        }
+    }
+
+    #[test]
+    fn token_like_to_case_insensitive() {
+        assert_eq!(
+            TokenLike::Symbol("ETH".into()).to_lowercase(),
+            TokenLike::Symbol("eth".into())
         );
     }
 }

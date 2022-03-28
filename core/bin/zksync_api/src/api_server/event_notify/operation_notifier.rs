@@ -2,7 +2,7 @@ use crate::api_server::rpc_server::types::{
     BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
 };
 use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use zksync_storage::ConnectionPool;
 use zksync_types::aggregated_operations::AggregatedOperation;
 use zksync_types::tx::TxHash;
@@ -23,9 +23,13 @@ pub struct OperationNotifier {
 }
 
 impl OperationNotifier {
-    pub fn new(cache_capacity: usize, db_pool: ConnectionPool) -> Self {
+    pub fn new(
+        cache_capacity: usize,
+        db_pool: ConnectionPool,
+        token_cache_invalidate_period: Duration,
+    ) -> Self {
         Self {
-            state: NotifierState::new(cache_capacity, db_pool),
+            state: NotifierState::new(cache_capacity, db_pool, token_cache_invalidate_period),
             tx_subs: SubStorage::new(),
             prior_op_subs: SubStorage::new(),
             account_subs: SubStorage::new(),

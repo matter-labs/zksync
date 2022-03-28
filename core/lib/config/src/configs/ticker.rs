@@ -1,7 +1,9 @@
+use num::{rational::Ratio, BigUint};
 // External uses
 use serde::Deserialize;
 // Workspace uses
 use zksync_types::Address;
+use zksync_utils::scaled_u64_to_ratio;
 // Local uses
 use crate::envy_load;
 
@@ -36,18 +38,24 @@ pub struct TickerConfig {
     pub token_market_update_time: u64,
     /// Number of tickers for load balancing.
     pub number_of_ticker_actors: u8,
+    /// Subsidized price for ChangePubKey in cents scaled by SUBSIDY_USD_AMOUNTS_SCALE
+    pub subsidy_cpk_price_usd_scaled: u64,
 }
 
 impl TickerConfig {
+    pub fn subsidy_cpk_price_usd(&self) -> Ratio<BigUint> {
+        scaled_u64_to_ratio(self.subsidy_cpk_price_usd_scaled)
+    }
+
     pub fn from_env() -> Self {
         envy_load!("fee_ticker", "FEE_TICKER_")
     }
 
     /// Returns the token price source type and the corresponding API URL.
-    pub fn price_source(&self) -> (TokenPriceSource, &str) {
+    pub fn price_source(&self) -> (TokenPriceSource, String) {
         let url = match self.token_price_source {
-            TokenPriceSource::CoinGecko => self.coingecko_base_url.as_ref(),
-            TokenPriceSource::CoinMarketCap => self.coinmarketcap_base_url.as_ref(),
+            TokenPriceSource::CoinGecko => self.coingecko_base_url.clone(),
+            TokenPriceSource::CoinMarketCap => self.coinmarketcap_base_url.clone(),
         };
         (self.token_price_source, url)
     }
@@ -71,6 +79,7 @@ mod tests {
             unconditionally_valid_tokens: vec![addr("0000000000000000000000000000000000000000")],
             token_market_update_time: 120,
             number_of_ticker_actors: 4,
+            subsidy_cpk_price_usd_scaled: 100,
         }
     }
 
@@ -89,6 +98,7 @@ FEE_TICKER_LIQUIDITY_VOLUME=100
 FEE_TICKER_NUMBER_OF_TICKER_ACTORS="4"
 FEE_TICKER_SUBSIDIZED_TOKENS_LIMITS=156
 FEE_TICKER_SCALE_FEE_PERCENT=100
+FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED=100
         "#;
         set_env(config);
 
@@ -110,13 +120,13 @@ FEE_TICKER_SCALE_FEE_PERCENT=100
         config.token_price_source = TokenPriceSource::CoinGecko;
         assert_eq!(
             config.price_source(),
-            (TokenPriceSource::CoinGecko, COINGECKO_URL)
+            (TokenPriceSource::CoinGecko, COINGECKO_URL.into())
         );
 
         config.token_price_source = TokenPriceSource::CoinMarketCap;
         assert_eq!(
             config.price_source(),
-            (TokenPriceSource::CoinMarketCap, COINMARKETCAP_URL)
+            (TokenPriceSource::CoinMarketCap, COINMARKETCAP_URL.into())
         );
     }
 }

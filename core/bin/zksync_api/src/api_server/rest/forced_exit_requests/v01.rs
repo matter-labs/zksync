@@ -19,7 +19,7 @@ pub use zksync_api_client::rest::forced_exit_requests::{
 };
 
 use zksync_api_client::rest::forced_exit_requests::ConfigInfo;
-use zksync_config::ZkSyncConfig;
+use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     forced_exit_requests::{
@@ -51,21 +51,22 @@ pub struct ApiForcedExitRequestsData {
 impl ApiForcedExitRequestsData {
     fn new(
         connection_pool: ConnectionPool,
-        config: &ZkSyncConfig,
+        config: &ForcedExitRequestsConfig,
+        contract: Address,
         forced_exit_checker: Box<dyn ForcedExitAccountAgeChecker>,
     ) -> Self {
         Self {
             connection_pool,
             forced_exit_checker,
 
-            is_enabled: config.forced_exit_requests.enabled,
-            price_per_token: config.forced_exit_requests.price_per_token,
-            max_tokens_per_request: config.forced_exit_requests.max_tokens_per_request,
-            recomended_tx_interval_millisecs: config.forced_exit_requests.recomended_tx_interval,
-            max_tx_interval_millisecs: config.forced_exit_requests.max_tx_interval,
-            forced_exit_contract_address: config.contracts.forced_exit_addr,
-            digits_in_id: config.forced_exit_requests.digits_in_id,
-            wait_confirmations: config.forced_exit_requests.wait_confirmations,
+            is_enabled: config.enabled,
+            price_per_token: config.price_per_token,
+            max_tokens_per_request: config.max_tokens_per_request,
+            recomended_tx_interval_millisecs: config.recomended_tx_interval,
+            max_tx_interval_millisecs: config.max_tx_interval,
+            forced_exit_contract_address: contract,
+            digits_in_id: config.digits_in_id,
+            wait_confirmations: config.wait_confirmations,
         }
     }
 }
@@ -87,7 +88,7 @@ async fn get_status(
         ForcedExitRequestStatus::Disabled
     };
 
-    metrics::histogram!("api.forced_exit_requests.v01.status", start.elapsed());
+    metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "forced_exit_request_status");
     Ok(Json(response))
 }
 
@@ -157,16 +158,13 @@ pub async fn submit_request(
 
     check_address_space_overflow(saved_fe_request.id, data.digits_in_id);
 
-    metrics::histogram!(
-        "api.forced_exit_requests.v01.submit_request",
-        start.elapsed()
-    );
+    metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "submit_forced_exit_request");
     Ok(Json(saved_fe_request))
 }
 
 pub async fn get_request_by_id(
     data: web::Data<ApiForcedExitRequestsData>,
-    web::Path(request_id): web::Path<ForcedExitRequestId>,
+    request_id: web::Path<ForcedExitRequestId>,
 ) -> JsonResult<ForcedExitRequest> {
     let start = Instant::now();
 
@@ -179,16 +177,12 @@ pub async fn get_request_by_id(
 
     let mut fe_requests_schema = storage.forced_exit_requests_schema();
 
-    metrics::histogram!(
-        "api.forced_exit_requests.v01.get_request_by_id",
-        start.elapsed()
-    );
-
     let fe_request_from_db = fe_requests_schema
-        .get_request_by_id(request_id)
+        .get_request_by_id(*request_id)
         .await
         .map_err(ApiError::internal)?;
 
+    metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "get_forced_exit_request_by_id");
     match fe_request_from_db {
         Some(fe_request) => Ok(Json(fe_request)),
         None => Err(ApiError::not_found("Request with such id does not exist")),
@@ -199,8 +193,9 @@ pub async fn get_request_by_id(
 // existing enough time
 pub async fn check_account_eligibility(
     data: web::Data<ApiForcedExitRequestsData>,
-    web::Path(account): web::Path<Address>,
+    account: web::Path<Address>,
 ) -> JsonResult<ForcedExitEligibilityResponse> {
+    let start = Instant::now();
     let mut storage = data
         .connection_pool
         .access_storage()
@@ -210,28 +205,30 @@ pub async fn check_account_eligibility(
 
     let eligible = data
         .forced_exit_checker
-        .check_forced_exit(&mut storage, account)
+        .check_forced_exit(&mut storage, *account)
         .await
         .map_err(ApiError::from)?;
 
     let result = ForcedExitEligibilityResponse { eligible };
 
+    metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "check_account_eligibility");
     Ok(Json(result))
 }
 
 pub fn api_scope(
     connection_pool: ConnectionPool,
-    config: &ZkSyncConfig,
+    config: &ForcedExitRequestsConfig,
+    contract: Address,
     fe_checker: Box<dyn ForcedExitAccountAgeChecker>,
 ) -> Scope {
-    let data = ApiForcedExitRequestsData::new(connection_pool, config, fe_checker);
+    let data = ApiForcedExitRequestsData::new(connection_pool, config, contract, fe_checker);
 
     // `enabled` endpoint should always be there
     let scope = web::scope("v0.1")
-        .data(data)
+        .app_data(web::Data::new(data))
         .route("status", web::get().to(get_status));
 
-    if config.forced_exit_requests.enabled {
+    if config.enabled {
         scope
             .route("/submit", web::post().to(submit_request))
             .route("/requests/{id}", web::get().to(get_request_by_id))
@@ -252,7 +249,7 @@ mod tests {
     use num::BigUint;
 
     use zksync_api_client::rest::client::Client;
-    use zksync_config::ForcedExitRequestsConfig;
+    use zksync_config::{ForcedExitRequestsConfig, ZkSyncConfig};
     use zksync_storage::ConnectionPool;
     use zksync_types::{Address, TokenId};
 
@@ -263,7 +260,7 @@ mod tests {
     };
 
     struct TestServer {
-        api_server: actix_web::test::TestServer,
+        api_server: actix_test::TestServer,
         #[allow(dead_code)]
         pool: ConnectionPool,
     }
@@ -277,7 +274,8 @@ mod tests {
                 move |cfg| {
                     api_scope(
                         cfg.pool.clone(),
-                        &cfg.config,
+                        &cfg.config.forced_exit_requests,
+                        cfg.config.contracts.forced_exit_addr,
                         Box::new(DummyForcedExitChecker {}),
                     )
                 },
@@ -474,6 +472,6 @@ pub fn check_address_space_overflow(id: i64, digits_in_id: u8) {
 
     metrics::histogram!(
         "forced_exit_requests.address_space_overflow",
-        exceeding_rate
+        exceeding_rate as f64
     );
 }

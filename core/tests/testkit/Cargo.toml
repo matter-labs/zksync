@@ -11,8 +11,9 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our tests.
 
 [dependencies]
-zksync_core = { path = "../../bin/zksync_core", version = "1.0" }
+zksync_core = { path = "../../bin/zksync_core", version = "1.0" , features = ['testkit']}
 zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_mempool = { path = "../../lib/mempool", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_circuit = { path = "../../lib/circuit", version = "1.0" }
@@ -24,14 +25,14 @@ zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0"  }
 zksync_test_account = { path = "../test_account", version = "1.0" }
 zksync_data_restore = { path = "../../bin/data_restore", version = "1.0" }
 
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 vlog = { path = "../../lib/vlog", version = "1.0" }
 num = { version = "0.3.1", features = ["serde"] }
 futures = "0.3"
 ethabi = "14.0.0"
-web3 = "0.15.0"
+web3 = "0.16.0"
 anyhow = "1.0"
 serde = "1.0.90"
 serde_json = "1.0.0"
-itertools = "0.9.0"
+itertools = "0.9"
 structopt = { version = "0.3" }

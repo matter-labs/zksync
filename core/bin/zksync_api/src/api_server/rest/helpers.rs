@@ -1,5 +1,6 @@
 //! Utilities for the REST API.
 
+use actix_web::error::InternalError;
 use actix_web::{HttpResponse, Result as ActixResult};
 use std::collections::HashMap;
 use zksync_storage::chain::{
@@ -69,6 +70,7 @@ pub fn deposit_op_to_tx_by_hash(
                     .to_string(),
                 fail_reason: None,
                 tx: tx_json,
+                batch_id: None,
             })
         }
         _ => None,
@@ -125,6 +127,7 @@ pub fn priority_op_to_tx_history(
         commited: false,
         verified: false,
         created_at: current_time,
+        batch_id: None,
     }
 }
 
@@ -140,7 +143,7 @@ pub async fn parse_tx_id(
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: ({})", err, data,);
-                HttpResponse::InternalServerError().finish()
+                InternalError::from_response(err, HttpResponse::InternalServerError().finish())
             })?;
 
         let next_block_id = last_block_id + 1;
@@ -150,11 +153,12 @@ pub async fn parse_tx_id(
 
     let parts: Vec<u64> = data
         .split(',')
-        .map(|val| val.parse().map_err(|_| HttpResponse::BadRequest().finish()))
-        .collect::<Result<Vec<u64>, HttpResponse>>()?;
-
+        .map(|val| val.parse().map_err(actix_web::error::ErrorBadRequest))
+        .collect::<Result<Vec<u64>, actix_web::error::Error>>()?;
     if parts.len() != 2 {
-        return Err(HttpResponse::BadRequest().finish().into());
+        return Err(actix_web::error::ErrorBadRequest(anyhow::anyhow!(
+            "Wrong amount of parameters. There must be two parameters: block and transaction ID"
+        )));
     }
 
     Ok((parts[0], parts[1]))

@@ -13,16 +13,17 @@ use futures::{
     channel::{mpsc, oneshot},
     StreamExt,
 };
-use tokio::runtime::{Builder, Handle};
+use tokio::task::JoinHandle;
+
 // Workspace uses
+use zksync_eth_client::EthereumGateway;
 use zksync_types::{
-    tx::{EthBatchSignData, EthSignData, TxEthSignature},
+    tx::{error::TxAddError, EthBatchSignData, EthSignData, TxEthSignature},
     Address, Order, SignedZkSyncTx, Token, ZkSyncTx,
 };
 // Local uses
-use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_eth_client::EthereumGateway;
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use crate::eth_checker::EthereumChecker;
+use zksync_types::tx::TransactionError;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
 /// either a single transaction, or the transaction batch.
@@ -31,6 +32,7 @@ pub enum TxVariant {
     Tx(SignedZkSyncTx),
     Batch(Vec<SignedZkSyncTx>, Option<EthBatchSignData>),
     Order(Box<Order>),
+    Toggle2FA,
 }
 
 /// Wrapper on a `TxVariant` which guarantees that (a batch of)
@@ -68,6 +70,7 @@ impl VerifiedTx {
             TxVariant::Tx(tx) => tx,
             TxVariant::Batch(_, _) => panic!("called `unwrap_tx` on a `Batch` value"),
             TxVariant::Order(_) => panic!("called `unwrap_tx` on an `Order` value"),
+            TxVariant::Toggle2FA => panic!("called `unwrap_tx` on an `Toggle2FA` value"),
         }
     }
 
@@ -77,6 +80,7 @@ impl VerifiedTx {
             TxVariant::Batch(txs, batch_sign_data) => (txs, batch_sign_data),
             TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
             TxVariant::Order(_) => panic!("called `unwrap_batch` on an `Order` value"),
+            TxVariant::Toggle2FA => panic!("called `unwrap_batch` on an `Toggle2FA` value"),
         }
     }
 }
@@ -116,6 +120,18 @@ async fn verify_eth_signature(
             }
         }
         RequestData::Order(request) => {
+            let signature_correct = verify_ethereum_signature(
+                &request.sign_data.signature,
+                &request.sign_data.message,
+                request.sender,
+                eth_checker,
+            )
+            .await;
+            if !signature_correct {
+                return Err(TxAddError::IncorrectEthSignature);
+            }
+        }
+        RequestData::Toggle2FA(request) => {
             let signature_correct = verify_ethereum_signature(
                 &request.sign_data.signature,
                 &request.sign_data.message,
@@ -282,20 +298,17 @@ async fn verify_eth_signature_txs_batch(
 fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
     match tx {
         TxVariant::Tx(tx) => {
-            if !tx.tx.check_correctness() {
-                return Err(TxAddError::IncorrectTx);
-            }
+            tx.tx.check_correctness()?;
         }
         TxVariant::Batch(batch, _) => {
-            if batch.iter_mut().any(|tx| !tx.tx.check_correctness()) {
-                return Err(TxAddError::IncorrectTx);
+            for tx in batch.iter_mut() {
+                tx.tx.check_correctness()?;
             }
         }
-        TxVariant::Order(order) => {
-            if !order.check_correctness() {
-                return Err(TxAddError::IncorrectTx);
-            }
-        }
+        TxVariant::Order(order) => order
+            .check_correctness()
+            .map_err(|err| TxAddError::IncorrectTx(TransactionError::OrderError(err)))?,
+        TxVariant::Toggle2FA => {} // There is no data to check correctness of
     }
     Ok(())
 }
@@ -327,6 +340,12 @@ pub struct OrderRequest {
     pub sender: Address,
 }
 
+#[derive(Debug)]
+pub struct Toggle2FARequest {
+    pub sign_data: EthSignData,
+    pub sender: Address,
+}
+
 /// Request for the signature check.
 #[derive(Debug)]
 pub struct VerifySignatureRequest {
@@ -340,6 +359,7 @@ pub enum RequestData {
     Tx(TxRequest),
     Batch(BatchRequest),
     Order(OrderRequest),
+    Toggle2FA(Toggle2FARequest),
 }
 
 impl RequestData {
@@ -350,49 +370,33 @@ impl RequestData {
                 TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
             }
             RequestData::Order(request) => TxVariant::Order(request.order.clone()),
+            RequestData::Toggle2FA(_) => TxVariant::Toggle2FA,
         }
     }
 }
 
 /// Main routine of the concurrent signature checker.
 /// See the module documentation for details.
-pub fn start_sign_checker_detached(
+pub fn start_sign_checker(
     client: EthereumGateway,
     input: mpsc::Receiver<VerifySignatureRequest>,
-    panic_notify: mpsc::Sender<bool>,
-) {
+) -> JoinHandle<()> {
     let eth_checker = EthereumChecker::new(client);
 
-    /// Main signature check requests handler.
     /// Basically it receives the requests through the channel and verifies signatures,
     /// notifying the request sender about the check result.
     async fn checker_routine(
-        handle: Handle,
         mut input: mpsc::Receiver<VerifySignatureRequest>,
         eth_checker: EthereumChecker,
     ) {
         while let Some(VerifySignatureRequest { data, response }) = input.next().await {
             let eth_checker = eth_checker.clone();
-            handle.spawn(async move {
+            tokio::spawn(async move {
                 let resp = VerifiedTx::verify(data, &eth_checker).await;
 
                 response.send(resp).unwrap_or_default();
             });
         }
     }
-
-    std::thread::Builder::new()
-        .name("Signature checker thread".to_string())
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-
-            let mut runtime = Builder::new()
-                .enable_all()
-                .threaded_scheduler()
-                .build()
-                .expect("failed to build runtime for signature processor");
-            let handle = runtime.handle().clone();
-            runtime.block_on(checker_routine(handle, input, eth_checker));
-        })
-        .expect("failed to start signature checker thread");
+    tokio::spawn(checker_routine(input, eth_checker))
 }

@@ -7,6 +7,7 @@ members = [
     "core/bin/prover",
     "core/bin/parse_pub_data",
     "core/bin/block_revert",
+    "core/bin/remove_proofs",
 
     # Server micro-services
     "core/bin/zksync_api",
@@ -17,7 +18,9 @@ members = [
     "core/bin/zksync_forced_exit_requests",
 
     # Libraries
+    "core/lib/token_db_cache",
     "core/lib/circuit",
+    "core/lib/mempool",
     "core/lib/eth_client",
     "core/lib/eth_signer",
     "core/lib/gateway_watcher",
@@ -38,15 +41,15 @@ members = [
     "core/lib/balancer",
 
     # Test infrastructure
+    "core/tests/flamegraph_target",
     "core/tests/test_account",
     "core/tests/testkit",
-    "core/tests/loadtest",
     "core/tests/loadnext",
 
     # SDK section
     "sdk/zksync-rs"
 ]
 
-[patch.crates-io]
-web3 = { git = "https://github.com/Deniallugo/rust-web3", branch = "update_ethabi"}
-
+[profile.release.package.flamegraph_target]
+# We need both performance and debug info to analyze.
+debug = true

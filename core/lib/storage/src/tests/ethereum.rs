@@ -1,12 +1,11 @@
 // Built-in deps
 use std::str::FromStr;
 // External imports
-use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     ethereum::ETHOperation,
-    BlockNumber,
+    BlockNumber, H256, U256,
 };
 // Local imports
 use crate::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};
@@ -198,7 +197,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 }
 
 /// Here we check `unprocessed` and `unconfirmed` operations getting.
-/// If there is no `ETHOperation` for `Operation`, it must be returend by `load_unprocessed_operations`.
+/// If there is no `ETHOperation` for `Operation`, it must be returned by `load_unprocessed_operations`.
 /// It must **not** be returned by `load_unconfirmed_operations`.
 ///
 /// If there is an `ETHOperation` and it's not confirmed, it must be returned by `load_unconfirmed_operations`

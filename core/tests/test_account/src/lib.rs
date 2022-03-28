@@ -4,7 +4,7 @@ use std::{fmt, sync::Mutex};
 use num::BigUint;
 // Workspace uses
 use zksync_basic_types::H256;
-use zksync_crypto::rand::{thread_rng, Rng};
+use zksync_crypto::rand::{thread_rng, Rng, SeedableRng, XorShiftRng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
 use zksync_types::{
     tx::{
@@ -85,7 +85,15 @@ impl ZkSyncAccount {
     /// Note: probably not secure, use for testing.
     pub fn rand() -> Self {
         let rng = &mut thread_rng();
+        Self::rand_with_rng(rng)
+    }
 
+    pub fn rand_with_seed(seed: [u32; 4]) -> Self {
+        let mut rng = XorShiftRng::from_seed(seed);
+        Self::rand_with_rng(&mut rng)
+    }
+
+    fn rand_with_rng<T: Rng>(rng: &mut T) -> Self {
         let pk = priv_key_from_fs(rng.gen());
         let (eth_private_key, eth_address) = {
             let eth_pk = rng.gen::<[u8; 32]>().into();
@@ -116,7 +124,7 @@ impl ZkSyncAccount {
         if let ZkSyncETHAccountData::EOA { eth_private_key } = &eth_account_data {
             assert_eq!(
                 address,
-                PackedEthSignature::address_from_private_key(&eth_private_key)
+                PackedEthSignature::address_from_private_key(eth_private_key)
                     .expect("private key is incorrect"),
                 "address should correspond to private key"
             );
@@ -183,7 +191,7 @@ impl ZkSyncAccount {
             if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
                 let message = mint_nft.get_ethereum_sign_message(token_symbol, 18);
                 Some(
-                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                    PackedEthSignature::sign(eth_private_key, message.as_bytes())
                         .expect("Signing the mint nft unexpectedly failed"),
                 )
             } else {
@@ -229,7 +237,7 @@ impl ZkSyncAccount {
             if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
                 let message = withdraw_nft.get_ethereum_sign_message(token_symbol, 18);
                 Some(
-                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                    PackedEthSignature::sign(eth_private_key, message.as_bytes())
                         .expect("Signing the withdraw nft unexpectedly failed"),
                 )
             } else {
@@ -306,7 +314,7 @@ impl ZkSyncAccount {
             if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
                 let message = swap.get_ethereum_sign_message(fee_token_symbol, 18);
                 Some(
-                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                    PackedEthSignature::sign(eth_private_key, message.as_bytes())
                         .expect("Signing the swap unexpectedly failed"),
                 )
             } else {
@@ -352,7 +360,7 @@ impl ZkSyncAccount {
             if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
                 let message = transfer.get_ethereum_sign_message(token_symbol, 18);
                 Some(
-                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                    PackedEthSignature::sign(eth_private_key, message.as_bytes())
                         .expect("Signing the transfer unexpectedly failed"),
                 )
             } else {
@@ -429,7 +437,7 @@ impl ZkSyncAccount {
             if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
                 let message = withdraw.get_ethereum_sign_message(token_symbol, 18);
                 Some(
-                    PackedEthSignature::sign(eth_private_key, &message.as_bytes())
+                    PackedEthSignature::sign(eth_private_key, message.as_bytes())
                         .expect("Signing the withdraw unexpectedly failed"),
                 )
             } else {

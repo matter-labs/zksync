@@ -1,4 +1,5 @@
 *
+!docker/prover/graceful-run.sh
 !docker/prover/prover-entry.sh
 !docker/exit-tool/exit-tool-entry.sh
 !docker/exit-tool/configs
@@ -10,6 +11,7 @@
 !etc/env/docker.env
 !etc/env/base
 !etc/tokens
+!etc/web3-abi
 !keys/packed
 !docker/nginx/nginx.conf
 !bin/

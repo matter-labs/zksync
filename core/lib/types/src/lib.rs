@@ -39,8 +39,6 @@
 pub mod account;
 pub mod aggregated_operations;
 pub mod block;
-pub mod config;
-pub mod error;
 pub mod ethereum;
 pub mod event;
 pub mod fee;
@@ -69,7 +67,9 @@ pub use self::operations::{
 };
 pub use self::priority_ops::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
 pub use self::register_factory::RegisterNFTFactoryEvent;
-pub use self::tokens::{NewTokenEvent, Token, TokenInfo, TokenLike, TokenPrice, TxFeeTypes, NFT};
+pub use self::tokens::{
+    NewTokenEvent, Token, TokenInfo, TokenKind, TokenLike, TokenPrice, TxFeeTypes, NFT,
+};
 pub use self::tx::{
     ForcedExit, MintNFT, Order, SignedZkSyncTx, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx,
 };

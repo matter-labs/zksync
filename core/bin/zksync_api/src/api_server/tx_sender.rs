@@ -10,46 +10,60 @@ use std::{
 
 // External uses
 use bigdecimal::BigDecimal;
+use chrono::{Duration, Utc};
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
 use itertools::izip;
+use num::rational::Ratio;
 use num::{bigint::ToBigInt, BigUint, Zero};
 use thiserror::Error;
 
 // Workspace uses
 use zksync_api_types::{
-    v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper},
+    v02::transaction::{SubmitBatchResponse, Toggle2FA, Toggle2FAResponse, TxHashSerializeWrapper},
     TxWithSignature,
 };
-use zksync_config::ZkSyncConfig;
+use zksync_storage::misc::records::Subsidy;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{
     tx::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
         TxEthSignatureVariant, TxHash,
     },
-    AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
+    AccountId, Address, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
+};
+use zksync_utils::{
+    big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, scaled_big_decimal_to_ratio,
 };
 
 // Local uses
 use crate::{
     api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
-    core_api_client::CoreApiClient,
-    fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
+    fee_ticker::{ResponseBatchFee, ResponseFee, TokenPriceRequestType},
     signature_checker::{
-        BatchRequest, OrderRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest,
+        BatchRequest, OrderRequest, RequestData, Toggle2FARequest, TxRequest, VerifiedTx,
+        VerifySignatureRequest,
     },
-    tx_error::TxAddError,
-    utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
+    tx_error::Toggle2FAError,
+    utils::block_details_cache::BlockDetailsCache,
 };
+use zksync_config::configs::api::CommonApiConfig;
+use zksync_mempool::MempoolTransactionRequest;
+use zksync_types::tx::error::TxAddError;
+
+use super::rpc_server::types::RequestMetadata;
+use crate::fee_ticker::{FeeTicker, PriceError};
+
+const VALIDNESS_INTERVAL_MINUTES: i64 = 40;
 
 #[derive(Clone)]
 pub struct TxSender {
-    pub core_api_client: CoreApiClient,
+    pub mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     pub sign_verify_requests: mpsc::Sender<VerifySignatureRequest>,
-    pub ticker_requests: mpsc::Sender<TickerRequest>,
+    pub ticker: FeeTicker,
 
     pub pool: ConnectionPool,
     pub tokens: TokenDBCache,
@@ -62,6 +76,10 @@ pub struct TxSender {
     // Limit the number of both transactions and Ethereum signatures per batch.
     pub max_number_of_transactions_per_batch: usize,
     pub max_number_of_authors_per_batch: usize,
+
+    pub current_subsidy_type: String,
+    pub max_subsidy_usd: Ratio<BigUint>,
+    pub subsidized_ips: HashSet<String>,
 }
 
 #[derive(Debug, Error)]
@@ -75,14 +93,20 @@ pub enum SubmitError {
     #[error("Incorrect transaction: {0}.")]
     IncorrectTx(String),
     #[error("Transaction adding error: {0}.")]
-    TxAdd(TxAddError),
+    TxAdd(#[from] TxAddError),
     #[error("Chosen token is not suitable for paying fees.")]
     InappropriateFeeToken,
+    // Not all TxAddErrors would apply to Toggle2FA, but
+    // it is helpful to re-use IncorrectEthSignature and DbError
+    #[error("Failed to toggle 2FA: {0}.")]
+    Toggle2FA(#[from] Toggle2FAError),
 
-    #[error("Communication error with the core server: {0}.")]
-    CommunicationCoreServer(String),
+    #[error("Communication error with the mempool: {0}.")]
+    MempoolCommunication(String),
+    #[error("Price error {0}")]
+    PriceError(#[from] PriceError),
     #[error("Internal error.")]
-    Internal(anyhow::Error),
+    Internal(#[from] anyhow::Error),
     #[error("{0}")]
     Other(String),
 }
@@ -96,8 +120,8 @@ impl SubmitError {
         Self::Other(msg.to_string())
     }
 
-    pub fn communication_core_server(msg: impl Display) -> Self {
-        Self::CommunicationCoreServer(msg.to_string())
+    pub fn mempool_communication(msg: impl Display) -> Self {
+        Self::MempoolCommunication(msg.to_string())
     }
 
     pub fn invalid_params(msg: impl Display) -> Self {
@@ -121,45 +145,32 @@ impl TxSender {
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config: &ZkSyncConfig,
-    ) -> Self {
-        let core_api_client = CoreApiClient::new(config.api.private.url.clone());
-
-        Self::with_client(
-            core_api_client,
-            connection_pool,
-            sign_verify_request_sender,
-            ticker_request_sender,
-            config,
-        )
-    }
-
-    pub(crate) fn with_client(
-        core_api_client: CoreApiClient,
-        connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config: &ZkSyncConfig,
+        ticker: FeeTicker,
+        config: &CommonApiConfig,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
         let max_number_of_transactions_per_batch =
-            config.api.common.max_number_of_transactions_per_batch as usize;
-        let max_number_of_authors_per_batch =
-            config.api.common.max_number_of_authors_per_batch as usize;
+            config.max_number_of_transactions_per_batch as usize;
+        let max_number_of_authors_per_batch = config.max_number_of_authors_per_batch as usize;
 
         Self {
-            core_api_client,
+            mempool_tx_sender,
             pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
-            ticker_requests: ticker_request_sender,
-            tokens: TokenDBCache::new(),
-            forced_exit_checker: ForcedExitChecker::new(config),
-            enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
-            blocks: BlockDetailsCache::new(config.api.common.caches_size),
+            ticker,
+            tokens: TokenDBCache::new(config.invalidate_token_cache_period()),
+            forced_exit_checker: ForcedExitChecker::new(
+                config.forced_exit_minimum_account_age_secs,
+            ),
+            enforce_pubkey_change_fee: config.enforce_pubkey_change_fee,
+            blocks: BlockDetailsCache::new(config.caches_size),
 
-            fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
+            fee_free_accounts: HashSet::from_iter(config.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
+            current_subsidy_type: config.subsidy_name.clone(),
+            max_subsidy_usd: config.max_subsidy_usd(),
+            subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
         }
     }
 
@@ -172,7 +183,6 @@ impl TxSender {
             _ => Ok(tx.account()),
         }
     }
-
     async fn get_address_by_id(&self, id: AccountId) -> Result<Address, anyhow::Error> {
         self.pool
             .access_storage()
@@ -187,20 +197,101 @@ impl TxSender {
     async fn get_tx_sender_type(&self, tx: &ZkSyncTx) -> Result<EthAccountType, SubmitError> {
         self.get_sender_type(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
             .await
+            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))
     }
 
-    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, SubmitError> {
+    async fn get_sender_type(&self, id: AccountId) -> Result<EthAccountType, anyhow::Error> {
         Ok(self
             .pool
             .access_storage()
-            .await
-            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+            .await?
             .chain()
             .account_schema()
             .account_type_by_id(id)
-            .await
-            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+            .await?
             .unwrap_or(EthAccountType::Owned))
+    }
+
+    pub async fn toggle_2fa(
+        &self,
+        toggle_2fa: Toggle2FA,
+    ) -> Result<Toggle2FAResponse, SubmitError> {
+        let account_id = toggle_2fa.account_id;
+        let current_type = self
+            .get_sender_type(toggle_2fa.account_id)
+            .await
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?;
+
+        if matches!(current_type, EthAccountType::CREATE2) {
+            return Err(SubmitError::Toggle2FA(Toggle2FAError::CREATE2));
+        }
+
+        // When 2FA is being enabled, supplied PubKeyHash is not used, so such a request
+        // is not valid.
+        if toggle_2fa.enable && toggle_2fa.pub_key_hash.is_some() {
+            return Err(SubmitError::Toggle2FA(Toggle2FAError::UnusedPubKeyHash));
+        }
+
+        let new_type = if toggle_2fa.enable {
+            EthAccountType::Owned
+        } else {
+            EthAccountType::No2FA(toggle_2fa.pub_key_hash)
+        };
+
+        self.verify_toggle_2fa_request_eth_signature(toggle_2fa)
+            .await?;
+
+        self.pool
+            .access_storage()
+            .await
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?
+            .chain()
+            .account_schema()
+            .set_account_type(account_id, new_type)
+            .await
+            .map_err(|_| SubmitError::Toggle2FA(Toggle2FAError::DbError))?;
+
+        Ok(Toggle2FAResponse { success: true })
+    }
+
+    async fn verify_toggle_2fa_request_eth_signature(
+        &self,
+        toggle_2fa: Toggle2FA,
+    ) -> Result<(), SubmitError> {
+        let current_time = Utc::now();
+        let request_time = toggle_2fa.timestamp;
+        let validness_interval = Duration::minutes(VALIDNESS_INTERVAL_MINUTES);
+
+        if current_time - validness_interval > request_time
+            || current_time + validness_interval < request_time
+        {
+            return Err(SubmitError::InvalidParams(format!(
+                "Timestamp differs by more than {} minutes",
+                VALIDNESS_INTERVAL_MINUTES
+            )));
+        }
+
+        let message = toggle_2fa.get_ethereum_sign_message().into_bytes();
+
+        let signature = toggle_2fa.signature;
+        let signer = self
+            .get_address_by_id(toggle_2fa.account_id)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+
+        let eth_sign_data = EthSignData { signature, message };
+        let (sender, receiever) = oneshot::channel();
+
+        let request = VerifySignatureRequest {
+            data: RequestData::Toggle2FA(Toggle2FARequest {
+                sign_data: eth_sign_data,
+                sender: signer,
+            }),
+            response: sender,
+        };
+
+        send_verify_request_and_recv(request, self.sign_verify_requests.clone(), receiever).await?;
+        Ok(())
     }
 
     async fn verify_order_eth_signature(
@@ -208,7 +299,10 @@ impl TxSender {
         order: &Order,
         signature: Option<TxEthSignature>,
     ) -> Result<(), SubmitError> {
-        let signer_type = self.get_sender_type(order.account_id).await?;
+        let signer_type = self
+            .get_sender_type(order.account_id)
+            .await
+            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?;
         if matches!(signer_type, EthAccountType::CREATE2) {
             return if signature.is_some() {
                 Err(SubmitError::IncorrectTx(
@@ -218,6 +312,20 @@ impl TxSender {
                 Ok(())
             };
         }
+
+        if matches!(signer_type, EthAccountType::No2FA(None)) {
+            // We don't verify signatures for accounts with no 2FA
+            return Ok(());
+        }
+        if let EthAccountType::No2FA(Some(unchecked_hash)) = signer_type {
+            let order_pub_key_hash = PubKeyHash::from_pubkey(&order.signature.pub_key.0);
+            // We don't scheck the signature only if the order was signed with the same
+            // is the same as unchecked PubKey
+            if order_pub_key_hash == unchecked_hash {
+                return Ok(());
+            }
+        }
+
         let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
         let signer = self
             .get_address_by_id(order.account_id)
@@ -252,6 +360,7 @@ impl TxSender {
         mut tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
         fast_processing: Option<bool>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
         let fast_processing = fast_processing.unwrap_or(false);
         if fast_processing && !tx.is_withdraw() {
@@ -269,14 +378,122 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        self.submit_tx(tx, signature).await
+        let result = self
+            .submit_tx(tx, signature, extracted_request_metadata)
+            .await;
+
+        if let Err(err) = &result {
+            let err_label = match err {
+                SubmitError::IncorrectTx(err) => err.clone(),
+                SubmitError::TxAdd(err) => err.to_string(),
+                _ => "other".to_string(),
+            };
+            let labels = vec![("stage", "api".to_string()), ("error", err_label)];
+            metrics::increment_counter!("rejected_txs", &labels);
+        }
+
+        result
+    }
+
+    pub async fn can_subsidize(
+        &self,
+        new_subsidy_usd: Ratio<BigUint>,
+    ) -> Result<bool, anyhow::Error> {
+        let subsidized_already = self
+            .pool
+            .access_storage()
+            .await?
+            .misc_schema()
+            .get_total_used_subsidy_for_type(&self.current_subsidy_type)
+            .await?;
+        let subsidized_already_usd = scaled_big_decimal_to_ratio(subsidized_already)?;
+
+        let result = if self.max_subsidy_usd > subsidized_already_usd {
+            &self.max_subsidy_usd - &subsidized_already_usd >= new_subsidy_usd
+        } else {
+            false
+        };
+
+        Ok(result)
+    }
+
+    pub async fn should_subsidize_cpk(
+        &self,
+        normal_fee: &BigUint,
+        subsidized_fee: &BigUint,
+        subsidy_size_usd: &Ratio<BigUint>,
+        extracted_request_metadata: Option<RequestMetadata>,
+    ) -> Result<bool, SubmitError> {
+        let should_subsidize_ip = if let Some(meta) = extracted_request_metadata {
+            self.subsidized_ips.contains(&meta.ip)
+        } else {
+            false
+        };
+
+        let result = should_subsidize_ip
+            && subsidized_fee < normal_fee
+            && self
+                .can_subsidize(subsidy_size_usd.clone())
+                .await
+                .map_err(SubmitError::Internal)?;
+
+        Ok(result)
+    }
+
+    pub async fn store_subsidy_data(
+        &self,
+        hash: TxHash,
+        normal_fee: BigUint,
+        subsidized_fee: BigUint,
+        token_id: TokenId,
+    ) -> Result<(), anyhow::Error> {
+        let token_price_in_usd = self
+            .ticker
+            .get_token_price(TokenLike::Id(token_id), TokenPriceRequestType::USDForOneWei)
+            .await?;
+
+        let full_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &normal_fee;
+        let subsidized_cost_usd = big_decimal_to_ratio(&token_price_in_usd)? * &subsidized_fee;
+        if full_cost_usd < subsidized_cost_usd {
+            return Err(anyhow::Error::msg(
+                "Trying to subsidize transaction which should not be subsidized",
+            ));
+        }
+
+        let subsidy = Subsidy {
+            usd_amount_scaled: ratio_to_scaled_u64(&full_cost_usd - &subsidized_cost_usd),
+            full_cost_usd_scaled: ratio_to_scaled_u64(full_cost_usd),
+            token_id,
+            token_amount: biguint_to_big_decimal(subsidized_fee),
+            full_cost_token: biguint_to_big_decimal(normal_fee),
+            subsidy_type: self.current_subsidy_type.clone(),
+            tx_hash: hash,
+        };
+
+        self.pool
+            .access_storage()
+            .await?
+            .misc_schema()
+            .store_subsidy(subsidy)
+            .await?;
+
+        Ok(())
     }
 
     pub async fn submit_tx(
         &self,
         tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
+        let labels = vec![
+            ("stage", "api".to_string()),
+            ("name", tx.variance_name()),
+            ("token", tx.token_id().to_string()),
+        ];
+        // The initial state of processing tx
+        metrics::increment_counter!("process_tx_count", &labels);
+
         if tx.is_close() {
             return Err(SubmitError::AccountCloseDisabled);
         }
@@ -303,30 +520,41 @@ impl TxSender {
         };
 
         let sign_verify_channel = self.sign_verify_requests.clone();
-        let ticker_request_sender = self.ticker_requests.clone();
+
+        let mut fee_data_for_subsidy: Option<ResponseFee> = None;
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
             let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
                 || self.enforce_pubkey_change_fee;
 
-            let fee_allowed =
-                Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone()).await?;
+            let fee_allowed = self.ticker.token_allowed_for_fees(token.clone()).await?;
 
             if !fee_allowed {
                 return Err(SubmitError::InappropriateFeeToken);
             }
 
-            let required_fee_data =
-                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
-                    .await?;
+            let required_fee_data = self
+                .ticker
+                .get_fee_from_ticker_in_wei(tx_type, token.clone(), address)
+                .await?;
+
+            let required_fee_data = if self
+                .should_subsidize_cpk(
+                    &required_fee_data.normal_fee.total_fee,
+                    &required_fee_data.subsidized_fee.total_fee,
+                    &required_fee_data.subsidy_size_usd,
+                    extracted_request_metadata,
+                )
+                .await?
+            {
+                fee_data_for_subsidy = Some(required_fee_data.clone());
+                required_fee_data.subsidized_fee
+            } else {
+                required_fee_data.normal_fee
+            };
 
             // Converting `BitUint` to `BigInt` is safe.
-            let required_fee: BigDecimal = required_fee_data
-                .normal_fee
-                .total_fee
-                .to_bigint()
-                .unwrap()
-                .into();
+            let required_fee: BigDecimal = required_fee_data.total_fee.to_bigint().unwrap().into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee = scale_user_fee_up(provided_fee);
@@ -363,12 +591,40 @@ impl TxSender {
                 .await?;
         }
 
-        // Send verified transactions to the mempool.
-        self.core_api_client
-            .send_tx(verified_tx)
+        let (sender, receiver) = oneshot::channel();
+        let item = MempoolTransactionRequest::NewTx(Box::new(verified_tx), sender);
+        let mut mempool_sender = self.mempool_tx_sender.clone();
+        mempool_sender
+            .send(item)
             .await
-            .map_err(SubmitError::communication_core_server)?
-            .map_err(SubmitError::TxAdd)?;
+            .map_err(SubmitError::internal)?;
+
+        receiver.await.map_err(SubmitError::internal)??;
+
+        // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
+        if let Some(fee_data_for_subsidy) = fee_data_for_subsidy {
+            // The following two bad scenarios are possible when applying subsidy for the tx:
+            // - The subsidy is stored, but the tx is then rejected by the state keeper
+            // - The tx is accepted by the state keeper, but the the `store_subsidy_data` returns an error for some reason
+            //
+            // Trying to omit these scenarios unfortunately leads to large code restructure
+            // which is not worth it for subsidies (we prefer stability here)
+            self.store_subsidy_data(
+                tx.hash(),
+                fee_data_for_subsidy.normal_fee.total_fee,
+                fee_data_for_subsidy.subsidized_fee.total_fee,
+                token.id,
+            )
+            .await
+            .map_err(|e| {
+                metrics::increment_counter!("tx_sender.submit_tx.store_subsidy_data_fail");
+                SubmitError::Other(format!(
+                    "Failed to store the subsidy to database. Reason: {}",
+                    e
+                ))
+            })?;
+        }
+
         // if everything is OK, return the transactions hashes.
         Ok(tx.hash())
     }
@@ -377,6 +633,7 @@ impl TxSender {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
+        extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<SubmitBatchResponse, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
@@ -390,6 +647,16 @@ impl TxSender {
         if txs.len() > self.max_number_of_transactions_per_batch {
             return Err(SubmitError::TxAdd(TxAddError::BatchTooBig));
         }
+
+        for tx in &txs {
+            let labels = vec![
+                ("stage", "api".to_string()),
+                ("name", tx.tx.variance_name()),
+                ("token", tx.tx.token_id().to_string()),
+            ];
+            metrics::increment_counter!("process_tx_count", &labels);
+        }
+
         // Same check but in terms of signatures.
         if eth_signatures.len() > self.max_number_of_authors_per_batch {
             return Err(SubmitError::TxAdd(TxAddError::EthSignaturesLimitExceeded));
@@ -406,6 +673,7 @@ impl TxSender {
         let eth_token = TokenLike::Id(TokenId(0));
 
         let mut token_fees = HashMap::<Address, BigUint>::new();
+        let mut token_fees_ids = vec![];
 
         for tx in &txs {
             let tx_fee_info = tx.tx.get_fee_info();
@@ -418,9 +686,7 @@ impl TxSender {
                 if provided_fee == BigUint::zero() {
                     continue;
                 }
-                let fee_allowed =
-                    Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
-                        .await?;
+                let fee_allowed = self.ticker.token_allowed_for_fees(token.clone()).await?;
 
                 // In batches, transactions with non-popular token are allowed to be included, but should not
                 // used to pay fees. Fees must be covered by some more common token.
@@ -437,14 +703,13 @@ impl TxSender {
                     eth_token.clone()
                 };
 
-                let token_price_in_usd = Self::ticker_price_request(
-                    self.ticker_requests.clone(),
-                    check_token.clone(),
-                    TokenPriceRequestType::USDForOneWei,
-                )
-                .await?;
+                let token_price_in_usd = self
+                    .ticker
+                    .get_token_price(check_token.clone(), TokenPriceRequestType::USDForOneWei)
+                    .await?;
 
                 let token_data = self.token_info_from_id(token).await?;
+                token_fees_ids.push(token_data.id);
                 let mut token_fee = token_fees.remove(&token_data.address).unwrap_or_default();
                 token_fee += &provided_fee;
                 token_fees.insert(token_data.address, token_fee);
@@ -455,19 +720,34 @@ impl TxSender {
             }
         }
 
+        let mut fee_data_for_subsidy: Option<ResponseBatchFee> = None;
+
         // Only one token in batch
         if token_fees.len() == 1 {
             let (batch_token, fee_paid) = token_fees.into_iter().next().unwrap();
-            let batch_token_fee = Self::ticker_batch_fee_request(
-                self.ticker_requests.clone(),
-                transaction_types.clone(),
-                batch_token.into(),
-            )
-            .await?;
+            let batch_token_fee = self
+                .ticker
+                .get_batch_from_ticker_in_wei(batch_token.into(), transaction_types.clone())
+                .await?;
+
+            let required_fee = if self
+                .should_subsidize_cpk(
+                    &batch_token_fee.normal_fee.total_fee,
+                    &batch_token_fee.subsidized_fee.total_fee,
+                    &batch_token_fee.subsidy_size_usd,
+                    extracted_request_metadata,
+                )
+                .await?
+            {
+                fee_data_for_subsidy = Some(batch_token_fee.clone());
+                batch_token_fee.subsidized_fee.total_fee
+            } else {
+                batch_token_fee.normal_fee.total_fee
+            };
+
             let user_provided_fee =
                 scale_user_fee_up(BigDecimal::from(fee_paid.to_bigint().unwrap()));
-            let required_normal_fee =
-                BigDecimal::from(batch_token_fee.normal_fee.total_fee.to_bigint().unwrap());
+            let required_normal_fee = BigDecimal::from(required_fee.to_bigint().unwrap());
 
             // Not enough fee
             if required_normal_fee > user_provided_fee {
@@ -480,24 +760,33 @@ impl TxSender {
             }
         } else {
             // Calculate required fee for ethereum token
-            let required_eth_fee = Self::ticker_batch_fee_request(
-                self.ticker_requests.clone(),
-                transaction_types,
-                eth_token.clone(),
-            )
-            .await?
-            .normal_fee;
+            let required_eth_fee = self
+                .ticker
+                .get_batch_from_ticker_in_wei(eth_token.clone(), transaction_types)
+                .await?;
 
-            let eth_price_in_usd = Self::ticker_price_request(
-                self.ticker_requests.clone(),
-                eth_token,
-                TokenPriceRequestType::USDForOneWei,
-            )
-            .await?;
+            let required_fee = if self
+                .should_subsidize_cpk(
+                    &required_eth_fee.normal_fee.total_fee,
+                    &required_eth_fee.subsidized_fee.total_fee,
+                    &required_eth_fee.subsidy_size_usd,
+                    extracted_request_metadata,
+                )
+                .await?
+            {
+                fee_data_for_subsidy = Some(required_eth_fee.clone());
+                required_eth_fee.subsidized_fee.total_fee
+            } else {
+                required_eth_fee.normal_fee.total_fee
+            };
+
+            let eth_price_in_usd = self
+                .ticker
+                .get_token_price(eth_token, TokenPriceRequestType::USDForOneWei)
+                .await?;
 
             let required_total_usd_fee =
-                BigDecimal::from(required_eth_fee.total_fee.to_bigint().unwrap())
-                    * &eth_price_in_usd;
+                BigDecimal::from(required_fee.to_bigint().unwrap()) * &eth_price_in_usd;
 
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
@@ -544,7 +833,7 @@ impl TxSender {
                     .await
                     .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
             );
-            tx_sender_types.push(self.get_tx_sender_type(&tx).await?);
+            tx_sender_types.push(self.get_tx_sender_type(tx).await?);
         }
 
         let batch_sign_data = if !eth_signatures.is_empty() {
@@ -586,48 +875,59 @@ impl TxSender {
         verified_txs.extend(verified_batch.into_iter());
 
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
-        // Send verified transactions to the mempool.
-        self.core_api_client
-            .send_txs_batch(verified_txs, verified_signatures)
+
+        let (sender, receiver) = oneshot::channel();
+        let item =
+            MempoolTransactionRequest::NewTxsBatch(verified_txs, verified_signatures, sender);
+        let mut mempool_sender = self.mempool_tx_sender.clone();
+        mempool_sender
+            .send(item)
             .await
-            .map_err(SubmitError::communication_core_server)?
-            .map_err(SubmitError::TxAdd)?;
+            .map_err(SubmitError::mempool_communication)?;
+
+        receiver.await.map_err(SubmitError::internal)??;
 
         let batch_hash = TxHash::batch_hash(&tx_hashes);
+
+        // fee_data_for_subsidy has Some value only if the batch of transactions is subsidised
+        if let Some(fee_data) = fee_data_for_subsidy {
+            let subsidy_token_id = if token_fees_ids.len() == 1 {
+                token_fees_ids[0]
+            } else {
+                // When there are more than token to pay the fee with,
+                // we get the price of the batch in ETH and then convert it to USD.
+                // Since the `subsidies` table contains the token_id field and the only fee which is fetched from the fee_ticker is
+                // in ETH, then we can consider ETH as the token_id of the subsidy. Even though formally this may not be the case.
+                TokenId(0)
+            };
+
+            // The following two bad scenarios are possible when applying subsidy for the tx:
+            // - The subsidy is stored, but the tx is then rejected by the state keeper
+            // - The tx is accepted by the state keeper, but the the `store_subsidy_data` returns an error for some reason
+            //
+            // Trying to omit these scenarios unfortunately leads to large code restructure
+            // which is not worth it for subsidies (we prefer stability here)
+            self.store_subsidy_data(
+                batch_hash,
+                fee_data.normal_fee.total_fee,
+                fee_data.subsidized_fee.total_fee,
+                subsidy_token_id,
+            )
+            .await
+            .map_err(|e| {
+                metrics::increment_counter!("tx_sender.submit_txs_batch.store_subsidy_data_fail");
+
+                SubmitError::Other(format!(
+                    "Failed to store the subsidy to database. Reason: {}",
+                    e
+                ))
+            })?;
+        }
+
         Ok(SubmitBatchResponse {
             transaction_hashes: tx_hashes.into_iter().map(TxHashSerializeWrapper).collect(),
             batch_hash,
         })
-    }
-
-    pub async fn get_txs_fee_in_wei(
-        &self,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<Fee, SubmitError> {
-        let resp_fee = Self::ticker_request(
-            self.ticker_requests.clone(),
-            tx_type,
-            address,
-            token.clone(),
-        )
-        .await?;
-        Ok(resp_fee.normal_fee)
-    }
-
-    pub async fn get_txs_batch_fee_in_wei(
-        &self,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<BatchFee, SubmitError> {
-        let resp_fee = Self::ticker_batch_fee_request(
-            self.ticker_requests.clone(),
-            transactions,
-            token.clone(),
-        )
-        .await?;
-        Ok(resp_fee.normal_fee)
     }
 
     /// For forced exits, we must check that target account exists for more
@@ -690,6 +990,14 @@ impl TxSender {
         &self,
         token_id: impl Into<TokenLike>,
     ) -> Result<Token, SubmitError> {
+        let token_id = token_id.into();
+        // Try to find the token in the cache first.
+        if let Some(token) = self.tokens.try_get_token_from_cache(token_id.clone()).await {
+            return Ok(token);
+        }
+
+        // Establish db connection and repeat the query, so the token is loaded
+        // from the db.
         let mut storage = self
             .pool
             .access_storage()
@@ -702,81 +1010,6 @@ impl TxSender {
             .map_err(SubmitError::internal)?
             // TODO Make error more clean
             .ok_or_else(|| SubmitError::other("Token not found in the DB"))
-    }
-
-    async fn ticker_batch_fee_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        transactions: Vec<(TxFeeTypes, Address)>,
-        token: TokenLike,
-    ) -> Result<ResponseBatchFee, SubmitError> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetBatchTxFee {
-                transactions,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .map_err(SubmitError::internal)?;
-        let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(|err| internal_error!(err))
-    }
-
-    async fn ticker_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<ResponseFee, SubmitError> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTxFee {
-                tx_type,
-                address,
-                token: token.clone(),
-                response: req.0,
-            })
-            .await
-            .map_err(SubmitError::internal)?;
-
-        let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(|err| internal_error!(err))
-    }
-
-    pub async fn token_allowed_for_fees(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        token: TokenLike,
-    ) -> Result<bool, SubmitError> {
-        let (sender, receiver) = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::IsTokenAllowed {
-                token: token.clone(),
-                response: sender,
-            })
-            .await
-            .expect("ticker receiver dropped");
-        receiver
-            .await
-            .expect("ticker answer sender dropped")
-            .map_err(SubmitError::internal)
-    }
-
-    pub async fn ticker_price_request(
-        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-        token: TokenLike,
-        req_type: TokenPriceRequestType,
-    ) -> Result<BigDecimal, SubmitError> {
-        let req = oneshot::channel();
-        ticker_request_sender
-            .send(TickerRequest::GetTokenPrice {
-                token: token.clone(),
-                response: req.0,
-                req_type,
-            })
-            .await
-            .map_err(SubmitError::internal)?;
-        let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(|err| internal_error!(err))
     }
 }
 
@@ -808,25 +1041,37 @@ async fn verify_tx_info_message_signature(
     msg_to_sign: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
-    let eth_sign_data = match msg_to_sign {
-        Some(message) => match account_type {
-            // Check if account is a CREATE2 account
-            // These accounts do not have to pass 2FA
-            EthAccountType::CREATE2 => {
-                if signature.is_some() {
-                    return Err(SubmitError::IncorrectTx(
-                        "Eth signature from CREATE2 account not expected".to_string(),
-                    ));
-                }
-                None
+    if matches!(
+        (account_type, signature.clone(), msg_to_sign.clone()),
+        (EthAccountType::CREATE2, Some(_), Some(_))
+    ) {
+        return Err(SubmitError::IncorrectTx(
+            "Eth signature from CREATE2 account not expected".to_string(),
+        ));
+    }
+
+    let should_check_eth_signature = match (account_type, tx) {
+        (EthAccountType::CREATE2, _) => false,
+        (EthAccountType::No2FA(_), ZkSyncTx::ChangePubKey(_)) => true,
+        (EthAccountType::No2FA(hash), _) => {
+            if let Some(not_checked_hash) = hash {
+                let tx_pub_key_hash = PubKeyHash::from_pubkey(&tx.signature().pub_key.0);
+
+                tx_pub_key_hash != not_checked_hash
+            } else {
+                false
             }
-            EthAccountType::Owned => {
-                let signature =
-                    signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
-                Some(EthSignData { signature, message })
-            }
-        },
-        None => None,
+        }
+
+        _ => true,
+    };
+
+    let eth_sign_data = match (msg_to_sign, should_check_eth_signature) {
+        (Some(message), true) => {
+            let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+            Some(EthSignData { signature, message })
+        }
+        _ => None,
     };
 
     let (sender, receiever) = oneshot::channel();
@@ -836,6 +1081,7 @@ async fn verify_tx_info_message_signature(
             tx: SignedZkSyncTx {
                 tx: tx.clone(),
                 eth_sign_data,
+                created_at: Utc::now(),
             },
             sender: tx_sender,
             token,
@@ -898,6 +1144,22 @@ async fn verify_txs_batch_signature(
                         .clone()
                         .map(|signature| EthSignData { signature, message })
                 }
+                EthAccountType::No2FA(Some(unchecked_hash)) => {
+                    let tx_pub_key_hash = PubKeyHash::from_pubkey(&tx.tx.signature().pub_key.0);
+                    if tx_pub_key_hash != unchecked_hash {
+                        if batch_sign_data.is_none() && !tx.signature.exists() {
+                            return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                        }
+
+                        tx.signature
+                            .tx_signature()
+                            .clone()
+                            .map(|signature| EthSignData { signature, message })
+                    } else {
+                        None
+                    }
+                }
+                EthAccountType::No2FA(None) => None,
             }
         } else {
             None
@@ -906,6 +1168,7 @@ async fn verify_txs_batch_signature(
         txs.push(SignedZkSyncTx {
             tx: tx.tx,
             eth_sign_data,
+            created_at: Utc::now(),
         });
     }
 

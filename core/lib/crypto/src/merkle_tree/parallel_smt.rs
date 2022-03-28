@@ -1,5 +1,5 @@
 /// Sparse Merkle tree with batch updates
-use super::hasher::Hasher;
+use super::{hasher::Hasher, TreeMemoryUsage};
 use crate::{
     ff::{PrimeField, PrimeFieldRepr},
     primitives::GetBits,
@@ -194,6 +194,28 @@ where
             nodes,
             cache,
             root: 0,
+        }
+    }
+
+    /// Roughly calculates the data on the RAM usage for this tree object.
+    /// See the [`TreeMemoryUsage`] doc-comments for details.
+    pub fn memory_stats(&self) -> TreeMemoryUsage {
+        use std::mem::size_of;
+
+        // For hashmaps, we use both size of keys and values.
+        let items = self.items.capacity() * (size_of::<ItemIndex>() + size_of::<T>());
+        let nodes = self.nodes.capacity() * size_of::<Node>();
+        let prehashed = self.prehashed.capacity() * size_of::<Hash>();
+        let cache =
+            self.cache.read().unwrap().capacity() * (size_of::<NodeIndex>() + size_of::<Hash>());
+        let allocated_total = items + nodes + prehashed + cache;
+
+        TreeMemoryUsage {
+            items,
+            nodes,
+            prehashed,
+            cache,
+            allocated_total,
         }
     }
 }
@@ -732,17 +754,11 @@ where
 mod tests {
     use super::*;
 
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     struct TestHasher;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Default)]
     struct TestLeaf(u64);
-
-    impl Default for TestLeaf {
-        fn default() -> Self {
-            TestLeaf(0)
-        }
-    }
 
     impl GetBits for TestLeaf {
         fn get_bits_le(&self) -> Vec<bool> {
@@ -753,12 +769,6 @@ mod tests {
                 i >>= 1;
             }
             acc
-        }
-    }
-
-    impl Default for TestHasher {
-        fn default() -> Self {
-            Self {}
         }
     }
 

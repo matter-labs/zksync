@@ -23,11 +23,22 @@ fn gen_account(id: u32) -> CircuitAccount<Engine> {
     }
 }
 
+/// `account.clone()` is used inside several benchmarks, since tree has a big `Drop` cost,
+/// but at the same time `account` is consumed by the tree.
+/// So if benchmark uses `account.clone()`, you can subtract its cost from the overall bench result.
+fn account_clone(b: &mut Bencher<'_>) {
+    let account = gen_account(0);
+
+    b.iter(|| {
+        let _ = black_box(account.clone());
+    });
+}
+
 /// Measures the time of `RealSMT` creation time.
 fn smt_create(b: &mut Bencher<'_>) {
     let depth = zksync_crypto::params::account_tree_depth();
 
-    b.iter(|| {
+    b.iter_with_large_drop(|| {
         RealSMT::new(black_box(depth));
     });
 }
@@ -40,58 +51,85 @@ fn smt_insert_empty(b: &mut Bencher<'_>) {
     let tree = RealSMT::new(depth);
     let account = gen_account(0);
 
-    let setup = || (tree.clone(), account.clone());
+    let setup = || tree.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut tree, account)| {
+        |tree| {
             let id = 0;
-            tree.insert(black_box(id), account);
+            tree.insert(black_box(id), account.clone());
         },
         BatchSize::SmallInput,
     );
 }
 
-/// Measures the time of insertion into a non-empty SMT.
-fn smt_insert_filled(b: &mut Bencher<'_>) {
+/// Measures the time of insertion into a non-empty SMT as the last element.
+fn smt_insert_filled_end(b: &mut Bencher<'_>) {
     let depth = zksync_crypto::params::account_tree_depth();
-    let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
-    for (id, account) in accounts.into_iter().enumerate() {
+    for (id, account) in (0..N_ACCOUNTS).map(gen_account).enumerate() {
         let id = id as u32;
         tree.insert(id, account.clone())
     }
     let latest_account = gen_account(N_ACCOUNTS);
 
-    let setup = || (tree.clone(), latest_account.clone());
+    let setup = || tree.clone();
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
-        |(mut tree, account)| {
+        |tree| {
             let id = N_ACCOUNTS;
-            tree.insert(black_box(id), account);
+            tree.insert(black_box(id), latest_account.clone());
+        },
+        BatchSize::SmallInput,
+    );
+}
+
+/// Measures the time of insertion into a non-empty SMT in between several elements.
+fn smt_insert_filled_middle(b: &mut Bencher<'_>) {
+    let depth = zksync_crypto::params::account_tree_depth();
+
+    let target_id = N_ACCOUNTS / 2;
+
+    // Create a tree and fill it with some accounts.
+    let mut tree = RealSMT::new(depth);
+    for (id, account) in (0..N_ACCOUNTS).map(gen_account).enumerate() {
+        let id = id as u32;
+        if id == target_id {
+            continue;
+        }
+
+        tree.insert(id, account.clone())
+    }
+    let latest_account = gen_account(N_ACCOUNTS);
+
+    let setup = || tree.clone();
+
+    b.iter_batched_ref(
+        setup,
+        |tree| {
+            tree.insert(black_box(target_id), latest_account.clone());
         },
         BatchSize::SmallInput,
     );
 }
 
 /// Measures the time of obtaining a SMT root hash.
-fn smt_root_hash(b: &mut Bencher<'_>) {
+fn smt_root_hash(b: &mut Bencher<'_>, size: u32) {
     let depth = zksync_crypto::params::account_tree_depth();
-    let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
-    for (id, account) in accounts.into_iter().enumerate() {
+    for (id, account) in (0..size).map(gen_account).enumerate() {
         let id = id as u32;
         tree.insert(id, account.clone());
     }
 
     let setup = || (tree.clone());
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
         |tree| {
             let _hash = black_box(tree.root_hash());
@@ -105,17 +143,16 @@ fn smt_root_hash(b: &mut Bencher<'_>) {
 ///
 /// This bench is expected to get better results than `smt_root_hash` due
 /// to some hashes being cached.
-fn smt_root_hash_cached(b: &mut Bencher<'_>) {
+fn smt_root_hash_cached(b: &mut Bencher<'_>, size: u32) {
     let depth = zksync_crypto::params::account_tree_depth();
-    let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
-    for (id, account) in accounts.into_iter().enumerate() {
+    for (id, account) in (0..size).map(gen_account).enumerate() {
         let id = id as u32;
         tree.insert(id, account.clone());
 
-        if id == N_ACCOUNTS / 2 {
+        if id == size / 2 {
             // Calculate the root hash to create cache.
             let _ = tree.root_hash();
         }
@@ -123,7 +160,7 @@ fn smt_root_hash_cached(b: &mut Bencher<'_>) {
 
     let setup = || (tree.clone());
 
-    b.iter_batched(
+    b.iter_batched_ref(
         setup,
         |tree| {
             let _hash = black_box(tree.root_hash());
@@ -132,10 +169,57 @@ fn smt_root_hash_cached(b: &mut Bencher<'_>) {
     );
 }
 
+/// Measures the time to `drop` a tree with calculated cache.
+fn smt_drop(b: &mut Bencher<'_>, size: u32) {
+    let depth = zksync_crypto::params::account_tree_depth();
+
+    // Create a tree and fill it with some accounts.
+    let mut tree = RealSMT::new(depth);
+    for (id, account) in (0..size).map(gen_account).enumerate() {
+        let id = id as u32;
+        tree.insert(id, account.clone());
+    }
+    tree.root_hash();
+
+    let setup = || (tree.clone());
+
+    b.iter_batched(
+        setup,
+        |tree| {
+            drop(tree);
+        },
+        BatchSize::SmallInput,
+    );
+}
+
 pub fn bench_merkle_tree(c: &mut Criterion) {
+    c.bench_function("account.clone()", account_clone);
     c.bench_function("Parallel SMT create", smt_create);
+
+    // Insert benchmarks.
     c.bench_function("Parallel SMT insert (empty)", smt_insert_empty);
-    c.bench_function("Parallel SMT insert (filled)", smt_insert_filled);
-    c.bench_function("Parallel SMT root hash", smt_root_hash);
-    c.bench_function("Parallel SMT root hash (cached)", smt_root_hash_cached);
+    c.bench_function(
+        "Parallel SMT insert (filled, at end)",
+        smt_insert_filled_end,
+    );
+    c.bench_function(
+        "Parallel SMT insert (filled, at middle)",
+        smt_insert_filled_middle,
+    );
+
+    // Root hash benchmarks.
+    for tree_size in &[10, 100, 1000, 10_000] {
+        let bench_name = format!("Parallel SMT root hash / size {}", tree_size);
+        c.bench_function(&bench_name, |b| smt_root_hash(b, *tree_size));
+    }
+    for tree_size in &[10, 100, 1000, 10_000] {
+        let bench_name = format!("Parallel SMT root hash (half-cached) / size {}", tree_size);
+        c.bench_function(&bench_name, |b| smt_root_hash_cached(b, *tree_size));
+    }
+
+    // Drop benchmarks.
+    for tree_size in &[10, 100, 1000, 10_000] {
+        let bench_name = format!("Parallel SMT drop / size {}", tree_size);
+        c.bench_function(&bench_name, |b| smt_drop(b, *tree_size));
+    }
 }

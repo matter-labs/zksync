@@ -2,8 +2,9 @@
 
 use super::ZkSyncTx;
 use crate::ZkSyncPriorityOp;
+use num::BigUint;
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::AccountId;
+use zksync_basic_types::{AccountId, TokenId};
 use zksync_crypto::params::{CHUNK_BYTES, LEGACY_CHUNK_BYTES};
 
 mod change_pubkey_op;
@@ -71,6 +72,30 @@ impl ZkSyncOp {
             ZkSyncOp::WithdrawNFT(_) => WithdrawNFTOp::CHUNKS,
         }
     }
+    /// Get information about amounts in operation
+    pub fn get_amount_info(&self) -> Option<Vec<(TokenId, BigUint)>> {
+        match self {
+            ZkSyncOp::Transfer(tx) => Some(vec![(tx.tx.token, tx.tx.amount.clone())]),
+            ZkSyncOp::Withdraw(tx) => Some(vec![(tx.tx.token, tx.tx.amount.clone())]),
+            ZkSyncOp::Close(_) => None,
+            ZkSyncOp::ChangePubKeyOffchain(_) => None,
+            ZkSyncOp::ForcedExit(_) => None,
+            ZkSyncOp::MintNFTOp(_) => None,
+            ZkSyncOp::Swap(tx) => Some(vec![
+                (tx.tx.orders.0.token_buy, tx.tx.amounts.0.clone()),
+                (tx.tx.orders.1.token_buy, tx.tx.amounts.1.clone()),
+            ]),
+            ZkSyncOp::Deposit(tx) => {
+                Some(vec![(tx.priority_op.token, tx.priority_op.amount.clone())])
+            }
+            ZkSyncOp::TransferToNew(tx) => Some(vec![(tx.tx.token, tx.tx.amount.clone())]),
+            ZkSyncOp::WithdrawNFT(_) => None,
+            ZkSyncOp::FullExit(tx) => tx
+                .withdraw_amount()
+                .map(|amount| vec![(tx.priority_op.token, amount)]),
+            ZkSyncOp::Noop(_) => None,
+        }
+    }
 
     /// Returns the public data required for the Ethereum smart contract to commit the operation.
     pub fn public_data(&self) -> Vec<u8> {
@@ -124,37 +149,35 @@ impl ZkSyncOp {
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, PublicDataDecodeError> {
         let op_type: u8 = *bytes.first().ok_or(PublicDataDecodeError::EmptyData)?;
         match op_type {
-            NoopOp::OP_CODE => Ok(ZkSyncOp::Noop(NoopOp::from_public_data(&bytes)?)),
+            NoopOp::OP_CODE => Ok(ZkSyncOp::Noop(NoopOp::from_public_data(bytes)?)),
             DepositOp::OP_CODE => Ok(ZkSyncOp::Deposit(Box::new(DepositOp::from_public_data(
-                &bytes,
+                bytes,
             )?))),
             TransferToNewOp::OP_CODE => Ok(ZkSyncOp::TransferToNew(Box::new(
-                TransferToNewOp::from_public_data(&bytes)?,
+                TransferToNewOp::from_public_data(bytes)?,
             ))),
             WithdrawOp::OP_CODE => Ok(ZkSyncOp::Withdraw(Box::new(WithdrawOp::from_public_data(
-                &bytes,
+                bytes,
             )?))),
-            CloseOp::OP_CODE => Ok(ZkSyncOp::Close(Box::new(CloseOp::from_public_data(
-                &bytes,
-            )?))),
+            CloseOp::OP_CODE => Ok(ZkSyncOp::Close(Box::new(CloseOp::from_public_data(bytes)?))),
             TransferOp::OP_CODE => Ok(ZkSyncOp::Transfer(Box::new(TransferOp::from_public_data(
-                &bytes,
+                bytes,
             )?))),
             FullExitOp::OP_CODE => Ok(ZkSyncOp::FullExit(Box::new(FullExitOp::from_public_data(
-                &bytes,
+                bytes,
             )?))),
             ChangePubKeyOp::OP_CODE => Ok(ZkSyncOp::ChangePubKeyOffchain(Box::new(
-                ChangePubKeyOp::from_public_data(&bytes)?,
+                ChangePubKeyOp::from_public_data(bytes)?,
             ))),
             ForcedExitOp::OP_CODE => Ok(ZkSyncOp::ForcedExit(Box::new(
-                ForcedExitOp::from_public_data(&bytes)?,
+                ForcedExitOp::from_public_data(bytes)?,
             ))),
-            SwapOp::OP_CODE => Ok(ZkSyncOp::Swap(Box::new(SwapOp::from_public_data(&bytes)?))),
+            SwapOp::OP_CODE => Ok(ZkSyncOp::Swap(Box::new(SwapOp::from_public_data(bytes)?))),
             MintNFTOp::OP_CODE => Ok(ZkSyncOp::MintNFTOp(Box::new(MintNFTOp::from_public_data(
-                &bytes,
+                bytes,
             )?))),
             WithdrawNFTOp::OP_CODE => Ok(ZkSyncOp::WithdrawNFT(Box::new(
-                WithdrawNFTOp::from_public_data(&bytes)?,
+                WithdrawNFTOp::from_public_data(bytes)?,
             ))),
             _ => Err(PublicDataDecodeError::UnknownOperationType),
         }
@@ -167,30 +190,30 @@ impl ZkSyncOp {
     pub fn from_legacy_public_data(bytes: &[u8]) -> Result<Self, PublicDataDecodeError> {
         let op_type: u8 = *bytes.first().ok_or(PublicDataDecodeError::EmptyData)?;
         match op_type {
-            NoopOp::OP_CODE => Ok(ZkSyncOp::Noop(NoopOp::from_legacy_public_data(&bytes)?)),
+            NoopOp::OP_CODE => Ok(ZkSyncOp::Noop(NoopOp::from_legacy_public_data(bytes)?)),
             DepositOp::OP_CODE => Ok(ZkSyncOp::Deposit(Box::new(
-                DepositOp::from_legacy_public_data(&bytes)?,
+                DepositOp::from_legacy_public_data(bytes)?,
             ))),
             TransferToNewOp::OP_CODE => Ok(ZkSyncOp::TransferToNew(Box::new(
-                TransferToNewOp::from_legacy_public_data(&bytes)?,
+                TransferToNewOp::from_legacy_public_data(bytes)?,
             ))),
             WithdrawOp::OP_CODE => Ok(ZkSyncOp::Withdraw(Box::new(
-                WithdrawOp::from_legacy_public_data(&bytes)?,
+                WithdrawOp::from_legacy_public_data(bytes)?,
             ))),
             CloseOp::OP_CODE => Ok(ZkSyncOp::Close(Box::new(CloseOp::from_legacy_public_data(
-                &bytes,
+                bytes,
             )?))),
             TransferOp::OP_CODE => Ok(ZkSyncOp::Transfer(Box::new(
-                TransferOp::from_legacy_public_data(&bytes)?,
+                TransferOp::from_legacy_public_data(bytes)?,
             ))),
             FullExitOp::OP_CODE => Ok(ZkSyncOp::FullExit(Box::new(
-                FullExitOp::from_legacy_public_data(&bytes)?,
+                FullExitOp::from_legacy_public_data(bytes)?,
             ))),
             ChangePubKeyOp::OP_CODE => Ok(ZkSyncOp::ChangePubKeyOffchain(Box::new(
-                ChangePubKeyOp::from_legacy_public_data(&bytes)?,
+                ChangePubKeyOp::from_legacy_public_data(bytes)?,
             ))),
             ForcedExitOp::OP_CODE => Ok(ZkSyncOp::ForcedExit(Box::new(
-                ForcedExitOp::from_legacy_public_data(&bytes)?,
+                ForcedExitOp::from_legacy_public_data(bytes)?,
             ))),
             _ => Err(PublicDataDecodeError::UnknownOperationType),
         }

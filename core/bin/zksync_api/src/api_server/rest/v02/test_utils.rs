@@ -6,10 +6,11 @@ use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
-use bigdecimal::BigDecimal;
+use anyhow::Error;
+use bigdecimal::{BigDecimal, Zero};
 use chrono::Utc;
 use futures::{channel::mpsc, StreamExt};
-use num::BigUint;
+use num::{rational::Ratio, BigUint};
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
@@ -18,7 +19,7 @@ use tokio::sync::Mutex;
 use zksync_api_client::rest::client::Client;
 use zksync_api_types::v02::Response;
 use zksync_config::ZkSyncConfig;
-use zksync_crypto::rand::{SeedableRng, XorShiftRng};
+use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
     chain::operations::OperationsSchema,
@@ -37,16 +38,22 @@ use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     prover::ProverJobType,
     tx::ChangePubKeyType,
-    AccountId, AccountMap, Address, BatchFee, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, MintNFTOp, Nonce, OutputFeeType,
-    PriorityOp, Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
+    AccountId, AccountMap, AccountUpdate, Address, BlockNumber, Deposit, DepositOp,
+    ExecutedOperations, ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, MintNFTOp, Nonce,
+    PriorityOp, Token, TokenId, TokenKind, TokenLike, TokenPrice, Transfer, TransferOp, ZkSyncOp,
+    ZkSyncTx, H256, NFT,
 };
+use zksync_utils::{big_decimal_to_ratio, scaled_u64_to_ratio, UnsignedRatioSerializeAsDecimal};
 
 // Local uses
-use crate::{
-    fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
-    signature_checker::{VerifiedTx, VerifySignatureRequest},
+use crate::fee_ticker::{
+    tests::TestToken,
+    ticker_info::BlocksInFutureAggregatedOperations,
+    validator::{cache::TokenInMemoryCache, FeeTokenValidator},
+    {FeeTicker, FeeTickerInfo, GasOperationsCost, PriceError, TickerConfig},
 };
+use crate::signature_checker::{VerifiedTx, VerifySignatureRequest};
+use std::any::Any;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -86,17 +93,18 @@ impl TestServerConfig {
         scope: String,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,
     {
         let this = self.clone();
-        let server = actix_web::test::start(move || {
+
+        let server = actix_test::start(move || {
             let app = App::new();
             let shared_data = shared_data.clone();
             let app = if let Some(shared_data) = shared_data {
-                app.data(shared_data)
+                app.app_data(web::Data::new(shared_data))
             } else {
                 app
             };
@@ -113,7 +121,7 @@ impl TestServerConfig {
         &self,
         scope_factory: F,
         shared_data: Option<D>,
-    ) -> (Client, actix_web::test::TestServer)
+    ) -> (Client, actix_test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
         D: Clone + Send + 'static,
@@ -345,16 +353,22 @@ impl TestServerConfig {
         // Make changes atomic.
         let mut storage = storage.start_transaction().await?;
 
+        let default_factory_address =
+            Address::from_str("1111111111111111111111111111111111111111").unwrap();
+        storage
+            .config_schema()
+            .store_config(
+                Default::default(),
+                Default::default(),
+                default_factory_address,
+            )
+            .await?;
+
         // Below lies the initialization of the data for the test.
         let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
 
         // Required since we use `EthereumSchema` in this test.
         storage.ethereum_schema().initialize_eth_data().await?;
-
-        storage
-            .config_schema()
-            .store_config(Address::default(), Address::default(), Address::default())
-            .await?;
 
         // Insert PHNX token
         storage
@@ -364,6 +378,7 @@ impl TestServerConfig {
                 Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
                 "PHNX",
                 18,
+                TokenKind::ERC20,
             ))
             .await?;
         // Insert Golem token with old symbol (from rinkeby).
@@ -374,6 +389,7 @@ impl TestServerConfig {
                 Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
                 "GNT",
                 18,
+                TokenKind::ERC20,
             ))
             .await?;
 
@@ -394,6 +410,7 @@ impl TestServerConfig {
                         *account_id,
                         account,
                         block_number.0 * accounts.len() as u32 + id as u32,
+                        &mut rng,
                     ));
                 });
             apply_updates(&mut accounts, updates.clone());
@@ -411,10 +428,38 @@ impl TestServerConfig {
                 vec![]
             };
 
+            let mut mint_nft_updates = Vec::new();
+            for (i, tx) in txs.iter().enumerate() {
+                if let Some(tx) = tx.get_executed_tx() {
+                    if let ZkSyncTx::MintNFT(tx) = &tx.signed_tx.tx {
+                        let nft_address: Address = rng.gen::<[u8; 20]>().into();
+                        let content_hash: H256 = rng.gen::<[u8; 32]>().into();
+                        let token = NFT::new(
+                            TokenId(80000 + block_number.0 * 100 + i as u32),
+                            0,
+                            tx.creator_id,
+                            tx.creator_address,
+                            nft_address,
+                            None,
+                            content_hash,
+                        );
+                        let update = (
+                            tx.creator_id,
+                            AccountUpdate::MintNFT {
+                                token,
+                                nonce: Nonce(0),
+                            },
+                        );
+                        mint_nft_updates.push(update);
+                    }
+                }
+            }
+            updates.extend(mint_nft_updates);
+
             storage
                 .chain()
                 .block_schema()
-                .save_block(gen_sample_block(
+                .save_full_block(gen_sample_block(
                     block_number,
                     BLOCK_SIZE_CHUNKS,
                     txs.clone(),
@@ -607,7 +652,7 @@ impl TestServerConfig {
                 block_number: 2,
                 block_index: 2,
                 operation: serde_json::to_value(
-                    dummy_deposit_op(Address::default(), AccountId(1), VERIFIED_OP_SERIAL_ID, 2).op,
+                    dummy_deposit_op(Address::default(), AccountId(3), VERIFIED_OP_SERIAL_ID, 2).op,
                 )
                 .unwrap(),
                 from_account: Default::default(),
@@ -620,14 +665,18 @@ impl TestServerConfig {
                 eth_block: 10,
                 created_at: chrono::Utc::now(),
                 eth_block_index: Some(1),
-                tx_hash: Default::default(),
+                tx_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
+                affected_accounts: vec![Default::default()],
+                token: 0,
             },
             // Committed priority operation.
             NewExecutedPriorityOperation {
                 block_number: EXECUTED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
                 operation: serde_json::to_value(
-                    dummy_full_exit_op(AccountId(1), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
+                    dummy_full_exit_op(AccountId(3), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
                         .op,
                 )
                 .unwrap(),
@@ -641,7 +690,11 @@ impl TestServerConfig {
                 eth_block: 14,
                 created_at: chrono::Utc::now(),
                 eth_block_index: Some(1),
-                tx_hash: Default::default(),
+                tx_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
+                affected_accounts: vec![Default::default()],
+                token: 0,
             },
         ];
 
@@ -776,63 +829,106 @@ pub fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
     sender
 }
 
-pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
-    let (sender, mut receiver) = mpsc::channel(10);
+#[derive(Debug, Clone)]
+pub struct DummyFeeTickerInfo {
+    prices: HashMap<TokenLike, BigDecimal>,
+}
 
-    let prices: HashMap<_, _> = prices.iter().cloned().collect();
-    actix_rt::spawn(async move {
-        while let Some(item) = receiver.next().await {
-            match item {
-                TickerRequest::GetTxFee { response, .. } => {
-                    let normal_fee = Fee::new(
-                        OutputFeeType::Withdraw,
-                        BigUint::from(1_u64).into(),
-                        BigUint::from(1_u64).into(),
-                        1_u64.into(),
-                        1_u64.into(),
-                    );
+#[async_trait::async_trait]
+impl FeeTickerInfo for DummyFeeTickerInfo {
+    async fn is_account_new(&self, _address: Address) -> anyhow::Result<bool> {
+        Ok(false)
+    }
 
-                    let res = Ok(ResponseFee { normal_fee });
+    async fn blocks_in_future_aggregated_operations(
+        &self,
+    ) -> anyhow::Result<crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations> {
+        Ok(BlocksInFutureAggregatedOperations {
+            blocks_to_commit: 1,
+            blocks_to_prove: 1,
+            blocks_to_execute: 1,
+        })
+    }
 
-                    response.send(res).expect("Unable to send response");
-                }
-                TickerRequest::GetTokenPrice {
-                    token, response, ..
-                } => {
-                    let msg = if let Some(price) = prices.get(&token) {
-                        Ok(price.clone())
-                    } else {
-                        Ok(BigDecimal::from(0u64))
-                    };
+    async fn remaining_chunks_in_pending_block(&self) -> anyhow::Result<Option<usize>> {
+        Ok(None)
+    }
 
-                    response.send(msg).expect("Unable to send response");
-                }
-                TickerRequest::IsTokenAllowed { token, response } => {
-                    // For test purposes, PHNX token is not allowed.
-                    let is_phnx = match token {
-                        TokenLike::Id(id) => *id == 1,
-                        TokenLike::Symbol(sym) => sym == "PHNX",
-                        TokenLike::Address(_) => unreachable!(),
-                    };
-                    response.send(Ok(!is_phnx)).unwrap_or_default();
-                }
-                TickerRequest::GetBatchTxFee {
-                    response,
-                    transactions,
-                    ..
-                } => {
-                    let normal_fee = BatchFee::new(
-                        BigUint::from(transactions.len()).into(),
-                        BigUint::from(transactions.len()).into(),
-                    );
-
-                    let res = Ok(ResponseBatchFee { normal_fee });
-
-                    response.send(res).expect("Unable to send response");
-                }
-            }
+    async fn get_last_token_price(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
+        if let Some(price) = self.prices.get(&token) {
+            Ok(TokenPrice {
+                usd_price: big_decimal_to_ratio(price).unwrap(),
+                last_updated: Utc::now(),
+            })
+        } else {
+            Ok(TokenPrice {
+                usd_price: Ratio::zero(),
+                last_updated: Utc::now(),
+            })
         }
-    });
+    }
 
-    sender
+    async fn get_gas_price_wei(&self) -> Result<BigUint, Error> {
+        Ok(BigUint::from(1u64))
+    }
+
+    async fn get_token(&self, token: TokenLike) -> Result<Token, Error> {
+        Ok(match token {
+            TokenLike::Id(id) => Token {
+                id,
+                ..Default::default()
+            },
+            TokenLike::Address(address) => Token {
+                address,
+                ..Default::default()
+            },
+            TokenLike::Symbol(symbol) => Token {
+                symbol,
+                ..Default::default()
+            },
+        })
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+}
+
+const SUBSIDY_CPK_PRICE_USD_SCALED: u64 = 10000000; // 10 dollars
+const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
+
+pub fn get_test_ticker_config() -> TickerConfig {
+    TickerConfig {
+        zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot("0.001")
+            .unwrap(),
+        gas_cost_tx: GasOperationsCost::from_constants(TEST_FAST_WITHDRAW_COEFF),
+        tokens_risk_factors: TestToken::all_tokens()
+            .into_iter()
+            .filter_map(|t| {
+                let id = t.id;
+                t.risk_factor.map(|risk| (id, risk))
+            })
+            .collect(),
+        scale_fee_coefficient: Ratio::new(BigUint::from(150u32), BigUint::from(100u32)),
+        max_blocks_to_aggregate: 5,
+        subsidy_cpk_price_usd: scaled_u64_to_ratio(SUBSIDY_CPK_PRICE_USD_SCALED),
+    }
+}
+pub fn dummy_fee_ticker(
+    prices: &[(TokenLike, BigDecimal)],
+    in_memory_cache: Option<TokenInMemoryCache>,
+) -> FeeTicker {
+    let prices: HashMap<_, _> = prices.iter().cloned().collect();
+    let validator = FeeTokenValidator::new(
+        in_memory_cache.unwrap_or_default(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+    );
+
+    FeeTicker::new(
+        Box::new(DummyFeeTickerInfo { prices }),
+        get_test_ticker_config(),
+        validator,
+    )
 }

@@ -21,11 +21,13 @@ thread_local! {
 use wasm_bindgen::prelude::*;
 
 use franklin_crypto::{
-    alt_babyjubjub::{fs::FsRepr, AltJubjubBn256, FixedGenerators},
+    alt_babyjubjub::{edwards, fs::FsRepr, AltJubjubBn256, FixedGenerators},
     bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
-    eddsa::{PrivateKey, PublicKey, Seed},
+    eddsa::{PrivateKey, PublicKey, Seed, Signature as EddsaSignature},
     jubjub::JubjubEngine,
 };
+
+pub type Signature = EddsaSignature<Engine>;
 
 use crate::utils::set_panic_hook;
 use sha2::{Digest, Sha256};
@@ -176,4 +178,51 @@ pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Result<Vec<u8>, JsValue> {
     );
 
     Ok(packed_full_signature)
+}
+
+#[wasm_bindgen]
+pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
+    if signature.len() != PACKED_POINT_SIZE + PACKED_SIGNATURE_SIZE {
+        return Err(JsValue::from_str("Signature length is not 96 bytes. Make sure it contains both the public key and the signature itself."));
+    }
+
+    let pubkey = &signature[..PACKED_POINT_SIZE];
+    let pubkey = JUBJUB_PARAMS
+        .with(|params| edwards::Point::read(&*pubkey, params).map(PublicKey))
+        .map_err(|_| JsValue::from_str("couldn't read public key"))?;
+
+    let signature = deserialize_signature(&signature[PACKED_POINT_SIZE..])?;
+
+    let msg = utils::rescue_hash_tx_msg(msg);
+    let value = JUBJUB_PARAMS.with(|jubjub_params| {
+        RESCUE_PARAMS.with(|rescue_params| {
+            pubkey.verify_musig_rescue(
+                &msg,
+                &signature,
+                FixedGenerators::SpendingKeyGenerator,
+                rescue_params,
+                jubjub_params,
+            )
+        })
+    });
+
+    Ok(value)
+}
+
+fn deserialize_signature(bytes: &[u8]) -> Result<Signature, JsValue> {
+    let (r_bar, s_bar) = bytes.split_at(PACKED_POINT_SIZE);
+
+    let r = JUBJUB_PARAMS
+        .with(|params| edwards::Point::read(r_bar, params))
+        .map_err(|_| JsValue::from_str("Failed to parse signature"))?;
+
+    let mut s_repr = FsRepr::default();
+    s_repr
+        .read_le(s_bar)
+        .map_err(|_| JsValue::from_str("Failed to parse signature"))?;
+
+    let s = <Engine as JubjubEngine>::Fs::from_repr(s_repr)
+        .map_err(|_| JsValue::from_str("Failed to parse signature"))?;
+
+    Ok(Signature { r, s })
 }

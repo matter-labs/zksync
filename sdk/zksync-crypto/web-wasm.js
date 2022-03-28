@@ -13,7 +13,8 @@ const brokenStrings = [
     // This substring is unique, had to
     // write only part of line to make the RegExp works.
     // Probably will rewrite in the future
-    `input = import.meta.url.replace`
+    `input = import.meta.url.replace`,
+    `input = new URL`
 ];
 
 let jsCode = fs.readFileSync(jsFile).toString();

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 use num::{BigUint, Zero};
+use thiserror::Error;
 
 use zksync_crypto::{
     convert::FeConvert,
@@ -12,7 +14,10 @@ use zksync_crypto::{
 
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
-use crate::tx::error::TransactionSignatureError;
+use crate::tx::error::{
+    FEE_AMOUNT_IS_NOT_PACKABLE, WRONG_ACCOUNT_ID, WRONG_FEE_ERROR, WRONG_SIGNATURE,
+    WRONG_TOKEN_FOR_PAYING_FEE,
+};
 use crate::tx::version::TxVersion;
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
@@ -93,7 +98,7 @@ impl MintNFT {
         fee_token: TokenId,
         nonce: Nonce,
         private_key: &PrivateKey,
-    ) -> Result<Self, TransactionSignatureError> {
+    ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             creator_id,
             creator_address,
@@ -105,9 +110,7 @@ impl MintNFT {
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
-        if !tx.check_correctness() {
-            return Err(TransactionSignatureError);
-        }
+        tx.check_correctness()?;
         Ok(tx)
     }
 
@@ -121,31 +124,13 @@ impl MintNFT {
         out.extend_from_slice(&[255u8 - Self::TX_TYPE]);
         out.extend_from_slice(&[version]);
         out.extend_from_slice(&self.creator_id.to_be_bytes());
-        out.extend_from_slice(&self.creator_address.as_bytes());
-        out.extend_from_slice(&self.content_hash.as_bytes());
-        out.extend_from_slice(&self.recipient.as_bytes());
+        out.extend_from_slice(self.creator_address.as_bytes());
+        out.extend_from_slice(self.content_hash.as_bytes());
+        out.extend_from_slice(self.recipient.as_bytes());
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
-    }
-
-    /// Verifies the transaction correctness:
-    ///
-    /// - `creator_account_id` field must be within supported range.
-    /// - `fee_token` field must be within supported range.
-    /// - `fee` field must represent a packable value.
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.fee <= BigUint::from(u128::MAX)
-            && is_fee_amount_packable(&self.fee)
-            && self.creator_id <= max_account_id()
-            && self.fee_token <= max_processable_token();
-        if valid {
-            let signer = self.verify_signature();
-            valid = valid && signer.is_some();
-            self.cached_signer = VerifiedSignatureCache::Cached(signer);
-        };
-        valid
     }
 
     /// Restores the `PubKeyHash` from the transaction signature.
@@ -190,6 +175,63 @@ impl MintNFT {
         }
         message.push_str(format!("Nonce: {}", self.nonce).as_str());
         message
+    }
+
+    /// Helper method to remove cache and test transaction behavior without the signature cache.
+    #[doc(hidden)]
+    pub fn wipe_signer_cache(&mut self) {
+        self.cached_signer = VerifiedSignatureCache::NotCached;
+    }
+
+    /// Verifies the transaction correctness:
+    ///
+    /// - `creator_account_id` field must be within supported range.
+    /// - `fee_token` field must be within supported range.
+    /// - `fee` field must represent a packable value.
+    pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        if self.fee > BigUint::from(u128::MAX) {
+            return Err(TransactionError::WrongFee);
+        }
+        if !is_fee_amount_packable(&self.fee) {
+            return Err(TransactionError::FeeNotPackable);
+        }
+
+        if self.creator_id > max_account_id() {
+            return Err(TransactionError::WrongCreatorId);
+        }
+
+        // Fee can only be paid in processable tokens
+        if self.fee_token > max_processable_token() {
+            return Err(TransactionError::WrongFeeToken);
+        }
+        let signer = self.verify_signature();
+        self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        if signer.is_none() {
+            return Err(TransactionError::WrongSignature);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum TransactionError {
+    WrongFee,
+    FeeNotPackable,
+    WrongCreatorId,
+    WrongSignature,
+    WrongFeeToken,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            TransactionError::WrongFee => WRONG_FEE_ERROR,
+            TransactionError::FeeNotPackable => FEE_AMOUNT_IS_NOT_PACKABLE,
+            TransactionError::WrongSignature => WRONG_SIGNATURE,
+            TransactionError::WrongCreatorId => WRONG_ACCOUNT_ID,
+            TransactionError::WrongFeeToken => WRONG_TOKEN_FOR_PAYING_FEE,
+        };
+        write!(f, "{}", error)
     }
 }
 

@@ -102,7 +102,7 @@ fn test_data_for_prover() -> JobRequestData {
         account_id: empty_account_id,
     };
 
-    let deposit_witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+    let deposit_witness = DepositWitness::apply_tx(witness_accum.account_tree, &deposit_op);
     let deposit_operations = deposit_witness.calculate_operations(());
     let pub_data_from_witness = deposit_witness.get_pubdata();
     let offset_commitment = deposit_witness.get_offset_commitment_data();
@@ -166,7 +166,7 @@ async fn test_shutdown_request() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(prover_options.prover.cycle_wait()).fuse();
+    let timeout = tokio::time::sleep(prover_options.prover.cycle_wait()).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 
@@ -204,7 +204,7 @@ async fn test_receiving_heartbeats() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(Duration::from_secs(10)).fuse();
+    let timeout = tokio::time::sleep(Duration::from_secs(10)).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 
@@ -241,7 +241,7 @@ async fn test_publishing_proof() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(Duration::from_secs(10)).fuse();
+    let timeout = tokio::time::sleep(Duration::from_secs(10)).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 

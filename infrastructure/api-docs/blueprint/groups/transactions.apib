@@ -20,7 +20,7 @@ Submit single transaction
 ## api/v0.2/transactions/:txHash [/transactions/{txHash}]
 
 + Parameters
-    + txHash (required, string, `{{txHash}}`) ... hash of the transaction in the zkSync network
+    + txHash (required, string, `{{txHash}}`) ... The hash of the transaction in the zkSync network
 
 ### Get transaction receipt [GET]
 Get transaction receipt
@@ -36,7 +36,7 @@ Get transaction receipt
 ## api/v0.2/transactions/:txHash/data [/transactions/{txHash}/data]
 
 + Parameters
-    + txHash (required, string, `{{txHash}}`) ... hash of the transaction in the zkSync network
+    + txHash (required, string, `{{txHash}}`) ... The hash of the transaction in the zkSync network
 
 ### Get transaction data [GET]
 Get transaction data
@@ -46,4 +46,25 @@ Get transaction data
         + request (Request, required)
         + status: success (string, required)
         + result (Transaction.Signed, required{{isResultNullable}})
+        + error (Error, required, nullable)
+
+## api/v0.2/transactions/toggle2FA [/transactions/toggle2FA]
+
+### Toggle 2-factor authentication [POST]
+Enable or disable requirement for L1 signature for L2 transactions. It takes an optional `pubKeyHash` parameter, which, if specified,
+ensures that only transactions signed with a specific L2 private key won't have their Ethereum signature checked.
+
++ Request (application/json)
+    + Attributes
+        + enable: false (boolean, required)
+        + accountId: {{accountId}} (number, required)
+        + timestamp: {{toggle2FATimestamp}} (number, required)
+        + signature (Toggle2FAEthSignature, required)
+        + pubKeyHash: {{toggle2FAPubKeyHash}} (string, optional)
+
++ Response 200 (application/json)
+    + Attributes
+        + request (Request, required)
+        + status: success (string, required)
+        + result (Toggle2FAResult, required{{isResultNullable}})
         + error (Error, required, nullable)

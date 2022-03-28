@@ -12,7 +12,7 @@ use crate::fee_ticker::PriceError;
 use zksync_types::{Token, TokenLike, TokenPrice};
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CoinMarketCapAPI {
     client: reqwest::Client,
     base_url: Url,
@@ -85,21 +85,20 @@ pub(super) struct CoinmarketCapResponse {
 mod test {
     use super::*;
     use std::str::FromStr;
-    use zksync_types::TokenId;
+    use zksync_types::{TokenId, TokenKind};
     use zksync_utils::parse_env;
 
     #[test]
     // Should be run in the dev environment
     fn test_fetch_coinmarketcap_data() {
-        let mut runtime = tokio::runtime::Builder::new()
-            .basic_scheduler()
+        let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("tokio runtime");
         let ticker_url = parse_env("FEE_TICKER_COINMARKETCAP_BASE_URL");
         let client = reqwest::Client::new();
         let api = CoinMarketCapAPI::new(client, ticker_url);
-        let token = Token::new(TokenId(0), Default::default(), "ETH", 18);
+        let token = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
         runtime
             .block_on(api.get_price(&token))
             .expect("Failed to get data from ticker");

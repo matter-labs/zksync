@@ -6,9 +6,10 @@ use zksync_api_types::v02::pagination::{
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
+    block::Block,
     helpers::apply_updates,
     tx::{ChangePubKeyType, TxHash},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId,
 };
 // Local imports
 use super::operations_ext::{
@@ -22,7 +23,8 @@ use crate::{
     },
     ethereum::EthereumSchema,
     test_data::{
-        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_sample_block,
+        dummy_ethereum_tx_hash, dummy_root_hash_for_block, gen_acc_random_updates,
+        gen_sample_block, gen_sample_incomplete_block, gen_sample_pending_block,
         gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS,
     },
     tests::{create_rng, db_test},
@@ -61,7 +63,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Execute and commit these blocks.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(1),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -71,7 +73,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .commit_state_update(BlockNumber(1), &updates_block_1, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(2),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -81,7 +83,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .commit_state_update(BlockNumber(2), &updates_block_2, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(
+        .save_full_block(gen_sample_block(
             BlockNumber(3),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -107,6 +109,15 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?;
     assert_eq!((block, &state), (BlockNumber(3), &accounts_block_3));
 
+    for (account_id, account) in state {
+        let nonce = storage
+            .chain()
+            .account_schema()
+            .estimate_nonce(account_id)
+            .await?
+            .unwrap();
+        assert_eq!(account.nonce, nonce)
+    }
     // Add proofs for the first two blocks.
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
@@ -235,7 +246,9 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
 
         // Store the block in the block schema.
         let block = gen_sample_block(block_number, BLOCK_SIZE_CHUNKS, Default::default());
-        BlockSchema(&mut storage).save_block(block.clone()).await?;
+        BlockSchema(&mut storage)
+            .save_full_block(block.clone())
+            .await?;
         OperationsSchema(&mut storage)
             .store_aggregated_action(gen_unique_aggregated_operation(
                 block_number,
@@ -440,7 +453,7 @@ async fn test_block_page(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
         // Store the operation in the block schema.
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -575,7 +588,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
 
         // Store the block in the block schema.
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -686,7 +699,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
     };
-    let _sentry_guard = vlog::init();
+    let _vlog_guard = vlog::init();
 
     let from_account_id = AccountId(0xbabe);
     let from_zksync_account = ZkSyncAccount::rand();
@@ -775,7 +788,6 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         pending_block_iteration: 1,
         success_operations: txs_1,
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
     let pending_block_2 = PendingBlock {
@@ -785,7 +797,6 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         pending_block_iteration: 2,
         success_operations: txs_2,
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
 
@@ -799,8 +810,14 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         .load_pending_block()
         .await?
         .expect("No pending block");
+    // Load saved block and check its correctness.
+    let chunks_left = BlockSchema(&mut storage)
+        .pending_block_chunks_left()
+        .await?
+        .expect("No pending block");
     assert_eq!(pending_block.number, pending_block_1.number);
     assert_eq!(pending_block.chunks_left, pending_block_1.chunks_left);
+    assert_eq!(pending_block.chunks_left, chunks_left as usize);
     assert_eq!(
         pending_block.unprocessed_priority_op_before,
         pending_block_1.unprocessed_priority_op_before
@@ -823,14 +840,14 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     // Also check that we can find the transaction by its hash.
     assert!(
         OperationsExtSchema(&mut storage)
-            .get_tx_by_hash(&tx_1.hash().as_ref())
+            .get_tx_by_hash(tx_1.hash().as_ref())
             .await?
             .is_some(),
         "Cannot find the pending transaction by hash"
     );
 
     // Finalize the block.
-    BlockSchema(&mut storage).save_block(block_1).await?;
+    BlockSchema(&mut storage).save_full_block(block_1).await?;
 
     // Ensure that pending block is no more available.
     assert!(
@@ -866,21 +883,21 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     // Also check that we can find the transaction by its hash.
     assert!(
         OperationsExtSchema(&mut storage)
-            .get_tx_by_hash(&tx_1.hash().as_ref())
+            .get_tx_by_hash(tx_1.hash().as_ref())
             .await?
             .is_some(),
         "Cannot find the pending transaction by hash"
     );
     assert!(
         OperationsExtSchema(&mut storage)
-            .get_tx_by_hash(&tx_2.hash().as_ref())
+            .get_tx_by_hash(tx_2.hash().as_ref())
             .await?
             .is_some(),
         "Cannot find the pending transaction by hash"
     );
 
     // Finalize the block.
-    BlockSchema(&mut storage).save_block(block_2).await?;
+    BlockSchema(&mut storage).save_full_block(block_2).await?;
 
     // Ensure that pending block is no more available.
     assert!(
@@ -1042,7 +1059,7 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Insert 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -1056,6 +1073,22 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
             ))
             .await?;
     }
+    // Insert 1 incomplete block.
+    BlockSchema(&mut storage)
+        .save_incomplete_block(&gen_sample_incomplete_block(
+            BlockNumber(6),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
+        .await?;
+
+    assert_eq!(
+        BlockSchema(&mut storage)
+            .get_last_incomplete_block_number()
+            .await?,
+        Some(BlockNumber(6))
+    );
+
     // Remove blocks with numbers greater than 2.
     BlockSchema(&mut storage)
         .remove_blocks(BlockNumber(2))
@@ -1070,6 +1103,14 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .get_block(BlockNumber(3))
         .await?
         .is_none());
+
+    // Incomplete block should be removed as well.
+    assert_eq!(
+        BlockSchema(&mut storage)
+            .get_last_incomplete_block_number()
+            .await?,
+        None
+    );
 
     Ok(())
 }
@@ -1086,7 +1127,6 @@ async fn test_remove_pending_block(mut storage: StorageProcessor<'_>) -> QueryRe
         pending_block_iteration: 1,
         success_operations: Vec::new(),
         failed_txs: Vec::new(),
-        previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
 
@@ -1115,6 +1155,9 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         setup.get_tx_hash(0, 4),
         setup.get_tx_hash(0, 5),
         setup.get_tx_hash(0, 6),
+        setup.get_tx_hash(0, 7),
+        setup.get_tx_hash(0, 8),
+        setup.get_tx_hash(0, 9),
     ];
 
     for (tx_hash, limit, direction, expected, test_name) in vec![
@@ -1147,10 +1190,10 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
             "Big limit (newer)",
         ),
         (
-            tx_hashes[6],
+            tx_hashes[9],
             5,
             PaginationDirection::Older,
-            tx_hashes[2..=6].iter().rev().cloned().collect(),
+            tx_hashes[5..=9].iter().rev().cloned().collect(),
             "Last 5 txs",
         ),
         (
@@ -1234,14 +1277,17 @@ async fn test_remove_new_account_tree_cache(mut storage: StorageProcessor<'_>) -
     // Insert account tree cache for 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
             ))
             .await?;
         BlockSchema(&mut storage)
-            .store_account_tree_cache(BlockNumber(block_number), serde_json::Value::default())
+            .store_account_tree_cache(
+                BlockNumber(block_number),
+                serde_json::Value::default().to_string(),
+            )
             .await?;
     }
 
@@ -1263,20 +1309,74 @@ async fn test_remove_new_account_tree_cache(mut storage: StorageProcessor<'_>) -
     Ok(())
 }
 
+/// Check that `get_block_number_by_hash` works correctly
+#[db_test]
+async fn test_get_block_number_by_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let expected_number = BlockNumber(1);
+    let block = gen_sample_block(expected_number, BLOCK_SIZE_CHUNKS, Default::default());
+    storage
+        .chain()
+        .block_schema()
+        .save_full_block(block.clone())
+        .await?;
+
+    let actual_number = storage
+        .chain()
+        .block_schema()
+        .get_block_number_by_hash(&block.new_root_hash.to_bytes())
+        .await?;
+    assert_eq!(actual_number, Some(expected_number));
+
+    Ok(())
+}
+
+/// Check that `get_block_transactions_hashes` works correctly
+#[db_test]
+async fn test_get_block_transactions_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+    setup.add_block(1);
+
+    let before_commit = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions_hashes(BlockNumber(1))
+        .await?;
+    assert!(before_commit.is_empty());
+
+    commit_schema_data(&mut storage, &setup).await?;
+
+    let after_commit = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions_hashes(BlockNumber(1))
+        .await?;
+    let len = setup.blocks[0].block_transactions.len();
+    let expected: Vec<Vec<u8>> = (0..len)
+        .into_iter()
+        .map(|index| setup.get_tx_hash(0, index).as_ref().to_vec())
+        .collect();
+    assert_eq!(after_commit, expected);
+
+    Ok(())
+}
+
 /// Check that account tree cache is removed correctly.
 #[db_test]
 async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Insert account tree cache for 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
-            .save_block(gen_sample_block(
+            .save_full_block(gen_sample_block(
                 BlockNumber(block_number),
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
             ))
             .await?;
         BlockSchema(&mut storage)
-            .store_account_tree_cache(BlockNumber(block_number), serde_json::Value::default())
+            .store_account_tree_cache(
+                BlockNumber(block_number),
+                serde_json::Value::default().to_string(),
+            )
             .await?;
     }
 
@@ -1294,6 +1394,78 @@ async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -
         .get_account_tree_cache_block(BlockNumber(1))
         .await?
         .is_none());
+
+    Ok(())
+}
+
+/// Checks the logic behind `save_incomplete_block` / `finish_incomplete_block`.
+#[db_test]
+async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut schema = BlockSchema(&mut storage);
+
+    let block_number = BlockNumber(1);
+
+    let pending_block = gen_sample_pending_block(block_number, Vec::new());
+    let incomplete_block = gen_sample_incomplete_block(block_number, BLOCK_SIZE_CHUNKS, Vec::new());
+    let root_hash = dummy_root_hash_for_block(block_number);
+    let complete_block =
+        Block::from_incomplete(incomplete_block.clone(), root_hash, Default::default());
+
+    schema.save_pending_block(pending_block).await?;
+    assert!(
+        schema.load_pending_block().await?.is_some(),
+        "Pending block should be saved"
+    );
+
+    // Pending block doesn't change next expected serial ID.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        0,
+        "There should be no serial ID"
+    );
+
+    schema.save_incomplete_block(&incomplete_block).await?;
+
+    // Pending block should be removed now.
+    assert!(
+        schema.load_pending_block().await?.is_none(),
+        "Pending block should be removed after saving incomplete block"
+    );
+
+    // Block should not be available yet.
+    assert!(
+        schema.get_block(block_number).await?.is_none(),
+        "Block should not exist"
+    );
+
+    // Next expected serial ID should be loaded from incomplete block.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        1,
+        "Serial ID should be loaded from the incomplete blocks table"
+    );
+
+    // Finish the block and ensure it's created correctly.
+    schema
+        .finish_incomplete_block(complete_block.clone())
+        .await?;
+    let block_from_storage = schema
+        .get_block(block_number)
+        .await?
+        .expect("Block should exist now");
+
+    assert_eq!(block_from_storage.block_number, block_number);
+    assert_eq!(
+        block_from_storage.new_root_hash,
+        complete_block.new_root_hash
+    );
+
+    // Next expected serial ID should be loaded from complete block.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        1,
+        "Serial ID should be loaded from the complete blocks table"
+    );
 
     Ok(())
 }

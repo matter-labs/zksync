@@ -7,7 +7,7 @@ use web3::{
     contract::Options,
     types::{TransactionReceipt, U256, U64},
 };
-use zksync_config::ZkSyncConfig;
+use zksync_config::{ContractsConfig, ETHClientConfig, ETHSenderConfig};
 use zksync_eth_client::EthereumGateway;
 use zksync_storage::StorageProcessor;
 use zksync_types::{aggregated_operations::stored_block_info, block::Block, BlockNumber, H256};
@@ -25,6 +25,12 @@ async fn revert_blocks_in_storage(
         .return_executed_txs_to_mempool(last_block)
         .await?;
     println!("`mempool_txs`, `executed_transactions` tables are updated");
+    transaction
+        .chain()
+        .state_schema()
+        .clear_current_nonce_table(last_block)
+        .await?;
+    println!("`committed_nonce` table is updated");
     transaction
         .chain()
         .block_schema()
@@ -76,12 +82,6 @@ async fn revert_blocks_in_storage(
         .remove_eth_unprocessed_aggregated_ops()
         .await?;
     println!("`eth_unprocessed_aggregated_ops` table is cleaned");
-    transaction
-        .chain()
-        .operations_schema()
-        .remove_executed_priority_operations(last_block)
-        .await?;
-    println!("`executed_priority_operations` table is cleaned");
     transaction
         .chain()
         .operations_schema()
@@ -160,18 +160,18 @@ async fn revert_blocks_on_contract(
 ) -> anyhow::Result<()> {
     let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
     let data = client.encode_tx_data("revertBlocks", tx_arg);
-    let gas_limit = 80000 + 5000 * blocks.len();
+    let gas_limit = 200000 + 15000 * blocks.len();
     let signed_tx = client
         .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(gas_limit))))
         .await
         .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
-    let receipt = send_raw_tx_and_wait_confirmation(&client, signed_tx.raw_tx).await?;
+    let receipt = send_raw_tx_and_wait_confirmation(client, signed_tx.raw_tx).await?;
     storage.ethereum_schema().get_next_nonce().await
         .expect("Ethereum tx has been sent but updating operator nonce in storage has failed. You need to update it manually");
-    ensure!(
-        receipt.status == Some(U64::from(1)),
-        "Tx to contract failed"
-    );
+    if receipt.status != Some(U64::from(1)) {
+        let reason = client.failure_reason(signed_tx.hash).await?;
+        anyhow::bail!("Tx to contract failed {:?}", reason);
+    }
 
     println!("Blocks were reverted on contract");
     Ok(())
@@ -218,7 +218,7 @@ struct Opt {
     #[structopt(subcommand)]
     command: Command,
     /// Private key of operator which will call the contract function.
-    #[structopt(long = "key", env = "REVERT_TOOL_OPERATOR_PRIVATE_KEY")]
+    #[structopt(long = "key", env = "ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY")]
     operator_private_key: String,
 }
 
@@ -226,18 +226,25 @@ struct Opt {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
-    let mut config = ZkSyncConfig::from_env();
 
     let key_without_prefix = opt
         .operator_private_key
         .strip_prefix("0x")
         .unwrap_or_else(|| opt.operator_private_key.as_str());
 
-    config.eth_sender.sender.operator_private_key =
+    let contracts = ContractsConfig::from_env();
+    let eth_client_config = ETHClientConfig::from_env();
+    let mut eth_sender_config = ETHSenderConfig::from_env();
+
+    eth_sender_config.sender.operator_private_key =
         H256::from_str(key_without_prefix).expect("Cannot deserialize private key");
 
     let mut storage = StorageProcessor::establish_connection().await?;
-    let client = EthereumGateway::from_config(&config);
+    let client = EthereumGateway::from_config(
+        &eth_client_config,
+        &eth_sender_config,
+        contracts.contract_addr,
+    );
 
     let last_commited_block = storage
         .chain()

@@ -164,7 +164,7 @@ impl<S: EthereumSigner> Signer<S> {
         let eth_signature = match &self.eth_signer {
             Some(signer) => {
                 let message = transfer.get_ethereum_sign_message(&token.symbol, token.decimals);
-                let signature = signer.sign_message(&message.as_bytes()).await?;
+                let signature = signer.sign_message(message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
@@ -205,7 +205,7 @@ impl<S: EthereumSigner> Signer<S> {
         let eth_signature = match &self.eth_signer {
             Some(signer) => {
                 let message = withdraw.get_ethereum_sign_message(&token.symbol, token.decimals);
-                let signature = signer.sign_message(&message.as_bytes()).await?;
+                let signature = signer.sign_message(message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
@@ -243,7 +243,7 @@ impl<S: EthereumSigner> Signer<S> {
         let eth_signature = match &self.eth_signer {
             Some(signer) => {
                 let message = forced_exit.get_ethereum_sign_message(&token.symbol, token.decimals);
-                let signature = signer.sign_message(&message.as_bytes()).await?;
+                let signature = signer.sign_message(message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
@@ -283,7 +283,7 @@ impl<S: EthereumSigner> Signer<S> {
             Some(signer) => {
                 let message =
                     mint_nft.get_ethereum_sign_message(&fee_token.symbol, fee_token.decimals);
-                let signature = signer.sign_message(&message.as_bytes()).await?;
+                let signature = signer.sign_message(message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
@@ -325,7 +325,7 @@ impl<S: EthereumSigner> Signer<S> {
             Some(signer) => {
                 let message =
                     withdraw_nft.get_ethereum_sign_message(&fee_token.symbol, fee_token.decimals);
-                let signature = signer.sign_message(&message.as_bytes()).await?;
+                let signature = signer.sign_message(message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)

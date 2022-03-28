@@ -103,7 +103,6 @@ async fn handle_graphql(
     params: web::Json<GrqaphqlQuery>,
     volume_storage: web::Data<VolumeStorage>,
 ) -> Result<HttpResponse> {
-    // TODO https://linear.app/matterlabs/issue/ZKS-413/support-full-version-of-graphql-for-tokenvalidator
     let query_parser = Regex::new(r#"\{token\(id:\s"(?P<address>.*?)"\).*"#).expect("Right regexp");
     let caps = query_parser.captures(&params.query).unwrap();
     let address = &caps["address"].to_ascii_lowercase();
@@ -121,7 +120,7 @@ async fn handle_graphql(
 fn main() {
     vlog::init();
 
-    let mut runtime = actix_rt::System::new("dev-liquidity-token-watcher");
+    let runtime = actix_rt::System::new();
     let config = DevLiquidityTokenWatcherConfig::from_env();
 
     let storage = match config.regime {
@@ -138,9 +137,9 @@ fn main() {
     runtime.block_on(async {
         HttpServer::new(move || {
             App::new()
-                .data(storage.clone())
+                .app_data(web::Data::new(storage.clone()))
+                .wrap(Cors::default().send_wildcard().max_age(3600))
                 .wrap(middleware::Logger::default())
-                .wrap(Cors::new().send_wildcard().max_age(3600).finish())
                 .route("/graphql", web::post().to(handle_graphql))
         })
         .bind("0.0.0.0:9975")

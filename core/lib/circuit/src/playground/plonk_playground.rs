@@ -35,7 +35,7 @@ fn test_transpile_deposit_franklin_existing_account() {
 
     plasma_state.apply_deposit_op(&deposit_op);
 
-    let deposit_witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+    let deposit_witness = DepositWitness::apply_tx(witness_accum.account_tree, &deposit_op);
     let deposit_operations = deposit_witness.calculate_operations(());
     let pub_data_from_witness = deposit_witness.get_pubdata();
 
@@ -225,8 +225,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
 
     for _ in 0..NUM_DEPOSITS {
         plasma_state.apply_deposit_op(&deposit_op);
-        let deposit_witness =
-            DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_witness = DepositWitness::apply_tx(witness_accum.account_tree, &deposit_op);
         let deposit_operations = deposit_witness.calculate_operations(());
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
@@ -400,8 +399,7 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
 
     for _ in 0..NUM_DEPOSITS {
         plasma_state.apply_deposit_op(&deposit_op);
-        let deposit_witness =
-            DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_witness = DepositWitness::apply_tx(witness_accum.account_tree, &deposit_op);
         let deposit_operations = deposit_witness.calculate_operations(());
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
