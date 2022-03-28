@@ -8,6 +8,8 @@ use super::records::AccountTreeCache;
 use crate::{QueryResult, StorageProcessor};
 
 /// Tree cache schema contains methods to store/load Merkle tree cache.
+///
+/// This schema is used to interact with caches encoded as *binary* data (using `bincode` protocol).
 #[derive(Debug)]
 pub struct TreeCacheSchemaBincode<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 

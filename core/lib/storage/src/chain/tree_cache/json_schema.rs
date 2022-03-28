@@ -8,6 +8,8 @@ use super::records::AccountTreeCache;
 use crate::{QueryResult, StorageProcessor};
 
 /// Tree cache schema contains methods to store/load Merkle tree cache.
+///
+/// This schema is used to interact with caches encoded as *JSON* data.
 #[derive(Debug)]
 pub struct TreeCacheSchemaJSON<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
