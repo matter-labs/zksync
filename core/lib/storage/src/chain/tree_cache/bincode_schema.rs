@@ -31,7 +31,7 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
             INSERT INTO account_tree_cache (block, tree_cache_binary)
             VALUES ($1, $2)
             ON CONFLICT (block)
-            DO NOTHING
+            DO UPDATE SET tree_cache_binary = $2
             ",
             *block as i64,
             tree_cache,

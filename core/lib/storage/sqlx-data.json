@@ -1554,19 +1554,6 @@
       "nullable": []
     }
   },
-  "266b9f781a6b9f8514f8f306fff35821a077bce723545fe0b6beb67c44f62971": {
-    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "273c7371b1a13bbb03490e874b7f2eab969defa6aa9f2b416e4f9e8a135aa97c": {
     "query": "\n                        INSERT INTO account_creates ( account_id, is_create, block_number, address, nonce, update_order_id )\n                        VALUES ( $1, $2, $3, $4, $5, $6 )\n                        ",
     "describe": {
@@ -5273,6 +5260,19 @@
       "nullable": []
     }
   },
+  "a331b144edb30078170ca904570563cc379640480347fbd46009a166d51ac76e": {
+    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache_binary)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO UPDATE SET tree_cache_binary = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "a35474b8ed25c6265defe4e7621f11eae0deedc08a9cbc9780773c5be5697fcc": {
     "query": "\n                INSERT INTO withdrawn_nfts_factories (token_id, factory_address)\n                SELECT token_id, \n                    COALESCE(nft_factory.factory_address, server_config.nft_factory_addr) as factory_address\n                FROM nft\n                INNER JOIN server_config ON server_config.id = true\n                LEFT JOIN nft_factory ON nft_factory.creator_id = nft.creator_account_id\n                WHERE nft.token_id = ANY($1)\n            ",
     "describe": {
@@ -6855,19 +6855,6 @@
       ]
     }
   },
-  "cf01f8cc48db73ecb9cb466d26f36eb81441c614cfb48ddcb468ff8d8256ea3b": {
-    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache_binary)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "d106212871e6b0266259fa0f819ab51c1e58ec799a45b618a4ec4d67d00f49be": {
     "query": "\n                INSERT INTO tx_filters (address, token, tx_hash)\n                SELECT u.address, u.token, u.tx_hash\n                FROM UNNEST ($1::bytea[], $2::integer[], $3::bytea[])\n                AS u(address, token, tx_hash)\n                ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING\n            ",
     "describe": {
@@ -7183,6 +7170,19 @@
         false,
         false
       ]
+    }
+  },
+  "d97ffc342a571d0cfabc58ebc5de24d71ac0d7104d9f2b2a9cd39141fd2c9d3c": {
+    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO UPDATE SET tree_cache = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "db91278dbc648e1c7ebf4775d7927104e887c0bb338ed51c9aff21cfdecb2f27": {
