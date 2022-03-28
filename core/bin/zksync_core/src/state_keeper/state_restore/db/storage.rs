@@ -37,7 +37,7 @@ impl<'a, 'b> StateRestoreDb for StateRestoreStorage<'a, 'b> {
     async fn load_last_cached_block(&mut self) -> Option<BlockNumber> {
         self.storage
             .chain()
-            .block_schema()
+            .tree_cache_schema_bincode()
             .get_last_block_with_account_tree_cache()
             .await
             .expect("Can't load the last block with cache")
@@ -87,14 +87,14 @@ impl<'a, 'b> StateRestoreDb for StateRestoreStorage<'a, 'b> {
     ) -> SparseMerkleTreeSerializableCacheBN256 {
         let cache = self.storage
             .chain()
-            .block_schema()
+            .tree_cache_schema_bincode()
             .get_account_tree_cache_block(block)
             .await
             .expect("Can't load account tree cache")
             .unwrap_or_else(|| {
                 panic!("Account tree cache was requested for block {}, for which it was checked to exist", block)
             });
-        serde_json::from_value(cache).expect("Unable to decode tree cache")
+        SparseMerkleTreeSerializableCacheBN256::decode_bincode(&cache)
     }
 
     async fn store_account_tree_cache(
@@ -102,11 +102,10 @@ impl<'a, 'b> StateRestoreDb for StateRestoreStorage<'a, 'b> {
         block: BlockNumber,
         account_tree_cache: SparseMerkleTreeSerializableCacheBN256,
     ) {
-        let encoded_tree_cache = serde_json::to_string(&account_tree_cache)
-            .expect("Unable to encode account tree cache");
+        let encoded_tree_cache = account_tree_cache.encode_bincode();
         self.storage
             .chain()
-            .block_schema()
+            .tree_cache_schema_bincode()
             .store_account_tree_cache(block, encoded_tree_cache)
             .await
             .expect("Unable to store account tree cache in the database");
