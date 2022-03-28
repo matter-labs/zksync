@@ -42,4 +42,12 @@ impl<'a, 'c> ChainIntermediator<'a, 'c> {
     pub fn mempool_schema(self) -> mempool::MempoolSchema<'a, 'c> {
         mempool::MempoolSchema(self.0)
     }
+
+    pub fn tree_cache_schema_json(self) -> tree_cache::TreeCacheSchemaJSON<'a, 'c> {
+        tree_cache::TreeCacheSchemaJSON(self.0)
+    }
+
+    pub fn tree_cache_schema_bincode(self) -> tree_cache::TreeCacheSchemaBincode<'a, 'c> {
+        tree_cache::TreeCacheSchemaBincode(self.0)
+    }
 }
