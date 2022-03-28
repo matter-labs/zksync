@@ -2,4 +2,4 @@
 # https://help.github.com/articles/about-codeowners/
 
 # Changes in smart contracts
-/contracts/contracts     @popzxc
+/contracts/contracts     @vladbochok @popzxc
