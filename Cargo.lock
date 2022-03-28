@@ -5184,6 +5184,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efd1f82c56340fdf16f2a953d7bda4f8fdffba13d93b00844c25572110b26079"
 
 [[package]]
+name = "tree_cache_updater"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "structopt",
+ "tokio",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
