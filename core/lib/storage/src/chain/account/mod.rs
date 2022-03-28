@@ -457,23 +457,20 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
         let block_number = sqlx::query!(
             "
-                SELECT MAX(block_number)
-                FROM(
-                    SELECT block_number FROM account_balance_updates
-                    WHERE account_id = $1
-                    UNION ALL
-                    SELECT block_number FROM account_creates
-                    WHERE account_id = $1
-                    UNION ALL
-                    SELECT block_number FROM account_pubkey_updates
-                    WHERE account_id = $1
-                ) as subquery
-            ",
+            SELECT GREATEST(
+                (SELECT MAX(block_number) FROM account_balance_updates
+                WHERE account_id = $1),
+                (SELECT MAX(block_number) FROM account_creates
+                WHERE account_id = $1),
+                (SELECT MAX(block_number) FROM account_pubkey_updates
+                WHERE account_id = $1)
+            )
+    ",
             i64::from(*account_id),
         )
         .fetch_one(self.0.conn())
         .await?
-        .max
+        .greatest
         .unwrap_or(0);
 
         metrics::histogram!(

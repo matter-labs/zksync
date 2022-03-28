@@ -22,7 +22,7 @@
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "handlebars": "^4.7.7",
-    "hardhat": "^2.0.8",
+    "hardhat": "^2.8.0",
     "hardhat-contract-sizer": "^2.0.2",
     "hardhat-typechain": "^0.3.3",
     "jsonwebtoken": "^8.5.1",
@@ -41,7 +41,8 @@
   },
   "scripts": {
     "build": "hardhat compile",
-    "test": "CONTRACT_TESTS=1 zk f yarn run hardhat test",
+    "test": "CONTRACT_TESTS=1 zk f yarn run hardhat test test/*.spec.ts",
+    "test:fork": "CONTRACT_TESTS=1 TEST_CONTRACTS_FORK=1 zk f yarn run hardhat test test/*.fork.ts",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
     "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",

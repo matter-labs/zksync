@@ -39,7 +39,7 @@ regenesis_threshold=2
 listing_fee_token="0x0000000000000000000000000000000000000000"
 
 # The number of token (in wei) we want to be payed for listing a token
-listing_fee=10000000000000000
+listing_fee=0
 
 # Listing cap, the maximum number of tokens which can be listed (2^16 - 100 by default)
 listing_cap=65436

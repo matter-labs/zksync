@@ -370,7 +370,7 @@ impl<W: EthClient> EthWatch<W> {
         }
     }
 
-    pub async fn run(mut self, mut eth_watch_req: mpsc::Receiver<EthWatchRequest>) {
+    pub async fn restore_from_eth_using_latest_block_number(&mut self) {
         // As infura may be not responsive, we want to retry the query until we've actually got the
         // block number.
         // Normally, however, this loop is not expected to last more than one iteration.
@@ -400,7 +400,9 @@ impl<W: EthClient> EthWatch<W> {
         self.restore_state_from_eth(block)
             .await
             .expect("Unable to restore ETHWatcher state");
+    }
 
+    pub async fn run(mut self, mut eth_watch_req: mpsc::Receiver<EthWatchRequest>) {
         while let Some(request) = eth_watch_req.next().await {
             match request {
                 EthWatchRequest::PollETHNode => {
@@ -447,8 +449,7 @@ impl<W: EthClient> EthWatch<W> {
     }
 }
 
-#[must_use]
-pub fn start_eth_watch(
+pub async fn start_eth_watch(
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     eth_gateway: EthereumGateway,
@@ -462,11 +463,13 @@ pub fn start_eth_watch(
         contract_config.governance_addr,
     );
 
-    let eth_watch = EthWatch::new(
+    let mut eth_watch = EthWatch::new(
         eth_client,
         mempool_req_sender,
         eth_watcher_config.confirmations_for_eth_event,
     );
+
+    eth_watch.restore_from_eth_using_latest_block_number().await;
 
     tokio::spawn(eth_watch.run(eth_req_receiver));
 

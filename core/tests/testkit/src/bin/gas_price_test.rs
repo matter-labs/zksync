@@ -373,7 +373,7 @@ async fn commit_cost_of_mint_nft(
             ETHAccountId(2),
             ZKSyncAccountId(2),
             Token(TokenId(0)),
-            BigUint::from(0u32),
+            BigUint::from(1u32),
         )
         .await;
     test_setup
@@ -445,7 +445,7 @@ async fn commit_cost_of_transfers(
             ETHAccountId(2),
             ZKSyncAccountId(2),
             Token(TokenId(0)),
-            BigUint::from(0u32),
+            BigUint::from(1u32),
         )
         .await;
     test_setup
@@ -538,7 +538,7 @@ async fn commit_cost_of_swaps(
             ETHAccountId(1),
             ZKSyncAccountId(4),
             Token(TokenId(0)),
-            0u32.into(),
+            1u32.into(),
         )
         .await;
     test_setup
@@ -546,7 +546,7 @@ async fn commit_cost_of_swaps(
             ETHAccountId(1),
             ZKSyncAccountId(5),
             Token(TokenId(0)),
-            0u32.into(),
+            1u32.into(),
         )
         .await;
     test_setup

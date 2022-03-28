@@ -192,13 +192,13 @@ contract Governance is Config {
         bytes32 messageHash = keccak256(packRegisterNFTFactoryMsg(_creatorAccountId, _creatorAddress, msg.sender));
 
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
-        require(recoveredAddress == _creatorAddress && recoveredAddress != address(0), "ws");
+        require(recoveredAddress == _creatorAddress, "ws");
         nftFactories[_creatorAccountId][_creatorAddress] = NFTFactory(msg.sender);
         emit NFTFactoryRegisteredCreator(_creatorAccountId, _creatorAddress, msg.sender);
     }
 
-    //@notice Set default factory for our contract. This factory will be used to mint an NFT token that has no factory
-    //@param _factory Address of NFT factory
+    /// @notice Set default factory for our contract. This factory will be used to mint an NFT token that has no factory
+    /// @param _factory Address of NFT factory
     function setDefaultNFTFactory(address _factory) external {
         requireGovernor(msg.sender);
         require(address(_factory) != address(0), "mb1"); // Factory should be non zero
@@ -209,11 +209,23 @@ contract Governance is Config {
 
     function getNFTFactory(uint32 _creatorAccountId, address _creatorAddress) external view returns (NFTFactory) {
         NFTFactory _factory = nftFactories[_creatorAccountId][_creatorAddress];
-        if (address(_factory) == address(0)) {
+        // even if the factory is undefined or has been destroyed, the user can mint NFT
+        if (address(_factory) == address(0) || !isContract(address(_factory))) {
             require(address(defaultFactory) != address(0), "fs"); // NFTFactory does not set
             return defaultFactory;
         } else {
             return _factory;
         }
+    }
+
+    /// @return whether the address is a contract or not
+    /// NOTE: for smart contracts that called `selfdestruct` will return a negative result
+    function isContract(address _address) internal view returns (bool) {
+        uint256 contractSize;
+        assembly {
+            contractSize := extcodesize(_address)
+        }
+
+        return contractSize != 0;
     }
 }
