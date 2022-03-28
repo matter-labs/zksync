@@ -1033,6 +1033,27 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns the ID of the next expected priority operation.
+    /// Performs a lookup in both incomplete and complete block tables.
+    pub async fn next_expected_serial_id(&mut self) -> QueryResult<u64> {
+        let start = Instant::now();
+
+        let next_expected_serial_id = sqlx::query!(
+            "SELECT GREATEST(
+                (SELECT MAX(unprocessed_prior_op_after) FROM incomplete_blocks),
+                (SELECT MAX(unprocessed_prior_op_after) FROM blocks)
+            )",
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .greatest
+        .map(|val| val as u64)
+        .unwrap_or_default();
+
+        metrics::histogram!("sql.chain.block.next_expected_serial_id", start.elapsed());
+        Ok(next_expected_serial_id)
+    }
+
     /// Returns the range of existing incomplete blocks.
     ///
     /// Returned range is *inclusive*, meaning that both returned blocks (if they were returned)
@@ -1161,19 +1182,18 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Stores account tree cache for a block
+    /// Stores account tree cache for a block.
+    /// Expects `tree_cache` to be a valid encoded JSON.
     pub async fn store_account_tree_cache(
         &mut self,
         block: BlockNumber,
-        tree_cache: serde_json::Value,
+        tree_cache: String,
     ) -> QueryResult<()> {
         let start = Instant::now();
         if *block == 0 {
             return Ok(());
         }
 
-        let tree_cache_str =
-            serde_json::to_string(&tree_cache).expect("Failed to serialize Account Tree Cache");
         sqlx::query!(
             "
             INSERT INTO account_tree_cache (block, tree_cache)
@@ -1182,7 +1202,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             DO NOTHING
             ",
             *block as i64,
-            tree_cache_str,
+            tree_cache,
         )
         .execute(self.0.conn())
         .await?;

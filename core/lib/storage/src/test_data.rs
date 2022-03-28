@@ -197,7 +197,7 @@ pub fn gen_sample_incomplete_block(
         block_number,
         fee_account: AccountId(0),
         block_transactions: txs,
-        processed_priority_ops: (0, 0),
+        processed_priority_ops: (0, 1),
         block_chunks_size,
         commit_gas_limit: 1_000_000.into(),
         verify_gas_limit: 1_500_000.into(),

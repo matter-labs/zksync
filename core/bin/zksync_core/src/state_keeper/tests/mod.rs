@@ -24,7 +24,9 @@ fn test_create_incorrect_state_keeper() {
     let fee_collector = Account::default_with_address(&H160::random());
 
     let mut init_params = ZkSyncStateInitParams::default();
-    init_params.insert_account(AccountId(0), fee_collector.clone());
+    init_params
+        .state
+        .insert_account(AccountId(0), fee_collector.clone());
 
     // should panic
     ZkSyncStateKeeper::new(

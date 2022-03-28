@@ -84,6 +84,7 @@ async fn start_server(
 
 /// Start HTTP REST API
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
@@ -98,9 +99,8 @@ pub fn start_server_thread_detached(
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
-
             actix_rt::System::new().block_on(async move {
+                let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
                 // TODO remove this config ZKS-815
                 let config = ZkSyncConfig::from_env();
 

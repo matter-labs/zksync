@@ -132,7 +132,7 @@ pub trait DatabaseInterface: Send + Sync + Clone + 'static {
         &self,
         connection: &mut StorageProcessor<'_>,
         block: BlockNumber,
-        tree_cache: serde_json::Value,
+        tree_cache: String,
     ) -> anyhow::Result<()>;
 
     async fn store_witness(

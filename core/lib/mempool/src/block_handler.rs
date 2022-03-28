@@ -23,6 +23,10 @@ impl ProposedBlock {
     pub fn is_empty(&self) -> bool {
         self.priority_ops.is_empty() && self.txs.is_empty()
     }
+
+    pub fn size(&self) -> usize {
+        self.priority_ops.len() + self.txs.len()
+    }
 }
 
 #[derive(Debug)]

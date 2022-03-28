@@ -127,11 +127,11 @@ struct Opt {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
-    let mut _sentry_guard = None;
+    let mut _vlog_guard = None;
     let server_mode = if opt.genesis {
         ServerCommand::Genesis
     } else {
-        _sentry_guard = vlog::init();
+        _vlog_guard = Some(vlog::init());
         ServerCommand::Launch
     };
 
@@ -259,7 +259,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.block_chunk_sizes,
             ));
             let private_config = PrivateApiConfig::from_env();
-            zksync_api::api_server::rest::start_server_thread_detached(
+            tasks.push(zksync_api::api_server::rest::start_server_thread_detached(
                 read_only_connection_pool.clone(),
                 RestApiConfig::from_env().bind_addr(),
                 contracts_config.contract_addr,
@@ -267,7 +267,7 @@ async fn run_server(components: &ComponentsToRun) {
                 sign_check_sender,
                 mempool_tx_request_sender,
                 private_config.url,
-            );
+            ));
         }
     }
 
