@@ -104,6 +104,12 @@ pub async fn run_core(
     let (processed_tx_events_sender, processed_tx_events_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
 
+    let mempool_tx_handler_task = run_mempool_tx_handler(
+        connection_pool.clone(),
+        mempool_tx_request_receiver,
+        config.chain.state_keeper.block_chunk_sizes.clone(),
+    );
+
     // Run health check api for core
     let private_api_task = private_api::start_private_core_api(
         connection_pool.clone(),
@@ -120,7 +126,8 @@ pub async fn run_core(
         &config.contracts,
         &config.eth_watch,
         mempool_tx_request_sender.clone(),
-    );
+    )
+    .await;
 
     // Insert pending withdrawals into database (if required)
     let mut storage_processor = connection_pool.access_storage().await?;
@@ -164,12 +171,6 @@ pub async fn run_core(
     let mempool_block_handler_task = run_mempool_block_handler(
         connection_pool.clone(),
         mempool_block_request_receiver,
-        config.chain.state_keeper.block_chunk_sizes.clone(),
-    );
-
-    let mempool_tx_handler_task = run_mempool_tx_handler(
-        connection_pool.clone(),
-        mempool_tx_request_receiver,
         config.chain.state_keeper.block_chunk_sizes.clone(),
     );
 

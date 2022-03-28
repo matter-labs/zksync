@@ -1511,6 +1511,26 @@
       ]
     }
   },
+  "2559418d7e594f257db82d57db493433c8560ab78ab7a3a34dfeca4fbf131076": {
+    "query": "\n            SELECT GREATEST(\n                (SELECT MAX(block_number) FROM account_balance_updates\n                WHERE account_id = $1),\n                (SELECT MAX(block_number) FROM account_creates\n                WHERE account_id = $1),\n                (SELECT MAX(block_number) FROM account_pubkey_updates\n                WHERE account_id = $1)\n            )\n    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "greatest",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "25cd6e69f55e94fae6c907a8807169df57eccff2f0bf0c8f21ffdb637dd2ea44": {
     "query": "INSERT INTO events (block_number, event_type, event_data)\n            SELECT $1, $2, u.event_data\n                FROM UNNEST ($3::jsonb[])\n                AS u(event_data)",
     "describe": {
@@ -2325,26 +2345,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "43469652ff4f68b9990157c9eefb0cce5347db70e6c00df12d9fb23f701bbafd": {
-    "query": "\n                SELECT MAX(block_number)\n                FROM(\n                    SELECT block_number FROM account_balance_updates\n                    WHERE account_id = $1\n                    UNION ALL\n                    SELECT block_number FROM account_creates\n                    WHERE account_id = $1\n                    UNION ALL\n                    SELECT block_number FROM account_pubkey_updates\n                    WHERE account_id = $1\n                ) as subquery\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "439d0083a3b98066071cde5909969b4e9ce744bc1bfa761116c6fb5bcc356075": {
