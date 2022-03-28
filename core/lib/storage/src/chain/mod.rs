@@ -5,6 +5,7 @@ pub mod operations;
 pub mod operations_ext;
 pub mod state;
 pub mod stats;
+pub mod tree_cache;
 
 use super::StorageProcessor;
 
