@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // Go through the suggested blocks range. For each block in this range, if the cachce exists, we will load it, convert to the bincode cache,
+    // Go through the suggested blocks range. For each block in this range, if the cache exists, we will load it, convert to the bincode cache,
     // and store to the binary schema.
     for block in min_block..(max_block.0) {
         if let Some(cache) = transaction
