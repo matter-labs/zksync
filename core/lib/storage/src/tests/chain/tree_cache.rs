@@ -165,3 +165,119 @@ async fn test_remove_new_account_tree_cache_bincode(
 
     Ok(())
 }
+
+/// Check that methods work correctly if there are both types of cache in the database.
+#[db_test]
+async fn different_cache_types_interoperability(
+    mut storage: StorageProcessor<'_>,
+) -> QueryResult<()> {
+    // Insert JSON account tree cache for 5 blocks, but insert binary cache only until 4th block.
+    for block_number in 1..=5 {
+        BlockSchema(&mut storage)
+            .save_full_block(gen_sample_block(
+                BlockNumber(block_number),
+                BLOCK_SIZE_CHUNKS,
+                Default::default(),
+            ))
+            .await?;
+        TreeCacheSchemaJSON(&mut storage)
+            .store_account_tree_cache(
+                BlockNumber(block_number),
+                serde_json::Value::default().to_string(),
+            )
+            .await?;
+
+        if block_number != 5 {
+            TreeCacheSchemaBincode(&mut storage)
+                .store_account_tree_cache(BlockNumber(block_number), vec![1, 2, 3])
+                .await?;
+        }
+    }
+
+    // Check that JSON corresponds to the 5th block and bincode to the 4th.
+    let last_json_cache = TreeCacheSchemaJSON(&mut storage)
+        .get_account_tree_cache()
+        .await?
+        .unwrap()
+        .0;
+    let last_bincode_cache = TreeCacheSchemaBincode(&mut storage)
+        .get_account_tree_cache()
+        .await?
+        .unwrap()
+        .0;
+    assert_eq!(last_json_cache, BlockNumber(5));
+    assert_eq!(last_bincode_cache, BlockNumber(4));
+
+    // The same must be true for just getting the block number.
+    assert_eq!(
+        TreeCacheSchemaJSON(&mut storage)
+            .get_last_block_with_account_tree_cache()
+            .await?
+            .unwrap(),
+        BlockNumber(5)
+    );
+    assert_eq!(
+        TreeCacheSchemaBincode(&mut storage)
+            .get_last_block_with_account_tree_cache()
+            .await?
+            .unwrap(),
+        BlockNumber(4)
+    );
+
+    // Check that resolving cache by number works as expected.
+
+    // For JSON both blocks 4 and 5 should be stored.
+    assert!(TreeCacheSchemaJSON(&mut storage)
+        .get_account_tree_cache_block(BlockNumber(4))
+        .await?
+        .is_some());
+    assert!(TreeCacheSchemaJSON(&mut storage)
+        .get_account_tree_cache_block(BlockNumber(5))
+        .await?
+        .is_some());
+
+    // For bincode only block 4 should be available
+    assert!(TreeCacheSchemaBincode(&mut storage)
+        .get_account_tree_cache_block(BlockNumber(4))
+        .await?
+        .is_some());
+    assert!(TreeCacheSchemaBincode(&mut storage)
+        .get_account_tree_cache_block(BlockNumber(5))
+        .await?
+        .is_none());
+
+    // Let's store the 5th block for bincode and check last blocks again.
+    TreeCacheSchemaBincode(&mut storage)
+        .store_account_tree_cache(BlockNumber(5), vec![1, 2, 3])
+        .await?;
+    let last_json_cache = TreeCacheSchemaJSON(&mut storage)
+        .get_account_tree_cache()
+        .await?
+        .unwrap()
+        .0;
+    let last_bincode_cache = TreeCacheSchemaBincode(&mut storage)
+        .get_account_tree_cache()
+        .await?
+        .unwrap()
+        .0;
+    assert_eq!(last_json_cache, BlockNumber(5));
+    assert_eq!(last_bincode_cache, BlockNumber(5));
+
+    // The same must be true for just getting the block number.
+    assert_eq!(
+        TreeCacheSchemaJSON(&mut storage)
+            .get_last_block_with_account_tree_cache()
+            .await?
+            .unwrap(),
+        BlockNumber(5)
+    );
+    assert_eq!(
+        TreeCacheSchemaBincode(&mut storage)
+            .get_last_block_with_account_tree_cache()
+            .await?
+            .unwrap(),
+        BlockNumber(5)
+    );
+
+    Ok(())
+}

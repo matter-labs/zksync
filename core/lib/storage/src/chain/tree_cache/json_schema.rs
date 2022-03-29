@@ -53,10 +53,11 @@ impl<'a, 'c> TreeCacheSchemaJSON<'a, 'c> {
     ) -> QueryResult<Option<BlockNumber>> {
         let start = Instant::now();
 
-        let last_block_with_cache = sqlx::query!("SELECT MAX(block) FROM account_tree_cache")
-            .fetch_one(self.0.conn())
-            .await?
-            .max;
+        let last_block_with_cache =
+            sqlx::query!("SELECT MAX(block) FROM account_tree_cache WHERE tree_cache IS NOT NULL")
+                .fetch_one(self.0.conn())
+                .await?
+                .max;
 
         metrics::histogram!(
             "sql.chain.tree_cache.json.get_last_block_with_account_tree_cache",
@@ -65,8 +66,8 @@ impl<'a, 'c> TreeCacheSchemaJSON<'a, 'c> {
         Ok(last_block_with_cache.map(|block| BlockNumber(block as u32)))
     }
 
-    /// Gets the latest stored account tree cache.
-    /// Returns `None` if there are no caches in the database.
+    /// Gets the latest stored account tree cache encoded in JSON.
+    /// Returns `None` if there are no caches in the database or only existing caches are binary.
     /// Returns the block number and associated cache otherwise.
     pub async fn get_account_tree_cache(
         &mut self,
@@ -76,6 +77,7 @@ impl<'a, 'c> TreeCacheSchemaJSON<'a, 'c> {
             AccountTreeCache,
             "
             SELECT * FROM account_tree_cache
+            WHERE tree_cache IS NOT NULL
             ORDER BY block DESC
             LIMIT 1
             ",
@@ -96,14 +98,17 @@ impl<'a, 'c> TreeCacheSchemaJSON<'a, 'c> {
 
             (
                 BlockNumber(w.block as u32),
-                serde_json::from_str(&w.tree_cache.unwrap())
-                    .expect("Failed to deserialize Account Tree Cache"),
+                serde_json::from_str(
+                    &w.tree_cache
+                        .expect("Must be 'some' because of condition in query"),
+                )
+                .expect("Failed to deserialize Account Tree Cache"),
             )
         }))
     }
 
     /// Gets stored account tree cache for a certain block.
-    /// Returns `None` if there is no cache for requested block.
+    /// Returns `None` if there is no cache for requested block or it's encoded in binary.
     pub async fn get_account_tree_cache_block(
         &mut self,
         block: BlockNumber,
@@ -113,7 +118,7 @@ impl<'a, 'c> TreeCacheSchemaJSON<'a, 'c> {
             AccountTreeCache,
             "
             SELECT * FROM account_tree_cache
-            WHERE block = $1
+            WHERE block = $1 AND tree_cache IS NOT NULL
             ",
             *block as i64
         )
@@ -125,14 +130,11 @@ impl<'a, 'c> TreeCacheSchemaJSON<'a, 'c> {
             start.elapsed()
         );
         Ok(account_tree_cache.map(|w| {
-            assert!(
-                w.tree_cache.is_some(),
-                "JSON schema was used to fetch from table without JSON data. Entry: {:?}",
-                w
-            );
-
-            serde_json::from_str(&w.tree_cache.unwrap())
-                .expect("Failed to deserialize Account Tree Cache")
+            serde_json::from_str(
+                &w.tree_cache
+                    .expect("Must be 'some' because of condition in query"),
+            )
+            .expect("Failed to deserialize Account Tree Cache")
         }))
     }
 
