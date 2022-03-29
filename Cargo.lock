@@ -6059,6 +6059,7 @@ name = "zksync_prometheus_exporter"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "futures 0.3.17",
  "metrics",
  "metrics-exporter-prometheus",
@@ -6068,9 +6069,11 @@ dependencies = [
  "tokio",
  "tracing",
  "vlog",
+ "zksync_crypto",
  "zksync_storage",
  "zksync_token_db_cache",
  "zksync_types",
+ "zksync_utils",
 ]
 
 [[package]]
