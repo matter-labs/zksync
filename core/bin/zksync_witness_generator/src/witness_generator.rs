@@ -125,7 +125,12 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             circuit_account_tree.set_internals(serde_json::from_value(account_tree_cache)?);
             if block != cached_block {
                 // There is no relevant cache, so we have to use some outdated cache and update the tree.
-                metrics::increment_counter!("witness_generator.cache_access", "type" => "miss");
+                if *block == *cached_block + 1 {
+                    // Off by 1 misses are normally expected
+                    metrics::increment_counter!("witness_generator.cache_access", "type" => "off_by_1");
+                } else {
+                    metrics::increment_counter!("witness_generator.cache_access", "type" => "miss");
+                }
 
                 vlog::info!("Reconstructing the cache for the block {} using the cached tree for the block {}", block, cached_block);
 
@@ -265,6 +270,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
 
         // Initialize counters for cache hits/misses.
         metrics::register_counter!("witness_generator.cache_access", "type" => "hit");
+        metrics::register_counter!("witness_generator.cache_access", "type" => "off_by_1");
         metrics::register_counter!("witness_generator.cache_access", "type" => "miss");
 
         let mut current_block = self.start_block;
