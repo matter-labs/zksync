@@ -18,6 +18,11 @@ on:
         description: Kubernets namespace of the config
         required: true
         type: string
+      restart:
+        description: Restart dependent services
+        required: false
+        type: boolean
+        default: false
     secrets:
       github-token:
         description: GitHub token
@@ -73,5 +78,7 @@ jobs:
           kubectl delete configmap -n ${{ inputs.namespace }} server-env-custom || /bin/true
           kubectl create configmap -n ${{ inputs.namespace }} server-env-custom --from-env-file=${{ env.ENVFILE }}
 
-          ## JFI: Decide if we need to restart server/prover and might be others. Should this be a parameter?
-          # kubectl delete pod -n ${{ inputs.namespace }} -l app.kubernetes.io/instance=server
+          if [ "${{ inputs.restart }}" = "true" ]; then
+            kubectl rollout -n ${{ inputs.namespace }} restart deployment/server-api
+            kubectl rollout -n ${{ inputs.namespace }} restart deployment/server
+          fi
