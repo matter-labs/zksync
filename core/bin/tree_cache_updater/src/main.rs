@@ -13,9 +13,6 @@ struct Opt {
     /// Maximum amount of blocks to convert.
     #[structopt(long)]
     max_blocks: usize,
-    /// Whether to remove all the old JSON caches or not.
-    #[structopt(long)]
-    clear_old: bool,
 }
 
 #[tokio::main]
@@ -37,10 +34,6 @@ async fn main() -> anyhow::Result<()> {
         "I'm going to convert caches for blocks from {} to {}",
         min_block, max_block.0
     );
-    if opt.clear_old {
-        println!("Also, all the old JSON caches will be removed completely from the database");
-    }
-
     println!("Database URL is {}", DBConfig::from_env().url);
     println!("Proceed? [y/n]");
 
@@ -72,17 +65,6 @@ async fn main() -> anyhow::Result<()> {
                 .await?;
         }
         println!("Block {} processed", block);
-    }
-
-    // We've processed all the blocks. Now, if user requested, we'll remove all the old caches.
-    if opt.clear_old {
-        // BlockNumber(0) because range is not inclusive. Everything starting from block 1 will be removed.
-        transaction
-            .chain()
-            .tree_cache_schema_json()
-            .remove_new_account_tree_cache(BlockNumber(0))
-            .await?;
-        println!("Old caches removed");
     }
 
     transaction.commit().await?;
