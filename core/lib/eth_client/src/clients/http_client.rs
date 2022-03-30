@@ -273,11 +273,13 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                     from: transaction.from,
                     to: transaction.to,
                     gas: Some(transaction.gas),
-                    gas_price: Some(transaction.gas_price),
+                    gas_price: transaction.gas_price,
                     value: Some(transaction.value),
                     data: Some(transaction.input),
                     transaction_type: None,
                     access_list: None,
+                    max_fee_per_gas: None,
+                    max_priority_fee_per_gas: None,
                 };
 
                 let encoded_revert_reason = self

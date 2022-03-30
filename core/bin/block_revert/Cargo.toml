@@ -19,7 +19,7 @@ zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 
 tokio = { version = "1", features = ["full"] }
-ethabi = "14.0.0"
+ethabi = "16.0.0"
 anyhow = "1.0"
-web3 = "0.16.0"
+web3 = "0.18.0"
 structopt = "0.3.20"

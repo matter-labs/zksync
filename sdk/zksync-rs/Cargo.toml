@@ -13,8 +13,8 @@ zksync_crypto = { path = "../../core/lib/crypto", version = "1.0" }
 zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
 
 sha2 = "0.8"
-web3 = "0.16.0"
-ethabi = "14.0.0"
+web3 = "0.18.0"
+ethabi = "16.0.0"
 tokio = { version = "1", features = ["time"] }
 
 serde = { version = "1.0", features = ["derive"] }

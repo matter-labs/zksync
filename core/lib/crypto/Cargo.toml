@@ -18,7 +18,7 @@ rescue_poseidon = { package = "rescue_poseidon", version = "0.3.0", git = "https
 
 num = { version = "0.3.1", features = ["serde"] }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
-ethabi = "14.0.0"
+ethabi = "16.0.0"
 
 serde = "1.0"
 thiserror = "1.0"
