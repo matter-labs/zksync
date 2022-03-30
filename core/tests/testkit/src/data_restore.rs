@@ -5,7 +5,7 @@ use zksync_data_restore::{
     data_restore_driver::DataRestoreDriver, inmemory_storage_interactor::InMemoryStorageInteractor,
     ETH_BLOCKS_STEP,
 };
-use zksync_types::{Account, AccountMap, TokenId};
+use zksync_types::{Account, AccountId, TokenId};
 
 use crate::{external_commands::Contracts, TestkitConfig};
 
@@ -16,7 +16,7 @@ pub async fn verify_restore(
     testkit_config: &TestkitConfig,
     contracts: &Contracts,
     fee_account_address: Address,
-    acc_state_from_test_setup: AccountMap,
+    acc_state_from_test_setup: Vec<(u32, Account)>,
     tokens: Vec<TokenId>,
     root_hash: Fr,
 ) {
@@ -53,8 +53,11 @@ pub async fn verify_restore(
     };
 
     for (id, account) in acc_state_from_test_setup {
-        let driver_acc = driver.tree_state.get_account(id).expect("Should exist");
-        let inter_acc = db.get_account(&id).expect("Should exist");
+        let driver_acc = driver
+            .tree_state
+            .get_account(AccountId(id))
+            .expect("Should exist");
+        let inter_acc = db.get_account(&AccountId(id)).expect("Should exist");
         for id in &tokens {
             assert_eq!(driver_acc.address, inter_acc.address);
             assert_eq!(account.address, inter_acc.address);

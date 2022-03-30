@@ -20,7 +20,9 @@
 //! Most of schema modules contain at least two files:
 //! - `mod.rs`, which contains the schema itself.
 //! - `records.rs`, which contains the representation of the associated database
-//!   tables as structures.
+//!   tables as structures. Note that in record types some fields can be marked
+//!   as `allow(dead_code)` -- the field may actually be unused, but it exists in
+//!   the database, so we need to deserialize it anyway.
 //!
 //! The latter ones usually don't contain any logic other than the structures
 //! declarations, and all the logic is contained in either schema (for most
@@ -110,6 +112,11 @@ pub type QueryResult<T, E = anyhow::Error> = Result<T, E>;
 pub const MAX_BLOCK_NUMBER: BlockNumber = BlockNumber(u32::MAX);
 /// The maximum possible index value in block in the storage.
 pub const MAX_BLOCK_INDEX: u32 = i32::MAX as u32;
+
+/// Obtains the database URL from the environment variable.
+pub fn get_database_replica_url() -> String {
+    env::var("DATABASE_REPLICA_URL").unwrap_or_else(|_| get_database_url())
+}
 
 /// Obtains the database URL from the environment variable.
 pub fn get_database_url() -> String {

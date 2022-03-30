@@ -1,5 +1,4 @@
 use crate::committer::{AppliedUpdatesRequest, BlockCommitRequest};
-use crate::mempool::ProposedBlock;
 use crate::state_keeper::{CommitRequest, ZkSyncStateInitParams, ZkSyncStateKeeper};
 use chrono::Utc;
 use futures::{channel::mpsc, stream::StreamExt};
@@ -9,6 +8,7 @@ use zksync_crypto::{
     rand::{Rng, SeedableRng, XorShiftRng},
     PrivateKey,
 };
+use zksync_mempool::ProposedBlock;
 use zksync_types::block::{IncompleteBlock, PendingBlock};
 use zksync_types::tx::TimeRange;
 use zksync_types::{
@@ -25,19 +25,21 @@ impl StateKeeperTester {
     pub fn new(available_chunk_size: usize, max_iterations: usize, fast_iterations: usize) -> Self {
         const CHANNEL_SIZE: usize = 32768;
         let (events_sender, _events_receiver) = mpsc::channel(CHANNEL_SIZE);
-        let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
+        let (request_tx, _request_rx) = mpsc::channel(CHANNEL_SIZE);
         let (response_tx, response_rx) = mpsc::channel(CHANNEL_SIZE);
 
         let fee_collector = Account::default_with_address(&H160::random());
 
         let mut init_params = ZkSyncStateInitParams::default();
-        init_params.insert_account(AccountId(0), fee_collector.clone());
+        init_params
+            .state
+            .insert_account(AccountId(0), fee_collector.clone());
 
         let (state_keeper, _root_hash_calculator) = ZkSyncStateKeeper::new(
             init_params,
             fee_collector.address,
-            request_rx,
             response_tx,
+            request_tx,
             vec![available_chunk_size],
             max_iterations,
             fast_iterations,

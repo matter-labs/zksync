@@ -88,7 +88,7 @@ async fn get_status(
         ForcedExitRequestStatus::Disabled
     };
 
-    metrics::histogram!("api.forced_exit_requests.v01.status", start.elapsed());
+    metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "forced_exit_request_status");
     Ok(Json(response))
 }
 
@@ -158,10 +158,7 @@ pub async fn submit_request(
 
     check_address_space_overflow(saved_fe_request.id, data.digits_in_id);
 
-    metrics::histogram!(
-        "api.forced_exit_requests.v01.submit_request",
-        start.elapsed()
-    );
+    metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "submit_forced_exit_request");
     Ok(Json(saved_fe_request))
 }
 
@@ -180,16 +177,12 @@ pub async fn get_request_by_id(
 
     let mut fe_requests_schema = storage.forced_exit_requests_schema();
 
-    metrics::histogram!(
-        "api.forced_exit_requests.v01.get_request_by_id",
-        start.elapsed()
-    );
-
     let fe_request_from_db = fe_requests_schema
         .get_request_by_id(*request_id)
         .await
         .map_err(ApiError::internal)?;
 
+    metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "get_forced_exit_request_by_id");
     match fe_request_from_db {
         Some(fe_request) => Ok(Json(fe_request)),
         None => Err(ApiError::not_found("Request with such id does not exist")),
@@ -202,6 +195,7 @@ pub async fn check_account_eligibility(
     data: web::Data<ApiForcedExitRequestsData>,
     account: web::Path<Address>,
 ) -> JsonResult<ForcedExitEligibilityResponse> {
+    let start = Instant::now();
     let mut storage = data
         .connection_pool
         .access_storage()
@@ -217,6 +211,7 @@ pub async fn check_account_eligibility(
 
     let result = ForcedExitEligibilityResponse { eligible };
 
+    metrics::histogram!("api", start.elapsed(), "type" => "v01", "endpoint_name" => "check_account_eligibility");
     Ok(Json(result))
 }
 

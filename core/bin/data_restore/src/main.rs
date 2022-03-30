@@ -82,7 +82,7 @@ impl ContractsConfig {
 #[tokio::main]
 async fn main() {
     vlog::info!("Restoring zkSync state from the contract");
-    let _sentry_guard = vlog::init();
+    let _vlog_guard = vlog::init();
     let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ETHClientConfig::from_env();
 

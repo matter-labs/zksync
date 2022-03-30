@@ -12,10 +12,10 @@ use zksync_types::{
 use futures::channel::mpsc;
 use futures::StreamExt;
 use tokio::sync::RwLock;
+use zksync_mempool::MempoolTransactionRequest;
 
 use super::is_missing_priority_op_error;
 use crate::eth_watch::{client::EthClient, EthWatch};
-use crate::mempool::MempoolTransactionRequest;
 
 struct FakeEthClientData {
     priority_ops: HashMap<u64, Vec<PriorityOp>>,

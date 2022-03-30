@@ -2,6 +2,7 @@
 
 // Built-in uses
 
+use std::time::Instant;
 // External uses
 use actix_web::{
     web::{self, Json},
@@ -34,6 +35,7 @@ async fn get_tx_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<TxFeeRequest>,
 ) -> ApiResult<ApiFee> {
+    let start = Instant::now();
     let token_allowed = api_try!(data
         .tx_sender
         .ticker
@@ -44,19 +46,23 @@ async fn get_tx_fee(
         return Error::from(SubmitError::InappropriateFeeToken).into();
     }
     // TODO implement subsidies for v02 api ZKS-888
-    data.tx_sender
+    let res = data
+        .tx_sender
         .ticker
         .get_fee_from_ticker_in_wei(body.tx_type.into(), body.token_like, body.address)
         .await
         .map(|fee| fee.normal_fee.into())
         .map_err(Error::from)
-        .into()
+        .into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_tx_fee");
+    res
 }
 
 async fn get_batch_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<BatchFeeRequest>,
 ) -> ApiResult<ApiFee> {
+    let start = Instant::now();
     let token_allowed = api_try!(data
         .tx_sender
         .ticker
@@ -71,13 +77,16 @@ async fn get_batch_fee(
         .into_iter()
         .map(|tx| (tx.tx_type.into(), tx.address))
         .collect();
-    data.tx_sender
+    let res = data
+        .tx_sender
         .ticker
         .get_batch_from_ticker_in_wei(body.token_like, txs)
         .await
         .map(|fee| fee.normal_fee.into())
         .map_err(Error::from)
-        .into()
+        .into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_batch_fee");
+    res
 }
 
 pub fn api_scope(tx_sender: TxSender) -> Scope {
@@ -100,6 +109,7 @@ mod tests {
     };
     use crate::fee_ticker::validator::cache::TokenInMemoryCache;
     use chrono::Utc;
+    use futures::channel::mpsc;
     use num::rational::Ratio;
     use num::BigUint;
     use std::collections::HashMap;
@@ -119,6 +129,8 @@ mod tests {
     )]
     async fn fee_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
+
+        let (mempool_tx_request_sender, _mempool_tx_request_receiver) = mpsc::channel(100);
 
         let shared_data = SharedData {
             net: cfg.config.chain.eth.network,
@@ -158,7 +170,7 @@ mod tests {
                     dummy_sign_verifier(),
                     dummy_fee_ticker(&prices, Some(cache.clone())),
                     &cfg.config.api.common,
-                    cfg.config.api.private.url.clone(),
+                    mempool_tx_request_sender.clone(),
                 ))
             },
             Some(shared_data),

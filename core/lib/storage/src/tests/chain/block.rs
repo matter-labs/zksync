@@ -109,6 +109,15 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?;
     assert_eq!((block, &state), (BlockNumber(3), &accounts_block_3));
 
+    for (account_id, account) in state {
+        let nonce = storage
+            .chain()
+            .account_schema()
+            .estimate_nonce(account_id)
+            .await?
+            .unwrap();
+        assert_eq!(account.nonce, nonce)
+    }
     // Add proofs for the first two blocks.
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
@@ -690,7 +699,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
     };
-    let _sentry_guard = vlog::init();
+    let _vlog_guard = vlog::init();
 
     let from_account_id = AccountId(0xbabe);
     let from_zksync_account = ZkSyncAccount::rand();
@@ -1066,7 +1075,7 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
     }
     // Insert 1 incomplete block.
     BlockSchema(&mut storage)
-        .save_incomplete_block(gen_sample_incomplete_block(
+        .save_incomplete_block(&gen_sample_incomplete_block(
             BlockNumber(6),
             BLOCK_SIZE_CHUNKS,
             Default::default(),
@@ -1275,7 +1284,10 @@ async fn test_remove_new_account_tree_cache(mut storage: StorageProcessor<'_>) -
             ))
             .await?;
         BlockSchema(&mut storage)
-            .store_account_tree_cache(BlockNumber(block_number), serde_json::Value::default())
+            .store_account_tree_cache(
+                BlockNumber(block_number),
+                serde_json::Value::default().to_string(),
+            )
             .await?;
     }
 
@@ -1361,7 +1373,10 @@ async fn test_remove_old_account_tree_cache(mut storage: StorageProcessor<'_>) -
             ))
             .await?;
         BlockSchema(&mut storage)
-            .store_account_tree_cache(BlockNumber(block_number), serde_json::Value::default())
+            .store_account_tree_cache(
+                BlockNumber(block_number),
+                serde_json::Value::default().to_string(),
+            )
             .await?;
     }
 
@@ -1402,7 +1417,14 @@ async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> Query
         "Pending block should be saved"
     );
 
-    schema.save_incomplete_block(incomplete_block).await?;
+    // Pending block doesn't change next expected serial ID.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        0,
+        "There should be no serial ID"
+    );
+
+    schema.save_incomplete_block(&incomplete_block).await?;
 
     // Pending block should be removed now.
     assert!(
@@ -1414,6 +1436,13 @@ async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> Query
     assert!(
         schema.get_block(block_number).await?.is_none(),
         "Block should not exist"
+    );
+
+    // Next expected serial ID should be loaded from incomplete block.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        1,
+        "Serial ID should be loaded from the incomplete blocks table"
     );
 
     // Finish the block and ensure it's created correctly.
@@ -1429,6 +1458,13 @@ async fn test_incomplete_block_logic(mut storage: StorageProcessor<'_>) -> Query
     assert_eq!(
         block_from_storage.new_root_hash,
         complete_block.new_root_hash
+    );
+
+    // Next expected serial ID should be loaded from complete block.
+    assert_eq!(
+        schema.next_expected_serial_id().await?,
+        1,
+        "Serial ID should be loaded from the complete blocks table"
     );
 
     Ok(())

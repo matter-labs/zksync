@@ -1,8 +1,9 @@
 // External uses
 use jsonrpc_core::ErrorCode;
+use zksync_types::tx::error::TxAddError;
 // Workspace uses
 // Local uses
-use crate::{api_server::tx_sender::SubmitError, tx_error::TxAddError};
+use crate::api_server::tx_sender::SubmitError;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RpcErrorCodes {
@@ -86,7 +87,7 @@ impl From<SubmitError> for jsonrpc_core::Error {
                 message: inner.to_string(),
                 data: None,
             },
-            SubmitError::CommunicationCoreServer(reason) => Self {
+            SubmitError::MempoolCommunication(reason) => Self {
                 code: RpcErrorCodes::Other.into(),
                 message: "Error communicating core server".to_string(),
                 data: Some(reason.into()),

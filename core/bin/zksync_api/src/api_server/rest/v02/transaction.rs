@@ -1,7 +1,7 @@
 //! Transactions part of API implementation.
 
 // Built-in uses
-
+use std::time::Instant;
 // External uses
 use actix_web::{
     web::{self, Json},
@@ -99,6 +99,7 @@ impl ApiTransactionData {
             let tx_hash = op.tx_hash();
             let tx = Transaction {
                 tx_hash,
+                block_index: None,
                 block_number: None,
                 op: TransactionData::L1(L1Transaction::from_pending_op(
                     op.data,
@@ -143,20 +144,27 @@ async fn tx_status(
     data: web::Data<ApiTransactionData>,
     tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<Receipt>> {
-    data.tx_status(*tx_hash).await.into()
+    let start = Instant::now();
+    let res = data.tx_status(*tx_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "tx_status");
+    res
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
     tx_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<TxData>> {
-    data.tx_data(*tx_hash).await.into()
+    let start = Instant::now();
+    let res = data.tx_data(*tx_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "tx_data");
+    res
 }
 
 async fn submit_tx(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<TxWithSignature>,
 ) -> ApiResult<TxHashSerializeWrapper> {
+    let start = Instant::now();
     let tx_hash = data
         .tx_sender
         .submit_tx(body.tx, body.signature, None)
@@ -173,6 +181,7 @@ async fn submit_tx(
     }
 
     let tx_hash = tx_hash.map_err(Error::from);
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "submit_tx");
     tx_hash.map(TxHashSerializeWrapper).into()
 }
 
@@ -180,6 +189,7 @@ async fn submit_batch(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<IncomingTxBatch>,
 ) -> ApiResult<SubmitBatchResponse> {
+    let start = Instant::now();
     let response = data
         .tx_sender
         .submit_txs_batch(body.txs, body.signature, None)
@@ -196,6 +206,7 @@ async fn submit_batch(
     }
 
     let response = response.map_err(Error::from);
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "submit_batch");
     response.into()
 }
 
@@ -203,12 +214,14 @@ async fn toggle_2fa(
     data: web::Data<ApiTransactionData>,
     Json(toggle_2fa): Json<Toggle2FA>,
 ) -> ApiResult<Toggle2FAResponse> {
+    let start = Instant::now();
     let response = data
         .tx_sender
         .toggle_2fa(toggle_2fa)
         .await
         .map_err(Error::from);
 
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "toggle_2fa");
     response.into()
 }
 
@@ -216,7 +229,10 @@ async fn get_batch(
     data: web::Data<ApiTransactionData>,
     batch_hash: web::Path<TxHash>,
 ) -> ApiResult<Option<ApiTxBatch>> {
-    data.get_batch(*batch_hash).await.into()
+    let start = Instant::now();
+    let res = data.get_batch(*batch_hash).await.into();
+    metrics::histogram!("api", start.elapsed(), "type" => "v02", "endpoint_name" => "get_batch");
+    res
 }
 
 pub fn api_scope(tx_sender: TxSender) -> Scope {
@@ -235,27 +251,25 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fee_ticker::validator::cache::TokenInMemoryCache;
-    use crate::{
-        api_server::rest::v02::{
-            test_utils::{
-                deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
-                TestServerConfig, TestTransactions,
-            },
-            SharedData,
+    use crate::api_server::rest::v02::{
+        test_utils::{
+            deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier, TestServerConfig,
+            TestTransactions,
         },
-        core_api_client::CoreApiClient,
+        SharedData,
     };
-    use actix_web::App;
+    use crate::fee_ticker::validator::cache::TokenInMemoryCache;
     use chrono::Utc;
-    use num::rational::Ratio;
-    use num::BigUint;
+    use futures::{channel::mpsc, StreamExt};
+    use num::{rational::Ratio, BigUint};
     use std::collections::HashMap;
     use std::str::FromStr;
+    use tokio::task::JoinHandle;
     use zksync_api_types::v02::{
         transaction::{L2Receipt, TxHashSerializeWrapper},
         ApiVersion,
     };
+    use zksync_mempool::MempoolTransactionRequest;
     use zksync_types::{
         tokens::{Token, TokenMarketVolume},
         tx::{
@@ -265,26 +279,26 @@ mod tests {
         Address, BlockNumber, SignedZkSyncTx, TokenId, TokenKind, TokenLike,
     };
 
-    fn submit_txs_loopback() -> (CoreApiClient, actix_test::TestServer) {
-        async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
-            Json(Ok(()))
-        }
+    fn submit_txs_loopback() -> (mpsc::Sender<MempoolTransactionRequest>, JoinHandle<()>) {
+        let (mempool_tx_request_sender, mut mempool_tx_request_receiver) = mpsc::channel(100);
 
-        async fn send_txs_batch(
-            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
-        ) -> Json<Result<(), ()>> {
-            Json(Ok(()))
-        }
-
-        let server = actix_test::start(move || {
-            App::new()
-                .route("new_tx", web::post().to(send_tx))
-                .route("new_txs_batch", web::post().to(send_txs_batch))
+        let task = tokio::spawn(async move {
+            while let Some(tx) = mempool_tx_request_receiver.next().await {
+                match tx {
+                    MempoolTransactionRequest::NewTx(_, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                    MempoolTransactionRequest::NewPriorityOps(_, _, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                    MempoolTransactionRequest::NewTxsBatch(_, _, resp) => {
+                        resp.send(Ok(())).unwrap_or_default()
+                    }
+                }
+            }
         });
 
-        let url = server.url("").trim_end_matches('/').to_owned();
-
-        (CoreApiClient::new(url), server)
+        (mempool_tx_request_sender, task)
     }
 
     #[actix_rt::test]
@@ -293,7 +307,7 @@ mod tests {
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
     async fn transactions_scope() -> anyhow::Result<()> {
-        let (core_client, core_server) = submit_txs_loopback();
+        let (sender, task) = submit_txs_loopback();
 
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
@@ -332,12 +346,12 @@ mod tests {
 
         let (client, server) = cfg.start_server(
             move |cfg: &TestServerConfig| {
-                api_scope(TxSender::with_client(
-                    core_client.clone(),
+                api_scope(TxSender::new(
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
                     dummy_fee_ticker(&prices, Some(cache.clone())),
                     &cfg.config.api.common,
+                    sender.clone(),
                 ))
             },
             Some(shared_data),
@@ -484,7 +498,7 @@ mod tests {
         assert!(tx_data.is_none());
 
         server.stop().await;
-        core_server.stop().await;
+        task.abort();
         Ok(())
     }
 }

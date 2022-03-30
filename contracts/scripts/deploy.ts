@@ -58,6 +58,10 @@ async function main() {
         await deployer.deployRegenesisMultisig({ gasPrice, nonce: args.nonce });
     }
 
+    if (args.contract === 'Create2Factory' || args.contract == null) {
+        await deployer.deployCreate2Factory({ gasPrice, nonce: args.nonce });
+    }
+
     if (args.contract === 'AdditionalZkSync' || args.contract == null) {
         await deployer.deployAdditionalZkSync({ gasPrice, nonce: args.nonce });
     }

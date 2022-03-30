@@ -13,6 +13,7 @@ import {
 type PriorityOpInterface<T> = {
     tx_hash: string;
     block_number: number;
+    block_index: number;
     op: T;
     success: true;
     fail_reason: null;
@@ -23,6 +24,7 @@ type PriorityOpInterface<T> = {
 type L2TxInterface<T> = {
     tx_hash: string;
     block_number: number;
+    block_index: number;
     op: T;
     success: boolean;
     fail_reason: string | null;

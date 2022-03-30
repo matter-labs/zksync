@@ -5,8 +5,10 @@
 
 // Built-in deps
 use std::collections::{HashMap, HashSet};
-
+use std::convert::TryFrom;
 use std::fmt::Display;
+use std::iter::FromIterator;
+use std::time::Duration;
 
 // External deps
 use bigdecimal::BigDecimal;
@@ -17,17 +19,18 @@ use num::{
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
 // Workspace deps
 
 use zksync_config::configs::ticker::TokenPriceSource;
 use zksync_storage::ConnectionPool;
+use zksync_token_db_cache::TokenDBCache;
 use zksync_types::{
-    tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address, BatchFee, ChangePubKeyOp, Fee,
-    MintNFTOp, OutputFeeType, SwapOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp,
-    TxFeeTypes, WithdrawNFTOp, WithdrawOp,
+    gas_counter::GasCounter, tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address,
+    BatchFee, ChangePubKeyOp, Fee, MintNFTOp, OutputFeeType, SwapOp, Token, TokenId, TokenLike,
+    TransferOp, TransferToNewOp, TxFeeTypes, WithdrawNFTOp, WithdrawOp,
 };
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 
@@ -42,11 +45,6 @@ use crate::fee_ticker::{
     },
     validator::{watcher::UniswapTokenWatcher, MarketUpdater},
 };
-use crate::utils::token_db_cache::TokenDBCache;
-use std::convert::TryFrom;
-use std::iter::FromIterator;
-use tokio::time::Instant;
-use zksync_types::gas_counter::GasCounter;
 
 mod constants;
 mod ticker_api;
@@ -201,13 +199,16 @@ pub struct FeeTicker {
 const CPK_CREATE2_FEE_TYPE: OutputFeeType = OutputFeeType::ChangePubKey(
     ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::CREATE2),
 );
+// Make no more than (Number of tokens) queries per 5 minutes to database is a good result
+// for updating names for tokens.
+const TOKEN_INVALIDATE_CACHE: Duration = Duration::from_secs(5 * 60);
 
 #[must_use]
 pub fn run_updaters(
     db_pool: ConnectionPool,
     config: &zksync_config::TickerConfig,
 ) -> Vec<JoinHandle<()>> {
-    let cache = (db_pool.clone(), TokenDBCache::new());
+    let cache = (db_pool.clone(), TokenDBCache::new(TOKEN_INVALIDATE_CACHE));
 
     let watcher = UniswapTokenWatcher::new(config.uniswap_url.clone());
 
@@ -230,13 +231,15 @@ pub fn run_updaters(
             tokio::spawn(ticker_api.keep_price_updated())
         }
 
-        TokenPriceSource::CoinGecko => {
+        TokenPriceSource::CoinGecko => tokio::spawn(async move {
             let token_price_api =
                 CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
+                    .await
                     .expect("failed to init CoinGecko client");
             let ticker_api = TickerApi::new(db_pool, token_price_api);
-            tokio::spawn(ticker_api.keep_price_updated())
-        }
+
+            ticker_api.keep_price_updated().await;
+        }),
     };
     tasks.push(price_updater);
     tasks
@@ -261,7 +264,7 @@ impl FeeTicker {
         max_blocks_to_aggregate: u32,
         connection_pool: ConnectionPool,
     ) -> Self {
-        let cache = (connection_pool, TokenDBCache::new());
+        let cache = (connection_pool, TokenDBCache::new(TOKEN_INVALIDATE_CACHE));
         let ticker_config = TickerConfig {
             zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
             gas_cost_tx: GasOperationsCost::from_constants(config.fast_processing_coeff),

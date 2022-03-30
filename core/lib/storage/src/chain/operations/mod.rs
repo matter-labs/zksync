@@ -77,7 +77,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     }
 
     /// Retrieves transaction from the database given its hash.
-    pub async fn get_executed_operation(
+    pub(crate) async fn get_executed_operation(
         &mut self,
         op_hash: &[u8],
     ) -> QueryResult<Option<StoredExecutedTransaction>> {

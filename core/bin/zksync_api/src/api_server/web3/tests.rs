@@ -24,13 +24,13 @@ use super::{
     Web3RpcApp, NFT_FACTORY_ADDRESS, ZKSYNC_PROXY_ADDRESS,
 };
 use crate::api_server::rest::v02::test_utils::TestServerConfig;
-use zksync_config::configs::api::Web3Config;
+use zksync_config::configs::api::{CommonApiConfig, Web3Config};
 
 async fn local_client() -> anyhow::Result<(RawClient, impl Future<Output = RpcResult<()>>)> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
 
-    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3, &cfg.config.api.common);
     let mut io = IoHandler::new();
     rpc_app.extend(&mut io);
 
@@ -465,7 +465,7 @@ async fn get_block() -> anyhow::Result<()> {
 async fn create_logs() -> anyhow::Result<()> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
-    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3, &cfg.config.api.common);
 
     let from_account_id = AccountId(3);
     let from_account = ZkSyncAccount::rand_with_seed([1, 2, 3, 4]);
@@ -853,7 +853,11 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
             .web3_receipt_by_hash(&tx_hash)
             .await?
             .unwrap();
-        let rpc_app = Web3RpcApp::new(pool.clone(), &Web3Config::from_env());
+        let rpc_app = Web3RpcApp::new(
+            pool.clone(),
+            &Web3Config::from_env(),
+            &CommonApiConfig::from_env(),
+        );
         rpc_app.tx_receipt(&mut storage, receipt).await?
     };
     assert_eq!(
@@ -872,7 +876,11 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
 )]
 async fn get_logs() -> anyhow::Result<()> {
     let pool = ConnectionPool::new(Some(1));
-    let rpc_app = Web3RpcApp::new(pool.clone(), &Web3Config::from_env());
+    let rpc_app = Web3RpcApp::new(
+        pool.clone(),
+        &Web3Config::from_env(),
+        &CommonApiConfig::from_env(),
+    );
 
     // Checks that it returns error if `fromBlock` is greater than `toBlock`.
     let fut = {
@@ -903,7 +911,7 @@ async fn get_logs() -> anyhow::Result<()> {
                 max_block_range: 3,
                 chain_id: 9,
             };
-            let rpc_app = Web3RpcApp::new(pool.clone(), &config);
+            let rpc_app = Web3RpcApp::new(pool.clone(), &config, &CommonApiConfig::from_env());
             let mut io = IoHandler::new();
             rpc_app.extend(&mut io);
 
@@ -943,6 +951,21 @@ async fn get_logs() -> anyhow::Result<()> {
     for log in logs {
         assert_eq!(log.block_number.unwrap().as_u64(), 1);
     }
+
+    // Checks that request without `fromBlock` and `toBlock` is processed.
+    // `latest` should be assumed.
+    let fut = {
+        let (client, server) = local_client().await?;
+        let req = Map::new();
+        join(
+            client.call_method("eth_getLogs", Params::Array(vec![Value::Object(req)])),
+            server,
+        )
+    };
+    let _ = fut
+        .await
+        .0
+        .expect("Request with `fromBlock` and `toBlock` omitted has failed");
 
     // Checks that address filter works correctly
     let mut addresses = Vec::new();

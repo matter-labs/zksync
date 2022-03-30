@@ -343,13 +343,11 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _: &mut StorageProcessor<'_>,
         block: BlockNumber,
-        tree_cache: serde_json::Value,
+        tree_cache: String,
     ) -> anyhow::Result<()> {
         if *block == 0 {
             return Ok(());
         }
-        let tree_cache =
-            serde_json::to_string(&tree_cache).expect("Failed to serialize Account Tree Cache");
 
         let mut account_tree_cache = self.account_tree_cache.write().await;
         *account_tree_cache = AccountTreeCache {

@@ -19,6 +19,7 @@ use sentry::{types::Dsn, ClientInitGuard};
 
 pub use tracing as __tracing;
 pub use tracing::{debug, info, log, trace};
+use tracing_appender::non_blocking::WorkerGuard;
 
 #[macro_export]
 macro_rules! warn {
@@ -44,6 +45,12 @@ macro_rules! error {
     };
 }
 
+/// When this is dropped sentry and logger stops working
+pub struct VlogGuard {
+    _sentry_guard: Option<ClientInitGuard>,
+    _logger_guard: WorkerGuard,
+}
+
 fn get_sentry_url() -> Option<Dsn> {
     if let Ok(sentry_url) = std::env::var("MISC_SENTRY_URL") {
         if let Ok(sentry_url) = Dsn::from_str(sentry_url.as_str()) {
@@ -53,19 +60,29 @@ fn get_sentry_url() -> Option<Dsn> {
     None
 }
 
-/// Initialize logging with tracing and set up log format
+/// Initialize logging with non blocking tracing and set up log format
 ///
 /// If the sentry URL is provided via an environment variable, this function will also initialize sentry.
-/// Returns a sentry client guard. The full description can be found in the official documentation:
+/// Returns a VlogGuard guard. Which contains Sentry Guard and Logger Guard
+///
+/// The full description can be found in the official documentation:
 /// https://docs.sentry.io/platforms/rust/#configure
-pub fn init() -> Option<ClientInitGuard> {
+/// https://docs.rs/tracing-appender/0.2.2/tracing_appender/non_blocking/index.html
+pub fn init() -> VlogGuard {
     let log_format = std::env::var("MISC_LOG_FORMAT").unwrap_or_else(|_| "plain".to_string());
+    let (non_blocking, _logger_guard) = tracing_appender::non_blocking(std::io::stdout());
     match log_format.as_str() {
-        "plain" => tracing_subscriber::fmt::init(),
+        "plain" => {
+            tracing_subscriber::fmt::Subscriber::builder()
+                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .with_writer(non_blocking)
+                .init();
+        }
         "json" => {
             let timer = tracing_subscriber::fmt::time::ChronoUtc::rfc3339();
             tracing_subscriber::fmt::Subscriber::builder()
                 .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .with_writer(non_blocking)
                 .with_timer(timer)
                 .json()
                 .init();
@@ -73,7 +90,7 @@ pub fn init() -> Option<ClientInitGuard> {
         _ => panic!("MISC_LOG_FORMAT has an unexpected value {}", log_format),
     };
 
-    get_sentry_url().map(|sentry_url| {
+    let _sentry_guard = get_sentry_url().map(|sentry_url| {
         sentry::init((
             sentry_url,
             sentry::ClientOptions {
@@ -85,5 +102,9 @@ pub fn init() -> Option<ClientInitGuard> {
                 ..Default::default()
             },
         ))
-    })
+    });
+    VlogGuard {
+        _sentry_guard,
+        _logger_guard,
+    }
 }

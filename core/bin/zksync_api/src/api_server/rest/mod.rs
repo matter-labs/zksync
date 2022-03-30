@@ -12,12 +12,15 @@ use crate::signature_checker::VerifySignatureRequest;
 
 use super::tx_sender::TxSender;
 
+use crate::api_server::rest::network_status::SharedNetworkStatus;
 use crate::fee_ticker::FeeTicker;
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
+use zksync_mempool::MempoolTransactionRequest;
 
 mod forced_exit_requests;
 mod helpers;
+pub mod network_status;
 mod v01;
 pub mod v02;
 
@@ -26,6 +29,7 @@ async fn start_server(
     fee_ticker: FeeTicker,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     bind_to: SocketAddr,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
 ) {
     HttpServer::new(move || {
         let api_v01 = api_v01.clone();
@@ -47,9 +51,9 @@ async fn start_server(
                 sign_verifier.clone(),
                 fee_ticker.clone(),
                 &api_v01.config.api.common,
-                api_v01.config.api.private.url.clone(),
+                mempool_tx_sender.clone(),
             );
-            v02::api_scope(tx_sender, &api_v01.config)
+            v02::api_scope(tx_sender, &api_v01.config, api_v01.network_status.clone())
         };
         App::new()
             .wrap(
@@ -80,28 +84,39 @@ async fn start_server(
 
 /// Start HTTP REST API
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
     fee_ticker: FeeTicker,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+    core_address: String,
 ) -> JoinHandle<()> {
     let (handler, panic_sender) = spawn_panic_handler();
 
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
-
             actix_rt::System::new().block_on(async move {
+                let _panic_sentinel = ThreadPanicNotify(panic_sender.clone());
                 // TODO remove this config ZKS-815
                 let config = ZkSyncConfig::from_env();
 
-                let api_v01 = ApiV01::new(connection_pool, contract_address, config);
+                let network_status = SharedNetworkStatus::new(core_address);
+                let api_v01 =
+                    ApiV01::new(connection_pool, contract_address, config, network_status);
                 api_v01.spawn_network_status_updater(panic_sender);
 
-                start_server(api_v01, fee_ticker, sign_verifier, listen_addr).await;
+                start_server(
+                    api_v01,
+                    fee_ticker,
+                    sign_verifier,
+                    listen_addr,
+                    mempool_tx_sender.clone(),
+                )
+                .await;
             });
         })
         .expect("Api server thread");

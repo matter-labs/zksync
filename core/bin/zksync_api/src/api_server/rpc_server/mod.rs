@@ -33,6 +33,7 @@ use self::types::*;
 use super::tx_sender::TxSender;
 use crate::fee_ticker::FeeTicker;
 use ip_insert_middleware::IpInsertMiddleWare;
+use zksync_mempool::MempoolTransactionRequest;
 
 #[derive(Clone)]
 pub struct RpcApp {
@@ -51,8 +52,8 @@ impl RpcApp {
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker: FeeTicker,
         config: &CommonApiConfig,
-        private_url: String,
         confirmations_for_eth_event: u64,
+        mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
         let api_requests_caches_size = config.caches_size;
 
@@ -61,7 +62,7 @@ impl RpcApp {
             sign_verify_request_sender,
             ticker,
             config,
-            private_url,
+            mempool_tx_sender,
         );
 
         RpcApp {
@@ -253,13 +254,14 @@ impl RpcApp {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker: FeeTicker,
     config: &JsonRpcConfig,
     common_api_config: &CommonApiConfig,
-    private_url: String,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     confirmations_for_eth_event: u64,
 ) -> JoinHandle<()> {
     let addr = config.http_bind_addr();
@@ -268,8 +270,8 @@ pub fn start_rpc_server(
         sign_verify_request_sender,
         ticker,
         common_api_config,
-        private_url,
         confirmations_for_eth_event,
+        mempool_tx_sender,
     );
 
     let (handler, panic_sender) = spawn_panic_handler();

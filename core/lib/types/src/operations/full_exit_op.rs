@@ -158,4 +158,8 @@ impl FullExitOp {
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
         vec![self.priority_op.account_id]
     }
+
+    pub fn withdraw_amount(&self) -> Option<BigUint> {
+        self.withdraw_amount.as_ref().map(|a| a.0.clone())
+    }
 }

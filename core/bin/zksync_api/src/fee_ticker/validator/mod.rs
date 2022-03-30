@@ -162,8 +162,6 @@ impl FeeTokenValidator {
 mod tests {
     use super::*;
     use crate::fee_ticker::validator::cache::TokenInMemoryCache;
-    use crate::fee_ticker::validator::watcher::UniswapTokenWatcher;
-    use bigdecimal::Zero;
     use num::rational::Ratio;
     use num::BigUint;
     use std::collections::HashMap;
@@ -188,21 +186,6 @@ mod tests {
                 .unwrap()
                 .clone())
         }
-    }
-
-    #[tokio::test]
-    #[ignore]
-    // We can use this test only online, run it manually if you need to test connection to uniswap
-    async fn get_real_token_amount() {
-        let mut watcher = UniswapTokenWatcher::new(
-            "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2".to_string(),
-        );
-        let dai_token_address =
-            Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
-        let dai_token = Token::new(TokenId(1), dai_token_address, "DAI", 18, TokenKind::ERC20);
-
-        let amount = watcher.get_token_market_volume(&dai_token).await.unwrap();
-        assert!(amount > BigDecimal::zero());
     }
 
     #[tokio::test]

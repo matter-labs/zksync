@@ -1,7 +1,7 @@
 use web3::transports::Http;
 
 use zksync_core::state_keeper::ZkSyncStateInitParams;
-use zksync_types::{block::Block, AccountId, AccountMap, AccountTree};
+use zksync_types::block::Block;
 
 use zksync_testkit::zksync_account::ZkSyncETHAccountData;
 use zksync_testkit::*;
@@ -144,14 +144,6 @@ async fn execute_blocks(
     (reverted_state, test_setup_accounts, executed_block)
 }
 
-fn balance_tree_to_account_map(balance_tree: &AccountTree) -> AccountMap {
-    let mut account_map = AccountMap::default();
-    for (id, account) in balance_tree.items.iter() {
-        account_map.insert(AccountId(*id as u32), account.clone());
-    }
-    account_map
-}
-
 async fn revert_blocks_test() {
     let fee_account = ZkSyncAccount::rand();
     let test_config = TestkitConfig::from_env();
@@ -159,13 +151,13 @@ async fn revert_blocks_test() {
     let state = genesis_state(&fee_account.address);
 
     println!("deploying contracts");
-    let contracts = deploy_contracts(false, state.tree.root_hash());
+    let contracts = deploy_contracts(false, state.state.root_hash());
     println!("contracts deployed");
 
     let (commit_account, account_set) =
         create_test_setup_state(&test_config, &contracts, &fee_account);
 
-    let hash = state.tree.root_hash();
+    let hash = state.state.root_hash();
     let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
     let mut test_setup = TestSetup::new(
         channels,
@@ -190,7 +182,7 @@ async fn revert_blocks_test() {
 
     sender.send(()).expect("sk stop send");
     handler.join().expect("sk thread join");
-    let hash = state.tree.root_hash();
+    let hash = state.state.root_hash();
     let start_block_number = state.last_block_number;
 
     let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
@@ -217,7 +209,7 @@ async fn revert_blocks_test() {
     sender.send(()).expect("sk stop send");
     handler.join().expect("sk thread join");
 
-    let hash = state.tree.root_hash();
+    let hash = state.state.root_hash();
     let start_block_number = state.last_block_number;
 
     let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
@@ -247,7 +239,7 @@ async fn revert_blocks_test() {
         &test_config,
         &contracts,
         fee_account.address,
-        balance_tree_to_account_map(&state.tree),
+        state.state.get_accounts(),
         vec![TokenId(0)],
         test_setup.current_state_root.unwrap(),
     )

@@ -192,7 +192,7 @@ async fn gas_price_test() {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address, genesis_state(&fee_account.address));
 
-    let genesis_root = genesis_state(&fee_account.address).tree.root_hash();
+    let genesis_root = genesis_state(&fee_account.address).state.root_hash();
 
     let contracts = deploy_contracts(false, genesis_root);
 
@@ -373,7 +373,7 @@ async fn commit_cost_of_mint_nft(
             ETHAccountId(2),
             ZKSyncAccountId(2),
             Token(TokenId(0)),
-            BigUint::from(0u32),
+            BigUint::from(1u32),
         )
         .await;
     test_setup
@@ -445,7 +445,7 @@ async fn commit_cost_of_transfers(
             ETHAccountId(2),
             ZKSyncAccountId(2),
             Token(TokenId(0)),
-            BigUint::from(0u32),
+            BigUint::from(1u32),
         )
         .await;
     test_setup
@@ -538,7 +538,7 @@ async fn commit_cost_of_swaps(
             ETHAccountId(1),
             ZKSyncAccountId(4),
             Token(TokenId(0)),
-            0u32.into(),
+            1u32.into(),
         )
         .await;
     test_setup
@@ -546,7 +546,7 @@ async fn commit_cost_of_swaps(
             ETHAccountId(1),
             ZKSyncAccountId(5),
             Token(TokenId(0)),
-            0u32.into(),
+            1u32.into(),
         )
         .await;
     test_setup

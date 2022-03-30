@@ -1,10 +1,16 @@
 use std::collections::VecDeque;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 // External uses
-use futures::{channel::mpsc, stream::StreamExt, SinkExt};
+use futures::{
+    channel::{mpsc, oneshot},
+    stream::StreamExt,
+    SinkExt,
+};
 use tokio::task::JoinHandle;
+use tokio::time;
 // Workspace uses
+use zksync_mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock};
 use zksync_state::state::{OpSuccess, ZkSyncState};
 use zksync_types::{
     block::{
@@ -25,14 +31,13 @@ use self::{
 };
 use crate::{
     committer::{BlockCommitRequest, CommitRequest},
-    mempool::ProposedBlock,
     tx_event_emitter::ProcessedOperations,
 };
 
 pub use self::{
     init_params::ZkSyncStateInitParams,
     root_hash_calculator::{start_root_hash_calculator, BlockRootHashJobQueue},
-    types::StateKeeperRequest,
+    types::StateKeeperTestkitRequest,
 };
 
 mod init_params;
@@ -52,8 +57,8 @@ pub struct ZkSyncStateKeeper {
     pending_block: PendingBlock,
     config: StateKeeperConfig,
 
-    rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
+    tx_for_mempool: mpsc::Sender<MempoolBlocksRequest>,
     /// Channel used for sending queued transaction events. Required since state keeper
     /// has no access to the database.
     processed_tx_events_sender: mpsc::Sender<ProcessedOperations>,
@@ -75,8 +80,8 @@ impl ZkSyncStateKeeper {
     pub fn new(
         initial_state: ZkSyncStateInitParams,
         fee_account_address: Address,
-        rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
+        tx_for_mempool: mpsc::Sender<MempoolBlocksRequest>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
@@ -88,21 +93,22 @@ impl ZkSyncStateKeeper {
         //    separately below.
         // 2. For root hash calculator (`rhc_state`). It will require the state at *last finished block*, so it can keep
         //    working on calculating root hashes for incomplete blocks that we had before the restart.
-        let mut sk_state = ZkSyncState::new(
-            initial_state.tree,
-            initial_state.acc_id_by_addr,
-            initial_state.nfts,
-        );
-        let rhc_state = sk_state.clone();
+        let mut sk_state = initial_state.state.clone();
+        let rhc_state = initial_state.state.clone();
 
         // Update the state keeper copy of state.
         let mut last_block = initial_state.last_block_number;
         for job in &initial_state.root_hash_jobs {
             // Ensure that all jobs are sequential and there are no gaps.
             assert_eq!(
-                job.block, last_block + 1,
-                "Unexpected incomplete block number. Started from block {}, got unexpected block {} instead of expected {}, root hash jobs queue: {:?}",
-                initial_state.last_block_number, job.block, last_block + 1, &initial_state.root_hash_jobs
+                job.block,
+                last_block + 1,
+                "Unexpected incomplete block number. Started from block {}, \
+                got unexpected block {} instead of expected {}, root hash jobs queue: {:?}",
+                initial_state.last_block_number,
+                job.block,
+                last_block + 1,
+                &initial_state.root_hash_jobs
             );
             last_block = job.block;
 
@@ -146,8 +152,8 @@ impl ZkSyncStateKeeper {
             pending_block,
             config,
 
-            rx_for_blocks,
             tx_for_commitments,
+            tx_for_mempool,
             processed_tx_events_sender,
 
             root_hash_queue,
@@ -156,11 +162,6 @@ impl ZkSyncStateKeeper {
         keeper.initialize(initial_state.pending_block);
 
         (keeper, root_hash_calculator)
-    }
-
-    /// Returns a copy of block root hash queue.
-    pub(crate) fn root_hash_queue(&self) -> BlockRootHashJobQueue {
-        self.root_hash_queue.clone()
     }
 
     // TODO (ZKS-821): We should get rid of this function and create state keeper in a ready-to-go state.
@@ -244,41 +245,97 @@ impl ZkSyncStateKeeper {
 
     pub async fn execute_reverted_blocks(&mut self) {
         while let Some(block) = self.reverted_blocks.pop_front() {
-            self.execute_incomplete_block(block).await
+            self.execute_incomplete_block(block).await;
         }
     }
 
-    async fn run(mut self) {
-        while let Some(req) = self.rx_for_blocks.next().await {
+    // Run StateKeeper with manual generating and executing blocks and miniblocks
+    #[cfg(feature = "testkit")]
+    pub async fn run_for_testkit(
+        mut self,
+        mut rx_for_blocks: mpsc::Receiver<StateKeeperTestkitRequest>,
+    ) {
+        while let Some(req) = rx_for_blocks.next().await {
             match req {
-                StateKeeperRequest::GetAccount(address, sender) => {
+                StateKeeperTestkitRequest::GetAccount(address, sender) => {
                     let account = self.state.get_account_by_address(&address);
                     sender.send(account).unwrap_or_default();
                 }
-                StateKeeperRequest::GetPendingBlockTimestamp(sender) => {
-                    sender
-                        .send(self.pending_block.timestamp)
-                        .unwrap_or_default();
-                }
-                // TODO (ZKS-821): Only used by block proposer, can be removed.
-                StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
-                    sender
-                        .send(self.pending_block.unprocessed_priority_op_current)
-                        .unwrap_or_default();
-                }
-                StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
-                    self.execute_proposed_block(proposed_block).await;
-                }
-                // TODO (ZKS-821): Only used by testkit, should be removed.
-                StateKeeperRequest::SealBlock => {
+                StateKeeperTestkitRequest::SealBlock => {
                     self.seal_pending_block().await;
                 }
-                // TODO (ZKS-821): Only used by testkit, should be removed.
-                StateKeeperRequest::GetCurrentState(sender) => {
+                StateKeeperTestkitRequest::GetCurrentState(sender) => {
                     sender.send(self.get_current_state()).unwrap_or_default();
+                }
+                StateKeeperTestkitRequest::ExecuteMiniBlock(block) => {
+                    self.execute_proposed_block(block).await;
                 }
             }
         }
+    }
+
+    // Generate and execute new miniblock every miniblock_interval
+    async fn run(mut self, miniblock_interval: Duration) {
+        let mut timer = time::interval(miniblock_interval);
+        loop {
+            let start = Instant::now();
+            timer.tick().await;
+            // Report timings between two miniblocks.
+            // If reported value stays at 0, most likely we have `miniblock_interval` variable too small and
+            // spend more time in the loop iteration than this interval.
+            metrics::histogram!("state_keeper.miniblock_interval", start.elapsed());
+
+            let start = Instant::now();
+            // `.throttle()` method will postpone the next miniblock iteration if currently we have too
+            // many blocks for which root hash is not yet calculated.
+            self.root_hash_queue.throttle().await;
+            metrics::histogram!("state_keeper.throttle", start.elapsed());
+
+            let block_timestamp = self.pending_block.timestamp;
+            let proposed_block = self.propose_new_block(block_timestamp).await;
+            metrics::histogram!("miniblock_size", proposed_block.size() as f64);
+
+            self.execute_proposed_block(proposed_block).await;
+        }
+    }
+
+    async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
+        let start = Instant::now();
+
+        let (response_sender, receiver) = oneshot::channel();
+
+        // These txs will be excluded from query result as already executed.
+        // By giving these hashes to the mempool,
+        // we won't receive back transactions that we already executed in the current block.
+
+        let executed_txs = self
+            .pending_block
+            .failed_txs
+            .iter()
+            .map(|tx| tx.signed_tx.hash())
+            .chain(
+                self.pending_block
+                    .success_operations
+                    .iter()
+                    .filter_map(|op| op.get_executed_tx().map(|tx| tx.signed_tx.hash())),
+            )
+            .collect();
+
+        let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {
+            last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
+            block_timestamp,
+            response_sender,
+            executed_txs,
+        });
+
+        self.tx_for_mempool
+            .send(mempool_req)
+            .await
+            .expect("mempool receiver dropped");
+
+        let block = receiver.await.expect("Mempool new block request failed");
+        metrics::histogram!("state_keeper.propose_new_block", start.elapsed());
+        block
     }
 
     async fn execute_incomplete_block(&mut self, block: IncompleteBlock) {
@@ -760,7 +817,6 @@ impl ZkSyncStateKeeper {
         let block_commit_request = BlockCommitRequest {
             block,
             block_metadata,
-            accounts_updated: self.pending_block.account_updates.clone(),
         };
         let applied_updates_request = self.pending_block.prepare_applied_updates_request();
         let root_hash_job = BlockRootHashJob {
@@ -774,6 +830,11 @@ impl ZkSyncStateKeeper {
             block_commit_request.block.block_transactions.len(),
             self.pending_block.chunks_left,
             self.pending_block.pending_block_iteration
+        );
+        metrics::gauge!(
+            "last_processed_block",
+            block_commit_request.block.block_number.0 as f64,
+            "stage" => "state_keeper"
         );
 
         let commit_request =
@@ -814,9 +875,7 @@ impl ZkSyncStateKeeper {
 
     pub fn get_current_state(&self) -> ZkSyncStateInitParams {
         ZkSyncStateInitParams {
-            tree: self.state.get_balance_tree(),
-            acc_id_by_addr: self.state.get_account_addresses(),
-            nfts: self.state.nfts.clone(),
+            state: self.state.clone(),
             last_block_number: self.pending_block.number - 1,
             unprocessed_priority_op: self.pending_block.unprocessed_priority_op_current,
 
@@ -828,6 +887,6 @@ impl ZkSyncStateKeeper {
 }
 
 #[must_use]
-pub fn start_state_keeper(sk: ZkSyncStateKeeper) -> JoinHandle<()> {
-    tokio::spawn(sk.run())
+pub fn start_state_keeper(sk: ZkSyncStateKeeper, miniblock_interval: Duration) -> JoinHandle<()> {
+    tokio::spawn(sk.run(miniblock_interval))
 }

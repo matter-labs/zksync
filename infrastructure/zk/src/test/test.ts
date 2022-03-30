@@ -21,19 +21,23 @@ async function runOnTestDb(reset: boolean, dir: string, command: string) {
 }
 
 export async function db(reset: boolean, ...args: string[]) {
+    // Running many similar transactions in parallel can cause db deadlocks, so we run
+    // them in a single thread. Given that tests are pretty fast, it's not a big problem.
     await runOnTestDb(
         reset,
         'core/lib/storage',
-        `cargo test --release -p zksync_storage -- --ignored --nocapture
+        `cargo test --release -p zksync_storage --lib -- --ignored --nocapture --test-threads=1
         ${args.join(' ')}`
     );
 }
 
 export async function rustApi(reset: boolean, ...args: string[]) {
+    // Running many similar transactions in parallel can cause db deadlocks, so we run
+    // them in a single thread. Given that tests are pretty fast, it's not a big problem.
     await runOnTestDb(
         reset,
         'core/bin/zksync_api',
-        `cargo test --release -p zksync_api -- --ignored --nocapture api_server
+        `cargo test --release -p zksync_api --lib -- --ignored --nocapture --test-threads=1 api_server
         ${args.join(' ')}`
     );
 }
