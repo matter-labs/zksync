@@ -8,17 +8,13 @@ ASM=dist/zksync-crypto-bundler_asm.js
 which wasm-pack || cargo install --version 0.10.1 wasm-pack #version 0.10.2 leads to errors
 
 # pack for bundler (!note this verion is used in the pkg.browser field)
-wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist-bundler
+wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
 # pack for browser
-wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist-web
+wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist
 # pack for node.js
-wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist-nodejs
+wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist
 
-mkdir -p dist
-cp -n dist-bundler/* dist-web/* dist-nodejs/* dist
-
-rm dist/package.json
-rm -r dist-bundler dist-web dist-nodejs
+rm dist/package.json dist/.gitignore
 
 if [ "$CI" == "1" ]; then
     exit 0
