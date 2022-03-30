@@ -45,7 +45,7 @@ async fn revert_blocks_in_storage(
     println!("`pending_block` table is cleaned");
     transaction
         .chain()
-        .block_schema()
+        .tree_cache_schema_bincode()
         .remove_new_account_tree_cache(last_block)
         .await?;
     println!("`account_tree_cache` table is cleaned");

@@ -667,6 +667,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bincode"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f609ceb2c41b0d0277314a789ef0e7eb14593d5485f7c67320bed3924ebb1b33"
+dependencies = [
+ "bincode_derive",
+]
+
+[[package]]
+name = "bincode_derive"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913287a8f3e00db4c7ae1b87e9b9b8cebd6b89217eaadfc281fa5c897da35dc3"
+dependencies = [
+ "virtue",
+]
+
+[[package]]
 name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5166,6 +5184,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efd1f82c56340fdf16f2a953d7bda4f8fdffba13d93b00844c25572110b26079"
 
 [[package]]
+name = "tree_cache_updater"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "structopt",
+ "tokio",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5330,6 +5362,12 @@ name = "version_check"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
+
+[[package]]
+name = "virtue"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "757cfbfe0d17ee6f22fe97e536d463047d451b47cf9d11e2b7d1398b0ef274dd"
 
 [[package]]
 name = "vlog"
@@ -5845,6 +5883,7 @@ name = "zksync_crypto"
 version = "1.0.0"
 dependencies = [
  "base64 0.13.0",
+ "bincode",
  "ethabi",
  "fnv",
  "franklin-crypto",

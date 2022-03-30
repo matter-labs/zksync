@@ -10,7 +10,7 @@ use tokio::time::sleep;
 // Workspace uses
 use zksync_crypto::params::account_tree_depth;
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
-use zksync_storage::chain::block::records::AccountTreeCache;
+use zksync_storage::chain::tree_cache::records::AccountTreeCache;
 use zksync_storage::prover::records::{StorageBlockWitness, StorageProverJobQueue, StoredProof};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
@@ -36,7 +36,7 @@ pub struct MockDatabase {
 impl MockDatabase {
     pub fn new() -> Self {
         let (circuit_tree, accounts) = Self::get_default_tree_and_accounts();
-        let tree_cache = serde_json::to_string(&circuit_tree.get_internals()).unwrap();
+        let tree_cache_binary = Some(circuit_tree.get_internals().encode_bincode());
 
         Self {
             prover_job_queue: Arc::new(RwLock::new((0, Vec::new()))),
@@ -45,7 +45,8 @@ impl MockDatabase {
             blocks: Arc::new(RwLock::new(Vec::new())),
             account_tree_cache: Arc::new(RwLock::new(AccountTreeCache {
                 block: 0,
-                tree_cache,
+                tree_cache: None,
+                tree_cache_binary,
             })),
             accounts_state: Arc::new(RwLock::new((0, accounts))),
         }
@@ -210,12 +211,11 @@ impl DatabaseInterface for MockDatabase {
     async fn load_account_tree_cache(
         &self,
         _: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<Option<(BlockNumber, serde_json::Value)>> {
+    ) -> anyhow::Result<Option<(BlockNumber, Vec<u8>)>> {
         let account_tree_cache = self.account_tree_cache.read().await;
         let result = (
             BlockNumber(account_tree_cache.block as u32),
-            serde_json::from_str(&account_tree_cache.tree_cache)
-                .expect("Failed to deserialize Account Tree Cache"),
+            account_tree_cache.tree_cache_binary.clone().unwrap(),
         );
 
         Ok(Some(result))
@@ -343,7 +343,7 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _: &mut StorageProcessor<'_>,
         block: BlockNumber,
-        tree_cache: String,
+        tree_cache_binary: Vec<u8>,
     ) -> anyhow::Result<()> {
         if *block == 0 {
             return Ok(());
@@ -352,7 +352,8 @@ impl DatabaseInterface for MockDatabase {
         let mut account_tree_cache = self.account_tree_cache.write().await;
         *account_tree_cache = AccountTreeCache {
             block: i64::from(*block),
-            tree_cache,
+            tree_cache: None,
+            tree_cache_binary: Some(tree_cache_binary),
         };
 
         Ok(())

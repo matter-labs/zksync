@@ -16,7 +16,20 @@ use std::{
 /// Nodes are indexed starting with index(root) = 0
 /// To store the index, at least 2 * TREE_HEIGHT bits is required.
 /// Wrapper-structure is used to avoid mixing up with `ItemIndex` on the type level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+)]
 struct NodeIndex(pub u64);
 
 /// Lead index: 0 <= i < N.
@@ -106,7 +119,7 @@ where
 }
 
 /// Merkle Tree branch node.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, bincode::Encode, bincode::Decode)]
 pub struct Node {
     depth: Depth,
     index: NodeIndex,
@@ -701,11 +714,24 @@ where
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, bincode::Encode, bincode::Decode)]
 pub struct SparseMerkleTreeSerializableCacheBN256 {
     root: NodeRef,
     nodes: Vec<Node>,
     cache: Vec<(NodeIndex, [u8; 32])>,
+}
+
+impl SparseMerkleTreeSerializableCacheBN256 {
+    pub fn encode_bincode(&self) -> Vec<u8> {
+        bincode::encode_to_vec(self, bincode::config::standard())
+            .expect("Unable to encode Merkle Tree cache")
+    }
+
+    pub fn decode_bincode(data: &[u8]) -> Self {
+        bincode::decode_from_slice(data, bincode::config::standard())
+            .expect("Unable to decode Merkle Tree cache")
+            .0
+    }
 }
 
 impl<T, H> SparseMerkleTree<T, Fr, H>

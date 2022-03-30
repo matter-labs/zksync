@@ -103,12 +103,6 @@ pub(crate) struct TransactionItem {
     pub batch_id: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountTreeCache {
-    pub block: i64,
-    pub tree_cache: String,
-}
-
 impl StorageBlockDetails {
     /// Checks if block is finalized, meaning that
     /// both Verify operation is performed for it, and this
