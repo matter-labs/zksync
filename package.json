@@ -23,7 +23,6 @@
     "crypto": "yarn workspace zksync-crypto",
     "contracts": "yarn workspace franklin-contracts",
     "ts-tests": "yarn workspace ts-tests",
-    "explorer": "yarn workspace sync-explorer",
     "zk": "yarn workspace zk",
     "reading-tool": "yarn workspace reading-tool",
     "api-docs": "yarn workspace api-docs"
