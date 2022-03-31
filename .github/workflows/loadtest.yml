@@ -187,7 +187,7 @@ jobs:
     name: Perform loadtest
     runs-on: [self-hosted, ci-runner]
     needs: [deploy]
-    container: rust:1.53
+    container: rust:1.59
     env:
       WEB3_URL: ${{ secrets.CI_LOADTEST_WEB3_URL }}
       MASTER_WALLET_PK: ${{ secrets.CI_LOADTEST_MAIN_PRIVKEY }}
@@ -197,7 +197,7 @@ jobs:
       ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
       ETH_NETWORK: "rinkeby"
       ALLOWED_PERCENT: 10
-      RUST_LOG: info
+      RUST_LOG: debug
     steps:
       - uses: actions/checkout@v2
       - name: Run loadtest
