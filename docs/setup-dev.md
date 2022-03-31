@@ -2,7 +2,8 @@
 
 ## `Docker`
 
-Install `docker`. It is recommended to follow the instructions from the [official site](https://docs.docker.com/install/).
+Install `docker`. It is recommended to follow the instructions from the
+[official site](https://docs.docker.com/install/).
 
 Installing `docker` via `snap` or from the default repository can cause troubles.
 
@@ -14,11 +15,12 @@ You need to install both `docker` and `docker-compose`.
 ERROR: Couldn't connect to Docker daemon - you might need to run `docker-machine start default`.
 ```
 
-If so, you **do not need** to install `docker-machine`. Most probably, it means that your user is not added to the`docker` group. You can verify this as follows:
+If so, you **do not need** to install `docker-machine`. Most probably, it means that your user is not added to the
+`docker` group. You can verify this as follows:
 
 ```bash
-docker-compose up # Should raise the same error
-sudo docker-compose up # Should work
+docker-compose up # should raise the same error
+sudo docker-compose up # should work
 ```
 
 If the first command fails, but the second succeeds, then you need to add your user to the `docker` group:
@@ -27,14 +29,20 @@ If the first command fails, but the second succeeds, then you need to add your u
 sudo usermod -a -G docker your_user_name
 ```
 
-After that, you should log out and log in again (user groups are refreshed after the login). The problem should be solved after this step.
+After that, you should log out and log in again (user groups are refreshed after the login). The problem should be
+solved after this step.
 
 If logging out does not help, restarting the computer should.
 
 ## `Node` & `Yarn`
 
-1. Install `Node` (requires version 14.14.0 or higher). Since our team attempts to always use the latest LTS version of `Node.js`, we suggest you install [nvm](https://github.com/nvm-sh/nvm). It will allow you to update `Node.js` version easily in the future.
-2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/). Check if `yarn` is installed by running `yarn -v`. If you face any problems when installing `yarn`, it might be the case that your package manager installed the wrong package. Make sure to thoroughly follow the instructions above on the official website. It contains a lot of troubleshooting guides in it.
+1. Install `Node` (requires version 14.14.0 or higher). Since our team attempts to always use the latest LTS version of
+   `Node.js`, we suggest you install [nvm](https://github.com/nvm-sh/nvm). It will allow you to update `Node.js` version
+   easily in the future.
+2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/). Check
+   if `yarn` is installed by running `yarn -v`. If you face any problems when installing `yarn`, it might be the case
+   that your package manager installed the wrong package. Make sure to thoroughly follow the instructions above on the
+   official website. It contains a lot of troubleshooting guides in it.
 3. Run `yarn global add @vue/cli-service`.
 
 ## `Axel`
@@ -103,13 +111,14 @@ On mac:
 ```bash
 brew install libpq
 brew link --force libpq
-``` 
+```
 
-See more info [here](https://stackoverflow.com/questions/44654216/correct-way-to-install-psql-without-full-postgres-on-macos).
+See more info
+[here](https://stackoverflow.com/questions/44654216/correct-way-to-install-psql-without-full-postgres-on-macos).
 
 ## `Diesel` CLI
 
-Install [`diesel`](https://diesel.rs/) CLI (it is used for migrations management only):
+Install [`diesel`](https://diesel.rs/) CLI (which is used for migrations management only):
 
 ```bash
 cargo install diesel_cli --no-default-features --features postgres
@@ -137,8 +146,8 @@ Also, we need [`sqlx`](https://github.com/launchbadge/sqlx) CLI (it is used to
 cargo install --version=0.5.6 sqlx-cli
 ```
 
-If you face an error `Could not find directory of OpenSSL installation`, then you should do the following.
-Theinstruction is targeted on debian-based Linux, but generally, the steps are similar for all OS.
+If you face an error `Could not find directory of OpenSSL installation`, then you should do the following. The
+instruction is targeted on debian-based Linux, but generally, the steps are similar for all OS.
 
 - Install `libssl-dev`:
 
@@ -146,9 +155,9 @@ Theinstruction is targeted on debian-based Linux, but generally, the steps are s
 sudo apt install libssl-dev
 ```
 
-- Install OpenSSL. Here is [the instruction for Ubuntu](https://www.spinup.com/installing-openssl-on-ubuntu/), but
-  thesteps should be similar for the debian-based Linux distros.
-- Add `OPENSSL_DIR` variable to your environment. This would typically be `/usr/local/ssl`. You can do this by addingthe
+- Install OpenSSL. Here is [the instruction for Ubuntu](https://www.spinup.com/installing-openssl-on-ubuntu/), but the
+  steps should be similar for the debian-based Linux distros.
+- Add `OPENSSL_DIR` variable to your environment. This would typically be `/usr/local/ssl`. You can do this by adding the
   following line to your shell profile file (e.g. `~/.bash_profile`):
 
 ```bash
@@ -178,13 +187,13 @@ brew install solidity@5
 ```
 
 If you're Arch user, download the archived version from [here](https://archive.archlinux.org/packages/s/solidity/) and
-install it
+install it:
 
 ```bash
 pacman -U solidity-0.5.14-1-x86_64.pkg.tar.xz
 ```
 
-Finally, to prevent pacman from upgrading it, add this line to your /etc/pacman.conf
+Finally, to prevent pacman from upgrading it, add this line to your `/etc/pacman.conf`:
 
 ```
 IgnorePkg = solidity
@@ -192,7 +201,8 @@ IgnorePkg = solidity
 
 ## drone cli
 
-The drone cli, which is used to create promotion jobs, can be installed following the instructions [described here](https://docs.drone.io/cli/install/).
+The drone cli, which is used to create promotion jobs, can be installed following the
+instructions [described here](https://docs.drone.io/cli/install/).
 
 ## `cmake`
 
