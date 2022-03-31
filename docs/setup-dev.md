@@ -2,25 +2,23 @@
 
 ## `Docker`
 
-Install `docker`. It is recommended to follow the instructions from the
-[official site](https://docs.docker.com/install/).
+Install `docker`. It is recommended to follow the instructions from the [official site](https://docs.docker.com/install/).
 
 Installing `docker` via `snap` or from the default repository can cause troubles.
 
 You need to install both `docker` and `docker-compose`.
 
-**Note:** On linux you may encounter the following error when you’ll try to work with `zksync`:
+**Note:** On linux you may encounter the following error when you try to work with `zksync`:
 
 ```
 ERROR: Couldn't connect to Docker daemon - you might need to run `docker-machine start default`.
 ```
 
-If so, you **do not need** to install `docker-machine`. Most probably, it means that your user is not added to
-the`docker` group. You can check it as follows:
+If so, you **do not need** to install `docker-machine`. Most probably, it means that your user is not added to the`docker` group. You can verify this as follows:
 
 ```bash
-docker-compose up # Should raise the same error.
-sudo docker-compose up # Should start doing things.
+docker-compose up # Should raise the same error
+sudo docker-compose up # Should work
 ```
 
 If the first command fails, but the second succeeds, then you need to add your user to the `docker` group:
@@ -29,21 +27,15 @@ If the first command fails, but the second succeeds, then you need to add your u
 sudo usermod -a -G docker your_user_name
 ```
 
-After that, you should logout and login again (user groups are refreshed after the login). The problem should be
-solvedat this step.
+After that, you should log out and log in again (user groups are refreshed after the login). The problem should be solved after this step.
 
 If logging out does not help, restarting the computer should.
 
 ## `Node` & `Yarn`
 
-1. Install `Node` (requires version 14.14.0 or higher). Since our team attempts to always use the latest LTS version
-   of`Node.js`, we suggest you to install [nvm](https://github.com/nvm-sh/nvm). It will allow you to
-   update `Node.js`version easily in the future.
-2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/). Check
-   if `yarn` is installed by running `yarn -v`.If you face any problems when installing `yarn`, it might be the case
-   that your package manager installed the wrong package.Make sure to thoroughly follow the instructions above on the
-   official website. It contains a lot of troubleshootingguides in it.
-3. Run `yarn global add @vue/cli-service`
+1. Install `Node` (requires version 14.14.0 or higher). Since our team attempts to always use the latest LTS version of `Node.js`, we suggest you install [nvm](https://github.com/nvm-sh/nvm). It will allow you to update `Node.js` version easily in the future.
+2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/). Check if `yarn` is installed by running `yarn -v`. If you face any problems when installing `yarn`, it might be the case that your package manager installed the wrong package. Make sure to thoroughly follow the instructions above on the official website. It contains a lot of troubleshooting guides in it.
+3. Run `yarn global add @vue/cli-service`.
 
 ## `Axel`
 
@@ -106,9 +98,18 @@ On debian-based linux:
 sudo apt-get install postgresql-client
 ```
 
+On mac:
+
+```bash
+brew install libpq
+brew link --force libpq
+``` 
+
+See more info [here](https://stackoverflow.com/questions/44654216/correct-way-to-install-psql-without-full-postgres-on-macos).
+
 ## `Diesel` CLI
 
-Install `[diesel](https://diesel.rs/)` CLI (it is used for migrations management only):
+Install [`diesel`](https://diesel.rs/) CLI (it is used for migrations management only):
 
 ```bash
 cargo install diesel_cli --no-default-features --features postgres
@@ -130,7 +131,7 @@ sudo apt install build-essential
 
 ## `sqlx` CLI
 
-Also, we need `[sqlx](https://github.com/launchbadge/sqlx)` CLI (it is used to generate database wrappers):
+Also, we need [`sqlx`](https://github.com/launchbadge/sqlx) CLI (it is used to generate database wrappers):
 
 ```bash
 cargo install --version=0.5.6 sqlx-cli
@@ -191,7 +192,7 @@ IgnorePkg = solidity
 
 ## drone cli
 
-drone cli used to create promotion jobs [described here](https://docs.drone.io/cli/install/).
+The drone cli, which is used to create promotion jobs, can be installed following the instructions [described here](https://docs.drone.io/cli/install/).
 
 ## `cmake`
 
@@ -199,6 +200,12 @@ Required by `binaryen` to build C++ sources. In order to speed it up, you might 
 
 ```bash
 sudo apt-get install cmake clang lld
+```
+
+On mac:
+
+```bash
+brew install cmake
 ```
 
 ## Environment
