@@ -1,6 +1,6 @@
 # Development guide
 
-This document covers development-related actions in zkSync.
+This document covers development-related actions in ri-aggregation.
 
 ## Initializing the project
 
@@ -16,7 +16,7 @@ You may also configure autocompletion for your shell via:
 zk completion install
 ```
 
-Once all the dependencies were installed, project can be initialized:
+Once all the dependencies are installed, the project can be initialized through:
 
 ```
 zk init
@@ -34,14 +34,14 @@ This command will do the following:
 - Insert required data into created database.
 - Create “genesis block” for server.
 
-Initializing may take pretty long, but many steps (such as downloading & unpacking keys and initializing containers)
-arerequired to be done only once.
+Initializing may take pretty long, but many steps (such as downloading & unpacking keys and initializing containers) are
+required to be done only once.
 
 Usually, it is a good idea to do `zk init` once after each merge to the `dev` branch (as application setup may change).
 
-**Note:** If after getting new functionality from the `dev` branch your code stopped working and `zk init` doesn’t
-help,you may try removing `$ZKSYNC_HOME/etc/env/dev.env` and running `zk init` once again. This may help if the
-applicationconfiguration has changed.
+**Note:** If after getting new functionality from the `dev` branch your code stopped working and `zk init` doesn’t help,
+you may try removing `$ZKSYNC_HOME/etc/env/dev.env` and running `zk init` once again. This may help if the application
+configuration has changed.
 
 If you don’t need all of the `zk init` functionality, but just need to start/stop containers, use the followingcommands:
 
@@ -69,7 +69,7 @@ Using the real prover for the development can be not really handy, since it’s 
 Instead, one may want to use the Dummy Prover: lightweight version of the prover, which does not actually proveanything,
 but acts like it does.
 
-To enable the dummy prover, run:
+To enable the dummy prover run:
 
 ```
 zk dummy-prover enable
@@ -81,10 +81,10 @@ And after that you will be able to use the dummy prover instead of actual prover
 zk dummy-prover run # Instead of `zk prover`
 ```
 
-**Warning:** `dummy-prover enable` subcommand changes the `Verifier.sol` contract, which is a part
-of `git` repository.Be sure not to commit these changes when using the dummy prover!
+**Warning:** `dummy-prover enable` subcommand changes the `Verifier.sol` contract, which is a part of `git` repository.
+Be sure not to commit these changes when using the dummy prover!
 
-If one will need to switch back to the real prover, a following command is required:
+If one will need to switch back to the real prover, the following command is required:
 
 ```
 zk dummy-prover disable
@@ -184,8 +184,8 @@ zk test db
 ## Developing circuit
 
 - To generate proofs one must have the universal setup files (which are downloaded during the first initialization).
-- To verify generated proofs one must have verification keys. Verification keys are generated for specific circuit
-  &Verifier.sol contract; without these keys it is impossible to verify proofs on the Ethereum network.
+- To verify generated proofs one must have verification keys. Verification keys are generated for the specific circuit
+  `Verifier.sol` contract; without these keys it is impossible to verify proofs on the Ethereum network.
 
 Steps to do after updating circuit:
 

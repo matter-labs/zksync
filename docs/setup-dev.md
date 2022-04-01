@@ -26,7 +26,7 @@ sudo docker-compose up # should work
 If the first command fails, but the second succeeds, then you need to add your user to the `docker` group:
 
 ```bash
-sudo usermod -a -G docker your_user_name
+sudo usermod -a -G docker <your_user_name>
 ```
 
 After that, you should log out and log in again (user groups are refreshed after the login). The problem should be
