@@ -151,3 +151,33 @@ fs_1.default.rmSync is not a function
 - `lexical-core = {git = 'https://github.com/Gelbpunkt/rust-lexical', branch = 'fix-warnings-and-update-deps'}`
 
 Then run zk init again. The suggestion from discord, to try `cargo update lexical-core` does not work
+
+### Usage after building on `master`
+
+**Problem**. After having built the project on `master`, the project is unable to verify transactions after building on another branch.
+
+**Solution**. Delete all related containers. Find them by executing:
+
+```bash
+docker container ls -a
+``` 
+
+And with the IDs from the previous steps (only related containers):
+
+```bash
+docker container rm <ID_1> <ID_2>...
+``` 
+
+Delete all related docker images. Find them by executing:
+
+```bash
+docker image ls -a
+``` 
+
+```bash
+docker image remove <ID_1> <ID_2>...
+``` 
+
+If you have intermediate images that you wish to remove, please check out [this thread](https://forums.docker.com/t/how-to-remove-none-images-after-building/7050).
+
+After this, re-install the project. This will trigger sizable downloads, so expect this to take a while.
