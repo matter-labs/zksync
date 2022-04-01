@@ -231,3 +231,9 @@ export PATH=$ZKSYNC_HOME/bin:$PATH
 # If you're like me, uncomment:
 # cd $ZKSYNC_HOME
 ```
+
+## M1 Macs
+
+If you’re using an M1 Mac and you’re expecting for the build to generate an RSKJ docker container, then copy the files
+from `/docker/rskj/from_source` to `/docker/rskj`. The new dockerfile will compile the rskj code from the source instead
+of trying to find an M1-compatible rskj PPA (which does not exist at the moment).

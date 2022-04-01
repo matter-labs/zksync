@@ -38,6 +38,19 @@ launch:
 zk up
 ```
 
+## Add certificates
+
+- Install [mkcert](https://github.com/FiloSottile/mkcert)
+  - `brew install mkcert`
+- Run: `mkcert --install`
+- Run: `mkcert 127.0.0.1 localhost`
+- Rename `127.0.0.1+1-key.pem` to `key.pem`
+- Rename `127.0.0.1+1.pem` to `cert.pem`
+- Put both files in the root directory
+- Set environment variables for node.js as
+  [documented here](https://github.com/FiloSottile/mkcert#using-the-root-with-nodejs)
+  - Ex: export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+
 ## (Re)deploy db and contraсts
 
 ```
@@ -104,6 +117,21 @@ SSL error: certificate verify failed
 
 **Solution**. Make sure that the version of `axel` on your computer is `2.17.10`.
 
+### OpenSSL error on ubuntu
+
+**Problem**. An error as the following:
+
+```bash
+thread 'main' panicked at 'OpenSSL library directory does not exist: /usr/lib/ss/lib', /home/usr/.cargo/registry/src/github.com-1ecc6299db9ec823/openssl-sys-0.9.65/build/main.rs:66:9
+```
+
+**Solution**. Try out the fixes [in this thread](https://github.com/sfackler/rust-openssl/issues/766), in particular:
+
+```bash
+export OPENSSL_LIB_DIR="/usr/lib/x86_64-linux-gnu"
+export OPENSSL_INCLUDE="/usr/include/openssl"
+```
+
 ### rmSync is not a function
 
 **Problem**. `zk init` fails with the following error:
@@ -113,3 +141,13 @@ fs_1.default.rmSync is not a function
 ```
 
 **Solution**. Make sure that the version of `node.js` installed on your computer is `14.14.0` or higher.
+
+### Rust compilation problems
+
+**Problem**. Compilation problems with lexical-core.
+
+**Solution**. In `zksync/Cargo.toml` append at the end:
+
+- `lexical-core = {git = 'https://github.com/Gelbpunkt/rust-lexical', branch = 'fix-warnings-and-update-deps'}`
+
+Then run zk init again. The suggestion from discord, to try `cargo update lexical-core` does not work
