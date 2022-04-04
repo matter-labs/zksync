@@ -152,12 +152,49 @@ fs_1.default.rmSync is not a function
 
 Then run zk init again. The suggestion from discord, to try `cargo update lexical-core` does not work
 
+**Problem**. Compilation problems with `bynarien` due to `Command Line Tools for Xcode v13.2+`.
+
+Error:
+```
+In file included from <project_root>/sdk/binaryen/src/wasm/wasm-type.cpp:28:
+<project_root>/sdk/binaryen/src/wasm-type.h:365:10: error: definition of implicit copy constructor for 'Tuple' is deprecated because it has a user-declared copy assignment operator [-Werror,-Wdeprecated-copy]
+  Tuple& operator=(const Tuple&) = delete;
+         ^
+<project_root>/sdk/binaryen/src/wasm/wasm-type.cpp:51:51: note: in implicit copy constructor for 'wasm::Tuple' first required here
+  TypeInfo(const Tuple& tuple) : kind(TupleKind), tuple(tuple) {}
+                                                  ^
+1 error generated.
+make[2]: *** [src/wasm/CMakeFiles/wasm.dir/wasm-type.cpp.o] Error 1
+make[1]: *** [src/wasm/CMakeFiles/wasm.dir/all] Error 2
+make: *** [all] Error 2
+error Command failed with exit code 2.
+```
+
+```bash
+❯ clang++ --version
+Apple clang version 13.1.6 (clang-1316.0.21.2)
+Target: x86_64-apple-darwin21.4.0
+```
+
+**Solution**. Download the latest working `Command Line Tools for Xcode` from [developer.apple.com](https://developer.apple.com/download/all/?q=command%20line%20tools). An apple account is required.
+
 ### Usage after building on `master`
 
 **Problem**. After having built the project on `master`, the project is unable to verify transactions after building on
 another branch.
 
-**Solution**. Delete all related containers. Find them by executing:
+**Solution**. Delete all related containers and the artifacts built.
+
+Deleting the files built under the `binaryen` submodule.
+
+Remove all the containers and images involved by running:
+
+```bash
+docker-compose down --rmi all -v --remove-orphans
+```
+
+Below some useful instructions to remove all the containers and images without `docker-compose`.
+Find the related containers by executing:
 
 ```bash
 docker container ls -a
