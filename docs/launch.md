@@ -155,6 +155,7 @@ Then run zk init again. The suggestion from discord, to try `cargo update lexica
 **Problem**. Compilation problems with `bynarien` due to `Command Line Tools for Xcode v13.2+`.
 
 Error:
+
 ```
 In file included from <project_root>/sdk/binaryen/src/wasm/wasm-type.cpp:28:
 <project_root>/sdk/binaryen/src/wasm-type.h:365:10: error: definition of implicit copy constructor for 'Tuple' is deprecated because it has a user-declared copy assignment operator [-Werror,-Wdeprecated-copy]
@@ -176,7 +177,8 @@ Apple clang version 13.1.6 (clang-1316.0.21.2)
 Target: x86_64-apple-darwin21.4.0
 ```
 
-**Solution**. Download the latest working `Command Line Tools for Xcode` from [developer.apple.com](https://developer.apple.com/download/all/?q=command%20line%20tools). An apple account is required.
+**Solution**. Download the latest working `Command Line Tools for Xcode` from
+[developer.apple.com](https://developer.apple.com/download/all/?q=command%20line%20tools). An apple account is required.
 
 ### Usage after building on `master`
 
@@ -193,8 +195,8 @@ Remove all the containers and images involved by running:
 docker-compose down --rmi all -v --remove-orphans
 ```
 
-Below some useful instructions to remove all the containers and images without `docker-compose`.
-Find the related containers by executing:
+Below some useful instructions to remove all the containers and images without `docker-compose`. Find the related
+containers by executing:
 
 ```bash
 docker container ls -a
