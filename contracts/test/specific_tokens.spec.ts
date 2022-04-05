@@ -154,7 +154,7 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
 
         expect(onchainBalAfter).eq(onchainBalBefore.add(withdrawAmount));
     });
-
+    /*
     it('Complete pending withdawals', async () => {
         zksyncContract.connect(wallet);
         const withdrawAmount = parseEther('1.0');
@@ -175,6 +175,7 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
             expect(onchainBalAfter.sub(onchainBalBefore)).eq(withdrawAmount.toString());
         }
     });
+    */
 });
 
 describe('zkSync process tokens which take fee from sender', function () {
@@ -290,7 +291,7 @@ describe('zkSync process tokens which take fee from sender', function () {
             withdrawAmount.sub(2 * FEE_AMOUNT).toString()
         );
     });
-
+    /*
     it('Complete pending withdawals => should not complete transfer because of token fee', async () => {
         zksyncContract.connect(wallet);
         const withdrawAmount = parseEther('1.0');
@@ -318,6 +319,7 @@ describe('zkSync process tokens which take fee from sender', function () {
             );
         }
     });
+    */
 });
 
 describe('zkSync process tokens which take fee from recipient', function () {

@@ -447,7 +447,7 @@ describe('zkSync withdraw unit tests', function () {
         );
         expect(revertReason, 'wrong revert reason').eq('1i');
     });
-
+    /*
     it('Withdraw token with empty return value', async () => {
         const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
         await zksyncContract.withdrawOrStoreExternal(3, EOA_Address, 1);
@@ -471,6 +471,7 @@ describe('zkSync withdraw unit tests', function () {
         const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenBytesTransferReturnValue.address);
         expect(balanceAfter.eq(balanceBefore.add(1)));
     });
+    */
 });
 
 describe('zkSync auth pubkey onchain unit tests', function () {

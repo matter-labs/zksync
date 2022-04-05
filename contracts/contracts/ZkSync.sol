@@ -430,57 +430,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "j");
     }
 
-    /// @dev 1. Try to send token to _recipients
-    /// @dev 2. On failure: Increment _recipients balance to withdraw.
-    function withdrawOrStoreNFT(Operations.WithdrawNFT memory op) internal {
-        NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
-        try
-            _factory.mintNFTFromZkSync{gas: WITHDRAWAL_NFT_GAS_LIMIT}(
-                op.creatorAddress,
-                op.receiver,
-                op.creatorAccountId,
-                op.serialId,
-                op.contentHash,
-                op.tokenId
-            )
-        {
-            // Save withdrawn nfts for future deposits
-            withdrawnNFTs[op.tokenId] = address(_factory);
-            emit WithdrawalNFT(op.tokenId);
-        } catch {
-            storePendingNFT(op);
-        }
-    }
-
-    /// @dev 1. Try to send token to _recipients
-    /// @dev 2. On failure: Increment _recipients balance to withdraw.
-    function withdrawOrStore(
-        uint16 _tokenId,
-        address _recipient,
-        uint128 _amount
-    ) internal {
-        bool sent = false;
-        if (_tokenId == 0) {
-            address payable toPayable = address(uint160(_recipient));
-            sent = sendETHNoRevert(toPayable, _amount);
-        } else {
-            address tokenAddr = governance.tokenAddresses(_tokenId);
-            // We use `transferERC20` here to check that `ERC20` token indeed transferred `_amount`
-            // and fail if token subtracted from zkSync balance more then `_amount` that was requested.
-            // This can happen if token subtracts fee from sender while transferring `_amount` that was requested to transfer.
-            try this.transferERC20{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
-                sent = true;
-            } catch {
-                sent = false;
-            }
-        }
-        if (sent) {
-            emit Withdrawal(_tokenId, _amount);
-        } else {
-            increasePendingBalance(_tokenId, _recipient, _amount);
-        }
-    }
-
     /// @dev Save NFT as pending to withdraw
     function storePendingNFT(Operations.WithdrawNFT memory op) internal {
         pendingWithdrawnNFTs[op.tokenId] = op;
@@ -498,37 +447,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         emit WithdrawalPending(_tokenId, _recipient, _amount);
     }
 
-    /// @dev helper function to process ETH/ERC20 withdrawal
-    function handleWithdrawFT(
-        bool _completeWithdrawals,
-        uint16 _tokenId,
-        address _addr,
-        uint128 _amount
-    ) internal {
-        if (_completeWithdrawals) {
-            withdrawOrStore(_tokenId, _addr, _amount);
-        } else {
-            increasePendingBalance(_tokenId, _addr, _amount);
-        }
-    }
-
-    /// @dev helper function to process NFT withdrawal
-    function handleWithdrawNFT(bool _completeWithdrawals, Operations.WithdrawNFT memory _op) internal {
-        if (_completeWithdrawals) {
-            withdrawOrStoreNFT(_op);
-        } else {
-            storePendingNFT(_op);
-        }
-    }
-
     /// @dev Executes one block
     /// @dev 1. Processes all priority operations or save them as pending
     /// @dev 2. Finalizes block on Ethereum
     /// @dev _executedBlockIdx is index in the array of the blocks that we want to execute together
     function executeOneBlock(
         ExecuteBlockInfo memory _blockExecuteData,
-        uint32 _executedBlockIdx,
-        bool _completeWithdrawals
+        uint32 _executedBlockIdx
     ) internal {
         // Ensure block was committed
         require(
@@ -548,16 +473,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
                 // Circuit guarantees that partial exits are available only for fungible tokens
                 require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf1");
-                handleWithdrawFT(_completeWithdrawals, uint16(op.tokenId), op.owner, op.amount);
+                increasePendingBalance(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
                 // Circuit guarantees that forced exits are available only for fungible tokens
                 require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf2");
-                handleWithdrawFT(_completeWithdrawals, uint16(op.tokenId), op.target, op.amount);
+                increasePendingBalance(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
-                    handleWithdrawFT(_completeWithdrawals, uint16(op.tokenId), op.owner, op.amount);
+                    increasePendingBalance(uint16(op.tokenId), op.owner, op.amount);
                 } else {
                     if (op.amount == 1) {
                         Operations.WithdrawNFT memory withdrawNftOp = Operations.WithdrawNFT(
@@ -568,12 +493,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                             op.owner,
                             op.tokenId
                         );
-                        handleWithdrawNFT(_completeWithdrawals, withdrawNftOp);
+                        storePendingNFT(withdrawNftOp);
                     }
                 }
             } else if (opType == Operations.OpType.WithdrawNFT) {
                 Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
-                handleWithdrawNFT(_completeWithdrawals, op);
+                storePendingNFT(op);
             } else {
                 revert("l"); // unsupported op in block execution
             }
@@ -586,14 +511,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Execute blocks, completing priority operations and processing withdrawals.
     /// @notice 1. Processes all pending operations (Send Exits, Complete priority requests)
     /// @notice 2. Finalizes block on Ethereum
-    function executeBlocks(ExecuteBlockInfo[] memory _blocksData, bool _completeWithdrawals) external nonReentrant {
+    function executeBlocks(ExecuteBlockInfo[] memory _blocksData) external nonReentrant {
         requireActive();
         governance.requireActiveValidator(msg.sender);
 
         uint64 priorityRequestsExecuted = 0;
         uint32 nBlocks = uint32(_blocksData.length);
         for (uint32 i = 0; i < nBlocks; ++i) {
-            executeOneBlock(_blocksData[i], i, _completeWithdrawals);
+            executeOneBlock(_blocksData[i], i);
             priorityRequestsExecuted += _blocksData[i].storedBlock.priorityOperations;
             emit BlockVerification(_blocksData[i].storedBlock.blockNumber);
         }
@@ -1016,15 +941,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
         uint128 balance = pendingBalances[_packedBalanceKey].balanceToWithdraw;
         pendingBalances[_packedBalanceKey] = PendingBalance(balance.add(_amount), FILLED_GAS_RESERVE_VALUE);
-    }
-
-    /// @notice Sends ETH
-    /// @param _to Address of recipient
-    /// @param _amount Amount of tokens to transfer
-    /// @return bool flag indicating that transfer is successful
-    function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
-        (bool callSuccess, ) = _to.call{gas: WITHDRAWAL_GAS_LIMIT, value: _amount}("");
-        return callSuccess;
     }
 
     /// @notice Delegates the call to the additional part of the main contract.
