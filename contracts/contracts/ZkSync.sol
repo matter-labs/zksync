@@ -451,10 +451,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev 1. Processes all priority operations or save them as pending
     /// @dev 2. Finalizes block on Ethereum
     /// @dev _executedBlockIdx is index in the array of the blocks that we want to execute together
-    function executeOneBlock(
-        ExecuteBlockInfo memory _blockExecuteData,
-        uint32 _executedBlockIdx
-    ) internal {
+    function executeOneBlock(ExecuteBlockInfo memory _blockExecuteData, uint32 _executedBlockIdx) internal {
         // Ensure block was committed
         require(
             hashStoredBlockInfo(_blockExecuteData.storedBlock) ==

@@ -16,5 +16,4 @@ contract ZkSyncWithdrawalUnitTest is ZkSync {
 
     // solhint-disable-next-line no-empty-blocks
     function receiveETH() external payable {}
-
 }
