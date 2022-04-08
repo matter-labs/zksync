@@ -22,7 +22,7 @@ zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version =
 
 hex = "0.4"
 rust-crypto = "0.2"
-web3 = "0.16.0"
+web3 = "0.18.0"
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 futures = "0.3"

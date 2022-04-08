@@ -78,7 +78,7 @@ pub fn transaction_from_tx_data(tx: TxData) -> Transaction {
         from: Some(tx.from),
         to: tx.to,
         value: 0.into(),
-        gas_price: 0.into(),
+        gas_price: Some(0.into()),
         gas: 0.into(),
         input: Vec::new().into(),
         v: None,
@@ -87,6 +87,8 @@ pub fn transaction_from_tx_data(tx: TxData) -> Transaction {
         raw: None,
         transaction_type: None,
         access_list: None,
+        max_fee_per_gas: None,
+        max_priority_fee_per_gas: None,
     }
 }
 

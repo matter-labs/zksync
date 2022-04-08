@@ -660,6 +660,8 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
                 nonce: Some(op.nonce),
                 gas_price: Some(op.last_used_gas_price),
                 gas: Some(gas_limit),
+                max_fee_per_gas: None,
+                max_priority_fee_per_gas: None,
                 ..Default::default()
             }
         };

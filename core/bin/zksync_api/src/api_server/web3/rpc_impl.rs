@@ -1,4 +1,5 @@
 // Built-in uses
+use ethabi::Address;
 use std::time::Instant;
 // External uses
 use jsonrpc_core::{Error, Result};
@@ -355,6 +356,8 @@ impl Web3RpcApp {
             transaction_index: receipt.block_index.map(Into::into).unwrap_or(U64::MAX),
             block_hash: Some(root_hash),
             block_number: Some(receipt.block_number.into()),
+            from: Address::from_slice(&receipt.from_account),
+            to: receipt.to_account.map(|acc| Address::from_slice(&acc)),
             cumulative_gas_used: 0.into(),
             gas_used: Some(0.into()),
             contract_address: None,
@@ -363,6 +366,7 @@ impl Web3RpcApp {
             root: Some(root_hash),
             logs_bloom: H2048::zero(),
             transaction_type: None,
+            effective_gas_price: None,
         })
     }
 

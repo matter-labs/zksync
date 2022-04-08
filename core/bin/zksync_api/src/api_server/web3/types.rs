@@ -133,6 +133,7 @@ impl BlockInfo {
             number: Some(block_number.0.into()),
             gas_used: 0.into(),
             gas_limit: 50000.into(),
+            base_fee_per_gas: None,
             extra_data: Vec::new().into(),
             logs_bloom: None,
             timestamp: timestamp.into(),

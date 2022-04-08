@@ -137,7 +137,7 @@ fn create_transaction_v4(number: u32, stored_block: Block, blocks: Vec<Block>) -
         from: Some([5u8; 20].into()),
         to: Some([7u8; 20].into()),
         value: u32_to_32bytes(10).into(),
-        gas_price: u32_to_32bytes(1).into(),
+        gas_price: Some(u32_to_32bytes(1).into()),
         gas: u32_to_32bytes(1).into(),
         input: Bytes(input_data),
         v: None,
@@ -146,6 +146,8 @@ fn create_transaction_v4(number: u32, stored_block: Block, blocks: Vec<Block>) -
         raw: None,
         transaction_type: None,
         access_list: None,
+        max_fee_per_gas: None,
+        max_priority_fee_per_gas: None,
     }
 }
 fn create_transaction(number: u32, block: Block) -> Transaction {
@@ -175,7 +177,7 @@ fn create_transaction(number: u32, block: Block) -> Transaction {
         from: Some([5u8; 20].into()),
         to: Some([7u8; 20].into()),
         value: u32_to_32bytes(10).into(),
-        gas_price: u32_to_32bytes(1).into(),
+        gas_price: Some(u32_to_32bytes(1).into()),
         gas: u32_to_32bytes(1).into(),
         input: Bytes(input_data),
         v: None,
@@ -184,6 +186,8 @@ fn create_transaction(number: u32, block: Block) -> Transaction {
         raw: None,
         transaction_type: None,
         access_list: None,
+        max_fee_per_gas: None,
+        max_priority_fee_per_gas: None,
     }
 }
 
