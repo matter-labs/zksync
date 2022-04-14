@@ -45,7 +45,18 @@ jobs:
         - /var/run/secrets/tokens:/var/run/secrets/tokens
     env:
       ENVFILE: ./compiled_envs/${{ inputs.environment }}.env
+      KUBE_CONTEXT: matterlabs-zksync-${{ inputs.cluster }}
+      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }}
     steps:
+      -
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/gh-workflows
+          path: gh-workflows
+      -
+        name: Generate ~/.kube/config
+        working-directory: gh-workflows
+        run: scripts/kubeconfig-projected-token
       -
         name: Clone configs
         uses: actions/checkout@v2
@@ -54,20 +65,6 @@ jobs:
           path: configs
           ref: ${{ inputs.ref }}
           token: ${{ secrets.github-token }}
-      -
-        id: kubeConf
-        run: |
-          kube_token=$(cat /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }})
-          echo "::add-mask::$kube_token"
-          echo "::set-output name=token::$kube_token"
-      -
-        name: Generate ~/.kube/config
-        run: |
-          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
-          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context matterlabs-zksync-${{ inputs.cluster }} --user=user --cluster=default
-          kubectl config use-context matterlabs-zksync-${{ inputs.cluster }}
-
       -
         name: Update Server Config
         working-directory: configs

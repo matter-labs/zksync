@@ -8,8 +8,6 @@ concurrency: loadtest
 
 env:
   ZKSYNC_ENV: loadtest
-  DEPLOY_SA_NAME: gha-deployer-stage
-  DEPLOY_K8S_CONTEXT: matterlabs-zksync-stage
 
 jobs:
   setup:
@@ -42,7 +40,8 @@ jobs:
     env:
       DEPLOY_APPS: -l name=sqlproxy
       HF_ARGS: -e ${{ needs.setup.outputs.release-environment }}
-
+      KUBE_CONTEXT: matterlabs-zksync-${{ needs.setup.outputs.cluster }}
+      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.cluster }}
     steps:
       - uses: actions/checkout@v2
       -
@@ -54,18 +53,14 @@ jobs:
           ref: master
           token: ${{ secrets.GH_TOKEN }}
       -
-        id: kubeConf
-        run: |
-          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
-          echo "::add-mask::$kube_token"
-          echo "::set-output name=token::$kube_token"
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/gh-workflows
+          path: gh-workflows
       -
         name: Generate ~/.kube/config
-        run: |
-          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
-          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
-          kubectl config use-context $DEPLOY_K8S_CONTEXT
+        working-directory: gh-workflows
+        run: scripts/kubeconfig-projected-token
       -
         name: Provision SQLProxy
         working-directory: helm-infra
@@ -147,24 +142,24 @@ jobs:
       image: dysnix/kubectl:v1.20-gcloud
       volumes:
         - /var/run/secrets/tokens:/var/run/secrets/tokens
+    env:
+      KUBE_CONTEXT: matterlabs-zksync-${{ needs.setup.outputs.cluster }}
+      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.cluster }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v2
-        with:
-          name: deployed_contracts
       -
-        id: kubeConf
-        run: |
-          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
-          echo "::add-mask::$kube_token"
-          echo "::set-output name=token::$kube_token"
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/gh-workflows
+          path: gh-workflows
       -
         name: Generate ~/.kube/config
-        run: |
-          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
-          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
-          kubectl config use-context $DEPLOY_K8S_CONTEXT
+        working-directory: gh-workflows
+        run: scripts/kubeconfig-projected-token
+      -
+        uses: actions/download-artifact@v2
+        with:
+          name: deployed_contracts
       -
         name: Update contracts in the ConfigMap
         run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
@@ -211,22 +206,21 @@ jobs:
       image: dysnix/kubectl:v1.20-gcloud
       volumes:
         - /var/run/secrets/tokens:/var/run/secrets/tokens
+    env:
+      KUBE_CONTEXT: matterlabs-zksync-${{ needs.setup.outputs.cluster }}
+      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.cluster }}
     if: always()
     steps:
       - uses: actions/checkout@v2
       -
-        id: kubeConf
-        run: |
-          kube_token=$(cat /var/run/secrets/tokens/${DEPLOY_SA_NAME})
-          echo "::add-mask::$kube_token"
-          echo "::set-output name=token::$kube_token"
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/gh-workflows
+          path: gh-workflows
       -
         name: Generate ~/.kube/config
-        run: |
-          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
-          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context $DEPLOY_K8S_CONTEXT --user=user --cluster=default
-          kubectl config use-context $DEPLOY_K8S_CONTEXT
+        working-directory: gh-workflows
+        run: scripts/kubeconfig-projected-token
       -
         name: Scale loadtest to 0 replicas
         run: |
