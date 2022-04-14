@@ -48,8 +48,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Data needed to execute committed and verified block
-    /// @param commitmentsInSlot verified commitments in one slot
-    /// @param commitmentIdx index such that commitmentsInSlot[commitmentIdx] is current block commitment
+    /// @param stored block that was committed
+    /// @param list of pubdata for onchain operations that needs to be processed
     struct ExecuteBlockInfo {
         StoredBlockInfo storedBlock;
         bytes[] pendingOnchainOpsPubdata;
