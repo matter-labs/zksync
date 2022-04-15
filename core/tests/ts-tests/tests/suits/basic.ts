@@ -134,16 +134,16 @@ const BasicTestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', prov
             await tester.testWithdrawNFT(bob, tester.syncWallet, token);
         });
 
-        // step('should execute a forced exit', async () => {
-        //     const forcedExitWallet = await tester.emptyWallet();
-        //     await tester.testTransfer(alice, forcedExitWallet, token, TX_AMOUNT);
-        //     await tester.testVerifiedForcedExit(alice, forcedExitWallet, token);
-        // });
+        step('should execute a forced exit', async () => {
+            const forcedExitWallet = await tester.emptyWallet();
+            await tester.testTransfer(alice, forcedExitWallet, token, TX_AMOUNT);
+            await tester.testVerifiedForcedExit(alice, forcedExitWallet, token);
+        });
 
-        // it('should check collected fees', async () => {
-        //     const collectedFee = (await tester.operatorBalance(token)).sub(operatorBalance);
-        //     expect(collectedFee.eq(tester.runningFee), `Fee collection failed, expected: ${tester.runningFee.toString()}, got: ${collectedFee.toString()}`).to.be.true;
-        // });
+        it('should check collected fees', async () => {
+            const collectedFee = (await tester.operatorBalance(token)).sub(operatorBalance);
+            expect(collectedFee.eq(tester.runningFee), `Fee collection failed, expected: ${tester.runningFee.toString()}, got: ${collectedFee.toString()}`).to.be.true;
+        });
     });
 
 for (const input of tokenAndTransport) {
