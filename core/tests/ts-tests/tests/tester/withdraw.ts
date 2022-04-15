@@ -1,7 +1,7 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, ETHProxy } from 'zksync';
-import { BigNumber } from 'ethers';
+import { BigNumber, Signer } from 'ethers';
 
 type TokenLike = types.TokenLike;
 
@@ -9,7 +9,7 @@ declare module './tester' {
     interface Tester {
         testVerifiedWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<void>;
         testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<any>;
-        testWithdrawNFT(wallet: Wallet, withdrawer: Wallet, feeToken: TokenLike, fast?: boolean): Promise<void>;
+        testWithdrawNFT(wallet: Wallet, withdrawer: Signer, feeToken: TokenLike, fast?: boolean): Promise<void>;
     }
 }
 
@@ -70,7 +70,7 @@ Tester.prototype.testWithdraw = async function (
 
 Tester.prototype.testWithdrawNFT = async function (
     wallet: Wallet,
-    withdrawer: Wallet,
+    withdrawer: Signer,
     feeToken: TokenLike,
     fastProcessing?: boolean
 ) {
@@ -102,10 +102,8 @@ Tester.prototype.testWithdrawNFT = async function (
     await handle.awaitVerifyReceipt();
 
     const ethProxy = new ETHProxy(this.ethProvider, await this.syncProvider.getContractAddress());
+    await ethProxy.getZkSyncContract().connect(withdrawer).withdrawPendingNFTBalance(nft.id);
     const defaultFactory = await ethProxy.getDefaultNFTFactory();
-
-    const withdrawTx = await withdrawer.withdrawPendingNFTBalance(nft.id);
-    await withdrawTx.wait();
 
     const creatorId = await defaultFactory.getCreatorAccountId(nft.id);
     const contentHash = await defaultFactory.getContentHash(nft.id);

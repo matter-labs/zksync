@@ -1,7 +1,7 @@
 import { deployContract } from 'ethereum-waffle';
 import fs from 'fs';
 import { Tester } from './tester';
-import { utils } from 'ethers';
+import { Signer, utils } from 'ethers';
 import { expect } from 'chai';
 import { Wallet, types, ETHProxy, utils as zkutils } from 'zksync';
 type TokenLike = types.TokenLike;
@@ -23,11 +23,11 @@ function readFactoryCode() {
 
 declare module './tester' {
     interface Tester {
-        testRegisterFactory(wallet: Wallet, withdrawer: Wallet, feeToken: TokenLike): Promise<void>;
+        testRegisterFactory(wallet: Wallet, withdrawer: Signer, feeToken: TokenLike): Promise<void>;
     }
 }
 
-Tester.prototype.testRegisterFactory = async function (wallet: Wallet, withdrawer: Wallet, feeToken: TokenLike) {
+Tester.prototype.testRegisterFactory = async function (wallet: Wallet, withdrawer: Signer, feeToken: TokenLike) {
     const contractAddress = await wallet.provider.getContractAddress();
     const ethProxy = new ETHProxy(wallet.ethSigner().provider!, contractAddress);
     const defaultNFTFactoryAddress = (await ethProxy.getGovernanceContract().defaultFactory()).toLowerCase();
@@ -91,8 +91,7 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, withdrawe
     const receiptWithdraw = await handleWithdraw.awaitVerifyReceipt();
     expect(receiptWithdraw.success, `Withdraw NFT failed with a reason: ${receiptWithdraw.failReason}`).to.be.true;
 
-    const withdrawTx = await withdrawer.withdrawPendingNFTBalance(nft.id);
-    await withdrawTx.wait();
+    await ethProxy.getZkSyncContract().connect(withdrawer).withdrawPendingNFTBalance(nft.id);
 
     const owner = await contract.ownerOf(nft.id);
     expect(owner == wallet.address(), 'Contract minting is wrong');
