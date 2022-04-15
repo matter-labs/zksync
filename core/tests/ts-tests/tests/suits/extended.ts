@@ -166,11 +166,11 @@ describe(`Extended tests`, () => {
     });
 
     step('should execute NFT withdraw', async () => {
-        await tester.testWithdrawNFT(chuck, token);
+        await tester.testWithdrawNFT(chuck, tester.syncWallet, token);
     });
 
     step('should register factory and withdraw nft', async () => {
-        await tester.testRegisterFactory(alice, token);
+        await tester.testRegisterFactory(alice, tester.syncWallet, token);
     });
 
     it('should check collected fees', async () => {
@@ -209,6 +209,7 @@ describe(`Extended tests`, () => {
     it('should fail trying to send tx with wrong signature', async () => {
         await tester.testWrongSignature(alice, bob, token, TX_AMOUNT, providerType);
     });
+
     it('should fail trying to send tx with wrong params', async () => {
         await tester.testApiErrors(alice, bob, token, TX_AMOUNT, providerType);
     });

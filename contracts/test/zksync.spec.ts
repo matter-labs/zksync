@@ -447,31 +447,28 @@ describe('zkSync withdraw unit tests', function () {
         );
         expect(revertReason, 'wrong revert reason').eq('1i');
     });
-    /*
     it('Withdraw token with empty return value', async () => {
-        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
-        await zksyncContract.withdrawOrStoreExternal(3, EOA_Address, 1);
-        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
+        const tokenAddress = tokenNoTransferReturnValue.address;
+        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, tokenAddress);
+        await zksyncContract.withdrawPendingBalance(EOA_Address, tokenAddress, 1);
+        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenAddress);
         expect(balanceAfter.eq(balanceBefore));
     });
 
     it('Should save pending balance for token without bytecode', async () => {
         const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, EOA_Address);
-        await zksyncContract.withdrawOrStoreExternal(2, EOA_Address, 1);
+        await zksyncContract.withdrawPendingBalance(EOA_Address, EOA_Address, 1);
         const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, EOA_Address);
         expect(balanceAfter.eq(balanceBefore.add(1)));
     });
 
     it('Should save pending balance for token with incorrect return value', async () => {
-        const balanceBefore = await zksyncContract.getPendingBalance(
-            EOA_Address,
-            tokenBytesTransferReturnValue.address
-        );
+        const tokenAddress = tokenBytesTransferReturnValue.address;
+        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, tokenAddress);
         await zksyncContract.withdrawOrStoreExternal(4, EOA_Address, 1);
-        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenBytesTransferReturnValue.address);
+        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenAddress);
         expect(balanceAfter.eq(balanceBefore.add(1)));
     });
-    */
 });
 
 describe('zkSync auth pubkey onchain unit tests', function () {

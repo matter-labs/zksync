@@ -9,7 +9,7 @@ declare module './tester' {
     interface Tester {
         testVerifiedWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<void>;
         testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<any>;
-        testWithdrawNFT(wallet: Wallet, feeToken: TokenLike, fast?: boolean): Promise<void>;
+        testWithdrawNFT(wallet: Wallet, withdrawer: Wallet, feeToken: TokenLike, fast?: boolean): Promise<void>;
     }
 }
 
@@ -68,7 +68,12 @@ Tester.prototype.testWithdraw = async function (
     return handle;
 };
 
-Tester.prototype.testWithdrawNFT = async function (wallet: Wallet, feeToken: TokenLike, fastProcessing?: boolean) {
+Tester.prototype.testWithdrawNFT = async function (
+    wallet: Wallet,
+    withdrawer: Wallet,
+    feeToken: TokenLike,
+    fastProcessing?: boolean
+) {
     const type = fastProcessing ? 'FastWithdrawNFT' : 'WithdrawNFT';
     const { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), feeToken);
 
@@ -98,6 +103,9 @@ Tester.prototype.testWithdrawNFT = async function (wallet: Wallet, feeToken: Tok
 
     const ethProxy = new ETHProxy(this.ethProvider, await this.syncProvider.getContractAddress());
     const defaultFactory = await ethProxy.getDefaultNFTFactory();
+
+    const withdrawTx = await withdrawer.withdrawPendingNFTBalance(nft.id);
+    await withdrawTx.wait();
 
     const creatorId = await defaultFactory.getCreatorAccountId(nft.id);
     const contentHash = await defaultFactory.getContentHash(nft.id);

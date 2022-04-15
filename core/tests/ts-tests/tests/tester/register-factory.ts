@@ -23,11 +23,11 @@ function readFactoryCode() {
 
 declare module './tester' {
     interface Tester {
-        testRegisterFactory(wallet: Wallet, feeToken: TokenLike): Promise<void>;
+        testRegisterFactory(wallet: Wallet, withdrawer: Wallet, feeToken: TokenLike): Promise<void>;
     }
 }
 
-Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken: TokenLike) {
+Tester.prototype.testRegisterFactory = async function (wallet: Wallet, withdrawer: Wallet, feeToken: TokenLike) {
     const contractAddress = await wallet.provider.getContractAddress();
     const ethProxy = new ETHProxy(wallet.ethSigner().provider!, contractAddress);
     const defaultNFTFactoryAddress = (await ethProxy.getGovernanceContract().defaultFactory()).toLowerCase();
@@ -90,6 +90,10 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, feeToken:
     });
     const receiptWithdraw = await handleWithdraw.awaitVerifyReceipt();
     expect(receiptWithdraw.success, `Withdraw NFT failed with a reason: ${receiptWithdraw.failReason}`).to.be.true;
+
+    const withdrawTx = await withdrawer.withdrawPendingNFTBalance(nft.id);
+    await withdrawTx.wait();
+
     const owner = await contract.ownerOf(nft.id);
     expect(owner == wallet.address(), 'Contract minting is wrong');
     this.runningFee = this.runningFee.add(withdrawFee);
