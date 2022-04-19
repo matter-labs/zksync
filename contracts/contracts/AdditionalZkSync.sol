@@ -38,7 +38,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner (must be total amount, not part of it)
     function performExodus(
-        StoredBlockInfo memory _storedBlockInfo,
+        StoredBlockInfo calldata _storedBlockInfo,
         address _owner,
         uint32 _accountId,
         uint32 _tokenId,
@@ -99,7 +99,8 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
         require(toProcess > 0, "9"); // no deposits to process
         uint64 currentDepositIdx = 0;
-        for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; ++id) {
+        uint64 currentFirstPriorityRequestId = firstPriorityRequestId;
+        for (uint64 id = currentFirstPriorityRequestId; id < currentFirstPriorityRequestId + toProcess; ++id) {
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
                 bytes memory depositPubdata = _depositsPubdata[currentDepositIdx];
                 require(Utils.hashBytesToBytes20(depositPubdata) == priorityRequests[id].hashedPubData, "a");
@@ -111,8 +112,8 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             }
             delete priorityRequests[id];
         }
-        firstPriorityRequestId += toProcess;
-        totalOpenPriorityRequests -= toProcess;
+        firstPriorityRequestId = firstPriorityRequestId + toProcess;
+        totalOpenPriorityRequests = totalOpenPriorityRequests + toProcess;
     }
 
     uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
@@ -129,7 +130,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
                 // approve cut upgrade notice period if needed
                 if (!securityCouncilApproves[id]) {
                     securityCouncilApproves[id] = true;
-                    numberOfApprovalsFromSecurityCouncil += 1;
+                    numberOfApprovalsFromSecurityCouncil = numberOfApprovalsFromSecurityCouncil + 1;
                     emit ApproveCutUpgradeNoticePeriod(addr);
 
                     if (numberOfApprovalsFromSecurityCouncil >= SECURITY_COUNCIL_THRESHOLD) {
@@ -178,7 +179,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     /// @return hash of the concatenation of targets for which there is an upgrade
     /// NOTE: revert if upgrade is not active at this moment
-    function getUpgradeTargetsHash() internal returns (bytes32) {
+    function getUpgradeTargetsHash() internal view returns (bytes32) {
         // Get the addresses of contracts that are being prepared for the upgrade.
         address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
         (bool success0, bytes memory newTarget0) = gatekeeper.staticcall(
@@ -245,7 +246,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         }
 
         totalBlocksCommitted = blocksCommitted;
-        totalCommittedPriorityRequests -= revertedPriorityRequests;
+        totalCommittedPriorityRequests = totalCommittedPriorityRequests - revertedPriorityRequests;
         if (totalBlocksCommitted < totalBlocksProven) {
             totalBlocksProven = totalBlocksCommitted;
         }
