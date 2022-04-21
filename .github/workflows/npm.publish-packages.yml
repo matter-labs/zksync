@@ -10,7 +10,7 @@ on:
 jobs:
   zksync:
     name: Publish zksync.js
-    uses: matter-labs/github-workflows/.github/workflows/npm.publish-package.yaml@main
+    uses: dysnix/github-workflows/.github/workflows/npm.publish-package.yaml@main
     with:
       working-directory: sdk/zksync.js
       build-command: |

@@ -9,8 +9,8 @@ All notable changes to `zksync.js` will be documented in this file.
 ### Added
 
 - We've added `remote json rpc signer` which means you could add support of zkSync L2 Wallets such as Argent zkSync or
-  other applications into your dapp. Read more here:
-  http://docs.zksync.io/api/sdk/js/accounts.html#creating-wallet-from-l2-wallets
+  other applications into your dapp. Read more here
+  <http://docs.zksync.io/api/sdk/js/accounts.html#creating-wallet-from-l2-wallets>
 
 ### Changed
 
@@ -19,8 +19,6 @@ All notable changes to `zksync.js` will be documented in this file.
   inconsistent.
 - All methods whose name started with `get` for example `getTransfer` were deleted. Now for this purpose, you could use
   `BatchBuilder.`
-
---- https://docs.zksync.io/api/changelog.html
 
 ### Deprecated
 
