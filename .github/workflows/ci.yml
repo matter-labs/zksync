@@ -58,12 +58,13 @@ jobs:
         run: |
           ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
+          ci_run zk run yarn
           ci_run zk run verify-keys unpack
+          ci_run yarn run build:zksync-sdk
           ci_run zk contract build
           ci_run zk run deploy-erc20 dev
           ci_run zk run deploy-eip1271
           ci_run zk db basic-setup
-          ci_run zk run yarn
 
       - name: restart dev-liquidity-token-watcher and dev-ticker
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker

@@ -10670,8 +10670,8 @@ yocto-queue@^0.1.0:
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-0.1.0.tgz#0294eb3dee05028d31ee1a5fa2c556a6aaf10a1b"
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
 
-"zksync@link:sdk/zksync.js":
-  version "0.12.0-alpha.6"
+"zksync@file:sdk/zksync.js":
+  version "0.12.1"
   dependencies:
     axios "^0.21.2"
     websocket "^1.0.30"

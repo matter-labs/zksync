@@ -37,12 +37,12 @@
     "ts-node": "^9.0.0",
     "typechain": "^4.0.0",
     "typescript": "^4.0.5",
-    "zksync": "link:../sdk/zksync.js"
+    "zksync": "file:../sdk/zksync.js"
   },
   "scripts": {
     "build": "hardhat compile",
-    "test": "CONTRACT_TESTS=1 zk f yarn run hardhat test test/*.spec.ts",
-    "test:fork": "CONTRACT_TESTS=1 TEST_CONTRACTS_FORK=1 zk f yarn run hardhat test test/*.fork.ts",
+    "test": "cd ../sdk/zksync.js && yarn && yarn build && cd ../../contracts && rm -rf node_modules && yarn && CONTRACT_TESTS=1 zk f yarn run hardhat test test/*.spec.ts",
+    "test:fork": "cd ../sdk/zksync.js && yarn && yarn build && cd ../../contracts && rm -rf node_modules && yarn && CONTRACT_TESTS=1 TEST_CONTRACTS_FORK=1 zk f yarn run hardhat test test/*.fork.ts",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
     "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",
