@@ -78,6 +78,7 @@ contract Governance is Config {
     /// @notice Change current governor
     /// @param _newGovernor Address of the new governor
     function changeGovernor(address _newGovernor) external {
+        require(_newGovernor != address(0), "1n");
         requireGovernor(msg.sender);
         if (networkGovernor != _newGovernor) {
             networkGovernor = _newGovernor;

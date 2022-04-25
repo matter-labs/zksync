@@ -427,7 +427,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         uint64 priorityRequestsCommitted = 0;
         uint32 newBlocksDataLength = uint32(_newBlocksData.length);
-        for (uint32 i = 0; i < newBlocksDataLength; ++i) {
+        for (uint256 i = 0; i < newBlocksDataLength; ++i) {
             _lastCommittedBlockData = commitOneBlock(_lastCommittedBlockData, _newBlocksData[i]);
 
             priorityRequestsCommitted += _lastCommittedBlockData.priorityOperations;
@@ -463,7 +463,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev 1. Processes all priority operations or save them as pending
     /// @dev 2. Finalizes block on Ethereum
     /// @dev _executedBlockIdx is index in the array of the blocks that we want to execute together
-    function executeOneBlock(ExecuteBlockInfo memory _blockExecuteData, uint32 _executedBlockIdx) internal {
+    function executeOneBlock(ExecuteBlockInfo memory _blockExecuteData, uint256 _executedBlockIdx) internal {
         // Ensure block was committed
         require(
             hashStoredBlockInfo(_blockExecuteData.storedBlock) ==
@@ -475,7 +475,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes32 pendingOnchainOpsHash = EMPTY_STRING_KECCAK;
 
         uint256 pendingOnchainOpsPubdataLength = _blockExecuteData.pendingOnchainOpsPubdata.length;
-        for (uint32 i = 0; i < pendingOnchainOpsPubdataLength; ++i) {
+        for (uint256 i = 0; i < pendingOnchainOpsPubdataLength; ++i) {
             bytes memory pubData = _blockExecuteData.pendingOnchainOpsPubdata[i];
 
             Operations.OpType opType = Operations.OpType(uint8(pubData[0]));
@@ -528,7 +528,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         uint64 priorityRequestsExecuted = 0;
         uint32 nBlocks = uint32(_blocksData.length);
-        for (uint32 i = 0; i < nBlocks; ++i) {
+        for (uint256 i = 0; i < nBlocks; ++i) {
             executeOneBlock(_blocksData[i], i);
             priorityRequestsExecuted += _blocksData[i].storedBlock.priorityOperations;
             emit BlockVerification(_blocksData[i].storedBlock.blockNumber);
