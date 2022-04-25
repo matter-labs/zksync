@@ -916,6 +916,11 @@
   dependencies:
     ethers "^5.0.2"
 
+"@typechain/ethers-v5@^3.0.0":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@typechain/ethers-v5/-/ethers-v5-3.0.0.tgz#584dcf3912257b8b9c785a92a51e70698e9187d9"
+  integrity sha512-hBYYsI2NMLbX7Y6PZWY0DvjfIwSC76aCN4LCUOZswFn6uUeXwQTouC8rYsQh5Kqx4OzRmSmOVA5pmWtvf0d0mQ==
+
 "@types/abstract-leveldown@*":
   version "5.0.2"
   resolved "https://registry.yarnpkg.com/@types/abstract-leveldown/-/abstract-leveldown-5.0.2.tgz#ee81917fe38f770e29eec8139b6f16ee4a8b0a5f"
