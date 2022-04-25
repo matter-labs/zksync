@@ -119,8 +119,6 @@ impl BlocksExecuteOperation {
     }
 
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
-        // make withdrawals in execute operation until the server and frontend are not updated
-        // let complete_withdrawals = Token::Bool(true);
         vec![Token::Array(
             self.blocks
                 .iter()
