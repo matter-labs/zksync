@@ -29,7 +29,7 @@ jobs:
         name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         with:
-          type: ${{ job.zksync.result }}
+          type: ${{ needs.zksync.result }}
           job_name: '*Publishing `${{ needs.zksync.outputs.package-name }}@${{ needs.zksync.outputs.package-version }}` ${{ needs.zksync.outputs.status }}*'
           icon_emoji: octocat
           channel: 'ci-notifications'
