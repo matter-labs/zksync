@@ -425,19 +425,17 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Check that we commit blocks after last committed block
         require(storedBlockHashes[totalBlocksCommitted] == hashStoredBlockInfo(_lastCommittedBlockData), "i"); // incorrect previous block data
 
-        uint64 priorityRequestsCommitted;
         uint32 newBlocksDataLength = uint32(_newBlocksData.length);
         for (uint256 i = 0; i < newBlocksDataLength; ++i) {
             _lastCommittedBlockData = commitOneBlock(_lastCommittedBlockData, _newBlocksData[i]);
 
-            priorityRequestsCommitted += _lastCommittedBlockData.priorityOperations;
+            totalCommittedPriorityRequests += _lastCommittedBlockData.priorityOperations;
             storedBlockHashes[_lastCommittedBlockData.blockNumber] = hashStoredBlockInfo(_lastCommittedBlockData);
 
             emit BlockCommit(_lastCommittedBlockData.blockNumber);
         }
 
         totalBlocksCommitted += newBlocksDataLength;
-        totalCommittedPriorityRequests += priorityRequestsCommitted;
 
         require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "j");
     }
