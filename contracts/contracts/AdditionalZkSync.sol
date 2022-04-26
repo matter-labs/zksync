@@ -112,7 +112,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             delete priorityRequests[id];
         }
         firstPriorityRequestId += toProcess;
-        totalOpenPriorityRequests += toProcess;
+        totalOpenPriorityRequests -= toProcess;
     }
 
     uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
