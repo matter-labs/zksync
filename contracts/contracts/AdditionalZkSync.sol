@@ -99,8 +99,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
         require(toProcess > 0, "9"); // no deposits to process
         uint64 currentDepositIdx = 0;
-        uint64 currentFirstPriorityRequestId = firstPriorityRequestId;
-        for (uint64 id = currentFirstPriorityRequestId; id < currentFirstPriorityRequestId + toProcess; ++id) {
+        for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; ++id) {
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
                 bytes memory depositPubdata = _depositsPubdata[currentDepositIdx];
                 require(Utils.hashBytesToBytes20(depositPubdata) == priorityRequests[id].hashedPubData, "a");
@@ -112,8 +111,8 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
             }
             delete priorityRequests[id];
         }
-        firstPriorityRequestId = firstPriorityRequestId + toProcess;
-        totalOpenPriorityRequests = totalOpenPriorityRequests + toProcess;
+        firstPriorityRequestId += toProcess;
+        totalOpenPriorityRequests += toProcess;
     }
 
     uint256 internal constant SECURITY_COUNCIL_THRESHOLD = $$(SECURITY_COUNCIL_THRESHOLD);
@@ -130,7 +129,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
                 // approve cut upgrade notice period if needed
                 if (!securityCouncilApproves[id]) {
                     securityCouncilApproves[id] = true;
-                    numberOfApprovalsFromSecurityCouncil = numberOfApprovalsFromSecurityCouncil + 1;
+                    numberOfApprovalsFromSecurityCouncil += 1;
                     emit ApproveCutUpgradeNoticePeriod(addr);
 
                     if (numberOfApprovalsFromSecurityCouncil >= SECURITY_COUNCIL_THRESHOLD) {
@@ -246,7 +245,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         }
 
         totalBlocksCommitted = blocksCommitted;
-        totalCommittedPriorityRequests = totalCommittedPriorityRequests - revertedPriorityRequests;
+        totalCommittedPriorityRequests -= revertedPriorityRequests;
         if (totalBlocksCommitted < totalBlocksProven) {
             totalBlocksProven = totalBlocksCommitted;
         }

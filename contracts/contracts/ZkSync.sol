@@ -425,7 +425,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Check that we commit blocks after last committed block
         require(storedBlockHashes[totalBlocksCommitted] == hashStoredBlockInfo(_lastCommittedBlockData), "i"); // incorrect previous block data
 
-        uint64 priorityRequestsCommitted = 0;
+        uint64 priorityRequestsCommitted;
         uint32 newBlocksDataLength = uint32(_newBlocksData.length);
         for (uint256 i = 0; i < newBlocksDataLength; ++i) {
             _lastCommittedBlockData = commitOneBlock(_lastCommittedBlockData, _newBlocksData[i]);
@@ -436,8 +436,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             emit BlockCommit(_lastCommittedBlockData.blockNumber);
         }
 
-        totalBlocksCommitted = totalBlocksCommitted + newBlocksDataLength;
-        totalCommittedPriorityRequests = totalCommittedPriorityRequests + priorityRequestsCommitted;
+        totalBlocksCommitted += newBlocksDataLength;
+        totalCommittedPriorityRequests += priorityRequestsCommitted;
 
         require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "j");
     }
@@ -534,11 +534,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             emit BlockVerification(_blocksData[i].storedBlock.blockNumber);
         }
 
-        firstPriorityRequestId = firstPriorityRequestId + priorityRequestsExecuted;
-        totalCommittedPriorityRequests = totalCommittedPriorityRequests - priorityRequestsExecuted;
-        totalOpenPriorityRequests = totalOpenPriorityRequests - priorityRequestsExecuted;
+        firstPriorityRequestId += priorityRequestsExecuted;
+        totalCommittedPriorityRequests -= priorityRequestsExecuted;
+        totalOpenPriorityRequests -= priorityRequestsExecuted;
 
-        totalBlocksExecuted = totalBlocksExecuted + nBlocks;
+        totalBlocksExecuted += nBlocks;
         require(totalBlocksExecuted <= totalBlocksProven, "n"); // Can't execute blocks more then committed and proven currently.
     }
 
@@ -973,7 +973,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         emit NewPriorityRequest(msg.sender, nextPriorityRequestId, _opType, _pubData, uint256(expirationBlock));
 
-        totalOpenPriorityRequests = totalOpenPriorityRequests + 1;
+        totalOpenPriorityRequests += 1;
     }
 
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
