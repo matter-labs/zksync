@@ -78,7 +78,7 @@ pub trait DatabaseInterface: Send + Sync + Clone + 'static {
     async fn load_account_tree_cache(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<Option<(BlockNumber, serde_json::Value)>>;
+    ) -> anyhow::Result<Option<(BlockNumber, Vec<u8>)>>;
 
     async fn load_idle_prover_job_from_job_queue(
         &self,
@@ -132,7 +132,7 @@ pub trait DatabaseInterface: Send + Sync + Clone + 'static {
         &self,
         connection: &mut StorageProcessor<'_>,
         block: BlockNumber,
-        tree_cache: String,
+        tree_cache_binary: Vec<u8>,
     ) -> anyhow::Result<()>;
 
     async fn store_witness(

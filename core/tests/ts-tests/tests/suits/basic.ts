@@ -131,7 +131,7 @@ const BasicTestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', prov
         });
 
         step('should execute NFT withdraw', async () => {
-            await tester.testWithdrawNFT(bob, token);
+            await tester.testWithdrawNFT(bob, tester.ethWallet, token);
         });
 
         step('should execute a forced exit', async () => {

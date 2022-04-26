@@ -2,6 +2,28 @@
 
 All notable changes to `zksync.js` will be documented in this file.
 
+## Version 0.12.0
+
+! Important, version 0.12.0 contains breaking changes, please make fixes before upgrading this npm package.
+
+### Added
+
+- We've added `remote json rpc signer` which means you could add support of zkSync L2 Wallets such as Argent zkSync or
+  other applications into your dapp. Read more here
+  <http://docs.zksync.io/api/sdk/js/accounts.html#creating-wallet-from-l2-wallets>
+
+### Changed
+
+- `getOrder` renamed to `signOrder`. The method was used for signing and the name of the method was inconsistent.
+- `getLimitOrder` was renamed to `signLimitOrder`. The method was used for signing and the name of the method was
+  inconsistent.
+- All methods whose name started with `get` for example `getTransfer` were deleted. Now for this purpose, you could use
+  `BatchBuilder.`
+
+### Deprecated
+
+### Fixed
+
 ## Version 0.11.0
 
 ### Added

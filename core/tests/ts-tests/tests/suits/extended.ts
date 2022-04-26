@@ -166,11 +166,11 @@ describe(`Extended tests`, () => {
     });
 
     step('should execute NFT withdraw', async () => {
-        await tester.testWithdrawNFT(chuck, token);
+        await tester.testWithdrawNFT(chuck, tester.ethWallet, token);
     });
 
     step('should register factory and withdraw nft', async () => {
-        await tester.testRegisterFactory(alice, token);
+        await tester.testRegisterFactory(alice, tester.ethWallet, token);
     });
 
     it('should check collected fees', async () => {

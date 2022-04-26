@@ -30,7 +30,7 @@ jobs:
       ref: ${{ github.event.inputs.ref }}
       cluster: ${{ needs.setup.outputs.cluster }}
       namespace: ${{ needs.setup.outputs.release-namespace }}
-      restart: ${{ inputs.restart }}
+      restart: ${{ github.event.inputs.restart }}
     secrets:
       github-token: ${{ secrets.GH_TOKEN }}
 

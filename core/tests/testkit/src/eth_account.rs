@@ -593,5 +593,8 @@ pub async fn get_executed_tx_fee(
         .await?
         .ok_or_else(|| format_err!("Transaction not found: 0x{:x?}", receipt.transaction_hash))?;
 
-    Ok((gas_used * tx.gas_price).to_string().parse().unwrap())
+    Ok((gas_used * tx.gas_price.unwrap())
+        .to_string()
+        .parse()
+        .unwrap())
 }

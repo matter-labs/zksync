@@ -152,6 +152,38 @@
       ]
     }
   },
+  "045f0be4b5eeb8fb77dccd65c4972e497b16243268f4c4e81461fc5df2552d89": {
+    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE block = $1 AND tree_cache_binary IS NOT NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tree_cache",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tree_cache_binary",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "052bc740befe43cd3d8d915371cb055187d4ff4ebf019fe12c8dc85b296acc47": {
     "query": "SELECT tx_hash, tx FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
     "describe": {
@@ -219,6 +251,36 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "07aeb7c43955ad6739172f6b4131dac25b0ab6392f7157cbeb5c1f6e8c975f67": {
+    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE tree_cache_binary IS NOT NULL\n            ORDER BY block DESC\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tree_cache",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tree_cache_binary",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        true,
+        true
+      ]
     }
   },
   "088013a67d0b8118980a606386ff38b394a26abfed0f209d17a6a583a297679b": {
@@ -340,32 +402,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "0ce7ffaee2c0f1d90d1e206dd848a0a7970982f92b09872285ece9d24de1770f": {
-    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE block = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tree_cache",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
     }
   },
   "0d69719ec6369f237d116ead6ac30490d7d1aa5d159c47ce8fcb7ac8bd15d7a4": {
@@ -1568,19 +1604,6 @@
       "nullable": []
     }
   },
-  "266b9f781a6b9f8514f8f306fff35821a077bce723545fe0b6beb67c44f62971": {
-    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "273c7371b1a13bbb03490e874b7f2eab969defa6aa9f2b416e4f9e8a135aa97c": {
     "query": "\n                        INSERT INTO account_creates ( account_id, is_create, block_number, address, nonce, update_order_id )\n                        VALUES ( $1, $2, $3, $4, $5, $6 )\n                        ",
     "describe": {
@@ -1596,6 +1619,24 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "278ec61240f07b4f7ed2e026c2bf4ff9599801bed68f968f44a284e834e56ca5": {
+    "query": "SELECT MAX(block) FROM account_tree_cache WHERE tree_cache IS NOT NULL",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "283d9869a56c60f851ee907cd36a70458b3b3f69a61670eeb0762f67c6ada1ed": {
@@ -2385,6 +2426,38 @@
       "nullable": []
     }
   },
+  "44d729155d6950140ab996c1b8f125be3af67d20847278374e4b0a2762f8ff55": {
+    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE block = $1 AND tree_cache IS NOT NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tree_cache",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tree_cache_binary",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "44e5ba11f839c21a12e1cee81b31e848f0e87e23cc9e16e136a88a6ae7c84303": {
     "query": "INSERT INTO proofs (block_number, proof)\n            VALUES ($1, $2)",
     "describe": {
@@ -2503,30 +2576,6 @@
       },
       "nullable": [
         false,
-        false,
-        false
-      ]
-    }
-  },
-  "4bb598fad1aedbf9cd6886f502399881c2772bae7171455ae1ec6a0e9a2629a0": {
-    "query": "\n            SELECT * FROM account_tree_cache\n            ORDER BY block DESC\n            LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tree_cache",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
         false,
         false
       ]
@@ -3700,6 +3749,24 @@
       ]
     }
   },
+  "77eb9c0302c6819f2592a2afcd528cdf161761caa76054306f94e31c30752abe": {
+    "query": "SELECT MAX(block) FROM account_tree_cache WHERE tree_cache_binary IS NOT NULL",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "786c418fd011ff4f7be35ac33e8b495f18ecb34adeb4585bfd3beebdf1939ccf": {
     "query": "\n            INSERT INTO tx_filters (address, token, tx_hash)\n            SELECT u.address, u.token, $3\n                FROM UNNEST ($1::bytea[], $2::integer[])\n                AS u(address, token)\n            ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING\n            ",
     "describe": {
@@ -4839,6 +4906,36 @@
       "nullable": []
     }
   },
+  "961c0d719460ce94790a2fd7b29a645e861e93f22182152ca61f3802e0c25bb8": {
+    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE tree_cache IS NOT NULL\n            ORDER BY block DESC\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tree_cache",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tree_cache_binary",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "963cad1979935b50bc5c2bbe174f5d94fbd5c38ea752d304f987229c89e6070a": {
     "query": "\n            DELETE FROM forced_exit_requests\n            WHERE fulfilled_by IS NULL AND valid_until < $1\n            ",
     "describe": {
@@ -5256,6 +5353,19 @@
           "Int4",
           "Numeric",
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a331b144edb30078170ca904570563cc379640480347fbd46009a166d51ac76e": {
+    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache_binary)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO UPDATE SET tree_cache_binary = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea"
         ]
       },
       "nullable": []
@@ -6753,24 +6863,6 @@
       ]
     }
   },
-  "cc97b33cc2f24fa09f02c16c048e12060daf39c91845cb35847daa229065560e": {
-    "query": "SELECT MAX(block) FROM account_tree_cache",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "cd0e1f11fb56662010b4ec2e0eb9a0e877f1eab4157f8ac57db9b18cca666cbe": {
     "query": "\n            SELECT max(id) as \"id!\" FROM tokens WHERE kind != 'NFT'::token_kind\n            ",
     "describe": {
@@ -7158,6 +7250,19 @@
         false,
         false
       ]
+    }
+  },
+  "d97ffc342a571d0cfabc58ebc5de24d71ac0d7104d9f2b2a9cd39141fd2c9d3c": {
+    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO UPDATE SET tree_cache = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "db91278dbc648e1c7ebf4775d7927104e887c0bb338ed51c9aff21cfdecb2f27": {
