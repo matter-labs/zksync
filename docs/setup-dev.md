@@ -30,7 +30,7 @@ sudo usermod -a -G docker your_user_name
 ```
 
 After that, you should logout and login again (user groups are refreshed after the login). The problem should be
-solvedat this step.
+solved at this step.
 
 If logging out does not help, restarting the computer should.
 
