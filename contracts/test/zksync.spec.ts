@@ -12,10 +12,6 @@ import * as zksync from 'zksync';
 import {
     ZkSync,
     TestnetERC20Token,
-    DummyERC20NoTransferReturnValue,
-    DummyERC20NoTransferReturnValueFactory,
-    DummyERC20BytesTransferReturnValue,
-    DummyERC20BytesTransferReturnValueFactory,
     ZkSyncProcessOpUnitTest,
     ZkSyncProcessOpUnitTestFactory,
     ZKSyncSignatureUnitTest,
@@ -290,8 +286,6 @@ describe('zkSync withdraw unit tests', function () {
     let incorrectTokenContract;
     let ethProxy: ETHProxy;
     let EOA_Address: string;
-    let tokenNoTransferReturnValue: DummyERC20NoTransferReturnValue;
-    let tokenBytesTransferReturnValue: DummyERC20BytesTransferReturnValue;
     before(async () => {
         [wallet] = await hardhat.ethers.getSigners();
         EOA_Address = wallet.address;
@@ -300,24 +294,6 @@ describe('zkSync withdraw unit tests', function () {
         contracts.zkSync = readContractCode('dev-contracts/ZkSyncWithdrawalUnitTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
         await deployer.deployAll({ gasLimit: 6500000 });
-
-        const tokenNoTransferReturnValueFactory = await hardhat.ethers.getContractFactory(
-            'DummyERC20NoTransferReturnValue'
-        );
-        const tokenNoTransferReturnValueContract = await tokenNoTransferReturnValueFactory.deploy();
-        tokenNoTransferReturnValue = DummyERC20NoTransferReturnValueFactory.connect(
-            tokenNoTransferReturnValueContract.address,
-            tokenNoTransferReturnValueContract.signer
-        );
-
-        const tokenBytesTransferReturnValueFactory = await hardhat.ethers.getContractFactory(
-            'DummyERC20BytesTransferReturnValue'
-        );
-        const tokenBytesTransferReturnValueContract = await tokenBytesTransferReturnValueFactory.deploy('0xDEADBEEF');
-        tokenBytesTransferReturnValue = DummyERC20BytesTransferReturnValueFactory.connect(
-            tokenBytesTransferReturnValueContract.address,
-            tokenBytesTransferReturnValueContract.signer
-        );
 
         zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
@@ -328,8 +304,6 @@ describe('zkSync withdraw unit tests', function () {
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
         await govContract.addToken(EOA_Address);
-        await govContract.addToken(tokenNoTransferReturnValue.address);
-        await govContract.addToken(tokenBytesTransferReturnValue.address);
 
         ethProxy = new ETHProxy(wallet.provider, {
             mainContract: zksyncContract.address,
@@ -446,30 +420,6 @@ describe('zkSync withdraw unit tests', function () {
             async () => await performWithdraw(wallet, incorrectTokenContract.address, 1, withdrawAmount.add(1))
         );
         expect(revertReason, 'wrong revert reason').eq('1i');
-    });
-
-    it('Withdraw token with empty return value', async () => {
-        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
-        await zksyncContract.withdrawOrStoreExternal(3, EOA_Address, 1);
-        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
-        expect(balanceAfter.eq(balanceBefore));
-    });
-
-    it('Should save pending balance for token without bytecode', async () => {
-        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, EOA_Address);
-        await zksyncContract.withdrawOrStoreExternal(2, EOA_Address, 1);
-        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, EOA_Address);
-        expect(balanceAfter.eq(balanceBefore.add(1)));
-    });
-
-    it('Should save pending balance for token with incorrect return value', async () => {
-        const balanceBefore = await zksyncContract.getPendingBalance(
-            EOA_Address,
-            tokenBytesTransferReturnValue.address
-        );
-        await zksyncContract.withdrawOrStoreExternal(4, EOA_Address, 1);
-        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenBytesTransferReturnValue.address);
-        expect(balanceAfter.eq(balanceBefore.add(1)));
     });
 });
 

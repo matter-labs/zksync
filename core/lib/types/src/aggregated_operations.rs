@@ -119,17 +119,12 @@ impl BlocksExecuteOperation {
     }
 
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
-        // make withdrawals in execute operation until the server and frontend are not updated
-        let complete_withdrawals = Token::Bool(true);
-        vec![
-            Token::Array(
-                self.blocks
-                    .iter()
-                    .map(BlocksExecuteOperation::get_eth_tx_args_for_block)
-                    .collect(),
-            ),
-            complete_withdrawals,
-        ]
+        vec![Token::Array(
+            self.blocks
+                .iter()
+                .map(BlocksExecuteOperation::get_eth_tx_args_for_block)
+                .collect(),
+        )]
     }
 
     pub fn block_range(&self) -> (BlockNumber, BlockNumber) {

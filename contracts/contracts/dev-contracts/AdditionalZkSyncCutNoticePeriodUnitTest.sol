@@ -7,6 +7,10 @@ pragma experimental ABIEncoderV2;
 import "../AdditionalZkSync.sol";
 
 contract AdditionalZkSyncCutNoticePeriodUnitTest is AdditionalZkSync {
+    constructor() {
+        initializeReentrancyGuard();
+    }
+
     function enableUpgradeFromScratch() external {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
