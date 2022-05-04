@@ -30,7 +30,7 @@ once_cell = "1.4"
 itertools = "0.9"
 hex = "0.4"
 metrics = "0.17"
-parity-crypto = { version = "0.8", features = ["publickey"] }
+parity-crypto = { version = "0.9", features = ["publickey"] }
 
 vlog = { path = "../../lib/vlog", version = "1.0" }
 

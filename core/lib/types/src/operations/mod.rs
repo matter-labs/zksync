@@ -82,8 +82,8 @@ impl ZkSyncOp {
             ZkSyncOp::ForcedExit(_) => None,
             ZkSyncOp::MintNFTOp(_) => None,
             ZkSyncOp::Swap(tx) => Some(vec![
-                (tx.tx.orders.0.token_buy, tx.tx.amounts.0.clone()),
-                (tx.tx.orders.1.token_buy, tx.tx.amounts.1.clone()),
+                (tx.tx.orders.0.token_sell, tx.tx.amounts.0.clone()),
+                (tx.tx.orders.1.token_sell, tx.tx.amounts.1.clone()),
             ]),
             ZkSyncOp::Deposit(tx) => {
                 Some(vec![(tx.priority_op.token, tx.priority_op.amount.clone())])

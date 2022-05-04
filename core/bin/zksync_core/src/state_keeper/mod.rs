@@ -277,12 +277,15 @@ impl ZkSyncStateKeeper {
     // Generate and execute new miniblock every miniblock_interval
     async fn run(mut self, miniblock_interval: Duration) {
         let mut timer = time::interval(miniblock_interval);
-        let mut last_iteration = Instant::now();
         loop {
+            let start = Instant::now();
             timer.tick().await;
+            // Report timings between two miniblocks.
+            // If reported value stays at 0, most likely we have `miniblock_interval` variable too small and
+            // spend more time in the loop iteration than this interval.
+            metrics::histogram!("state_keeper.miniblock_interval", start.elapsed());
 
             let start = Instant::now();
-
             // `.throttle()` method will postpone the next miniblock iteration if currently we have too
             // many blocks for which root hash is not yet calculated.
             self.root_hash_queue.throttle().await;
@@ -291,10 +294,6 @@ impl ZkSyncStateKeeper {
             let block_timestamp = self.pending_block.timestamp;
             let proposed_block = self.propose_new_block(block_timestamp).await;
             metrics::histogram!("miniblock_size", proposed_block.size() as f64);
-
-            // Report timings between two miniblocks.
-            metrics::histogram!("miniblock_interval", last_iteration.elapsed());
-            last_iteration = Instant::now();
 
             self.execute_proposed_block(proposed_block).await;
         }

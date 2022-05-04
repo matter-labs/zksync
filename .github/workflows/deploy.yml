@@ -64,8 +64,16 @@ jobs:
     env:
       DEPLOY_APPS: -l name=${{ inputs.server-release }} -l name=${{ inputs.prover-release }}
       IMAGE_TAG: ${{ inputs.image-tag }}
-
+      KUBE_CONTEXT: matterlabs-zksync-${{ inputs.cluster }}
+      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }}
     steps:
+      -
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/gh-workflows
+      -
+        name: Generate ~/.kube/config
+        run: scripts/kubeconfig-projected-token
       -
         name: Clone helm-infra
         uses: actions/checkout@v2
@@ -74,24 +82,11 @@ jobs:
           path: helm-infra
           token: ${{ secrets.github-token }}
       -
-        id: kubeConf
-        run: |
-          kube_token=$(cat /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }})
-          echo "::add-mask::$kube_token"
-          echo "::set-output name=token::$kube_token"
-      -
-        name: Generate ~/.kube/config
-        run: |
-          kubectl config set-credentials user --token=${{ steps.kubeConf.outputs.token }}
-          kubectl config set-cluster default --server=https://kubernetes.default --insecure-skip-tls-verify=true
-          kubectl config set-context matterlabs-zksync-${{ inputs.cluster }} --user=user --cluster=default
-          kubectl config use-context matterlabs-zksync-${{ inputs.cluster }}
-      -
         name: Deploy Zksync
         working-directory: helm-infra
         run: |
           UPDATE_REPOS=y helmfile -e ${{ inputs.release-environment }} repos
-          helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS apply --args "timeout 180s"
+          helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS apply --args "--timeout 180s"
       -
         name: Scale Up
         if: inputs.scaleup

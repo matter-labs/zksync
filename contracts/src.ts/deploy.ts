@@ -122,7 +122,7 @@ export class Deployer {
             console.log('Deploying create2 factory');
         }
 
-        if (this.addresses.Create2Factory != '') {
+        if (this.addresses.Create2Factory != '' && this.addresses.Create2Factory != undefined) {
             if (this.verbose) {
                 console.log(`CONTRACTS_CREATE2_FACTORY_ADDR=${this.addresses.Create2Factory}`);
                 console.log('Create2 factory already deployed');

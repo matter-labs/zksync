@@ -8,6 +8,11 @@ on:
       ref:
         description: Branch/tag to fetch configs from
         required: true
+      restart:
+        description: Restart dependent services
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   setup:
@@ -25,6 +30,7 @@ jobs:
       ref: ${{ github.event.inputs.ref }}
       cluster: ${{ needs.setup.outputs.cluster }}
       namespace: ${{ needs.setup.outputs.release-namespace }}
+      restart: ${{ github.event.inputs.restart }}
     secrets:
       github-token: ${{ secrets.GH_TOKEN }}
 
