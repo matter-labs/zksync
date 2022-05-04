@@ -1,4 +1,4 @@
-FROM rust:1.53
+FROM rust:1.60
 
 WORKDIR /usr/src/zksync
 
@@ -30,8 +30,5 @@ COPY docker/data-restore/data-restore-entry.sh /bin/
 # Setup the environment
 ENV ZKSYNC_HOME=/usr/src/zksync
 ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
-ENV IN_DOCKER=true
-
-RUN cd $ZKSYNC_HOME && zk
 
 ENTRYPOINT ["data-restore-entry.sh"]
