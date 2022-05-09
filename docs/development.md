@@ -35,15 +35,15 @@ This command will do the following:
 - Create “genesis block” for server.
 
 Initializing may take pretty long, but many steps (such as downloading & unpacking keys and initializing containers)
-arerequired to be done only once.
+are required to be done only once.
 
 Usually, it is a good idea to do `zk init` once after each merge to the `dev` branch (as application setup may change).
 
-**Note:** If after getting new functionality from the `dev` branch your code stopped working and `zk init` doesn’t
-help,you may try removing `$ZKSYNC_HOME/etc/env/dev.env` and running `zk init` once again. This may help if the
-applicationconfiguration has changed.
+**Note:** If after getting new functionality from the `dev` branch your code stopped working and `zk init` doesn't
+help, you may try removing `$ZKSYNC_HOME/etc/env/dev.env` and running `zk init` once again. This may help if the
+application configuration has changed.
 
-If you don’t need all of the `zk init` functionality, but just need to start/stop containers, use the followingcommands:
+If you don't need all of the `zk init` functionality, but just need to start/stop containers, use the following commands:
 
 ```
 zk up   # Set up `geth` and `postgres` containers
@@ -53,7 +53,7 @@ zk down # Shut down `geth` and `postgres` containers
 ## Committing changes
 
 `zksync` uses pre-commit and pre-push git hooks for basic code integrity checks. Hooks are set up automatically
-withinthe workspace initialization process. These hooks will not allow to commit the code which does not pass several
+within the workspace initialization process. These hooks will not allow to commit the code which does not pass several
 checks.
 
 Currently the following criteria are checked:
@@ -66,8 +66,8 @@ Currently the following criteria are checked:
 
 Using the real prover for the development can be not really handy, since it’s pretty slow and resource consuming.
 
-Instead, one may want to use the Dummy Prover: lightweight version of the prover, which does not actually proveanything,
-but acts like it does.
+Instead, one may want to use the Dummy Prover: lightweight version of the prover, which does not actually prove anything,
+but acts as it does.
 
 To enable the dummy prover, run:
 
@@ -82,9 +82,9 @@ zk dummy-prover run # Instead of `zk prover`
 ```
 
 **Warning:** `dummy-prover enable` subcommand changes the `Verifier.sol` contract, which is a part
-of `git` repository.Be sure not to commit these changes when using the dummy prover!
+of `git` repository. Be sure not to commit these changes when using the dummy prover!
 
-If one will need to switch back to the real prover, a following command is required:
+If one will need to switch back to the real prover, the following command is required:
 
 ```
 zk dummy-prover disable
@@ -119,7 +119,7 @@ Adding a new migration requires the following actions:
    diesel migration generate name-of-your-migration
    ```
 
-3. Implement migration: `up.sql` must contain new changes for the DB, and `down.sql` must revert the migration andreturn
+3. Implement migration: `up.sql` must contain new changes for the DB, and `down.sql` must revert the migration and return
    the database into previous state.
 4. Run `zk db migrate` to apply migration.
 5. Implement corresponding changes in the `storage` crate.
@@ -179,7 +179,7 @@ zk test db
   ```
 
   **Note**. If you have compilation issues with `sqlx`, then make sure to run `zk up` before running the tests. Also,
-  ifyou see some tests fail, might need to call `zk db reset` and restart the tests.
+  if you see some tests fail, you might need to call `zk db reset` and restart the tests.
 
 ## Developing circuit
 
@@ -190,9 +190,9 @@ zk test db
 Steps to do after updating circuit:
 
 1. Update circuit version by updating `KEY_DIR` in your env file (don’t forget to place it to `dev.env.example`)
-   (lastparts of this variable usually means last commit where you updated circuit).
+   (last parts of this variable usually mean last commit where you updated circuit).
 2. Regenerate verification keys and Verifier contract using `zk run verify-keys gen` command.
-3. Pack generated verification keys using `zk run verify-keys pack` command and commit resulting file to repo.
+3. Pack generated verification keys using `zk run verify-keys pack` command and commit the resulting file to the repo.
 
 ## Build and push Docker images to dockerhub
 
@@ -208,7 +208,7 @@ zk docker push <IMAGE>
 zk contract build
 ```
 
-### Publish source code on etherscan
+### Publish source code on Etherscan
 
 ```
 zk contract publish
