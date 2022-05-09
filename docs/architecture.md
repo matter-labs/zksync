@@ -35,9 +35,6 @@ zkSync repository consists of several applications:
     - `Witness Generator` service (`core/bin/zksync_witness_generator`) creates input data required for provers to prove
       blocks, and implements a private API server for provers to interact with.
 
-- Explorer: zkSync network explorer. A web application that receives data from the Server API and renders it to the
-  convenient blockchain explorer interface.
-
 Thus, in order to get a local zkSync setup running, the following has to be done:
 
 - zkSync smart contract is compiled and deployed to the Ethereum.
@@ -70,7 +67,7 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/contracts`: Loaders for zkSync contracts interfaces and ABI.
     - `/crypto`: Cryptographical primitives using among zkSync crates.
     - `/eth_client`: Module providing an interface to interact with an Ethereum node.
-    - `/zksync_prometheus_exporter`: Prometheus data exporter.
+    - `/prometheus_exporter`: Prometheus data exporter.
     - `/prover_utils`: Utilities related to the proof generation.
     - `/state`: A fast pre-circuit executor for zkSync transactions used on the Server level to generate blocks.
     - `/storage`: An encapsulated database interface.
@@ -78,10 +75,10 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/utils`: Miscellaneous helpers for zkSync crates.
     - `/vlog`: An utility library for verbose logging.
   - `/tests`: Testing infrastructure for zkSync network.
-    - `/loadtest`: An application for highload testing of zkSync server.
+    - `/loadnext`: An application for highload testing of zkSync server.
     - `/test_account`: A representation of zkSync account which can be used for tests.
     - `/testkit`: A relatively low-level testing library and test suite for zkSync.
-    - `/ts-test`: Integration tests set implemented in TypeScript. Requires a running Server and Prover applications to
+    - `/ts-tests`: Integration tests set implemented in TypeScript. Requires a running Server and Prover applications to
       operate.
 - `/docker`: Dockerfiles used for development of zkSync and for packaging zkSync for a production environment.
 - `/etc`: Configration files.
@@ -89,7 +86,6 @@ This section provides an overview on folders / sub-projects that exist in this r
   - `/js`: Configuration files for JavaScript applications (such as Explorer).
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
 - `/infrastructure`: Application that aren't naturally a part of zkSync core, but are related to it.
-  - `/explorer`: A blockchain explorer for zkSync network.
 - `/keys`: Verification keys for `circuit` module.
 - `/sdk`: Implementation of client libraries for zkSync network in different programming languages.
   - `/zksync-crypto`: zkSync network cryptographic primitives, which can be compiled to WASM.
