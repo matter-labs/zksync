@@ -7,7 +7,7 @@ This document is a description of the Rust library that can be used to interact 
 
 ## Usage
 
-Full reference on how to use the library can be found [here](https://zksync.io/sdk/rust/).
+Full reference on how to use the library can be found [here](https://docs.zksync.io/api/sdk/rust/tutorial.html).
 
 ## Changelog
 
