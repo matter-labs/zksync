@@ -554,7 +554,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         // Preventing "stack too deep error"
         {
-            // Ignoring the _committedBlocks which are already proved.
+            // Ignoring the _committedBlocks that are already proven.
             bytes32 firstUnverifiedBlockHash = storedBlockHashes[currentTotalBlocksProven + 1];
             while (hashStoredBlockInfo(_committedBlocks[i]) != firstUnverifiedBlockHash) {
                 ++i;
