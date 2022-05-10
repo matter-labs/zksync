@@ -42,7 +42,6 @@ The following guides for developers are available:
 
 - [zkSync server](core/bin/server)
 - [zkSync prover](core/bin/prover)
-- [zkSync explorer](infrastructure/explorer)
 - [JavaScript SDK](sdk/zksync.js)
 - [Rust SDK](sdk/zksync-rs)
 
