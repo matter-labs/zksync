@@ -11,7 +11,7 @@
 use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_contracts, get_test_accounts};
 use crate::zksync_account::ZkSyncAccount;
-use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
+use num::{rational::Ratio, traits::Pow, BigInt, BigUint, Zero};
 use std::ops::Mul;
 use std::str::FromStr;
 use web3::transports::Http;
@@ -47,10 +47,20 @@ struct CostsSample {
     verify_cost: BigInt,
     /// Operator withdrawal gas cost
     withdrawals_cost: BigInt,
+    /// Operator withdrawal gas cost
+    pending_withdrawals_cost: BigInt,
 }
 
 impl CostsSample {
     pub fn new(samples: usize, users_gas_cost: U256, block_result: BlockExecutionResult) -> Self {
+        let pending_withdrawals_cost = if let Some(rec) = block_result.pending_withdrawals_result {
+            rec.gas_used
+                .map(u256_to_bigint)
+                .expect("withdrawals gas used")
+        } else {
+            BigInt::zero()
+        };
+
         Self {
             samples,
             users_gas_cost: u256_to_bigint(users_gas_cost),
@@ -64,6 +74,7 @@ impl CostsSample {
                 .gas_used
                 .map(u256_to_bigint)
                 .expect("verify gas used"),
+            pending_withdrawals_cost,
             withdrawals_cost: block_result
                 .withdrawals_result
                 .gas_used
@@ -87,6 +98,8 @@ impl CostsSample {
             commit_cost,
             verify_cost,
             withdraw_cost,
+            // We withdraw just one
+            pending_withdraw_cost: self.pending_withdrawals_cost.clone(),
             total,
         }
     }
@@ -110,6 +123,7 @@ struct CostPerOperation {
     commit_cost: BigInt,
     verify_cost: BigInt,
     withdraw_cost: BigInt,
+    pending_withdraw_cost: BigInt,
     total: BigInt,
 }
 
@@ -139,12 +153,13 @@ impl CostPerOperation {
             String::new()
         };
         println!(
-            "Gas cost of {}:\nuser_gas_cost: {}\ncommit: {}\nprove: {}\nexecute: {}\ntotal: {}{}",
+            "Gas cost of {}:\nuser_gas_cost: {}\ncommit: {}\nprove: {}\nexecute: {}\npending_withdraw: {}\ntotal: {}{}",
             description,
             self.user_gas_cost,
             self.commit_cost,
             self.verify_cost,
             self.withdraw_cost,
+            self.pending_withdraw_cost,
             self.total,
             grief_info
         );

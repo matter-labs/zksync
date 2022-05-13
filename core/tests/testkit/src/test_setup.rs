@@ -1120,6 +1120,13 @@ impl TestSetup {
             .expect("execute block tx")
             .expect_success();
 
+        let pending_withdrawals_result = self
+            .commit_account
+            .execute_pending_withdrawals(&block_execute_op, &self.tokens)
+            .await
+            .expect("execute block tx")
+            .map(|a| a.expect_success());
+
         self.last_committed_block = new_block.clone();
 
         let block_chunks = new_block.block_chunks_size;
@@ -1167,6 +1174,7 @@ impl TestSetup {
             commit_result,
             verify_result,
             withdrawals_result,
+            pending_withdrawals_result,
             block_chunks,
         ))
     }

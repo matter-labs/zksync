@@ -99,7 +99,7 @@ impl VerifyCost {
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
     pub const SWAP_COST: u64 = 0;
     pub const FULL_EXIT_COST: u64 = 30_000;
-    pub const WITHDRAW_COST: u64 = 48_000;
+    pub const WITHDRAW_COST: u64 = 36_000 + 20_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST;
     pub const MINT_NFT_COST: u64 = 0;
     pub const WITHDRAW_NFT_COST: u64 = 200_000;
