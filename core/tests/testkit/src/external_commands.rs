@@ -64,6 +64,13 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
     }
 }
 
+fn pending_withdrawer_contract() -> ethabi::Contract {
+    let path = "contracts/artifacts/cache/solpp-generated-contracts/dev-contracts/PendingBalanceWithdrawer.sol/PendingBalanceWithdrawer.json";
+    let pending_withdrawer_abi: Value =
+        serde_json::from_slice(read(path).unwrap().as_slice()).unwrap();
+    serde_json::from_value(pending_withdrawer_abi.get("abi").unwrap().clone()).unwrap()
+}
+
 /// Runs external command and returns stdout output
 fn run_external_command(command: &str, args: &[&str]) -> String {
     let result = Command::new(command)
@@ -113,9 +120,6 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
             contracts.insert(name, address);
         }
     }
-    let pending_withdrawer_abi: Value = serde_json::from_slice( read("contracts/artifacts/cache/solpp-generated-contracts/dev-contracts/PendingBalanceWithdrawer.sol/PendingBalanceWithdrawer.json").unwrap().as_slice()).unwrap();
-    let contract =
-        serde_json::from_value(pending_withdrawer_abi.get("abi").unwrap().clone()).unwrap();
 
     Contracts {
         governance: contracts
@@ -134,7 +138,7 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
             .remove("CONTRACTS_TEST_ERC20")
             .expect("TEST_ERC20 missing"),
         pending_withdrawer: (
-            contract,
+            pending_withdrawer_contract(),
             contracts
                 .remove("CONTRACTS_PENDING_BALANCE_WITHDRAWER")
                 .expect("CONTRACTS_PENDING_BALANCE_WITHDRAWER missing"),

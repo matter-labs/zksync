@@ -1,5 +1,3 @@
-extern crate core;
-
 use zksync_types::{Account, AccountId, Address};
 
 pub use self::{

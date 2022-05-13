@@ -490,8 +490,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             .function(func)
             .expect("failed to get function parameters");
 
-        let tokens = params.into_tokens();
-        f.encode_input(&tokens)
+        f.encode_input(&params.into_tokens())
             .expect("failed to encode parameters")
     }
 

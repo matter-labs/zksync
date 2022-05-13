@@ -47,7 +47,7 @@ struct CostsSample {
     verify_cost: BigInt,
     /// Operator withdrawal gas cost
     withdrawals_cost: BigInt,
-    /// Operator withdrawal gas cost
+    /// Pending withdrawer withdrawal gas cost
     pending_withdrawals_cost: BigInt,
 }
 
@@ -98,7 +98,6 @@ impl CostsSample {
             commit_cost,
             verify_cost,
             withdraw_cost,
-            // We withdraw just one
             pending_withdraw_cost,
             total,
         }

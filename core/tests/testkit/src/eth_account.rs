@@ -441,9 +441,10 @@ impl EthereumAccount {
             .blocks
             .iter()
             .flat_map(|b| {
-                b.block_transactions
-                    .iter()
-                    .filter(|a| a.is_successful() && (a.variance_name() == "Withdraw"))
+                b.block_transactions.iter().filter(|a| {
+                    a.is_successful()
+                        && (a.variance_name() == "Withdraw" || a.variance_name() == "WithdrawNFT")
+                })
             })
             .collect();
         let mut ft_balances = vec![];
@@ -453,12 +454,12 @@ impl EthereumAccount {
             match ex_op {
                 ZkSyncTx::Withdraw(tx) => ft_balances.push(Token::Tuple(vec![
                     Token::Address(tx.to),
-                    Token::Address(tokens.get(&tx.token).unwrap().clone()),
-                    Token::Uint(Uint::from(2_000_000)),
+                    Token::Address(*tokens.get(&tx.token).unwrap()),
+                    Token::Uint(Uint::from(200_000)),
                 ])),
                 ZkSyncTx::WithdrawNFT(tx) => nft_balances.push(Token::Tuple(vec![
                     Token::Uint(Uint::from_str(&tx.token.0.to_string()).unwrap()),
-                    Token::Uint(Uint::from(3_000_000)),
+                    Token::Uint(Uint::from(300_000)),
                 ])),
                 _ => unreachable!(),
             };
@@ -550,7 +551,7 @@ impl EthereumAccount {
 #[derive(Debug, Clone)]
 pub struct ETHExecResult {
     success: bool,
-    pub receipt: TransactionReceipt,
+    receipt: TransactionReceipt,
     revert_reason: String,
 }
 
