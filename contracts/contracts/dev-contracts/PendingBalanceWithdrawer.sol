@@ -7,7 +7,7 @@ pragma experimental ABIEncoderV2;
 import "../ZkSync.sol";
 
 contract PendingBalanceWithdrawer {
-    ZkSync constant zkSync = ZkSync($(ZKSYNC_ADDRESS));
+    ZkSync zkSync;
 
     struct RequestWithdrawFT {
         address payable owner;
@@ -20,9 +20,14 @@ contract PendingBalanceWithdrawer {
         uint256 gas;
     }
 
-    function withdrawPendingBalances(RequestWithdrawFT[] calldata _FTRequests, RequestWithdrawNFT[] calldata _NFTRequests)
-        external
-    {
+    constructor(address _zkSync) {
+        zkSync = ZkSync(_zkSync);
+    }
+
+    function withdrawPendingBalances(
+        RequestWithdrawFT[] calldata _FTRequests,
+        RequestWithdrawNFT[] calldata _NFTRequests
+    ) external {
         for (uint256 i = 0; i < _FTRequests.length; ++i) {
             try
                 zkSync.withdrawPendingBalance{gas: _FTRequests[i].gas}(
@@ -34,11 +39,7 @@ contract PendingBalanceWithdrawer {
         }
 
         for (uint256 i = 0; i < _NFTRequests.length; ++i) {
-            try
-                zkSync.withdrawPendingNFTBalance{gas: _NFTRequests[i].gas}(
-                    _NFTRequests[i].tokenId
-                )
-            {} catch {}
+            try zkSync.withdrawPendingNFTBalance{gas: _NFTRequests[i].gas}(_NFTRequests[i].tokenId) {} catch {}
         }
     }
 }

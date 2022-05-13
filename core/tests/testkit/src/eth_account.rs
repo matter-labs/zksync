@@ -454,11 +454,11 @@ impl EthereumAccount {
                 ZkSyncTx::Withdraw(tx) => ft_balances.push(Token::Tuple(vec![
                     Token::Address(tx.to),
                     Token::Address(tokens.get(&tx.token).unwrap().clone()),
-                    Token::Uint(Uint::from(200_000)),
+                    Token::Uint(Uint::from(2_000_000)),
                 ])),
                 ZkSyncTx::WithdrawNFT(tx) => nft_balances.push(Token::Tuple(vec![
                     Token::Uint(Uint::from_str(&tx.token.0.to_string()).unwrap()),
-                    Token::Uint(Uint::from(300_000)),
+                    Token::Uint(Uint::from(3_000_000)),
                 ])),
                 _ => unreachable!(),
             };

@@ -61,7 +61,7 @@ async function main() {
     const pendingWithdrawer = await deployContract(
         deployWallet,
         readContractCode('dev-contracts/PendingBalanceWithdrawer'),
-        [],
+        [deployer.addresses.ZkSync],
         { gasLimit: 5000000 }
     );
     console.log(`CONTRACTS_PENDING_BALANCE_WITHDRAWER=${pendingWithdrawer.address}`);

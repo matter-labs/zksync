@@ -1121,8 +1121,7 @@ impl TestSetup {
             .await
             .expect("execute block tx")
             .expect_success();
-
-        let pending_withdrawals_result = if let Some(a) = self
+        let pending_withdrawals_result = self
             .commit_account
             .execute_pending_withdrawals(
                 &block_execute_op,
@@ -1131,23 +1130,7 @@ impl TestSetup {
             )
             .await
             .expect("execute block tx")
-        {
-            dbg!(&a);
-            let tx_hash = a.receipt.transaction_hash;
-            let res = if let Ok(rec) = a.success_result() {
-                rec
-            } else {
-                let failure_reason = self
-                    .commit_account
-                    .main_contract_eth_client
-                    .failure_reason(tx_hash)
-                    .await;
-                panic!("Failure {:?}", failure_reason);
-            };
-            Some(res)
-        } else {
-            None
-        };
+            .map(|a| a.expect_success());
 
         self.last_committed_block = new_block.clone();
 

@@ -11,7 +11,7 @@
 use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_contracts, get_test_accounts};
 use crate::zksync_account::ZkSyncAccount;
-use num::{rational::Ratio, traits::Pow, BigInt, BigUint, Zero};
+use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::ops::Mul;
 use std::str::FromStr;
 use web3::transports::Http;
@@ -53,14 +53,6 @@ struct CostsSample {
 
 impl CostsSample {
     pub fn new(samples: usize, users_gas_cost: U256, block_result: BlockExecutionResult) -> Self {
-        let pending_withdrawals_cost = if let Some(rec) = block_result.pending_withdrawals_result {
-            rec.gas_used
-                .map(u256_to_bigint)
-                .expect("withdrawals gas used")
-        } else {
-            BigInt::zero()
-        };
-
         Self {
             samples,
             users_gas_cost: u256_to_bigint(users_gas_cost),
@@ -74,7 +66,14 @@ impl CostsSample {
                 .gas_used
                 .map(u256_to_bigint)
                 .expect("verify gas used"),
-            pending_withdrawals_cost,
+            pending_withdrawals_cost: block_result
+                .pending_withdrawals_result
+                .map(|rec| {
+                    rec.gas_used
+                        .map(u256_to_bigint)
+                        .expect("pending withdrawals gas used")
+                })
+                .unwrap_or_default(),
             withdrawals_cost: block_result
                 .withdrawals_result
                 .gas_used
@@ -91,7 +90,8 @@ impl CostsSample {
         let commit_cost = (&self.commit_cost - &base_cost.base_commit_cost) / samples;
         let verify_cost = (&self.verify_cost - &base_cost.base_verify_cost) / samples;
         let withdraw_cost = (&self.withdrawals_cost - &base_cost.base_withdraw_cost) / samples;
-        let total = &commit_cost + &verify_cost + &withdraw_cost;
+        let pending_withdraw_cost = &self.pending_withdrawals_cost / samples;
+        let total = &commit_cost + &verify_cost + &withdraw_cost + &pending_withdraw_cost;
 
         CostPerOperation {
             user_gas_cost,
@@ -99,7 +99,7 @@ impl CostsSample {
             verify_cost,
             withdraw_cost,
             // We withdraw just one
-            pending_withdraw_cost: self.pending_withdrawals_cost.clone(),
+            pending_withdraw_cost,
             total,
         }
     }
