@@ -7,7 +7,7 @@ pragma experimental ABIEncoderV2;
 import "../ZkSync.sol";
 
 contract PendingBalanceWithdrawer {
-    ZkSync zkSync;
+    ZkSync immutable zkSync;
 
     struct RequestWithdrawFT {
         address payable owner;
