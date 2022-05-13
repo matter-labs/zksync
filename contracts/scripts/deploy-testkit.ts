@@ -58,6 +58,13 @@ async function main() {
         const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/" + i).connect(provider);
         await (await erc20.mint(testWallet.address, '0x4B3B4CA85A86C47A098A224000000000')).wait();
     }
+    const pendingWithdrawer = await deployContract(
+        deployWallet,
+        readContractCode('dev-contracts/PendingBalanceWithdrawer'),
+        [],
+        { gasLimit: 5000000 }
+    );
+    console.log(`CONTRACTS_PENDING_BALANCE_WITHDRAWER=${pendingWithdrawer.address}`);
 }
 
 main()

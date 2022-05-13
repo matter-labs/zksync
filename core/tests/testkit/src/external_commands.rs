@@ -2,11 +2,13 @@
 //! `zk` script should be in path.
 //!
 use std::collections::HashMap;
+use std::fs::read;
 use std::process::Command;
 use std::str::FromStr;
 use web3::types::{Address, H256};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use zksync_crypto::convert::FeConvert;
 use zksync_crypto::Fr;
 
@@ -17,6 +19,7 @@ pub struct Contracts {
     pub contract: Address,
     pub upgrade_gatekeeper: Address,
     pub test_erc20_address: Address,
+    pub pending_withdrawer: (ethabi::Contract, Address),
 }
 
 fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
@@ -40,6 +43,13 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
     {
         Some((
             String::from("CONTRACTS_UPGRADE_GATEKEEPER_ADDR"),
+            Address::from_str(output).expect("can't parse contract address"),
+        ))
+    } else if let Some(output) =
+        deploy_script_out.strip_prefix("CONTRACTS_PENDING_BALANCE_WITHDRAWER=0x")
+    {
+        Some((
+            String::from("CONTRACTS_PENDING_BALANCE_WITHDRAWER"),
             Address::from_str(output).expect("can't parse contract address"),
         ))
     } else {
@@ -103,6 +113,9 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
             contracts.insert(name, address);
         }
     }
+    let pending_withdrawer_abi: Value = serde_json::from_slice( read("contracts/artifacts/cache/solpp-generated-contracts/dev-contracts/PendingBalanceWithdrawer.sol/PendingBalanceWithdrawer.json").unwrap().as_slice()).unwrap();
+    let contract =
+        serde_json::from_value(pending_withdrawer_abi.get("abi").unwrap().clone()).unwrap();
 
     Contracts {
         governance: contracts
@@ -120,6 +133,12 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
         test_erc20_address: contracts
             .remove("CONTRACTS_TEST_ERC20")
             .expect("TEST_ERC20 missing"),
+        pending_withdrawer: (
+            contract,
+            contracts
+                .remove("CONTRACTS_PENDING_BALANCE_WITHDRAWER")
+                .expect("CONTRACTS_PENDING_BALANCE_WITHDRAWER missing"),
+        ),
     }
 }
 

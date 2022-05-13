@@ -2,7 +2,7 @@ use crate::external_commands::js_revert_reason;
 use std::collections::HashMap;
 
 use anyhow::{bail, ensure, format_err};
-use ethabi::{Token, Uint};
+use ethabi::{Contract, Token, Uint};
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -435,57 +435,59 @@ impl EthereumAccount {
         &self,
         execute_operation: &BlocksExecuteOperation,
         tokens: &HashMap<TokenId, Address>,
+        pending_withdrawer_contract: &(Contract, Address),
     ) -> Result<Option<ETHExecResult>, anyhow::Error> {
-        if let Some(ex_op) = execute_operation
+        let ex_ops: Vec<_> = execute_operation
             .blocks
-            .first()
-            .unwrap()
-            .block_transactions
             .iter()
-            .find(|a| a.is_successful() && (a.variance_name() == "Withdraw"))
-        {
-            // let address = self.main_contract_eth_client.call_contract_function().await;
+            .flat_map(|b| {
+                b.block_transactions
+                    .iter()
+                    .filter(|a| a.is_successful() && (a.variance_name() == "Withdraw"))
+            })
+            .collect();
+        let mut ft_balances = vec![];
+        let mut nft_balances = vec![];
+        for ex_op in ex_ops {
             let ex_op = ex_op.get_executed_tx().unwrap().signed_tx.clone().tx;
-            let (func_name, params) = match ex_op {
-                ZkSyncTx::Withdraw(tx) => (
-                    "withdrawPendingBalance",
-                    vec![
-                        Token::Address(tx.to),
-                        Token::Address(tokens.get(&tx.token).unwrap().clone()),
-                        Token::Uint(Uint::from_str(&tx.amount.to_string()).unwrap()),
-                    ],
-                ),
-                ZkSyncTx::WithdrawNFT(tx) => (
-                    "withdrawPendingNFTBalance",
-                    vec![Token::Uint(
-                        Uint::from_str(&tx.token.0.to_string()).unwrap(),
-                    )],
-                ),
+            match ex_op {
+                ZkSyncTx::Withdraw(tx) => ft_balances.push(Token::Tuple(vec![
+                    Token::Address(tx.to),
+                    Token::Address(tokens.get(&tx.token).unwrap().clone()),
+                    Token::Uint(Uint::from(200_000)),
+                ])),
+                ZkSyncTx::WithdrawNFT(tx) => nft_balances.push(Token::Tuple(vec![
+                    Token::Uint(Uint::from_str(&tx.token.0.to_string()).unwrap()),
+                    Token::Uint(Uint::from(300_000)),
+                ])),
                 _ => unreachable!(),
             };
-            dbg!(&params);
-            let data = self
-                .main_contract_eth_client
-                .encode_tx_data(func_name, params.as_slice());
-
-            let signed_tx = self
-                .main_contract_eth_client
-                .sign_prepared_tx(
-                    data,
-                    Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
-                )
-                .await
-                .map_err(|e| format_err!("Complete withdrawals send err: {}", e))?;
-            let receipt =
-                send_raw_tx_wait_confirmation(&self.main_contract_eth_client, signed_tx.raw_tx)
-                    .await?;
-
-            Ok(Some(
-                ETHExecResult::new(receipt, &self.main_contract_eth_client).await,
-            ))
-        } else {
-            Ok(None)
         }
+
+        if ft_balances.is_empty() && nft_balances.is_empty() {
+            return Ok(None);
+        }
+
+        let f = pending_withdrawer_contract
+            .0
+            .function("withdrawPendingBalances")
+            .expect("failed to get function parameters");
+
+        let tokens = vec![Token::Array(ft_balances), Token::Array(nft_balances)];
+        let data = f
+            .encode_input(&tokens)
+            .expect("failed to encode parameters");
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_prepared_tx_for_addr(data, pending_withdrawer_contract.1, Options::default())
+            .await
+            .map_err(|e| format_err!("Complete withdrawals send err: {}", e))?;
+
+        let receipt =
+            send_raw_tx_wait_confirmation(&self.main_contract_eth_client, signed_tx.raw_tx).await?;
+        Ok(Some(
+            ETHExecResult::new(receipt, &self.main_contract_eth_client).await,
+        ))
     }
 
     pub async fn revert_blocks(&self, blocks: &[Block]) -> Result<ETHExecResult, anyhow::Error> {
@@ -548,7 +550,7 @@ impl EthereumAccount {
 #[derive(Debug, Clone)]
 pub struct ETHExecResult {
     success: bool,
-    receipt: TransactionReceipt,
+    pub receipt: TransactionReceipt,
     revert_reason: String,
 }
 
