@@ -48,6 +48,7 @@ pub struct TestSetup {
 
     pub accounts: AccountSet,
     pub tokens: HashMap<TokenId, Address>,
+    pub deployed_contracts: Contracts,
 
     pub expected_changes_for_current_block: ExpectedAccountState,
 
@@ -94,6 +95,7 @@ impl TestSetup {
             processed_tx_events_receiver: sk_channels.queued_txs_events,
             accounts,
             tokens,
+            deployed_contracts: deployed_contracts.clone(),
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
             current_state_root: Some(initial_root),
@@ -996,6 +998,7 @@ impl TestSetup {
             .await
             .expect("block commit send tx")
             .expect_success();
+
         self.last_committed_block = new_block.clone();
 
         new_block
@@ -1081,7 +1084,6 @@ impl TestSetup {
             .send(StateKeeperTestkitRequest::SealBlock)
             .await
             .expect("sk receiver dropped");
-
         let new_block = self.await_for_block_commit().await;
         self.current_state_root = Some(new_block.new_root_hash);
 
@@ -1119,6 +1121,16 @@ impl TestSetup {
             .await
             .expect("execute block tx")
             .expect_success();
+        let pending_withdrawals_result = self
+            .commit_account
+            .execute_pending_withdrawals(
+                &block_execute_op,
+                &self.tokens,
+                &self.deployed_contracts.pending_withdrawer,
+            )
+            .await
+            .expect("execute block tx")
+            .map(|a| a.expect_success());
 
         self.last_committed_block = new_block.clone();
 
@@ -1167,6 +1179,7 @@ impl TestSetup {
             commit_result,
             verify_result,
             withdrawals_result,
+            pending_withdrawals_result,
             block_chunks,
         ))
     }

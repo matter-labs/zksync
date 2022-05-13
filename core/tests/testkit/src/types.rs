@@ -43,6 +43,7 @@ pub struct BlockExecutionResult {
     pub commit_result: TransactionReceipt,
     pub verify_result: TransactionReceipt,
     pub withdrawals_result: TransactionReceipt,
+    pub pending_withdrawals_result: Option<TransactionReceipt>,
     pub block_size_chunks: usize,
 }
 
@@ -52,6 +53,7 @@ impl BlockExecutionResult {
         commit_result: TransactionReceipt,
         verify_result: TransactionReceipt,
         withdrawals_result: TransactionReceipt,
+        pending_withdrawals_result: Option<TransactionReceipt>,
         block_size_chunks: usize,
     ) -> Self {
         Self {
@@ -59,6 +61,7 @@ impl BlockExecutionResult {
             commit_result,
             verify_result,
             withdrawals_result,
+            pending_withdrawals_result,
             block_size_chunks,
         }
     }

@@ -47,6 +47,8 @@ struct CostsSample {
     verify_cost: BigInt,
     /// Operator withdrawal gas cost
     withdrawals_cost: BigInt,
+    /// Pending withdrawer withdrawal gas cost
+    pending_withdrawals_cost: BigInt,
 }
 
 impl CostsSample {
@@ -64,6 +66,14 @@ impl CostsSample {
                 .gas_used
                 .map(u256_to_bigint)
                 .expect("verify gas used"),
+            pending_withdrawals_cost: block_result
+                .pending_withdrawals_result
+                .map(|rec| {
+                    rec.gas_used
+                        .map(u256_to_bigint)
+                        .expect("pending withdrawals gas used")
+                })
+                .unwrap_or_default(),
             withdrawals_cost: block_result
                 .withdrawals_result
                 .gas_used
@@ -80,13 +90,15 @@ impl CostsSample {
         let commit_cost = (&self.commit_cost - &base_cost.base_commit_cost) / samples;
         let verify_cost = (&self.verify_cost - &base_cost.base_verify_cost) / samples;
         let withdraw_cost = (&self.withdrawals_cost - &base_cost.base_withdraw_cost) / samples;
-        let total = &commit_cost + &verify_cost + &withdraw_cost;
+        let pending_withdraw_cost = &self.pending_withdrawals_cost / samples;
+        let total = &commit_cost + &verify_cost + &withdraw_cost + &pending_withdraw_cost;
 
         CostPerOperation {
             user_gas_cost,
             commit_cost,
             verify_cost,
             withdraw_cost,
+            pending_withdraw_cost,
             total,
         }
     }
@@ -110,6 +122,7 @@ struct CostPerOperation {
     commit_cost: BigInt,
     verify_cost: BigInt,
     withdraw_cost: BigInt,
+    pending_withdraw_cost: BigInt,
     total: BigInt,
 }
 
@@ -139,12 +152,13 @@ impl CostPerOperation {
             String::new()
         };
         println!(
-            "Gas cost of {}:\nuser_gas_cost: {}\ncommit: {}\nprove: {}\nexecute: {}\ntotal: {}{}",
+            "Gas cost of {}:\nuser_gas_cost: {}\ncommit: {}\nprove: {}\nexecute: {}\npending_withdraw: {}\ntotal: {}{}",
             description,
             self.user_gas_cost,
             self.commit_cost,
             self.verify_cost,
             self.withdraw_cost,
+            self.pending_withdraw_cost,
             self.total,
             grief_info
         );
