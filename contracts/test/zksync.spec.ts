@@ -47,7 +47,7 @@ describe('zkSync signature verification unit tests', function () {
         const accountId = 0xdeadba;
 
         const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId,address verifyingContract)')
+            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
         );
         const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
         const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
@@ -73,7 +73,7 @@ describe('zkSync signature verification unit tests', function () {
         const accountId = 0xdeadba;
 
         const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId,address verifyingContract)')
+            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
         );
         const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
         const incorrectChainId = '0x'.concat((network.config.chainId + 1).toString(16).padStart(64, '0'));
@@ -102,7 +102,7 @@ describe('zkSync signature verification unit tests', function () {
         const accountId = 0xdeadba;
 
         const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId,address verifyingContract)')
+            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
         );
         const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
         const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
@@ -134,7 +134,7 @@ describe('zkSync signature verification unit tests', function () {
         const accountId = 0xdeadba;
 
         const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId,address verifyingContract)')
+            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
         );
         const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
         const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
@@ -166,7 +166,7 @@ describe('zkSync signature verification unit tests', function () {
         const accountId = 0xdeadba;
 
         const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId,address verifyingContract)')
+            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
         );
         const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
         const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
@@ -193,7 +193,7 @@ describe('zkSync signature verification unit tests', function () {
         const accountId = 0xdeadba;
 
         const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId,address verifyingContract)')
+            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
         );
         const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
         const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
@@ -785,7 +785,7 @@ describe('zkSync test process next operation', function () {
         const accountId = 0x00ffee12;
 
         const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId,address verifyingContract)')
+            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
         );
         const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
         const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));

@@ -112,6 +112,5 @@ contract Config {
 
     string internal constant name = "ZkSync";
 
-    bytes32 internal constant DOMAIN_TYPEHASH =
-        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+    bytes32 internal constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId)");
 }
