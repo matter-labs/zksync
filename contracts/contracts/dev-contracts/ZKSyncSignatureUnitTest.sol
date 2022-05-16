@@ -9,7 +9,7 @@ import "../ZkSync.sol";
 contract ZKSyncSignatureUnitTest is ZkSync {
     function changePubkeySignatureCheckECRECOVER(Operations.ChangePubKey memory _changePk, bytes calldata _witness)
         external
-        pure
+        view
         returns (bool)
     {
         return verifyChangePubkeyECRECOVER(_witness, _changePk);

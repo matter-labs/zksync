@@ -771,7 +771,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that change operation is correct
     function verifyChangePubkey(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
         internal
-        pure
+        view
         returns (bool)
     {
         Operations.ChangePubkeyType changePkType = Operations.ChangePubkeyType(uint8(_ethWitness[0]));
@@ -793,17 +793,18 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _changePk Parsed change pubkey operation
     function verifyChangePubkeyECRECOVER(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
         internal
-        pure
+        view
         returns (bool)
     {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), Utils.getChainId()));
         bytes32 messageHash = keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n60",
                 _changePk.pubKeyHash,
                 _changePk.nonce,
                 _changePk.accountId,
-                bytes32(0)
+                domainSeparator
             )
         );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);

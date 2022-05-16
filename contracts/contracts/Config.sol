@@ -109,4 +109,9 @@ contract Config {
     uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
 
     uint256 internal constant SECURITY_COUNCIL_MEMBERS_NUMBER = $$(SECURITY_COUNCIL_MEMBERS_NUMBER);
+
+    string internal constant name = "ZkSync";
+
+    bytes32 internal constant DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 }
