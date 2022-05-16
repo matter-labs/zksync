@@ -14,7 +14,7 @@ use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_witness_generator::run_prover_server;
 
 use tokio::task::JoinHandle;
-use zksync_config::configs::api::{PrivateApiConfig, PrometheusConfig};
+use zksync_config::configs::api::{PrivateApiConfig, PrometheusConfig, TokenConfig};
 use zksync_config::{
     configs::api::{CommonApiConfig, JsonRpcConfig, ProverApiConfig, RestApiConfig, Web3Config},
     ChainConfig, ContractsConfig, DBConfig, ETHClientConfig, ETHSenderConfig, ETHWatchConfig,
@@ -162,7 +162,7 @@ async fn run_server(components: &ComponentsToRun) {
         tasks.push(zksync_api::api_server::web3::start_rpc_server(
             connection_pool.clone(),
             &Web3Config::from_env(),
-            &CommonApiConfig::from_env(),
+            &TokenConfig::from_env(),
         ));
     }
 
@@ -200,6 +200,7 @@ async fn run_server(components: &ComponentsToRun) {
 
         let contracts_config = ContractsConfig::from_env();
         let common_config = CommonApiConfig::from_env();
+        let token_config = TokenConfig::from_env();
         let chain_config = ChainConfig::from_env();
         let fee_ticker_config = TickerConfig::from_env();
         let ticker_info = Box::new(TickerInfo::new(read_only_connection_pool.clone()));
@@ -224,6 +225,7 @@ async fn run_server(components: &ComponentsToRun) {
                 sign_check_sender.clone(),
                 ticker.clone(),
                 &common_config,
+                &token_config,
                 &JsonRpcConfig::from_env(),
                 chain_config.state_keeper.miniblock_iteration_interval(),
                 mempool_tx_request_sender,
@@ -245,6 +247,7 @@ async fn run_server(components: &ComponentsToRun) {
                 ticker.clone(),
                 &JsonRpcConfig::from_env(),
                 &common_config,
+                &token_config,
                 mempool_tx_request_sender,
                 eth_watch_config.confirmations_for_eth_event,
             ));

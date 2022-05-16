@@ -11,7 +11,7 @@ use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
 
 use tokio::task::JoinHandle;
-use zksync_config::configs::api::{CommonApiConfig, Web3Config};
+use zksync_config::configs::api::{TokenConfig, Web3Config};
 
 mod calls;
 mod converter;
@@ -38,12 +38,12 @@ impl Web3RpcApp {
     pub fn new(
         connection_pool: ConnectionPool,
         config: &Web3Config,
-        common_config: &CommonApiConfig,
+        token_config: &TokenConfig,
     ) -> Self {
         Web3RpcApp {
             connection_pool,
-            logs_helper: LogsHelper::new(common_config.invalidate_token_cache_period()),
-            calls_helper: CallsHelper::new(common_config.invalidate_token_cache_period()),
+            logs_helper: LogsHelper::new(token_config.invalidate_token_cache_period()),
+            calls_helper: CallsHelper::new(token_config.invalidate_token_cache_period()),
             max_block_range: config.max_block_range,
             chain_id: config.chain_id,
         }
@@ -64,11 +64,11 @@ impl Web3RpcApp {
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     web3_config: &Web3Config,
-    common_config: &CommonApiConfig,
+    token_config: &TokenConfig,
 ) -> JoinHandle<()> {
     let addr = web3_config.bind_addr();
 
-    let rpc_app = Web3RpcApp::new(connection_pool, web3_config, common_config);
+    let rpc_app = Web3RpcApp::new(connection_pool, web3_config, token_config);
     let (handler, panic_sender) = spawn_panic_handler();
 
     std::thread::spawn(move || {

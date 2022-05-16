@@ -30,5 +30,7 @@ COPY docker/data-restore/data-restore-entry.sh /bin/
 # Setup the environment
 ENV ZKSYNC_HOME=/usr/src/zksync
 ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
+ENV CONFIG_PATH=/usr/src/configs
+ENV PG_DUMP_PATH=/pg_restore
 
 ENTRYPOINT ["data-restore-entry.sh"]

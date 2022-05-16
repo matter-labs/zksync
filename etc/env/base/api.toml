@@ -29,6 +29,7 @@ enforce_pubkey_change_fee=true
 max_number_of_transactions_per_batch=200
 max_number_of_authors_per_batch=10
 
+[api.token]
 invalidate_token_cache_period_sec=300
 
 # Configuration for the admin API server

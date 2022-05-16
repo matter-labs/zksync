@@ -11,7 +11,7 @@ use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
 use tokio::task::JoinHandle;
 // Workspace uses
-use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig, TokenConfig};
 use zksync_mempool::MempoolTransactionRequest;
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Address};
@@ -183,6 +183,7 @@ pub fn start_ws_server(
     sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker: FeeTicker,
     common_config: &CommonApiConfig,
+    token_config: &TokenConfig,
     config: &JsonRpcConfig,
     miniblock_iteration_interval: Duration,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
@@ -197,7 +198,7 @@ pub fn start_ws_server(
         event_sub_receiver,
         common_config.caches_size,
         miniblock_iteration_interval,
-        common_config,
+        token_config,
     );
 
     let req_rpc_app = super::rpc_server::RpcApp::new(
@@ -205,6 +206,7 @@ pub fn start_ws_server(
         sign_verify_request_sender,
         ticker,
         common_config,
+        token_config,
         confirmations_for_eth_event,
         mempool_tx_sender,
     );
