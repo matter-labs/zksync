@@ -34,8 +34,8 @@ services:
       - .:/usr/src/zksync
       - /usr/src/cache:/usr/src/cache
       - /usr/src/keys:/usr/src/keys
-      - /etc/sa_secret:/etc/sa_secret
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOST_GCS_KEY_PATH:-/etc/sa_secret/sa_key.json}:/etc/sa_secret/sa_key.json
     environment:
       - IN_DOCKER=true
       - CACHE_DIR=/usr/src/cache
