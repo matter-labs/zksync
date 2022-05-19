@@ -8,7 +8,7 @@ use jsonrpc_http_server::ServerBuilder;
 use tokio::task::JoinHandle;
 
 // Workspace uses
-use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig};
+use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig, TokenConfig};
 use zksync_storage::{
     chain::{
         block::records::StorageBlockDetails, operations::records::StoredExecutedPriorityOperation,
@@ -52,6 +52,7 @@ impl RpcApp {
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker: FeeTicker,
         config: &CommonApiConfig,
+        token_config: &TokenConfig,
         confirmations_for_eth_event: u64,
         mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
@@ -62,6 +63,7 @@ impl RpcApp {
             sign_verify_request_sender,
             ticker,
             config,
+            token_config,
             mempool_tx_sender,
         );
 
@@ -261,6 +263,7 @@ pub fn start_rpc_server(
     ticker: FeeTicker,
     config: &JsonRpcConfig,
     common_api_config: &CommonApiConfig,
+    token_config: &TokenConfig,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     confirmations_for_eth_event: u64,
 ) -> JoinHandle<()> {
@@ -270,6 +273,7 @@ pub fn start_rpc_server(
         sign_verify_request_sender,
         ticker,
         common_api_config,
+        token_config,
         confirmations_for_eth_event,
         mempool_tx_sender,
     );

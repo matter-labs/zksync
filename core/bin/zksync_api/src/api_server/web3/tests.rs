@@ -24,13 +24,13 @@ use super::{
     Web3RpcApp, NFT_FACTORY_ADDRESS, ZKSYNC_PROXY_ADDRESS,
 };
 use crate::api_server::rest::v02::test_utils::TestServerConfig;
-use zksync_config::configs::api::{CommonApiConfig, Web3Config};
+use zksync_config::configs::api::{TokenConfig, Web3Config};
 
 async fn local_client() -> anyhow::Result<(RawClient, impl Future<Output = RpcResult<()>>)> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
 
-    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3, &cfg.config.api.common);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3, &cfg.config.api.token_config);
     let mut io = IoHandler::new();
     rpc_app.extend(&mut io);
 
@@ -465,7 +465,7 @@ async fn get_block() -> anyhow::Result<()> {
 async fn create_logs() -> anyhow::Result<()> {
     let cfg = TestServerConfig::default();
     cfg.fill_database().await?;
-    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3, &cfg.config.api.common);
+    let rpc_app = Web3RpcApp::new(cfg.pool, &cfg.config.api.web3, &cfg.config.api.token_config);
 
     let from_account_id = AccountId(3);
     let from_account = ZkSyncAccount::rand_with_seed([1, 2, 3, 4]);
@@ -856,7 +856,7 @@ async fn get_transaction_receipt() -> anyhow::Result<()> {
         let rpc_app = Web3RpcApp::new(
             pool.clone(),
             &Web3Config::from_env(),
-            &CommonApiConfig::from_env(),
+            &TokenConfig::from_env(),
         );
         rpc_app.tx_receipt(&mut storage, receipt).await?
     };
@@ -879,7 +879,7 @@ async fn get_logs() -> anyhow::Result<()> {
     let rpc_app = Web3RpcApp::new(
         pool.clone(),
         &Web3Config::from_env(),
-        &CommonApiConfig::from_env(),
+        &TokenConfig::from_env(),
     );
 
     // Checks that it returns error if `fromBlock` is greater than `toBlock`.
@@ -911,7 +911,7 @@ async fn get_logs() -> anyhow::Result<()> {
                 max_block_range: 3,
                 chain_id: 9,
             };
-            let rpc_app = Web3RpcApp::new(pool.clone(), &config, &CommonApiConfig::from_env());
+            let rpc_app = Web3RpcApp::new(pool.clone(), &config, &TokenConfig::from_env());
             let mut io = IoHandler::new();
             rpc_app.extend(&mut io);
 

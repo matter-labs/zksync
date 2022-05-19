@@ -351,6 +351,7 @@ mod tests {
                     dummy_sign_verifier(),
                     dummy_fee_ticker(&prices, Some(cache.clone())),
                     &cfg.config.api.common,
+                    &cfg.config.api.token_config,
                     sender.clone(),
                 ))
             },

@@ -50,7 +50,7 @@ use crate::{
     tx_error::Toggle2FAError,
     utils::block_details_cache::BlockDetailsCache,
 };
-use zksync_config::configs::api::CommonApiConfig;
+use zksync_config::configs::api::{CommonApiConfig, TokenConfig};
 use zksync_mempool::MempoolTransactionRequest;
 use zksync_types::tx::error::TxAddError;
 
@@ -147,6 +147,7 @@ impl TxSender {
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker: FeeTicker,
         config: &CommonApiConfig,
+        token_config: &TokenConfig,
         mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
         let max_number_of_transactions_per_batch =
@@ -158,7 +159,7 @@ impl TxSender {
             pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
             ticker,
-            tokens: TokenDBCache::new(config.invalidate_token_cache_period()),
+            tokens: TokenDBCache::new(token_config.invalidate_token_cache_period()),
             forced_exit_checker: ForcedExitChecker::new(
                 config.forced_exit_minimum_account_age_secs,
             ),

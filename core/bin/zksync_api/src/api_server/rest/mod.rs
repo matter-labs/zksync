@@ -51,6 +51,7 @@ async fn start_server(
                 sign_verifier.clone(),
                 fee_ticker.clone(),
                 &api_v01.config.api.common,
+                &api_v01.config.api.token_config,
                 mempool_tx_sender.clone(),
             );
             v02::api_scope(tx_sender, &api_v01.config, api_v01.network_status.clone())
