@@ -120,7 +120,7 @@ impl BlocksExecuteOperation {
 
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
         // Does not make automatic withdrawals in execute operation
-        let complete_withdrawals = Token::Bool(false);
+        let complete_withdrawals = Token::Bool(true);
         vec![
             Token::Array(
                 self.blocks
