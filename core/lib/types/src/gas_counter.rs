@@ -99,10 +99,12 @@ impl VerifyCost {
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
     pub const SWAP_COST: u64 = 0;
     pub const FULL_EXIT_COST: u64 = 30_000;
-    pub const WITHDRAW_COST: u64 = 90_000;
+    pub const WITHDRAW_COST: u64 = 30_000;
+    pub const PENDING_WITHDRAW_COST: u64 = 60_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST;
     pub const MINT_NFT_COST: u64 = 0;
-    pub const WITHDRAW_NFT_COST: u64 = 300_000;
+    pub const WITHDRAW_NFT_COST: u64 = 80_000;
+    pub const PENDING_WITHDRAW_NFT_COST: u64 = 240_000;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
