@@ -119,13 +119,15 @@ impl MempoolTransactionsHandler {
                 TxAddError::DbError
             })?;
 
-        for op in &ops {
-            let labels = vec![
-                ("stage", "mempool".to_string()),
-                ("name", op.data.variance_name()),
-                ("token", op.data.token_id().to_string()),
-            ];
-            metrics::increment_counter!("process_tx_count", &labels);
+        if confirmed {
+            for op in &ops {
+                let labels = vec![
+                    ("stage", "mempool".to_string()),
+                    ("name", op.data.variance_name()),
+                    ("token", op.data.token_id().to_string()),
+                ];
+                metrics::increment_counter!("process_tx_count", &labels);
+            }
         }
 
         Ok(())
