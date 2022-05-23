@@ -87,4 +87,5 @@ else
 fi
 
 migrate
+
 $ZKSYNC_HOME/target/release/zksync_data_restore $COMMAND $MODE --config $CONFIG_FILE --web3 $WEB3_URL || exit 1
