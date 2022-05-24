@@ -18,7 +18,6 @@ import {
     ZKSyncSignatureUnitTestFactory,
     ZkSyncWithdrawalUnitTestFactory
 } from '../typechain';
-import { network } from 'hardhat';
 
 const TEST_PRIORITY_EXPIRATION = 101;
 const CHUNK_SIZE = 10;
@@ -45,7 +44,6 @@ describe('zkSync signature verification unit tests', function () {
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
@@ -65,7 +63,6 @@ describe('zkSync signature verification unit tests', function () {
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
@@ -90,7 +87,6 @@ describe('zkSync signature verification unit tests', function () {
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
@@ -115,7 +111,6 @@ describe('zkSync signature verification unit tests', function () {
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
@@ -135,7 +130,6 @@ describe('zkSync signature verification unit tests', function () {
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
@@ -720,7 +714,6 @@ describe('zkSync test process next operation', function () {
         const nonce = 0x1234;
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const accountId = 0x00ffee12;
-
         const _ethWitness = await wallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
         const ethWitnessBytes = Uint8Array.from(Buffer.from(_ethWitness.slice(2), 'hex'));
         const ethWitness = ethers.utils.concat(['0x00', ethWitnessBytes, new Uint8Array(32).fill(0)]);
