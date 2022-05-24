@@ -191,7 +191,8 @@ library Operations {
         ECRECOVER,
         CREATE2,
         OldECRECOVER,
-        ECRECOVERV2
+        ECRECOVERV2,
+        EIP712
     }
 
     struct ChangePubKey {

@@ -783,6 +783,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             return verifyChangePubkeyOldECRECOVER(_ethWitness, _changePk);
         } else if (changePkType == Operations.ChangePubkeyType.ECRECOVERV2) {
             return verifyChangePubkeyECRECOVERV2(_ethWitness, _changePk);
+        } else if (changePkType == Operations.ChangePubkeyType.EIP712) {
+            return verifyChangePubkeyEIP712(_ethWitness, _changePk);
         } else {
             revert("G"); // Incorrect ChangePubKey type
         }
@@ -797,17 +799,36 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         returns (bool)
     {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), Utils.getChainId()));
         bytes32 messageHash = keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n60",
                 _changePk.pubKeyHash,
                 _changePk.nonce,
                 _changePk.accountId,
-                domainSeparator
+                bytes32(0)
             )
         );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
+        return recoveredAddress == _changePk.owner;
+    }
+
+    /// @notice Checks that signature is valid for pubkey change message
+    /// @param _ethWitness Signature (65 bytes)
+    /// @param _changePk Parsed change pubkey operation
+    function verifyChangePubkeyEIP712(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
+        internal
+        view
+        returns (bool)
+    {
+        (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
+        bytes32 eip712DomainSeparator = keccak256(
+            abi.encode(EIP712_DOMAIN_TYPEHASH, keccak256(bytes(name)), keccak256(bytes(version)), Utils.getChainId())
+        );
+        bytes32 structHash = keccak256(
+            abi.encode(EIP712_CHANGEPUBKEY_TYPEHASH, _changePk.pubKeyHash, _changePk.nonce, _changePk.accountId)
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", eip712DomainSeparator, structHash));
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, digest);
         return recoveredAddress == _changePk.owner;
     }
 

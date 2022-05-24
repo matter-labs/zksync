@@ -46,15 +46,8 @@ describe('zkSync signature verification unit tests', function () {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
 
-        const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
-        );
-        const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
-        const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
-        const domainSeperator = ethers.utils.keccak256(ethers.utils.concat([DOMAIN_TYPEHASH, nameHash, chainId]));
-
         const signature = await randomWallet.signMessage(
-            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId, domainSeperator)
+            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
         const witness = ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
@@ -67,49 +60,14 @@ describe('zkSync signature verification unit tests', function () {
         expect(result).eq(true);
     });
 
-    it('pubkey hash signature verification incorrect chain id', async () => {
-        const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
-        const nonce = 0x11223344;
-        const accountId = 0xdeadba;
-
-        const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
-        );
-        const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
-        const incorrectChainId = '0x'.concat((network.config.chainId + 1).toString(16).padStart(64, '0'));
-        const domainSeperator = ethers.utils.keccak256(
-            ethers.utils.concat([DOMAIN_TYPEHASH, nameHash, incorrectChainId])
-        );
-
-        const signature = await randomWallet.signMessage(
-            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId, domainSeperator)
-        );
-        const witness = ethers.utils.concat(['0x00', signature]);
-        const { result } = await getCallRevertReason(
-            async () =>
-                await testContract.changePubkeySignatureCheckECRECOVER(
-                    { accountId, owner: randomWallet.address, nonce, pubKeyHash: pubkeyHash.replace('sync:', '0x') },
-                    witness
-                )
-        );
-        expect(result).eq(false);
-    });
-
     it('pubkey hash signature verification incorrect nonce', async () => {
         const incorrectNonce = 0x11223345;
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
 
-        const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
-        );
-        const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
-        const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
-        const domainSeperator = ethers.utils.keccak256(ethers.utils.concat([DOMAIN_TYPEHASH, nameHash, chainId]));
-
         const signature = await randomWallet.signMessage(
-            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId, domainSeperator)
+            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
         const witness = ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
@@ -133,15 +91,8 @@ describe('zkSync signature verification unit tests', function () {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
 
-        const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
-        );
-        const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
-        const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
-        const domainSeperator = ethers.utils.keccak256(ethers.utils.concat([DOMAIN_TYPEHASH, nameHash, chainId]));
-
         const signature = await randomWallet.signMessage(
-            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId, domainSeperator)
+            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
         const witness = ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
@@ -165,15 +116,8 @@ describe('zkSync signature verification unit tests', function () {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
 
-        const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
-        );
-        const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
-        const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
-        const domainSeperator = ethers.utils.keccak256(ethers.utils.concat([DOMAIN_TYPEHASH, nameHash, chainId]));
-
         const signature = await randomWallet.signMessage(
-            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId, domainSeperator)
+            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
         const witness = ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
@@ -192,15 +136,8 @@ describe('zkSync signature verification unit tests', function () {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
 
-        const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
-        );
-        const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
-        const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
-        const domainSeperator = ethers.utils.keccak256(ethers.utils.concat([DOMAIN_TYPEHASH, nameHash, chainId]));
-
         const signature = await randomWallet.signMessage(
-            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId, domainSeperator)
+            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
         const witness = ethers.utils.concat(['0x00', signature]);
         const { result } = await getCallRevertReason(
@@ -784,16 +721,7 @@ describe('zkSync test process next operation', function () {
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const accountId = 0x00ffee12;
 
-        const DOMAIN_TYPEHASH = ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId)')
-        );
-        const nameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ZkSync'));
-        const chainId = '0x'.concat(network.config.chainId.toString(16).padStart(64, '0'));
-        const domainSeperator = ethers.utils.keccak256(ethers.utils.concat([DOMAIN_TYPEHASH, nameHash, chainId]));
-
-        const _ethWitness = await wallet.signMessage(
-            zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId, domainSeperator)
-        );
+        const _ethWitness = await wallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
         const ethWitnessBytes = Uint8Array.from(Buffer.from(_ethWitness.slice(2), 'hex'));
         const ethWitness = ethers.utils.concat(['0x00', ethWitnessBytes, new Uint8Array(32).fill(0)]);
 

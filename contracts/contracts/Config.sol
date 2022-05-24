@@ -112,5 +112,11 @@ contract Config {
 
     string internal constant name = "ZkSync";
 
-    bytes32 internal constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId)");
+    string internal constant version = "1.0";
+
+    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId)");
+
+    bytes32 internal constant EIP712_CHANGEPUBKEY_TYPEHASH =
+        keccak256("changePubKey(bytes20 pubKeyHash,uint32 nonce,uint32 accountId)");
 }
