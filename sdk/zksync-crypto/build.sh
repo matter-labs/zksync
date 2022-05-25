@@ -5,15 +5,19 @@ set -e
 BG_ASM=dist/zksync-crypto-bundler_bg_asm.js
 ASM=dist/zksync-crypto-bundler_asm.js
 
-which wasm-pack || cargo install --version 0.10.1 wasm-pack #version 0.10.2 leads to errors
+which wasm-pack || cargo install --version 0.10.1 wasm-pack #Dec 16th update to wasm-pack (v0.10.2) breaks zk init
 
 # pack for bundler (!note this verion is used in the pkg.browser field)
 wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
 # pack for browser
-wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist
+wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=web-dist
 # pack for node.js
-wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist
+wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=node-dist
 
+# merge dist folders, wasm-pack delete out-dir folder before the new build
+mv web-dist/* dist/
+mv node-dist/* dist/
+rm -rf web-dist node-dist
 rm dist/package.json dist/.gitignore
 
 if [ "$CI" == "1" ]; then
