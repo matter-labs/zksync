@@ -159,6 +159,108 @@ describe('zkSync signature verification unit tests', function () {
             expect(address, `address mismatch, message ${message.toString('hex')}`).eq(wallet.address);
         }
     });
+
+    it('pubkey hash signature EIP712 verification success', async () => {
+        const accountId = 0xdeadba;
+        const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
+        const nonce = 0x11223344;
+        const EIP712Domain = {
+            name: 'ZkSync',
+            version: '1.0',
+            chainId: hardhat.network.config.chainId
+        };
+        const types = {
+            changePubKey: [
+                { name: 'pubKeyHash', type: 'bytes20' },
+                { name: 'nonce', type: 'uint32' },
+                { name: 'accountId', type: 'uint32' }
+            ]
+        };
+        const message = {
+            pubKeyHash: pubkeyHash,
+            nonce: nonce,
+            accountId: accountId
+        };
+        const signature = await randomWallet._signTypedData(EIP712Domain, types, message);
+
+        const witness = ethers.utils.concat(['0x00', signature]);
+        const { result } = await getCallRevertReason(
+            async () =>
+                await testContract.changePubkeySignatureCheckEIP712(
+                    { accountId, owner: randomWallet.address, nonce, pubKeyHash: pubkeyHash },
+                    witness
+                )
+        );
+        expect(result).eq(true);
+    });
+
+    it('pubkey hash signature EIP712 verification incorrect chain id', async () => {
+        const accountId = 0xdeadba;
+        const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
+        const nonce = 0x11223344;
+        const EIP712Domain = {
+            name: 'ZkSync',
+            version: '1.0',
+            chainId: hardhat.network.config.chainId + 1 // incorrect chaind id
+        };
+        const types = {
+            changePubKey: [
+                { name: 'pubKeyHash', type: 'bytes20' },
+                { name: 'nonce', type: 'uint32' },
+                { name: 'accountId', type: 'uint32' }
+            ]
+        };
+        const message = {
+            pubKeyHash: pubkeyHash,
+            nonce: nonce,
+            accountId: accountId
+        };
+        const signature = await randomWallet._signTypedData(EIP712Domain, types, message);
+
+        const witness = ethers.utils.concat(['0x00', signature]);
+        const { result } = await getCallRevertReason(
+            async () =>
+                await testContract.changePubkeySignatureCheckEIP712(
+                    { accountId, owner: randomWallet.address, nonce, pubKeyHash: pubkeyHash },
+                    witness
+                )
+        );
+        expect(result).eq(false);
+    });
+
+    it('pubkey hash signature EIP712 verification incorrect version', async () => {
+        const accountId = 0xdeadba;
+        const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
+        const nonce = 0x11223344;
+        const EIP712Domain = {
+            name: 'ZkSync',
+            version: '2.0', // incorrect version
+            chainId: hardhat.network.config.chainId
+        };
+        const types = {
+            changePubKey: [
+                { name: 'pubKeyHash', type: 'bytes20' },
+                { name: 'nonce', type: 'uint32' },
+                { name: 'accountId', type: 'uint32' }
+            ]
+        };
+        const message = {
+            pubKeyHash: pubkeyHash,
+            nonce: nonce,
+            accountId: accountId
+        };
+        const signature = await randomWallet._signTypedData(EIP712Domain, types, message);
+
+        const witness = ethers.utils.concat(['0x00', signature]);
+        const { result } = await getCallRevertReason(
+            async () =>
+                await testContract.changePubkeySignatureCheckEIP712(
+                    { accountId, owner: randomWallet.address, nonce, pubKeyHash: pubkeyHash },
+                    witness
+                )
+        );
+        expect(result).eq(false);
+    });
 });
 
 describe('ZK priority queue ops unit tests', function () {

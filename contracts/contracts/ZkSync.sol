@@ -771,7 +771,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that change operation is correct
     function verifyChangePubkey(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
         internal
-        view
+        pure
         returns (bool)
     {
         Operations.ChangePubkeyType changePkType = Operations.ChangePubkeyType(uint8(_ethWitness[0]));
@@ -795,7 +795,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _changePk Parsed change pubkey operation
     function verifyChangePubkeyECRECOVER(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
         internal
-        view
+        pure
         returns (bool)
     {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
@@ -812,12 +812,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return recoveredAddress == _changePk.owner;
     }
 
-    /// @notice Checks that signature is valid for pubkey change message
+    /// @notice Checks that signature is valid for pubkey change EIP712 message
     /// @param _ethWitness Signature (65 bytes)
     /// @param _changePk Parsed change pubkey operation
     function verifyChangePubkeyEIP712(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
         internal
-        view
+        pure
         returns (bool)
     {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
