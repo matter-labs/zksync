@@ -6,7 +6,7 @@ function reset_db() {
       cd core/lib/storage
       psql "$DATABASE_URL" -c 'DROP OWNED BY CURRENT_USER CASCADE' || /bin/true
       psql "$DATABASE_URL" -c 'DROP SCHEMA IF EXISTS public CASCADE' || /bin/true
-      psql "$DATABASE_URL" -c 'CREATE SCHEMA public'
+      psql "$DATABASE_URL" -c 'CREATE SCHEMA public' || /bin/true
       diesel database setup
       cd $ZKSYNC_HOME
 }
