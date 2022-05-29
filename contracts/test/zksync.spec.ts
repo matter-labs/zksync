@@ -170,7 +170,7 @@ describe('zkSync signature verification unit tests', function () {
             chainId: hardhat.network.config.chainId
         };
         const types = {
-            changePubKey: [
+            ChangePubKey: [
                 { name: 'pubKeyHash', type: 'bytes20' },
                 { name: 'nonce', type: 'uint32' },
                 { name: 'accountId', type: 'uint32' }
@@ -204,7 +204,7 @@ describe('zkSync signature verification unit tests', function () {
             chainId: hardhat.network.config.chainId + 1 // incorrect chaind id
         };
         const types = {
-            changePubKey: [
+            ChangePubKey: [
                 { name: 'pubKeyHash', type: 'bytes20' },
                 { name: 'nonce', type: 'uint32' },
                 { name: 'accountId', type: 'uint32' }
@@ -238,7 +238,7 @@ describe('zkSync signature verification unit tests', function () {
             chainId: hardhat.network.config.chainId
         };
         const types = {
-            changePubKey: [
+            ChangePubKey: [
                 { name: 'pubKeyHash', type: 'bytes20' },
                 { name: 'nonce', type: 'uint32' },
                 { name: 'accountId', type: 'uint32' }

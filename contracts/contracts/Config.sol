@@ -118,5 +118,5 @@ contract Config {
         keccak256("EIP712Domain(string name,string version,uint256 chainId)");
 
     bytes32 internal constant EIP712_CHANGEPUBKEY_TYPEHASH =
-        keccak256("changePubKey(bytes20 pubKeyHash,uint32 nonce,uint32 accountId)");
+        keccak256("ChangePubKey(bytes20 pubKeyHash,uint32 nonce,uint32 accountId)");
 }
