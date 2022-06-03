@@ -37,16 +37,4 @@ contract ZKSyncProveBlocksUnitTest is ZkSync {
         }
         this.proveBlocks(_committedBlocks, proofInput);
     }
-
-    function proveBlocksTest2(StoredBlockInfo[] calldata _committedBlocks) external {
-        uint256[16] memory subproofsLimbsTemp;
-        ProofInput memory proofInput = ProofInput(
-            new uint256[](0),
-            new uint256[](0),
-            new uint256[](_committedBlocks.length),
-            new uint8[](0),
-            subproofsLimbsTemp
-        );
-        this.proveBlocks(_committedBlocks, proofInput);
-    }
 }
