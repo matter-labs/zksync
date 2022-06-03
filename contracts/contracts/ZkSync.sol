@@ -461,7 +461,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev 1. Processes all priority operations or save them as pending
     /// @dev 2. Finalizes block on Ethereum
     /// @dev _executedBlockIdx is index in the array of the blocks that we want to execute together
-    function executeOneBlock(ExecuteBlockInfo memory _blockExecuteData, uint256 _executedBlockIdx) internal {
+    function executeOneBlock(ExecuteBlockInfo calldata _blockExecuteData, uint256 _executedBlockIdx) internal {
         // Ensure block was committed
         require(
             hashStoredBlockInfo(_blockExecuteData.storedBlock) ==
@@ -474,7 +474,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         uint256 pendingOnchainOpsPubdataLength = _blockExecuteData.pendingOnchainOpsPubdata.length;
         for (uint256 i = 0; i < pendingOnchainOpsPubdataLength; ++i) {
-            bytes memory pubData = _blockExecuteData.pendingOnchainOpsPubdata[i];
+            bytes calldata pubData = _blockExecuteData.pendingOnchainOpsPubdata[i];
 
             Operations.OpType opType = Operations.OpType(uint8(pubData[0]));
 
@@ -558,6 +558,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             bytes32 firstUnverifiedBlockHash = storedBlockHashes[currentTotalBlocksProven + 1];
             while (hashStoredBlockInfo(_committedBlocks[i]) != firstUnverifiedBlockHash) {
                 ++i;
+                require(i < _committedBlocks.length, "o2");
             }
         }
 

@@ -16,7 +16,9 @@ import {
     ZkSyncProcessOpUnitTestFactory,
     ZKSyncSignatureUnitTest,
     ZKSyncSignatureUnitTestFactory,
-    ZkSyncWithdrawalUnitTestFactory
+    ZkSyncWithdrawalUnitTestFactory,
+    ZKSyncProveBlocksUnitTest,
+    ZKSyncProveBlocksUnitTestFactory
 } from '../typechain';
 
 const TEST_PRIORITY_EXPIRATION = 101;
@@ -859,5 +861,81 @@ describe('zkSync test process next operation', function () {
 
         const committedPriorityRequestsAfter = await zksyncContract.getTotalCommittedPriorityRequests();
         expect(committedPriorityRequestsAfter, 'priority request number').eq(committedPriorityRequestsBefore);
+    });
+});
+
+describe('zkSync prove blocks unit tests', function () {
+    this.timeout(50000);
+
+    let testContract: ZKSyncProveBlocksUnitTest;
+
+    before(async () => {
+        [wallet] = await hardhat.ethers.getSigners();
+
+        const contracts = readProductionContracts();
+        contracts.zkSync = readContractCode('dev-contracts/ZKSyncProveBlocksUnitTest');
+        const deployer = new Deployer({ deployWallet: wallet, contracts });
+        await deployer.deployAll({ gasLimit: 6500000 });
+        testContract = ZKSyncProveBlocksUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
+    });
+
+    it('prove blocks success', async () => {
+        const numberOfCommittedBlocks = 10;
+        const numberOfProvedBlocks = 3;
+        const startBlockToBeProved = 4;
+        const endBlockToBeProved = 9;
+        const { revertReason } = await getCallRevertReason(async () => {
+            await testContract.initializeNumberOfCommittedAndProvedBlocks(
+                numberOfCommittedBlocks,
+                numberOfProvedBlocks
+            );
+            await testContract.proveBlocksTest(startBlockToBeProved, endBlockToBeProved);
+        });
+        expect(revertReason).eq('VM did not revert');
+    });
+
+    it('prove blocks sucess: proving the already proved blocks', async () => {
+        const numberOfCommittedBlocks = 10;
+        const numberOfProvedBlocks = 3;
+        const startBlockToBeProved = 1; // since the blocks 1 to 3 are proved already, the function will skip them and prove from block 4 to 9
+        const endBlockToBeProved = 9;
+        const { revertReason } = await getCallRevertReason(async () => {
+            await testContract.initializeNumberOfCommittedAndProvedBlocks(
+                numberOfCommittedBlocks,
+                numberOfProvedBlocks
+            );
+            await testContract.proveBlocksTest(startBlockToBeProved, endBlockToBeProved);
+        });
+        expect(revertReason).eq('VM did not revert');
+    });
+
+    it('prove blocks incorrect: start block number to be proved', async () => {
+        const numberOfCommittedBlocks = 10;
+        const numberOfProvedBlocks = 3;
+        const startBlockToBeProved = 5; // incorrect start block number, because the block number 4 is not proved yet
+        const endBlockToBeProved = 9;
+        const { revertReason } = await getCallRevertReason(async () => {
+            await testContract.initializeNumberOfCommittedAndProvedBlocks(
+                numberOfCommittedBlocks,
+                numberOfProvedBlocks
+            );
+            await testContract.proveBlocksTest(startBlockToBeProved, endBlockToBeProved);
+        });
+        expect(revertReason).eq('o2');
+    });
+
+    it('prove blocks incorrect: proving more blocks than committed', async () => {
+        const numberOfCommittedBlocks = 10;
+        const numberOfProvedBlocks = 3;
+        const startBlockToBeProved = 4;
+        const endBlockToBeProved = 12; // the block number to be proved is more than total committed blocks
+        const { revertReason } = await getCallRevertReason(async () => {
+            await testContract.initializeNumberOfCommittedAndProvedBlocks(
+                numberOfCommittedBlocks,
+                numberOfProvedBlocks
+            );
+            await testContract.proveBlocksTest(startBlockToBeProved, endBlockToBeProved);
+        });
+        expect(revertReason).eq('o1');
     });
 });
