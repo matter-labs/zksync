@@ -530,12 +530,17 @@ impl<T: Transport> DataRestoreDriver<T> {
         // TODO (ZKS-722): either due to Ethereum node lag or unknown
         // bug in the events state, we have to additionally filter out
         // already processed rollup blocks.
+        let mut last_processed_block = self.tree_state.block_number;
         for event in self
             .events_state
             .get_only_verified_committed_events()
             .iter()
             .filter(|bl| bl.block_num > self.tree_state.block_number)
         {
+            // For some reasons, we have a bug where event state contains duplicates for blocks
+            if last_processed_block >= event.block_num {
+                continue;
+            }
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.
             // These blocks go one after the other, and checking only the last transaction hash is safe.
@@ -557,10 +562,12 @@ impl<T: Transport> DataRestoreDriver<T> {
                 last_event_tx_hash = Some(event.transaction_hash);
             }
 
-            let rollup_block = last_tx_blocks
-                .remove(&event.block_num)
-                .expect("Block not found");
-            blocks.push(rollup_block);
+            if let Some(rollup_block) = last_tx_blocks.remove(&event.block_num) {
+                blocks.push(rollup_block);
+                last_processed_block = event.block_num;
+            } else {
+                panic!("Block not found")
+            }
         }
 
         blocks

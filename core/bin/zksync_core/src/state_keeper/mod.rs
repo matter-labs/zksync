@@ -308,17 +308,19 @@ impl ZkSyncStateKeeper {
         // By giving these hashes to the mempool,
         // we won't receive back transactions that we already executed in the current block.
 
+        // It's counterintuitive, but we want to exclude only successful operations, because in the situation,
+        // when we are under attack by rejected txs, pending block becomes massive and contains a lot of rejected txs,
+        // as a result we will send tons of tx_hash to the database.
+        // Excluding success operations is mandatory because they will fail in the next step,
+        // at the same time executing rejected txs is safe, in the worst-case scenario, they become successful.
+        // Keeping in mind that we regularly clean the memmpool from executing txs, it's impossible when
+        // tons of rejected txs will be returned from the database.
+
         let executed_txs = self
             .pending_block
-            .failed_txs
+            .success_operations
             .iter()
-            .map(|tx| tx.signed_tx.hash())
-            .chain(
-                self.pending_block
-                    .success_operations
-                    .iter()
-                    .filter_map(|op| op.get_executed_tx().map(|tx| tx.signed_tx.hash())),
-            )
+            .filter_map(|op| op.get_executed_tx().map(|tx| tx.signed_tx.hash()))
             .collect();
 
         let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {

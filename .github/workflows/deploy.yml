@@ -58,7 +58,8 @@ jobs:
     name: Server
     runs-on: [self-hosted, deployer, "${{ inputs.cluster }}"]
     container:
-      image: dysnix/kubectl:v1.20-gcloud
+      image: dysnix/kubectl:v1.21-gcloud
+      options: --user root
       volumes:
         - /var/run/secrets/tokens:/var/run/secrets/tokens
     env:
@@ -67,6 +68,11 @@ jobs:
       KUBE_CONTEXT: matterlabs-zksync-${{ inputs.cluster }}
       KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }}
     steps:
+      -
+        name: reown helm home
+        run: |
+          chown -R root /dysnix/kubectl/.cache/helm
+          chown -R root /dysnix/kubectl/.local/share/helm
       -
         uses: actions/checkout@v2
         with:
