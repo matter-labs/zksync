@@ -547,7 +547,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         nonReentrant
     {
         requireActive();
-        require(_committedBlocks.length == _proof.commitments.length, "r"); // unequal length of blocks and proof.commitments
+        require(_committedBlocks.length == _proof.commitments.length, "o3"); // unequal length of blocks and proof.commitments
 
         uint256 i;
         uint32 currentTotalBlocksProven = totalBlocksProven;
