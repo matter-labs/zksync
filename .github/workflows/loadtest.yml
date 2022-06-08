@@ -14,174 +14,12 @@ jobs:
     name: Setup
     uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@dev
     with:
-      environment: loadtest
+      environment: rinkeby-beta
       create-deployment: true
-
-  update:
-    name: Update
-    uses: matter-labs/zksync-dev/.github/workflows/server.update-config.yml@dev
-    needs: [setup]
-    with:
-      ref: master
-      cluster: ${{ needs.setup.outputs.cluster }}
-      environment: ${{ needs.setup.outputs.environment }}
-      namespace: ${{ needs.setup.outputs.release-namespace }}
-    secrets:
-      github-token: ${{ secrets.GH_TOKEN }}
-
-  sqlproxy:
-    name: Setup and Provision SQLProxy
-    needs: [setup, update]
-    runs-on: [self-hosted, deployer, "${{ needs.setup.outputs.cluster}}"]
-    container:
-      image: dysnix/kubectl:v1.20-gcloud
-      volumes:
-        - /var/run/secrets/tokens:/var/run/secrets/tokens
-    env:
-      DEPLOY_APPS: -l name=sqlproxy
-      HF_ARGS: -e ${{ needs.setup.outputs.release-environment }}
-      KUBE_CONTEXT: matterlabs-zksync-${{ needs.setup.outputs.cluster }}
-      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.cluster }}
-    steps:
-      - uses: actions/checkout@v2
-      -
-        name: Clone helm-infra
-        uses: actions/checkout@v2
-        with:
-          repository: matter-labs/helm-infra
-          path: helm-infra
-          ref: master
-          token: ${{ secrets.GH_TOKEN }}
-      -
-        uses: actions/checkout@v2
-        with:
-          repository: matter-labs/gh-workflows
-          path: gh-workflows
-      -
-        name: Generate ~/.kube/config
-        working-directory: gh-workflows
-        run: scripts/kubeconfig-projected-token
-      -
-        name: Provision SQLProxy
-        working-directory: helm-infra
-        run: |
-          UPDATE_REPOS=y helmfile $HF_ARGS repos
-          helmfile $HF_ARGS $DEPLOY_APPS sync
-      -
-        name: Create etc/env/loadtest.env
-        run: |
-          mkdir -p etc/env/
-          kubectl get cm -n ${ZKSYNC_ENV} server-env-custom -o json | jq -j '.data | to_entries | .[] | "\(.key)=\(.value)\n"' > etc/env/${ZKSYNC_ENV}.env
-          kubectl get secret -n ${ZKSYNC_ENV} secretenv-zksync -o go-template='{{range $k, $v := .data}}{{ printf "%s=\"%s\"\n" $k ($v | base64decode) }}{{end}}' \
-            >> etc/env/${ZKSYNC_ENV}.env
-      -
-        uses: actions/upload-artifact@v2
-        with:
-          name: loadtest_env
-          path: etc/env/${{ env.ZKSYNC_ENV }}.env
-          if-no-files-found: error
-
-  setup-db:
-    name: Compile contracts
-    needs: [setup, sqlproxy]
-    runs-on: [self-hosted, deployer, "${{ needs.setup.outputs.cluster }}"]
-    env:
-      RUSTUP_HOME: /usr/share/rust/.rustup
-      CARGO_HOME: /usr/share/rust/.cargo
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v2
-        with:
-          name: loadtest_env
-          path: etc/env
-      -
-        name: Preperare env
-        run: |
-          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-          echo $(pwd)/bin >> $GITHUB_PATH
-          echo CI=1 >> $GITHUB_ENV
-          echo $CARGO_HOME/bin >> $GITHUB_PATH
-      -
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      -
-        name: Update cargo dependencies
-        run: |
-          cargo install --version=0.5.6 sqlx-cli
-          cargo install diesel_cli --no-default-features --features postgres
-      -
-        name: Setup loadtest database
-        run: |
-          zk
-          zk run yarn
-          zk run verify-keys unpack
-          zk db setup
-          zk server --genesis
-          zk contract build
-          zk contract deploy
-          cd contracts && zk f yarn governance-add-erc20 add-multi-current-network rinkeby
-          zk db insert contract
-      -
-        uses: actions/upload-artifact@v2
-        with:
-          name: deployed_contracts
-          path: deployed_contracts.log
-          if-no-files-found: error
-
-  configmap:
-    name: Update configMap
-    runs-on: [self-hosted, deployer, "${{ needs.setup.outputs.cluster}}"]
-    needs: [setup, setup-db]
-    container:
-      image: dysnix/kubectl:v1.20-gcloud
-      volumes:
-        - /var/run/secrets/tokens:/var/run/secrets/tokens
-    env:
-      KUBE_CONTEXT: matterlabs-zksync-${{ needs.setup.outputs.cluster }}
-      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.cluster }}
-    steps:
-      - uses: actions/checkout@v2
-      -
-        uses: actions/checkout@v2
-        with:
-          repository: matter-labs/gh-workflows
-          path: gh-workflows
-      -
-        name: Generate ~/.kube/config
-        working-directory: gh-workflows
-        run: scripts/kubeconfig-projected-token
-      -
-        uses: actions/download-artifact@v2
-        with:
-          name: deployed_contracts
-      -
-        name: Update contracts in the ConfigMap
-        run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
-
-  deploy:
-    name: Deploy
-    uses: matter-labs/zksync-dev/.github/workflows/deploy.yml@dev
-    needs: [setup, configmap]
-    with:
-      cluster: ${{ needs.setup.outputs.cluster }}
-      environment: ${{ needs.setup.outputs.environment }}
-      release-environment: ${{ needs.setup.outputs.release-environment }}
-      release-namespace: ${{ needs.setup.outputs.release-namespace }}
-      deployment-id: ${{ needs.setup.outputs.deployment-id }}
-      image-tag: ${{ needs.setup.outputs.sha-short }}
-    secrets:
-      github-token: ${{ secrets.GH_TOKEN }}
 
   loadtest:
     name: Perform loadtest
     runs-on: [self-hosted, ci-runner]
-    needs: [deploy]
     container: rust:1.59
     env:
       WEB3_URL: ${{ secrets.CI_LOADTEST_WEB3_URL }}
@@ -189,44 +27,15 @@ jobs:
       ACCOUNTS_AMOUNT: 20
       OPERATIONS_PER_ACCOUNT: 20
       MAIN_TOKEN: "BAT"
-      ZKSYNC_RPC_ADDR: "https://loadtest-api.zksync.dev/jsrpc"
+      ZKSYNC_RPC_ADDR: "https://rinkeby-beta-api.zksync.io/jsrpc"
       ETH_NETWORK: "rinkeby"
       ALLOWED_PERCENT: 10
-      RUST_LOG: debug
+      RUST_LOG: loadnext=debug
     steps:
       - uses: actions/checkout@v2
       - name: Run loadtest
         run: cargo run --bin loadnext
 
-  cleanup:
-    name: Cleanup loadtest environment
-    needs: [setup, loadtest]
-    runs-on: [self-hosted, deployer, "${{ needs.setup.outputs.cluster}}"]
-    container:
-      image: dysnix/kubectl:v1.20-gcloud
-      volumes:
-        - /var/run/secrets/tokens:/var/run/secrets/tokens
-    env:
-      KUBE_CONTEXT: matterlabs-zksync-${{ needs.setup.outputs.cluster }}
-      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ needs.setup.outputs.cluster }}
-    if: always()
-    steps:
-      - uses: actions/checkout@v2
-      -
-        uses: actions/checkout@v2
-        with:
-          repository: matter-labs/gh-workflows
-          path: gh-workflows
-      -
-        name: Generate ~/.kube/config
-        working-directory: gh-workflows
-        run: scripts/kubeconfig-projected-token
-      -
-        name: Scale loadtest to 0 replicas
-        run: |
-          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 server
-          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 prover
-          kubectl -n $ZKSYNC_ENV scale deploy --replicas=0 sqlproxy-gcloud-sqlproxy
 
   notify:
     runs-on: ubuntu-latest

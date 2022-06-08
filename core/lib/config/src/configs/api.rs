@@ -29,6 +29,7 @@ pub struct ApiConfig {
     pub prover: ProverApiConfig,
     /// Configuration options for the Prometheus exporter.
     pub prometheus: PrometheusConfig,
+    pub token_config: TokenConfig,
 }
 
 impl ApiConfig {
@@ -42,6 +43,7 @@ impl ApiConfig {
             private: envy_load!("private", "API_PRIVATE_"),
             prover: envy_load!("prover", "API_PROVER_"),
             prometheus: envy_load!("prometheus", "API_PROMETHEUS_"),
+            token_config: envy_load!("token", "API_TOKEN_"),
         }
     }
 }
@@ -49,10 +51,6 @@ impl ApiConfig {
 impl CommonApiConfig {
     pub fn max_subsidy_usd(&self) -> Ratio<BigUint> {
         scaled_u64_to_ratio(self.max_subsidy_usd_scaled)
-    }
-
-    pub fn invalidate_token_cache_period(&self) -> Duration {
-        Duration::from_secs(self.invalidate_token_cache_period_sec)
     }
 
     pub fn from_env() -> Self {
@@ -124,9 +122,22 @@ pub struct CommonApiConfig {
 
     /// The name of current subsidy. It is needed to conveniently fetch historical data regarding subsidies for different partners
     pub subsidy_name: String,
+}
 
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+pub struct TokenConfig {
     /// The interval of updating tokens from database
     pub invalidate_token_cache_period_sec: u64,
+}
+
+impl TokenConfig {
+    pub fn from_env() -> TokenConfig {
+        envy_load!("token", "API_TOKEN_")
+    }
+
+    pub fn invalidate_token_cache_period(&self) -> Duration {
+        Duration::from_secs(self.invalidate_token_cache_period_sec)
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -252,7 +263,6 @@ mod tests {
                 subsidized_ips: vec!["127.0.0.1".to_owned()],
                 max_subsidy_usd_scaled: 20000,
                 subsidy_name: String::from("PartnerName"),
-                invalidate_token_cache_period_sec: 10,
             },
             admin: AdminApiConfig {
                 port: 8080,
@@ -285,6 +295,9 @@ mod tests {
                 secret_auth: "sample".into(),
             },
             prometheus: PrometheusConfig { port: 3312 },
+            token_config: TokenConfig {
+                invalidate_token_cache_period_sec: 10,
+            },
         }
     }
 
@@ -300,7 +313,7 @@ API_COMMON_MAX_SUBSIDY_USD_SCALED=20000
 API_COMMON_SUBSIDY_NAME=PartnerName
 API_COMMON_MAX_NUMBER_OF_TRANSACTIONS_PER_BATCH=200
 API_COMMON_MAX_NUMBER_OF_AUTHORS_PER_BATCH=10
-API_COMMON_INVALIDATE_TOKEN_CACHE_PERIOD_SEC="10"
+API_TOKEN_INVALIDATE_TOKEN_CACHE_PERIOD_SEC="10"
 API_ADMIN_PORT="8080"
 API_ADMIN_URL="http://127.0.0.1:8080"
 API_ADMIN_SECRET_AUTH="sample"

@@ -2,13 +2,17 @@
 
 set -e
 
-function migrate() {
+function reset_db() {
+      cd core/lib/storage
       psql "$DATABASE_URL" -c 'DROP OWNED BY CURRENT_USER CASCADE' || /bin/true
       psql "$DATABASE_URL" -c 'DROP SCHEMA IF EXISTS public CASCADE' || /bin/true
-      psql "$DATABASE_URL" -c 'CREATE SCHEMA public'
-
-      cd core/lib/storage
+      psql "$DATABASE_URL" -c 'CREATE SCHEMA public' || /bin/true
       diesel database setup
+      cd $ZKSYNC_HOME
+}
+
+function migrate() {
+      cd core/lib/storage
       diesel migration run
       cd $ZKSYNC_HOME
 }
@@ -29,7 +33,7 @@ fi
 case $COMMAND in
   genesis)
       echo "Resetting the database"
-      migrate
+      reset_db
       COMMAND="--genesis"
     ;;
   continue)
@@ -67,14 +71,21 @@ esac
 if [[ -n $PG_DUMP && "$COMMAND" == "--continue" ]]
 then
   # Do not drop db if the file doesn't exist.
-  [ -f /pg_restore/$PG_DUMP ] || { echo "$PG_DUMP not found" ; exit 1 ; }
+  [ -f $PG_DUMP_PATH/$PG_DUMP ] || { echo "$PG_DUMP_PATH/$PG_DUMP  not found" ; exit 1 ; }
 
-  migrate
+  reset_db
 
   echo "Applying $PG_DUMP"
-  pg_restore -j 8 -d $DATABASE_URL --clean --if-exists /pg_restore/$PG_DUMP
+  pg_restore -j 8 -d $DATABASE_URL --clean --if-exists $PG_DUMP_PATH/$PG_DUMP
 fi
 
-CONFIG_FILE="/usr/src/configs/${NETWORK}.json"
+if [[ -z $CONFIG_PATH ]]
+then
+  CONFIG_FILE="${ZKSYNC_HOME}/docker/exit-tool/configs/${NETWORK}.json"
+else
+  CONFIG_FILE="${CONFIG_PATH}/${NETWORK}.json"
+fi
 
-./target/release/zksync_data_restore $COMMAND $MODE --config $CONFIG_FILE --web3 $WEB3_URL || exit 1
+migrate
+
+$ZKSYNC_HOME/target/release/zksync_data_restore $COMMAND $MODE --config $CONFIG_FILE --web3 $WEB3_URL || exit 1

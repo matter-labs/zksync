@@ -84,11 +84,13 @@ async fn main() {
     vlog::info!("Restoring zkSync state from the contract");
     let _vlog_guard = vlog::init();
     let connection_pool = ConnectionPool::new(Some(1));
-    let config_opts = ETHClientConfig::from_env();
 
     let opt = Opt::from_args();
 
-    let web3_url = opt.web3_url.unwrap_or_else(|| config_opts.web3_url());
+    let web3_url = opt.web3_url.unwrap_or_else(|| {
+        let config_opts = ETHClientConfig::from_env();
+        config_opts.web3_url()
+    });
 
     let transport = Http::new(&web3_url).expect("failed to start web3 transport");
 

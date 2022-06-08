@@ -5,7 +5,7 @@ use jsonrpc_pubsub::{
     SubscriptionId,
 };
 use std::time::Duration;
-use zksync_config::configs::api::CommonApiConfig;
+use zksync_config::configs::api::TokenConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
@@ -60,7 +60,7 @@ pub fn start_sub_notifier(
     mut subscription_stream: mpsc::Receiver<EventNotifierRequest>,
     api_requests_caches_size: usize,
     miniblock_interval: Duration,
-    common_api_config: &CommonApiConfig,
+    token_config: &TokenConfig,
 ) -> tokio::task::JoinHandle<()> {
     let (new_block_sender, mut new_block_receiver) = mpsc::channel(NOTIFIER_CHANNEL_CAPACITY);
     let (new_txs_sender, mut new_txs_receiver) = mpsc::channel(NOTIFIER_CHANNEL_CAPACITY);
@@ -68,7 +68,7 @@ pub fn start_sub_notifier(
     let mut notifier = OperationNotifier::new(
         api_requests_caches_size,
         db_pool.clone(),
-        common_api_config.invalidate_token_cache_period(),
+        token_config.invalidate_token_cache_period(),
     );
 
     tokio::spawn(async move {

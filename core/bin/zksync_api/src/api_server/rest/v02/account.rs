@@ -532,7 +532,9 @@ mod tests {
                 move |cfg: &TestServerConfig| {
                     api_scope(
                         cfg.pool.clone(),
-                        TokenDBCache::new(cfg.config.api.common.invalidate_token_cache_period()),
+                        TokenDBCache::new(
+                            cfg.config.api.token_config.invalidate_token_cache_period(),
+                        ),
                         cfg.config.eth_watch.confirmations_for_eth_event,
                     )
                 },

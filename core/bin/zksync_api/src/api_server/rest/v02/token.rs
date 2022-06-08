@@ -365,7 +365,7 @@ mod tests {
                 api_scope(
                     &cfg.config,
                     cfg.pool.clone(),
-                    TokenDBCache::new(cfg.config.api.common.invalidate_token_cache_period()),
+                    TokenDBCache::new(cfg.config.api.token_config.invalidate_token_cache_period()),
                     fee_ticker.clone(),
                 )
             },

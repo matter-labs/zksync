@@ -8,7 +8,7 @@ use loadnext::{config::LoadtestConfig, executor::Executor, report_collector::Loa
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    vlog::init();
+    let _vlog_guard = vlog::init();
 
     let config = LoadtestConfig::from_env().unwrap_or_else(|err| {
         vlog::warn!(

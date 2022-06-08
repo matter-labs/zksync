@@ -3,13 +3,13 @@ on:
   push:
     branches:
       - dev
-      - breaking
       - hotfix/*
+      - breaking
     tags:
       - hotfix-*
 
-# Disable simultaneous deployments into stage
-concurrency: deploy-stage
+# Disable simultaneous deployments into rinkeby-beta
+concurrency: deploy.rinkeby-beta
 
 jobs:
   images:
@@ -52,7 +52,7 @@ jobs:
     uses: matter-labs/zksync-dev/.github/workflows/setup.runtime.yml@dev
     needs: [images]
     with:
-      environment: stage
+      environment: rinkeby-beta
       create-deployment: true
 
   update:
