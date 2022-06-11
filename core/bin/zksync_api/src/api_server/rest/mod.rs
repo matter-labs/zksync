@@ -33,9 +33,9 @@ async fn start_server(
 ) {
     HttpServer::new(move || {
         let api_v01 = api_v01.clone();
-
+        // This api stores forced exit requests, it's necessary to use main database connection
         let forced_exit_requests_api_scope = forced_exit_requests::api_scope(
-            api_v01.connection_pool.clone(),
+            api_v01.main_database_connection_pool.clone(),
             api_v01
                 .config
                 .api
@@ -87,7 +87,8 @@ async fn start_server(
 #[allow(clippy::too_many_arguments)]
 #[must_use]
 pub fn start_server_thread_detached(
-    connection_pool: ConnectionPool,
+    read_only_connection_pool: ConnectionPool,
+    main_database_connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
     fee_ticker: FeeTicker,
@@ -106,8 +107,13 @@ pub fn start_server_thread_detached(
                 let config = ZkSyncConfig::from_env();
 
                 let network_status = SharedNetworkStatus::new(core_address);
-                let api_v01 =
-                    ApiV01::new(connection_pool, contract_address, config, network_status);
+                let api_v01 = ApiV01::new(
+                    read_only_connection_pool,
+                    main_database_connection_pool,
+                    contract_address,
+                    config,
+                    network_status,
+                );
                 api_v01.spawn_network_status_updater(panic_sender);
 
                 start_server(
