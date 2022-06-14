@@ -175,18 +175,20 @@ impl ApiAccountData {
     ) -> Result<Option<Account>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let mut transaction = storage.start_transaction().await.map_err(Error::storage)?;
-        let account = transaction
+        let ((last_block, _), account) = transaction
             .chain()
             .account_schema()
             .last_committed_state_for_account(account_id)
             .await
-            .map_err(Error::storage)?
-            .1;
+            .map_err(Error::storage)?;
         let result = if let Some(account) = account {
             let last_block = transaction
                 .chain()
                 .account_schema()
-                .last_committed_block_with_update_for_acc(account_id)
+                .last_committed_block_with_update_for_acc(
+                    account_id,
+                    BlockNumber(last_block as u32),
+                )
                 .await
                 .map_err(Error::storage)?;
             Ok(Some(
@@ -252,15 +254,12 @@ impl ApiAccountData {
                 .last_committed_state_for_account(account_id)
                 .await
                 .map_err(Error::storage)?;
+
+            let finalized_block = BlockNumber(finalized_state.0 as u32);
             let finalized = if let Some(account) = finalized_state.1 {
                 Some(
-                    self.api_account(
-                        account,
-                        account_id,
-                        BlockNumber(finalized_state.0 as u32),
-                        &mut transaction,
-                    )
-                    .await?,
+                    self.api_account(account, account_id, finalized_block, &mut transaction)
+                        .await?,
                 )
             } else {
                 None
@@ -269,7 +268,7 @@ impl ApiAccountData {
                 let last_block = transaction
                     .chain()
                     .account_schema()
-                    .last_committed_block_with_update_for_acc(account_id)
+                    .last_committed_block_with_update_for_acc(account_id, finalized_block)
                     .await
                     .map_err(Error::storage)?;
                 Some(
