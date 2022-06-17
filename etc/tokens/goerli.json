@@ -1,0 +1,26 @@
+[
+  {
+    "name": "ChainLink Token (goerli)",
+    "symbol": "LINK",
+    "decimals": 18,
+    "address": "0x63bfb2118771bd0da7A6936667A7BB705A06c1bA"
+  },
+  {
+    "name": "wBTC",
+    "symbol": "wBTC",
+    "decimals": 8,
+    "address": "0xCA063A2AB07491eE991dCecb456D1265f842b568"
+  },
+  {
+    "name": "USD Coin (goerli)",
+    "symbol": "USDC",
+    "decimals": 6,
+    "address": "0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4"
+  },
+  {
+    "name": "DAI",
+    "symbol": "DAI",
+    "decimals": 18,
+    "address": "0x5C221E77624690fff6dd741493D735a17716c26B"
+  }
+]
