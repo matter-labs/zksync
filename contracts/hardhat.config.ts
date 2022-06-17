@@ -63,6 +63,7 @@ localConfig.SECURITY_COUNCIL_THRESHOLD = process.env.MISC_SECURITY_COUNCIL_THRES
 localConfig.EASY_EXODUS = process.env.CONTRACTS_TEST_EASY_EXODUS === 'true';
 
 const contractDefs = {
+    goerli: testnetConfig,
     rinkeby: testnetConfig,
     ropsten: testnetConfig,
     mainnet: prodConfig,
