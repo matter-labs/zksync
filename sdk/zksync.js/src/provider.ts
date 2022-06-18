@@ -66,10 +66,10 @@ export async function getDefaultProvider(
         }
     } else if (network === 'goerli-beta') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://goerli-beta-api.zksync.io/jsrpc-ws', network);
+            return await Provider.newWebsocketProvider('wss://goerli-beta-api.zksync.dev/jsrpc-ws', network);
         } else if (transport === 'HTTP') {
             return await Provider.newHttpProvider(
-                'https://goerli-beta-api.zksync.io/jsrpc',
+                'https://goerli-beta-api.zksync.dev/jsrpc',
                 pollIntervalMilliSecs,
                 network
             );
