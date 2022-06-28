@@ -222,3 +222,14 @@ If you have intermediate images that you wish to remove, please check out
 [this thread](https://forums.docker.com/t/how-to-remove-none-images-after-building/7050).
 
 After this, re-install the project. This will trigger sizable downloads, so expect this to take a while.
+
+### Compiling issues M1
+***Problem***
+The error could be `dyld[xxxx]: missing symbol called`.
+
+With Mac M1, the clang version (c and c++ compiler) compiles for the ARM architecture only but there are some Rust dependencies that have support for the intel x86_64 only.
+
+**Solution**
+Use a terminal fully on [rosetta](https://support.apple.com/en-us/HT211861), for reference on how to do it, follow this [instructions](https://stackoverflow.com/questions/64882584/how-to-run-the-homebrew-installer-under-rosetta-2-on-m1-macbook/66299285#66299285).  
+
+You have to reinstall all dependencies but now with the x86_64 architecture.
