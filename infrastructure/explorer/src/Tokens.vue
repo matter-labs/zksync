@@ -96,8 +96,8 @@ export default {
             this.loading = false;
         },
         urlForToken(address) {
-            const prefix = store.network === 'mainnet' ? '' : `${store.network}.`;
-            return `https://${prefix}etherscan.io/token/${address}`;
+            const explorerLink = store.explorerLink;
+            return `${explorerLink}/token/${address}`;
         }
     },
     components

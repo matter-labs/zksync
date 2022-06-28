@@ -53,7 +53,7 @@ window.app = new Vue({
     el: '#app',
     router,
     created() {
-        document.title = `zkSync ${store.capitalizedNetwork} Explorer — trustless scalable payments`;
+        document.title = `RIF Aggregation ${store.capitalizedNetwork} Explorer — trustless scalable payments`;
     },
     render: (h) => h(App)
 });

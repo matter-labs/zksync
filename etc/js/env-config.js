@@ -1,56 +1,26 @@
 export default {
     'http://localhost': {
         API_SERVER: 'https://localhost:3001',
+        WALLET_ADDRESS: 'http://localhost:3000',
+        EXPLORER: 'http://localhost:7001',
         ETH_NETWORK: 'localhost',
         WS_API_ADDR: 'ws://localhost:3031',
         HTTP_RPC_API_ADDR: 'http://localhost:3030'
     },
-    'https://stage.zksync.dev': {
-        API_SERVER: 'https://stage-api.zksync.dev',
-        ETH_NETWORK: 'rinkeby',
-        WS_API_ADDR: 'wss://stage-api.zksync.dev/jsrpc-ws',
-        HTTP_RPC_API_ADDR: 'https://stage-api.zksync.dev/jsrpc'
+    'https://explorer.dev.aggregation.rifcomputing.net': {
+        API_SERVER: 'https://dev.aggregation.rifcomputing.net:3029',
+        WALLET_ADDRESS: 'https://wallet.dev.aggregation.rifcomputing.net',
+        EXPLORER: 'https://explorer.testnet.rsk.co',
+        ETH_NETWORK: 'testnet',
+        WS_API_ADDR: 'https://dev.aggregation.rifcomputing.net:3031',
+        HTTP_RPC_API_ADDR: 'https://dev.aggregation.rifcomputing.net:3030'
     },
-    'https://rinkeby.zkscan.io': {
-        API_SERVER: 'https://rinkeby-api.zksync.io',
-        ETH_NETWORK: 'rinkeby',
-        WS_API_ADDR: 'wss://rinkeby-api.zksync.io/jsrpc-ws',
-        HTTP_RPC_API_ADDR: 'https://rinkeby-api.zksync.io/jsrpc'
-    },
-    'https://ropsten.zkscan.io': {
-        API_SERVER: 'https://ropsten-api.zksync.io',
-        ETH_NETWORK: 'ropsten',
-        WS_API_ADDR: 'wss://ropsten-api.zksync.io/jsrpc-ws',
-        HTTP_RPC_API_ADDR: 'https://ropsten-api.zksync.io/jsrpc'
-    },
-    'https://rinkeby-beta.zkscan.io': {
-        API_SERVER: 'https://rinkeby-beta-api.zksync.io',
-        ETH_NETWORK: 'rinkeby',
-        WS_API_ADDR: 'wss://rinkeby-beta-api.zksync.io/jsrpc-ws',
-        HTTP_RPC_API_ADDR: 'https://rinkeby-beta-api.zksync.io/jsrpc'
-    },
-    'https://ropsten-beta.zkscan.io': {
-        API_SERVER: 'https://ropsten-beta-api.zksync.io',
-        ETH_NETWORK: 'ropsten',
-        WS_API_ADDR: 'wss://ropsten-beta-api.zksync.io/jsrpc-ws',
-        HTTP_RPC_API_ADDR: 'https://ropsten-beta-api.zksync.io/jsrpc'
-    },
-    'https://zkscan.io': {
-        API_SERVER: 'https://api.zksync.io',
-        ETH_NETWORK: 'mainnet',
-        WS_API_ADDR: 'wss://api.zksync.io/jsrpc-ws',
-        HTTP_RPC_API_ADDR: 'https://api.zksync.io/jsrpc'
-    },
-    'https://dev.zksync.dev': {
-        API_SERVER: 'https://dev-api.zksync.dev',
-        ETH_NETWORK: 'rinkeby',
-        WS_API_ADDR: 'wss://dev-api.zksync.dev/jsrpc-ws',
-        HTTP_RPC_API_ADDR: 'https://dev-api.zksync.dev/jsrpc'
-    },
-    'https://breaking.zksync.dev': {
-        API_SERVER: 'https://breaking-api.zksync.dev',
-        ETH_NETWORK: 'rinkeby',
-        WS_API_ADDR: 'wss://breaking-api.zksync.dev/jsrpc-ws',
-        HTTP_RPC_API_ADDR: 'https://breaking-api.zksync.dev/jsrpc'
+    'https://explorer.aggregation.rifcomputing.net': {
+        API_SERVER: 'https://aggregation.rifcomputing.net:3029',
+        WALLET_ADDRESS: 'https://wallet.aggregation.rifcomputing.net',
+        EXPLORER: 'https://explorer.rsk.co',
+        ETH_NETWORK: 'rsk_mainnet',
+        WS_API_ADDR: 'https://aggregation.rifcomputing.net:3031',
+        HTTP_RPC_API_ADDR: 'https://aggregation.rifcomputing.net:3030'
     }
 }[`${location.protocol}//${location.hostname}`];

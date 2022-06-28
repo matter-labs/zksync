@@ -61,38 +61,24 @@ export function getLocalAccountLink(address) {
 
 export function blockchainExplorerToken(token, account) {
     if (store.network === 'localhost') {
-        return `http://localhost:8000/${account}`;
+        return `${store.explorerLink}/${account}`;
     }
     const prefix = store.network === 'mainnet' ? '' : `${store.network}.`;
     const tokenAddress = window.syncProvider.tokenSet.resolveTokenAddress(token);
 
     if (tokenAddress != '0x0000000000000000000000000000000000000000') {
-        return `https://${prefix}etherscan.io/token/${tokenAddress}?a=${account}`;
+        return `${store.explorerLink}/token/${tokenAddress}?a=${account}`;
     } else {
-        return `https://${prefix}etherscan.io/address/${account}`;
+        return `${store.explorerLink}/address/${account}`;
     }
 }
 
 export function getBlockchainExplorerTx(network) {
-    if (network === 'localhost') {
-        return 'http://localhost:8000';
-    }
-    if (network === 'mainnet') {
-        return 'https://etherscan.io/tx';
-    }
-
-    return `https://${network}.etherscan.io/tx`;
+    return `${store.explorerLink}/tx`;
 }
 
 export function getBlockchainExplorerAddress(network) {
-    if (network === 'localhost') {
-        return 'http://localhost:8000';
-    }
-    if (network === 'mainnet') {
-        return 'https://etherscan.io/address';
-    }
-
-    return `https://${network}.etherscan.io/address`;
+    return `${store.explorerLink}/address`;
 }
 
 export function readyStateFromString(s) {

@@ -1,9 +1,9 @@
 <template>
-    <b-navbar toggleable="md" type="dark" variant="info">
+    <b-navbar toggleable="md" type="dark" variant="light">
         <b-container>
             <b-navbar-brand>
-                <a href="https://zksync.io" target="_blank">
-                    <img class="navbar-hero-img" src="./assets/ZK_dark.svg" />
+                <a href="/" target="_blank">
+                    <img class="navbar-hero-img" src="./assets/rif_logo.svg" />
                 </a>
                 <b-badge variant="primary" class="hero-network-name pointer" v-on:click.prevent="goToHome">
                     {{ store.capitalizedNetwork }}
@@ -32,16 +32,6 @@
                         class="nowrap"
                     >
                         Wallet
-                        <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
-                    </b-nav-item>
-                    <b-nav-item
-                        v-if="store.statusLink"
-                        v-bind:href="store.statusLink"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="nowrap"
-                    >
-                        Status
                         <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
                     </b-nav-item>
                 </b-navbar-nav>
@@ -109,5 +99,14 @@ export default {
 }
 .pointer {
     cursor: pointer;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+    color: #4d4d4d;
+}
+.navbar-dark .navbar-nav .nav-link:hover, 
+.navbar-dark .navbar-nav .nav-link:active, 
+.navbar-dark .navbar-nav .nav-link:focus {
+    color: #000;
 }
 </style>
