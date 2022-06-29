@@ -557,7 +557,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             bytes32 firstUnverifiedBlockHash = storedBlockHashes[currentTotalBlocksProven + 1];
             while (hashStoredBlockInfo(_committedBlocks[i]) != firstUnverifiedBlockHash) {
                 ++i;
-                require(i < _committedBlocks.length, "o2"); // None of the "_committedBlocks" is equal to "firstUnverifiedBlockHash"
+                require(i < _committedBlocks.length, "o2"); // Revert if the first unverified block is not among committed ones.
             }
         }
 
