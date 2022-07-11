@@ -64,8 +64,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      -
-        name: Map runtime environment data
+      - name: Map runtime environment data
         id: envMap
         uses: kanga333/variable-mapper@v0.2.2
         with:
@@ -77,32 +76,28 @@ jobs:
               ".*": {
                 "namespace": "${{ inputs.environment }}",
                 "hfEnv": "${{ inputs.environment }}",
-                "cluster": "stage"
+                "cluster": "stage-new" # TODO: rename new cluster to stage
               },
               "^rinkeby$": { "cluster": "testnet" },
               "^ropsten$": { "cluster": "testnet" },
               "^mainnet$": { "cluster": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
             }
-      -
-        run: echo "::set-output name=short::$(git rev-parse --short HEAD)"
+      - run: echo "::set-output name=short::$(git rev-parse --short HEAD)"
         id: sha
-      -
-        name: Create GitHub Deployment
+      - name: Create GitHub Deployment
         uses: chrnorm/deployment-action@releases/v1
         id: deployment
         if: inputs.create-deployment
         with:
           token: ${{ github.token }}
           environment: ${{ inputs.environment }}
-      -
-        name: Match the tag vX.Y.Z-rN pattern
+      - name: Match the tag vX.Y.Z-rN pattern
         uses: actions-ecosystem/action-regex-match@v2
         id: regex
         with:
           text: ${{ github.ref }}
           regex: '^(v\d+\.\d+\.\d+)(-r\d+)?$'
-      -
-        name: Find the latest config "-rN" tag
+      - name: Find the latest config "-rN" tag
         uses: dysnix/find-latest-tag@v2
         if: inputs.find-latest-config && steps.regex.outputs.match != ''
         id: latest-config
