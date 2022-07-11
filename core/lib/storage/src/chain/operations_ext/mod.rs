@@ -1188,29 +1188,28 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         };
 
         let token_query = if token.is_some() {
-            "AND token = $2"
+            "AND a.token = $2"
         } else {
             ""
         };
 
         let query = format!(
             r#"
-            SELECT DISTINCT
-                executed_priority_operations.sequence_number,
-                executed_priority_operations.tx_hash,
-                operation as op,
-                block_number,
-                created_at,
+            SELECT 
+                b.sequence_number,
+                b.tx_hash,
+                b.operation as op,
+                b.block_number,
+                b.created_at,
                 true as success,
                 Null as fail_reason,
-                eth_hash,
-                priority_op_serialid,
-                block_index,
+                b.eth_hash,
+                b.priority_op_serialid,
+                b.block_index,
                 Null::bigint as batch_id
-            FROM tx_filters
-            INNER JOIN executed_priority_operations
-                ON tx_filters.tx_hash = executed_priority_operations.tx_hash
-            WHERE address = $1 {} {}
+            FROM executed_priority_operations as b
+            WHERE EXISTS ( SELECT 1 FROM tx_filters as a WHERE a.tx_hash = b.tx_hash AND a.address = $1 {} )
+             {} 
         "#,
             token_query, query_direction
         );
@@ -1245,29 +1244,28 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         };
 
         let token_query = if token.is_some() {
-            "AND token = $2"
+            "AND a.token = $2"
         } else {
             ""
         };
 
         let query = format!(
             r#"
-               SELECT DISTINCT
+               SELECT 
                     txs.sequence_number,
                     txs.tx_hash,
-                    tx as op,
-                    block_number,
-                    created_at,
-                    success,
-                    fail_reason,
+                    txs.tx as op,
+                    txs.block_number,
+                    txs.created_at,
+                    txs.success,
+                    txs.fail_reason,
                     Null::bytea as eth_hash,
                     Null::bigint as priority_op_serialid,
-                    block_index,
-                    batch_id
-                FROM tx_filters
-                INNER JOIN executed_transactions txs
-                    ON tx_filters.tx_hash = txs.tx_hash
-                WHERE address = $1 {} {} 
+                    txs.block_index,
+                    txs.batch_id
+                FROM executed_transactions as txs
+                WHERE EXISTS ( SELECT 1 FROM tx_filters as a WHERE a.tx_hash = txs.tx_hash AND a.address = $1 {} )
+                 {} 
             "#,
             token_query, query_direction
         );

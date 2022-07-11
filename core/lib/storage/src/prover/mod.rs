@@ -72,7 +72,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let start = Instant::now();
         let result = sqlx::query!(
             "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')
-            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds' RETURNING id",
+            WHERE job_status = $2 AND (now() - INTERVAL '120 seconds') >= updated_at RETURNING id",
             ProverJobStatus::Idle.to_number(),
             ProverJobStatus::InProgress.to_number(),
         )

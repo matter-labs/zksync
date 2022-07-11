@@ -3628,6 +3628,27 @@
       ]
     }
   },
+  "76385fe94faaff36649e7f2e8b59cbfad7b656dd0c1fd823939b2e70a2278685": {
+    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 AND (now() - INTERVAL '120 seconds') >= updated_at RETURNING id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "76ac37f173ae27687dbb0eb261a5ab9920fd2185e50a476c00315a874dd6b75c": {
     "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')\n            WHERE id = $2 AND job_type = $3",
     "describe": {
@@ -8889,27 +8910,6 @@
         false,
         false,
         false,
-        false
-      ]
-    }
-  },
-  "faefd7d582000800f48eddcc1e933a876f5b0cd556f0dc45c6241eb72da97894": {
-    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds' RETURNING id",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4"
-        ]
-      },
-      "nullable": [
         false
       ]
     }
