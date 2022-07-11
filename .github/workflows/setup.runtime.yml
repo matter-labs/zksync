@@ -71,12 +71,13 @@ jobs:
           key: ${{ inputs.environment }}
           export_to: output
           mode: overwrite
+          # TODO: rename stage-new cluster to stage after migration from old to new is done
           map: |
             {
               ".*": {
                 "namespace": "${{ inputs.environment }}",
                 "hfEnv": "${{ inputs.environment }}",
-                "cluster": "stage-new" # TODO: rename new cluster to stage
+                "cluster": "stage-new"
               },
               "^rinkeby$": { "cluster": "testnet" },
               "^ropsten$": { "cluster": "testnet" },
