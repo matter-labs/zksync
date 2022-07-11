@@ -13,7 +13,7 @@ jobs:
       find-latest-config: true
       environment: ${{ github.event.deployment.environment }}
     secrets:
-      github-token: ${{ secrets.GH_TOKEN }}
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   update:
     name: Update
@@ -25,7 +25,7 @@ jobs:
       environment: ${{ needs.setup.outputs.environment }}
       namespace: ${{ needs.setup.outputs.release-namespace }}
     secrets:
-      github-token: ${{ secrets.GH_TOKEN }}
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   deploy:
     name: Deploy
@@ -39,7 +39,7 @@ jobs:
       deployment-id: ${{ github.event.deployment.id }}
       image-tag: ${{ needs.setup.outputs.sha-short }}
     secrets:
-      github-token: ${{ secrets.GH_TOKEN }}
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   notify:
     runs-on: ubuntu-latest
