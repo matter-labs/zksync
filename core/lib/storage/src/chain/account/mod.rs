@@ -460,12 +460,15 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let block_number = sqlx::query!(
             "
             SELECT GREATEST(
-                (SELECT MAX(block_number) FROM account_balance_updates
-                WHERE account_id = $1 AND block_number >= $2),
-                (SELECT MAX(block_number) FROM account_creates
-                WHERE account_id = $1 AND block_number >= $2),
-                (SELECT MAX(block_number) FROM account_pubkey_updates
-                WHERE account_id = $1 AND block_number >= $2)
+                (SELECT block_number FROM account_balance_updates
+                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1
+                ),
+                (SELECT block_number FROM account_creates
+                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1
+                ),
+                (SELECT block_number FROM account_pubkey_updates
+                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1
+                )
             )
     ",
             i64::from(*account_id),
