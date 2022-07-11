@@ -2368,27 +2368,6 @@
       "nullable": []
     }
   },
-  "437718be33383e1db84110963f08d50fcca36fb6ce174d26109f556ee0ec87e7": {
-    "query": "\n            SELECT GREATEST(\n                (SELECT MAX(block_number) FROM account_balance_updates\n                WHERE account_id = $1 AND block_number >= $2),\n                (SELECT MAX(block_number) FROM account_creates\n                WHERE account_id = $1 AND block_number >= $2),\n                (SELECT MAX(block_number) FROM account_pubkey_updates\n                WHERE account_id = $1 AND block_number >= $2)\n            )\n    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "greatest",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "439d0083a3b98066071cde5909969b4e9ce744bc1bfa761116c6fb5bcc356075": {
     "query": "DELETE FROM account_balance_updates WHERE block_number > $1",
     "describe": {
@@ -6273,6 +6252,27 @@
         false,
         false,
         true
+      ]
+    }
+  },
+  "bf64c3301d4a81968a1220319fae8ec04063f7a83757da850e3f8f5aed121750": {
+    "query": "\n            SELECT GREATEST(\n                (SELECT block_number FROM account_balance_updates\n                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1\n                ),\n                (SELECT block_number FROM account_creates\n                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1\n                ),\n                (SELECT block_number FROM account_pubkey_updates\n                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1\n                )\n            )\n    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "greatest",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
