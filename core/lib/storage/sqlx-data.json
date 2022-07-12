@@ -184,6 +184,26 @@
       ]
     }
   },
+  "0503311e607839221d1f3d32259f29a811b7abffbd4ae3808136eba8984741dd": {
+    "query": "\n            SELECT tx_hash as \"tx_hash!\"\n                FROM tx_filters as f\n                WHERE address = $1\n                ORDER BY\n                    GREATEST\n                    (\n                        (SELECT t1.sequence_number FROM executed_transactions AS t1 WHERE t1.tx_hash = f.tx_hash ORDER BY t1.sequence_number DESC LIMIT 1 ),\n                        (SELECT t2.sequence_number FROM executed_priority_operations AS t2 WHERE t2.tx_hash = f.tx_hash ORDER BY t2.sequence_number DESC LIMIT 1 )\n                    )\n                DESC\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "052bc740befe43cd3d8d915371cb055187d4ff4ebf019fe12c8dc85b296acc47": {
     "query": "SELECT tx_hash, tx FROM executed_transactions WHERE block_number BETWEEN $1 AND $2",
     "describe": {
@@ -3290,26 +3310,6 @@
       ],
       "parameters": {
         "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
-  "67cad4f873f4a8b41b5574aae3c64a88795fe69b7ef353a785f9b12357f12913": {
-    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1\n                ), transactions AS (\n                    SELECT executed_transactions.tx_hash, sequence_number\n                    FROM tx_hashes\n                    INNER JOIN executed_transactions\n                        ON tx_hashes.tx_hash = executed_transactions.tx_hash\n                ORDER BY sequence_number DESC\n                LIMIT 1\n                ), priority_ops AS (\n                    SELECT executed_priority_operations.tx_hash, executed_priority_operations.sequence_number\n                    FROM tx_hashes\n                    INNER JOIN executed_priority_operations\n                        ON tx_hashes.tx_hash = executed_priority_operations.tx_hash\n                ORDER BY sequence_number DESC\n                LIMIT 1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\"\n                FROM everything\n                ORDER BY sequence_number DESC\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea"
-        ]
       },
       "nullable": [
         null
