@@ -1288,32 +1288,16 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         let record = sqlx::query!(
             r#"
-                WITH tx_hashes AS (
-                    SELECT DISTINCT tx_hash FROM tx_filters
-                    WHERE address = $1
-                ), transactions AS (
-                    SELECT executed_transactions.tx_hash, sequence_number
-                    FROM tx_hashes
-                    INNER JOIN executed_transactions
-                        ON tx_hashes.tx_hash = executed_transactions.tx_hash
-                ORDER BY sequence_number DESC
-                LIMIT 1
-                ), priority_ops AS (
-                    SELECT executed_priority_operations.tx_hash, executed_priority_operations.sequence_number
-                    FROM tx_hashes
-                    INNER JOIN executed_priority_operations
-                        ON tx_hashes.tx_hash = executed_priority_operations.tx_hash
-                ORDER BY sequence_number DESC
-                LIMIT 1
-                ), everything AS (
-                    SELECT * FROM transactions
-                    UNION ALL
-                    SELECT * FROM priority_ops
-                )
-                SELECT
-                    tx_hash as "tx_hash!"
-                FROM everything
-                ORDER BY sequence_number DESC
+            SELECT tx_hash as "tx_hash!"
+                FROM tx_filters as f
+                WHERE address = $1
+                ORDER BY
+                    GREATEST
+                    (
+                        (SELECT t1.sequence_number FROM executed_transactions AS t1 WHERE t1.tx_hash = f.tx_hash ORDER BY t1.sequence_number DESC LIMIT 1 ),
+                        (SELECT t2.sequence_number FROM executed_priority_operations AS t2 WHERE t2.tx_hash = f.tx_hash ORDER BY t2.sequence_number DESC LIMIT 1 )
+                    )
+                DESC
                 LIMIT 1
             "#,
             address.as_bytes()
