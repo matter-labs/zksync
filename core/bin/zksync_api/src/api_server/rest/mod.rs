@@ -77,7 +77,9 @@ async fn start_server(
     .workers(super::THREADS_PER_SERVER)
     .bind(bind_to)
     .unwrap()
-    .shutdown_timeout(1)
+    .shutdown_timeout(60)
+    .keep_alive(10)
+    .client_timeout(60000)
     .run()
     .await
     .expect("REST API server has crashed");
