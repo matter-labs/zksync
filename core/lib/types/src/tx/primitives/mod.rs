@@ -10,5 +10,6 @@ pub mod signature_cache;
 pub mod time_range;
 pub mod tx_hash;
 
+mod eip712_signature;
 #[cfg(test)]
 mod tests;

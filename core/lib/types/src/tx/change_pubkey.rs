@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tiny_keccak::keccak256;
 
 use zksync_basic_types::{Address, TokenId, H256};
 use zksync_crypto::{
@@ -31,6 +32,7 @@ pub enum ChangePubKeyType {
     Onchain,
     ECDSA,
     CREATE2,
+    EIP712,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +41,15 @@ pub struct ChangePubKeyECDSAData {
     pub eth_signature: PackedEthSignature,
     #[serde(default)]
     pub batch_hash: H256,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangePubKeyEIP712Data {
+    pub eth_signature: PackedEthSignature,
+    pub code_hash: H256,
+    pub nonce: Nonce,
+    pub account_id: AccountId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +83,7 @@ pub enum ChangePubKeyEthAuthData {
     Onchain,
     ECDSA(ChangePubKeyECDSAData),
     CREATE2(ChangePubKeyCREATE2Data),
+    EIP712(ChangePubKeyEIP712Data),
 }
 
 impl ChangePubKeyEthAuthData {
@@ -107,6 +119,11 @@ impl ChangePubKeyEthAuthData {
                 bytes.extend_from_slice(code_hash.as_bytes());
                 bytes
             }
+            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature, .. }) => {
+                let mut bytes = vec![0x00];
+                bytes.extend_from_slice(&eth_signature.serialize_packed());
+                bytes
+            }
         }
     }
 
@@ -115,6 +132,7 @@ impl ChangePubKeyEthAuthData {
             ChangePubKeyEthAuthData::Onchain => ChangePubKeyType::Onchain,
             ChangePubKeyEthAuthData::ECDSA(_) => ChangePubKeyType::ECDSA,
             ChangePubKeyEthAuthData::CREATE2(_) => ChangePubKeyType::CREATE2,
+            ChangePubKeyEthAuthData::EIP712(_) => ChangePubKeyType::EIP712,
         }
     }
 }
@@ -377,6 +395,15 @@ impl ChangePubKey {
                 ChangePubKeyEthAuthData::CREATE2(create2_data) => {
                     let create2_address = create2_data.get_address(&self.new_pk_hash);
                     create2_address == self.account
+                }
+                ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                    eth_signature, ..
+                }) => {
+                    let recovered_address = self
+                        .get_eth_signed_data()
+                        .ok()
+                        .and_then(|msg| eth_signature.signature_recover_signer(&msg).ok());
+                    recovered_address == Some(self.account)
                 }
             }
         } else if let Some(old_eth_signature) = &self.eth_signature {
