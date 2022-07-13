@@ -1188,7 +1188,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         };
 
         let token_query = if token.is_some() {
-            "AND a.token = $2"
+            "AND token = $2"
         } else {
             ""
         };
@@ -1208,7 +1208,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 b.block_index,
                 Null::bigint as batch_id
             FROM executed_priority_operations as b
-            WHERE EXISTS ( SELECT 1 FROM tx_filters as a WHERE a.tx_hash = b.tx_hash AND a.address = $1 {} )
+            JOIN 
+                (SELECT DISTINCT tx_hash FROM tx_filters WHERE address = $1 {})
+                    as a ON a.tx_hash = b.tx_hash
              {} 
         "#,
             token_query, query_direction
@@ -1244,7 +1246,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         };
 
         let token_query = if token.is_some() {
-            "AND a.token = $2"
+            "AND token = $2"
         } else {
             ""
         };
@@ -1264,7 +1266,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     txs.block_index,
                     txs.batch_id
                 FROM executed_transactions as txs
-                WHERE EXISTS ( SELECT 1 FROM tx_filters as a WHERE a.tx_hash = txs.tx_hash AND a.address = $1 {} )
+                JOIN 
+                    (SELECT DISTINCT tx_hash FROM tx_filters WHERE address = $1 {})
+                        as a ON a.tx_hash = txs.tx_hash
                  {} 
             "#,
             token_query, query_direction
