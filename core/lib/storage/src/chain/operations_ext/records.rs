@@ -198,3 +198,9 @@ pub struct Web3TxReceipt {
     pub to_account: Option<Vec<u8>>,
     pub success: bool,
 }
+
+#[derive(Debug, FromRow, Clone, PartialEq)]
+pub struct SequenceNumberRecord {
+    pub sequence_number: i64,
+    pub is_priority: bool,
+}

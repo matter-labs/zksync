@@ -1,0 +1,13 @@
+[package]
+name = "add_seq_no"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"

@@ -89,7 +89,6 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .fetch_optional(self.0.conn())
         .await?;
-
         metrics::histogram!(
             "sql.chain.operations.get_executed_operation",
             start.elapsed()
@@ -176,19 +175,20 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             .remove_tx(&operation.tx_hash)
             .await?;
 
-        if operation.success {
+        let sequence_number: Option<i64> = if operation.success {
             // If transaction succeed, it should replace the stored tx with the same hash.
             // The situation when a duplicate tx is stored in the database may exist only if has
             // failed previously.
             // Possible scenario: user had no enough funds for transfer, then deposited some and
             // sent the same transfer again.
-
             sqlx::query!(
                 "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data, batch_id)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                 ON CONFLICT (tx_hash)
                 DO UPDATE
-                SET block_number = $1, block_index = $2, tx = $3, operation = $4, tx_hash = $5, from_account = $6, to_account = $7, success = $8, fail_reason = $9, primary_account_address = $10, nonce = $11, created_at = $12, eth_sign_data = $13, batch_id = $14",
+                SET block_number = $1, block_index = $2, tx = $3, operation = $4, tx_hash = $5, from_account = $6, to_account = $7, success = $8, fail_reason = $9, primary_account_address = $10, nonce = $11, created_at = $12, eth_sign_data = $13, batch_id = $14
+                RETURNING sequence_number
+                ",
                 operation.block_number,
                 operation.block_index,
                 operation.tx,
@@ -204,15 +204,18 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 operation.eth_sign_data,
                 operation.batch_id,
             )
-            .execute(transaction.conn())
-            .await?;
+            .fetch_optional(transaction.conn())
+            .await?.map(|a| a.sequence_number).flatten()
         } else {
             // If transaction failed, we do nothing on conflict.
             sqlx::query!(
-                "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data, batch_id)
+                "
+                INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data, batch_id)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                 ON CONFLICT (tx_hash)
-                DO NOTHING",
+                DO NOTHING
+                RETURNING sequence_number
+                ",
                 operation.block_number,
                 operation.block_index,
                 operation.tx,
@@ -228,33 +231,34 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 operation.eth_sign_data,
                 operation.batch_id,
             )
+            .fetch_optional(transaction.conn())
+            .await?.map(|a| a.sequence_number).flatten()
+        };
+        if let Some(seq_no) = sequence_number {
+            let mut addresses = Vec::new();
+            let mut tokens = Vec::new();
+            for address in operation.affected_accounts {
+                for token in operation.used_tokens.iter() {
+                    addresses.push(address.clone());
+                    tokens.push(*token);
+                }
+            }
+            sqlx::query!(
+                "
+                INSERT INTO tx_filters (address, token, tx_hash, sequence_number, is_priority)
+                SELECT u.address, u.token, $3, $4, false
+                    FROM UNNEST ($1::bytea[], $2::integer[])
+                    AS u(address, token)
+                ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING
+                ",
+                &addresses,
+                &tokens,
+                &operation.tx_hash,
+                &seq_no
+            )
             .execute(transaction.conn())
             .await?;
-        };
-
-        let mut addresses = Vec::new();
-        let mut tokens = Vec::new();
-        for address in operation.affected_accounts {
-            for token in operation.used_tokens.iter() {
-                addresses.push(address.clone());
-                tokens.push(*token);
-            }
         }
-        sqlx::query!(
-            "
-            INSERT INTO tx_filters (address, token, tx_hash)
-            SELECT u.address, u.token, $3
-                FROM UNNEST ($1::bytea[], $2::integer[])
-                AS u(address, token)
-            ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING
-            ",
-            &addresses,
-            &tokens,
-            &operation.tx_hash
-        )
-        .execute(transaction.conn())
-        .await?;
-
         transaction.commit().await?;
         metrics::histogram!("sql.chain.operations.store_executed_tx", start.elapsed());
         // It's almost impossible situation, but it could be triggered in tests
@@ -273,8 +277,9 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let offset = Utc::now() - max_age;
         let tx_hashes: Vec<Vec<u8>> = sqlx::query!(
             r#"
-        SELECT tx_hash FROM executed_transactions 
-        WHERE success = false AND created_at < $1 LIMIT 1000"#,
+            SELECT tx_hash FROM executed_transactions 
+            WHERE success = false AND created_at < $1 LIMIT 1000
+            "#,
             offset
         )
         .fetch_all(transaction.conn())
@@ -321,12 +326,14 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             .remove_priority_op_from_mempool(operation.priority_op_serialid)
             .await?;
 
-        sqlx::query!(
+        let sequence_number: Option<i64>= sqlx::query!(
             "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account,
                 priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, eth_block_index, tx_hash)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (priority_op_serialid)
-            DO NOTHING",
+            DO NOTHING
+            RETURNING sequence_number
+            ",
             operation.block_number,
             operation.block_index,
             operation.operation,
@@ -340,26 +347,29 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             operation.eth_block_index,
             operation.tx_hash,
         )
-        .execute(transaction.conn())
-        .await?;
+        .fetch_optional(transaction.conn())
+        .await?.map(|a| a.sequence_number).flatten();
 
         let mut tokens = Vec::new();
         tokens.resize(operation.affected_accounts.len(), operation.token);
 
-        sqlx::query!(
-            "
-            INSERT INTO tx_filters (address, token, tx_hash)
-            SELECT u.address, u.token, $3
-                FROM UNNEST ($1::bytea[], $2::integer[])
-                AS u(address, token)
-            ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING
-            ",
-            &operation.affected_accounts,
-            &tokens,
-            &operation.tx_hash
-        )
-        .execute(transaction.conn())
-        .await?;
+        if let Some(seq_no) = sequence_number {
+            sqlx::query!(
+                "
+                INSERT INTO tx_filters (address, token, tx_hash, sequence_number, is_priority)
+                SELECT u.address, u.token, $3, $4, true
+                    FROM UNNEST ($1::bytea[], $2::integer[])
+                    AS u(address, token)
+                ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING
+                ",
+                &operation.affected_accounts,
+                &tokens,
+                &operation.tx_hash,
+                seq_no
+            )
+            .execute(transaction.conn())
+            .await?;
+        }
 
         transaction.commit().await?;
         metrics::histogram!(
