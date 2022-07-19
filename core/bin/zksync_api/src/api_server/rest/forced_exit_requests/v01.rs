@@ -154,7 +154,10 @@ pub async fn submit_request(
             valid_until,
         })
         .await
-        .map_err(|_| ApiError::internal(""))?;
+        .map_err(|err| {
+            vlog::error!("Store forced exit error {:?}", err);
+            ApiError::internal("Database error")
+        })?;
 
     check_address_space_overflow(saved_fe_request.id, data.digits_in_id);
 

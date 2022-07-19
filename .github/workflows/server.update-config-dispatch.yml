@@ -32,7 +32,7 @@ jobs:
       namespace: ${{ needs.setup.outputs.release-namespace }}
       restart: ${{ github.event.inputs.restart }}
     secrets:
-      github-token: ${{ secrets.GH_TOKEN }}
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   notify:
     runs-on: ubuntu-latest

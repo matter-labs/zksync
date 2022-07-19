@@ -264,6 +264,7 @@ async fn run_server(components: &ComponentsToRun) {
             let private_config = PrivateApiConfig::from_env();
             tasks.push(zksync_api::api_server::rest::start_server_thread_detached(
                 read_only_connection_pool.clone(),
+                connection_pool.clone(),
                 RestApiConfig::from_env().bind_addr(),
                 contracts_config.contract_addr,
                 ticker,

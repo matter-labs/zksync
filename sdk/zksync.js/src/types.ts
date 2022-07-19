@@ -16,19 +16,23 @@ export type TotalFee = Map<TokenLike, BigNumber>;
 
 export type Nonce = number | 'committed';
 
-export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
+export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'goerli-beta';
 
 const MAINNET_NETWORK_CHAIN_ID = 1;
 const ROPSTEN_NETWORK_CHAIN_ID = 3;
 const RINKEBY_NETWORK_CHAIN_ID = 4;
+const GOERLI_NETWORK_CHAIN_ID = 5;
 const LOCALHOST_NETWORK_CHAIN_ID = 9;
 
 export function l1ChainId(network?: Network): number {
     if (network === 'rinkeby' || network === 'rinkeby-beta') {
         return RINKEBY_NETWORK_CHAIN_ID;
     }
-    if (network === 'ropsten' || network === 'ropsten-beta') {
+    if (network === 'ropsten') {
         return ROPSTEN_NETWORK_CHAIN_ID;
+    }
+    if (network === 'goerli-beta') {
+        return GOERLI_NETWORK_CHAIN_ID;
     }
     if (network === 'mainnet') {
         return MAINNET_NETWORK_CHAIN_ID;

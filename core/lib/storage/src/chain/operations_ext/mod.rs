@@ -26,6 +26,7 @@ use self::records::{
     AccountCreatedAt, InBlockBatchTx, PriorityOpReceiptResponse, StorageTxData, StorageTxReceipt,
     TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse, Web3TxData, Web3TxReceipt,
 };
+use crate::chain::operations_ext::records::SequenceNumberRecord;
 use crate::{
     chain::{
         block::records::TransactionItem,
@@ -1039,36 +1040,47 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     )
                     .await?
             } else {
-                let mut txs = transaction
+                let mut priority_seq_numbers = vec![];
+                let mut executed_sequence_numbers = vec![];
+                transaction
                     .chain()
                     .operations_ext_schema()
-                    .get_executed_txs_for_account(
+                    .get_tx_seq_numbers_for_account(
                         query.from.address,
                         query.from.token,
                         i64::from(query.limit),
                         id_from,
                         query.direction,
                     )
+                    .await?
+                    .iter()
+                    .for_each(|record| {
+                        if record.is_priority {
+                            priority_seq_numbers.push(record.sequence_number)
+                        } else {
+                            executed_sequence_numbers.push(record.sequence_number)
+                        }
+                    });
+
+                let mut txs = transaction
+                    .chain()
+                    .operations_ext_schema()
+                    .get_executed_txs_for_account(executed_sequence_numbers)
                     .await?;
+
                 txs.append(
                     &mut transaction
                         .chain()
                         .operations_ext_schema()
-                        .get_priority_operations_for_account(
-                            query.from.address,
-                            query.from.token,
-                            i64::from(query.limit),
-                            id_from,
-                            query.direction,
-                        )
+                        .get_priority_operations_for_account(priority_seq_numbers)
                         .await?,
                 );
+
                 txs.into_iter()
                     .sorted_by(|tx1, tx2| match query.direction {
                         PaginationDirection::Newer => tx1.created_at.cmp(&tx2.created_at),
                         PaginationDirection::Older => tx2.created_at.cmp(&tx1.created_at),
                     })
-                    .take(query.limit as usize)
                     .collect()
             };
 
@@ -1166,18 +1178,19 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .fetch_all(self.0.conn())
             .await?)
     }
-    async fn get_priority_operations_for_account(
+
+    async fn get_tx_seq_numbers_for_account(
         &mut self,
         address: Address,
         token: Option<TokenId>,
         limit: i64,
         id_from: i64,
         direction: PaginationDirection,
-    ) -> QueryResult<Vec<TransactionItem>> {
+    ) -> QueryResult<Vec<SequenceNumberRecord>> {
         let query_direction = match direction {
             PaginationDirection::Newer => {
-                "AND sequence_number  >= $3 
-                ORDER BY sequence_number 
+                "AND sequence_number  >= $3
+                ORDER BY sequence_number
                 LIMIT $4"
             }
             PaginationDirection::Older => {
@@ -1194,26 +1207,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         };
 
         let query = format!(
-            r#"
-            SELECT DISTINCT
-                executed_priority_operations.sequence_number,
-                executed_priority_operations.tx_hash,
-                operation as op,
-                block_number,
-                created_at,
-                true as success,
-                Null as fail_reason,
-                eth_hash,
-                priority_op_serialid,
-                block_index,
-                Null::bigint as batch_id
-            FROM tx_filters
-            INNER JOIN executed_priority_operations
-                ON tx_filters.tx_hash = executed_priority_operations.tx_hash
-            WHERE address = $1 {} {}
-        "#,
+            "SELECT DISTINCT sequence_number, is_priority FROM tx_filters WHERE address = $1 {} {}",
             token_query, query_direction
         );
+
         Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
             .bind(token.unwrap_or_default().0 as i32)
@@ -1223,38 +1220,47 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .await?)
     }
 
+    async fn get_priority_operations_for_account(
+        &mut self,
+        sequence_numbers: Vec<i64>,
+    ) -> QueryResult<Vec<TransactionItem>> {
+        Ok(sqlx::query_as!(
+            TransactionItem,
+            r#"
+            SELECT 
+                sequence_number,
+                tx_hash,
+                operation as op,
+                block_number,
+                created_at,
+                true as "success!",
+                Null as fail_reason,
+                eth_hash as "eth_hash?", 
+                priority_op_serialid as "priority_op_serialid?",
+                block_index as "block_index?",
+                Null::bigint as batch_id
+            FROM executed_priority_operations 
+            WHERE sequence_number IN (SELECT u.sequence_number
+                FROM UNNEST ($1::bigint[])
+                AS u(sequence_number)
+            )
+        "#,
+            &sequence_numbers
+        )
+        .fetch_all(self.0.conn())
+        .await?)
+    }
+
     async fn get_executed_txs_for_account(
         &mut self,
-        address: Address,
-        token: Option<TokenId>,
-        limit: i64,
-        id_from: i64,
-        direction: PaginationDirection,
+        sequence_numbers: Vec<i64>,
     ) -> QueryResult<Vec<TransactionItem>> {
-        let query_direction = match direction {
-            PaginationDirection::Newer => {
-                "AND txs.sequence_number >= $3
-                ORDER BY txs.sequence_number
-                LIMIT $4"
-            }
-            PaginationDirection::Older => {
-                "AND txs.sequence_number  <= $3
-                ORDER BY txs.sequence_number DESC
-                LIMIT $4"
-            }
-        };
-
-        let token_query = if token.is_some() {
-            "AND token = $2"
-        } else {
-            ""
-        };
-
-        let query = format!(
+        Ok(sqlx::query_as!(
+            TransactionItem,
             r#"
-               SELECT DISTINCT
-                    txs.sequence_number,
-                    txs.tx_hash,
+               SELECT
+                    sequence_number,
+                    tx_hash,
                     tx as op,
                     block_number,
                     created_at,
@@ -1264,21 +1270,16 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     Null::bigint as priority_op_serialid,
                     block_index,
                     batch_id
-                FROM tx_filters
-                INNER JOIN executed_transactions txs
-                    ON tx_filters.tx_hash = txs.tx_hash
-                WHERE address = $1 {} {} 
-            "#,
-            token_query, query_direction
-        );
-
-        Ok(sqlx::query_as(&query)
-            .bind(address.as_bytes())
-            .bind(token.unwrap_or_default().0 as i32)
-            .bind(id_from)
-            .bind(limit)
-            .fetch_all(self.0.conn())
-            .await?)
+                FROM executed_transactions 
+            WHERE sequence_number IN (SELECT u.sequence_number
+                FROM UNNEST ($1::bigint[])
+                AS u(sequence_number)
+            )
+        "#,
+            &sequence_numbers
+        )
+        .fetch_all(self.0.conn())
+        .await?)
     }
 
     pub async fn get_account_last_tx_hash(
@@ -1290,32 +1291,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         let record = sqlx::query!(
             r#"
-                WITH tx_hashes AS (
-                    SELECT DISTINCT tx_hash FROM tx_filters
-                    WHERE address = $1
-                ), transactions AS (
-                    SELECT executed_transactions.tx_hash, sequence_number
-                    FROM tx_hashes
-                    INNER JOIN executed_transactions
-                        ON tx_hashes.tx_hash = executed_transactions.tx_hash
-                ORDER BY sequence_number DESC
-                LIMIT 1
-                ), priority_ops AS (
-                    SELECT executed_priority_operations.tx_hash, executed_priority_operations.sequence_number
-                    FROM tx_hashes
-                    INNER JOIN executed_priority_operations
-                        ON tx_hashes.tx_hash = executed_priority_operations.tx_hash
-                ORDER BY sequence_number DESC
-                LIMIT 1
-                ), everything AS (
-                    SELECT * FROM transactions
-                    UNION ALL
-                    SELECT * FROM priority_ops
-                )
-                SELECT
-                    tx_hash as "tx_hash!"
-                FROM everything
-                ORDER BY sequence_number DESC
+            SELECT tx_hash as "tx_hash!"
+                FROM tx_filters as f
+                WHERE address = $1
+                ORDER BY sequence_number
+                DESC
                 LIMIT 1
             "#,
             address.as_bytes()
@@ -1850,26 +1830,153 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(BlockNumber(std::cmp::max(max1, max2) as u32))
     }
 
-    pub async fn save_executed_tx_filters(
+    // TODO Delete it right after execution
+    pub async fn set_unique_sequence_number_for_priority_operations(
         &mut self,
-        addresses: Vec<Vec<u8>>,
-        tokens: Vec<i32>,
-        hashes: Vec<Vec<u8>>,
-    ) -> QueryResult<()> {
+        last_seq_no: i64,
+        excluded_tx_hashes: &[Vec<u8>],
+    ) -> i64 {
+        let values = sqlx::query!(
+            r#"
+            SELECT sequence_number, tx_hash 
+            FROM executed_priority_operations 
+            WHERE sequence_number >= $1 AND tx_hash NOT IN (
+                SELECT u.tx_hash
+                FROM UNNEST ($2::bytea[])
+                AS u(tx_hash) 
+            )
+            ORDER BY sequence_number LIMIT 1000
+            "#,
+            last_seq_no,
+            excluded_tx_hashes
+        )
+        .fetch_all(self.0.conn())
+        .await
+        .unwrap();
+        let mut last_seq_no = last_seq_no;
+        for value in values {
+            sqlx::query!(
+                "UPDATE tx_filters SET sequence_number = $1, is_priority = true WHERE tx_hash = $2",
+                value.sequence_number.unwrap(),
+                value.tx_hash
+            )
+            .execute(self.0.conn())
+            .await
+            .unwrap();
+            last_seq_no = value.sequence_number.unwrap();
+        }
+        last_seq_no
+    }
+
+    // TODO Delete it right after execution
+    pub async fn set_seq_no_for_executed_txs(&mut self, last_seq_no: i64) -> i64 {
+        let values = sqlx::query!(
+            r#"
+            SELECT sequence_number, tx_hash 
+            FROM executed_transactions where sequence_number >= $1 
+            ORDER BY sequence_number 
+            LIMIT 1000"#,
+            last_seq_no
+        )
+        .fetch_all(self.0.conn())
+        .await
+        .unwrap();
+
+        let mut last_seq_no = last_seq_no;
+        for value in values {
+            sqlx::query!(
+                "UPDATE tx_filters SET sequence_number = $1, is_priority=false WHERE tx_hash = $2",
+                value.sequence_number.unwrap(),
+                &value.tx_hash
+            )
+            .execute(self.0.conn())
+            .await
+            .unwrap();
+            last_seq_no = value.sequence_number.unwrap();
+        }
+        last_seq_no
+    }
+
+    // TODO Delete it right after execution
+    pub async fn get_last_seq_no(&mut self) -> i64 {
+        sqlx::query!(
+            r#"
+            SELECT MAX(sequence_number) AS MAX 
+            FROM tx_filters 
+            WHERE sequence_number IS NOT NULL
+            AND is_priority=false
+            "#
+        )
+        .fetch_one(self.0.conn())
+        .await
+        .unwrap()
+        .max
+        .unwrap_or_default()
+    }
+
+    // TODO Delete it right after execution
+    pub async fn update_non_unique_tx_filters_for_priority_ops(&mut self) -> Vec<Vec<u8>> {
+        let mut tx_hash = vec![];
+        let mut records = vec![];
+        let mut transaction = self.0.start_transaction().await.unwrap();
         sqlx::query!(
             "
-                INSERT INTO tx_filters (address, token, tx_hash)
-                SELECT u.address, u.token, u.tx_hash
-                FROM UNNEST ($1::bytea[], $2::integer[], $3::bytea[])
-                AS u(address, token, tx_hash)
-                ON CONFLICT ON CONSTRAINT tx_filters_pkey DO NOTHING
-            ",
-            &addresses,
-            &tokens,
-            &hashes
+            SELECT tx_hash, 
+                   to_account, 
+                   operation -> 'priority_op' -> 'token' as token_id, 
+                   sequence_number 
+            FROM executed_priority_operations 
+            WHERE tx_hash IN(
+                SELECT tx_hash 
+                FROM executed_priority_operations 
+                GROUP BY (tx_hash) HAVING COUNT(*) > 1
+            )
+         "
         )
-        .execute(self.0.conn())
-        .await?;
+        .fetch_all(transaction.conn())
+        .await
+        .unwrap()
+        .iter()
+        .for_each(|a| {
+            tx_hash.push(a.tx_hash.as_ref().unwrap().clone());
+            records.push((
+                a.tx_hash.as_ref().unwrap().clone(),
+                a.to_account.as_ref().unwrap().clone(),
+                a.token_id.as_ref().unwrap().as_i64().unwrap() as i32,
+                a.sequence_number.unwrap(),
+            ));
+        });
+        transaction
+            .chain()
+            .operations_ext_schema()
+            .update_executed_tx_filters(records)
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+        tx_hash
+    }
+
+    // TODO Delete it right after execution
+    pub async fn update_executed_tx_filters(
+        &mut self,
+        records: Vec<(Vec<u8>, Vec<u8>, i32, i64)>,
+    ) -> QueryResult<()> {
+        for (tx_hash, address, token, sequence_number) in records {
+            sqlx::query!(
+                r#"
+                UPDATE tx_filters 
+                SET sequence_number=$1, is_priority=true 
+                WHERE tx_hash = $2 AND address=$3 AND token=$4
+                "#,
+                sequence_number,
+                tx_hash,
+                address,
+                token
+            )
+            .execute(self.0.conn())
+            .await?;
+        }
+
         Ok(())
     }
 }

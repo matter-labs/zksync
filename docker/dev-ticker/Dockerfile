@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:experimental
-FROM rust:1.55 as builder
+FROM rust:1.59 as builder
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo install sccache
 WORKDIR /usr/src/zksync
@@ -7,7 +7,7 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/root/.cache/sccache \
     RUSTC_WRAPPER=/usr/local/cargo/bin/sccache \
-    cargo build --release
+    cargo build --bin dev-ticker-server --release
 
 FROM debian:bullseye
 RUN apt update

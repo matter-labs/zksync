@@ -25,6 +25,7 @@ use zksync_types::{block::ExecutedOperations, BlockNumber, PriorityOp, H160, H25
 pub struct ApiV01 {
     pub(crate) caches: Caches,
     pub(crate) connection_pool: ConnectionPool,
+    pub(crate) main_database_connection_pool: ConnectionPool,
     pub(crate) network_status: SharedNetworkStatus,
     pub(crate) contract_address: String,
     pub(crate) config: ZkSyncConfig,
@@ -33,6 +34,7 @@ pub struct ApiV01 {
 impl ApiV01 {
     pub fn new(
         connection_pool: ConnectionPool,
+        main_database_connection_pool: ConnectionPool,
         contract_address: H160,
         config: ZkSyncConfig,
         network_status: SharedNetworkStatus,
@@ -40,6 +42,7 @@ impl ApiV01 {
         Self {
             caches: Caches::new(config.api.common.caches_size),
             connection_pool,
+            main_database_connection_pool,
             network_status,
             contract_address: format!("{:?}", contract_address),
             config,

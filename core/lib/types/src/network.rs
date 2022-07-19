@@ -21,6 +21,8 @@ pub enum Network {
     /// Ethereum Rinkeby testnet.
     Rinkeby,
     /// Ethereum Ropsten testnet.
+    Goerli,
+    /// Ethereum Goerli testnet.
     Ropsten,
     /// Self-hosted Ethereum & zkSync networks.
     Localhost,
@@ -38,6 +40,7 @@ impl FromStr for Network {
             "mainnet" => Self::Mainnet,
             "rinkeby" => Self::Rinkeby,
             "ropsten" => Self::Ropsten,
+            "goerli" => Self::Goerli,
             "localhost" => Self::Localhost,
             "test" => Self::Test,
             another => return Err(another.to_owned()),
@@ -52,6 +55,7 @@ impl fmt::Display for Network {
             Self::Rinkeby => write!(f, "rinkeby"),
             Self::Ropsten => write!(f, "ropsten"),
             Self::Localhost => write!(f, "localhost"),
+            Network::Goerli => write!(f, "goerli"),
             Self::Unknown => write!(f, "unknown"),
             Self::Test => write!(f, "test"),
         }
@@ -65,6 +69,7 @@ impl Network {
             Network::Mainnet => 1,
             Network::Ropsten => 3,
             Network::Rinkeby => 4,
+            Network::Goerli => 5,
             Network::Localhost => 9,
             Network::Unknown => panic!("Unknown chain ID"),
             Network::Test => panic!("Test chain ID"),

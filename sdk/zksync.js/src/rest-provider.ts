@@ -15,9 +15,9 @@ export async function getDefaultRestProvider(
         return await RestProvider.newProvider('https://ropsten-api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
     } else if (network === 'rinkeby') {
         return await RestProvider.newProvider('https://rinkeby-api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
-    } else if (network === 'ropsten-beta') {
+    } else if (network === 'goerli-beta') {
         return await RestProvider.newProvider(
-            'https://ropsten-beta-api.zksync.io/api/v0.2',
+            'https://goerli-beta-api.zksync.dev/api/v0.2',
             pollIntervalMilliSecs,
             network
         );
