@@ -353,6 +353,7 @@ mod tests {
                     &cfg.config.api.common,
                     &cfg.config.api.token_config,
                     sender.clone(),
+                    cfg.config.eth_client.chain_id as u32,
                 ))
             },
             Some(shared_data),

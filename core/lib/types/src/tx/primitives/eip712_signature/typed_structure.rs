@@ -2,7 +2,7 @@ use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::tx::primitives::eip712_signature::{StructBuilder, TypeBuilder};
+use crate::tx::primitives::eip712_signature::{EncodeBuilder, StructBuilder, TypeBuilder};
 use crate::{H256, U256};
 
 #[derive(Debug, Clone)]

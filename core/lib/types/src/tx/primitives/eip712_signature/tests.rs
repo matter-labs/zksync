@@ -1,9 +1,9 @@
-use crate::tx::primitives::eip712_signature::EIP712TypedStructure;
 use crate::tx::primitives::eip712_signature::{
     struct_builder::StructBuilder,
     typed_structure::{EIP712TypedStructure, Eip712Domain},
+    utils::get_eip712_json,
 };
-use crate::tx::primitives::{eip712_signature::utils::get_eip712_json, PackedEthSignature};
+use crate::tx::PackedEthSignature;
 use parity_crypto::Keccak256;
 use serde::Serialize;
 use std::str::FromStr;
@@ -108,11 +108,13 @@ fn test_encode_eip712_typed_struct() {
     let address_owner = PackedEthSignature::address_from_private_key(&private_key).unwrap();
 
     let signature = PackedEthSignature::sign_typed_data(&private_key, &domain, &message).unwrap();
-    let signed_bytes = PackedEthSignature::typed_data_to_signed_bytes(&domain, &message);
+    let signed_bytes = PackedEthSignature::typed_data_to_signed_message(&domain, &message);
 
     assert_eq!(
         address_owner,
-        signature.signature_recover_signer(&signed_bytes).unwrap()
+        signature
+            .signature_recover_signer_from_raw_message(&signed_bytes)
+            .unwrap()
     );
 }
 

@@ -4,7 +4,7 @@ mod change_pubkey;
 mod close;
 mod forced_exit;
 mod mint_nft;
-mod primitives;
+pub mod primitives;
 mod swap;
 mod transfer;
 mod version;
@@ -21,8 +21,8 @@ mod tests;
 pub use self::close::Close;
 pub use self::{
     change_pubkey::{
-        ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
-        ChangePubKeyType,
+        ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEIP712Data,
+        ChangePubKeyEthAuthData, ChangePubKeyType,
     },
     error::TransactionError,
     forced_exit::ForcedExit,

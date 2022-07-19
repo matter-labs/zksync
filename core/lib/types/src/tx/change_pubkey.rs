@@ -4,7 +4,6 @@ use std::fmt::{Display, Formatter};
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tiny_keccak::keccak256;
 
 use zksync_basic_types::{Address, TokenId, H256};
 use zksync_crypto::{
@@ -15,15 +14,18 @@ use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{PackedEthSignature, TimeRange, TxSignature, VerifiedSignatureCache};
 use crate::tx::error::{
-    FEE_AMOUNT_IS_NOT_PACKABLE, INVALID_AUTH_DATA, WRONG_ACCOUNT_ID, WRONG_FEE_ERROR,
-    WRONG_SIGNATURE, WRONG_TIME_RANGE, WRONG_TOKEN_FOR_PAYING_FEE,
+    ChangePubkeySignedDataError, FEE_AMOUNT_IS_NOT_PACKABLE, INVALID_AUTH_DATA, WRONG_ACCOUNT_ID,
+    WRONG_FEE_ERROR, WRONG_SIGNATURE, WRONG_TIME_RANGE, WRONG_TOKEN_FOR_PAYING_FEE,
 };
+
 use crate::{
     account::PubKeyHash,
     helpers::{is_fee_amount_packable, pack_fee_amount},
     tokens::ChangePubKeyFeeTypeArg,
-    tx::error::ChangePubkeySignedDataError,
-    tx::version::TxVersion,
+    tx::{
+        primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain, StructBuilder},
+        version::TxVersion,
+    },
     AccountId, Nonce, TxFeeTypes,
 };
 
@@ -47,9 +49,6 @@ pub struct ChangePubKeyECDSAData {
 #[serde(rename_all = "camelCase")]
 pub struct ChangePubKeyEIP712Data {
     pub eth_signature: PackedEthSignature,
-    pub code_hash: H256,
-    pub nonce: Nonce,
-    pub account_id: AccountId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,7 +118,7 @@ impl ChangePubKeyEthAuthData {
                 bytes.extend_from_slice(code_hash.as_bytes());
                 bytes
             }
-            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature, .. }) => {
+            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature }) => {
                 let mut bytes = vec![0x00];
                 bytes.extend_from_slice(&eth_signature.serialize_packed());
                 bytes
@@ -175,6 +174,8 @@ pub struct ChangePubKey {
     pub time_range: Option<TimeRange>,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
+    #[serde(skip)]
+    pub chain_id: Option<u32>,
 }
 
 impl ChangePubKey {
@@ -196,6 +197,7 @@ impl ChangePubKey {
         time_range: TimeRange,
         signature: Option<TxSignature>,
         eth_signature: Option<PackedEthSignature>,
+        chain_id: Option<u32>,
     ) -> Self {
         // TODO: support CREATE2 (ZKS-452)
         let eth_auth_data = Some(
@@ -221,6 +223,7 @@ impl ChangePubKey {
             eth_auth_data,
             cached_signer: VerifiedSignatureCache::NotCached,
             time_range: Some(time_range),
+            chain_id,
         };
         if signature.is_some() {
             tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
@@ -241,6 +244,7 @@ impl ChangePubKey {
         time_range: TimeRange,
         eth_signature: Option<PackedEthSignature>,
         private_key: &PrivateKey,
+        chain_id: Option<u32>,
     ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             account_id,
@@ -252,6 +256,7 @@ impl ChangePubKey {
             time_range,
             None,
             eth_signature,
+            chain_id,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         tx.check_correctness()?;
@@ -386,31 +391,37 @@ impl ChangePubKey {
             match eth_auth_data {
                 ChangePubKeyEthAuthData::Onchain => true, // Should query Ethereum to check it
                 ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { eth_signature, .. }) => {
-                    let recovered_address = self
-                        .get_eth_signed_data()
-                        .ok()
-                        .and_then(|msg| eth_signature.signature_recover_signer(&msg).ok());
+                    let recovered_address = self.get_eth_signed_data().ok().and_then(|msg| {
+                        eth_signature
+                            .signature_recover_signer_from_raw_message(&msg)
+                            .ok()
+                    });
                     recovered_address == Some(self.account)
                 }
                 ChangePubKeyEthAuthData::CREATE2(create2_data) => {
                     let create2_address = create2_data.get_address(&self.new_pk_hash);
                     create2_address == self.account
                 }
-                ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
-                    eth_signature, ..
-                }) => {
-                    let recovered_address = self
-                        .get_eth_signed_data()
-                        .ok()
-                        .and_then(|msg| eth_signature.signature_recover_signer(&msg).ok());
-                    recovered_address == Some(self.account)
+                ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature }) => {
+                    if let Some(chain_id) = self.chain_id {
+                        let domain = Eip712Domain::new(chain_id);
+
+                        let data = PackedEthSignature::typed_data_to_signed_bytes(&domain, self);
+                        let recovered_address =
+                            eth_signature.signature_recover_signer_from_hash(data).ok();
+                        recovered_address == Some(self.account)
+                    } else {
+                        vlog::warn!("No chain id for EIP712 data");
+                        false
+                    }
                 }
             }
         } else if let Some(old_eth_signature) = &self.eth_signature {
-            let recovered_address = self
-                .get_old_eth_signed_data()
-                .ok()
-                .and_then(|msg| old_eth_signature.signature_recover_signer(&msg).ok());
+            let recovered_address = self.get_old_eth_signed_data().ok().and_then(|msg| {
+                old_eth_signature
+                    .signature_recover_signer_from_raw_message(&msg)
+                    .ok()
+            });
             recovered_address == Some(self.account)
         } else {
             true
@@ -546,5 +557,15 @@ impl Display for TransactionError {
             TransactionError::InvalidAuthData => INVALID_AUTH_DATA,
         };
         write!(f, "{}", error)
+    }
+}
+
+impl EIP712TypedStructure for ChangePubKey {
+    const TYPE_NAME: &'static str = "ChangePubKey";
+
+    fn build_structure<BUILDER: StructBuilder>(&self, builder: &mut BUILDER) {
+        builder.add_member("pubKeyHash", &H256::from_slice(&self.new_pk_hash.data));
+        builder.add_member("nonce", &self.nonce.0);
+        builder.add_member("accountId", &self.account_id.0);
     }
 }

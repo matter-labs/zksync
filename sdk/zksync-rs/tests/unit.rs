@@ -434,6 +434,7 @@ mod signatures_with_vectors {
                         token,
                         change_pubkey_tx.fee.clone(),
                         change_pubkey_tx.time_range,
+                        None,
                     )
                     .await
                     .expect("Change pub key signing error");

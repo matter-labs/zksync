@@ -54,6 +54,7 @@ impl RpcApp {
         config: &CommonApiConfig,
         token_config: &TokenConfig,
         confirmations_for_eth_event: u64,
+        chain_id: u32,
         mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
         let api_requests_caches_size = config.caches_size;
@@ -65,6 +66,7 @@ impl RpcApp {
             config,
             token_config,
             mempool_tx_sender,
+            chain_id,
         );
 
         RpcApp {
@@ -265,6 +267,7 @@ pub fn start_rpc_server(
     common_api_config: &CommonApiConfig,
     token_config: &TokenConfig,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+    chain_id: u32,
     confirmations_for_eth_event: u64,
 ) -> JoinHandle<()> {
     let addr = config.http_bind_addr();
@@ -275,6 +278,7 @@ pub fn start_rpc_server(
         common_api_config,
         token_config,
         confirmations_for_eth_event,
+        chain_id,
         mempool_tx_sender,
     );
 

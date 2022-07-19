@@ -6,6 +6,8 @@ use num::BigUint;
 use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng, SeedableRng, XorShiftRng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
+use zksync_types::tx::primitives::eip712_signature::Eip712Domain;
+use zksync_types::tx::ChangePubKeyEIP712Data;
 use zksync_types::{
     tx::{
         ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
@@ -14,6 +16,8 @@ use zksync_types::{
     AccountId, Address, Close, ForcedExit, MintNFT, Nonce, Order, PubKeyHash, Swap, TokenId,
     Transfer, Withdraw, WithdrawNFT,
 };
+
+const CHAIN_ID: u32 = 64;
 
 #[derive(Debug, Clone)]
 pub enum ZkSyncETHAccountData {
@@ -489,6 +493,7 @@ impl ZkSyncAccount {
             time_range,
             None,
             &self.private_key,
+            Some(CHAIN_ID),
         )
         .expect("Can't sign ChangePubKey operation");
 
@@ -514,6 +519,20 @@ impl ZkSyncAccount {
                     ChangePubKeyEthAuthData::CREATE2(create2_data.clone())
                 } else {
                     panic!("CREATE2 ChangePubKey can only be executed for CREATE2 account");
+                }
+            }
+            ChangePubKeyType::EIP712 => {
+                if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                    let domain = Eip712Domain::new(CHAIN_ID);
+                    let eth_signature = PackedEthSignature::sign_typed_data(
+                        eth_private_key,
+                        &domain,
+                        &change_pubkey,
+                    )
+                    .expect("Signature should succeed");
+                    ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature })
+                } else {
+                    panic!("ECDSA ChangePubKey can only be executed for EOA account");
                 }
             }
         };

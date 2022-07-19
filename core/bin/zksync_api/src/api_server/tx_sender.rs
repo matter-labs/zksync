@@ -80,6 +80,7 @@ pub struct TxSender {
     pub current_subsidy_type: String,
     pub max_subsidy_usd: Ratio<BigUint>,
     pub subsidized_ips: HashSet<String>,
+    pub chain_id: u32,
 }
 
 #[derive(Debug, Error)]
@@ -149,6 +150,7 @@ impl TxSender {
         config: &CommonApiConfig,
         token_config: &TokenConfig,
         mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+        chain_id: u32,
     ) -> Self {
         let max_number_of_transactions_per_batch =
             config.max_number_of_transactions_per_batch as usize;
@@ -172,6 +174,7 @@ impl TxSender {
             current_subsidy_type: config.subsidy_name.clone(),
             max_subsidy_usd: config.max_subsidy_usd(),
             subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
+            chain_id,
         }
     }
 
@@ -483,7 +486,7 @@ impl TxSender {
 
     pub async fn submit_tx(
         &self,
-        tx: ZkSyncTx,
+        mut tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
         extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
@@ -502,6 +505,9 @@ impl TxSender {
         if let ZkSyncTx::ForcedExit(forced_exit) = &tx {
             self.check_forced_exit(forced_exit).await?;
         }
+        if let ZkSyncTx::ChangePubKey(change_pub_key) = &mut tx {
+            change_pub_key.chain_id = Some(self.chain_id)
+        };
 
         // Resolve the token.
         let token = self.token_info_from_id(tx.token_id()).await?;

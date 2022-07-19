@@ -203,6 +203,7 @@ async fn run_server(components: &ComponentsToRun) {
         let token_config = TokenConfig::from_env();
         let chain_config = ChainConfig::from_env();
         let fee_ticker_config = TickerConfig::from_env();
+        let eth_client_config = ETHClientConfig::from_env();
         let ticker_info = Box::new(TickerInfo::new(read_only_connection_pool.clone()));
 
         let ticker = FeeTicker::new_with_default_validator(
@@ -230,6 +231,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.miniblock_iteration_interval(),
                 mempool_tx_request_sender,
                 eth_watch_config.confirmations_for_eth_event,
+                eth_client_config.chain_id as u32,
             ));
         }
 
@@ -249,6 +251,7 @@ async fn run_server(components: &ComponentsToRun) {
                 &common_config,
                 &token_config,
                 mempool_tx_request_sender,
+                eth_client_config.chain_id as u32,
                 eth_watch_config.confirmations_for_eth_event,
             ));
         }
@@ -269,6 +272,7 @@ async fn run_server(components: &ComponentsToRun) {
                 contracts_config.contract_addr,
                 ticker,
                 sign_check_sender,
+                eth_client_config.chain_id as u32,
                 mempool_tx_request_sender,
                 private_config.url,
             ));

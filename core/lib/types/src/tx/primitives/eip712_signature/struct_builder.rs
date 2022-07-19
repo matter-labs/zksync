@@ -3,10 +3,6 @@ use serde_json::Value;
 use std::collections::{BTreeMap, VecDeque};
 use zksync_basic_types::H256;
 
-use crate::tx::primitives::eip712_signature::typed_structure::{
-    EncodedStructureMember, StructMember,
-};
-
 /// Interface that collects members of the structure into the structure of the EIP-712 standard.
 pub trait StructBuilder {
     fn new() -> Self;

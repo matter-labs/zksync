@@ -72,6 +72,7 @@ pub fn create_change_pubkey_tx() -> ExecutedOperations {
             Default::default(),
             None,
             None,
+            None,
         ),
         account_id: AccountId(0),
     }));

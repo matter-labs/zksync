@@ -1,4 +1,5 @@
 pub mod eip1271_signature;
+pub mod eip712_signature;
 pub mod eth_batch_sign_data;
 pub mod eth_batch_signature;
 pub mod eth_signature;
@@ -10,6 +11,5 @@ pub mod signature_cache;
 pub mod time_range;
 pub mod tx_hash;
 
-mod eip712_signature;
 #[cfg(test)]
 mod tests;

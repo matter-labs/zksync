@@ -3,6 +3,7 @@ use crate::{EthereumSigner, SignerError};
 
 use parity_crypto::publickey::sign;
 
+use zksync_types::tx::primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::{Address, H256};
 
@@ -44,6 +45,15 @@ impl EthereumSigner for PrivateKeySigner {
         let sig = sign(&self.private_key.into(), &raw_tx.hash().into())
             .map_err(|_| SignerError::NoSigningKey)?;
         Ok(raw_tx.rlp_encode_tx(sig))
+    }
+
+    async fn sign_typed_data<S: EIP712TypedStructure + Sync>(
+        &self,
+        eip712_domain: &Eip712Domain,
+        typed_struct: &S,
+    ) -> Result<PackedEthSignature, SignerError> {
+        PackedEthSignature::sign_typed_data(&self.private_key, eip712_domain, typed_struct)
+            .map_err(|err| SignerError::SigningFailed(err.to_string()))
     }
 }
 

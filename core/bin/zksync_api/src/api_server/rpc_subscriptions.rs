@@ -188,6 +188,7 @@ pub fn start_ws_server(
     miniblock_iteration_interval: Duration,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     confirmations_for_eth_event: u64,
+    chain_id: u32,
 ) -> JoinHandle<()> {
     let addr = config.ws_bind_addr();
 
@@ -208,6 +209,7 @@ pub fn start_ws_server(
         common_config,
         token_config,
         confirmations_for_eth_event,
+        chain_id,
         mempool_tx_sender,
     );
 

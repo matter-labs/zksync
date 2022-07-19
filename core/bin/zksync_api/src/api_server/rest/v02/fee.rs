@@ -172,6 +172,7 @@ mod tests {
                     &cfg.config.api.common,
                     &cfg.config.api.token_config,
                     mempool_tx_request_sender.clone(),
+                    cfg.config.eth_client.chain_id as u32,
                 ))
             },
             Some(shared_data),

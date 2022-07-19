@@ -75,6 +75,7 @@ impl<S: EthereumSigner> Signer<S> {
         self.account_id
     }
 
+    // TODO Refactor
     pub async fn sign_change_pubkey_tx(
         &self,
         nonce: Nonce,
@@ -82,6 +83,7 @@ impl<S: EthereumSigner> Signer<S> {
         fee_token: Token,
         fee: BigUint,
         time_range: TimeRange,
+        chain_id: Option<u32>,
     ) -> Result<ChangePubKey, SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -95,6 +97,7 @@ impl<S: EthereumSigner> Signer<S> {
             time_range,
             None,
             &self.private_key,
+            chain_id,
         )
         .map_err(signing_failed_error)?;
 
