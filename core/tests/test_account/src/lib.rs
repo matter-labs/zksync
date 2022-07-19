@@ -532,7 +532,7 @@ impl ZkSyncAccount {
                     .expect("Signature should succeed");
                     ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature })
                 } else {
-                    panic!("ECDSA ChangePubKey can only be executed for EOA account");
+                    panic!("EIP712 ChangePubKey can only be executed for EOA account");
                 }
             }
         };

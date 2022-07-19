@@ -7,8 +7,8 @@ use zksync_crypto::PrivateKey;
 use zksync_eth_signer::{error::SignerError, EthereumSigner};
 use zksync_types::{
     tx::{
-        ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature,
-        TimeRange, TxEthSignature,
+        primitives::eip712_signature::Eip712Domain, ChangePubKey, ChangePubKeyEIP712Data,
+        ChangePubKeyEthAuthData, PackedEthSignature, TimeRange, TxEthSignature,
     },
     AccountId, Address, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, TokenId, Transfer, Withdraw,
     WithdrawNFT, H256,
@@ -75,7 +75,6 @@ impl<S: EthereumSigner> Signer<S> {
         self.account_id
     }
 
-    // TODO Refactor
     pub async fn sign_change_pubkey_tx(
         &self,
         nonce: Nonce,
@@ -109,26 +108,18 @@ impl<S: EthereumSigner> Signer<S> {
                 .as_ref()
                 .ok_or(SignerError::MissingEthSigner)?;
 
-            let sign_bytes = change_pubkey
-                .get_eth_signed_data()
-                .map_err(signing_failed_error)?;
+            let chain_id = chain_id.ok_or(SignerError::CustomError(
+                "Can't sign eip712 without chain id".to_string(),
+            ))?;
+            let domain = Eip712Domain::new(chain_id);
             let eth_signature = eth_signer
-                .sign_message(&sign_bytes)
+                .sign_typed_data(&domain, &change_pubkey)
                 .await
-                .map_err(signing_failed_error)?;
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
 
-            let eth_signature = match eth_signature {
-                TxEthSignature::EthereumSignature(packed_signature) => Ok(packed_signature),
-                TxEthSignature::EIP1271Signature(..) => Err(SignerError::CustomError(
-                    "Can't sign ChangePubKey message with EIP1271 signer".to_string(),
-                )),
-            }?;
-
-            ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
-                eth_signature,
-                batch_hash: H256::zero(),
-            })
+            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature })
         };
+
         change_pubkey.eth_auth_data = Some(eth_auth_data);
 
         assert!(
