@@ -452,26 +452,32 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     pub async fn last_committed_block_with_update_for_acc(
         &mut self,
         account_id: AccountId,
+        block_number: BlockNumber,
     ) -> QueryResult<BlockNumber> {
         let start = Instant::now();
 
+        let block_number = *block_number as i64;
         let block_number = sqlx::query!(
             "
             SELECT GREATEST(
-                (SELECT MAX(block_number) FROM account_balance_updates
-                WHERE account_id = $1),
-                (SELECT MAX(block_number) FROM account_creates
-                WHERE account_id = $1),
-                (SELECT MAX(block_number) FROM account_pubkey_updates
-                WHERE account_id = $1)
+                (SELECT block_number FROM account_balance_updates
+                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1
+                ),
+                (SELECT block_number FROM account_creates
+                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1
+                ),
+                (SELECT block_number FROM account_pubkey_updates
+                    WHERE account_id = $1 AND block_number >= $2 ORDER BY block_number DESC LIMIT 1
+                )
             )
     ",
             i64::from(*account_id),
+            block_number,
         )
         .fetch_one(self.0.conn())
         .await?
         .greatest
-        .unwrap_or(0);
+        .unwrap_or(block_number);
 
         metrics::histogram!(
             "sql.chain.account.last_committed_block_with_update_for_acc",

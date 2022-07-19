@@ -53,7 +53,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .account_and_last_block(AccountId(1))
         .await?;
     let last_committed = AccountSchema(&mut storage)
-        .last_committed_block_with_update_for_acc(AccountId(1))
+        .last_committed_block_with_update_for_acc(AccountId(1), BlockNumber(last_finalized as u32))
         .await?;
     assert_eq!(last_finalized, 0);
     assert_eq!(*last_committed, 0);
@@ -100,7 +100,10 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             .account_and_last_block(*account_id)
             .await?;
         let last_committed = AccountSchema(&mut storage)
-            .last_committed_block_with_update_for_acc(*account_id)
+            .last_committed_block_with_update_for_acc(
+                *account_id,
+                BlockNumber(last_finalized as u32),
+            )
             .await?;
         assert_eq!(last_finalized, 0);
         assert_eq!(*last_committed, 1);
@@ -170,7 +173,10 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             .account_and_last_block(account_id)
             .await?;
         let last_committed = AccountSchema(&mut storage)
-            .last_committed_block_with_update_for_acc(account_id)
+            .last_committed_block_with_update_for_acc(
+                account_id,
+                BlockNumber(last_finalized as u32),
+            )
             .await?;
         assert_eq!(last_finalized, 1);
         assert_eq!(*last_committed, 1);

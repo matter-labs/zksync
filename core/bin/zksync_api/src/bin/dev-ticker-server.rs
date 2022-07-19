@@ -171,13 +171,15 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
     let localhost_tokens = load_tokens(&"etc/tokens/localhost.json");
     let rinkeby_tokens = load_tokens(&"etc/tokens/rinkeby.json");
     let ropsten_tokens = load_tokens(&"etc/tokens/ropsten.json");
+    let goerli_tokens = load_tokens(&"etc/tokens/goerli.json");
     let data: Vec<TokenData> = localhost_tokens
         .into_iter()
         .chain(rinkeby_tokens.into_iter())
         .chain(ropsten_tokens.into_iter())
+        .chain(goerli_tokens.into_iter())
         .collect();
     if sloppy_mode {
-        web::scope("/")
+        web::scope("")
             .app_data(web::Data::new(data))
             .route(
                 "/cryptocurrency/quotes/latest",
@@ -192,7 +194,7 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
                 web::get().to(make_sloppy!(handle_coingecko_token_price_query)),
             )
     } else {
-        web::scope("/")
+        web::scope("")
             .app_data(web::Data::new(data))
             .route(
                 "/cryptocurrency/quotes/latest",
@@ -224,27 +226,24 @@ struct FeeTickerOpts {
     sloppy: bool,
 }
 
-fn main() {
-    vlog::init();
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let _vlog_guard = vlog::init();
 
     let opts = FeeTickerOpts::from_args();
     if opts.sloppy {
         vlog::info!("Fee ticker server will run in a sloppy mode.");
     }
 
-    let runtime = actix_rt::System::new();
-    runtime.block_on(async move {
-        HttpServer::new(move || {
-            App::new()
-                .wrap(Cors::default().allow_any_origin().max_age(3600))
-                .wrap(middleware::Logger::default())
-                .service(main_scope(opts.sloppy))
-        })
-        .bind("0.0.0.0:9876")
-        .unwrap()
-        .shutdown_timeout(1)
-        .run()
-        .await
-        .expect("Server crashed");
-    });
+    HttpServer::new(move || {
+        App::new()
+            .wrap(Cors::default().allow_any_origin().max_age(3600))
+            .wrap(middleware::Logger::default())
+            .service(main_scope(opts.sloppy))
+    })
+    .bind("0.0.0.0:9876")
+    .unwrap()
+    .shutdown_timeout(1)
+    .run()
+    .await
 }

@@ -39,7 +39,7 @@ jobs:
     -
       name: update-images
       run: |
-        ci_run docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        ci_run docker login -u ${{ secrets.DOCKERHUB_USER }} -p ${{ secrets.DOCKERHUB_TOKEN }}
         ci_run zk docker push rust
     -
       name: docker-down
@@ -65,7 +65,7 @@ jobs:
       environment: ${{ needs.setup.outputs.environment }}
       namespace: ${{ needs.setup.outputs.release-namespace }}
     secrets:
-      github-token: ${{ secrets.GH_TOKEN }}
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   deploy:
     name: Deploy
@@ -79,7 +79,7 @@ jobs:
       deployment-id: ${{ needs.setup.outputs.deployment-id }}
       image-tag: ${{ needs.setup.outputs.sha-short }}
     secrets:
-      github-token: ${{ secrets.GH_TOKEN }}
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   notify:
     runs-on: ubuntu-latest

@@ -1,0 +1,11 @@
+CREATE INDEX IF NOT EXISTS ix_tx_filters_tx_hash_address  ON public.tx_filters(tx_hash, address);
+DROP INDEX IF EXISTS tokens_symbol_index;
+DROP INDEX IF EXISTS tokens_symbol_idx;
+CREATE INDEX IF NOT EXISTS tokens_symbol_lower_idx ON public.tokens (lower(symbol));
+CREATE INDEX IF NOT EXISTS ix_executed_transactions_failed_at ON executed_transactions ( created_at ) WHERE ( success = false );
+DROP INDEX IF EXISTS executed_transactions_tx_hash_idx;
+CREATE INDEX IF NOT EXISTS ix_prover_job_queue_job_type_last_block ON prover_job_queue ( job_type, last_block );
+CREATE INDEX IF NOT EXISTS ix_prover_job_queue_job_status_updated_at  ON prover_job_queue ( job_status, updated_at );
+CREATE INDEX IF NOT EXISTS aggregate_operations_action_type_to_block_true_idx ON public.aggregate_operations ( action_type, to_block ) where ( confirmed is distinct from false );
+CREATE INDEX IF NOT EXISTS aggregate_operations_action_type_to_block_false_idx ON public.aggregate_operations ( action_type, to_block ) where ( confirmed is distinct from true );
+CREATE INDEX IF NOT EXISTS aggregate_operations_action_type_to_block_idx ON public.aggregate_operations ( action_type, to_block );
