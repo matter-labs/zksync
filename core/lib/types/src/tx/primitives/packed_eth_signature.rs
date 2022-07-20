@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-use crate::tx::primitives::eip712_signature::utils::get_eip712_json;
 use crate::tx::primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 use parity_crypto::{
     publickey::{public_to_address, recover, sign, KeyPair, Signature as ETHSignature},

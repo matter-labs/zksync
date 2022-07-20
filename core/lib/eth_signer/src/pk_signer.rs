@@ -62,8 +62,7 @@ mod test {
     use super::PrivateKeySigner;
     use super::RawTransaction;
     use crate::EthereumSigner;
-    use zksync_types::tx::primitives::eip712_signature::Eip712Domain;
-    use zksync_types::tx::ChangePubKey;
+    use zksync_types::tx::{primitives::eip712_signature::Eip712Domain, ChangePubKey};
     use zksync_types::{AccountId, Nonce, PubKeyHash, H160, H256, U256};
 
     #[tokio::test]
@@ -97,13 +96,16 @@ mod test {
 
     #[tokio::test]
     async fn change_pub_key_signature() {
-        let account_id = AccountId(0xdeadba);
-
         let pubkey_hash =
             PubKeyHash::from_hex("sync:fefefefefefefefefefefefefefefefefefefefe").unwrap();
+        let account_id = AccountId(0xdeadba);
         let nonce = Nonce(0x11223344);
 
-        let domain = Eip712Domain::new(9);
+        let pk = hex::decode("d26b03c9b31e2b4d09b4761ea86b3e0a32dd23b3886c7111280d73f0c34c1841")
+            .unwrap();
+        let pk_signer = PrivateKeySigner::new(H256::from_slice(&pk));
+
+        let domain = Eip712Domain::new(31337);
         let change_pub_key = ChangePubKey::new(
             account_id,
             Default::default(),
@@ -114,16 +116,14 @@ mod test {
             Default::default(),
             None,
             None,
-            Some(9),
+            Some(31337),
         );
-        let pk = hex::decode("d26b03c9b31e2b4d09b4761ea86b3e0a32dd23b3886c7111280d73f0c34c1841")
-            .unwrap();
-        let pk_signer = PrivateKeySigner::new(H256::from_slice(&pk));
-        let result = pk_signer
+
+        let signature = pk_signer
             .sign_typed_data(&domain, &change_pub_key)
             .await
             .unwrap();
-        dbg!(result.serialize_packed());
-        panic!()
+        let expected_signature = hex::decode("ea37325672e61e170663ea4fc5db2831c6f8251c4d9e24bb247da0cc50aedd5c615f7a6b18d90e3486fc767b54785467938912301a9b3e7ba474e27cdbb56c471c").unwrap();
+        assert_eq!(signature.serialize_packed().to_vec(), expected_signature);
     }
 }
