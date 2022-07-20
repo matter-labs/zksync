@@ -122,10 +122,12 @@ impl ZkSyncOp {
     ///
     /// - `ChangePubKey`;
     pub fn eth_witness(&self) -> Option<Vec<u8>> {
-        match self {
+        let res = match self {
             ZkSyncOp::ChangePubKeyOffchain(op) => Some(op.get_eth_witness()),
             _ => None,
-        }
+        };
+        dbg!(&res);
+        res
     }
 
     /// Returns eth_witness data and data_size for operation, if any.

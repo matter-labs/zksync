@@ -117,7 +117,10 @@ impl<S: EthereumSigner> Signer<S> {
                 .await
                 .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
 
-            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature })
+            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                eth_signature,
+                batch_hash: Default::default(),
+            })
         };
 
         change_pubkey.eth_auth_data = Some(eth_auth_data);

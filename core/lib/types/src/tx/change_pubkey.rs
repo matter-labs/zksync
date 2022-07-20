@@ -49,6 +49,8 @@ pub struct ChangePubKeyECDSAData {
 #[serde(rename_all = "camelCase")]
 pub struct ChangePubKeyEIP712Data {
     pub eth_signature: PackedEthSignature,
+    #[serde(default)]
+    pub batch_hash: H256,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,7 +120,10 @@ impl ChangePubKeyEthAuthData {
                 bytes.extend_from_slice(code_hash.as_bytes());
                 bytes
             }
-            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature }) => {
+            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                eth_signature,
+                batch_hash,
+            }) => {
                 let mut bytes = vec![0x00];
                 bytes.extend_from_slice(&eth_signature.serialize_packed());
                 bytes
@@ -202,7 +207,7 @@ impl ChangePubKey {
         let eth_auth_data = Some(
             eth_signature
                 .map(|eth_signature| {
-                    ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                    ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
                         eth_signature,
                         batch_hash: H256::zero(),
                     })
@@ -333,12 +338,18 @@ impl ChangePubKey {
         eth_signed_msg.extend_from_slice(&self.nonce.to_be_bytes());
         eth_signed_msg.extend_from_slice(&self.account_id.to_be_bytes());
         // In case this transaction is not part of a batch, we simply append zeros.
-        if let Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { batch_hash, .. })) =
-            self.eth_auth_data
-        {
-            eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
-        } else {
-            eth_signed_msg.extend_from_slice(H256::default().as_bytes());
+        match &self.eth_auth_data {
+            Some(ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                batch_hash, ..
+            })) => {
+                eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
+            }
+            Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { batch_hash, .. })) => {
+                eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
+            }
+            _ => {
+                eth_signed_msg.extend_from_slice(H256::default().as_bytes());
+            }
         }
         if eth_signed_msg.len() != CHANGE_PUBKEY_SIGNATURE_LEN {
             return Err(ChangePubkeySignedDataError::SignedMessageLengthMismatch {
@@ -401,7 +412,9 @@ impl ChangePubKey {
                     let create2_address = create2_data.get_address(&self.new_pk_hash);
                     create2_address == self.account
                 }
-                ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature }) => {
+                ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                    eth_signature, ..
+                }) => {
                     if let Some(chain_id) = self.chain_id {
                         let domain = Eip712Domain::new(chain_id);
                         let data = PackedEthSignature::typed_data_to_signed_bytes(&domain, self);

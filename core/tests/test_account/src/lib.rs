@@ -530,7 +530,10 @@ impl ZkSyncAccount {
                         &change_pubkey,
                     )
                     .expect("Signature should succeed");
-                    ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature })
+                    ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                        eth_signature,
+                        batch_hash: Default::default(),
+                    })
                 } else {
                     panic!("EIP712 ChangePubKey can only be executed for EOA account");
                 }
