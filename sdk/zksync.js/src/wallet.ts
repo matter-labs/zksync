@@ -331,7 +331,7 @@ export class Wallet extends AbstractWallet {
                 batchHash: changePubKey.batchHash
             };
         } else if (changePubKey.ethAuthType === 'EIP712') {
-            const domain = getDomain(await this.getAccountId());
+            const domain = getDomain(await this.ethSigner().getChainId());
 
             const types = changePubKeyEIP712Types();
 
