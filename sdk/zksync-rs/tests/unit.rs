@@ -155,7 +155,7 @@ mod signatures_with_vectors {
     use zksync_config::test_config::unit_vectors::TxData;
     use zksync_eth_signer::PrivateKeySigner;
     use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
-    use zksync_types::{network::Network, AccountId, Address, H256};
+    use zksync_types::{network::Network, AccountId, Address, ChainId, H256};
 
     async fn get_signer(
         eth_private_key_raw: &[u8],
@@ -404,6 +404,7 @@ mod signatures_with_vectors {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_change_pubkey_signature() {
         let test_vectors = TestVectorsConfig::load();
         for TestEntry { inputs, outputs } in test_vectors.transactions.items {
@@ -434,7 +435,7 @@ mod signatures_with_vectors {
                         token,
                         change_pubkey_tx.fee.clone(),
                         change_pubkey_tx.time_range,
-                        None,
+                        Some(ChainId(9)),
                     )
                     .await
                     .expect("Change pub key signing error");

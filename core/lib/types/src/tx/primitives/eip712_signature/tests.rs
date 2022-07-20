@@ -84,7 +84,7 @@ fn test_encode_eip712_typed_struct() {
 
     assert_eq!(
         message.hash_struct(),
-        H256::from_str("c52c0ee5d84264471806290a3f2c4cecfc5490626bf912d01f240d7a274b371e").unwrap()
+        H256::from_str("be9b2f924d8a769bf1dfffbebf79bacacd82aa65f767afcbf6f363e456d02de9").unwrap()
     );
 
     assert_eq!(
@@ -113,12 +113,12 @@ fn test_encode_eip712_typed_struct() {
     let address_owner = PackedEthSignature::address_from_private_key(&private_key).unwrap();
 
     let signature = PackedEthSignature::sign_typed_data(&private_key, &domain, &message).unwrap();
-    let signed_bytes = PackedEthSignature::typed_data_to_signed_message(&domain, &message);
+    let signed_bytes = PackedEthSignature::typed_data_to_signed_bytes(&domain, &message);
 
     assert_eq!(
         address_owner,
         signature
-            .signature_recover_signer_from_raw_message(&signed_bytes)
+            .signature_recover_signer_from_hash(signed_bytes)
             .unwrap()
     );
 }
@@ -159,7 +159,8 @@ fn test_get_eip712_json() {
            "to":{
               "name":"Bob",
               "wallet":"0xd94e3dc39d4cad1dad634e7eb585a57a19dc7efe"
-           }
+           },
+           "data": [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
         },
         "primaryType":"Mail",
         "types":{
@@ -189,6 +190,10 @@ fn test_get_eip712_json() {
               {
                  "name":"contents",
                  "type":"string"
+              },
+              {
+                 "name":"data",
+                 "type":"bytes20"
               }
            ],
            "Person":[
