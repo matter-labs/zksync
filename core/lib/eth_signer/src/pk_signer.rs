@@ -155,7 +155,7 @@ mod test {
             Some(chain_id),
         );
 
-        let signature = PackedEthSignature::deserialize_packed(&vec![
+        let signature = PackedEthSignature::deserialize_packed(&[
             119, 9, 17, 255, 181, 230, 46, 68, 33, 132, 97, 20, 114, 80, 116, 36, 11, 103, 205, 4,
             119, 126, 149, 136, 40, 0, 125, 94, 144, 110, 169, 204, 93, 64, 113, 69, 184, 5, 12,
             234, 226, 126, 72, 215, 177, 100, 245, 141, 57, 198, 200, 95, 221, 251, 25, 193, 243,
