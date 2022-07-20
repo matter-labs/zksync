@@ -134,6 +134,7 @@ pub trait EIP712TypedStructure: Serialize {
             bytes.extend_from_slice(data.as_bytes());
         }
 
+        dbg!(&bytes);
         bytes.keccak256().into()
     }
 

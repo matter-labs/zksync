@@ -26,7 +26,7 @@ use crate::{
         primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain, StructBuilder},
         version::TxVersion,
     },
-    AccountId, Nonce, TxFeeTypes,
+    AccountId, Nonce, TxFeeTypes, H160,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
@@ -172,10 +172,9 @@ pub struct ChangePubKey {
     /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
     #[serde(flatten)]
     pub time_range: Option<TimeRange>,
+    pub chain_id: Option<u32>,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
-    #[serde(skip)]
-    pub chain_id: Option<u32>,
 }
 
 impl ChangePubKey {
@@ -405,13 +404,12 @@ impl ChangePubKey {
                 ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature }) => {
                     if let Some(chain_id) = self.chain_id {
                         let domain = Eip712Domain::new(chain_id);
-
                         let data = PackedEthSignature::typed_data_to_signed_bytes(&domain, self);
                         let recovered_address =
                             eth_signature.signature_recover_signer_from_hash(data).ok();
                         recovered_address == Some(self.account)
                     } else {
-                        vlog::warn!("No chain id for EIP712 data");
+                        vlog::error!("No chain id for EIP712 data");
                         false
                     }
                 }
@@ -564,7 +562,7 @@ impl EIP712TypedStructure for ChangePubKey {
     const TYPE_NAME: &'static str = "ChangePubKey";
 
     fn build_structure<BUILDER: StructBuilder>(&self, builder: &mut BUILDER) {
-        builder.add_member("pubKeyHash", &H256::from_slice(&self.new_pk_hash.data));
+        builder.add_member("pubKeyHash", &self.new_pk_hash.data);
         builder.add_member("nonce", &self.nonce.0);
         builder.add_member("accountId", &self.account_id.0);
     }

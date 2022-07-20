@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate serde_derive;
+extern crate core;
 
 use async_trait::async_trait;
 use error::SignerError;

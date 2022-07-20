@@ -375,6 +375,15 @@ mod tests {
         );
 
         let deserialized: TxFeeTypes =
+            serde_json::from_str(r#"{ "ChangePubKey": "EIP712" }"#).unwrap();
+        assert_eq!(
+            deserialized,
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                ChangePubKeyType::EIP712
+            ))
+        );
+
+        let deserialized: TxFeeTypes =
             serde_json::from_str(r#"{ "ChangePubKey": "CREATE2" }"#).unwrap();
 
         assert_eq!(

@@ -35,6 +35,7 @@ async fn get_tx_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<TxFeeRequest>,
 ) -> ApiResult<ApiFee> {
+    println!("body {:?}", &body);
     let start = Instant::now();
     let token_allowed = api_try!(data
         .tx_sender

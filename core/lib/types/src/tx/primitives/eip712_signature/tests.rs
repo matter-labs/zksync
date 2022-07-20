@@ -29,6 +29,7 @@ struct Mail {
     from: Person,
     to: Person,
     contents: String,
+    data: [u8; 20],
 }
 
 impl EIP712TypedStructure for Mail {
@@ -37,6 +38,7 @@ impl EIP712TypedStructure for Mail {
         builder.add_member("from", &self.from);
         builder.add_member("to", &self.to);
         builder.add_member("contents", &self.contents);
+        builder.add_member("data", &self.data);
     }
 }
 
@@ -58,11 +60,12 @@ fn test_encode_eip712_typed_struct() {
             wallet: Address::from_str("bBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB").unwrap(),
         },
         contents: "Hello, Bob!".to_string(),
+        data: [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5],
     };
 
     assert_eq!(
         &message.encode_type(),
-        "Mail(Person from,Person to,string contents)Person(string name,address wallet)"
+        "Mail(Person from,Person to,string contents,bytes20 data)Person(string name,address wallet)"
     );
 
     assert_eq!(
@@ -73,6 +76,8 @@ fn test_encode_eip712_typed_struct() {
             H256::from_str("cd54f074a4af31b4411ff6a60c9719dbd559c221c8ac3492d9d872b041d703d1")
                 .unwrap(),
             H256::from_str("b5aadf3154a261abdd9086fc627b61efca26ae5702701d05cd2305f7c52a2fc8")
+                .unwrap(),
+            H256::from_str("0102030405010203040501020304050102030405000000000000000000000000")
                 .unwrap()
         ]
     );
@@ -136,6 +141,7 @@ fn test_get_eip712_json() {
             wallet: Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
         },
         contents: "Hello, Bob!".to_string(),
+        data: [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5],
     };
 
     let expected_value = r#"{

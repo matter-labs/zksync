@@ -1,5 +1,3 @@
-extern crate core;
-
 pub mod credentials;
 pub mod error;
 pub mod ethereum;

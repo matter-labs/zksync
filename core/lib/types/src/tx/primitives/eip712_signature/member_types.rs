@@ -30,6 +30,28 @@ impl StructMember for Address {
     }
 }
 
+impl<const N: usize> StructMember for [u8; N] {
+    const MEMBER_TYPE: &'static str = "bytes";
+    const IS_REFERENCE_TYPE: bool = false;
+
+    fn member_type(&self) -> String {
+        format!("{}{}", Self::MEMBER_TYPE, N)
+    }
+
+    fn get_inner_members(&self) -> Vec<EncodedStructureMember> {
+        Vec::new()
+    }
+
+    fn encode_member_data(&self) -> H256 {
+        if N > 32 {
+            panic!("Wrong size of bytes")
+        }
+        let mut bytes = [0; 32];
+        bytes[..N].copy_from_slice(self);
+        bytes.into()
+    }
+}
+
 impl StructMember for &[u8] {
     const MEMBER_TYPE: &'static str = "bytes";
     const IS_REFERENCE_TYPE: bool = false;

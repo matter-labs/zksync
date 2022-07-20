@@ -108,9 +108,9 @@ impl<S: EthereumSigner> Signer<S> {
                 .as_ref()
                 .ok_or(SignerError::MissingEthSigner)?;
 
-            let chain_id = chain_id.ok_or(SignerError::CustomError(
-                "Can't sign eip712 without chain id".to_string(),
-            ))?;
+            let chain_id = chain_id.ok_or_else(|| {
+                SignerError::CustomError("Can't sign eip712 without chain id".to_string())
+            })?;
             let domain = Eip712Domain::new(chain_id);
             let eth_signature = eth_signer
                 .sign_typed_data(&domain, &change_pubkey)
