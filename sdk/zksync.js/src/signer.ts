@@ -382,7 +382,7 @@ export class Create2WalletSigner extends ethers.Signer implements TypedDataSigne
         _types: Record<string, Array<TypedDataField>>,
         _value: Record<string, any>
     ): Promise<string> {
-        return 'test';
+        throw new Error("Create2Wallet signer can't sign TypedData");
     }
 
     connect(provider: ethers.providers.Provider): ethers.Signer & TypedDataSigner {
@@ -420,7 +420,7 @@ export class No2FAWalletSigner extends ethers.Signer implements TypedDataSigner 
         _types: Record<string, Array<TypedDataField>>,
         _value: Record<string, any>
     ): Promise<string> {
-        return 'test';
+        throw new Error("No2FAWallet signer can't sign TypedData");
     }
 
     connect(provider: ethers.providers.Provider): ethers.Signer & TypedDataSigner {

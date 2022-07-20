@@ -7,11 +7,11 @@ use zksync_crypto::PrivateKey;
 use zksync_eth_signer::{error::SignerError, EthereumSigner};
 use zksync_types::{
     tx::{
-        primitives::eip712_signature::Eip712Domain, ChangePubKey, ChangePubKeyEIP712Data,
+        eip712_signature::Eip712Domain, ChangePubKey, ChangePubKeyEIP712Data,
         ChangePubKeyEthAuthData, PackedEthSignature, TimeRange, TxEthSignature,
     },
-    AccountId, Address, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, TokenId, Transfer, Withdraw,
-    WithdrawNFT, H256,
+    AccountId, Address, ChainId, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, TokenId, Transfer,
+    Withdraw, WithdrawNFT, H256,
 };
 // Local imports
 use crate::WalletCredentials;
@@ -82,7 +82,7 @@ impl<S: EthereumSigner> Signer<S> {
         fee_token: Token,
         fee: BigUint,
         time_range: TimeRange,
-        chain_id: Option<u32>,
+        chain_id: Option<ChainId>,
     ) -> Result<ChangePubKey, SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 

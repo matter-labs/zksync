@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use zksync_config::configs::api::{CommonApiConfig, JsonRpcConfig, TokenConfig};
 use zksync_mempool::MempoolTransactionRequest;
 use zksync_storage::ConnectionPool;
-use zksync_types::{tx::TxHash, ActionType, Address};
+use zksync_types::{tx::TxHash, ActionType, Address, ChainId};
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 // Local uses
 use crate::fee_ticker::FeeTicker;
@@ -188,7 +188,7 @@ pub fn start_ws_server(
     miniblock_iteration_interval: Duration,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     confirmations_for_eth_event: u64,
-    chain_id: u32,
+    chain_id: ChainId,
 ) -> JoinHandle<()> {
     let addr = config.ws_bind_addr();
 

@@ -1,8 +1,9 @@
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use zksync_basic_types::ChainId;
 
-use crate::tx::primitives::eip712_signature::{EncodeBuilder, StructBuilder, TypeBuilder};
+use crate::eip712_signature::{EncodeBuilder, StructBuilder, TypeBuilder};
 use crate::{H256, U256};
 
 #[derive(Debug, Clone)]
@@ -134,7 +135,6 @@ pub trait EIP712TypedStructure: Serialize {
             bytes.extend_from_slice(data.as_bytes());
         }
 
-        dbg!(&bytes);
         bytes.keccak256().into()
     }
 
@@ -162,11 +162,11 @@ impl Eip712Domain {
     pub const NAME: &'static str = "ZkSync";
     pub const VERSION: &'static str = "1.0";
 
-    pub fn new(chain_id: u32) -> Self {
+    pub fn new(chain_id: ChainId) -> Self {
         Self {
             name: Self::NAME.to_string(),
             version: Self::VERSION.to_string(),
-            chain_id: U256::from(chain_id),
+            chain_id: U256::from(chain_id.0),
         }
     }
 }

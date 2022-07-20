@@ -1,4 +1,4 @@
-use crate::tx::primitives::eip712_signature::{
+use crate::eip712_signature::{
     struct_builder::StructBuilder,
     typed_structure::{EIP712TypedStructure, Eip712Domain},
     utils::get_eip712_json,

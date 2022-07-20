@@ -88,7 +88,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             contract_address
                 .parse()
                 .map_err(|err| ClientError::MalformedResponse(format!("{}", err)))?,
-            network.chain_id(),
+            network.chain_id().0 as u8,
             1.5f64,
         );
         let erc20_abi = ierc20_contract();

@@ -94,7 +94,7 @@ where
                     fee_token,
                     fee,
                     time_range,
-                    Some(self.wallet.provider.network().chain_id() as u32),
+                    Some(self.wallet.provider.network().chain_id()),
                 )
                 .await
                 .map_err(ClientError::SigningError)?,

@@ -33,7 +33,7 @@ use zksync_types::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
         TxEthSignatureVariant, TxHash,
     },
-    AccountId, Address, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
+    AccountId, Address, ChainId, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
 use zksync_utils::{
     big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, scaled_big_decimal_to_ratio,
@@ -80,7 +80,7 @@ pub struct TxSender {
     pub current_subsidy_type: String,
     pub max_subsidy_usd: Ratio<BigUint>,
     pub subsidized_ips: HashSet<String>,
-    pub chain_id: u32,
+    pub chain_id: ChainId,
 }
 
 #[derive(Debug, Error)]
@@ -150,7 +150,7 @@ impl TxSender {
         config: &CommonApiConfig,
         token_config: &TokenConfig,
         mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
-        chain_id: u32,
+        chain_id: ChainId,
     ) -> Self {
         let max_number_of_transactions_per_batch =
             config.max_number_of_transactions_per_batch as usize;

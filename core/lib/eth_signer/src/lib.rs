@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate serde_derive;
-extern crate core;
 
 use async_trait::async_trait;
 use error::SignerError;
@@ -10,7 +9,7 @@ use zksync_types::Address;
 pub use json_rpc_signer::JsonRpcSigner;
 pub use pk_signer::PrivateKeySigner;
 pub use raw_ethereum_tx::RawTransaction;
-use zksync_types::tx::primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain};
+use zksync_types::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 
 pub mod error;
 pub mod json_rpc_signer;

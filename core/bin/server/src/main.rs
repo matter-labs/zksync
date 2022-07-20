@@ -24,6 +24,7 @@ use zksync_core::rejected_tx_cleaner::run_rejected_tx_cleaner;
 use zksync_mempool::run_mempool_tx_handler;
 use zksync_prometheus_exporter::{run_operation_counter, run_prometheus_exporter};
 use zksync_storage::ConnectionPool;
+use zksync_types::ChainId;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
@@ -231,7 +232,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.miniblock_iteration_interval(),
                 mempool_tx_request_sender,
                 eth_watch_config.confirmations_for_eth_event,
-                eth_client_config.chain_id as u32,
+                ChainId(eth_client_config.chain_id as u32),
             ));
         }
 
@@ -251,7 +252,7 @@ async fn run_server(components: &ComponentsToRun) {
                 &common_config,
                 &token_config,
                 mempool_tx_request_sender,
-                eth_client_config.chain_id as u32,
+                ChainId(eth_client_config.chain_id as u32),
                 eth_watch_config.confirmations_for_eth_event,
             ));
         }
@@ -272,7 +273,7 @@ async fn run_server(components: &ComponentsToRun) {
                 contracts_config.contract_addr,
                 ticker,
                 sign_check_sender,
-                eth_client_config.chain_id as u32,
+                ChainId(eth_client_config.chain_id as u32),
                 mempool_tx_request_sender,
                 private_config.url,
             ));

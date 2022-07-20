@@ -8,7 +8,7 @@ use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::Address;
 
 use serde_json::Value;
-use zksync_types::tx::primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain};
+use zksync_types::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 
 pub fn is_signature_from_address(
     signature: &PackedEthSignature,
@@ -85,7 +85,7 @@ impl EthereumSigner for JsonRpcSigner {
         }
     }
 
-    /// Signs typed struct using ethereum private key by EIP-712 signature standard.
+    /// Signs typed struct using ethereum private key according to the EIP-712 signature standard.
     /// Result of this function is the equivalent of RPC calling `eth_signTypedData`.
     async fn sign_typed_data<S: EIP712TypedStructure + Sync>(
         &self,
@@ -107,11 +107,10 @@ impl EthereumSigner for JsonRpcSigner {
             PackedEthSignature::typed_data_to_signed_bytes(eip712_domain, typed_struct);
         // Checks the correctness of the message signature without a prefix
 
-        if self.address()?
-            == signature
-                .signature_recover_signer_from_hash(signed_bytes)
-                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
-        {
+        let recovered_address = signature
+            .signature_recover_signer_from_hash(signed_bytes)
+            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+        if self.address()? == recovered_address {
             Ok(signature)
         } else {
             Err(SignerError::SigningFailed(
@@ -326,8 +325,9 @@ impl JsonRpcSigner {
 mod messages {
     use crate::RawTransaction;
     use hex::encode;
-    use zksync_types::tx::primitives::eip712_signature::utils::get_eip712_json;
-    use zksync_types::tx::primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain};
+    use zksync_types::eip712_signature::{
+        utils::get_eip712_json, EIP712TypedStructure, Eip712Domain,
+    };
     use zksync_types::Address;
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -374,7 +374,7 @@ mod messages {
             Self::create("eth_sign", params)
         }
 
-        /// Signs typed struct using ethereum private key by EIP-712 signature standard.
+        /// Signs typed struct using ethereum private key according to the EIP-712 signature standard.
         /// The address to sign with must be unlocked.
         pub fn sign_typed_data<S: EIP712TypedStructure + Sync>(
             address: Address,

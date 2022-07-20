@@ -4,7 +4,7 @@ mod change_pubkey;
 mod close;
 mod forced_exit;
 mod mint_nft;
-pub mod primitives;
+mod primitives;
 mod swap;
 mod transfer;
 mod version;
@@ -38,6 +38,7 @@ pub use self::{
 // Re-export primitives associated with transactions.
 pub use self::primitives::{
     eip1271_signature::EIP1271Signature,
+    eip712_signature,
     eth_batch_sign_data::EthBatchSignData,
     eth_batch_signature::EthBatchSignatures,
     eth_signature::{TxEthSignature, TxEthSignatureVariant},

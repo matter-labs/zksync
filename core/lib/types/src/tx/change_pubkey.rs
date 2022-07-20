@@ -5,7 +5,7 @@ use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use zksync_basic_types::{Address, TokenId, H256};
+use zksync_basic_types::{Address, ChainId, TokenId, H256};
 use zksync_crypto::{
     params::{max_account_id, max_processable_token, CURRENT_TX_VERSION},
     PrivateKey,
@@ -26,7 +26,7 @@ use crate::{
         primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain, StructBuilder},
         version::TxVersion,
     },
-    AccountId, Nonce, TxFeeTypes, H160,
+    AccountId, Nonce, TxFeeTypes,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
@@ -120,10 +120,7 @@ impl ChangePubKeyEthAuthData {
                 bytes.extend_from_slice(code_hash.as_bytes());
                 bytes
             }
-            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
-                eth_signature,
-                batch_hash,
-            }) => {
+            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature, .. }) => {
                 let mut bytes = vec![0x00];
                 bytes.extend_from_slice(&eth_signature.serialize_packed());
                 bytes
@@ -177,7 +174,7 @@ pub struct ChangePubKey {
     /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
     #[serde(flatten)]
     pub time_range: Option<TimeRange>,
-    pub chain_id: Option<u32>,
+    pub chain_id: Option<ChainId>,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
 }
@@ -201,7 +198,7 @@ impl ChangePubKey {
         time_range: TimeRange,
         signature: Option<TxSignature>,
         eth_signature: Option<PackedEthSignature>,
-        chain_id: Option<u32>,
+        chain_id: Option<ChainId>,
     ) -> Self {
         // TODO: support CREATE2 (ZKS-452)
         let eth_auth_data = Some(
@@ -248,7 +245,7 @@ impl ChangePubKey {
         time_range: TimeRange,
         eth_signature: Option<PackedEthSignature>,
         private_key: &PrivateKey,
-        chain_id: Option<u32>,
+        chain_id: Option<ChainId>,
     ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             account_id,

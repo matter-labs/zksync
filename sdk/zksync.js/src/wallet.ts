@@ -31,9 +31,16 @@ import {
     TokenRatio,
     WeiRatio
 } from './types';
-import { getChangePubkeyLegacyMessage, getChangePubkeyMessage, MAX_TIMESTAMP, isNFT } from './utils';
+import {
+    getChangePubkeyLegacyMessage,
+    getChangePubkeyMessage,
+    MAX_TIMESTAMP,
+    isNFT,
+    changePubKeyEIP712Types
+} from './utils';
 import { Transaction, submitSignedTransaction } from './operations';
 import { AbstractWallet } from './abstract-wallet';
+import { getDomain } from './utils';
 
 export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransactionsBatch } from './operations';
 
@@ -324,28 +331,18 @@ export class Wallet extends AbstractWallet {
                 batchHash: changePubKey.batchHash
             };
         } else if (changePubKey.ethAuthType === 'EIP712') {
-            const domain = {
-                name: 'ZkSync',
-                version: '1.0',
-                chainId: await this.ethSigner().getChainId()
-            };
+            const domain = getDomain(await this.getAccountId());
 
-            const types = {
-                ChangePubKey: [
-                    { name: 'pubKeyHash', type: 'bytes20' },
-                    { name: 'nonce', type: 'uint32' },
-                    { name: 'accountId', type: 'uint32' }
-                ]
-            };
+            const types = changePubKeyEIP712Types();
 
             const pubKeyHash = `0x${newPubKeyHash.substr(5)}`;
-            const message = {
+            const changePubKeyMessage = {
                 pubKeyHash,
                 nonce: changePubKey.nonce,
                 accountId: await this.getAccountId()
             };
 
-            let ethSignature = await this.ethSigner()._signTypedData(domain, types, message);
+            const ethSignature = await this.ethSigner()._signTypedData(domain, types, changePubKeyMessage);
             ethAuthData = {
                 type: 'EIP712',
                 ethSignature,

@@ -3,10 +3,10 @@ use std::{fmt, sync::Mutex};
 // External uses
 use num::BigUint;
 // Workspace uses
-use zksync_basic_types::H256;
+use zksync_basic_types::{ChainId, H256};
 use zksync_crypto::rand::{thread_rng, Rng, SeedableRng, XorShiftRng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
-use zksync_types::tx::primitives::eip712_signature::Eip712Domain;
+use zksync_types::eip712_signature::Eip712Domain;
 use zksync_types::tx::ChangePubKeyEIP712Data;
 use zksync_types::{
     tx::{
@@ -17,7 +17,7 @@ use zksync_types::{
     Transfer, Withdraw, WithdrawNFT,
 };
 
-const CHAIN_ID: u32 = 64;
+const CHAIN_ID: ChainId = ChainId(9);
 
 #[derive(Debug, Clone)]
 pub enum ZkSyncETHAccountData {

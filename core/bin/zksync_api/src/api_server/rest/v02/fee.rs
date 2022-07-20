@@ -35,7 +35,6 @@ async fn get_tx_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<TxFeeRequest>,
 ) -> ApiResult<ApiFee> {
-    println!("body {:?}", &body);
     let start = Instant::now();
     let token_allowed = api_try!(data
         .tx_sender
@@ -120,7 +119,7 @@ mod tests {
     };
     use zksync_types::{
         tokens::{TokenLike, TokenMarketVolume},
-        Address, Token, TokenId, TokenKind,
+        Address, ChainId, Token, TokenId, TokenKind,
     };
 
     #[actix_rt::test]
@@ -173,7 +172,7 @@ mod tests {
                     &cfg.config.api.common,
                     &cfg.config.api.token_config,
                     mempool_tx_request_sender.clone(),
-                    cfg.config.eth_client.chain_id as u32,
+                    ChainId(cfg.config.eth_client.chain_id as u32),
                 ))
             },
             Some(shared_data),

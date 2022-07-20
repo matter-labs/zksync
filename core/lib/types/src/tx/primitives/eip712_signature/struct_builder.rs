@@ -1,4 +1,4 @@
-use crate::tx::primitives::eip712_signature::{EncodedStructureMember, StructMember};
+use crate::eip712_signature::{EncodedStructureMember, StructMember};
 use serde_json::Value;
 use std::collections::{BTreeMap, VecDeque};
 use zksync_basic_types::H256;
@@ -7,7 +7,7 @@ use zksync_basic_types::H256;
 pub trait StructBuilder {
     fn new() -> Self;
 
-    fn add_member<MEMBER: crate::tx::primitives::eip712_signature::StructMember>(
+    fn add_member<MEMBER: crate::eip712_signature::StructMember>(
         &mut self,
         name: &str,
         member: &MEMBER,

@@ -351,7 +351,6 @@ impl Block {
             }
         }
 
-        dbg!(&eth_witness);
         (eth_witness, used_bytes)
     }
 

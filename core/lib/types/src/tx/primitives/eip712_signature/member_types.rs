@@ -1,6 +1,4 @@
-use crate::tx::primitives::eip712_signature::typed_structure::{
-    EncodedStructureMember, StructMember,
-};
+use crate::eip712_signature::typed_structure::{EncodedStructureMember, StructMember};
 use parity_crypto::Keccak256;
 use zksync_basic_types::{Address, H256, U256};
 

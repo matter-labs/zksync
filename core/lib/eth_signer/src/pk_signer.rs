@@ -3,7 +3,7 @@ use crate::{EthereumSigner, SignerError};
 
 use parity_crypto::publickey::sign;
 
-use zksync_types::tx::primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain};
+use zksync_types::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::{Address, H256};
 
@@ -62,8 +62,8 @@ mod test {
     use super::PrivateKeySigner;
     use super::RawTransaction;
     use crate::EthereumSigner;
-    use zksync_types::tx::{primitives::eip712_signature::Eip712Domain, ChangePubKey};
-    use zksync_types::{AccountId, Nonce, PubKeyHash, H160, H256, U256};
+    use zksync_types::tx::{eip712_signature::Eip712Domain, ChangePubKey};
+    use zksync_types::{AccountId, ChainId, Nonce, PubKeyHash, H160, H256, U256};
 
     #[tokio::test]
     async fn test_generating_signature() {
@@ -105,7 +105,8 @@ mod test {
             .unwrap();
         let pk_signer = PrivateKeySigner::new(H256::from_slice(&pk));
 
-        let domain = Eip712Domain::new(31337);
+        let chain_id = ChainId(31337);
+        let domain = Eip712Domain::new(chain_id);
         let change_pub_key = ChangePubKey::new(
             account_id,
             Default::default(),
@@ -116,7 +117,7 @@ mod test {
             Default::default(),
             None,
             None,
-            Some(31337),
+            Some(chain_id),
         );
 
         let signature = pk_signer

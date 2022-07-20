@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::tx::primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain};
+use crate::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 use parity_crypto::{
     publickey::{public_to_address, recover, sign, KeyPair, Signature as ETHSignature},
     Keccak256,
@@ -90,7 +90,7 @@ impl PackedEthSignature {
     }
 
     /// Checks signature and returns ethereum address of the signer.
-    /// hash should be from the same message that was passed to `eth.sign`(or similar) method
+    /// The hash should be from the same message that was passed to `eth.sign`(or similar) method
     /// as argument.
     pub fn signature_recover_signer_from_hash(
         &self,
@@ -107,7 +107,7 @@ impl PackedEthSignature {
         Ok(KeyPair::from_secret((*private_key).into())?.address())
     }
 
-    /// Signs typed struct using ethereum private key by EIP-712 signature standard.
+    /// Signs typed struct using ethereum private key according to the EIP-712 signature standard.
     /// Result of this function is the equivalent of RPC calling `eth_signTypedData`.
     pub fn sign_typed_data(
         private_key: &H256,

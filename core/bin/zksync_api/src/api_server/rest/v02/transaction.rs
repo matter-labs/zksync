@@ -276,7 +276,7 @@ mod tests {
             EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature,
             TxEthSignatureVariant,
         },
-        Address, BlockNumber, SignedZkSyncTx, TokenId, TokenKind, TokenLike,
+        Address, BlockNumber, ChainId, SignedZkSyncTx, TokenId, TokenKind, TokenLike,
     };
 
     fn submit_txs_loopback() -> (mpsc::Sender<MempoolTransactionRequest>, JoinHandle<()>) {
@@ -353,7 +353,7 @@ mod tests {
                     &cfg.config.api.common,
                     &cfg.config.api.token_config,
                     sender.clone(),
-                    cfg.config.eth_client.chain_id as u32,
+                    ChainId(cfg.config.eth_client.chain_id as u32),
                 ))
             },
             Some(shared_data),

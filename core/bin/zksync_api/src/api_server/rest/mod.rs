@@ -3,7 +3,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
 use zksync_storage::ConnectionPool;
-use zksync_types::H160;
+use zksync_types::{ChainId, H160};
 
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
@@ -30,7 +30,7 @@ async fn start_server(
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     bind_to: SocketAddr,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
-    chain_id: u32,
+    chain_id: ChainId,
 ) {
     HttpServer::new(move || {
         let api_v01 = api_v01.clone();
@@ -97,7 +97,7 @@ pub fn start_server_thread_detached(
     contract_address: H160,
     fee_ticker: FeeTicker,
     sign_verifier: mpsc::Sender<VerifySignatureRequest>,
-    chain_id: u32,
+    chain_id: ChainId,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     core_address: String,
 ) -> JoinHandle<()> {

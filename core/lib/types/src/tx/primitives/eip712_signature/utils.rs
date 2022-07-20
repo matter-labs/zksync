@@ -1,4 +1,4 @@
-use crate::tx::primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain};
+use crate::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 use serde_json::{Map, Value};
 
 /// Formats the data that needs to be signed in json according to the standard eip-712.
