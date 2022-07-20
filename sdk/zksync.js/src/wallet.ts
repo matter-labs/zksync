@@ -3,6 +3,8 @@ import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
 import { Create2WalletSigner, Signer, unableToSign } from './signer';
 import { BatchBuilderInternalTx } from './batch-builder';
+import { TypedDataSigner } from '@ethersproject/abstract-signer';
+
 import {
     Address,
     ChangePubKey,
@@ -37,7 +39,7 @@ export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransac
 
 export class Wallet extends AbstractWallet {
     protected constructor(
-        public _ethSigner: ethers.Signer,
+        public _ethSigner: ethers.Signer & TypedDataSigner,
         private _ethMessageSigner: EthMessageSigner,
         cachedAddress: Address,
         public signer?: Signer,
@@ -52,7 +54,7 @@ export class Wallet extends AbstractWallet {
     //
 
     static async fromEthSigner(
-        ethWallet: ethers.Signer,
+        ethWallet: ethers.Signer & TypedDataSigner,
         provider: SyncProvider,
         signer?: Signer,
         accountId?: number,
@@ -95,7 +97,7 @@ export class Wallet extends AbstractWallet {
     }
 
     static async fromEthSignerNoKeys(
-        ethWallet: ethers.Signer,
+        ethWallet: ethers.Signer & TypedDataSigner,
         provider: SyncProvider,
         accountId?: number,
         ethSignerType?: EthSignerType
@@ -115,7 +117,7 @@ export class Wallet extends AbstractWallet {
     }
 
     static async fromSyncSigner(
-        ethWallet: ethers.Signer,
+        ethWallet: ethers.Signer & TypedDataSigner,
         syncSigner: Signer,
         provider: SyncProvider,
         accountId?: number
@@ -130,7 +132,7 @@ export class Wallet extends AbstractWallet {
     // Abstract getters
     //
 
-    override ethSigner(): ethers.Signer {
+    override ethSigner(): ethers.Signer & TypedDataSigner {
         return this._ethSigner;
     }
 
@@ -318,6 +320,34 @@ export class Wallet extends AbstractWallet {
             const ethSignature = (await this.ethMessageSigner().getEthMessageSignature(changePubKeyMessage)).signature;
             ethAuthData = {
                 type: 'ECDSA',
+                ethSignature,
+                batchHash: changePubKey.batchHash
+            };
+        } else if (changePubKey.ethAuthType === 'EIP712') {
+            const domain = {
+                name: 'ZkSync',
+                version: '1.0',
+                chainId: await this.ethSigner().getChainId()
+            };
+
+            const types = {
+                ChangePubKey: [
+                    { name: 'pubKeyHash', type: 'bytes20' },
+                    { name: 'nonce', type: 'uint32' },
+                    { name: 'accountId', type: 'uint32' }
+                ]
+            };
+
+            const pubKeyHash = `0x${newPubKeyHash.substr(5)}`;
+            const message = {
+                pubKeyHash,
+                nonce: changePubKey.nonce,
+                accountId: await this.getAccountId()
+            };
+
+            let ethSignature = await this.ethSigner()._signTypedData(domain, types, message);
+            ethAuthData = {
+                type: 'EIP712',
                 ethSignature,
                 batchHash: changePubKey.batchHash
             };
