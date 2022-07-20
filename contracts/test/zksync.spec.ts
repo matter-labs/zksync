@@ -263,6 +263,23 @@ describe('zkSync signature verification unit tests', function () {
         );
         expect(result).eq(false);
     });
+
+    it('pubkey hash hardcoded signature EIP712 verification', async () => {
+        const accountId = 0xdeadba;
+        const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
+        const nonce = 0x11223344;
+        const signature =
+            '0xea37325672e61e170663ea4fc5db2831c6f8251c4d9e24bb247da0cc50aedd5c615f7a6b18d90e3486fc767b54785467938912301a9b3e7ba474e27cdbb56c471c';
+        const witness = ethers.utils.concat(['0x04', signature]);
+        const { result } = await getCallRevertReason(
+            async () =>
+                await testContract.changePubkeySignatureCheckEIP712(
+                    { accountId, owner: '0xc85065ab91b00cc3d121f29ac7f5335f3a902c41', nonce, pubKeyHash: pubkeyHash },
+                    witness
+                )
+        );
+        expect(result).eq(true);
+    });
 });
 
 describe('ZK priority queue ops unit tests', function () {

@@ -121,7 +121,7 @@ impl ChangePubKeyEthAuthData {
                 bytes
             }
             ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature, .. }) => {
-                let mut bytes = vec![0x00];
+                let mut bytes = vec![0x4];
                 bytes.extend_from_slice(&eth_signature.serialize_packed());
                 bytes
             }
