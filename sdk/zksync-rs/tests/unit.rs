@@ -155,7 +155,7 @@ mod signatures_with_vectors {
     use zksync_config::test_config::unit_vectors::TxData;
     use zksync_eth_signer::PrivateKeySigner;
     use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
-    use zksync_types::{network::Network, AccountId, Address, ChainId, H256};
+    use zksync_types::{network::Network, AccountId, Address, H256};
 
     async fn get_signer(
         eth_private_key_raw: &[u8],
@@ -404,7 +404,6 @@ mod signatures_with_vectors {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_change_pubkey_signature() {
         let test_vectors = TestVectorsConfig::load();
         for TestEntry { inputs, outputs } in test_vectors.transactions.items {
@@ -428,14 +427,15 @@ mod signatures_with_vectors {
                     0,
                     TokenKind::ERC20,
                 );
+
+                #[allow(deprecated)]
+                // For checking backward compatibility with old signatures
                 let change_pub_key = signer
-                    .sign_change_pubkey_tx(
+                    .sign_change_pubkey_tx_ecdsa(
                         sign_data.nonce,
-                        false,
                         token,
                         change_pubkey_tx.fee.clone(),
                         change_pubkey_tx.time_range,
-                        Some(ChainId(9)),
                     )
                     .await
                     .expect("Change pub key signing error");
