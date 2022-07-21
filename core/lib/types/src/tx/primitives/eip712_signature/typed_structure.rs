@@ -71,6 +71,8 @@ impl EncodedStructureMember {
 pub trait StructMember {
     const MEMBER_TYPE: &'static str;
     const IS_REFERENCE_TYPE: bool;
+    // Use this const for compile time checking const generics
+    const ASSERT: usize = 0;
 
     fn member_type(&self) -> String {
         Self::MEMBER_TYPE.to_string()

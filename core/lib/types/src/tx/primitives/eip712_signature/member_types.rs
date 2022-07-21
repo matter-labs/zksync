@@ -1,6 +1,8 @@
-use crate::eip712_signature::typed_structure::{EncodedStructureMember, StructMember};
 use parity_crypto::Keccak256;
+
 use zksync_basic_types::{Address, H256, U256};
+
+use crate::eip712_signature::typed_structure::{EncodedStructureMember, StructMember};
 
 impl StructMember for String {
     const MEMBER_TYPE: &'static str = "string";
@@ -31,6 +33,7 @@ impl StructMember for Address {
 impl<const N: usize> StructMember for [u8; N] {
     const MEMBER_TYPE: &'static str = "bytes";
     const IS_REFERENCE_TYPE: bool = false;
+    const ASSERT: usize = 31 - N;
 
     fn member_type(&self) -> String {
         format!("{}{}", Self::MEMBER_TYPE, N)
@@ -40,10 +43,9 @@ impl<const N: usize> StructMember for [u8; N] {
         Vec::new()
     }
 
+    #[allow(path_statements)]
     fn encode_member_data(&self) -> H256 {
-        if N > 32 {
-            panic!("Wrong size of bytes")
-        }
+        Self::ASSERT;
         let mut bytes = [0; 32];
         bytes[..N].copy_from_slice(self);
         bytes.into()
