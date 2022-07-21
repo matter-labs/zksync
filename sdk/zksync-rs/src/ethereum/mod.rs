@@ -88,7 +88,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             contract_address
                 .parse()
                 .map_err(|err| ClientError::MalformedResponse(format!("{}", err)))?,
-            network.chain_id().0 as u8,
+            network.chain_id(),
             1.5f64,
         );
         let erc20_abi = ierc20_contract();
@@ -375,7 +375,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             let gas_limits: Map<String, Value> = serde_json::from_str(RAW_ERC20_DEPOSIT_GAS_LIMIT)
                 .map_err(|_| ClientError::Other)?;
             let address_str = format!("{:?}", token_info.address);
-            let is_mainnet = self.client().chain_id() == 1;
+            let is_mainnet = self.client().chain_id().0 == 1;
             let gas_limit = if is_mainnet && gas_limits.contains_key(&address_str) {
                 gas_limits
                     .get(&address_str)

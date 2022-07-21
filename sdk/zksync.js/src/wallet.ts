@@ -334,8 +334,8 @@ export class Wallet extends AbstractWallet {
             const domain = getDomain(await this.ethSigner().getChainId());
 
             const types = changePubKeyEIP712Types();
+            const pubKeyHash = newPubKeyHash.replace('sync:', '0x');
 
-            const pubKeyHash = `0x${newPubKeyHash.substr(5)}`;
             const changePubKeyMessage = {
                 pubKeyHash,
                 nonce: changePubKey.nonce,

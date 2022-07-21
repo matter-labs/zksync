@@ -7,6 +7,7 @@ use zksync_types::{H160, U256};
 #[derive(Debug, Default, Clone, PartialEq, Deserialize, Serialize)]
 pub struct RawTransaction {
     /// Chain id: mainnet => 1, rinkeby => 4, ropsten => 43, etc.
+    // TODO Implement sepolia support with chain id greater than u8
     pub chain_id: u8,
     /// Nonce
     pub nonce: U256,

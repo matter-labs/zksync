@@ -45,6 +45,8 @@ impl<const N: usize> StructMember for [u8; N] {
 
     #[allow(path_statements)]
     fn encode_member_data(&self) -> H256 {
+        #[allow(clippy::no_effect)]
+        // It's compile time check
         Self::ASSERT;
         let mut bytes = [0; 32];
         bytes[..N].copy_from_slice(self);

@@ -7,7 +7,7 @@ use crate::envy_load;
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ETHClientConfig {
     /// Numeric identifier of the L1 network (e.g. `9` for localhost).
-    pub chain_id: u8,
+    pub chain_id: u32,
     /// How much do we want to increase gas price provided by the network?
     /// Normally it's 1, we use the network-provided price (and limit it with the gas adjuster in eth sender).
     /// However, it can be increased to speed up the transaction mining time.
