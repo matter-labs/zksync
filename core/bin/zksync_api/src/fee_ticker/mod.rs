@@ -125,7 +125,7 @@ impl GasOperationsCost {
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                     ChangePubKeyType::EIP712,
                 )),
-                // TODO recalculate fee
+                // The cost of ECDSA and EIP712 ChangePubKey is almost the same.
                 constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
