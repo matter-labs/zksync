@@ -419,7 +419,7 @@ impl ChangePubKey {
                             eth_signature.signature_recover_signer_from_hash(data).ok();
                         recovered_address == Some(self.account)
                     } else {
-                        vlog::error!("No chain id for EIP712 data");
+                        vlog::error!("No chain id for EIP712 data. Tx {:?}", &self);
                         false
                     }
                 }

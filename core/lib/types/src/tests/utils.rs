@@ -69,7 +69,7 @@ pub fn create_change_pubkey_tx() -> ExecutedOperations {
     let sk = priv_key_from_fs(XorShiftRng::new_unseeded().gen());
     let pk = H256::random();
 
-    let mut chang_pub_key = ChangePubKey::new_signed(
+    let mut change_pub_key = ChangePubKey::new_signed(
         AccountId(1),
         Default::default(),
         PubKeyHash::from_privkey(&sk),
@@ -83,15 +83,15 @@ pub fn create_change_pubkey_tx() -> ExecutedOperations {
     )
     .unwrap();
     let domain = Eip712Domain::new(ChainId(9));
-    let eth_signature = PackedEthSignature::sign_typed_data(&pk, &domain, &chang_pub_key).unwrap();
-    chang_pub_key.eth_signature = Some(eth_signature.clone());
-    chang_pub_key.eth_auth_data = Some(ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+    let eth_signature = PackedEthSignature::sign_typed_data(&pk, &domain, &change_pub_key).unwrap();
+    change_pub_key.eth_signature = Some(eth_signature.clone());
+    change_pub_key.eth_auth_data = Some(ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
         eth_signature,
         batch_hash: Default::default(),
     }));
 
     let change_pubkey_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
-        tx: chang_pub_key,
+        tx: change_pub_key,
         account_id: AccountId(0),
     }));
 
