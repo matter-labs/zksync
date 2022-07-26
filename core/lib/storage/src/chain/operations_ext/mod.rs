@@ -1229,10 +1229,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             r#"
             SELECT 
                 sequence_number,
-                tx_hash,
-                operation as op,
-                block_number,
-                created_at,
+                tx_hash as "tx_hash!",
+                operation as "op!",
+                block_number as "block_number!",
+                created_at as "created_at!",
                 true as "success!",
                 Null as fail_reason,
                 eth_hash as "eth_hash?", 
@@ -1260,11 +1260,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             r#"
                SELECT
                     sequence_number,
-                    tx_hash,
-                    tx as op,
-                    block_number,
-                    created_at,
-                    success,
+                    tx_hash as "tx_hash!",
+                    tx as "op!",
+                    block_number as "block_number!",
+                    created_at as "created_at!",
+                    success as "success!",
                     fail_reason,
                     Null::bytea as eth_hash,
                     Null::bigint as priority_op_serialid,
