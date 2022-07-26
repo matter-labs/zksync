@@ -77,7 +77,10 @@ impl<S: EthereumSigner> Signer<S> {
     }
 
     #[deprecated]
-    pub async fn sign_change_pubkey_tx_ecdsa(
+    #[doc(hidden)]
+    /// This method required only for backward compatibility with tests.
+    /// You should use `sign_change_pubkey_tx` method with EIP712 ChangePubKey for offchain signature
+    pub async fn __old_sign_change_pubkey_tx_ecdsa(
         &self,
         nonce: Nonce,
         fee_token: Token,

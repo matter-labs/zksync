@@ -429,9 +429,9 @@ mod signatures_with_vectors {
                 );
 
                 #[allow(deprecated)]
-                // For checking backward compatibility with old signatures
+                // For backward compatibility with old signatures
                 let change_pub_key = signer
-                    .sign_change_pubkey_tx_ecdsa(
+                    .__old_sign_change_pubkey_tx_ecdsa(
                         sign_data.nonce,
                         token,
                         change_pubkey_tx.fee.clone(),
