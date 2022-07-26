@@ -40,6 +40,6 @@ services:
       - CACHE_DIR=/usr/src/cache
       - SCCACHE_CACHE_SIZE=50g
       - SCCACHE_GCS_BUCKET=sccache-zksync-ci
-      - SCCACHE_GCS_OAUTH_URL=http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/github-actions@zksync.iam.gserviceaccount.com/
+      - SCCACHE_GCS_OAUTH_URL=http://169.254.169.254/computeMetadata/v1/instance/service-accounts/github-actions@zksync.iam.gserviceaccount.com/
       - SCCACHE_GCS_RW_MODE=READ_WRITE
       - CI=1
