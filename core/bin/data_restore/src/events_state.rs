@@ -535,17 +535,34 @@ impl EventsState {
         true
     }
 
+    fn max_verified_block_number(&self) -> Option<BlockNumber> {
+        self.verified_events
+            .iter()
+            .max_by_key(|e| e.block_num)
+            .map(|num| num.block_num)
+    }
+
     /// Removes verified committed blocks events and all verified
     fn remove_verified_events(&mut self) {
-        let count_to_remove = self.verified_events.len();
+        let max_verified_block_number = self.max_verified_block_number();
         self.verified_events.clear();
-        self.committed_events.drain(0..count_to_remove);
+        if let Some(max_verified_block_number) = max_verified_block_number {
+            self.committed_events
+                .retain(|e| e.block_num > max_verified_block_number)
+        }
     }
 
     /// Returns only verified committed blocks from verified
     pub fn get_only_verified_committed_events(&self) -> Vec<BlockEvent> {
-        let count_to_get = self.verified_events.len();
-        self.committed_events[0..count_to_get].to_vec()
+        if let Some(max_verified_block_number) = self.max_verified_block_number() {
+            self.committed_events
+                .iter()
+                .filter(|e| e.block_num <= max_verified_block_number)
+                .cloned()
+                .collect()
+        } else {
+            vec![]
+        }
     }
 }
 
