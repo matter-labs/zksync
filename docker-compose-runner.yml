@@ -42,4 +42,5 @@ services:
       - SCCACHE_GCS_BUCKET=sccache-zksync-ci
       - SCCACHE_GCS_OAUTH_URL=http://169.254.169.254/computeMetadata/v1/instance/service-accounts/github-actions@zksync.iam.gserviceaccount.com/
       - SCCACHE_GCS_RW_MODE=READ_WRITE
+      - SCCACHE_ERROR_LOG=/tmp/sccache_log.txt
       - CI=1
