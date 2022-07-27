@@ -147,6 +147,8 @@ jobs:
           ci_run cat server.log
           ci_run cat api.log
           ci_run cat dummy_prover.log
+          ci_run sccache --show-stats
+          ci_run cat /tmp/sccache_log.txt
 
   circuit-tests:
     runs-on: [self-hosted, ci-runner]
