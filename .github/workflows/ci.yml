@@ -7,6 +7,10 @@ on:
       - staging
       - trying
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: [self-hosted, ci-runner]
@@ -278,13 +282,12 @@ jobs:
       [lint, unit-tests, integration, circuit-tests, testkit, revert-blocks]
     steps:
       - uses: technote-space/workflow-conclusion-action@v2
-      -
-        name: Notify to Mattermost (on incidents)
+      - name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         if: ${{ env.WORKFLOW_CONCLUSION == 'failure' }}
         with:
           type: failure
-          job_name: '*CI suites for PR #${{ github.event.pull_request.number }} failed*'
+          job_name: "*CI suites for PR #${{ github.event.pull_request.number }} failed*"
           icon_emoji: octocat
-          channel: 'ci-notifications'
+          channel: "ci-notifications"
           url: ${{ secrets.MATTERMOST_WEBHOOK }}
