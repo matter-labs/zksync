@@ -1,7 +1,7 @@
-use crate::raw_ethereum_tx::RawTransaction;
+use crate::raw_ethereum_tx::{RawTransaction, Transaction};
 use crate::{EthereumSigner, SignerError};
 
-use parity_crypto::publickey::sign;
+use secp256k1::SecretKey;
 
 use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::{Address, H256};
@@ -41,9 +41,26 @@ impl EthereumSigner for PrivateKeySigner {
 
     /// Signs and returns the RLP-encoded transaction.
     async fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError> {
-        let sig = sign(&self.private_key.into(), &raw_tx.hash().into())
-            .map_err(|_| SignerError::NoSigningKey)?;
-        Ok(raw_tx.rlp_encode_tx(sig))
+        let key = SecretKey::from_slice(self.private_key.as_bytes()).unwrap();
+
+        let gas_price = match raw_tx.max_fee_per_gas {
+            Some(val) => val,
+            None => raw_tx.gas_price,
+        };
+        let tx = Transaction {
+            to: raw_tx.to,
+            nonce: raw_tx.nonce,
+            gas: raw_tx.gas,
+            gas_price,
+            value: raw_tx.value,
+            data: raw_tx.data,
+            transaction_type: raw_tx.transaction_type,
+            access_list: raw_tx.access_list.unwrap_or_default(),
+            max_priority_fee_per_gas: raw_tx.max_priority_fee_per_gas.unwrap_or_default(),
+        };
+
+        let signed = tx.sign(&key, raw_tx.chain_id);
+        Ok(signed.raw_transaction.0)
     }
 }
 
@@ -52,34 +69,40 @@ mod test {
     use super::PrivateKeySigner;
     use super::RawTransaction;
     use crate::EthereumSigner;
+    use web3::types::U64;
     use zksync_types::{H160, H256, U256};
 
     #[tokio::test]
-    async fn test_generating_signature() {
+    async fn test_generating_signed_raw_transaction() {
         let private_key = H256::from([5; 32]);
         let signer = PrivateKeySigner::new(private_key);
         let raw_transaction = RawTransaction {
-            chain_id: 1,
-            nonce: U256::from(1),
-            to: Some(H160::zero()),
-            value: U256::from(10),
-            gas_price: U256::from(1),
-            gas: U256::from(2),
+            nonce: U256::from(1u32),
+            to: Some(H160::default()),
+            gas: Default::default(),
+            gas_price: U256::from(2u32),
+            max_fee_per_gas: Some(U256::from(2u32)),
+            max_priority_fee_per_gas: Some(U256::from(1u32)),
+            value: Default::default(),
             data: vec![1, 2, 3],
+            chain_id: 270,
+            transaction_type: Some(U64::from(1u32)),
+            access_list: None,
         };
-        let signature = signer
+        let raw_tx = signer
             .sign_transaction(raw_transaction.clone())
             .await
             .unwrap();
-        assert_ne!(signature.len(), 1);
+        assert_ne!(raw_tx.len(), 1);
         // precalculated signature with right algorithm implementation
-        let precalculated_signature: Vec<u8> = vec![
-            248, 96, 1, 1, 2, 148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10,
-            131, 1, 2, 3, 37, 160, 152, 202, 15, 174, 50, 167, 190, 239, 206, 183, 109, 215, 135,
-            60, 43, 71, 11, 74, 252, 97, 83, 86, 66, 249, 237, 111, 118, 121, 105, 214, 130, 249,
-            160, 106, 110, 143, 138, 113, 12, 177, 239, 121, 188, 247, 21, 236, 236, 163, 254, 28,
-            48, 250, 5, 20, 234, 54, 58, 162, 103, 252, 20, 243, 121, 7, 19,
+        let precalculated_raw_tx: Vec<u8> = vec![
+            1, 248, 100, 130, 1, 14, 1, 2, 128, 148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 128, 131, 1, 2, 3, 192, 1, 160, 98, 201, 238, 158, 215, 98, 23, 231,
+            221, 161, 170, 16, 54, 85, 187, 107, 12, 228, 218, 139, 103, 164, 17, 196, 178, 185,
+            252, 243, 186, 175, 93, 230, 160, 93, 204, 205, 5, 46, 187, 231, 211, 102, 133, 200,
+            254, 119, 94, 206, 81, 8, 143, 204, 14, 138, 43, 183, 214, 209, 166, 16, 116, 176, 44,
+            52, 133,
         ];
-        assert_eq!(signature, precalculated_signature);
+        assert_eq!(raw_tx, precalculated_raw_tx);
     }
 }

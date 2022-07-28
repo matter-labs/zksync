@@ -8,7 +8,7 @@ use zksync_types::TokenId;
 
 #[derive(Debug, Clone)]
 pub struct TestkitConfig {
-    pub chain_id: u8,
+    pub chain_id: u64,
     pub gas_price_factor: f64,
     pub web3_url: String,
     pub contract_upgrade_eth_blocks: Vec<u64>,
