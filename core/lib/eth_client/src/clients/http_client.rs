@@ -200,14 +200,17 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
         // form and sign tx
         let tx = RawTransaction {
-            // TODO Implement support for sepolia ZKS-976
-            chain_id: self.inner.chain_id.0 as u8,
+            chain_id: self.inner.chain_id.0,
+            transaction_type: None,
+            access_list: None,
+            max_fee_per_gas: Default::default(),
             nonce,
             to: Some(contract_addr),
             value: options.value.unwrap_or_default(),
             gas_price,
             gas,
             data,
+            max_priority_fee_per_gas: Default::default(),
         };
 
         let signed_tx = self.inner.eth_signer.sign_transaction(tx).await?;

@@ -21,7 +21,7 @@ basic_type!(
 basic_type!(
     /// Unique identifier of the ethereum chain
     ChainId,
-    u32
+    u64
 );
 
 basic_type!(

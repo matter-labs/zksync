@@ -232,7 +232,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.miniblock_iteration_interval(),
                 mempool_tx_request_sender,
                 eth_watch_config.confirmations_for_eth_event,
-                ChainId(eth_client_config.chain_id as u32),
+                ChainId(eth_client_config.chain_id),
             ));
         }
 
@@ -252,7 +252,7 @@ async fn run_server(components: &ComponentsToRun) {
                 &common_config,
                 &token_config,
                 mempool_tx_request_sender,
-                ChainId(eth_client_config.chain_id as u32),
+                ChainId(eth_client_config.chain_id),
                 eth_watch_config.confirmations_for_eth_event,
             ));
         }
@@ -273,7 +273,7 @@ async fn run_server(components: &ComponentsToRun) {
                 contracts_config.contract_addr,
                 ticker,
                 sign_check_sender,
-                ChainId(eth_client_config.chain_id as u32),
+                ChainId(eth_client_config.chain_id),
                 mempool_tx_request_sender,
                 private_config.url,
             ));
