@@ -34,7 +34,7 @@ struct ETHDirectClientInner<S: EthereumSigner> {
     sender_account: Address,
     contract_addr: H160,
     contract: ethabi::Contract,
-    chain_id: u8,
+    chain_id: u64,
     gas_price_factor: f64,
     web3: Web3<Http>,
 }
@@ -64,7 +64,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         operator_eth_addr: H160,
         eth_signer: S,
         contract_eth_addr: H160,
-        chain_id: u8,
+        chain_id: u64,
         gas_price_factor: f64,
     ) -> Self {
         Self {
@@ -200,12 +200,16 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         // form and sign tx
         let tx = RawTransaction {
             chain_id: self.inner.chain_id,
+            transaction_type: None,
+            access_list: None,
+            max_fee_per_gas: Default::default(),
             nonce,
             to: Some(contract_addr),
             value: options.value.unwrap_or_default(),
             gas_price,
             gas,
             data,
+            max_priority_fee_per_gas: Default::default(),
         };
 
         let signed_tx = self.inner.eth_signer.sign_transaction(tx).await?;
@@ -476,7 +480,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         self.inner.contract_addr
     }
 
-    pub fn chain_id(&self) -> u8 {
+    pub fn chain_id(&self) -> u64 {
         self.inner.chain_id
     }
 

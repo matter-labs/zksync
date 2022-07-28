@@ -71,7 +71,7 @@ impl EthereumAccount {
         address: Address,
         transport: Http,
         contract_address: Address,
-        chain_id: u8,
+        chain_id: u64,
         gas_price_factor: f64,
     ) -> Self {
         let eth_signer = PrivateKeySigner::new(private_key);

@@ -485,12 +485,16 @@ mod tests {
         let transaction_signature = client
             .sign_transaction(RawTransaction {
                 chain_id: 0,
+                transaction_type: None,
+                access_list: None,
+                max_fee_per_gas: Default::default(),
                 nonce: Default::default(),
                 to: None,
                 value: Default::default(),
                 gas_price: Default::default(),
                 gas: Default::default(),
                 data: vec![],
+                max_priority_fee_per_gas: Default::default(),
             })
             .await
             .unwrap();

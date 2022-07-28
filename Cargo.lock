@@ -6151,11 +6151,13 @@ dependencies = [
  "parity-crypto 0.9.0",
  "reqwest",
  "rlp",
+ "secp256k1 0.21.3",
  "serde",
  "serde_derive",
  "serde_json",
  "thiserror",
  "tokio",
+ "web3",
  "zksync_types",
 ]
 
