@@ -1407,86 +1407,6 @@
       ]
     }
   },
-  "20c3f14f055c818f21183125b4609da923d51a698bcf8a25941a39f564f0d35f": {
-    "query": "\n            SELECT \n                sequence_number,\n                tx_hash,\n                operation as op,\n                block_number,\n                created_at,\n                true as \"success!\",\n                Null as fail_reason,\n                eth_hash as \"eth_hash?\", \n                priority_op_serialid as \"priority_op_serialid?\",\n                block_index as \"block_index?\",\n                Null::bigint as batch_id\n            FROM executed_priority_operations \n            WHERE sequence_number IN (SELECT u.sequence_number\n                FROM UNNEST ($1::bigint[])\n                AS u(sequence_number)\n            )\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "sequence_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tx_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 2,
-          "name": "op",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 6,
-          "name": "fail_reason",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 7,
-          "name": "eth_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 8,
-          "name": "priority_op_serialid?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 9,
-          "name": "block_index?",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 10,
-          "name": "batch_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8Array"
-        ]
-      },
-      "nullable": [
-        true,
-        false,
-        false,
-        false,
-        false,
-        null,
-        null,
-        false,
-        false,
-        false,
-        null
-      ]
-    }
-  },
   "21d959769e02bf5c52b68e69732363716534dbbbf0638a500ef46152136d2cab": {
     "query": "\n                    SELECT id, address, decimals, kind as \"kind: _\", symbol FROM tokens\n                    WHERE address = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -2622,6 +2542,86 @@
       "nullable": []
     }
   },
+  "450e7bde5e9e9bbcc4b4124a7d2fe6d4c818a96c0af5a9586cf29c01944c53b5": {
+    "query": "\n            SELECT \n                sequence_number,\n                tx_hash as \"tx_hash!\",\n                operation as \"op!\",\n                block_number as \"block_number!\",\n                created_at as \"created_at!\",\n                true as \"success!\",\n                Null as fail_reason,\n                eth_hash as \"eth_hash?\", \n                priority_op_serialid as \"priority_op_serialid?\",\n                block_index as \"block_index?\",\n                Null::bigint as batch_id\n            FROM executed_priority_operations \n            WHERE sequence_number IN (SELECT u.sequence_number\n                FROM UNNEST ($1::bigint[])\n                AS u(sequence_number)\n            )\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "sequence_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 2,
+          "name": "op!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "block_number!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "fail_reason",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "eth_hash?",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 8,
+          "name": "priority_op_serialid?",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "block_index?",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 10,
+          "name": "batch_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
   "457b4a87812ac9dcad6fbfc356952f05481a5729074ce305c3dedb33f99672f6": {
     "query": "\n            DELETE FROM pending_block WHERE number = $1\n            ",
     "describe": {
@@ -3641,6 +3641,86 @@
         null,
         null,
         null
+      ]
+    }
+  },
+  "6b690884e0984b833c6b8c1640d3442d6bf123b7b7a3ef175fa9d9e4c57d8b8a": {
+    "query": "\n               SELECT\n                    sequence_number,\n                    tx_hash as \"tx_hash!\",\n                    tx as \"op!\",\n                    block_number as \"block_number!\",\n                    created_at as \"created_at!\",\n                    success as \"success!\",\n                    fail_reason,\n                    Null::bytea as eth_hash,\n                    Null::bigint as priority_op_serialid,\n                    block_index,\n                    batch_id\n                FROM executed_transactions \n            WHERE sequence_number IN (SELECT u.sequence_number\n                FROM UNNEST ($1::bigint[])\n                AS u(sequence_number)\n            )\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "sequence_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx_hash!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 2,
+          "name": "op!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "block_number!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "fail_reason",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 8,
+          "name": "priority_op_serialid",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "block_index",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 10,
+          "name": "batch_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
       ]
     }
   },
@@ -5283,86 +5363,6 @@
         false,
         null,
         false
-      ]
-    }
-  },
-  "98b0bebc9881ab8e0cb553f03400d8fd935998dc827905645dd5ff5d222fd95d": {
-    "query": "\n               SELECT\n                    sequence_number,\n                    tx_hash,\n                    tx as op,\n                    block_number,\n                    created_at,\n                    success,\n                    fail_reason,\n                    Null::bytea as eth_hash,\n                    Null::bigint as priority_op_serialid,\n                    block_index,\n                    batch_id\n                FROM executed_transactions \n            WHERE sequence_number IN (SELECT u.sequence_number\n                FROM UNNEST ($1::bigint[])\n                AS u(sequence_number)\n            )\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "sequence_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tx_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 2,
-          "name": "op",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "success",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 6,
-          "name": "fail_reason",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 7,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 8,
-          "name": "priority_op_serialid",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 9,
-          "name": "block_index",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 10,
-          "name": "batch_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8Array"
-        ]
-      },
-      "nullable": [
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        null,
-        null,
-        true,
-        true
       ]
     }
   },
