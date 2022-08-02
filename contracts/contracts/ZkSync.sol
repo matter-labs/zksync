@@ -461,7 +461,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev 1. Processes all priority operations or save them as pending
     /// @dev 2. Finalizes block on Ethereum
     /// @dev _executedBlockIdx is index in the array of the blocks that we want to execute together
-    function executeOneBlock(ExecuteBlockInfo memory _blockExecuteData, uint256 _executedBlockIdx) internal {
+    function executeOneBlock(ExecuteBlockInfo calldata _blockExecuteData, uint256 _executedBlockIdx) internal {
         // Ensure block was committed
         require(
             hashStoredBlockInfo(_blockExecuteData.storedBlock) ==
@@ -474,7 +474,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         uint256 pendingOnchainOpsPubdataLength = _blockExecuteData.pendingOnchainOpsPubdata.length;
         for (uint256 i = 0; i < pendingOnchainOpsPubdataLength; ++i) {
-            bytes memory pubData = _blockExecuteData.pendingOnchainOpsPubdata[i];
+            bytes calldata pubData = _blockExecuteData.pendingOnchainOpsPubdata[i];
 
             Operations.OpType opType = Operations.OpType(uint8(pubData[0]));
 
@@ -547,7 +547,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         nonReentrant
     {
         requireActive();
-        require(_committedBlocks.length == _proof.commitments.length, "o3"); // unequal length of blocks and proof.commitments
 
         uint256 i;
         uint32 currentTotalBlocksProven = totalBlocksProven;
@@ -558,6 +557,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             bytes32 firstUnverifiedBlockHash = storedBlockHashes[currentTotalBlocksProven + 1];
             while (hashStoredBlockInfo(_committedBlocks[i]) != firstUnverifiedBlockHash) {
                 ++i;
+                require(i < _committedBlocks.length, "o2"); // Revert if the first unverified block is not among committed ones.
             }
         }
 
@@ -783,6 +783,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             return verifyChangePubkeyOldECRECOVER(_ethWitness, _changePk);
         } else if (changePkType == Operations.ChangePubkeyType.ECRECOVERV2) {
             return verifyChangePubkeyECRECOVERV2(_ethWitness, _changePk);
+        } else if (changePkType == Operations.ChangePubkeyType.EIP712) {
+            return verifyChangePubkeyEIP712(_ethWitness, _changePk);
         } else {
             revert("G"); // Incorrect ChangePubKey type
         }
@@ -807,6 +809,26 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             )
         );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
+        return recoveredAddress == _changePk.owner;
+    }
+
+    /// @notice Checks that signature is valid for pubkey change EIP712 message
+    /// @param _ethWitness Signature (65 bytes)
+    /// @param _changePk Parsed change pubkey operation
+    function verifyChangePubkeyEIP712(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
+        internal
+        pure
+        returns (bool)
+    {
+        (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
+        bytes32 eip712DomainSeparator = keccak256(
+            abi.encode(EIP712_DOMAIN_TYPEHASH, keccak256(bytes(name)), keccak256(bytes(version)), Utils.getChainId())
+        );
+        bytes32 structHash = keccak256(
+            abi.encode(EIP712_CHANGEPUBKEY_TYPEHASH, _changePk.pubKeyHash, _changePk.nonce, _changePk.accountId)
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", eip712DomainSeparator, structHash));
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, digest);
         return recoveredAddress == _changePk.owner;
     }
 
