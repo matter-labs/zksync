@@ -8,6 +8,12 @@ export interface ChangePubKeyECDSA {
     batchHash?: string;
 }
 
+export interface ChangePubKeyEIP712 {
+    type: 'EIP712';
+    ethSignature: string;
+    batchHash?: string;
+}
+
 export interface ChangePubKeyCREATE2 {
     type: 'CREATE2';
     creatorAddress: string;
@@ -24,9 +30,10 @@ export type ChangePubKeyOp = {
         pubKey: string;
         signature: string;
     };
-    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2 | ChangePubKeyEIP712;
     newPkHash: string;
     nonce: number;
+    chainId?: number;
     type: 'ChangePubKey';
     ethSignature: null;
     validFrom: number;

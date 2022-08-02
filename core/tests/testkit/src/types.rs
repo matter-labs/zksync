@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use web3::types::TransactionReceipt;
 use zksync_config::ZkSyncConfig;
 use zksync_types::block::Block;
-use zksync_types::TokenId;
+use zksync_types::{ChainId, TokenId};
 
 #[derive(Debug, Clone)]
 pub struct TestkitConfig {
-    pub chain_id: u64,
+    pub chain_id: ChainId,
     pub gas_price_factor: f64,
     pub web3_url: String,
     pub contract_upgrade_eth_blocks: Vec<u64>,
@@ -19,7 +19,7 @@ impl TestkitConfig {
     pub fn from_env() -> Self {
         let config = ZkSyncConfig::from_env();
         TestkitConfig {
-            chain_id: config.eth_client.chain_id,
+            chain_id: ChainId(config.eth_client.chain_id),
             gas_price_factor: config.eth_client.gas_price_factor,
             web3_url: config.eth_client.web3_url(),
             contract_upgrade_eth_blocks: config.contracts.upgrade_eth_blocks,

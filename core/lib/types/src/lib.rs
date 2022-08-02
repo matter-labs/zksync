@@ -74,6 +74,8 @@ pub use self::tx::{
     ForcedExit, MintNFT, Order, SignedZkSyncTx, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx,
 };
 
+pub use self::tx::eip712_signature;
+
 #[doc(hidden)]
 pub use self::{operations::CloseOp, tx::Close};
 

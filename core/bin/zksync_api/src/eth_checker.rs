@@ -122,7 +122,7 @@ mod tests {
     use zksync_eth_signer::PrivateKeySigner;
     use zksync_types::{
         tx::{EIP1271Signature, PackedEthSignature},
-        Address,
+        Address, ChainId,
     };
 
     #[tokio::test]
@@ -148,7 +148,7 @@ mod tests {
             Default::default(),
             PrivateKeySigner::new(Default::default()),
             Default::default(),
-            0,
+            ChainId(0),
             1.0,
         ));
 

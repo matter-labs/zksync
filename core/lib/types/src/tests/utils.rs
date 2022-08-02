@@ -1,6 +1,11 @@
-use crate::tx::ChangePubKey;
+use crate::eip712_signature::Eip712Domain;
+use crate::tx::{
+    ChangePubKey, ChangePubKeyEIP712Data, ChangePubKeyEthAuthData, PackedEthSignature,
+};
 use crate::*;
 use chrono::Utc;
+use zksync_crypto::priv_key_from_fs;
+use zksync_crypto::rand::{Rng, XorShiftRng};
 
 pub fn create_full_exit_op() -> ExecutedOperations {
     let priority_op = FullExit {
@@ -61,18 +66,32 @@ pub fn create_withdraw_tx() -> ExecutedOperations {
 }
 
 pub fn create_change_pubkey_tx() -> ExecutedOperations {
+    let sk = priv_key_from_fs(XorShiftRng::new_unseeded().gen());
+    let pk = H256::random();
+
+    let mut change_pub_key = ChangePubKey::new_signed(
+        AccountId(1),
+        Default::default(),
+        PubKeyHash::from_privkey(&sk),
+        TokenId(0),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        None,
+        &sk,
+        Some(ChainId(9)),
+    )
+    .unwrap();
+    let domain = Eip712Domain::new(ChainId(9));
+    let eth_signature = PackedEthSignature::sign_typed_data(&pk, &domain, &change_pub_key).unwrap();
+    change_pub_key.eth_signature = Some(eth_signature.clone());
+    change_pub_key.eth_auth_data = Some(ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+        eth_signature,
+        batch_hash: Default::default(),
+    }));
+
     let change_pubkey_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
-        tx: ChangePubKey::new(
-            AccountId(1),
-            Default::default(),
-            Default::default(),
-            TokenId(0),
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            None,
-            None,
-        ),
+        tx: change_pub_key,
         account_id: AccountId(0),
     }));
 

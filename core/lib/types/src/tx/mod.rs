@@ -21,8 +21,8 @@ mod tests;
 pub use self::close::Close;
 pub use self::{
     change_pubkey::{
-        ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
-        ChangePubKeyType,
+        ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEIP712Data,
+        ChangePubKeyEthAuthData, ChangePubKeyType,
     },
     error::TransactionError,
     forced_exit::ForcedExit,
@@ -38,6 +38,7 @@ pub use self::{
 // Re-export primitives associated with transactions.
 pub use self::primitives::{
     eip1271_signature::EIP1271Signature,
+    eip712_signature,
     eth_batch_sign_data::EthBatchSignData,
     eth_batch_signature::EthBatchSignatures,
     eth_signature::{TxEthSignature, TxEthSignatureVariant},

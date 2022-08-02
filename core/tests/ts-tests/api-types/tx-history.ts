@@ -1,4 +1,4 @@
-import { Order, ChangePubKeyOnchain, ChangePubKeyECDSA, ChangePubKeyCREATE2 } from './transaction';
+import { Order, ChangePubKeyOnchain, ChangePubKeyECDSA, ChangePubKeyCREATE2, ChangePubKeyEIP712 } from './transaction';
 
 type DepositOp = {
     account_id: number;
@@ -50,12 +50,13 @@ type ChangePubKeyOp = {
     type: string;
     feeToken: number;
     fee: string;
-    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2 | null;
+    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2 | ChangePubKeyEIP712 | null;
     ethSignature: string | null;
     signature: {
         pubKey: string;
         signature: string;
     };
+    chainId?: number;
     validFrom: number;
     validUntil: number;
 };

@@ -26,6 +26,7 @@ fn success() {
         Default::default(),
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 
@@ -70,6 +71,7 @@ fn nonce_mismatch() {
         Default::default(),
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 
@@ -94,6 +96,7 @@ fn invalid_account_id() {
         Default::default(),
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 

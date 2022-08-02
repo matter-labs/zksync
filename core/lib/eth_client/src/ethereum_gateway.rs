@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use zksync_config::{ETHClientConfig, ETHSenderConfig};
 use zksync_contracts::zksync_contract;
 use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::{TransactionReceipt, H160, H256, U256};
+use zksync_types::{ChainId, TransactionReceipt, H160, H256, U256};
 
 use crate::clients::mock::MockEthereum;
 use crate::clients::multiplexer::MultiplexerEthereumClient;
@@ -63,7 +63,7 @@ impl EthereumGateway {
                 eth_sender_config.sender.operator_commit_eth_addr,
                 PrivateKeySigner::new(eth_sender_config.sender.operator_private_key),
                 main_contract,
-                eth_client_config.chain_id,
+                ChainId(eth_client_config.chain_id),
                 eth_client_config.gas_price_factor,
             ))
         } else {
@@ -80,7 +80,7 @@ impl EthereumGateway {
                         eth_sender_config.sender.operator_commit_eth_addr,
                         PrivateKeySigner::new(eth_sender_config.sender.operator_private_key),
                         main_contract,
-                        eth_client_config.chain_id,
+                        ChainId(eth_client_config.chain_id),
                         eth_client_config.gas_price_factor,
                     ),
                 );
