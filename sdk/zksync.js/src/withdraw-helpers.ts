@@ -31,11 +31,10 @@ function checkEthProvider(ethersWallet: ethers.Signer) {
 // https://github.com/makerdao/multicall
 function getMulticallAddressByNetwork(network: Network) {
     switch (network) {
-        case 'rinkeby':
+        case 'sepolia':
         case 'rinkeby-beta':
             return '0x42ad527de7d4e9d9d011ac45b31d8551f8fe9821';
-        case 'ropsten':
-            return '0x53c43764255c17bd724f74c4ef150724ac50a3ed';
+        case 'goerli':
         case 'goerli-beta':
             return '0x77dca2c955b15e9de4dbbcf1246b4b85b651e50e';
         case 'mainnet':

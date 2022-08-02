@@ -11,10 +11,10 @@ export async function getDefaultRestProvider(
 ): Promise<RestProvider> {
     if (network === 'localhost') {
         return await RestProvider.newProvider('http://127.0.0.1:3001/api/v0.2', pollIntervalMilliSecs, network);
-    } else if (network === 'ropsten') {
-        return await RestProvider.newProvider('https://ropsten-api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
-    } else if (network === 'rinkeby') {
-        return await RestProvider.newProvider('https://rinkeby-api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
+    } else if (network === 'goerli') {
+        return await RestProvider.newProvider('https://goerli-api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
+    } else if (network === 'sepolia') {
+        return await RestProvider.newProvider('https://sepolia-api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
     } else if (network === 'goerli-beta') {
         return await RestProvider.newProvider(
             'https://goerli-beta-api.zksync.dev/api/v0.2',
