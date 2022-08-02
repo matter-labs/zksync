@@ -44,22 +44,18 @@ export async function getDefaultProvider(
         } else if (transport === 'HTTP') {
             return await Provider.newHttpProvider('http://127.0.0.1:3030', pollIntervalMilliSecs, network);
         }
-    } else if (network === 'ropsten') {
+    } else if (network === 'goerli') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://ropsten-api.zksync.io/jsrpc-ws', network);
+            return await Provider.newWebsocketProvider('wss://goerli-api.zksync.io/jsrpc-ws', network);
         } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider(
-                'https://ropsten-api.zksync.io/jsrpc',
-                pollIntervalMilliSecs,
-                network
-            );
+            return await Provider.newHttpProvider('https://goerli-api.zksync.io/jsrpc', pollIntervalMilliSecs, network);
         }
-    } else if (network === 'rinkeby') {
+    } else if (network === 'sepolia') {
         if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://rinkeby-api.zksync.io/jsrpc-ws', network);
+            return await Provider.newWebsocketProvider('wss://sepolia-api.zksync.io/jsrpc-ws', network);
         } else if (transport === 'HTTP') {
             return await Provider.newHttpProvider(
-                'https://rinkeby-api.zksync.io/jsrpc',
+                'https://sepolia-api.zksync.io/jsrpc',
                 pollIntervalMilliSecs,
                 network
             );

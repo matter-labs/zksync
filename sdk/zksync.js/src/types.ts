@@ -16,7 +16,7 @@ export type TotalFee = Map<TokenLike, BigNumber>;
 
 export type Nonce = number | 'committed';
 
-export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'goerli-beta';
+export type Network = 'localhost' | 'sepolia' | 'goerli' | 'mainnet' | 'rinkeby-beta' | 'goerli-beta';
 
 const MAINNET_NETWORK_CHAIN_ID = 1;
 const ROPSTEN_NETWORK_CHAIN_ID = 3;
