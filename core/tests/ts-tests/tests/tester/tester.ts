@@ -7,7 +7,7 @@ import * as crypto from 'crypto';
 
 const zksyncAbi =
     require('../../../../../contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json').abi;
-type Network = 'localhost' | 'rinkeby' | 'ropsten';
+type Network = 'localhost' | 'goerli' | 'sepolia';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
