@@ -106,6 +106,7 @@ impl AccountPool {
             let eth_pk = H256::from_str(&config.master_wallet_pk)
                 .expect("Can't parse master wallet private key");
             let address = pk_to_address(&eth_pk);
+            vlog::info!("Master address is {:?}", &address);
             let zksync_pk = private_key_from_seed(eth_pk.as_bytes())
                 .expect("Can't generate the zkSync private key");
             let wallet_credentials =
