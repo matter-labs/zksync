@@ -137,9 +137,8 @@ impl Transfer {
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        if let Some(time_range) = &self.time_range {
-            out.extend_from_slice(&time_range.as_be_bytes());
-        }
+        let time_range = self.time_range.unwrap_or_default();
+        out.extend_from_slice(&time_range.as_be_bytes());
         out
     }
 
