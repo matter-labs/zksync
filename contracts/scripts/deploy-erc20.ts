@@ -13,10 +13,7 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 const provider = web3Provider();
-const wallet = Wallet.fromMnemonic(
-    process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-    "m/44'/60'/0'/0/1"
-).connect(provider);
+const wallet = Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
 type Token = {
     address: string | null;
@@ -37,10 +34,11 @@ async function deployToken(token: TokenDescription): Promise<Token> {
         [token.name, token.symbol, token.decimals],
         { gasLimit: 5000000 }
     );
-
     await erc20.mint(wallet.address, parseEther('3000000000'));
     for (let i = 0; i < 10; ++i) {
-        const testWallet = Wallet.fromMnemonic(process.env.MNEMONIC as string, "m/44'/60'/0'/0/" + i).connect(provider);
+        const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
+            provider
+        );
         await erc20.mint(testWallet.address, parseEther('3000000000'));
     }
     token.address = erc20.address;
@@ -82,7 +80,6 @@ async function main() {
         .action(async (tokens_json: string) => {
             const tokens: Array<TokenDescription> = JSON.parse(tokens_json);
             const result = [];
-
             for (const token of tokens) {
                 result.push(await deployToken(token));
             }
