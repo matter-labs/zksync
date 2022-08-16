@@ -1,5 +1,4 @@
 use futures::{channel::mpsc, future::join_all};
-use std::ops::Mul;
 
 use tokio::task::JoinHandle;
 use zksync::{
@@ -57,7 +56,7 @@ impl Executor {
         self.set_signing_key().await?;
         let (executor_future, account_futures) = self.send_initial_transfers().await?;
         self.wait_account_routines(account_futures).await;
-        self.deposit_to_master().await;
+
         let final_resultion = executor_future.await.unwrap_or(LoadtestResult::TestFailed);
 
         Ok(final_resultion)
@@ -84,7 +83,7 @@ impl Executor {
     /// Mints the ERC-20 token on the main wallet.
     async fn mint(&mut self) -> anyhow::Result<()> {
         vlog::info!("Master Account: Minting ERC20 token...");
-        let deposit_amount = self.amount_to_deposit().mul(3);
+        let deposit_amount = self.amount_to_deposit();
 
         let master_wallet = &self.pool.master_wallet;
         let mut ethereum = master_wallet.ethereum(&self.config.web3_url).await?;
