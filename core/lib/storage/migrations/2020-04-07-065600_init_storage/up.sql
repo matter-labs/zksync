@@ -335,6 +335,7 @@ CREATE EXTENSION IF NOT EXISTS tablefunc;
 -- Data insertion section --
 -- ---------------------- --
 
+-- TODO: We may need to change this part to replace `ETH` with `RBTC`
 -- Add ETH token
 INSERT INTO tokens
 VALUES (0,

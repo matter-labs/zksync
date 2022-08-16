@@ -26,6 +26,34 @@ export async function drop() {
                      (${SQL()} 'DROP SCHEMA IF EXISTS public CASCADE' && ${SQL()} 'CREATE SCHEMA public')`);
 }
 
+export async function listMarketValue() {
+    await utils.confirmAction();
+    console.log('list tokens...');
+
+    let response = await utils.exec(`${SQL()} ' SELECT * from ticker_market_volume'`);
+    console.log(response);
+}
+
+export async function listTokens() {
+    await utils.confirmAction();
+    console.log('get token...');
+    let response = await utils.exec(`${SQL()} 'SELECT * FROM ticker_price'`);
+    console.log(response);
+}
+
+export async function setPrice(token_id: number, price: number = 0.05) {
+    await utils.confirmAction();
+    console.log('set token price...');
+    let response = await utils.exec(
+        `${SQL()} "insert into ticker_price (token_id, usd_price, last_updated) values(${token_id}, ${price}, '2022-07-13 02:16:47.169+00')
+        ON CONFLICT (token_id)
+        DO
+          UPDATE SET usd_price = ${price}, last_updated = '2022-07-13 02:16:47.169+00'
+        "`
+    );
+    console.log(response);
+}
+
 export async function migrate() {
     await utils.confirmAction();
     console.log('Running migrations...');
@@ -83,3 +111,6 @@ command
 command.command('setup').description('initialize the database and perform migrations').action(setup);
 command.command('wait').description('wait for database to get ready for interaction').action(wait);
 command.command('reset').description('reinitialize the database').action(reset);
+command.command('listMarketValue').description('list market value of the tokens').action(listMarketValue);
+command.command('listTokens').description('List tokens').action(listTokens);
+command.command('setPrice <token_id> <price>').description('set token price').action(setPrice);

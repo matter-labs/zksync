@@ -42,6 +42,8 @@
 import { clientPromise } from './Client';
 import Navbar from './Navbar.vue';
 import store from './store';
+import config from './env-config';
+
 const components = {
     Navbar
 };
@@ -97,7 +99,11 @@ export default {
         },
         urlForToken(address) {
             const explorerLink = store.explorerLink;
-            return `${explorerLink}/token/${address}`;
+            if(store.network === 'localhost') {
+                return `http://localhost:8000/${address}`;
+            } else {
+                return `${explorerLink}/token/${address}`;
+            }
         }
     },
     components

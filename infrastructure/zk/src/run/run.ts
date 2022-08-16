@@ -14,11 +14,6 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
     if (command == 'dev') {
         await utils.spawn(`yarn --silent --cwd contracts deploy-erc20 add-multi '
             [
-                { "name": "DAI",  "symbol": "DAI",  "decimals": 18 },
-                { "name": "wBTC", "symbol": "wBTC", "decimals":  8, "implementation": "RevertTransferERC20" },
-                { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
-                { "name": "GNT",  "symbol": "GNT",  "decimals": 18 },
-                { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
         if (!process.env.CI) {
             await docker.restart('dev-liquidity-token-watcher');
@@ -42,6 +37,12 @@ export async function governanceAddERC20(command: 'dev' | 'new', address?: strin
 export async function serverAddERC20(address: string, symbol: string, decimals: string) {
     await utils.spawn(
         `yarn --cwd contracts server-add-erc20 add --address ${address} --symbol ${symbol} --decimals ${decimals}`
+    );
+}
+
+export async function serverAddERC20AndMint(name: string, symbol: string, decimals: string, net: string) {
+    await utils.spawn(
+        `yarn --cwd contracts server-add-erc20 add-and-mint --sname ${name} --symbol ${symbol} --decimals ${decimals} --env ${net}`
     );
 }
 
@@ -234,6 +235,14 @@ command
     .action(async (address: string, symbol: string, decimals: string) => {
         await utils.confirmAction();
         await serverAddERC20(address, symbol, decimals);
+    });
+
+command
+    .command('server-add-erc20-and-mint <name> <symbol> <decimals> <net>')
+    .description('add-and-mint testnet erc20 token to the zkSynk server')
+    .action(async (name: string, symbol: string, decimals: string, net: string) => {
+        await utils.confirmAction();
+        await serverAddERC20AndMint(name, symbol, decimals, net);
     });
 
 command
