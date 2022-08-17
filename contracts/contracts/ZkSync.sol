@@ -292,7 +292,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
 
         pendingBalances[packedBalanceKey].balanceToWithdraw = balance - amount;
-        emit Withdrawal(tokenId, amount);
+        emit Withdrawal(_owner, tokenId, amount);
     }
 
     /// @notice  Withdraws NFT from zkSync contract to the owner
@@ -450,11 +450,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function increasePendingBalance(
         uint16 _tokenId,
         address _recipient,
-        uint128 _amount
+        uint128 _amount,
+        Operations.WithdrawalType withdrawalType
     ) internal {
         bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
         increaseBalanceToWithdraw(packedBalanceKey, _amount);
-        emit WithdrawalPending(_tokenId, _recipient, _amount);
+        emit WithdrawalPending(_tokenId, _recipient, _amount, withdrawalType);
     }
 
     /// @dev Executes one block
@@ -482,16 +483,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
                 // Circuit guarantees that partial exits are available only for fungible tokens
                 require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf1");
-                increasePendingBalance(uint16(op.tokenId), op.owner, op.amount);
+                increasePendingBalance(uint16(op.tokenId), op.owner, op.amount, Operations.WithdrawalType.PartialExit);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
                 // Circuit guarantees that forced exits are available only for fungible tokens
                 require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "mf2");
-                increasePendingBalance(uint16(op.tokenId), op.target, op.amount);
+                increasePendingBalance(uint16(op.tokenId), op.target, op.amount, Operations.WithdrawalType.ForcedExit);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
-                    increasePendingBalance(uint16(op.tokenId), op.owner, op.amount);
+                    increasePendingBalance(uint16(op.tokenId), op.owner, op.amount, Operations.WithdrawalType.FullExit);
                 } else {
                     if (op.amount == 1) {
                         Operations.WithdrawNFT memory withdrawNftOp = Operations.WithdrawNFT(
@@ -542,10 +543,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Blocks commitment verification.
     /// @notice Only verifies block commitments without any other processing
-    function proveBlocks(StoredBlockInfo[] calldata _committedBlocks, ProofInput calldata _proof)
-        external
-        nonReentrant
-    {
+    function proveBlocks(StoredBlockInfo[] calldata _committedBlocks, ProofInput memory _proof) external nonReentrant {
         requireActive();
 
         uint256 i;

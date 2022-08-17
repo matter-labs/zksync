@@ -27,6 +27,13 @@ library Operations {
         Swap
     }
 
+    /// @notice zkSync withdrawal types
+    enum WithdrawalType {
+        PartialExit,
+        ForcedExit,
+        FullExit
+    }
+
     // Byte lengths
 
     uint8 internal constant OP_TYPE_BYTES = 1;
