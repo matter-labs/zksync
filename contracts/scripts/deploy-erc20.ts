@@ -34,7 +34,6 @@ async function deployToken(token: TokenDescription): Promise<Token> {
         [token.name, token.symbol, token.decimals],
         { gasLimit: 5000000 }
     );
-
     await erc20.mint(wallet.address, parseEther('3000000000'));
     for (let i = 0; i < 10; ++i) {
         const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
@@ -81,7 +80,6 @@ async function main() {
         .action(async (tokens_json: string) => {
             const tokens: Array<TokenDescription> = JSON.parse(tokens_json);
             const result = [];
-
             for (const token of tokens) {
                 result.push(await deployToken(token));
             }

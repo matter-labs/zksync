@@ -45,7 +45,7 @@ impl Default for TimeRange {
     fn default() -> Self {
         Self {
             valid_from: 0,
-            valid_until: u64::max_value(),
+            valid_until: u64::MAX,
         }
     }
 }

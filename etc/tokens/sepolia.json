@@ -1,0 +1,14 @@
+[
+  {
+    "address": "0xFF82bB6DB46Ad45F017e2Dfb478102C7671B13b3",
+    "name": "wBTC",
+    "symbol": "wBTC",
+    "decimals": "8"
+  },
+  {
+    "address": "0x403e5E352a0dF919b7d89e4C2edB21d75bf613fA",
+    "name": "USDC",
+    "symbol": "USDC",
+    "decimals": "18"
+  }
+]

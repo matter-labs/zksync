@@ -418,7 +418,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
         for op in ops {
             let serial_id = op.serial_id as i64;
-            let tx_hash = op.tx_hash().to_string();
+            let tx_hash = hex::encode(op.tx_hash().as_ref());
             let data = serde_json::to_value(op.data.clone()).expect("Should be encoded");
             let deadline_block = op.deadline_block as i64;
             let eth_hash = op.eth_hash.as_bytes().to_vec();
@@ -706,6 +706,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 .into_iter()
                 .map(|op| ExecutedOperations::PriorityOp(Box::new(op.into_executed())));
 
+            executed_operations.extend(executed_priority_ops);
             executed_operations.sort_by_key(|exec_op| {
                 match exec_op {
                     ExecutedOperations::Tx(tx) => {
@@ -720,7 +721,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 }
             });
 
-            executed_operations.extend(executed_priority_ops);
             incomplete_blocks.push_back(IncompleteBlock::new_from_available_block_sizes(
                 BlockNumber(block.number as u32),
                 fee_account_id,
