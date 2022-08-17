@@ -623,3 +623,32 @@ fn test_priority_op_from_valid_logs() {
         assert!(op.is_ok());
     }
 }
+
+#[cfg(test)]
+pub mod tx_tests {
+    use crate::Transfer;
+
+    /// Transactions without valid_from, valid_until are not supported with TX_VERSION = 1 and higher.
+    /// This was only supported for legacy transactions.
+    /// We had a bug on the server that allowed us to receive transaction with TX_VERSION = 1
+    /// without valid_from, valid_until.
+    #[test]
+    fn new_tx_without_valid_from_until() {
+        let mut transfer: Transfer = serde_json::from_str(
+            r#"{
+                    "to": "0x67def541702da86bea49a8bce311f11cc6bb3abb",
+                    "fee": "11480000000000",
+                    "from": "0x75f9b48c531158d26ba7488035021fe41e6be392",
+                    "nonce": 1,
+                    "token": 0,
+                    "amount": "1000000000000000",
+                    "accountId": 2849,
+                    "signature": {
+                      "pubKey": "392973220f529f708564ae7544623c1aaf6b6b799eebe7ddb112592eb2646a1f",
+                      "signature": "897dcafe59091d3d2002521ed877761e64983c39d5b756873bb980843409299cf180d3eeaa4a5a93316bb588fd5613fdaad678b611e431381d4b15ceae44dd02"
+                    }
+                  }"#,
+        ).unwrap();
+        transfer.check_correctness().unwrap_err();
+    }
+}
