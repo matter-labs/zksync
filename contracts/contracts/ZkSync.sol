@@ -451,11 +451,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint16 _tokenId,
         address _recipient,
         uint128 _amount,
-        Operations.WithdrawalType withdrawalType
+        Operations.WithdrawalType _withdrawalType
     ) internal {
         bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
         increaseBalanceToWithdraw(packedBalanceKey, _amount);
-        emit WithdrawalPending(_tokenId, _recipient, _amount, withdrawalType);
+        emit WithdrawalPending(_tokenId, _recipient, _amount, _withdrawalType);
     }
 
     /// @dev Executes one block

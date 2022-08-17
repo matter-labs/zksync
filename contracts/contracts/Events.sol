@@ -20,7 +20,7 @@ interface Events {
     /// @notice Event emitted when user funds are withdrawn from the zkSync state but not from contract
     event WithdrawalPending(
         uint16 indexed tokenId,
-        address indexed recepient,
+        address indexed recipient,
         uint128 amount,
         Operations.WithdrawalType withdrawalType
     );
