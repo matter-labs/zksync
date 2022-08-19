@@ -10,6 +10,7 @@ All notable changes to the contracts will be documented in this file.
 
 - `nonReentrant` modifier for all external functions as additional protection from reentrancy attack.
 - New method for EIP-712 `ChangePubKey` authorization.
+- A check for non-zero address when changing the governor.
 
 ### Changed
 
