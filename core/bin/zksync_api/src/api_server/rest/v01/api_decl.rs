@@ -14,7 +14,9 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{block::ExecutedOperations, BlockNumber, PriorityOp, H160, H256};
+use zksync_types::{
+    block::ExecutedOperations, BlockNumber, PriorityOp, SequentialTxId, H160, H256,
+};
 
 /// `ApiV01` structure contains the implementation of `/api/v0.1` endpoints set.
 /// It is considered (somewhat) stable and will be supported for a while.
@@ -114,10 +116,16 @@ impl ApiV01 {
     }
 
     // Spawns future updating SharedNetworkStatus in the current `actix::System`
-    pub fn spawn_network_status_updater(&self, panic_notify: mpsc::Sender<bool>) {
-        self.network_status
-            .clone()
-            .start_updater_detached(panic_notify, self.connection_pool.clone());
+    pub fn spawn_network_status_updater(
+        &self,
+        panic_notify: mpsc::Sender<bool>,
+        last_tx_id: SequentialTxId,
+    ) {
+        self.network_status.clone().start_updater_detached(
+            panic_notify,
+            self.connection_pool.clone(),
+            last_tx_id,
+        );
     }
 
     // cache access functions

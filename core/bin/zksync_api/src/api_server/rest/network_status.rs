@@ -123,6 +123,7 @@ impl SharedNetworkStatus {
         mut self,
         panic_notify: mpsc::Sender<bool>,
         connection_pool: ConnectionPool,
+        mut last_tx_id: SequentialTxId,
     ) {
         std::thread::Builder::new()
             .name("rest-state-updater".to_string())
@@ -133,7 +134,6 @@ impl SharedNetworkStatus {
 
                 let state_update_task = async move {
                     let mut timer = time::interval(Duration::from_millis(30000));
-                    let mut last_tx_id = SequentialTxId(0);
                     loop {
                         timer.tick().await;
                         match self.update(&connection_pool, last_tx_id).await {
