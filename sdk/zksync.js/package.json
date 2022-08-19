@@ -1,6 +1,10 @@
 {
-    "name": "zksync",
-    "version": "0.11.6",
+    "name": "@rsksmart/rif-aggregation-sdk-js",
+    "version": "0.0.2",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/rsksmart/ri-aggregation"
+    },
     "license": "MIT",
     "main": "build/index.js",
     "types": "build/index.d.ts",

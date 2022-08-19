@@ -3,7 +3,7 @@ import fs from 'fs';
 import { Tester } from './tester';
 import { utils } from 'ethers';
 import { expect } from 'chai';
-import { Wallet, types, ETHProxy } from 'zksync';
+import { Wallet, types, ETHProxy } from '@rsksmart/rif-aggregation-sdk-js';
 type TokenLike = types.TokenLike;
 
 function readContractCode(name: string) {

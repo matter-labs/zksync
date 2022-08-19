@@ -1,14 +1,14 @@
 import { Contract, constants, BigNumber, Wallet } from 'ethers';
 import { keccak256, parseEther } from 'ethers/lib/utils';
-import { ETHProxy } from 'zksync';
-import { Address, TokenAddress } from 'zksync/build/types';
+import { ETHProxy } from '@rsksmart/rif-aggregation-sdk-js';
+import { Address, TokenAddress } from '@rsksmart/rif-aggregation-sdk-js/build/types';
 import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
 
 const hardhat = require('hardhat');
 const { simpleEncode } = require('ethereumjs-abi');
 const { expect } = require('chai');
 const { getCallRevertReason, IERC20_INTERFACE, DEFAULT_REVERT_REASON, increaseTime, evmMine } = require('./common');
-import * as zksync from 'zksync';
+import * as zksync from '@rsksmart/rif-aggregation-sdk-js';
 import {
     ZkSync,
     ZkSyncProcessOpUnitTest,

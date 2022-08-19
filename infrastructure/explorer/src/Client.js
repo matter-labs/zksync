@@ -3,7 +3,7 @@ import * as constants from './constants';
 import { formatToken, isBlockVerified } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
 
-import { Provider } from 'zksync';
+import { Provider } from '@rsksmart/rif-aggregation-sdk-js';
 
 import axios from 'axios';
 import * as ethers from 'ethers';

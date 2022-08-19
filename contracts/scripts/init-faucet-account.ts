@@ -1,7 +1,7 @@
 import { ArgumentParser } from 'argparse';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as zksync from 'zksync';
+import * as zksync from '@rsksmart/rif-aggregation-sdk-js';
 import { ethers, Wallet } from 'ethers';
 import { web3Provider } from './utils';
 

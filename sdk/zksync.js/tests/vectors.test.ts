@@ -1,6 +1,6 @@
 import { assert, expect } from 'chai';
 import { BigNumber, utils, Wallet } from 'ethers';
-import * as zksync from 'zksync';
+import * as zksync from '@rsksmart/rif-aggregation-sdk-js';
 
 import {
     closestPackableTransactionAmount,

@@ -1,6 +1,6 @@
 import { Tester, expectThrow } from './tester';
 import { expect } from 'chai';
-import { Wallet, types, utils, wallet } from 'zksync';
+import { Wallet, types, utils, wallet } from '@rsksmart/rif-aggregation-sdk-js';
 import { BigNumber } from 'ethers';
 
 type TokenLike = types.TokenLike;

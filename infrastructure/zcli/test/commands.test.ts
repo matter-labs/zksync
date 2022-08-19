@@ -5,7 +5,7 @@ import * as path from 'path';
 import mock from 'mock-fs';
 import type { Network, Config } from '../src/types';
 import * as ethers from 'ethers';
-import * as zksync from 'zksync';
+import * as zksync from '@rsksmart/rif-aggregation-sdk-js';
 import * as commands from '../src/commands';
 import { saveConfig, loadConfig, configLocation, DEFAULT_CONFIG } from '../src/config';
 

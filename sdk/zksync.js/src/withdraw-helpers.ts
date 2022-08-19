@@ -31,13 +31,11 @@ function checkEthProvider(ethersWallet: ethers.Signer) {
 // https://github.com/makerdao/multicall
 function getMulticallAddressByNetwork(network: Network) {
     switch (network) {
-        case 'rinkeby':
-        case 'rinkeby-beta':
-            return '0x42ad527de7d4e9d9d011ac45b31d8551f8fe9821';
-        case 'ropsten':
-        case 'ropsten-beta':
-            return '0x53c43764255c17bd724f74c4ef150724ac50a3ed';
+        case 'testnet':
+            return '0x9e469e1fc7fb4c5d17897b68eaf1afc9df39f103';
         case 'mainnet':
+            return '0x6c62bf5440de2cb157205b15c424bceb5c3368f5';
+        case 'mainnet-zk':
             return '0xeefba1e63905ef1d7acba5a8513c70307c1ce441';
         default:
             throw new Error('There is no default multicall contract address for this network');

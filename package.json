@@ -26,7 +26,7 @@
     ]
   },
   "scripts": {
-    "zksync": "yarn workspace zksync",
+    "zksync": "yarn workspace @rsksmart/rif-aggregation-sdk-js",
     "crypto": "yarn workspace zksync-crypto",
     "contracts": "yarn workspace franklin-contracts",
     "zcli": "yarn workspace zcli",

@@ -1,6 +1,6 @@
 import { expect, use } from 'chai';
 import { BigNumber, utils } from 'ethers';
-import { Wallet, types, crypto, Signer, No2FAWalletSigner } from 'zksync';
+import { Wallet, types, crypto, Signer, No2FAWalletSigner } from '@rsksmart/rif-aggregation-sdk-js';
 import chaiAsPromised from 'chai-as-promised';
 import { Tester } from './tester';
 import './priority-ops';

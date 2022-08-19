@@ -27,6 +27,7 @@
     "hardhat-typechain": "^0.3.3",
     "jsonwebtoken": "^8.5.1",
     "mocha": "^8.2.0",
+    "@rsksmart/rif-aggregation-sdk-js": "0.0.2",
     "openzeppelin-solidity": "^2.3.0",
     "path": "^0.12.7",
     "prettier": "^1.18.2",
@@ -36,8 +37,7 @@
     "ts-generator": "^0.1.1",
     "ts-node": "^9.0.0",
     "typechain": "^4.0.0",
-    "typescript": "^4.0.5",
-    "zksync": "link:../sdk/zksync.js"
+    "typescript": "^4.0.5"
   },
   "scripts": {
     "build": "hardhat compile",

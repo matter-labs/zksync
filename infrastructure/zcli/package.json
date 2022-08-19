@@ -14,7 +14,7 @@
         "commander": "^6.2.0",
         "ethers": "^5.4.4",
         "isomorphic-fetch": "^3.0.0",
-        "zksync": "link:../../sdk/zksync.js"
+        "@rsksmart/rif-aggregation-sdk-js": "0.0.2"
     },
     "devDependencies": {
         "@types/chai": "^4.2.14",

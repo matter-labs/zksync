@@ -1,4 +1,4 @@
-import { Wallet, RestProvider, getDefaultRestProvider, types, utils } from 'zksync';
+import { Wallet, RestProvider, getDefaultRestProvider, types, utils } from '@rsksmart/rif-aggregation-sdk-js';
 import { Tester } from './tester';
 import * as ethers from 'ethers';
 import './priority-ops';

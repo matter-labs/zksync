@@ -1,6 +1,6 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types, ETHProxy } from 'zksync';
+import { Wallet, types, ETHProxy } from '@rsksmart/rif-aggregation-sdk-js';
 import { BigNumber } from 'ethers';
 
 type TokenLike = types.TokenLike;

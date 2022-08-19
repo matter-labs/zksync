@@ -1,15 +1,10 @@
-# JavaScript SDK for zkSync
+# JavaScript SDK for RIF Aggregation
 
-**zkSync** is a scaling and privacy engine for Ethereum. Its current functionality scope includes low gas transfers of
-ETH and ERC20 tokens in the Ethereum network.
+**RIF Aggregation** is a scaling and privacy engine for RSK. Its current functionality scope includes low gas transfers
+of RBTC and ERC20 tokens in the RSK network.
 
-This document is a description of the JS library that can be used to interact with zkSync.
+This document is a description of the JS library that can be used to interact with RIF Aggregation.
 
 ## Usage
 
 Full reference on how to use the library can be found [here](https://zksync.io/api/sdk/js/).
-
-## Changelog
-
-The changelog of the zksync.js is avaliable
-[here](https://github.com/matter-labs/zksync/blob/master/changelog/js-sdk.md).

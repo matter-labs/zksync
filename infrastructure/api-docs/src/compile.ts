@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
-import * as zksync from 'zksync';
+import * as zksync from '@rsksmart/rif-aggregation-sdk-js';
 import * as ethers from 'ethers';
 
 export function getDirPath() {

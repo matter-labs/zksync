@@ -10,6 +10,16 @@ export async function getDefaultRestProvider(
 ): Promise<RestProvider> {
     if (network === 'localhost') {
         return await RestProvider.newProvider('https://127.0.0.1:3001/api/v0.2', pollIntervalMilliSecs);
+    } else if (network === 'testnet') {
+        return await RestProvider.newProvider(
+            'https://dev.aggregation.rifcomputing.net:3029/api/v0.2',
+            pollIntervalMilliSecs
+        );
+    } else if (network === 'mainnet') {
+        return await RestProvider.newProvider(
+            'https://aggregation.rifcomputing.net:3029/api/v0.2',
+            pollIntervalMilliSecs
+        );
     } else if (network === 'ropsten') {
         return await RestProvider.newProvider('https://ropsten-api.zksync.io/api/v0.2', pollIntervalMilliSecs);
     } else if (network === 'rinkeby') {
@@ -18,7 +28,7 @@ export async function getDefaultRestProvider(
         return await RestProvider.newProvider('https://ropsten-beta-api.zksync.io/api/v0.2', pollIntervalMilliSecs);
     } else if (network === 'rinkeby-beta') {
         return await RestProvider.newProvider('https://rinkeby-beta-api.zksync.io/api/v0.2', pollIntervalMilliSecs);
-    } else if (network === 'mainnet') {
+    } else if (network === 'mainnet-zk') {
         return await RestProvider.newProvider('https://api.zksync.io/api/v0.2', pollIntervalMilliSecs);
     } else {
         throw new Error(`Ethereum network ${network} is not supported`);

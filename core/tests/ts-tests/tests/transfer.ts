@@ -1,8 +1,8 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types } from 'zksync';
+import { Wallet, types } from '@rsksmart/rif-aggregation-sdk-js';
 import { BigNumber } from 'ethers';
-import { closestPackableTransactionFee } from '../../../../sdk/zksync.js';
+import { closestPackableTransactionFee } from '@rsksmart/rif-aggregation-sdk-js';
 
 type TokenLike = types.TokenLike;
 

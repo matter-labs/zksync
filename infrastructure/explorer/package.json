@@ -16,12 +16,12 @@
     "lru-cache": "^6.0.0",
     "node-libs-browser": "^2.2.1",
     "node-sass": "^4.13.0",
+    "@rsksmart/rif-aggregation-sdk-js": "0.0.2",
     "sass-loader": "^8.0.0",
     "v-clipboard": "^2.2.2",
     "vue": "^2.6.10",
     "vue-router": "^3.1.3",
-    "vue-timers": "^2.0.4",
-    "zksync": "link:../../sdk/zksync.js"
+    "vue-timers": "^2.0.4"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^4.0.0",
