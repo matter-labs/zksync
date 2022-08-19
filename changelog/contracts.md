@@ -15,7 +15,7 @@ All notable changes to the contracts will be documented in this file.
 
 - Use `calldata` instead of `memory` for gas cost optimization.
 - The visibility of the function `authFactsResetTimer` changed from internal to public.
-- `WithdrawalPending` - event parameters changed.
+- `WithdrawalPending` event parameters changed.
 - `proveBlocks` ignores already proved blocks.
 
 ### Removed
