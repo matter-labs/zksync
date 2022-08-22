@@ -3,7 +3,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
 use zksync_storage::ConnectionPool;
-use zksync_types::H160;
+use zksync_types::{SequentialTxId, H160};
 
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
@@ -108,7 +108,15 @@ pub fn start_server_thread_detached(
                 // TODO remove this config ZKS-815
                 let config = ZkSyncConfig::from_env();
 
-                let network_status = SharedNetworkStatus::new(core_address);
+                let mut network_status = SharedNetworkStatus::new(core_address);
+                // We want to update the network status, as soon as possible, otherwise we can catch the situation,
+                // when the node is started and receiving the request, but the status is still `null` and
+                // monitoring tools spawn the notification that our node is down, though it's just a default status
+                let last_tx_id = network_status
+                    .update(&read_only_connection_pool, SequentialTxId(0))
+                    .await
+                    .unwrap();
+
                 let api_v01 = ApiV01::new(
                     read_only_connection_pool,
                     main_database_connection_pool,
@@ -116,7 +124,8 @@ pub fn start_server_thread_detached(
                     config,
                     network_status,
                 );
-                api_v01.spawn_network_status_updater(panic_sender);
+
+                api_v01.spawn_network_status_updater(panic_sender, last_tx_id);
 
                 start_server(
                     api_v01,
