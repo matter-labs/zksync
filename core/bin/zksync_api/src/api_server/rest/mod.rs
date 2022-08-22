@@ -110,8 +110,8 @@ pub fn start_server_thread_detached(
 
                 let mut network_status = SharedNetworkStatus::new(core_address);
                 // We want to update the network status, as soon as possible, otherwise we can catch the situation,
-                // when the node is start and receiving the request but the status is null and
-                // we receive the notification that our node is down, but it's just a default status
+                // when the node is started and receiving the request, but the status is still `null` and
+                // monitoring tools spawn the notification that our node is down, though it's just a default status
                 let last_tx_id = network_status
                     .update(&read_only_connection_pool, SequentialTxId(0))
                     .await
