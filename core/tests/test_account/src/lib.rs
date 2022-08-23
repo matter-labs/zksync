@@ -167,12 +167,12 @@ impl ZkSyncAccount {
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> (MintNFT, Option<PackedEthSignature>) {
+        let account_id = self
+            .get_account_id()
+            .expect("can't sign tx without account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let mint_nft = MintNFT::new_signed(
-            self.account_id
-                .lock()
-                .unwrap()
-                .expect("can't sign tx without account id"),
+            account_id,
             self.address,
             content_hash,
             *recipient,
@@ -212,12 +212,12 @@ impl ZkSyncAccount {
         increment_nonce: bool,
         time_range: TimeRange,
     ) -> (WithdrawNFT, Option<PackedEthSignature>) {
+        let account_id = self
+            .get_account_id()
+            .expect("can't sign tx without account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let withdraw_nft = WithdrawNFT::new_signed(
-            self.account_id
-                .lock()
-                .unwrap()
-                .expect("can't sign tx without account id"),
+            account_id,
             self.address,
             *recipient,
             token,
@@ -259,10 +259,12 @@ impl ZkSyncAccount {
         increment_nonce: bool,
         time_range: TimeRange,
     ) -> Order {
+        let account_id = self
+            .get_account_id()
+            .expect("can't sign tx without account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let order = Order::new_signed(
-            self.get_account_id()
-                .expect("can't sign tx without account id"),
+            account_id,
             *recipient,
             nonce.unwrap_or_else(|| *stored_nonce),
             token_sell,
@@ -292,10 +294,12 @@ impl ZkSyncAccount {
         fee_token_symbol: &str,
         fee: BigUint,
     ) -> (Swap, Option<PackedEthSignature>) {
+        let account_id = self
+            .get_account_id()
+            .expect("can't sign tx without account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let swap = Swap::new_signed(
-            self.get_account_id()
-                .expect("can't sign tx without account id"),
+            account_id,
             self.address,
             nonce.unwrap_or_else(|| *stored_nonce),
             orders,
@@ -335,12 +339,12 @@ impl ZkSyncAccount {
         increment_nonce: bool,
         time_range: TimeRange,
     ) -> (Transfer, Option<PackedEthSignature>) {
+        let account_id = self
+            .get_account_id()
+            .expect("can't sign tx without account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let transfer = Transfer::new_signed(
-            self.account_id
-                .lock()
-                .unwrap()
-                .expect("can't sign tx without account id"),
+            account_id,
             self.address,
             *to,
             token_id,
@@ -378,12 +382,12 @@ impl ZkSyncAccount {
         increment_nonce: bool,
         time_range: TimeRange,
     ) -> ForcedExit {
+        let account_id = self
+            .get_account_id()
+            .expect("can't sign tx without account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let forced_exit = ForcedExit::new_signed(
-            self.account_id
-                .lock()
-                .unwrap()
-                .expect("can't sign tx without account id"),
+            account_id,
             *target,
             token_id,
             fee,
@@ -412,12 +416,12 @@ impl ZkSyncAccount {
         increment_nonce: bool,
         time_range: TimeRange,
     ) -> (Withdraw, Option<PackedEthSignature>) {
+        let account_id = self
+            .get_account_id()
+            .expect("can't sign tx without account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let withdraw = Withdraw::new_signed(
-            self.account_id
-                .lock()
-                .unwrap()
-                .expect("can't sign tx without account id"),
+            account_id,
             self.address,
             *eth_address,
             token_id,
@@ -472,9 +476,7 @@ impl ZkSyncAccount {
         time_range: TimeRange,
     ) -> ChangePubKey {
         let account_id = self
-            .account_id
-            .lock()
-            .unwrap()
+            .get_account_id()
             .expect("can't sign tx withoud account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let nonce = nonce.unwrap_or_else(|| *stored_nonce);
