@@ -35,7 +35,10 @@ impl UniswapTokenWatcher {
         // Uniswap has graphql API, using full graphql client for one query is overkill for current task
         let start = Instant::now();
 
-        let query = format!("{{token(id: \"{:#x}\"){{untrackedVolumeUSD}}}}", address);
+        let query = format!(
+            "{{token(id: \"{:#x}\"){{totalLiquidity, derivedETH}}}}",
+            address
+        );
 
         let raw_response = self
             .client
@@ -63,7 +66,9 @@ impl UniswapTokenWatcher {
         metrics::histogram!("ticker.uniswap_watcher.get_market_volume", start.elapsed());
 
         let volume = if let Some(token) = response.data.token {
-            token.untracked_volume_usd.parse()?
+            let total_liquidity: BigDecimal = token.total_liquidity.parse()?;
+            let derived_eth: BigDecimal = token.derived_eth.parse()?;
+            total_liquidity * derived_eth
         } else {
             BigDecimal::zero()
         };
@@ -91,9 +96,12 @@ pub struct GraphqlTokenResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenResponse {
-    /// Total amount swapped all time in token pair stored in USD, no minimum liquidity threshold.
-    #[serde(rename = "untrackedVolumeUSD")]
-    pub untracked_volume_usd: String,
+    /// Total liquidity in token itself
+    #[serde(rename = "totalLiquidity")]
+    pub total_liquidity: String,
+    /// Price of token in eth
+    #[serde(rename = "derivedETH")]
+    pub derived_eth: String,
 }
 
 #[async_trait::async_trait]
