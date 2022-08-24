@@ -5,7 +5,7 @@ on:
 
   push:
     branches:
-      - devops/refactor-pipeline*
+      - rsk_merge_master_Dec2021
 
 # Disable simultaneous deployments into a single environment
 concurrency: deploy-${{ github.event.inputs.environment }}
@@ -16,6 +16,7 @@ env:
 
 jobs:
   update:
+    if: github.ref == 'master'
     name: Update Configs
     runs-on: [k8s, deployer, stage]
     steps:
@@ -33,6 +34,7 @@ jobs:
             }
 
   setup:
+    if: github.ref == 'master'
     name: Setup and Provision SQLProxy
     ## stage selects the specific cluster
     runs-on: [k8s, deployer, stage]
@@ -87,6 +89,7 @@ jobs:
           if-no-files-found: error
 
   dbsetup:
+    if: github.ref == 'master'
     name: Cleanup the database, compile and update contracts
     ## stage selects the specific cluster
     runs-on: [k8s, deployer, stage]
@@ -141,6 +144,7 @@ jobs:
           if-no-files-found: error
 
   update-configmap:
+    if: github.ref == 'master'
     name: Update ConfigMap
     runs-on: [k8s, deployer, stage]
     needs: [dbsetup]
@@ -161,6 +165,7 @@ jobs:
         run: .github/scripts/zksync-env.sh --update-from deployed_contracts.log
 
   deploy:
+    if: github.ref == 'master'
     name: Deploy apps
     runs-on: [k8s, deployer, stage]
     needs: [setup, update-configmap]
@@ -180,6 +185,7 @@ jobs:
             }
 
   loadtest:
+    if: github.ref == 'master'
     name: Perform loadtest
     runs-on: [self-hosted, MAIN]
     needs: deploy
@@ -199,6 +205,7 @@ jobs:
         run: cargo run --bin loadnext
 
   cleanup:
+    if: github.ref == 'master'
     name: Cleanup loadtest environment
     ## stage selects the specific cluster
     runs-on: [k8s, deployer, stage]

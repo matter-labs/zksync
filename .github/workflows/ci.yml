@@ -4,31 +4,40 @@ on:
   pull_request:
   push:
     branches:
-    - staging
-    - trying
+    - rsk_merge_master_Dec2021
 
 jobs:
   lint:
-    runs-on: [self-hosted, CI-worker]
+    runs-on:  ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
 
-      - name: setup-env
+      - name: modify rsk node conf and install mkcert
         run: |
-          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-          echo $(pwd)/bin >> $GITHUB_PATH
-
+          wget https://github.com/FiloSottile/mkcert/releases/download/v1.4.3/mkcert-v1.4.3-linux-amd64
+          chmod +x ./mkcert*
+          cp ./mkcert* bin/mkcert
+        
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose -f docker-compose-runner.yml up --build -d zk
-          ci_run sccache --start-server
-
+          docker-compose -f docker-compose-runner.yml pull
+          docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk 
+          ci_run sccache --start-server &
+              
       - name: setup-env
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
+      
+      - name: generate SSL certificates
+        run: |
+          ci_run mkcert -CAROOT
+          ci_run mkcert --install
+          ci_run mkcert 127.0.0.1 localhost
+          ci_run mv 127.0.0.1+1-key.pem key.pem
+          ci_run mv 127.0.0.1+1.pem cert.pem
 
       - name: lints
         run: |
@@ -37,7 +46,7 @@ jobs:
           ci_run zk lint --check
 
   unit-tests:
-    runs-on: [self-hosted, CI-worker]
+    runs-on:  ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -48,15 +57,10 @@ jobs:
           echo $(pwd)/bin >> $GITHUB_PATH
         
       - name: start-services
-        #run: |
-          #docker-compose -f docker-compose-runner.yml down
-          #docker-compose -f docker-compose-runner.yml pull
-          #docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk
-          #ci_run sccache --start-server
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull
-          docker-compose -f docker-compose-runner.yml up --build -d postgres zk
+          docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk
           ci_run sccache --start-server
 
       - name: init
@@ -83,7 +87,7 @@ jobs:
         run: ci_run zk test server-rust
 
   integration:
-    runs-on: [self-hosted, FAST]
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -93,33 +97,48 @@ jobs:
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
         
+      - name: modify rsk node conf and install mkcert
+        run: |
+          sed -i '/autoMine/ s/true/false/' docker/rskj/node.conf
+          wget https://github.com/FiloSottile/mkcert/releases/download/v1.4.3/mkcert-v1.4.3-linux-amd64
+          chmod +x ./mkcert*
+          cp ./mkcert* bin/mkcert
+
       - name: start-services
-        #run: |
-          #docker-compose -f docker-compose-runner.yml down
-          #docker-compose -f docker-compose-runner.yml pull
-          #docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk
-          #ci_run sccache --start-server
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull
-          docker-compose -f docker-compose-runner.yml up --build -d postgres zk
-          ci_run sccache --start-server
+          docker-compose -f docker-compose-runner.yml up --build -d rskj postgres zk
+          ci_run sccache --start-server &
 
-      - name: init
+      - name: setup-env (path)
         run: |
-          ci_run ln -s /usr/src/keys/setup keys/setup
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
+      - name: generate SSL certificates
+        run: |
+          ci_run mkcert -CAROOT
+          ci_run mkcert --install
+          ci_run mkcert 127.0.0.1 localhost
+          ci_run mv 127.0.0.1+1-key.pem key.pem
+          ci_run mv 127.0.0.1+1.pem cert.pem
+
+      - name: run zk init
+        run: |
+          sed -i '/plonkSetup/d' infrastructure/zk/src/init.ts
           ci_run zk
-          ci_run zk dummy-prover enable --no-redeploy
           ci_run zk init
 
       - name: restart dev-liquidity-token-watcher and dev-ticker
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher dev-ticker
 
+
       - name: run-services
         run: |
-          ci_run zk server &>server.log &
+          ci_run zk server  &>/dev/null &
           ci_run sleep 10
-          ci_run zk dummy-prover run &>dummy_prover.log &
+          ci_run zk dummy-prover run  &>/dev/null &
           ci_run sleep 100
 
       - name: integration-server
@@ -139,15 +158,9 @@ jobs:
       - name: integration-withdrawal-helpers
         run: ci_run zk test i withdrawal-helpers
 
-      - name: Show logs
-        if: always()
-        run: |
-          ci_run cat server.log
-          ci_run cat dummy_prover.log
-
   circuit-tests:
-    runs-on: [self-hosted, CI-worker]
-
+    if: github.ref == 'master' # imply that this should run only on production or very controlled env. Refer to research doc
+    runs-on:  ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
@@ -166,7 +179,7 @@ jobs:
         run: ci_run zk test crypto-rust
 
   testkit:
-    runs-on: [self-hosted, CI-worker]
+    runs-on:  ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
