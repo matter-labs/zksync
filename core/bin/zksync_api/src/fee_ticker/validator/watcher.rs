@@ -96,7 +96,7 @@ pub struct GraphqlTokenResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenResponse {
-    /// Total liquidity in token it self
+    /// Total liquidity in token itself
     #[serde(rename = "totalLiquidity")]
     pub total_liquidity: String,
     /// Price of token in eth
