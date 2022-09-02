@@ -30,7 +30,6 @@ pub fn get_rpc_addr(network: Network) -> &'static str {
         Network::Unknown => panic!("Attempt to create a provider from an unknown network"),
         Network::Test => panic!("Attempt to create a provider from an test network"),
         Network::Goerli => "https://goerli-api.zksync.io/jsrpc",
-        Network::Sepolia => "https://sepolia-api.zksync.io/jsrpc",
     }
 }
 
