@@ -57,6 +57,7 @@ mod utils;
 
 #[cfg(test)]
 mod tests;
+pub mod withdrawals;
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};

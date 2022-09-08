@@ -6,6 +6,7 @@ use std::sync::Arc;
 use web3::types::Address;
 
 use zksync_types::block::Block;
+use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
     NewTokenEvent, Operation, PriorityOp, SerialId, Token, TokenId, TokenInfo, TokenKind,
@@ -30,6 +31,8 @@ struct Inner {
     last_committed_block: BlockNumber,
     last_verified_block: BlockNumber,
     accounts: AccountMap,
+    // withdrawals: HashMap<(TokenId, Address), Vec<WithdrawalPendingEvent>>,
+    // finalized_withdrawals: HashMap<H256, Vec<WithdrawalPendingEvent>>,
 }
 
 impl Default for Inner {
@@ -43,6 +46,8 @@ impl Default for Inner {
             last_committed_block: BlockNumber(0),
             last_verified_block: BlockNumber(0),
             accounts: Default::default(),
+            // withdrawals: Default::default(),
+            // finalized_withdrawals: Default::default(),
         }
     }
 }
@@ -84,6 +89,34 @@ impl InMemoryStorageInteractor {
             .into_iter()
             .filter(|event| event.block_type == EventType::Verified)
             .collect()
+    }
+
+    // TODO refactor
+    pub async fn save_withdrawals(
+        &mut self,
+        _withdrawals: &[WithdrawalEvent],
+        _pending_withdrawals: &[WithdrawalPendingEvent],
+    ) {
+        // let inner = self.inner.borrow_mut();
+        // for withdrawal in pending_withdrawals {
+        //     let key = (withdrawal.token_id, withdrawal.recipient);
+        //     let values = inner.withdrawals.entry(key).or_insert_with(|| vec![]);
+        //     values.push(withdrawal.clone())
+        // }
+        // for withdrawal in withdrawals {
+        //     if let Some(values) = inner
+        //         .withdrawals
+        //         .get(&(withdrawal.token_id, withdrawal.recipient))
+        //     {
+        //         for value in values {
+        //             let values = inner
+        //                 .finalized_withdrawals
+        //                 .entry(value.tx_hash)
+        //                 .or_insert_with(|| vec![]);
+        //             values.push(value.clone())
+        //         }
+        //     }
+        // }
     }
 
     pub(crate) fn load_committed_events_state(&self) -> Vec<BlockEvent> {

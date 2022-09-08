@@ -414,7 +414,14 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
     /// Returns bool flag, true if there are new block events
     async fn update_events_state(&mut self, interactor: &mut StorageInteractor<'_>) -> bool {
-        let (block_events, token_events, priority_op_data, last_watched_eth_block_number) = self
+        let (
+            block_events,
+            token_events,
+            priority_op_data,
+            withdrawal_pending_events,
+            withdrawal_events,
+            last_watched_eth_block_number,
+        ) = self
             .events_state
             .update_events_state(
                 &self.web3,
@@ -434,6 +441,10 @@ impl<T: Transport> DataRestoreDriver<T> {
                 &priority_op_data,
                 last_watched_eth_block_number,
             )
+            .await;
+
+        interactor
+            .save_withdrawals(&withdrawal_events, &withdrawal_pending_events)
             .await;
 
         !block_events.is_empty()

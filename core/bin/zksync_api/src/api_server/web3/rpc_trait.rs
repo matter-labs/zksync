@@ -1,6 +1,7 @@
 // External uses
 use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_derive::rpc;
+use zksync_types::withdrawals::WithdrawalPendingEvent;
 // Local uses
 use super::{
     types::{
@@ -94,6 +95,9 @@ pub trait Web3Rpc {
 
     #[rpc(name = "eth_call", returns = "Bytes")]
     fn call(&self, req: CallRequest, _block: Option<BlockNumber>) -> BoxFutureResult<Bytes>;
+
+    #[rpc(name = "zksync_checkWithdrawal", returns = "Vec<String>")]
+    fn check_withdrawal(&self, tx_hash: H256) -> BoxFutureResult<Vec<WithdrawalPendingEvent>>;
 }
 
 impl Web3Rpc for Web3RpcApp {
@@ -182,5 +186,9 @@ impl Web3Rpc for Web3RpcApp {
 
     fn call(&self, req: CallRequest, block: Option<BlockNumber>) -> BoxFutureResult<Bytes> {
         spawn! { self._impl_call(req, block) }
+    }
+
+    fn check_withdrawal(&self, tx_hash: H256) -> BoxFutureResult<Vec<WithdrawalPendingEvent>> {
+        spawn! { self._impl_check_withdrawal(tx_hash) }
     }
 }
