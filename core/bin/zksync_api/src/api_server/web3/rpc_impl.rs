@@ -324,15 +324,12 @@ impl Web3RpcApp {
 
         let withdrawals = storage
             .withdrawals_schema()
-            .get_pending_withdrawals(tx_hash)
+            .get_finalized_withdrawals(tx_hash)
             .await
             .map_err(|_| Error::internal_error())?;
 
         metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "check_withdrawal");
-        Ok(withdrawals
-            .into_iter()
-            .map(WithdrawalPendingEvent::from)
-            .collect())
+        Ok(withdrawals)
     }
 
     pub(crate) async fn logs_from_receipt(

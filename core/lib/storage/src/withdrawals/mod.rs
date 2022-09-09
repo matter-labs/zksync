@@ -4,7 +4,7 @@ use num::{BigUint, Zero};
 use std::str::FromStr;
 use std::time::Instant;
 use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
-use zksync_types::{H256, U256};
+use zksync_types::H256;
 use zksync_utils::biguint_to_big_decimal;
 
 pub mod records;
@@ -77,16 +77,21 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn get_pending_withdrawals(
+    pub async fn get_finalized_withdrawals(
         &mut self,
         tx_hash: H256,
-    ) -> QueryResult<Vec<PendingWithdrawal>> {
-        Ok(sqlx::query_as!(
+    ) -> QueryResult<Vec<WithdrawalPendingEvent>> {
+        let withdrawals = sqlx::query_as!(
             PendingWithdrawal,
             "SELECT * FROM withdrawals WHERE withdrawal_tx_hash = $1",
             tx_hash.as_bytes()
         )
         .fetch_all(self.0.conn())
-        .await?)
+        .await?;
+
+        Ok(withdrawals
+            .into_iter()
+            .map(WithdrawalPendingEvent::from)
+            .collect())
     }
 }

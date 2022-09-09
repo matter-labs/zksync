@@ -1,18 +1,34 @@
-use crate::Log;
-use crate::{H256, U256};
-use ethabi::Address;
-use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
+
+use ethabi::Address;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
 use zksync_basic_types::TokenId;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+use crate::{Log, H256, U256};
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub enum WithdrawalType {
     Withdrawal,
     FullExit,
     ForcedExit,
 }
+
+impl TryFrom<String> for WithdrawalType {
+    type Error = ();
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Ok(match value.as_str() {
+            "Withdrawal" => WithdrawalType::Withdrawal,
+            "FullExit" => WithdrawalType::FullExit,
+            "ForcedExit" => WithdrawalType::ForcedExit,
+            _ => return Err(()),
+        })
+    }
+}
+
 impl Display for WithdrawalType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
@@ -20,28 +36,14 @@ impl Display for WithdrawalType {
 }
 
 impl TryFrom<U256> for WithdrawalType {
-    type Error = WithdrawalPendingParseError;
+    type Error = ();
 
     fn try_from(value: U256) -> Result<Self, Self::Error> {
         Ok(match value.as_u32() {
             0 => WithdrawalType::Withdrawal,
             1 => WithdrawalType::ForcedExit,
             2 => WithdrawalType::FullExit,
-            _ => {
-                return Err(WithdrawalPendingParseError::ParseError(Log {
-                    address: Default::default(),
-                    topics: vec![],
-                    data: Default::default(),
-                    block_hash: None,
-                    block_number: None,
-                    transaction_hash: None,
-                    transaction_index: None,
-                    log_index: None,
-                    transaction_log_index: None,
-                    log_type: None,
-                    removed: None,
-                }))
-            }
+            _ => return Err(()),
         })
     }
 }
@@ -64,7 +66,6 @@ pub struct WithdrawalEvent {
     pub recipient: Address,
     pub amount: U256,
     pub tx_hash: H256,
-    pub log_index: u64,
 }
 
 #[derive(Debug, Error)]
@@ -106,7 +107,7 @@ impl TryFrom<Log> for WithdrawalEvent {
         }
 
         assert_eq!(event.data.0.len(), 32);
-        let amount = U256::from_big_endian(&event.data.0[..32]);
+        let amount = U256::from_big_endian(&event.data.0);
         Ok(WithdrawalEvent {
             block_number: event.block_number.unwrap().as_u64(),
             recipient: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
@@ -115,7 +116,6 @@ impl TryFrom<Log> for WithdrawalEvent {
             ),
             amount,
             tx_hash: event.transaction_hash.unwrap(),
-            log_index: event.log_index.unwrap().as_u64(),
         })
     }
 }

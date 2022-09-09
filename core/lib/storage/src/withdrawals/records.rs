@@ -1,5 +1,6 @@
 use crate::BigDecimal;
-use zksync_types::withdrawals::WithdrawalPendingEvent;
+use std::convert::TryFrom;
+use zksync_types::withdrawals::{WithdrawalPendingEvent, WithdrawalType};
 use zksync_types::{Address, TokenId, H256, U256};
 
 pub struct PendingWithdrawal {
@@ -25,8 +26,8 @@ impl From<PendingWithdrawal> for WithdrawalPendingEvent {
             token_id: TokenId(value.token_id as u32),
             recipient: Address::from_slice(&value.account),
             amount,
-            withdrawal_type: serde_json::from_str(&value.withdrawal_type).unwrap(),
             log_index: value.pending_tx_log_index as u64,
+            withdrawal_type: WithdrawalType::try_from(value.withdrawal_type).unwrap(),
         }
     }
 }
