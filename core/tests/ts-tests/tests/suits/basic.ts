@@ -127,7 +127,7 @@ const BasicTestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', prov
         });
 
         step('should execute a withdrawal', async () => {
-            await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
+            await tester.testFinalizeVerifiedWithdraw(alice, token, TX_AMOUNT);
         });
 
         step('should execute NFT withdraw', async () => {
@@ -137,7 +137,7 @@ const BasicTestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', prov
         step('should execute a forced exit', async () => {
             const forcedExitWallet = await tester.emptyWallet();
             await tester.testTransfer(alice, forcedExitWallet, token, TX_AMOUNT);
-            await tester.testVerifiedForcedExit(alice, forcedExitWallet, token);
+            await tester.testFinalizedForcedExit(alice, forcedExitWallet, token);
         });
 
         it('should check collected fees', async () => {

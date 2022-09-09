@@ -1868,7 +1868,7 @@
         {
           "name": "amount",
           "ordinal": 2,
-          "type_info": "Int8"
+          "type_info": "Numeric"
         },
         {
           "name": "token_id",
@@ -1891,13 +1891,23 @@
           "type_info": "Int8"
         },
         {
-          "name": "withdrawal_tx_hash",
+          "name": "pending_tx_log_index",
           "ordinal": 7,
+          "type_info": "Int8"
+        },
+        {
+          "name": "withdrawal_tx_hash",
+          "ordinal": 8,
           "type_info": "Bytea"
         },
         {
           "name": "withdrawal_tx_block",
-          "ordinal": 8,
+          "ordinal": 9,
+          "type_info": "Int8"
+        },
+        {
+          "name": "withdrawal_tx_log_index",
+          "ordinal": 10,
           "type_info": "Int8"
         }
       ],
@@ -1909,6 +1919,8 @@
         false,
         false,
         false,
+        false,
+        true,
         true,
         true
       ],
@@ -2139,6 +2151,54 @@
       }
     },
     "query": "SELECT root_hash FROM blocks WHERE number = $1"
+  },
+  "3440dfb6c7a6f0857636473fdc385ab51c0195780a3319e27347e423f5057d3b": {
+    "describe": {
+      "columns": [
+        {
+          "name": "block_num!",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "ops",
+          "ordinal": 1,
+          "type_info": "JsonbArray"
+        },
+        {
+          "name": "fee_account!",
+          "ordinal": 2,
+          "type_info": "Int8"
+        },
+        {
+          "name": "timestamp",
+          "ordinal": 3,
+          "type_info": "Int8"
+        },
+        {
+          "name": "previous_block_root_hash",
+          "ordinal": 4,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "contract_version!",
+          "ordinal": 5,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        null,
+        false,
+        true,
+        true,
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT blocks.block_num AS \"block_num!\", ops, fee_account as \"fee_account!\",\n            timestamp, previous_block_root_hash, contract_version as \"contract_version!\"\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation ORDER BY id) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN (\n                SELECT DISTINCT block_num, contract_version\n                FROM data_restore_events_state\n            ) events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC"
   },
   "357d6ead6603c088c16ca1257981f85d316a31d6aee3f867f3646f0783f6fb43": {
     "describe": {
@@ -4204,54 +4264,6 @@
     },
     "query": "SELECT * FROM proofs WHERE block_number = $1"
   },
-  "79ddd8e2392143e04fc8f9eafea8fbb0c7982d190467ef803045b0d5db78ee51": {
-    "describe": {
-      "columns": [
-        {
-          "name": "block_num",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "ops",
-          "ordinal": 1,
-          "type_info": "JsonbArray"
-        },
-        {
-          "name": "fee_account",
-          "ordinal": 2,
-          "type_info": "Int8"
-        },
-        {
-          "name": "timestamp",
-          "ordinal": 3,
-          "type_info": "Int8"
-        },
-        {
-          "name": "previous_block_root_hash",
-          "ordinal": 4,
-          "type_info": "Bytea"
-        },
-        {
-          "name": "contract_version",
-          "ordinal": 5,
-          "type_info": "Int4"
-        }
-      ],
-      "nullable": [
-        false,
-        null,
-        false,
-        true,
-        true,
-        false
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "SELECT blocks.block_num AS block_num, ops, fee_account,\n            timestamp, previous_block_root_hash, contract_version\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation ORDER BY id) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN (\n                SELECT DISTINCT block_num, contract_version\n                FROM data_restore_events_state\n            ) events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC"
-  },
   "7bc4a6d9e909dce159213d0826726c10c7ec4008db2a4f05cbe613aa849e8a40": {
     "describe": {
       "columns": [],
@@ -4522,23 +4534,6 @@
       }
     },
     "query": "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1\n            LIMIT 1"
-  },
-  "8206829e6563523bf0d26c0b6f627f3182513f8bb77f27e0f53cfa5af1c1362a": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Int4",
-          "Text",
-          "Bytea",
-          "Int8"
-        ]
-      }
-    },
-    "query": "INSERT INTO withdrawals (account, amount, token_id, withdrawal_type, pending_tx_hash, pending_tx_block) VALUES ($1, $2, $3, $4, $5, $6)"
   },
   "82486779f7f76a4a50c2a3d5cbc460dae08a2296ffcb9744dfde5c44e70d2a5d": {
     "describe": {
@@ -5022,7 +5017,7 @@
         {
           "name": "amount",
           "ordinal": 2,
-          "type_info": "Int8"
+          "type_info": "Numeric"
         },
         {
           "name": "token_id",
@@ -5045,13 +5040,23 @@
           "type_info": "Int8"
         },
         {
-          "name": "withdrawal_tx_hash",
+          "name": "pending_tx_log_index",
           "ordinal": 7,
+          "type_info": "Int8"
+        },
+        {
+          "name": "withdrawal_tx_hash",
+          "ordinal": 8,
           "type_info": "Bytea"
         },
         {
           "name": "withdrawal_tx_block",
-          "ordinal": 8,
+          "ordinal": 9,
+          "type_info": "Int8"
+        },
+        {
+          "name": "withdrawal_tx_log_index",
+          "ordinal": 10,
           "type_info": "Int8"
         }
       ],
@@ -5063,6 +5068,8 @@
         false,
         false,
         false,
+        false,
+        true,
         true,
         true
       ],
@@ -9416,6 +9423,24 @@
       }
     },
     "query": "SELECT * FROM mint_nft_updates WHERE block_number <= $1"
+  },
+  "fac25adaea485eba00b562c9ab956a03ad6e0d1a020856e611f6e017aaee4939": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Numeric",
+          "Int4",
+          "Text",
+          "Bytea",
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "INSERT INTO withdrawals (account, amount, token_id, withdrawal_type, pending_tx_hash, pending_tx_log_index, pending_tx_block) VALUES ($1, $2, $3, $4, $5, $6, $7)\n                 ON CONFLICT (pending_tx_hash, pending_tx_log_index) DO NOTHING"
   },
   "fd16aadbd04d4a48332d59c77290a588f1a33922418b55a08c656a44ff75b8e8": {
     "describe": {

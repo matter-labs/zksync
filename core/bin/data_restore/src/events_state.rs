@@ -451,10 +451,7 @@ impl EventsState {
                 })?)
             } else {
                 withdrawals.push(WithdrawalEvent::try_from(log).map_err(|e| {
-                    format_err!(
-                        "Failed to parse WithdrawalPendingEvent event log from ETH: {}",
-                        e
-                    )
+                    format_err!("Failed to parse Withdrawal event log from ETH: {}", e)
                 })?)
             }
         }

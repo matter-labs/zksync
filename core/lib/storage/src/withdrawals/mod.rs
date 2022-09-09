@@ -1,8 +1,11 @@
 use crate::withdrawals::records::PendingWithdrawal;
-use crate::{QueryResult, StorageProcessor};
+use crate::{BigDecimal, QueryResult, StorageProcessor};
+use num::{BigUint, Zero};
+use std::str::FromStr;
 use std::time::Instant;
 use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{H256, U256};
+use zksync_utils::biguint_to_big_decimal;
 
 pub mod records;
 #[derive(Debug)]
@@ -17,14 +20,19 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         for withdrawal in withdrawals {
+            let amount =
+                biguint_to_big_decimal(BigUint::from_str(&withdrawal.amount.to_string()).unwrap());
+
             sqlx::query!(
-                "INSERT INTO withdrawals (account, amount, token_id, withdrawal_type, pending_tx_hash, pending_tx_block) \
-                VALUES ($1, $2, $3, $4, $5, $6)",
+                "INSERT INTO withdrawals (account, amount, token_id, withdrawal_type, pending_tx_hash, pending_tx_log_index, pending_tx_block) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 ON CONFLICT (pending_tx_hash, pending_tx_log_index) DO NOTHING",
                 withdrawal.recipient.as_bytes(),
-                withdrawal.amount.as_u64() as i64,
+                amount,
                 withdrawal.token_id.0 as i32,
-                withdrawal.withdrawal_type,
+                withdrawal.withdrawal_type.to_string(),
                 withdrawal.tx_hash.as_bytes(),
+                withdrawal.log_index as i64,
                 withdrawal.block_number as i64
             )
             .execute(transaction.conn())
@@ -49,7 +57,9 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
         ).fetch_all(transaction.conn())
         .await?;
 
-        let mut amount = U256::zero();
+        let withdrawal_amount =
+            biguint_to_big_decimal(BigUint::from_str(&withdrawal.amount.to_string()).unwrap());
+        let mut amount = BigDecimal::zero();
         for pending_withdrawal in pending_withdrawals {
             sqlx::query!(
                 "UPDATE withdrawals SET withdrawal_tx_hash = $2, withdrawal_tx_block = $3 WHERE id = $1",
@@ -57,8 +67,8 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
                 withdrawal.tx_hash.as_bytes(),
                 withdrawal.block_number as i64,
             ).execute(transaction.conn()).await?;
-            amount += U256::from(pending_withdrawal.amount as u64);
-            if amount >= withdrawal.amount {
+            amount += pending_withdrawal.amount;
+            if amount >= withdrawal_amount {
                 break;
             }
         }

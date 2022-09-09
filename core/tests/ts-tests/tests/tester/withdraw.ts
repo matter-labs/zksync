@@ -8,6 +8,12 @@ type TokenLike = types.TokenLike;
 declare module './tester' {
     interface Tester {
         testVerifiedWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<void>;
+        testFinalizeVerifiedWithdraw(
+            wallet: Wallet,
+            token: TokenLike,
+            amount: BigNumber,
+            fast?: boolean
+        ): Promise<void>;
         testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<any>;
         testWithdrawNFT(wallet: Wallet, withdrawer: Signer, feeToken: TokenLike, fast?: boolean): Promise<void>;
     }
@@ -39,6 +45,22 @@ Tester.prototype.testVerifiedWithdraw = async function (
         onchainBalanceAfter.sub(onchainBalanceBefore).add(pendingBalanceAfter).sub(pendingBalanceBefore).eq(amount),
         'Wrong amount onchain after withdraw'
     ).to.be.true;
+};
+
+Tester.prototype.testFinalizeVerifiedWithdraw = async function (
+    wallet: Wallet,
+    token: TokenLike,
+    amount: BigNumber,
+    fastProcessing?: boolean
+) {
+    const tokenAddress = wallet.provider.tokenSet.resolveTokenAddress(token);
+    await this.testVerifiedWithdraw(wallet, token, amount, fastProcessing);
+    const onchainBalanceBefore = await wallet.getEthereumBalance(token);
+    await this.contract.withdrawPendingBalance(wallet.address(), tokenAddress, amount);
+    const onchainBalanceAfter = await wallet.getEthereumBalance(token);
+
+    expect(onchainBalanceAfter.sub(onchainBalanceBefore).eq(amount), 'Wrong amount onchain after complete withdraw').to
+        .be.true;
 };
 
 Tester.prototype.testWithdraw = async function (

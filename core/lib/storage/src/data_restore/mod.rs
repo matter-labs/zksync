@@ -104,8 +104,8 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         // The contract version is obtained from block events.
         let stored_blocks = sqlx::query_as!(
             StoredRollupOpsBlock,
-            "SELECT blocks.block_num AS block_num, ops, fee_account,
-            timestamp, previous_block_root_hash, contract_version
+            r#"SELECT blocks.block_num AS "block_num!", ops, fee_account as "fee_account!",
+            timestamp, previous_block_root_hash, contract_version as "contract_version!"
             FROM data_restore_rollup_blocks AS blocks
             JOIN (
                 SELECT block_num, array_agg(operation ORDER BY id) as ops
@@ -118,7 +118,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 FROM data_restore_events_state
             ) events
                 ON blocks.block_num = events.block_num
-            ORDER BY blocks.block_num ASC"
+            ORDER BY blocks.block_num ASC"#
         )
         .fetch_all(self.0.conn())
         .await?;
