@@ -35,6 +35,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 use itertools::Itertools;
+use sqlx::Row;
 
 pub(crate) mod conversion;
 pub mod records;
@@ -698,7 +699,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
                 WHERE aggregate_operations.confirmed = true
             ), tx_hashes AS (
-                SELECT sequence_number FROM tx_filters
+                SELECT DISTINCT sequence_number FROM tx_filters
                 WHERE address = $1
                 ORDER BY sequence_number desc
                 OFFSET $2
@@ -724,7 +725,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         ON tx_hashes.sequence_number = executed_transactions.sequence_number
                     UNION ALL
                     SELECT
-                        concat_ws(',', block_number, block_index) as tx_id,
+                        concat_ws(',', block_number, block_index) AS tx_id,
                         operation as tx,
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
@@ -806,37 +807,62 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(tx_history)
     }
 
-    async fn get_sequence_number(
+    async fn get_closest_number(
         &mut self,
         block_number: i64,
         block_index: i32,
+        direction: SearchDirection,
     ) -> QueryResult<Option<i64>> {
-        let tx_seq_no = sqlx::query!(
-            r#"
-            SELECT sequence_number AS "sequence_number!"
-            FROM executed_transactions
-            WHERE block_number=$1 AND block_index=$2
-            "#,
-            block_number as i32,
-            block_index
-        )
-        .fetch_optional(self.0.conn())
-        .await?;
-        let result = if let Some(tx_seq_no) = tx_seq_no {
-            Some(tx_seq_no.sequence_number)
-        } else {
-            sqlx::query!(
-                r#"
-                SELECT sequence_number AS "sequence_number!"
-                FROM executed_priority_operations
-                WHERE block_number=$1 AND block_index=$2
-                "#,
-                block_number,
-                block_index
-            )
-            .fetch_optional(self.0.conn())
+        if block_number == 0 {
+            return Ok(Some(0));
+        }
+        let (function, sign) = match direction {
+            SearchDirection::Older => ("MAX", "<="),
+            SearchDirection::Newer => ("MIN", ">="),
+        };
+        let max_block = sqlx::query_scalar!("SELECT MAX(number) FROM blocks")
+            .fetch_one(self.0.conn())
             .await?
-            .map(|tx| tx.sequence_number)
+            .unwrap_or_default();
+        if max_block < block_number {
+            return Ok(Some(
+                sqlx::query_scalar!("SELECT MAX(sequence_number) FROM tx_filters")
+                    .fetch_one(self.0.conn())
+                    .await?
+                    .unwrap_or_default()
+                    + 1,
+            ));
+        };
+        let query = format!(
+            r#"
+            SELECT {0}(sequence_number) as sequence_number
+            FROM executed_transactions
+            WHERE block_number{1}$1 AND block_index{1}$2
+            "#,
+            function, sign
+        );
+        let tx_seq_no: Option<i64> = sqlx::query_scalar(&query)
+            .bind(block_number as i32)
+            .bind(block_index)
+            .fetch_one(self.0.conn())
+            .await?;
+        let result = if let Some(tx_seq_no) = tx_seq_no {
+            Some(tx_seq_no)
+        } else {
+            let query = format!(
+                "
+            SELECT {0}(sequence_number) AS sequence_number
+            FROM executed_priority_operations
+            WHERE block_number{1}$1 AND block_index{1}$2
+            ",
+                function, sign
+            );
+            let res: Option<i64> = sqlx::query_scalar(&query)
+                .bind(block_number as i32)
+                .bind(block_index)
+                .fetch_one(self.0.conn())
+                .await?;
+            res
         };
         Ok(result)
     }
@@ -864,7 +890,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let sequence_number = transaction
             .chain()
             .operations_ext_schema()
-            .get_sequence_number(block_id as i64, block_tx_id as i32)
+            .get_closest_number(block_id as i64, block_tx_id as i32, direction)
             .await?;
         let sequence_number = if let Some(sequence_number) = sequence_number {
             sequence_number
@@ -875,23 +901,23 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         let (pagination_query, order_query) = match direction {
             SearchDirection::Older => (
-                "SELECT sequence_number FROM tx_filters
+                "SELECT DISTINCT sequence_number FROM tx_filters
                 WHERE address = $1
-                ORDER BY sequence_number ASC
-                WHERE sequence_number < $2
+                AND sequence_number < $2
+                ORDER BY sequence_number DESC 
                 LIMIT $3
                 ",
-                "ORDER BY transactions.sequence_number ASC",
+                "ORDER BY transactions.block_number DESC, transactions.sequence_number DESC",
             ),
             SearchDirection::Newer => (
                 "
-                SELECT sequence_number FROM tx_filters
+                SELECT DISTINCT sequence_number FROM tx_filters
                 WHERE address = $1
+                AND sequence_number > $2
                 ORDER BY sequence_number DESC
-                WHERE sequence_number > $2
                 LIMIT $3
                 ",
-                "ORDER BY transactions.sequence_number DESC",
+                "ORDER BY transactions.block_number DESC, transactions.sequence_number DESC",
             ),
         };
 
@@ -930,7 +956,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     *
                 FROM (
                     SELECT
-                        concat_ws(',', block_number, block_index) as tx_id,
+                        concat_ws(',', block_number, block_index) AS tx_id,
                         tx,
                         'sync-tx:' || encode(executed_transactions.tx_hash, 'hex') as hash,
                         null as pq_id,
@@ -939,14 +965,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         fail_reason,
                         block_number,
                         created_at,
-                        sequence_number,
+                        executed_transactions.sequence_number,
                         batch_id
                     FROM executed_transactions
                     INNER JOIN tx_hashes
                         ON tx_hashes.sequence_number = executed_transactions.sequence_number
                     UNION ALL
                     SELECT
-                        concat_ws(',', block_number, block_index) as tx_id,
+                        concat_ws(',', block_number, block_index) AS tx_id,
                         operation as tx,
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
@@ -955,7 +981,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         null as fail_reason,
                         block_number,
                         created_at,
-                        sequence_number,
+                        executed_priority_operations.sequence_number,
                         Null::bigint as batch_id
                     FROM
                         executed_priority_operations
@@ -964,17 +990,17 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     ) t
             )
             SELECT
-                tx_id as "tx_id!",
-                hash as "hash?",
-                eth_block as "eth_block?",
-                pq_id as "pq_id?",
-                tx as "tx!",
-                success as "success?",
-                fail_reason as "fail_reason?",
-                true as "commited!",
-                coalesce(verified.confirmed, false) as "verified!",
-                created_at as "created_at!",
-                batch_id as "batch_id?"
+                tx_id,
+                hash,
+                eth_block,
+                pq_id,
+                tx,
+                success,
+                fail_reason,
+                true as commited,
+                coalesce(verified.confirmed, false) as verified,
+                created_at ,
+                batch_id 
             FROM transactions
             LEFT JOIN aggr_comm committed ON
                 committed.block_number = transactions.block_number AND committed.confirmed = true
@@ -984,6 +1010,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             "#,
             pagination_query, order_query
         );
+
         let mut tx_history: Vec<TransactionsHistoryItem> = sqlx::query_as(&query)
             .bind(address.as_bytes())
             .bind(sequence_number)

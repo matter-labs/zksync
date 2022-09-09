@@ -95,8 +95,9 @@ pub async fn commit_schema_data(
         storage
             .chain()
             .block_schema()
-            .save_block_transactions(block.block_number, block.block_transactions.clone())
-            .await?;
+            .save_full_block(block.clone())
+            .await
+            .unwrap();
     }
 
     Ok(())
@@ -279,7 +280,7 @@ async fn get_account_transactions_history_from(
     setup.add_block(1);
     setup.add_block(2);
 
-    let block_size = setup.blocks[0].block_transactions.len() as u64;
+    let block_size = setup.blocks[1].block_transactions.len() as u64;
 
     let txs_from = 10; // Amount of transactions related to "from" account.
     let txs_to = 7;
@@ -297,7 +298,7 @@ async fn get_account_transactions_history_from(
         // Load all the transactions newer than genesis.
         (0, 2, 0, 0, SearchDirection::Newer),
         // Load all the transactions newer than the last tx of the first block.
-        (0, 1, 1, block_size, SearchDirection::Newer),
+        (0, 1, 1, block_size - 1, SearchDirection::Newer),
     ];
 
     for (start_block, n_blocks, block_id, tx_id, direction) in test_vector {
