@@ -698,8 +698,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
                 WHERE aggregate_operations.confirmed = true
             ), tx_hashes AS (
-                SELECT DISTINCT tx_hash FROM tx_filters
+                SELECT sequence_number FROM tx_filters
                 WHERE address = $1
+                ORDER BY
+                    sequence_number desc
+                OFFSET
+                    $2
+                LIMIT
+                    $3
             ), transactions AS (
                 SELECT
                     *
@@ -714,13 +720,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         fail_reason,
                         block_number,
                         created_at,
-                        sequence_number,
+                        executed_transactions.sequence_number,
                         batch_id
-                    FROM tx_hashes
-                    INNER JOIN executed_transactions
-                        ON tx_hashes.tx_hash = executed_transactions.tx_hash
-                    union all
-                    select
+                    FROM executed_transactions
+                    INNER JOIN tx_hashes
+                        ON tx_hashes.sequence_number = executed_transactions.sequence_number
+                    UNION ALL
+                    SELECT
                         concat_ws(',', block_number, block_index) as tx_id,
                         operation as tx,
                         '0x' || encode(eth_hash, 'hex') as hash,
@@ -730,20 +736,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         null as fail_reason,
                         block_number,
                         created_at,
-                        sequence_number,
+                        executed_priority_operations.sequence_number,
                         Null::bigint as batch_id
-                    from
-                        executed_priority_operations
-                    where
-                        from_account = $1
-                        or
-                        to_account = $1) t
-                order by
-                    block_number desc, created_at desc
-                offset
-                    $2
-                limit
-                    $3
+                    FROM executed_priority_operations 
+                    INNER JOIN tx_hashes
+                        ON tx_hashes.sequence_number = executed_priority_operations.sequence_number
+                    ) t
             )
             select
                 tx_id as "tx_id!",
