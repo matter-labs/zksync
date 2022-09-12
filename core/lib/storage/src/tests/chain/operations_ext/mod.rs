@@ -16,13 +16,9 @@ use zksync_types::{
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
 use crate::{
-    chain::block::BlockSchema,
     chain::operations::OperationsSchema,
     chain::operations_ext::SearchDirection,
-    test_data::{
-        dummy_ethereum_tx_hash, gen_sample_block, gen_unique_aggregated_operation,
-        BLOCK_SIZE_CHUNKS,
-    },
+    test_data::{dummy_ethereum_tx_hash, gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS},
     tests::{db_test, ACCOUNT_MUTEX},
     tokens::StoreTokenError,
     QueryResult, StorageProcessor,
@@ -131,13 +127,6 @@ pub async fn commit_block(
 ) -> QueryResult<()> {
     // Required since we use `EthereumSchema` in this test.
     storage.ethereum_schema().initialize_eth_data().await?;
-    BlockSchema(storage)
-        .save_full_block(gen_sample_block(
-            block_number,
-            BLOCK_SIZE_CHUNKS,
-            Default::default(),
-        ))
-        .await?;
     OperationsSchema(storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
@@ -298,7 +287,7 @@ async fn get_account_transactions_history_from(
         // Load all the transactions newer than genesis.
         (0, 2, 0, 0, SearchDirection::Newer),
         // Load all the transactions newer than the last tx of the first block.
-        (0, 1, 1, block_size - 1, SearchDirection::Newer),
+        (0, 1, 1, block_size, SearchDirection::Newer),
     ];
 
     for (start_block, n_blocks, block_id, tx_id, direction) in test_vector {
@@ -1030,15 +1019,6 @@ async fn tx_data_for_web3(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     setup.add_block(1);
     commit_schema_data(&mut storage, &setup).await?;
-    storage
-        .chain()
-        .block_schema()
-        .save_full_block(gen_sample_block(
-            BlockNumber(1),
-            BLOCK_SIZE_CHUNKS,
-            Default::default(),
-        ))
-        .await?;
 
     // Test data for L1 op.
     let eth_hash = match setup.blocks[0].block_transactions[0].clone() {

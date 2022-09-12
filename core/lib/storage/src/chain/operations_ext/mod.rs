@@ -35,7 +35,6 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 use itertools::Itertools;
-use sqlx::Row;
 
 pub(crate) mod conversion;
 pub mod records;
@@ -807,7 +806,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(tx_history)
     }
 
-    async fn get_closest_number(
+    async fn get_closest_sequence_number(
         &mut self,
         block_number: i64,
         block_index: i32,
@@ -816,55 +815,40 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         if block_number == 0 {
             return Ok(Some(0));
         }
-        let (function, sign) = match direction {
-            SearchDirection::Older => ("MAX", "<="),
-            SearchDirection::Newer => ("MIN", ">="),
-        };
-        let max_block = sqlx::query_scalar!("SELECT MAX(number) FROM blocks")
-            .fetch_one(self.0.conn())
-            .await?
-            .unwrap_or_default();
-        if max_block < block_number {
-            return Ok(Some(
-                sqlx::query_scalar!("SELECT MAX(sequence_number) FROM tx_filters")
-                    .fetch_one(self.0.conn())
-                    .await?
-                    .unwrap_or_default()
-                    + 1,
-            ));
+        let (function, function2) = match direction {
+            SearchDirection::Older => ("MAX", "GREATEST"),
+            SearchDirection::Newer => ("MIN", "LEAST"),
         };
         let query = format!(
             r#"
-            SELECT {0}(sequence_number) as sequence_number
-            FROM executed_transactions
-            WHERE block_number{1}$1 AND block_index{1}$2
+            SELECT COALESCE(
+                (SELECT {1}(
+                    (
+                        SELECT {0}(sequence_number) as sequence_number
+                        FROM executed_transactions
+                        WHERE block_number=$1 AND block_index=$2
+                    ),
+                    (
+                        SELECT {0}(sequence_number) AS sequence_number
+                        FROM executed_priority_operations
+                        WHERE block_number=$1 AND block_index=$2
+                    )
+                )),
+                (SELECT {1}(
+                    (SELECT {0}(sequence_number) as sequence_number FROM executed_transactions WHERE block_number=$1),
+                    (SELECT {0}(sequence_number) as sequence_number FROM executed_priority_operations WHERE block_number=$1)
+                ) + 1),
+                (SELECT {0}(sequence_number) + 1 FROM tx_filters)
+            )
             "#,
-            function, sign
+            function, function2
         );
         let tx_seq_no: Option<i64> = sqlx::query_scalar(&query)
             .bind(block_number as i32)
             .bind(block_index)
             .fetch_one(self.0.conn())
             .await?;
-        let result = if let Some(tx_seq_no) = tx_seq_no {
-            Some(tx_seq_no)
-        } else {
-            let query = format!(
-                "
-            SELECT {0}(sequence_number) AS sequence_number
-            FROM executed_priority_operations
-            WHERE block_number{1}$1 AND block_index{1}$2
-            ",
-                function, sign
-            );
-            let res: Option<i64> = sqlx::query_scalar(&query)
-                .bind(block_number as i32)
-                .bind(block_index)
-                .fetch_one(self.0.conn())
-                .await?;
-            res
-        };
-        Ok(result)
+        Ok(tx_seq_no)
     }
 
     /// Loads the range of the transactions applied to the account starting
@@ -890,7 +874,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let sequence_number = transaction
             .chain()
             .operations_ext_schema()
-            .get_closest_number(block_id as i64, block_tx_id as i32, direction)
+            .get_closest_sequence_number(block_id as i64, block_tx_id as i32, direction)
             .await?;
         let sequence_number = if let Some(sequence_number) = sequence_number {
             sequence_number
