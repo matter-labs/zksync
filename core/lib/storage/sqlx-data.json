@@ -4451,92 +4451,6 @@
       "nullable": []
     }
   },
-  "8271f6c777f2b4ebdbe313af873ff6e223fce9ea47cf7f5df076fe5da7633902": {
-    "query": "\n            WITH aggr_comm AS (\n                SELECT \n                   aggregate_operations.confirmed, \n                   commit_aggregated_blocks_binding.block_number \n               FROM aggregate_operations\n                   INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id\n               WHERE aggregate_operations.confirmed = true \n            ), aggr_exec AS (\n                SELECT \n                   aggregate_operations.confirmed, \n                   execute_aggregated_blocks_binding.block_number \n               FROM aggregate_operations\n                   INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n               WHERE aggregate_operations.confirmed = true \n            ), tx_hashes AS (\n                SELECT DISTINCT tx_hash FROM tx_filters\n                WHERE address = $1\n            ), transactions as (\n                select\n                    *\n                from (\n                    select\n                        concat_ws(',', block_number, block_index) as tx_id,\n                        tx,\n                        'sync-tx:' || encode(executed_transactions.tx_hash, 'hex') as hash,\n                        null as pq_id,\n                        null as eth_block,\n                        success,\n                        fail_reason,\n                        block_number,\n                        created_at,\n                        sequence_number,\n                        batch_id\n                    from tx_hashes\n                    inner join executed_transactions\n                        on tx_hashes.tx_hash = executed_transactions.tx_hash\n                    where\n                        block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6)\n                    union all\n                    select\n                        concat_ws(',', block_number, block_index) as tx_id,\n                        operation as tx,\n                        '0x' || encode(eth_hash, 'hex') as hash,\n                        priority_op_serialid as pq_id,\n                        eth_block,\n                        true as success,\n                        null as fail_reason,\n                        block_number,\n                        created_at,\n                        sequence_number,\n                        Null::bigint as batch_id\n                    from \n                        executed_priority_operations\n                    where \n                        (\n                            from_account = $1\n                            or\n                            to_account = $1\n                        )\n                        and\n                        (block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6))\n                    ) t\n                order by\n                    sequence_number desc\n                limit \n                    $7\n            )\n            select\n                tx_id as \"tx_id!\",\n                hash as \"hash?\",\n                eth_block as \"eth_block?\",\n                pq_id as \"pq_id?\",\n                tx as \"tx!\",\n                success as \"success?\",\n                fail_reason as \"fail_reason?\",\n                true as \"commited!\",\n                coalesce(verified.confirmed, false) as \"verified!\",\n                created_at as \"created_at!\",\n                batch_id as \"batch_id?\"\n            from transactions\n            left join aggr_comm committed on\n                committed.block_number = transactions.block_number AND committed.confirmed = true\n            left join aggr_exec verified on\n                verified.block_number = transactions.block_number AND verified.confirmed = true\n            order by transactions.sequence_number desc\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_id!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "hash?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "eth_block?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "pq_id?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "tx!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 5,
-          "name": "success?",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 6,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 7,
-          "name": "commited!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 8,
-          "name": "verified!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 9,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 10,
-          "name": "batch_id?",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int4",
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
-    }
-  },
   "839caf265f3e87a43a788d8fc321ec8d3ada6987d46ce1179683aefb0bb1e789": {
     "query": "SELECT COUNT(*) from mempool_txs\n            WHERE tx_hash = $1",
     "describe": {
@@ -4812,6 +4726,88 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "8b595500c13f036b4aaa0a611af88db5b8ecaf8784a382a4eed3b7ad14bcbfd2": {
+    "query": "\n            WITH aggr_exec AS (\n                SELECT\n                    aggregate_operations.confirmed,\n                    execute_aggregated_blocks_binding.block_number\n                FROM aggregate_operations\n                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                WHERE aggregate_operations.confirmed = true\n            ), tx_hashes AS (\n                SELECT DISTINCT sequence_number FROM tx_filters\n                WHERE address = $1\n                ORDER BY sequence_number desc\n                OFFSET $2\n                LIMIT $3\n            ), transactions AS (\n                SELECT\n                    *\n                FROM (\n                    SELECT\n                        concat_ws(',', block_number, block_index) AS tx_id,\n                        tx,\n                        'sync-tx:' || encode(executed_transactions.tx_hash, 'hex') AS hash,\n                        null as pq_id,\n                        null as eth_block,\n                        success,\n                        fail_reason,\n                        block_number,\n                        created_at,\n                        executed_transactions.sequence_number,\n                        batch_id\n                    FROM executed_transactions\n                    INNER JOIN tx_hashes\n                        ON tx_hashes.sequence_number = executed_transactions.sequence_number\n                    UNION ALL\n                    SELECT\n                        concat_ws(',', block_number, block_index) AS tx_id,\n                        operation as tx,\n                        '0x' || encode(eth_hash, 'hex') as hash,\n                        priority_op_serialid as pq_id,\n                        eth_block,\n                        true as success,\n                        null as fail_reason,\n                        block_number,\n                        created_at,\n                        executed_priority_operations.sequence_number,\n                        Null::bigint as batch_id\n                    FROM executed_priority_operations \n                    INNER JOIN tx_hashes\n                        ON tx_hashes.sequence_number = executed_priority_operations.sequence_number\n                    ) t\n            )\n            SELECT\n                tx_id as \"tx_id!\",\n                hash as \"hash?\",\n                eth_block as \"eth_block?\",\n                pq_id as \"pq_id?\",\n                tx as \"tx!\",\n                success as \"success?\",\n                fail_reason as \"fail_reason?\",\n                true as \"commited!\",\n                coalesce(verified.confirmed, false) as \"verified!\",\n                created_at as \"created_at!\",\n                batch_id as \"batch_id?\"\n            FROM transactions\n            LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number\n            ORDER BY transactions.block_number DESC, sequence_number DESC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_id!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "hash?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "eth_block?",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "pq_id?",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "tx!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "success?",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "fail_reason?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "commited!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "verified!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 9,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "batch_id?",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
       ]
     }
   },
@@ -7746,88 +7742,6 @@
         false,
         true,
         true
-      ]
-    }
-  },
-  "dc0b69a1138a4ec747b30ec443e3d1a434a68f464ab70c85589daca32d29a77a": {
-    "query": "\n            WITH aggr_exec AS (\n                SELECT\n                    aggregate_operations.confirmed,\n                    execute_aggregated_blocks_binding.block_number\n                FROM aggregate_operations\n                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                WHERE aggregate_operations.confirmed = true\n            ), tx_hashes AS (\n                SELECT DISTINCT tx_hash FROM tx_filters\n                WHERE address = $1\n            ), transactions AS (\n                SELECT\n                    *\n                FROM (\n                    SELECT\n                        concat_ws(',', block_number, block_index) AS tx_id,\n                        tx,\n                        'sync-tx:' || encode(executed_transactions.tx_hash, 'hex') AS hash,\n                        null as pq_id,\n                        null as eth_block,\n                        success,\n                        fail_reason,\n                        block_number,\n                        created_at,\n                        sequence_number,\n                        batch_id\n                    FROM tx_hashes\n                    INNER JOIN executed_transactions\n                        ON tx_hashes.tx_hash = executed_transactions.tx_hash\n                    union all\n                    select\n                        concat_ws(',', block_number, block_index) as tx_id,\n                        operation as tx,\n                        '0x' || encode(eth_hash, 'hex') as hash,\n                        priority_op_serialid as pq_id,\n                        eth_block,\n                        true as success,\n                        null as fail_reason,\n                        block_number,\n                        created_at,\n                        sequence_number,\n                        Null::bigint as batch_id\n                    from\n                        executed_priority_operations\n                    where\n                        from_account = $1\n                        or\n                        to_account = $1) t\n                order by\n                    block_number desc, created_at desc\n                offset\n                    $2\n                limit\n                    $3\n            )\n            select\n                tx_id as \"tx_id!\",\n                hash as \"hash?\",\n                eth_block as \"eth_block?\",\n                pq_id as \"pq_id?\",\n                tx as \"tx!\",\n                success as \"success?\",\n                fail_reason as \"fail_reason?\",\n                true as \"commited!\",\n                coalesce(verified.confirmed, false) as \"verified!\",\n                created_at as \"created_at!\",\n                batch_id as \"batch_id?\"\n            from transactions\n            LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number\n            order by transactions.block_number desc, sequence_number desc\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_id!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "hash?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "eth_block?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "pq_id?",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "tx!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 5,
-          "name": "success?",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 6,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 7,
-          "name": "commited!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 8,
-          "name": "verified!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 9,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 10,
-          "name": "batch_id?",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
       ]
     }
   },
