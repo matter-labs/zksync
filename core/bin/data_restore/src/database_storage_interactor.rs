@@ -161,18 +161,20 @@ impl<'a> DatabaseStorageInteractor<'a> {
         withdrawals: &[WithdrawalEvent],
         pending_withdrawals: &[WithdrawalPendingEvent],
     ) {
-        self.storage
+        let mut transaction = self.storage.start_transaction().await.unwrap();
+        transaction
             .withdrawals_schema()
             .save_pending_withdrawals(pending_withdrawals)
             .await
             .unwrap();
         for withdrawal in withdrawals {
-            self.storage
+            transaction
                 .withdrawals_schema()
                 .finalize_withdrawal(withdrawal)
                 .await
                 .unwrap();
         }
+        transaction.commit().await.unwrap();
     }
 
     pub async fn save_events_state(

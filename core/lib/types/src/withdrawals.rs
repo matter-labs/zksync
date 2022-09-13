@@ -69,6 +69,7 @@ pub struct WithdrawalEvent {
 }
 
 #[derive(Debug, Error)]
+#[clippy::allow(large-enum-variant)]
 pub enum WithdrawalPendingParseError {
     #[error("Cannot parse log for Withdrawal Pending Event {0:?}")]
     ParseError(Log),
