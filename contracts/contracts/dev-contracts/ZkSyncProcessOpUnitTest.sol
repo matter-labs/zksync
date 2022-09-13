@@ -8,7 +8,7 @@ import "../ZkSync.sol";
 
 contract ZkSyncProcessOpUnitTest is ZkSync {
     function collectOnchainOpsExternal(
-        CommitBlockInfo memory _newBlockData,
+        CommitBlockInfo calldata _newBlockData,
         bytes32 processableOperationsHash,
         uint64 priorityOperationsProcessed,
         bytes memory offsetsCommitment

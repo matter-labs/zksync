@@ -17,8 +17,12 @@ import {
     Create2Data,
     Swap,
     Order,
-    Ratio
+    Ratio,
+    ChangePubKeyEIP712
 } from './types';
+
+import { TypedDataSigner } from '@ethersproject/abstract-signer';
+import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer/src.ts';
 
 export class Signer {
     readonly #privateKey: Uint8Array;
@@ -288,7 +292,7 @@ export class Signer {
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
-        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2 | ChangePubKeyEIP712;
         ethSignature?: string;
         validFrom: number;
         validUntil: number;
@@ -338,7 +342,7 @@ export class Signer {
     }
 }
 
-export class Create2WalletSigner extends ethers.Signer {
+export class Create2WalletSigner extends ethers.Signer implements TypedDataSigner {
     public readonly address: string;
     // salt for create2 function call
     public readonly salt: string;
@@ -373,12 +377,20 @@ export class Create2WalletSigner extends ethers.Signer {
         throw new Error("Create2Wallet signer can't sign transactions");
     }
 
-    connect(provider: ethers.providers.Provider): ethers.Signer {
+    async _signTypedData(
+        _domain: TypedDataDomain,
+        _types: Record<string, Array<TypedDataField>>,
+        _value: Record<string, any>
+    ): Promise<string> {
+        throw new Error("Create2Wallet signer can't sign TypedData");
+    }
+
+    connect(provider: ethers.providers.Provider): ethers.Signer & TypedDataSigner {
         return new Create2WalletSigner(this.zkSyncPubkeyHash, this.create2WalletData, provider);
     }
 }
 
-export class No2FAWalletSigner extends ethers.Signer {
+export class No2FAWalletSigner extends ethers.Signer implements TypedDataSigner {
     constructor(public readonly address: string, provider?: ethers.providers.Provider) {
         super();
         Object.defineProperty(this, 'provider', {
@@ -403,7 +415,15 @@ export class No2FAWalletSigner extends ethers.Signer {
         throw new Error("No2FAWallet signer can't sign transactions");
     }
 
-    connect(provider: ethers.providers.Provider): ethers.Signer {
+    async _signTypedData(
+        _domain: TypedDataDomain,
+        _types: Record<string, Array<TypedDataField>>,
+        _value: Record<string, any>
+    ): Promise<string> {
+        throw new Error("No2FAWallet signer can't sign TypedData");
+    }
+
+    connect(provider: ethers.providers.Provider): ethers.Signer & TypedDataSigner {
         return new No2FAWalletSigner(this.address, provider);
     }
 }

@@ -253,6 +253,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
         Default::default(),
         None,
         None,
+        None,
     );
 
     change_pubkey.eth_auth_data = {

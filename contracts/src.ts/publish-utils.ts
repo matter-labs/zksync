@@ -10,7 +10,7 @@ export async function publishSourceCodeToEtherscan(
     constructorArguments,
     contractDirPath = 'contracts'
 ) {
-    const SUPPORTED_NETWORKS = ['mainnet', 'rinkeby', 'ropsten'];
+    const SUPPORTED_NETWORKS = ['mainnet', 'goerli', 'sepolia'];
     const contractPath = `${contractDirPath}/${contractName}.sol`;
     const sourceCode = await getSolidityInput(contractPath);
 

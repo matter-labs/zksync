@@ -158,7 +158,7 @@ async fn verify_ethereum_signature(
 ) -> bool {
     let signer_account = match eth_signature {
         TxEthSignature::EthereumSignature(packed_signature) => {
-            packed_signature.signature_recover_signer(message)
+            packed_signature.signature_recover_signer_from_raw_message(message)
         }
         TxEthSignature::EIP1271Signature(signature) => {
             return eth_checker

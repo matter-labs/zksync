@@ -211,6 +211,7 @@ pub mod operations_test {
                 Some(PackedEthSignature::deserialize_packed(
                     &hex::decode("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4").unwrap(),
                 ).unwrap()),
+                None
             );
             let account_id = AccountId(42u32);
 
@@ -473,6 +474,7 @@ pub mod tx_conversion_test {
             (*FEE).clone(),
             NONCE,
             *TIME_RANGE,
+            None,
             None,
             None,
         );

@@ -59,7 +59,7 @@ impl<S: EthereumSigner> WalletCredentials<S> {
 
         // Check that signature is correct and corresponds to the provided address.
         let address_from_pk = packed_signature
-            .signature_recover_signer(&eth_sign_message)
+            .signature_recover_signer_from_raw_message(&eth_sign_message)
             .map_err(|_| ClientError::IncorrectCredentials)?;
         if eth_address != address_from_pk {
             return Err(ClientError::IncorrectAddress);

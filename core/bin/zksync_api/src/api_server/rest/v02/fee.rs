@@ -119,7 +119,7 @@ mod tests {
     };
     use zksync_types::{
         tokens::{TokenLike, TokenMarketVolume},
-        Address, Token, TokenId, TokenKind,
+        Address, ChainId, Token, TokenId, TokenKind,
     };
 
     #[actix_rt::test]
@@ -172,6 +172,7 @@ mod tests {
                     &cfg.config.api.common,
                     &cfg.config.api.token_config,
                     mempool_tx_request_sender.clone(),
+                    ChainId(cfg.config.eth_client.chain_id),
                 ))
             },
             Some(shared_data),

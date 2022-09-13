@@ -416,7 +416,7 @@ impl Block {
                     onchain_ops.push(OnchainOperationsBlockInfo {
                         public_data_offset,
                         eth_witness: executed_op.eth_witness().unwrap_or_default(),
-                    })
+                    });
                 }
 
                 if executed_op.is_processable_onchain_operation() {

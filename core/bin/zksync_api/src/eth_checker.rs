@@ -74,6 +74,28 @@ impl EthereumChecker {
         nonce: Nonce,
         pub_key_hash: &PubKeyHash,
     ) -> Result<bool, anyhow::Error> {
+        let auth_fact_reset_timer = self
+            .client
+            .call_main_contract_function::<i64, _, _, _>(
+                "authFactsResetTimer",
+                (address, u64::from(*nonce)),
+                None,
+                Options::default(),
+                None,
+            )
+            .await
+            .map_err(|e| {
+                anyhow::format_err!("Failed to query contract authFactsResetTimer: {}", e)
+            })?;
+
+        // The timer is set to non-zero value only if an user requests a change already existing auth.
+        // After the request for re-auth, they must wait a certain time and be able to change `authFacts`.
+        // So, we check that user didn't requested re-auth, to be sure that current auth won't be
+        // changed before block will be committed. It protects us of invalidation block on L1.
+        if auth_fact_reset_timer != 0 {
+            return Ok(false);
+        }
+
         let auth_fact: Vec<u8> = self
             .client
             .call_main_contract_function(
@@ -100,7 +122,7 @@ mod tests {
     use zksync_eth_signer::PrivateKeySigner;
     use zksync_types::{
         tx::{EIP1271Signature, PackedEthSignature},
-        Address,
+        Address, ChainId,
     };
 
     #[tokio::test]
@@ -126,7 +148,7 @@ mod tests {
             Default::default(),
             PrivateKeySigner::new(Default::default()),
             Default::default(),
-            0,
+            ChainId(0),
             1.0,
         ));
 

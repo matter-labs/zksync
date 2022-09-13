@@ -19,7 +19,7 @@ use zksync_types::aggregated_operations::{
     stored_block_info, BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
 };
 use zksync_types::block::Block;
-use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId, ZkSyncTx};
+use zksync_types::{AccountId, Address, ChainId, Nonce, PriorityOp, PubKeyHash, TokenId, ZkSyncTx};
 
 pub fn parse_ether(eth_value: &str) -> Result<BigUint, anyhow::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();
@@ -71,7 +71,7 @@ impl EthereumAccount {
         address: Address,
         transport: Http,
         contract_address: Address,
-        chain_id: u64,
+        chain_id: ChainId,
         gas_price_factor: f64,
     ) -> Self {
         let eth_signer = PrivateKeySigner::new(private_key);

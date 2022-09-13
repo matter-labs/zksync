@@ -24,6 +24,7 @@ use zksync_core::rejected_tx_cleaner::run_rejected_tx_cleaner;
 use zksync_mempool::run_mempool_tx_handler;
 use zksync_prometheus_exporter::{run_operation_counter, run_prometheus_exporter};
 use zksync_storage::ConnectionPool;
+use zksync_types::ChainId;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
@@ -203,6 +204,7 @@ async fn run_server(components: &ComponentsToRun) {
         let token_config = TokenConfig::from_env();
         let chain_config = ChainConfig::from_env();
         let fee_ticker_config = TickerConfig::from_env();
+        let eth_client_config = ETHClientConfig::from_env();
         let ticker_info = Box::new(TickerInfo::new(read_only_connection_pool.clone()));
 
         let ticker = FeeTicker::new_with_default_validator(
@@ -230,6 +232,7 @@ async fn run_server(components: &ComponentsToRun) {
                 chain_config.state_keeper.miniblock_iteration_interval(),
                 mempool_tx_request_sender,
                 eth_watch_config.confirmations_for_eth_event,
+                ChainId(eth_client_config.chain_id),
             ));
         }
 
@@ -249,6 +252,7 @@ async fn run_server(components: &ComponentsToRun) {
                 &common_config,
                 &token_config,
                 mempool_tx_request_sender,
+                ChainId(eth_client_config.chain_id),
                 eth_watch_config.confirmations_for_eth_event,
             ));
         }
@@ -269,6 +273,7 @@ async fn run_server(components: &ComponentsToRun) {
                 contracts_config.contract_addr,
                 ticker,
                 sign_check_sender,
+                ChainId(eth_client_config.chain_id),
                 mempool_tx_request_sender,
                 private_config.url,
             ));

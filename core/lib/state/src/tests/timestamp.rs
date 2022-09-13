@@ -29,6 +29,7 @@ fn invalid_timestamp_valid_from() {
         time_range,
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 
@@ -64,6 +65,7 @@ fn invalid_timestamp_valid_until() {
         time_range,
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 
@@ -100,6 +102,7 @@ fn batch_invalid_timestamp() {
         time_range,
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 

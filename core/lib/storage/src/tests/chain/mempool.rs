@@ -73,6 +73,7 @@ fn zksync_txs() -> Vec<SignedZkSyncTx> {
         Default::default(),
         None,
         None,
+        None,
     );
 
     let txs = [

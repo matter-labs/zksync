@@ -293,6 +293,7 @@ mod test {
             Default::default(),
             None,
             None,
+            None,
         );
         let op1 = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
             tx,

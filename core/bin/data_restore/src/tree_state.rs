@@ -725,6 +725,7 @@ mod test {
             Default::default(),
             None,
             None,
+            None,
         );
         let op5 = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
             tx: tx5,
@@ -940,6 +941,7 @@ mod test {
             BigUint::from(1u32),
             Nonce(2),
             Default::default(),
+            None,
             None,
             None,
         );
