@@ -17,14 +17,14 @@ pub enum WithdrawalType {
 }
 
 impl TryFrom<String> for WithdrawalType {
-    type Error = ();
+    type Error = WithdrawalPendingParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Ok(match value.as_str() {
             "Withdrawal" => WithdrawalType::Withdrawal,
             "FullExit" => WithdrawalType::FullExit,
             "ForcedExit" => WithdrawalType::ForcedExit,
-            _ => return Err(()),
+            _ => return Err(WithdrawalPendingParseError::TypeError),
         })
     }
 }
@@ -36,14 +36,14 @@ impl Display for WithdrawalType {
 }
 
 impl TryFrom<U256> for WithdrawalType {
-    type Error = ();
+    type Error = WithdrawalPendingParseError;
 
     fn try_from(value: U256) -> Result<Self, Self::Error> {
         Ok(match value.as_u32() {
             0 => WithdrawalType::Withdrawal,
             1 => WithdrawalType::ForcedExit,
             2 => WithdrawalType::FullExit,
-            _ => return Err(()),
+            _ => return Err(WithdrawalPendingParseError::TypeError),
         })
     }
 }
@@ -72,6 +72,8 @@ pub struct WithdrawalEvent {
 pub enum WithdrawalPendingParseError {
     #[error("Cannot parse log for Withdrawal Pending Event {0:?}")]
     ParseError(Log),
+    #[error("Type Error")]
+    TypeError,
 }
 
 impl TryFrom<Log> for WithdrawalPendingEvent {
