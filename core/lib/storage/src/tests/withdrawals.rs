@@ -25,9 +25,27 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
                 tx_hash: pending_tx_hash,
                 token_id: Default::default(),
                 recipient,
-                amount: U256::from(10u8),
+                amount: U256::from(5u8),
                 withdrawal_type: WithdrawalType::ForcedExit,
                 log_index: 1,
+            },
+            WithdrawalPendingEvent {
+                block_number: 10,
+                tx_hash: pending_tx_hash,
+                token_id: Default::default(),
+                recipient,
+                amount: U256::from(5u8),
+                withdrawal_type: WithdrawalType::ForcedExit,
+                log_index: 2,
+            },
+            WithdrawalPendingEvent {
+                block_number: 10,
+                tx_hash: pending_tx_hash,
+                token_id: Default::default(),
+                recipient,
+                amount: U256::from(5u8),
+                withdrawal_type: WithdrawalType::ForcedExit,
+                log_index: 3,
             },
         ])
         .await?;
@@ -57,7 +75,7 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     storage
         .withdrawals_schema()
         .finalize_withdrawal(&WithdrawalEvent {
-            block_number: 11,
+            block_number: 12,
             token_id: Default::default(),
             recipient,
             amount: U256::from(10u8),
@@ -70,7 +88,25 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .get_finalized_withdrawals(withdrawal_tx_hash_2)
         .await?;
 
-    assert_eq!(withdrawals.len(), 1);
+    assert_eq!(withdrawals.len(), 2);
     assert_eq!(withdrawals[0].withdrawal_type, WithdrawalType::ForcedExit);
+    assert_eq!(withdrawals[1].withdrawal_type, WithdrawalType::ForcedExit);
+    // Do not process the finalize withdrawal twice
+    storage
+        .withdrawals_schema()
+        .finalize_withdrawal(&WithdrawalEvent {
+            block_number: 11,
+            token_id: Default::default(),
+            recipient,
+            amount: U256::from(10u8),
+            tx_hash: withdrawal_tx_hash_2,
+        })
+        .await?;
+    let result: Option<i64> =
+        sqlx::query_scalar!("SELECT COUNT(*) FROM withdrawals WHERE withdrawal_tx_hash IS NULL")
+            .fetch_one(storage.conn())
+            .await
+            .unwrap();
+    assert_eq!(result.unwrap(), 1);
     Ok(())
 }

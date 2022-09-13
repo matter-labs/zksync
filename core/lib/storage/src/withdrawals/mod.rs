@@ -46,6 +46,17 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
 
     pub async fn finalize_withdrawal(&mut self, withdrawal: &WithdrawalEvent) -> QueryResult<()> {
         let mut transaction = self.0.start_transaction().await?;
+        let max_processed_block =
+            sqlx::query_scalar!("SELECT MAX(withdrawal_tx_block) FROM withdrawals")
+                .fetch_one(transaction.conn())
+                .await?;
+        // We have already processed txs from this block
+        if let Some(block) = max_processed_block {
+            if (block as u64) >= withdrawal.block_number {
+                return Ok(());
+            }
+        }
+
         let pending_withdrawals = sqlx::query_as!(
             PendingWithdrawal,
             "SELECT * FROM withdrawals \
