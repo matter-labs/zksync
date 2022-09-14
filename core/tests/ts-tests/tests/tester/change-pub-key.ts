@@ -16,7 +16,7 @@ declare module './tester' {
 Tester.prototype.testChangePubKey = async function (wallet: Wallet, feeToken: TokenLike, onchain: boolean) {
     if (await wallet.isSigningKeySet()) return;
 
-    const ethAuthType: ChangePubkeyTypes = onchain ? 'Onchain' : 'EIP712';
+    const ethAuthType: ChangePubkeyTypes = onchain ? 'Onchain' : 'ECDSA';
 
     const feeType = { ChangePubKey: ethAuthType };
     let { totalFee: fee } = await this.syncProvider.getTransactionFee(feeType, wallet.address(), feeToken);
