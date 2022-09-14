@@ -111,9 +111,15 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
             .execute(transaction.conn())
             .await?;
             amount += charged_amount;
-            if amount >= withdrawal_amount {
+            if amount == withdrawal_amount {
                 break;
             }
+            assert!(
+                amount < withdrawal_amount,
+                "Amount should never be greater than withdrawal amount {:?} {:?}",
+                amount,
+                withdrawal_amount
+            );
         }
         transaction.commit().await?;
 
@@ -138,6 +144,7 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
             INNER JOIN withdrawals \
             ON finalized_withdrawals.pending_withdrawals_id = withdrawals.id \
             WHERE finalized_withdrawals.tx_hash = $1\
+            ORDER BY withdrawals.tx_log_index
             ",
             tx_hash.as_bytes()
         )

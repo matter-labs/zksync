@@ -35,7 +35,7 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
                 token_id: Default::default(),
                 recipient,
                 amount: U256::from(5u8),
-                withdrawal_type: WithdrawalType::ForcedExit,
+                withdrawal_type: WithdrawalType::Withdrawal,
                 log_index: 2,
             },
             WithdrawalPendingEvent {
@@ -54,8 +54,8 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     storage
         .withdrawals_schema()
         .finalize_withdrawal(&WithdrawalEvent {
-            block_number: 11,
-            log_index: 0,
+            block_number: 10,
+            log_index: 4,
             token_id: Default::default(),
             recipient,
             amount: U256::from(2u8),
@@ -74,8 +74,8 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     storage
         .withdrawals_schema()
         .finalize_withdrawal(&WithdrawalEvent {
-            block_number: 11,
-            log_index: 1,
+            block_number: 10,
+            log_index: 5,
             token_id: Default::default(),
             recipient,
             amount: U256::from(8u8),
@@ -110,17 +110,17 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     assert_eq!(withdrawals.len(), 2);
     assert_eq!(withdrawals[0].withdrawal_type, WithdrawalType::ForcedExit);
-    assert_eq!(withdrawals[1].withdrawal_type, WithdrawalType::ForcedExit);
+    assert_eq!(withdrawals[1].withdrawal_type, WithdrawalType::Withdrawal);
     // Do not process the finalize withdrawal twice
     storage
         .withdrawals_schema()
         .finalize_withdrawal(&WithdrawalEvent {
             block_number: 11,
-            log_index: 0,
+            log_index: 2,
             token_id: Default::default(),
             recipient,
             amount: U256::from(10u8),
-            tx_hash: withdrawal_tx_hash_2,
+            tx_hash: withdrawal_tx_hash_3,
         })
         .await?;
     let result: Option<i64> = sqlx::query_scalar!(
