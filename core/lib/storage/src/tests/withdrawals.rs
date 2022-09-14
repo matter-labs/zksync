@@ -55,6 +55,7 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .withdrawals_schema()
         .finalize_withdrawal(&WithdrawalEvent {
             block_number: 11,
+            log_index: 0,
             token_id: Default::default(),
             recipient,
             amount: U256::from(10u8),
@@ -75,7 +76,8 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     storage
         .withdrawals_schema()
         .finalize_withdrawal(&WithdrawalEvent {
-            block_number: 12,
+            block_number: 11,
+            log_index: 1,
             token_id: Default::default(),
             recipient,
             amount: U256::from(10u8),
@@ -96,6 +98,7 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .withdrawals_schema()
         .finalize_withdrawal(&WithdrawalEvent {
             block_number: 11,
+            log_index: 0,
             token_id: Default::default(),
             recipient,
             amount: U256::from(10u8),

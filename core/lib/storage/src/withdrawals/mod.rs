@@ -46,13 +46,15 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
 
     pub async fn finalize_withdrawal(&mut self, withdrawal: &WithdrawalEvent) -> QueryResult<()> {
         let mut transaction = self.0.start_transaction().await?;
-        let max_processed_block =
-            sqlx::query_scalar!("SELECT MAX(withdrawal_tx_block) FROM withdrawals")
-                .fetch_one(transaction.conn())
-                .await?;
-        // We have already processed txs from this block
-        if let Some(block) = max_processed_block {
-            if (block as u64) >= withdrawal.block_number {
+        let max_processed_log = sqlx::query_scalar!(
+            "SELECT MAX(withdrawal_tx_log_index) FROM withdrawals WHERE withdrawal_tx_block= $1",
+            withdrawal.block_number as i64
+        )
+        .fetch_one(transaction.conn())
+        .await?;
+        // We have already processed txs from this log
+        if let Some(log_index) = max_processed_log {
+            if (log_index as u64) >= withdrawal.log_index {
                 return Ok(());
             }
         }
@@ -60,7 +62,7 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
         let pending_withdrawals = sqlx::query_as!(
             PendingWithdrawal,
             "SELECT * FROM withdrawals \
-             WHERE account= $1 AND token_id = $2 AND pending_tx_block < $3 AND withdrawal_tx_hash is NULL \
+             WHERE account= $1 AND token_id = $2 AND pending_tx_block <= $3 AND withdrawal_tx_hash is NULL \
              ORDER BY pending_tx_block",
             withdrawal.recipient.as_bytes(),
             withdrawal.token_id.0 as i32,
@@ -73,10 +75,12 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
         let mut amount = BigDecimal::zero();
         for pending_withdrawal in pending_withdrawals {
             sqlx::query!(
-                "UPDATE withdrawals SET withdrawal_tx_hash = $2, withdrawal_tx_block = $3 WHERE id = $1",
+                "UPDATE withdrawals SET withdrawal_tx_hash = $2, withdrawal_tx_block = $3, withdrawal_tx_log_index = $4 WHERE id = $1",
                 pending_withdrawal.id,
                 withdrawal.tx_hash.as_bytes(),
                 withdrawal.block_number as i64,
+                withdrawal.log_index as i64
+
             ).execute(transaction.conn()).await?;
             amount += pending_withdrawal.amount;
             if amount >= withdrawal_amount {

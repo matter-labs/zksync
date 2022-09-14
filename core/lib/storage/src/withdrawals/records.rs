@@ -14,6 +14,7 @@ pub struct PendingWithdrawal {
     pub pending_tx_log_index: i64,
     pub withdrawal_tx_hash: Option<Vec<u8>>,
     pub withdrawal_tx_block: Option<i64>,
+    pub withdrawal_tx_log_index: Option<i64>,
 }
 
 impl From<PendingWithdrawal> for WithdrawalPendingEvent {

@@ -1046,6 +1046,21 @@
     },
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 "
   },
+  "1621a8b280e78d440a3098e3c9ad55ccd4c0ab3e84ca3255fc88bfce4956c86e": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Bytea",
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "UPDATE withdrawals SET withdrawal_tx_hash = $2, withdrawal_tx_block = $3, withdrawal_tx_log_index = $4 WHERE id = $1"
+  },
   "163c54b9ce64671b284e09c43bab0aadeda9d45e7b7f5ea43c1cae0f49b15b8d": {
     "describe": {
       "columns": [],
@@ -1090,6 +1105,88 @@
       }
     },
     "query": "WITH aggregate_ops AS (\n                SELECT aggregate_operations.id FROM aggregate_operations\n                   WHERE confirmed = $1 and action_type != $2 and aggregate_operations.id != ANY(SELECT id from eth_aggregated_ops_binding)\n                ORDER BY aggregate_operations.id ASC\n              )\n              INSERT INTO eth_unprocessed_aggregated_ops (op_id)\n              SELECT id from aggregate_ops\n              ON CONFLICT (op_id)\n              DO NOTHING"
+  },
+  "1952592e91d6709afa66d501caa3102bf41d38d3ee8d0b6436f36e544885aa39": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "account",
+          "ordinal": 1,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "amount",
+          "ordinal": 2,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "token_id",
+          "ordinal": 3,
+          "type_info": "Int4"
+        },
+        {
+          "name": "withdrawal_type",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "pending_tx_hash",
+          "ordinal": 5,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "pending_tx_block",
+          "ordinal": 6,
+          "type_info": "Int8"
+        },
+        {
+          "name": "pending_tx_log_index",
+          "ordinal": 7,
+          "type_info": "Int8"
+        },
+        {
+          "name": "withdrawal_tx_hash",
+          "ordinal": 8,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "withdrawal_tx_block",
+          "ordinal": 9,
+          "type_info": "Int8"
+        },
+        {
+          "name": "withdrawal_tx_log_index",
+          "ordinal": 10,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int4",
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT * FROM withdrawals WHERE account= $1 AND token_id = $2 AND pending_tx_block <= $3 AND withdrawal_tx_hash is NULL ORDER BY pending_tx_block"
   },
   "19b2670f1ac5f960611e9ed59ec49ee1395d0a0193f317276cdaa675023945af": {
     "describe": {
@@ -1904,6 +2001,11 @@
           "name": "withdrawal_tx_block",
           "ordinal": 9,
           "type_info": "Int8"
+        },
+        {
+          "name": "withdrawal_tx_log_index",
+          "ordinal": 10,
+          "type_info": "Int8"
         }
       ],
       "nullable": [
@@ -1915,6 +2017,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ],
@@ -2773,24 +2876,6 @@
       }
     },
     "query": "\n            DELETE FROM pending_block WHERE number = $1\n            "
-  },
-  "45835bd8baba982b410df9a81970dfb547dd9660f6a768a1eb588ce1ee33f36f": {
-    "describe": {
-      "columns": [
-        {
-          "name": "max",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "SELECT MAX(withdrawal_tx_block) FROM withdrawals"
   },
   "45dc23ee9e4fd0bf52e2a82f3ed83210ec3a49c01b70a82bd6fac566da1a0f3b": {
     "describe": {
@@ -3939,20 +4024,6 @@
     },
     "query": "SELECT max(serial_id) FROM mempool_priority_operations WHERE l2_address = $1"
   },
-  "6dca129e3d5f7bca30b6851316d2d70e16babb285cd1f5fb6ea6ec5a9f7014a2": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Bytea",
-          "Int8"
-        ]
-      }
-    },
-    "query": "UPDATE withdrawals SET withdrawal_tx_hash = $2, withdrawal_tx_block = $3 WHERE id = $1"
-  },
   "6dfbe5878cdb5d4d7050ee282a3552e20af4f9d676feb2256f351d59f39bbf63": {
     "describe": {
       "columns": [],
@@ -5026,82 +5097,6 @@
       }
     },
     "query": "SELECT GREATEST(\n                (SELECT MAX(unprocessed_prior_op_after) FROM incomplete_blocks),\n                (SELECT MAX(unprocessed_prior_op_after) FROM blocks)\n            )"
-  },
-  "8c82708dc2d8a59a3300b5fc1774212bbfbefcb220d8a09a607c321393ba72dd": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int4"
-        },
-        {
-          "name": "account",
-          "ordinal": 1,
-          "type_info": "Bytea"
-        },
-        {
-          "name": "amount",
-          "ordinal": 2,
-          "type_info": "Numeric"
-        },
-        {
-          "name": "token_id",
-          "ordinal": 3,
-          "type_info": "Int4"
-        },
-        {
-          "name": "withdrawal_type",
-          "ordinal": 4,
-          "type_info": "Text"
-        },
-        {
-          "name": "pending_tx_hash",
-          "ordinal": 5,
-          "type_info": "Bytea"
-        },
-        {
-          "name": "pending_tx_block",
-          "ordinal": 6,
-          "type_info": "Int8"
-        },
-        {
-          "name": "pending_tx_log_index",
-          "ordinal": 7,
-          "type_info": "Int8"
-        },
-        {
-          "name": "withdrawal_tx_hash",
-          "ordinal": 8,
-          "type_info": "Bytea"
-        },
-        {
-          "name": "withdrawal_tx_block",
-          "ordinal": 9,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int4",
-          "Int8"
-        ]
-      }
-    },
-    "query": "SELECT * FROM withdrawals WHERE account= $1 AND token_id = $2 AND pending_tx_block < $3 AND withdrawal_tx_hash is NULL ORDER BY pending_tx_block"
   },
   "8cb055b53a74f063c8ddb8769bff22fa8c9782d28f7c0b4438cf7e67e8cf4c6a": {
     "describe": {
@@ -6556,6 +6551,26 @@
       }
     },
     "query": "\n            SELECT * FROM ticker_price\n            WHERE token_id = $1\n            LIMIT 1\n            "
+  },
+  "bafc8cba55f22410283e738db0709c49e007a94b39d4cfb7d635258bf6965dc4": {
+    "describe": {
+      "columns": [
+        {
+          "name": "max",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT MAX(withdrawal_tx_log_index) FROM withdrawals WHERE withdrawal_tx_block= $1"
   },
   "bb0d4ef63ffd6423bf4495d5342a060ccc14737bb5072d3adc31d7cddf0f99f8": {
     "describe": {

@@ -62,6 +62,7 @@ pub struct WithdrawalPendingEvent {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WithdrawalEvent {
     pub block_number: u64,
+    pub log_index: u64,
     pub token_id: TokenId,
     pub recipient: Address,
     pub amount: U256,
@@ -81,10 +82,9 @@ impl TryFrom<Log> for WithdrawalPendingEvent {
     type Error = WithdrawalPendingParseError;
 
     fn try_from(event: Log) -> Result<WithdrawalPendingEvent, WithdrawalPendingParseError> {
-        if event.topics.len() != 3 {
+        if event.topics.len() != 3 || event.data.0.len() != 32 * 2 {
             return Err(WithdrawalPendingParseError::ParseError(event));
         }
-        assert_eq!(event.data.0.len(), 32 * 2);
         let amount = U256::from_big_endian(&event.data.0[..32]);
         let tx_type = WithdrawalType::try_from(U256::from_big_endian(&event.data.0[32..]))?;
         Ok(WithdrawalPendingEvent {
@@ -105,11 +105,10 @@ impl TryFrom<Log> for WithdrawalEvent {
     type Error = WithdrawalPendingParseError;
 
     fn try_from(event: Log) -> Result<WithdrawalEvent, WithdrawalPendingParseError> {
-        if event.topics.len() != 3 {
+        if event.topics.len() != 3 || event.data.0.len() != 32 {
             return Err(WithdrawalPendingParseError::ParseError(event));
         }
 
-        assert_eq!(event.data.0.len(), 32);
         let amount = U256::from_big_endian(&event.data.0);
         Ok(WithdrawalEvent {
             block_number: event.block_number.unwrap().as_u64(),
@@ -119,6 +118,7 @@ impl TryFrom<Log> for WithdrawalEvent {
             ),
             amount,
             tx_hash: event.transaction_hash.unwrap(),
+            log_index: event.log_index.unwrap().as_u64(),
         })
     }
 }
