@@ -758,7 +758,7 @@ impl TxSender {
 
             // Not enough fee
             if required_normal_fee > user_provided_fee {
-                vlog::error!(
+                vlog::info!(
                     "User provided batch fee in token is too low, required: {}, provided (scaled): {}",
                     required_normal_fee.to_string(),
                     user_provided_fee.to_string(),
@@ -798,7 +798,7 @@ impl TxSender {
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
             if required_total_usd_fee > scaled_provided_fee_in_usd {
-                vlog::error!(
+                vlog::info!(
                     "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
                     &required_total_usd_fee,
                     provided_total_usd_fee.to_string(),

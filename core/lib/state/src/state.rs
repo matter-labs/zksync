@@ -527,7 +527,7 @@ impl ZkSyncState {
 mod tests {
     use super::*;
     use crate::tests::{AccountState::*, PlasmaTestBuilder};
-    use vlog::sentry::types::Utc;
+    use chrono::Utc;
     use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
     use zksync_types::{
         tx::{Transfer, Withdraw},
