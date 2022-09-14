@@ -49,9 +49,10 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
         // Try to find this log in already processed logs
         let log = sqlx::query_scalar!(
             "SELECT tx_log_index FROM finalized_withdrawals \
-            WHERE tx_block = $1 AND tx_log_index = $2 \
+            WHERE tx_block = $1 AND tx_hash = $2 AND tx_log_index = $3 \
             LIMIT 1",
             withdrawal.block_number as i64,
+            withdrawal.tx_hash.as_bytes(),
             withdrawal.log_index as i64,
         )
         .fetch_optional(transaction.conn())
@@ -99,8 +100,8 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
             .await?;
             sqlx::query!(
                 "INSERT INTO finalized_withdrawals \
-              (pending_withdrawals_id, amount, tx_hash, tx_block, tx_log_index) \
-              VALUES ($1, $2, $3, $4, $5)",
+                 (pending_withdrawals_id, amount, tx_hash, tx_block, tx_log_index) \
+                 VALUES ($1, $2, $3, $4, $5)",
                 pending_withdrawal.id,
                 charged_amount,
                 withdrawal.tx_hash.as_bytes(),
