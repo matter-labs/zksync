@@ -1,4 +1,4 @@
-use crate::withdrawals::records::PendingWithdrawal;
+use crate::withdrawals::records::{ExtendedFinalizedWithdrawal, PendingWithdrawal};
 use crate::{BigDecimal, QueryResult, StorageProcessor};
 use num::{BigUint, Zero};
 use std::str::FromStr;
@@ -24,9 +24,9 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
                 biguint_to_big_decimal(BigUint::from_str(&withdrawal.amount.to_string()).unwrap());
 
             sqlx::query!(
-                "INSERT INTO withdrawals (account, amount, token_id, withdrawal_type, pending_tx_hash, pending_tx_log_index, pending_tx_block) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                 ON CONFLICT (pending_tx_hash, pending_tx_log_index) DO NOTHING",
+                "INSERT INTO withdrawals (account, full_amount, remaining_amount, token_id, withdrawal_type, tx_hash, tx_log_index, tx_block) \
+                 VALUES ($1, $2, $2, $3, $4, $5, $6, $7)
+                 ON CONFLICT (tx_hash, tx_log_index) DO NOTHING",
                 withdrawal.recipient.as_bytes(),
                 amount,
                 withdrawal.token_id.0 as i32,
@@ -46,43 +46,70 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
 
     pub async fn finalize_withdrawal(&mut self, withdrawal: &WithdrawalEvent) -> QueryResult<()> {
         let mut transaction = self.0.start_transaction().await?;
-        let max_processed_log = sqlx::query_scalar!(
-            "SELECT MAX(withdrawal_tx_log_index) FROM withdrawals WHERE withdrawal_tx_block= $1",
-            withdrawal.block_number as i64
+        // Try to find this log in already processed logs
+        let log = sqlx::query_scalar!(
+            "SELECT tx_log_index FROM finalized_withdrawals \
+            WHERE tx_block = $1 AND tx_log_index = $2 \
+            LIMIT 1",
+            withdrawal.block_number as i64,
+            withdrawal.log_index as i64,
         )
-        .fetch_one(transaction.conn())
+        .fetch_optional(transaction.conn())
         .await?;
-        // We have already processed txs from this log
-        if let Some(log_index) = max_processed_log {
-            if (log_index as u64) >= withdrawal.log_index {
-                return Ok(());
-            }
+
+        // If we have already processed txs from this log, just return
+        if log.is_some() {
+            return Ok(());
         }
 
         let pending_withdrawals = sqlx::query_as!(
             PendingWithdrawal,
             "SELECT * FROM withdrawals \
-             WHERE account= $1 AND token_id = $2 AND pending_tx_block <= $3 AND withdrawal_tx_hash is NULL \
-             ORDER BY pending_tx_block",
+             WHERE account= $1 AND token_id = $2 AND tx_block <= $3 AND remaining_amount > 0 \
+             ORDER BY tx_block, tx_log_index",
             withdrawal.recipient.as_bytes(),
             withdrawal.token_id.0 as i32,
             withdrawal.block_number as i64
-        ).fetch_all(transaction.conn())
+        )
+        .fetch_all(transaction.conn())
         .await?;
 
         let withdrawal_amount =
             biguint_to_big_decimal(BigUint::from_str(&withdrawal.amount.to_string()).unwrap());
         let mut amount = BigDecimal::zero();
         for pending_withdrawal in pending_withdrawals {
+            let mut remaining_amount = pending_withdrawal.remaining_amount;
+            let remaining_withdrawal_amount = withdrawal_amount.clone() - amount.clone();
+
+            let charged_amount;
+            if remaining_withdrawal_amount < remaining_amount {
+                remaining_amount -= remaining_withdrawal_amount.clone();
+                charged_amount = remaining_withdrawal_amount;
+            } else {
+                charged_amount = remaining_amount;
+                remaining_amount = BigDecimal::zero();
+            }
+
             sqlx::query!(
-                "UPDATE withdrawals SET withdrawal_tx_hash = $2, withdrawal_tx_block = $3, withdrawal_tx_log_index = $4 WHERE id = $1",
+                "UPDATE withdrawals SET remaining_amount = $2 WHERE id = $1",
                 pending_withdrawal.id,
+                remaining_amount
+            )
+            .execute(transaction.conn())
+            .await?;
+            sqlx::query!(
+                "INSERT INTO finalized_withdrawals \
+              (pending_withdrawals_id, amount, tx_hash, tx_block, tx_log_index) \
+              VALUES ($1, $2, $3, $4, $5)",
+                pending_withdrawal.id,
+                charged_amount,
                 withdrawal.tx_hash.as_bytes(),
                 withdrawal.block_number as i64,
-                withdrawal.log_index as i64
-
-            ).execute(transaction.conn()).await?;
-            amount += pending_withdrawal.amount;
+                withdrawal.log_index as i64,
+            )
+            .execute(transaction.conn())
+            .await?;
+            amount += charged_amount;
             if amount >= withdrawal_amount {
                 break;
             }
@@ -97,8 +124,20 @@ impl<'a, 'c> WithdrawalsSchema<'a, 'c> {
         tx_hash: H256,
     ) -> QueryResult<Vec<WithdrawalPendingEvent>> {
         let withdrawals = sqlx::query_as!(
-            PendingWithdrawal,
-            "SELECT * FROM withdrawals WHERE withdrawal_tx_hash = $1",
+            ExtendedFinalizedWithdrawal,
+            "SELECT
+                withdrawals.account,
+                withdrawals.token_id,
+                withdrawals.withdrawal_type,
+                finalized_withdrawals.amount,
+                withdrawals.tx_hash,
+                finalized_withdrawals.tx_block,
+                finalized_withdrawals.tx_log_index
+            FROM finalized_withdrawals \
+            INNER JOIN withdrawals \
+            ON finalized_withdrawals.pending_withdrawals_id = withdrawals.id \
+            WHERE finalized_withdrawals.tx_hash = $1\
+            ",
             tx_hash.as_bytes()
         )
         .fetch_all(self.0.conn())

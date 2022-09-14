@@ -58,7 +58,7 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             log_index: 0,
             token_id: Default::default(),
             recipient,
-            amount: U256::from(10u8),
+            amount: U256::from(2u8),
             tx_hash: withdrawal_tx_hash_1,
         })
         .await?;
@@ -67,9 +67,7 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .withdrawals_schema()
         .get_finalized_withdrawals(withdrawal_tx_hash_1)
         .await?;
-
     assert_eq!(withdrawals.len(), 1);
-
     assert_eq!(withdrawals[0].withdrawal_type, WithdrawalType::Withdrawal);
 
     let withdrawal_tx_hash_2 = H256::random();
@@ -80,7 +78,7 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             log_index: 1,
             token_id: Default::default(),
             recipient,
-            amount: U256::from(10u8),
+            amount: U256::from(8u8),
             tx_hash: withdrawal_tx_hash_2,
         })
         .await?;
@@ -88,6 +86,26 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let withdrawals = storage
         .withdrawals_schema()
         .get_finalized_withdrawals(withdrawal_tx_hash_2)
+        .await?;
+    assert_eq!(withdrawals.len(), 1);
+    assert_eq!(withdrawals[0].withdrawal_type, WithdrawalType::Withdrawal);
+
+    let withdrawal_tx_hash_3 = H256::random();
+    storage
+        .withdrawals_schema()
+        .finalize_withdrawal(&WithdrawalEvent {
+            block_number: 11,
+            log_index: 2,
+            token_id: Default::default(),
+            recipient,
+            amount: U256::from(10u8),
+            tx_hash: withdrawal_tx_hash_3,
+        })
+        .await?;
+
+    let withdrawals = storage
+        .withdrawals_schema()
+        .get_finalized_withdrawals(withdrawal_tx_hash_3)
         .await?;
 
     assert_eq!(withdrawals.len(), 2);
@@ -105,11 +123,15 @@ async fn test_finalizing(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             tx_hash: withdrawal_tx_hash_2,
         })
         .await?;
-    let result: Option<i64> =
-        sqlx::query_scalar!("SELECT COUNT(*) FROM withdrawals WHERE withdrawal_tx_hash IS NULL")
-            .fetch_one(storage.conn())
-            .await
-            .unwrap();
+    let result: Option<i64> = sqlx::query_scalar!(
+        "SELECT COUNT(*) \
+        FROM withdrawals FULL OUTER JOIN finalized_withdrawals \
+        ON finalized_withdrawals.pending_withdrawals_id = withdrawals.id \
+        WHERE finalized_withdrawals.tx_hash IS NULL"
+    )
+    .fetch_one(storage.conn())
+    .await
+    .unwrap();
     assert_eq!(result.unwrap(), 1);
     Ok(())
 }
