@@ -287,7 +287,7 @@ impl EthereumAccount {
     pub async fn balances_to_withdraw(&self, token: Address) -> Result<BigUint, anyhow::Error> {
         let contract = self.main_contract_eth_client.main_contract();
 
-        Ok(contract
+        contract
             .query(
                 "getPendingBalance",
                 (self.address, token),
@@ -297,7 +297,7 @@ impl EthereumAccount {
             )
             .await
             .map(u256_to_big_dec)
-            .map_err(|e| format_err!("Contract query fail: {}", e))?)
+            .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
     pub async fn approve_erc20(

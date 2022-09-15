@@ -2393,6 +2393,24 @@
     },
     "query": "INSERT INTO committed_nonce (account_id, nonce, block_number) VALUES ($1, $2, $3) \n                 ON CONFLICT (account_id) \n                 DO UPDATE \n                 SET nonce = $2, block_number = $3\n                 "
   },
+  "3c7addfbdf988190fe3d6c4fe01569599e4fe7e55ed24f83e9309cbbcb0ba46c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT COUNT(*) FROM withdrawals WHERE withdrawal_tx_hash IS NULL"
+  },
   "3e63555f8c8d341b2536bec02e1c60755888686fab50cad8dde060c3aca96f9b": {
     "describe": {
       "columns": [
@@ -2681,6 +2699,24 @@
       }
     },
     "query": "\n            DELETE FROM pending_block WHERE number = $1\n            "
+  },
+  "45835bd8baba982b410df9a81970dfb547dd9660f6a768a1eb588ce1ee33f36f": {
+    "describe": {
+      "columns": [
+        {
+          "name": "max",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT MAX(withdrawal_tx_block) FROM withdrawals"
   },
   "45dc23ee9e4fd0bf52e2a82f3ed83210ec3a49c01b70a82bd6fac566da1a0f3b": {
     "describe": {

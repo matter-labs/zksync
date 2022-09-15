@@ -73,6 +73,7 @@
 
 // `sqlx` macros result in these warning being triggered.
 #![allow(clippy::toplevel_ref_arg, clippy::suspicious_else_formatting)]
+#![allow(clippy::derive_partial_eq_without_eq, clippy::map_flatten)]
 
 // Built-in deps
 use std::env;

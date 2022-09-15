@@ -35,6 +35,7 @@
 //!
 //! [`Block`]: ./block/struct.Block.html
 //! [`Account`]: ./account/struct.Account.html
+#![allow(clippy::derive_partial_eq_without_eq)]
 
 pub mod account;
 pub mod aggregated_operations;

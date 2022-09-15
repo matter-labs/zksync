@@ -119,8 +119,8 @@ impl PlonkStepByStepProver {
                 self.precomputed_sample_proofs
                     .single_proofs
                     .iter()
-                    .cloned()
-                    .take(proofs_to_pad),
+                    .take(proofs_to_pad)
+                    .cloned(),
             )
             .collect();
 

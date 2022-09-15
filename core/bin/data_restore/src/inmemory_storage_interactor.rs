@@ -92,6 +92,7 @@ impl InMemoryStorageInteractor {
         _withdrawals: &[WithdrawalEvent],
         _pending_withdrawals: &[WithdrawalPendingEvent],
     ) {
+        // We don't use it for testing right now
     }
 
     pub(crate) fn load_committed_events_state(&self) -> Vec<BlockEvent> {
