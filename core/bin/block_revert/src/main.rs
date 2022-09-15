@@ -230,7 +230,7 @@ async fn main() -> anyhow::Result<()> {
     let key_without_prefix = opt
         .operator_private_key
         .strip_prefix("0x")
-        .unwrap_or_else(|| opt.operator_private_key.as_str());
+        .unwrap_or(opt.operator_private_key.as_str());
 
     let contracts = ContractsConfig::from_env();
     let eth_client_config = ETHClientConfig::from_env();

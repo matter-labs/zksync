@@ -80,16 +80,14 @@ where
         let fee = match self.fee {
             Some(fee) => fee,
             None => {
-                let fee = self
-                    .wallet
+                self.wallet
                     .provider
                     .get_txs_batch_fee(
                         vec![TxFeeTypes::Transfer, TxFeeTypes::Transfer],
                         vec![to, to],
                         fee_token.id,
                     )
-                    .await?;
-                fee
+                    .await?
             }
         };
 

@@ -28,8 +28,8 @@ fn create_new_commit_operation(
 ) -> Option<BlocksCommitOperation> {
     let new_blocks = new_blocks
         .iter()
-        .cloned()
         .take(max_blocks_to_commit)
+        .cloned()
         .collect::<Vec<_>>();
     let any_block_commit_deadline_triggered = {
         let block_commit_deadline_seconds = block_commit_deadline.as_secs() as i64;
@@ -157,8 +157,8 @@ fn create_execute_blocks_operation(
 ) -> Option<BlocksExecuteOperation> {
     let proven_non_executed_block = proven_non_executed_block
         .iter()
-        .cloned()
         .take(max_blocks_to_execute)
+        .cloned()
         .collect::<Vec<_>>();
     let any_block_execute_deadline_triggered = {
         let block_execute_deadline_seconds = block_execute_deadline.as_secs() as i64;

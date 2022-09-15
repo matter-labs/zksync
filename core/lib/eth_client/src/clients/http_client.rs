@@ -461,7 +461,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         };
         #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.get_tx_status", start.elapsed());
-        Ok(res?)
+        res
     }
 
     pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {

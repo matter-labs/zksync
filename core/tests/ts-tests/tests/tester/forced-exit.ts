@@ -7,9 +7,27 @@ type TokenLike = types.TokenLike;
 declare module './tester' {
     interface Tester {
         testVerifiedForcedExit(initiatorWallet: Wallet, targetWallet: Wallet, token: TokenLike): Promise<void>;
+        testFinalizedForcedExit(initiatorWallet: Wallet, targetWallet: Wallet, token: TokenLike): Promise<void>;
         testForcedExit(initiatorWallet: Wallet, targetWallet: Wallet, token: TokenLike): Promise<any>;
     }
 }
+
+Tester.prototype.testFinalizedForcedExit = async function (
+    initiatorWallet: Wallet,
+    targetWallet: Wallet,
+    token: TokenLike
+) {
+    const tokenAddress = initiatorWallet.provider.tokenSet.resolveTokenAddress(token);
+    await this.testVerifiedForcedExit(initiatorWallet, targetWallet, token);
+    const onchainBalanceBefore = await targetWallet.getEthereumBalance(token);
+    const amount = await this.contract.getPendingBalance(targetWallet.address(), tokenAddress);
+    await this.contract.withdrawPendingBalance(targetWallet.address(), tokenAddress, amount.div(2));
+    await this.contract.withdrawPendingBalance(targetWallet.address(), tokenAddress, amount.div(2));
+    const onchainBalanceAfter = await targetWallet.getEthereumBalance(token);
+
+    expect(onchainBalanceAfter.sub(onchainBalanceBefore).eq(amount), 'Wrong amount onchain after complete withdraw').to
+        .be.true;
+};
 
 Tester.prototype.testVerifiedForcedExit = async function (
     initiatorWallet: Wallet,

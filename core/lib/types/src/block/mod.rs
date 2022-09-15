@@ -138,7 +138,7 @@ impl ExecutedOperations {
     /// Unlike public data, some operations may not have a witness.
     pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
         self.get_executed_op()
-            .map(|op| op.eth_witness().unwrap_or_else(Vec::new))
+            .map(|op| op.eth_witness().unwrap_or_default())
     }
 
     /// Returns the list of accounts affected by the operation.

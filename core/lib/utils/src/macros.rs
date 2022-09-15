@@ -45,7 +45,7 @@ mod tests {
     #[tokio::test]
     async fn retries_given_fut() {
         let mut counter = 0;
-        let _ = retry_opt! {
+        retry_opt! {
             CondRespond {
                 respond: counter == 10
             }.await,

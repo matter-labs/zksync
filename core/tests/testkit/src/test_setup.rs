@@ -1219,12 +1219,10 @@ impl TestSetup {
     }
 
     async fn get_zksync_balance(&self, zksync_id: ZKSyncAccountId, token: TokenId) -> BigUint {
-        let result = self
-            .get_zksync_account_committed_state(zksync_id)
+        self.get_zksync_account_committed_state(zksync_id)
             .await
             .map(|(_, acc)| acc.get_balance(token))
-            .unwrap_or_default();
-        result
+            .unwrap_or_default()
     }
 
     pub async fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigUint {
@@ -1241,11 +1239,10 @@ impl TestSetup {
                 .expect("Failed to get erc20 balance")
         };
 
-        let result = result
+        result
             + self
                 .get_balance_to_withdraw(eth_account_id, self.tokens[&token])
-                .await;
-        result
+                .await
     }
 
     pub async fn get_balance_to_withdraw(

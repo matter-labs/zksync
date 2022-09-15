@@ -35,6 +35,7 @@
 //!
 //! [`Block`]: ./block/struct.Block.html
 //! [`Account`]: ./account/struct.Account.html
+#![allow(clippy::derive_partial_eq_without_eq)]
 
 pub mod account;
 pub mod aggregated_operations;
@@ -57,6 +58,7 @@ mod utils;
 
 #[cfg(test)]
 mod tests;
+pub mod withdrawals;
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};

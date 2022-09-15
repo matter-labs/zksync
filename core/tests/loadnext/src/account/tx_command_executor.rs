@@ -109,7 +109,7 @@ impl AccountLifespan {
             .amount
             .clone()
             .try_into()
-            .unwrap_or_else(|_| u128::max_value())
+            .unwrap_or(u128::MAX)
             .into();
         let eth_tx_hash = match ethereum
             .deposit(self.main_token.id, amount, self.wallet.address())
