@@ -22,9 +22,6 @@ jobs:
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
-          ## Setup sccache GCS key (update docker-compose .env)
-          SCCACHE_TEMP=$(echo `mktemp -d`)/sa_key.json; echo $SCCACHE_CGS_KEY > $SCCACHE_TEMP
-          echo "HOST_GCS_KEY_PATH=$SCCACHE_TEMP" >> .env
 
       - name: start-services
         run: |
@@ -53,9 +50,6 @@ jobs:
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
-          ## Setup sccache GCS key (update docker-compose .env)
-          SCCACHE_TEMP=$(echo `mktemp -d`)/sa_key.json; echo $SCCACHE_CGS_KEY > $SCCACHE_TEMP
-          echo "HOST_GCS_KEY_PATH=$SCCACHE_TEMP" >> .env
 
       - name: start-services
         run: |
@@ -99,8 +93,6 @@ jobs:
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
           ## Setup sccache GCS key (update docker-compose .env)
-          SCCACHE_TEMP=$(echo `mktemp -d`)/sa_key.json; echo $SCCACHE_CGS_KEY > $SCCACHE_TEMP
-          echo "HOST_GCS_KEY_PATH=$SCCACHE_TEMP" >> .env
 
       - name: start-services
         run: |
@@ -160,9 +152,6 @@ jobs:
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
-          ## Setup sccache GCS key (update docker-compose .env)
-          SCCACHE_TEMP=$(echo `mktemp -d`)/sa_key.json; echo $SCCACHE_CGS_KEY > $SCCACHE_TEMP
-          echo "HOST_GCS_KEY_PATH=$SCCACHE_TEMP" >> .env
 
       - name: start-services
         run: |
@@ -191,9 +180,6 @@ jobs:
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
           echo PLUGIN_CONFIG=fast >> $GITHUB_ENV # use fast mode for geth image (instant tx commit)
-          ## Setup sccache GCS key (update docker-compose .env)
-          SCCACHE_TEMP=$(echo `mktemp -d`)/sa_key.json; echo $SCCACHE_CGS_KEY > $SCCACHE_TEMP
-          echo "HOST_GCS_KEY_PATH=$SCCACHE_TEMP" >> .env
 
       - name: start-services
         run: |
@@ -223,8 +209,6 @@ jobs:
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
           ## Setup sccache GCS key (update docker-compose .env)
-          SCCACHE_TEMP=$(echo `mktemp -d`)/sa_key.json; echo $SCCACHE_CGS_KEY > $SCCACHE_TEMP
-          echo "HOST_GCS_KEY_PATH=$SCCACHE_TEMP" >> .env
 
       - name: start-services
         run: |
