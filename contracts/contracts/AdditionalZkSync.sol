@@ -38,7 +38,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner (must be total amount, not part of it)
     function performExodus(
-        StoredBlockInfo memory _storedBlockInfo,
+        StoredBlockInfo calldata _storedBlockInfo,
         address _owner,
         uint32 _accountId,
         uint32 _tokenId,
@@ -48,7 +48,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         uint32 _nftSerialId,
         bytes32 _nftContentHash,
         uint256[] calldata _proof
-    ) external {
+    ) external nonReentrant {
         require(_accountId <= MAX_ACCOUNT_ID, "e");
         require(_accountId != SPECIAL_ACCOUNT_ID, "v");
         require(_tokenId < SPECIAL_NFT_TOKEN_ID, "T");
@@ -74,7 +74,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         if (_tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
             bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
-            emit WithdrawalPending(uint16(_tokenId), _owner, _amount);
+            emit WithdrawalPending(uint16(_tokenId), _owner, _amount, Operations.WithdrawalType.FullExit);
         } else {
             require(_amount != 0, "Z"); // Unsupported nft amount
             Operations.WithdrawNFT memory withdrawNftOp = Operations.WithdrawNFT(
@@ -91,7 +91,10 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
         performedExodus[_accountId][_tokenId] = true;
     }
 
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] calldata _depositsPubdata) external {
+    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] calldata _depositsPubdata)
+        external
+        nonReentrant
+    {
         require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
         require(toProcess > 0, "9"); // no deposits to process
@@ -144,7 +147,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     /// @notice approve to decrease upgrade notice period time to zero
     /// NOTE: сan only be called after the start of the upgrade
-    function cutUpgradeNoticePeriod(bytes32 targetsHash) external {
+    function cutUpgradeNoticePeriod(bytes32 targetsHash) external nonReentrant {
         require(upgradeStartTimestamp != 0, "p1");
         require(getUpgradeTargetsHash() == targetsHash, "p3"); // given targets are not in the active upgrade
 
@@ -154,7 +157,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     /// @notice approve to decrease upgrade notice period time to zero by signatures
     /// NOTE: Can accept many signatures at a time, thus it is possible
     /// to completely cut the upgrade notice period in one transaction
-    function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external {
+    function cutUpgradeNoticePeriodBySignature(bytes[] calldata signatures) external nonReentrant {
         require(upgradeStartTimestamp != 0, "p2");
 
         bytes32 targetsHash = getUpgradeTargetsHash();
@@ -175,7 +178,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
 
     /// @return hash of the concatenation of targets for which there is an upgrade
     /// NOTE: revert if upgrade is not active at this moment
-    function getUpgradeTargetsHash() internal returns (bytes32) {
+    function getUpgradeTargetsHash() internal view returns (bytes32) {
         // Get the addresses of contracts that are being prepared for the upgrade.
         address gatekeeper = $(UPGRADE_GATEKEEPER_ADDRESS);
         (bool success0, bytes memory newTarget0) = gatekeeper.staticcall(
@@ -203,7 +206,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     ///         2) After `AUTH_FACT_RESET_TIMELOCK` time is passed second `setAuthPubkeyHash` transaction will reset pubkey hash for `_nonce`.
     /// @param _pubkeyHash New pubkey hash
     /// @param _nonce Nonce of the change pubkey L2 transaction
-    function setAuthPubkeyHash(bytes calldata _pubkeyHash, uint32 _nonce) external {
+    function setAuthPubkeyHash(bytes calldata _pubkeyHash, uint32 _nonce) external nonReentrant {
         requireActive();
 
         require(_pubkeyHash.length == PUBKEY_HASH_BYTES, "y"); // PubKeyHash should be 20 bytes.
@@ -222,7 +225,7 @@ contract AdditionalZkSync is Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Reverts unverified blocks
-    function revertBlocks(StoredBlockInfo[] calldata _blocksToRevert) external {
+    function revertBlocks(StoredBlockInfo[] calldata _blocksToRevert) external nonReentrant {
         requireActive();
 
         governance.requireActiveValidator(msg.sender);

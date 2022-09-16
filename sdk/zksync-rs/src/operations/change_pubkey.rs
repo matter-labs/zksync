@@ -60,7 +60,7 @@ where
                             ))
                         } else {
                             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                                ChangePubKeyType::ECDSA,
+                                ChangePubKeyType::EIP712,
                             ))
                         },
                         self.wallet.address(),
@@ -88,7 +88,14 @@ where
         Ok(ZkSyncTx::from(
             self.wallet
                 .signer
-                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee, time_range)
+                .sign_change_pubkey_tx(
+                    nonce,
+                    self.onchain_auth,
+                    fee_token,
+                    fee,
+                    time_range,
+                    Some(self.wallet.provider.network().chain_id()),
+                )
                 .await
                 .map_err(ClientError::SigningError)?,
         ))

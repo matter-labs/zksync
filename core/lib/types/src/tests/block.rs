@@ -92,7 +92,8 @@ fn test_get_eth_witness_data() {
         create_withdraw_tx(),
         create_change_pubkey_tx(),
     ];
-    let change_pubkey_tx = &operations[0];
+    let change_pubkey_tx_1 = &operations[0];
+    let change_pubkey_tx_2 = &operations[3];
     let mut block = Block::new(
         BlockNumber(0),
         Fr::one(),
@@ -106,22 +107,28 @@ fn test_get_eth_witness_data() {
         0,
     );
 
-    let witness = change_pubkey_tx
+    let witness_1 = change_pubkey_tx_1
         .get_executed_op()
         .unwrap()
         .eth_witness()
         .unwrap();
-    let used_bytes = witness.len() as u64;
+    let witness_2 = change_pubkey_tx_2
+        .get_executed_op()
+        .unwrap()
+        .eth_witness()
+        .unwrap();
+    let used_bytes_1 = witness_1.len() as u64;
+    let used_bytes_2 = witness_2.len() as u64;
 
     let expected = (
-        [&witness[..], &witness[..]].concat(),
-        vec![used_bytes, used_bytes],
+        [&witness_1[..], &witness_2[..]].concat(),
+        vec![used_bytes_1, used_bytes_2],
     );
 
     assert_eq!(block.get_eth_witness_data(), expected);
 
     block.block_transactions.pop();
-    let expected = (witness, vec![used_bytes]);
+    let expected = (witness_1, vec![used_bytes_1]);
     assert_eq!(block.get_eth_witness_data(), expected);
 
     // Remove the last operation which has witness data.

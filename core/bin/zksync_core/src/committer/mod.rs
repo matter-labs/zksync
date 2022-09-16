@@ -220,7 +220,7 @@ async fn seal_incomplete_block(
         zksync_prometheus_exporter::calculate_volume_for_block(&mut storage, &block, token_db_cache)
             .await
     {
-        vlog::error!("Can't calculate volume metric: {:?}", err)
+        vlog::warn!("Can't calculate volume metric: {:?}", err)
     }
     metrics::histogram!("committer.seal_incomplete_block", start.elapsed());
 }

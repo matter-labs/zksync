@@ -62,4 +62,12 @@ library Utils {
     function hashBytesToBytes20(bytes memory _bytes) internal pure returns (bytes20) {
         return bytes20(uint160(uint256(keccak256(_bytes))));
     }
+
+    function getChainId() internal pure returns (uint256) {
+        uint256 chainId;
+        assembly {
+            chainId := chainid()
+        }
+        return chainId;
+    }
 }

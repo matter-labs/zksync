@@ -715,7 +715,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             false,
             TokenId(0),
             Default::default(),
-            ChangePubKeyType::ECDSA,
+            ChangePubKeyType::EIP712,
             Default::default(),
         );
 

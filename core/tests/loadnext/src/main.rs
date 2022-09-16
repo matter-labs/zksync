@@ -3,7 +3,6 @@
 //! In order to launch it, you must provide required environmental variables, for details see `README.md`.
 //! Without required variables provided, test is launched in the localhost/development mode with some hard-coded
 //! values to check the local zkSync deployment.
-
 use loadnext::{config::LoadtestConfig, executor::Executor, report_collector::LoadtestResult};
 
 #[tokio::main]

@@ -78,8 +78,7 @@ jobs:
                 "hfEnv": "${{ inputs.environment }}",
                 "cluster": "stage"
               },
-              "^goerli$": { "cluster": "testnet-new" },
-              "^sepolia$": { "cluster": "testnet-new" },
+              "^goerli$": { "cluster": "testnet" },
               "^mainnet$": { "cluster": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
             }
       - run: echo "::set-output name=short::$(git rev-parse --short HEAD)"

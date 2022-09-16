@@ -157,7 +157,7 @@ contract Storage {
 
     /// @dev Timer for authFacts entry reset (address, nonce -> timer).
     /// @dev Used when user wants to reset `authFacts` for some nonce.
-    mapping(address => mapping(uint32 => uint256)) internal authFactsResetTimer;
+    mapping(address => mapping(uint32 => uint256)) public authFactsResetTimer;
 
     mapping(uint32 => address) internal withdrawnNFTs;
 

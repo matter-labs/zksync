@@ -12,6 +12,7 @@ declare module './wallet' {
             multicallParams: MulticallParams,
             amounts?: BigNumberish[]
         ): Promise<ContractTransaction>;
+        withdrawPendingNFTBalance(tokenId: number): Promise<ContractTransaction>;
     }
 }
 
@@ -31,7 +32,6 @@ function checkEthProvider(ethersWallet: ethers.Signer) {
 // https://github.com/makerdao/multicall
 function getMulticallAddressByNetwork(network: Network) {
     switch (network) {
-        case 'sepolia':
         case 'rinkeby-beta':
             return '0x42ad527de7d4e9d9d011ac45b31d8551f8fe9821';
         case 'goerli':
@@ -113,6 +113,24 @@ Wallet.prototype.withdrawPendingBalances = async function (
 
     return multicallContract.aggregate(calls, {
         gasLimit: multicallParams.gasLimit || BigNumber.from('300000'),
+        gasPrice
+    }) as ContractTransaction;
+};
+
+Wallet.prototype.withdrawPendingNFTBalance = async function (
+    // Here and in all the other functions in this file
+    // "this" is just to make the `this` typed.
+    // User do not have to pass it.
+    this: Wallet,
+    tokenId: number
+): Promise<ContractTransaction> {
+    checkEthProvider(this.ethSigner());
+
+    const zksyncContract = this.getZkSyncMainContract();
+    const gasPrice = await this.ethSigner().getGasPrice();
+
+    return zksyncContract.withdrawPendingNFTBalance(tokenId, {
+        gasLimit: BigNumber.from('200000'),
         gasPrice
     }) as ContractTransaction;
 };

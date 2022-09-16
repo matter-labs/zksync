@@ -74,6 +74,7 @@ fn test_change_pubkey_offchain_old_signature_success() {
         Default::default(),
         None,
         None,
+        None,
     );
     tx.signature =
         TxSignature::sign_musig(&account.zksync_account.private_key, &tx.get_old_bytes());

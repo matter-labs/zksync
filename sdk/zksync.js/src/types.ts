@@ -16,10 +16,9 @@ export type TotalFee = Map<TokenLike, BigNumber>;
 
 export type Nonce = number | 'committed';
 
-export type Network = 'localhost' | 'sepolia' | 'goerli' | 'mainnet' | 'rinkeby-beta' | 'goerli-beta';
+export type Network = 'localhost' | 'goerli' | 'mainnet' | 'rinkeby-beta' | 'goerli-beta';
 
 const MAINNET_NETWORK_CHAIN_ID = 1;
-const SEPOLIA_NETWORK_CHAIN_ID = 11155111;
 const RINKEBY_NETWORK_CHAIN_ID = 4;
 const GOERLI_NETWORK_CHAIN_ID = 5;
 const LOCALHOST_NETWORK_CHAIN_ID = 9;
@@ -30,9 +29,6 @@ export function l1ChainId(network?: Network): number {
     }
     if (network === 'goerli' || network === 'goerli-beta') {
         return GOERLI_NETWORK_CHAIN_ID;
-    }
-    if (network === 'sepolia') {
-        return SEPOLIA_NETWORK_CHAIN_ID;
     }
     if (network === 'mainnet') {
         return MAINNET_NETWORK_CHAIN_ID;
@@ -250,7 +246,7 @@ export interface ForcedExit {
     validUntil: number;
 }
 
-export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2' | 'ECDSALegacyMessage';
+export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2' | 'ECDSALegacyMessage' | 'EIP712';
 
 export interface ChangePubKeyOnchain {
     type: 'Onchain';
@@ -258,6 +254,12 @@ export interface ChangePubKeyOnchain {
 
 export interface ChangePubKeyECDSA {
     type: 'ECDSA';
+    ethSignature: string;
+    batchHash?: string;
+}
+
+export interface ChangePubKeyEIP712 {
+    type: 'EIP712';
     ethSignature: string;
     batchHash?: string;
 }
@@ -278,7 +280,7 @@ export interface ChangePubKey {
     fee: BigNumberish;
     nonce: number;
     signature?: Signature;
-    ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+    ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2 | ChangePubKeyEIP712;
     ethSignature?: string;
     validFrom: number;
     validUntil: number;

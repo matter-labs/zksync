@@ -11,7 +11,7 @@ use crate::{
 
 /// Type of transaction. It doesn't copy the zkSync operation list, because
 /// it divides some transactions in subcategories (e.g. to new account / to existing account; to self / to other; etc)/
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TxType {
     Deposit,
     TransferToNew,
@@ -92,7 +92,7 @@ impl TxType {
 /// Modifier to be applied to the transaction in order to make it incorrect.
 /// Incorrect transactions are a significant part of loadtest, because we want to ensure
 /// that server is resilient for all the possible kinds of user input.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum IncorrectnessModifier {
     ZeroFee,
     IncorrectZkSyncSignature,
@@ -163,7 +163,7 @@ impl IncorrectnessModifier {
 /// Expected outcome of transaction:
 /// Since we may create erroneous transactions on purpose,
 /// we may expect different outcomes for each transaction.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ExpectedOutcome {
     /// Transactions was successfully executed.
     TxSucceed,

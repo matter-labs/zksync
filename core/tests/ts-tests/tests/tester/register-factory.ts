@@ -90,6 +90,7 @@ Tester.prototype.testRegisterFactory = async function (wallet: Wallet, withdrawe
     });
     const receiptWithdraw = await handleWithdraw.awaitVerifyReceipt();
     expect(receiptWithdraw.success, `Withdraw NFT failed with a reason: ${receiptWithdraw.failReason}`).to.be.true;
+
     await ethProxy.getZkSyncContract().connect(withdrawer).withdrawPendingNFTBalance(nft.id);
 
     const owner = await contract.ownerOf(nft.id);

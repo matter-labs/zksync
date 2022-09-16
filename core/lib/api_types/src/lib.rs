@@ -1,3 +1,4 @@
+#![allow(clippy::derive_partial_eq_without_eq)]
 pub use either::Either;
 use serde::{Deserialize, Serialize};
 use zksync_types::{

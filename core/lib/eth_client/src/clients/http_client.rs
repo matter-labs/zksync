@@ -21,6 +21,7 @@ use web3::{
 
 // Workspace uses
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
+use zksync_types::ChainId;
 
 use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 /// Gas limit value to be used in transaction if for some reason
@@ -34,7 +35,7 @@ struct ETHDirectClientInner<S: EthereumSigner> {
     sender_account: Address,
     contract_addr: H160,
     contract: ethabi::Contract,
-    chain_id: u64,
+    chain_id: ChainId,
     gas_price_factor: f64,
     web3: Web3<Http>,
 }
@@ -64,7 +65,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         operator_eth_addr: H160,
         eth_signer: S,
         contract_eth_addr: H160,
-        chain_id: u64,
+        chain_id: ChainId,
         gas_price_factor: f64,
     ) -> Self {
         Self {
@@ -199,7 +200,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
         // form and sign tx
         let tx = RawTransaction {
-            chain_id: self.inner.chain_id,
+            chain_id: self.inner.chain_id.0,
             transaction_type: None,
             access_list: None,
             max_fee_per_gas: Default::default(),
@@ -460,7 +461,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         };
         #[cfg(feature = "with-metrics")]
         metrics::histogram!("eth_client.direct.get_tx_status", start.elapsed());
-        Ok(res?)
+        res
     }
 
     pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {
@@ -480,7 +481,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         self.inner.contract_addr
     }
 
-    pub fn chain_id(&self) -> u64 {
+    pub fn chain_id(&self) -> ChainId {
         self.inner.chain_id
     }
 

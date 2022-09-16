@@ -24,7 +24,7 @@ impl PackedPublicKey {
             return Err(DeserializeError::IncorrectPublicKeyLength);
         }
         Ok(PackedPublicKey(PublicKey::<Engine>(
-            edwards::Point::read(&*bytes, &JUBJUB_PARAMS as &AltJubjubBn256)
+            edwards::Point::read(bytes, &JUBJUB_PARAMS as &AltJubjubBn256)
                 .map_err(DeserializeError::RestoreCurvePoint)?,
         )))
     }

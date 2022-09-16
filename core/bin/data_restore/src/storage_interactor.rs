@@ -5,6 +5,7 @@ use web3::types::H256;
 use zksync_storage::data_restore::records::{
     NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock,
 };
+use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{
     block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
     PriorityOp, SerialId, Token, TokenId, TokenInfo, NFT,
@@ -138,6 +139,14 @@ impl StorageInteractor<'_> {
             priority_op_data,
             last_watched_eth_block_number
         ))
+    }
+
+    pub async fn save_withdrawals(
+        &mut self,
+        withdrawals: &[WithdrawalEvent],
+        pending_withdrawals: &[WithdrawalPendingEvent],
+    ) {
+        storage_interact!(self.save_withdrawals(withdrawals, pending_withdrawals))
     }
 
     /// Saves genesis accounts state in storage

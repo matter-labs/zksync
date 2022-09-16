@@ -146,9 +146,9 @@ impl TokenDBCache {
         token: TokenId,
         market: TokenMarketVolume,
     ) -> anyhow::Result<()> {
-        Ok(storage
+        storage
             .tokens_schema()
             .update_token_market_volume(token, market)
-            .await?)
+            .await
     }
 }

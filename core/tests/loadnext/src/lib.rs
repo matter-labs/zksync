@@ -1,3 +1,4 @@
+#![allow(clippy::derive_partial_eq_without_eq)]
 pub mod account;
 pub mod account_pool;
 pub mod all;

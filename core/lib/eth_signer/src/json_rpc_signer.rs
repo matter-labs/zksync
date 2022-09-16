@@ -8,6 +8,7 @@ use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::Address;
 
 use serde_json::Value;
+use zksync_types::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 
 pub fn is_signature_from_address(
     signature: &PackedEthSignature,
@@ -15,7 +16,7 @@ pub fn is_signature_from_address(
     address: Address,
 ) -> Result<bool, SignerError> {
     let signature_is_correct = signature
-        .signature_recover_signer(msg)
+        .signature_recover_signer_from_raw_message(msg)
         .map_err(|err| SignerError::RecoverAddress(err.to_string()))?
         == address;
     Ok(signature_is_correct)
@@ -77,6 +78,40 @@ impl EthereumSigner for JsonRpcSigner {
         // Checks the correctness of the message signature without a prefix
         if is_signature_from_address(&signature, msg, self.address()?)? {
             Ok(TxEthSignature::EthereumSignature(signature))
+        } else {
+            Err(SignerError::SigningFailed(
+                "Invalid signature from JsonRpcSigner".to_string(),
+            ))
+        }
+    }
+
+    /// Signs typed struct using ethereum private key according to the EIP-712 signature standard.
+    /// Result of this function is the equivalent of RPC calling `eth_signTypedData`.
+    async fn sign_typed_data<S: EIP712TypedStructure + Sync>(
+        &self,
+        eip712_domain: &Eip712Domain,
+        typed_struct: &S,
+    ) -> Result<PackedEthSignature, SignerError> {
+        let signature: PackedEthSignature = {
+            let message =
+                JsonRpcRequest::sign_typed_data(self.address()?, eip712_domain, typed_struct);
+            let ret = self
+                .post(&message)
+                .await
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+            serde_json::from_value(ret)
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
+        };
+
+        let signed_bytes =
+            PackedEthSignature::typed_data_to_signed_bytes(eip712_domain, typed_struct);
+        // Checks the correctness of the message signature without a prefix
+
+        let recovered_address = signature
+            .signature_recover_signer_from_hash(signed_bytes)
+            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+        if self.address()? == recovered_address {
+            Ok(signature)
         } else {
             Err(SignerError::SigningFailed(
                 "Invalid signature from JsonRpcSigner".to_string(),
@@ -290,6 +325,9 @@ impl JsonRpcSigner {
 mod messages {
     use crate::RawTransaction;
     use hex::encode;
+    use zksync_types::eip712_signature::{
+        utils::get_eip712_json, EIP712TypedStructure, Eip712Domain,
+    };
     use zksync_types::Address;
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -334,6 +372,21 @@ mod messages {
                 serde_json::to_value(format!("0x{}", encode(message))).expect("serialization fail"),
             ];
             Self::create("eth_sign", params)
+        }
+
+        /// Signs typed struct using ethereum private key according to the EIP-712 signature standard.
+        /// The address to sign with must be unlocked.
+        pub fn sign_typed_data<S: EIP712TypedStructure + Sync>(
+            address: Address,
+            eip712_domain: &Eip712Domain,
+            typed_struct: &S,
+        ) -> Self {
+            let params = vec![
+                serde_json::to_value(address).expect("serialization fail"),
+                get_eip712_json(eip712_domain, typed_struct),
+            ];
+
+            Self::create("eth_signTypedData_v3", params)
         }
 
         /// Signs a transaction that can be submitted to the network.

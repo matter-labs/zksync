@@ -282,10 +282,10 @@ impl ApiV01 {
         eth_tx_hash: H256,
     ) -> Result<Option<PriorityOp>, anyhow::Error> {
         let mut storage = self.connection_pool.access_storage().await?;
-        Ok(storage
+        storage
             .chain()
             .mempool_schema()
             .get_pending_operation_by_hash(eth_tx_hash)
-            .await?)
+            .await
     }
 }

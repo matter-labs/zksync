@@ -5,6 +5,7 @@ use zksync_storage::{
     data_restore::records::{NewBlockEvent, NewRollupOpsBlock},
     StorageProcessor,
 };
+use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
     AccountId, BlockNumber, NewTokenEvent, PriorityOp, SerialId, Token, TokenId, TokenInfo,
@@ -153,6 +154,27 @@ impl<'a> DatabaseStorageInteractor<'a> {
             ))
             .await
             .expect("failed to store token");
+    }
+
+    pub async fn save_withdrawals(
+        &mut self,
+        withdrawals: &[WithdrawalEvent],
+        pending_withdrawals: &[WithdrawalPendingEvent],
+    ) {
+        let mut transaction = self.storage.start_transaction().await.unwrap();
+        transaction
+            .withdrawals_schema()
+            .save_pending_withdrawals(pending_withdrawals)
+            .await
+            .unwrap();
+        for withdrawal in withdrawals {
+            transaction
+                .withdrawals_schema()
+                .finalize_withdrawal(withdrawal)
+                .await
+                .unwrap();
+        }
+        transaction.commit().await.unwrap();
     }
 
     pub async fn save_events_state(

@@ -11,7 +11,7 @@ use zksync_types::{
 };
 
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
-use vlog::sentry::types::Utc;
+use chrono::Utc;
 
 /// Check MintNFT operation
 #[test]

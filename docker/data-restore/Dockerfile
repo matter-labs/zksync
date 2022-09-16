@@ -1,4 +1,4 @@
-FROM rust:1.60
+FROM rust:1.63
 
 WORKDIR /usr/src/zksync
 

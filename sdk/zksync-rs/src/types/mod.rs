@@ -107,6 +107,7 @@ pub enum ChangePubKeyFeeType {
     Onchain,
     ECDSA,
     CREATE2,
+    EIP712,
 }
 
 /// Type of the fee calculation pattern.

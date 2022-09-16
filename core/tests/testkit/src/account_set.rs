@@ -341,7 +341,7 @@ impl AccountSet {
             fee_token,
             fee,
             if zksync_account.eth_account_data.is_eoa() {
-                ChangePubKeyType::ECDSA
+                ChangePubKeyType::EIP712
             } else if zksync_account.eth_account_data.is_create2() {
                 ChangePubKeyType::CREATE2
             } else {

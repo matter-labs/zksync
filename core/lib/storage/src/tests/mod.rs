@@ -32,6 +32,7 @@ mod forced_exit_requests;
 mod misc;
 mod prover;
 mod tokens;
+mod withdrawals;
 
 pub use db_test_macro::test as db_test;
 

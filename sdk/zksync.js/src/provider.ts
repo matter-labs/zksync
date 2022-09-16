@@ -50,16 +50,6 @@ export async function getDefaultProvider(
         } else if (transport === 'HTTP') {
             return await Provider.newHttpProvider('https://goerli-api.zksync.io/jsrpc', pollIntervalMilliSecs, network);
         }
-    } else if (network === 'sepolia') {
-        if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://sepolia-api.zksync.io/jsrpc-ws', network);
-        } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider(
-                'https://sepolia-api.zksync.io/jsrpc',
-                pollIntervalMilliSecs,
-                network
-            );
-        }
     } else if (network === 'goerli-beta') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('wss://goerli-beta-api.zksync.dev/jsrpc-ws', network);

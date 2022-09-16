@@ -73,6 +73,7 @@
 
 // `sqlx` macros result in these warning being triggered.
 #![allow(clippy::toplevel_ref_arg, clippy::suspicious_else_formatting)]
+#![allow(clippy::derive_partial_eq_without_eq, clippy::map_flatten)]
 
 // Built-in deps
 use std::env;
@@ -101,6 +102,7 @@ pub mod prover;
 pub mod test_data;
 pub mod tokens;
 pub mod utils;
+pub mod withdrawals;
 
 use forced_exit_requests::ForcedExitRequestsSchema;
 
@@ -237,6 +239,10 @@ impl<'a> StorageProcessor<'a> {
 
     pub fn event_schema(&mut self) -> event::EventSchema<'_, 'a> {
         event::EventSchema(self)
+    }
+
+    pub fn withdrawals_schema(&mut self) -> withdrawals::WithdrawalsSchema<'_, 'a> {
+        withdrawals::WithdrawalsSchema(self)
     }
 
     pub fn misc_schema(&mut self) -> misc::MiscSchema<'_, 'a> {
