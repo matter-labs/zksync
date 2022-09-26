@@ -334,9 +334,7 @@ dependencies = [
 name = "add_seq_no"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "tokio",
- "zksync_config",
  "zksync_storage",
 ]
 
@@ -1362,7 +1360,6 @@ dependencies = [
 name = "db_test_macro"
 version = "0.1.0"
 dependencies = [
- "proc-macro2",
  "quote",
  "syn",
 ]
@@ -1501,7 +1498,7 @@ version = "16.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4c98847055d934070b90e806e12d3936b787d0a115068981c1d8dfd5dfef5a5"
 dependencies = [
- "ethereum-types 0.12.1",
+ "ethereum-types",
  "hex",
  "serde",
  "serde_json",
@@ -1525,20 +1522,6 @@ dependencies = [
 
 [[package]]
 name = "ethereum-types"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f64b5df66a228d85e4b17e5d6c6aa43b0310898ffe8a85988c4c032357aaabfd"
-dependencies = [
- "ethbloom",
- "fixed-hash",
- "impl-rlp",
- "impl-serde",
- "primitive-types 0.9.1",
- "uint",
-]
-
-[[package]]
-name = "ethereum-types"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05136f7057fe789f06e6d41d07b34e6f70d8c86e5693b60f97aaa6553553bdaf"
@@ -1547,7 +1530,7 @@ dependencies = [
  "fixed-hash",
  "impl-rlp",
  "impl-serde",
- "primitive-types 0.10.1",
+ "primitive-types",
  "uint",
 ]
 
@@ -2452,10 +2435,8 @@ dependencies = [
  "anyhow",
  "handlebars",
  "hex",
- "rust-crypto",
  "serde_json",
  "structopt",
- "time 0.1.43",
  "vlog",
  "zksync_circuit",
  "zksync_config",
@@ -3149,30 +3130,6 @@ dependencies = [
 
 [[package]]
 name = "parity-crypto"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c81ac9a98f245685fdfd1c37685613ecf123cf7941e2365e9aa551622065e8e"
-dependencies = [
- "aes",
- "aes-ctr",
- "block-modes",
- "digest 0.9.0",
- "ethereum-types 0.11.0",
- "hmac 0.10.1",
- "lazy_static",
- "pbkdf2 0.6.0",
- "ripemd160",
- "rustc-hex",
- "scrypt",
- "secp256k1 0.20.3",
- "sha2 0.9.8",
- "subtle 2.4.1",
- "tiny-keccak 2.0.2",
- "zeroize",
-]
-
-[[package]]
-name = "parity-crypto"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b92ea9ddac0d6e1db7c49991e7d397d34a9fd814b4c93cda53788e8eef94e35"
@@ -3181,7 +3138,7 @@ dependencies = [
  "aes-ctr",
  "block-modes",
  "digest 0.9.0",
- "ethereum-types 0.12.1",
+ "ethereum-types",
  "hmac 0.10.1",
  "lazy_static",
  "pbkdf2 0.7.5",
@@ -3343,13 +3300,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3b8c0d71734018084da0c0354193a5edfb81b20d2d57a92c5b154aefc554a4a"
 dependencies = [
- "base64 0.13.0",
  "crypto-mac 0.10.1",
- "hmac 0.10.1",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "sha2 0.9.8",
- "subtle 2.4.1",
 ]
 
 [[package]]
@@ -3521,19 +3472,6 @@ name = "ppv-lite86"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed0cfbc8191465bed66e1718596ee0b0b35d5ee1f41c5df2189d0fe8bde535ba"
-
-[[package]]
-name = "primitive-types"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06345ee39fbccfb06ab45f3a1a5798d9dafa04cb8921a76d227040003a234b0e"
-dependencies = [
- "fixed-hash",
- "impl-codec",
- "impl-rlp",
- "impl-serde",
- "uint",
-]
 
 [[package]]
 name = "primitive-types"
@@ -3997,12 +3935,8 @@ name = "remove_proofs"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "ethabi",
  "structopt",
  "tokio",
- "web3",
- "zksync_config",
- "zksync_eth_client",
  "zksync_storage",
  "zksync_types",
 ]
@@ -5614,7 +5548,7 @@ dependencies = [
  "bytes 1.1.0",
  "derive_more",
  "ethabi",
- "ethereum-types 0.12.1",
+ "ethereum-types",
  "futures 0.3.17",
  "futures-timer",
  "headers",
@@ -5852,13 +5786,11 @@ dependencies = [
  "actix-rt",
  "actix-test",
  "actix-web",
- "actix-web-httpauth",
  "anyhow",
  "async-trait",
  "bigdecimal",
  "chrono",
  "criterion",
- "ctrlc",
  "ethabi",
  "futures 0.3.17",
  "hex",
@@ -5870,7 +5802,6 @@ dependencies = [
  "jsonrpc-http-server",
  "jsonrpc-pubsub",
  "jsonrpc-ws-server",
- "jsonwebtoken",
  "lru-cache",
  "metrics",
  "num",
@@ -5889,15 +5820,12 @@ dependencies = [
  "web3",
  "zksync_api_client",
  "zksync_api_types",
- "zksync_balancer",
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
- "zksync_gateway_watcher",
  "zksync_mempool",
- "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_test_account",
  "zksync_token_db_cache",
@@ -5962,7 +5890,6 @@ name = "zksync_circuit"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "bigdecimal",
  "criterion",
  "hex",
  "num",
@@ -5984,7 +5911,6 @@ dependencies = [
  "num",
  "serde",
  "serde_json",
- "zksync_crypto",
  "zksync_types",
  "zksync_utils",
 ]
@@ -6065,7 +5991,6 @@ name = "zksync_data_restore"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "chrono",
  "db_test_macro",
  "ethabi",
@@ -6076,7 +6001,6 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
- "tiny-keccak 1.5.0",
  "tokio",
  "vlog",
  "web3",
@@ -6086,7 +6010,6 @@ dependencies = [
  "zksync_state",
  "zksync_storage",
  "zksync_types",
- "zksync_utils",
 ]
 
 [[package]]
@@ -6097,8 +6020,6 @@ dependencies = [
  "ethabi",
  "hex",
  "metrics",
- "parity-crypto 0.8.0",
- "serde",
  "tokio",
  "vlog",
  "web3",
@@ -6115,25 +6036,15 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "ctrlc",
- "ethabi",
- "futures 0.3.17",
- "hex",
  "lazy_static",
  "metrics",
  "num",
- "serde",
- "serde_json",
  "tokio",
  "vlog",
  "web3",
  "zksync_basic_types",
  "zksync_config",
- "zksync_contracts",
  "zksync_eth_client",
- "zksync_eth_signer",
- "zksync_gateway_watcher",
- "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_types",
 ]
@@ -6148,7 +6059,7 @@ dependencies = [
  "futures 0.3.17",
  "hex",
  "jsonrpc-core 17.1.0",
- "parity-crypto 0.9.0",
+ "parity-crypto",
  "reqwest",
  "rlp",
  "secp256k1 0.21.3",
@@ -6230,12 +6141,8 @@ dependencies = [
  "chrono",
  "futures 0.3.17",
  "metrics",
- "serde",
- "serde_json",
- "thiserror",
  "tokio",
  "vlog",
- "zksync_balancer",
  "zksync_storage",
  "zksync_types",
 ]
@@ -6245,12 +6152,7 @@ name = "zksync_notifier"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "bigdecimal",
- "futures 0.3.17",
- "hex",
- "num",
  "reqwest",
- "serde",
  "serde_json",
  "zksync_types",
 ]
@@ -6261,14 +6163,10 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",
- "futures 0.3.17",
  "metrics",
  "metrics-exporter-prometheus",
- "metrics-macros",
- "metrics-util",
  "num",
  "tokio",
- "tracing",
  "vlog",
  "zksync_crypto",
  "zksync_storage",
@@ -6284,27 +6182,21 @@ dependencies = [
  "anyhow",
  "async-trait",
  "backoff 0.3.0",
- "chrono",
  "ctrlc",
  "futures 0.3.17",
- "hex",
  "jsonwebtoken",
  "metrics",
  "num",
  "reqwest",
- "rust-crypto",
  "serde",
- "serde_json",
  "structopt",
  "tokio",
  "vlog",
- "web3",
  "zksync_circuit",
  "zksync_config",
  "zksync_crypto",
  "zksync_prometheus_exporter",
  "zksync_prover_utils",
- "zksync_state",
  "zksync_types",
  "zksync_utils",
 ]
@@ -6368,7 +6260,6 @@ dependencies = [
  "criterion",
  "metrics",
  "num",
- "serde_json",
  "thiserror",
  "vlog",
  "web3",
@@ -6392,7 +6283,7 @@ dependencies = [
  "metrics",
  "num",
  "once_cell",
- "parity-crypto 0.9.0",
+ "parity-crypto",
  "serde",
  "serde_json",
  "sqlx",
@@ -6400,7 +6291,6 @@ dependencies = [
  "tokio",
  "vlog",
  "zksync_api_types",
- "zksync_config",
  "zksync_crypto",
  "zksync_prover_utils",
  "zksync_test_account",
@@ -6453,8 +6343,6 @@ name = "zksync_token_db_cache"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "futures 0.3.17",
- "metrics",
  "tokio",
  "zksync_storage",
  "zksync_types",
@@ -6472,7 +6360,7 @@ dependencies = [
  "itertools 0.9.0",
  "num",
  "once_cell",
- "parity-crypto 0.9.0",
+ "parity-crypto",
  "secp256k1 0.20.3",
  "serde",
  "serde_json",
@@ -6510,21 +6398,17 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "ctrlc",
  "futures 0.3.17",
  "jsonwebtoken",
  "metrics",
  "num",
- "reqwest",
  "serde",
  "serde_json",
  "tokio",
- "tracing",
  "vlog",
  "zksync_circuit",
  "zksync_config",
  "zksync_crypto",
- "zksync_prometheus_exporter",
  "zksync_prover",
  "zksync_prover_utils",
  "zksync_state",

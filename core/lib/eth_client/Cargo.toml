@@ -15,11 +15,8 @@ zksync_eth_signer = { path = "../eth_signer", version = "1.0" }
 zksync_config = { path = "../config", version = "1.0" }
 zksync_contracts = { path = "../contracts", version = "1.0" }
 vlog = { path = "../../lib/vlog", version = "1.0" }
-
-serde = "1.0.90"
 ethabi = "16.0.0"
 web3 = "0.18.0"
-parity-crypto = {version = "0.8", features = ["publickey"] }
 hex = "0.4"
 
 anyhow = "1.0"

@@ -7,7 +7,5 @@ edition = "2021"
 
 [dependencies]
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
-zksync_config = { path = "../../lib/config", version = "1.0" }
 
 tokio = { version = "1", features = ["full"] }
-anyhow = "1.0"
