@@ -1431,12 +1431,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         } else {
             sqlx::query!(
                 r#"
-                WITH tx_hashes AS (
-                    SELECT DISTINCT tx_hash FROM tx_filters 
-                    WHERE address = $1 AND ($2::boolean OR token = $3)
-                )
-                SELECT COUNT(*) as "count!"
-                FROM tx_hashes
+                  SELECT
+                    COUNT( DISTINCT tx_hash ) AS "count!"
+                  FROM
+                    tx_filters
+                  WHERE address = $1 AND ($2::boolean OR token = $3)
                 "#,
                 address.as_bytes(),
                 token.is_none(),

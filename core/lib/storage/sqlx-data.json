@@ -2393,24 +2393,6 @@
     },
     "query": "INSERT INTO committed_nonce (account_id, nonce, block_number) VALUES ($1, $2, $3) \n                 ON CONFLICT (account_id) \n                 DO UPDATE \n                 SET nonce = $2, block_number = $3\n                 "
   },
-  "3c7addfbdf988190fe3d6c4fe01569599e4fe7e55ed24f83e9309cbbcb0ba46c": {
-    "describe": {
-      "columns": [
-        {
-          "name": "count",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "SELECT COUNT(*) FROM withdrawals WHERE withdrawal_tx_hash IS NULL"
-  },
   "3e63555f8c8d341b2536bec02e1c60755888686fab50cad8dde060c3aca96f9b": {
     "describe": {
       "columns": [
@@ -2489,28 +2471,6 @@
       }
     },
     "query": "\n            SELECT account_id, account_type as \"account_type!: DbAccountType\" \n            FROM eth_account_types WHERE account_id = $1\n            "
-  },
-  "41658b41160ecd5bc97cf22c82b63448f05bf1f8bd4c0b9dd64f6b16c830c093": {
-    "describe": {
-      "columns": [
-        {
-          "name": "count!",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Bool",
-          "Int4"
-        ]
-      }
-    },
-    "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters \n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                )\n                SELECT COUNT(*) as \"count!\"\n                FROM tx_hashes\n                "
   },
   "41a4d1c9fa9953cd94714a408afd892962f9eea9a9f1674b8dddfa72e2eb9ec2": {
     "describe": {
@@ -2699,24 +2659,6 @@
       }
     },
     "query": "\n            DELETE FROM pending_block WHERE number = $1\n            "
-  },
-  "45835bd8baba982b410df9a81970dfb547dd9660f6a768a1eb588ce1ee33f36f": {
-    "describe": {
-      "columns": [
-        {
-          "name": "max",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "SELECT MAX(withdrawal_tx_block) FROM withdrawals"
   },
   "45dc23ee9e4fd0bf52e2a82f3ed83210ec3a49c01b70a82bd6fac566da1a0f3b": {
     "describe": {
@@ -3158,6 +3100,28 @@
       }
     },
     "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                    INTERSECT\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $4 AND ($2::boolean OR token = $3)\n                )\n                SELECT COUNT(*) as \"count!\" FROM tx_hashes\n                "
+  },
+  "521937d610e1cc84b4964a02109d541fb5b321ca951e6c00ee38b44ebf9bee05": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count!",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bool",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n                  SELECT\n                    COUNT( DISTINCT tx_hash ) AS \"count!\"\n                  FROM\n                    tx_filters\n                  WHERE address = $1 AND ($2::boolean OR token = $3)\n                "
   },
   "53eeaa19ee5ffdc8c3f28c142cf9c4f22783c40c5cceff6b8030276e9d29bc9b": {
     "describe": {
