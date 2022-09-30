@@ -62,7 +62,7 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/zksync_witness_generator`: zkSync server Witness Generator & Prover Server microservice.
   - `/lib`: Dependencies of the binaries above.
     - `/basic_types`: Crate with declaration of the essential zkSync primitives, such as `address`.
-    - `/circuit`: Cryptographic environment enforsing the correctness of executed transactions in the zkSync network.
+    - `/circuit`: Cryptographic environment enforcing the correctness of executed transactions in the zkSync network.
     - `/config`: Utilities to load configuration options of zkSync applications.
     - `/contracts`: Loaders for zkSync contracts interfaces and ABI.
     - `/crypto`: Cryptographical primitives using among zkSync crates.
@@ -85,7 +85,7 @@ This section provides an overview on folders / sub-projects that exist in this r
   - `/env`: `.env` files that contain environment variables for different configuration of zkSync Server / Prover.
   - `/js`: Configuration files for JavaScript applications (such as Explorer).
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
-- `/infrastructure`: Application that aren't naturally a part of zkSync core, but are related to it.
+- `/infrastructure`: Applications that aren't naturally a part of zkSync core, but are related to it.
 - `/keys`: Verification keys for `circuit` module.
 - `/sdk`: Implementation of client libraries for zkSync network in different programming languages.
   - `/zksync-crypto`: zkSync network cryptographic primitives, which can be compiled to WASM.
