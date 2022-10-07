@@ -77,6 +77,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: matter-labs/gh-workflows
+          token: ${{ secrets.github-token }}
       -
         name: Generate ~/.kube/config
         run: scripts/kubeconfig-projected-token

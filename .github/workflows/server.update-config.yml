@@ -54,6 +54,7 @@ jobs:
         with:
           repository: matter-labs/gh-workflows
           path: gh-workflows
+          token: ${{ secrets.github-token }}
       -
         name: Generate ~/.kube/config
         working-directory: gh-workflows
