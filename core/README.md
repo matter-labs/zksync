@@ -11,4 +11,4 @@ You can read description of the API provided [here](https://zksync.io/api/).
 
 ## Changelog
 
-The changelog of the contracts is avaliable [here](/changelog/core.md).
+The changelog of the core components is available [here](/changelog/core.md).
