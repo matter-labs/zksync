@@ -16,6 +16,7 @@ jobs:
 
       - name: setup-env
         run: |
+          echo "1"
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
           ## Setup sccache GCS key (update docker-compose .env)
