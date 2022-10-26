@@ -33,7 +33,6 @@ services:
     volumes:
       - .:/usr/src/zksync
       - /usr/src/cache:/usr/src/cache
-      - /usr/src/keys:/usr/src/keys
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOST_GCS_KEY_PATH:-/etc/sa_secret/sa_key.json}:/etc/sa_secret/sa_key.json
     environment:
