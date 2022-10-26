@@ -39,7 +39,7 @@ REQUIRED_SETUP_POWS=`get_required_plonk_setup_powers`
 if [ "$PROVER_DOWNLOAD_SETUP" == "false" ]; then
   echo Downloading setup powers $REQUIRED_SETUP_POWS
 
-  SETUP_DO_SPACE_DIR=https://universal-setup.ams3.digitaloceanspaces.com
+  SETUP_DO_SPACE_DIR=https://storage.googleapis.com/universal-setup
   mkdir -p keys/setup && pushd keys/setup
 
   for i in ${REQUIRED_SETUP_POWS//,/ }; do
