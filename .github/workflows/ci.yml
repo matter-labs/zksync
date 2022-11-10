@@ -61,6 +61,7 @@ jobs:
       - name: init
         run: |
           ci_run zk
+          ci_run zk run plonk-setup
           ci_run zk run yarn
           ci_run zk run verify-keys unpack
           ci_run yarn run build:zksync-sdk
@@ -161,6 +162,7 @@ jobs:
       - name: init
         run: |
           ci_run zk
+          ci_run zk run plonk-setup
           ci_run zk run verify-keys unpack
 
       - name: circuit-tests
@@ -188,6 +190,7 @@ jobs:
       - name: init
         run: |
           ci_run zk
+          ci_run zk run plonk-setup
           ci_run zk run verify-keys unpack
           ci_run zk contract build
 
