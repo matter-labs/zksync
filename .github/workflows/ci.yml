@@ -60,7 +60,6 @@ jobs:
 
       - name: init
         run: |
-          # ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
           ci_run zk run yarn
           ci_run zk run verify-keys unpack
@@ -103,7 +102,6 @@ jobs:
 
       - name: init
         run: |
-          # ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
           ci_run zk dummy-prover enable --no-redeploy
           ci_run zk init
@@ -162,7 +160,6 @@ jobs:
 
       - name: init
         run: |
-          # ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
           ci_run zk run verify-keys unpack
 
@@ -190,7 +187,6 @@ jobs:
 
       - name: init
         run: |
-          # ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
           ci_run zk run verify-keys unpack
           ci_run zk contract build
@@ -219,7 +215,6 @@ jobs:
 
       - name: init
         run: |
-          # ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
           ci_run zk dummy-prover enable --no-redeploy
           ci_run zk init
