@@ -192,8 +192,6 @@ jobs:
           ci_run zk
           ci_run zk run plonk-setup
           ci_run zk run verify-keys unpack
-          ls -l keys/
-          ls -l keys/setup
           ci_run zk contract build
 
       - name: integration-testkit
