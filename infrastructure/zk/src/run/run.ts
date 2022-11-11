@@ -83,7 +83,7 @@ export async function plonkSetup(powers?: number[]) {
     process.chdir('keys/setup');
     for (let power = 20; power <= 26; power++) {
         if (!fs.existsSync(`setup_2^${power}.key`)) {
-            await utils.spawn(`curl -LO ${URL}/setup_2^{power}.key`);
+            await utils.spawn(`curl -LO ${URL}/setup_2^${power}.key`);
             await utils.sleep(1);
         }
     }
