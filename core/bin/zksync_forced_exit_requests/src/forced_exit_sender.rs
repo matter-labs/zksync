@@ -27,6 +27,14 @@ pub trait ForcedExitSender {
     async fn process_request(&mut self, amount: BigUint, submission_time: DateTime<Utc>);
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum ForcedExitRequestConfirmationError {
+    #[error("Forced exit tx failed: {0}")]
+    FailedTx(String),
+    #[error("Database Error: {0}")]
+    DatabaseError(#[from] anyhow::Error),
+}
+
 pub struct MempoolForcedExitSender<T: CoreInteractionWrapper> {
     core_interaction_wrapper: T,
     config: ForcedExitRequestsConfig,
@@ -157,7 +165,13 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
 
         if let Some(hashes) = hashes {
             for hash in hashes.into_iter() {
-                self.wait_until_comitted(hash).await?;
+                if let Err(ForcedExitRequestConfirmationError::DatabaseError(err)) =
+                    self.wait_until_comitted(hash).await
+                {
+                    // We have to return only if tx was failed because of database interaction.
+                    // Failed tx in state keeper is legit.
+                    anyhow::bail!(err);
+                }
                 self.core_interaction_wrapper
                     .set_fulfilled_at(request.id)
                     .await?;
@@ -191,7 +205,10 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
         Ok(())
     }
 
-    pub async fn wait_until_comitted(&self, tx_hash: TxHash) -> anyhow::Result<()> {
+    pub async fn wait_until_comitted(
+        &self,
+        tx_hash: TxHash,
+    ) -> Result<(), ForcedExitRequestConfirmationError> {
         let timeout_millis: u64 = 120000;
         let poll_interval_millis: u64 = 200;
         let poll_interval = time::Duration::from_millis(poll_interval_millis);
@@ -209,11 +226,13 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
             let receipt = self.core_interaction_wrapper.get_receipt(tx_hash).await?;
 
             if let Some(tx_receipt) = receipt {
-                if tx_receipt.success {
-                    return Ok(());
+                return if tx_receipt.success {
+                    Ok(())
                 } else {
-                    return Err(anyhow::Error::msg("ForcedExit transaction failed"));
-                }
+                    Err(ForcedExitRequestConfirmationError::FailedTx(
+                        tx_receipt.fail_reason.unwrap_or_default(),
+                    ))
+                };
             }
 
             timer.tick().await;
@@ -256,7 +275,14 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
 
         // We wait only for the first transaction to complete since the transactions
         // are sent in a batch
-        self.wait_until_comitted(hashes[0]).await?;
+        if let Err(ForcedExitRequestConfirmationError::DatabaseError(err)) =
+            self.wait_until_comitted(hashes[0]).await
+        {
+            // We have to return only if tx was failed because of database interaction.
+            // Failed tx in state keeper is legit.
+            anyhow::bail!(err);
+        }
+
         self.core_interaction_wrapper.set_fulfilled_at(id).await?;
 
         Ok(())
