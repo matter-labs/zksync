@@ -6208,6 +6208,7 @@ dependencies = [
  "log 0.4.14",
  "metrics",
  "num",
+ "thiserror",
  "tokio",
  "vlog",
  "web3",

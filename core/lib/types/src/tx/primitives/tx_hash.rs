@@ -34,7 +34,7 @@ impl TxHash {
 
     pub fn batch_hash(tx_hashes: &[TxHash]) -> TxHash {
         let bytes: Vec<u8> = tx_hashes.iter().flat_map(AsRef::as_ref).cloned().collect();
-        TxHash::from_slice(&*sha256(&bytes)).unwrap()
+        TxHash::from_slice(&sha256(&bytes)).unwrap()
     }
 }
 

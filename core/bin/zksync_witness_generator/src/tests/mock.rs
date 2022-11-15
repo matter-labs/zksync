@@ -96,7 +96,7 @@ impl DatabaseInterface for MockDatabase {
     ) -> anyhow::Result<()> {
         let mut prover_job_queue = self.prover_job_queue.write().await;
         let id = prover_job_queue.0;
-        (*prover_job_queue).0 += 1;
+        prover_job_queue.0 += 1;
 
         let new_job = StorageProverJobQueue {
             job_status: ProverJobStatus::Idle.to_number(),
