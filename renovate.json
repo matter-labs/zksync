@@ -1,0 +1,5 @@
+{
+  "extends": ["config:base", "helpers:pinGitHubActionDigests"],
+  "enabledManagers": ["github-actions"],
+  "prCreation": "immediate"
+}
