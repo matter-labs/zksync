@@ -57,7 +57,8 @@ Tester.prototype.testFinalizeVerifiedWithdraw = async function (
     await this.testVerifiedWithdraw(wallet, token, amount, fastProcessing);
     const onchainBalanceBefore = await wallet.getEthereumBalance(token);
     await this.contract.withdrawPendingBalance(wallet.address(), tokenAddress, amount.div(2));
-    await this.contract.withdrawPendingBalance(wallet.address(), tokenAddress, amount.div(2));
+    const tx = await this.contract.withdrawPendingBalance(wallet.address(), tokenAddress, amount.div(2));
+    await tx.wait();
     const onchainBalanceAfter = await wallet.getEthereumBalance(token);
 
     expect(onchainBalanceAfter.sub(onchainBalanceBefore).eq(amount), 'Wrong amount onchain after complete withdraw').to
@@ -125,7 +126,8 @@ Tester.prototype.testWithdrawNFT = async function (
     await handle.awaitVerifyReceipt();
 
     const ethProxy = new ETHProxy(this.ethProvider, await this.syncProvider.getContractAddress());
-    await ethProxy.getZkSyncContract().connect(withdrawer).withdrawPendingNFTBalance(nft.id);
+    const tx = await ethProxy.getZkSyncContract().connect(withdrawer).withdrawPendingNFTBalance(nft.id);
+    await tx.wait();
     const defaultFactory = await ethProxy.getDefaultNFTFactory();
 
     const creatorId = await defaultFactory.getCreatorAccountId(nft.id);

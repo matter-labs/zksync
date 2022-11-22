@@ -22,7 +22,8 @@ Tester.prototype.testFinalizedForcedExit = async function (
     const onchainBalanceBefore = await targetWallet.getEthereumBalance(token);
     const amount = await this.contract.getPendingBalance(targetWallet.address(), tokenAddress);
     await this.contract.withdrawPendingBalance(targetWallet.address(), tokenAddress, amount.div(2));
-    await this.contract.withdrawPendingBalance(targetWallet.address(), tokenAddress, amount.div(2));
+    const tx = await this.contract.withdrawPendingBalance(targetWallet.address(), tokenAddress, amount.div(2));
+    await tx.wait();
     const onchainBalanceAfter = await targetWallet.getEthereumBalance(token);
 
     expect(onchainBalanceAfter.sub(onchainBalanceBefore).eq(amount), 'Wrong amount onchain after complete withdraw').to
