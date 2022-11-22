@@ -16,7 +16,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
 
       - name: setup-env
         run: |
@@ -44,7 +44,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
 
       - name: setup-env
         run: |
@@ -86,7 +86,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
 
       - name: setup-env
         run: |
@@ -145,7 +145,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
 
       - name: prepare
         run: |
@@ -172,7 +172,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
 
       - name: prepare
         run: |
@@ -201,7 +201,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
 
       - name: setup-env
         run: |
@@ -265,7 +265,7 @@ jobs:
     needs:
       [lint, unit-tests, integration, circuit-tests, testkit, revert-blocks]
     steps:
-      - uses: technote-space/workflow-conclusion-action@v2
+      - uses: technote-space/workflow-conclusion-action@482bb0dbebad067b3b26ca4f6222c4023cf51ccf # v2
       - name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         if: ${{ env.WORKFLOW_CONCLUSION == 'failure' }}

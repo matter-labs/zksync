@@ -74,7 +74,7 @@ jobs:
           chown -R root /dysnix/kubectl/.cache/helm
           chown -R root /dysnix/kubectl/.local/share/helm
       -
-        uses: actions/checkout@v2
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
         with:
           repository: matter-labs/gh-workflows
           token: ${{ secrets.github-token }}
@@ -83,7 +83,7 @@ jobs:
         run: scripts/kubeconfig-projected-token
       -
         name: Clone helm-infra
-        uses: actions/checkout@v2
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
         with:
           repository: matter-labs/helm-infra
           path: helm-infra

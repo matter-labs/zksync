@@ -36,7 +36,7 @@ jobs:
       ALLOWED_PERCENT: 10
       RUST_LOG: loadnext=debug
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
       - name: Run loadtest
         run: cargo run --bin loadnext
 
@@ -46,7 +46,7 @@ jobs:
     needs: [loadtest]
     if: always() && !cancelled()
     steps:
-      - uses: technote-space/workflow-conclusion-action@v2
+      - uses: technote-space/workflow-conclusion-action@482bb0dbebad067b3b26ca4f6222c4023cf51ccf # v2
       -
         name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1

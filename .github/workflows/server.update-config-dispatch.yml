@@ -39,7 +39,7 @@ jobs:
     needs: [update]
     if: always() && !cancelled()
     steps:
-      - uses: technote-space/workflow-conclusion-action@v2
+      - uses: technote-space/workflow-conclusion-action@482bb0dbebad067b3b26ca4f6222c4023cf51ccf # v2
       -
         name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1

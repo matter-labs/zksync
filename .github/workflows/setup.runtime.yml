@@ -63,10 +63,10 @@ jobs:
       config-tag: ${{ steps.latest-config.outputs.tag }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
       - name: Map runtime environment data
         id: envMap
-        uses: kanga333/variable-mapper@v0.2.2
+        uses: kanga333/variable-mapper@92703696e9a3f370901c3d53ae3836569b1055e5 # v0.2.2
         with:
           key: ${{ inputs.environment }}
           export_to: output
@@ -91,13 +91,13 @@ jobs:
           token: ${{ github.token }}
           environment: ${{ inputs.environment }}
       - name: Match the tag vX.Y.Z-rN pattern
-        uses: actions-ecosystem/action-regex-match@v2
+        uses: actions-ecosystem/action-regex-match@9e6c4fb3d5e898f505be7a1fb6e7b0a278f6665b # v2
         id: regex
         with:
           text: ${{ github.ref }}
           regex: '^(v\d+\.\d+\.\d+)(-r\d+)?$'
       - name: Find the latest config "-rN" tag
-        uses: dysnix/find-latest-tag@v2
+        uses: dysnix/find-latest-tag@4138bcb046c9e693926b6e12798fae730a27be85 # v2
         if: inputs.find-latest-config && steps.regex.outputs.match != ''
         id: latest-config
         with:

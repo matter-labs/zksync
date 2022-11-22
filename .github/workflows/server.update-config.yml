@@ -50,7 +50,7 @@ jobs:
       KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }}
     steps:
       -
-        uses: actions/checkout@v2
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
         with:
           repository: matter-labs/gh-workflows
           path: gh-workflows
@@ -61,7 +61,7 @@ jobs:
         run: scripts/kubeconfig-projected-token
       -
         name: Clone configs
-        uses: actions/checkout@v2
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
         with:
           repository: matter-labs/configs
           path: configs
