@@ -295,7 +295,7 @@ impl<E: Engine> CircuitElement<E> {
 
         let two = E::Fr::from_str("2").unwrap();
         let power = E::Fr::from_str(&length.to_string()).unwrap();
-        let mut base = two.pow(&power.into_repr());
+        let mut base = two.pow(power.into_repr());
         base.sub_assign(&E::Fr::one());
 
         let expr = Expression::constant::<CS>(base) - &x.get_number() + &y.get_number();

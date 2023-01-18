@@ -1222,7 +1222,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
-            .bind(&second_address.as_bytes())
+            .bind(second_address.as_bytes())
             .bind(token.unwrap_or_default().0 as i32)
             .bind(id_from)
             .bind(limit)

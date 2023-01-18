@@ -375,9 +375,9 @@ impl ChangePubKey {
                  nonce: 0x{nonce}\n\
                  account id: 0x{account_id}\
                  \n\n",
-                pubkey = hex::encode(&self.new_pk_hash.data).to_ascii_lowercase(),
-                nonce = hex::encode(&self.nonce.to_be_bytes()).to_ascii_lowercase(),
-                account_id = hex::encode(&self.account_id.to_be_bytes()).to_ascii_lowercase()
+                pubkey = hex::encode(self.new_pk_hash.data).to_ascii_lowercase(),
+                nonce = hex::encode(self.nonce.to_be_bytes()).to_ascii_lowercase(),
+                account_id = hex::encode(self.account_id.to_be_bytes()).to_ascii_lowercase()
             )
             .as_bytes(),
         );
@@ -461,7 +461,7 @@ impl ChangePubKey {
     pub fn get_ethereum_sign_message_part(&self, token_symbol: &str, decimals: u8) -> String {
         let mut message = format!(
             "Set signing key: {}",
-            hex::encode(&self.new_pk_hash.data).to_ascii_lowercase()
+            hex::encode(self.new_pk_hash.data).to_ascii_lowercase()
         );
         if !self.fee.is_zero() {
             message.push_str(

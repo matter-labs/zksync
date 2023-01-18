@@ -172,10 +172,10 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
         let mut queries = vec![
             expected_block_detail.block_number.to_string(),
             hex::encode(&expected_block_detail.new_state_root),
-            hex::encode(&expected_block_detail.commit_tx_hash.as_ref().unwrap()),
+            hex::encode(expected_block_detail.commit_tx_hash.as_ref().unwrap()),
         ];
         if let Some(verify_tx_hash) = expected_block_detail.verify_tx_hash.as_ref() {
-            queries.push(hex::encode(&verify_tx_hash));
+            queries.push(hex::encode(verify_tx_hash));
         }
 
         for query in queries {

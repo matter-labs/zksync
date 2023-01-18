@@ -3,7 +3,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
 use zksync_storage::ConnectionPool;
-use zksync_types::{ChainId, SequentialTxId, H160};
+use zksync_types::{ChainId, H160};
 
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 

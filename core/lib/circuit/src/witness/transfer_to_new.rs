@@ -369,8 +369,8 @@ impl TransferToNewWitness<Bn256> {
                 fee: Some(fee_encoded),
                 a: Some(a),
                 b: Some(b),
-                valid_from: Some(fr_from(&valid_from)),
-                valid_until: Some(fr_from(&valid_until)),
+                valid_from: Some(fr_from(valid_from)),
+                valid_until: Some(fr_from(valid_until)),
                 ..Default::default()
             },
             before_root: Some(before_root),

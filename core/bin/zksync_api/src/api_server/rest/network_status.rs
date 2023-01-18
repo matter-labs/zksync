@@ -1,4 +1,3 @@
-use anyhow::Error;
 use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -132,9 +131,8 @@ impl SharedNetworkStatus {
                     let mut timer = time::interval(Duration::from_millis(30000));
                     loop {
                         timer.tick().await;
-                        match self.update(&connection_pool).await {
-                            Err(_) => vlog::error!("Can't update network status"),
-                            _ => {}
+                        if let Err(err) = self.update(&connection_pool).await {
+                            vlog::error!("Can't update network status {}", err);
                         }
                     }
                 };

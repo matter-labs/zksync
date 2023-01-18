@@ -420,7 +420,7 @@ impl MintNFTWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(fr_from(&bit)))
+            .map(|bit| Some(fr_from(bit)))
             .collect();
 
         MintNFTWitness {
@@ -477,7 +477,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
             special_account_before_third_chunk: OperationBranch {
-                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
+                address: Some(fr_from(NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(Fr::from_str(&NFT_TOKEN_ID.0.to_string()).unwrap()),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_before_third_chunk,
@@ -487,7 +487,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
             special_account_before_fourth_chunk: OperationBranch {
-                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
+                address: Some(fr_from(NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(new_token_id),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_before_fourth_chunk,

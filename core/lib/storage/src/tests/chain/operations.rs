@@ -2,8 +2,8 @@
 use chrono::{Duration, Utc};
 // Workspace imports
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, Address, BlockNumber, Deposit, SequentialTxId,
-    ZkSyncPriorityOp, H256,
+    aggregated_operations::AggregatedActionType, Address, BlockNumber, Deposit, ZkSyncPriorityOp,
+    H256,
 };
 // Local imports
 use crate::chain::mempool::MempoolSchema;

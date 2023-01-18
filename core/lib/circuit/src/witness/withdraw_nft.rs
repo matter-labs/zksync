@@ -374,7 +374,7 @@ impl WithdrawNFTWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(fr_from(&bit)))
+            .map(|bit| Some(fr_from(bit)))
             .collect();
 
         WithdrawNFTWitness {
@@ -387,8 +387,8 @@ impl WithdrawNFTWitness<Bn256> {
                 fee: Some(fee_encoded),
                 a: Some(a),
                 b: Some(b),
-                valid_from: Some(fr_from(&valid_from)),
-                valid_until: Some(fr_from(&valid_until)),
+                valid_from: Some(fr_from(valid_from)),
+                valid_until: Some(fr_from(valid_until)),
                 special_eth_addresses: vec![
                     Some(
                         creator_account_witness_fourth_chunk
@@ -431,7 +431,7 @@ impl WithdrawNFTWitness<Bn256> {
                 },
             },
             special_account_third_chunk: OperationBranch {
-                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
+                address: Some(fr_from(NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_third_chunk,

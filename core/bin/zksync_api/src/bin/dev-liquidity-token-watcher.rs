@@ -130,7 +130,7 @@ fn main() {
             config.default_volume.into(),
         ),
         Regime::Whitelist => {
-            let whitelisted_tokens = load_tokens(&"etc/tokens/localhost.json");
+            let whitelisted_tokens = load_tokens("etc/tokens/localhost.json");
             VolumeStorage::whitelisted_tokens(whitelisted_tokens, config.default_volume.into())
         }
     };

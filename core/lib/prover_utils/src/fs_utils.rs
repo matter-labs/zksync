@@ -44,7 +44,7 @@ pub fn save_universal_setup_monomial_file<R: Read>(
 ) -> Result<(), anyhow::Error> {
     let setup_file_name = get_universal_setup_monomial_file_name(power_of_two)?;
     let mut path = base_universal_setup_dir()?;
-    path.push(&setup_file_name);
+    path.push(setup_file_name);
     let mut file = File::create(path)?;
     copy(&mut reader, &mut file)?;
     Ok(())
@@ -55,7 +55,7 @@ fn get_universal_setup_file_buff_reader(
 ) -> Result<BufReader<File>, anyhow::Error> {
     let setup_file = {
         let mut path = base_universal_setup_dir()?;
-        path.push(&setup_file_name);
+        path.push(setup_file_name);
         File::open(path).map_err(|e| {
             format_err!(
                 "Failed to open universal setup file {}, err: {}",

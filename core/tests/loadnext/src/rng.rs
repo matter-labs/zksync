@@ -39,7 +39,7 @@ impl LoadtestRng {
     }
 
     pub fn seed_hex(&self) -> String {
-        hex::encode(&self.seed)
+        hex::encode(self.seed)
     }
 
     pub fn derive(&self, eth_pk: H256) -> Self {

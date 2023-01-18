@@ -317,7 +317,7 @@ pub fn create_exit_circuit_with_public_input(
             byte_as_bits
         })
         .flatten()
-        .map(|bit| Some(fr_from(&bit)))
+        .map(|bit| Some(fr_from(bit)))
         .collect();
     for bit in &content_hash_as_vec {
         append_be_fixed_width(&mut pubdata_commitment, &bit.unwrap(), 1);
@@ -352,7 +352,7 @@ pub fn create_exit_circuit_with_public_input(
             },
         },
         special_account_audit_data: OperationBranch {
-            address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID)),
+            address: Some(fr_from(NFT_STORAGE_ACCOUNT_ID)),
             token: Some(token_id_fe),
             witness: OperationBranchWitness {
                 account_witness: special_account_witness,

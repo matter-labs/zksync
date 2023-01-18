@@ -58,7 +58,6 @@ mod tests {
         SharedData,
     };
     use zksync_api_types::v02::ApiVersion;
-    use zksync_types::SequentialTxId;
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -109,7 +108,7 @@ mod tests {
             }
         };
 
-        status.update(&cfg.pool, SequentialTxId(0)).await.unwrap();
+        status.update(&cfg.pool).await.unwrap();
         let response = client.status().await?;
         let status: NetworkStatus = deserialize_response_result(response)?;
 
