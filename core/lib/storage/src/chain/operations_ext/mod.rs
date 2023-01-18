@@ -1432,9 +1432,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             sqlx::query!(
                 r#"
                   SELECT
-                    COUNT( DISTINCT tx_hash ) AS "count!"
+                    SUM(count)
                   FROM
-                    tx_filters
+                    txs_count
                   WHERE address = $1 AND ($2::boolean OR token = $3)
                 "#,
                 address.as_bytes(),
@@ -1443,7 +1443,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             )
             .fetch_one(self.0.conn())
             .await?
-            .count
+            .sum
+            .unwrap_or(0) as i64
         };
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_count",

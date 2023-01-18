@@ -94,10 +94,10 @@ mod tests {
                 .block_schema()
                 .get_last_verified_confirmed_block()
                 .await?;
-            let (total_transactions, _) = storage
+            let total_transactions = storage
                 .chain()
                 .stats_schema()
-                .count_total_transactions(SequentialTxId(0))
+                .count_total_transactions()
                 .await?;
             let mempool_size = storage.chain().mempool_schema().get_mempool_size().await?;
             NetworkStatus {

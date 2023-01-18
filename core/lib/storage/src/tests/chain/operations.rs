@@ -411,10 +411,10 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
     assert_eq!(count, 1);
     assert_eq!(count_tx_filters, 1);
     // The last one is indeed succesful.
-    let (count, _) = storage
+    let count = storage
         .chain()
         .stats_schema()
-        .count_total_transactions(SequentialTxId(0))
+        .count_total_transactions()
         .await?;
     let count_tx_filters = storage
         .chain()

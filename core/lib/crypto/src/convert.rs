@@ -47,7 +47,7 @@ pub trait FeConvert: PrimeField {
 
         // Buffer is reversed and read as little endian, since we pad it with zeros to
         // match the expected length.
-        let mut buf = hex::decode(&value)?;
+        let mut buf = hex::decode(value)?;
         buf.reverse();
         let mut repr = Self::Repr::default();
 
