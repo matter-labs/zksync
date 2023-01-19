@@ -58,6 +58,7 @@ mod tests {
         SharedData,
     };
     use zksync_api_types::v02::ApiVersion;
+    use zksync_types::SequentialTxId;
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -93,10 +94,10 @@ mod tests {
                 .block_schema()
                 .get_last_verified_confirmed_block()
                 .await?;
-            let total_transactions = storage
+            let (total_transactions, _) = storage
                 .chain()
                 .stats_schema()
-                .count_total_transactions()
+                .count_total_transactions(SequentialTxId(0))
                 .await?;
             let mempool_size = storage.chain().mempool_schema().get_mempool_size().await?;
             NetworkStatus {
@@ -108,7 +109,7 @@ mod tests {
             }
         };
 
-        status.update(&cfg.pool).await.unwrap();
+        status.update(&cfg.pool, SequentialTxId(0)).await.unwrap();
         let response = client.status().await?;
         let status: NetworkStatus = deserialize_response_result(response)?;
 

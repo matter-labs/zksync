@@ -1429,6 +1429,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .await?
             .count
         } else {
+            // Postgresql doesn't support unique indexes for nullable fields, so we have to use
+            // artificial token -1 which means no token
             sqlx::query!(
                 r#"
                   SELECT
@@ -1439,12 +1441,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                   AND token = $2
                 "#,
                 address.as_bytes(),
-                token
+                token.map(|a| a.0 as i32).unwrap_or(-1)
             )
             .fetch_one(self.0.conn())
             .await?
-            .sum
-            .unwrap_or(0) as i64
+            .count as i64
         };
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_count",

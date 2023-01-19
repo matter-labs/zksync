@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 use tokio::{runtime::Runtime, time};
 use zksync_api_types::CoreStatus;
 use zksync_storage::ConnectionPool;
-use zksync_types::BlockNumber;
+use zksync_types::{BlockNumber, SequentialTxId};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -58,9 +58,13 @@ impl SharedNetworkStatus {
     pub(crate) async fn update(
         &mut self,
         connection_pool: &ConnectionPool,
-    ) -> Result<(), anyhow::Error> {
+        last_tx_id: SequentialTxId,
+    ) -> Result<SequentialTxId, anyhow::Error> {
         let mut storage = connection_pool.access_storage().await?;
         let mut transaction = storage.start_transaction().await?;
+        let NetworkStatus {
+            total_transactions, ..
+        } = self.read().await;
 
         let last_verified = transaction
             .chain()
@@ -76,12 +80,12 @@ impl SharedNetworkStatus {
             .await
             .unwrap_or(BlockNumber(0));
 
-        let total_transactions = transaction
+        let (total_new_transactions, last_tx_id) = transaction
             .chain()
             .stats_schema()
-            .count_total_transactions()
+            .count_total_transactions(last_tx_id)
             .await
-            .unwrap_or(0);
+            .unwrap_or((0, SequentialTxId(0)));
 
         let mempool_size = transaction
             .chain()
@@ -104,7 +108,7 @@ impl SharedNetworkStatus {
             next_block_at_max: None,
             last_committed,
             last_verified,
-            total_transactions,
+            total_transactions: total_transactions + total_new_transactions,
             outstanding_txs,
             mempool_size,
             core_status,
@@ -112,13 +116,14 @@ impl SharedNetworkStatus {
 
         // save status to state
         *self.status.as_ref().write().await = status;
-        Ok(())
+        Ok(last_tx_id)
     }
 
     pub fn start_updater_detached(
         mut self,
         panic_notify: mpsc::Sender<bool>,
         connection_pool: ConnectionPool,
+        mut last_tx_id: SequentialTxId,
     ) {
         std::thread::Builder::new()
             .name("rest-state-updater".to_string())
@@ -131,8 +136,9 @@ impl SharedNetworkStatus {
                     let mut timer = time::interval(Duration::from_millis(30000));
                     loop {
                         timer.tick().await;
-                        if let Err(err) = self.update(&connection_pool).await {
-                            vlog::error!("Can't update network status {}", err);
+                        match self.update(&connection_pool, last_tx_id).await {
+                            Ok(tx_id) => last_tx_id = tx_id,
+                            Err(_) => vlog::error!("Can't update network status"),
                         }
                     }
                 };

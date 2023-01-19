@@ -1852,24 +1852,6 @@
     },
     "query": "\n                UPDATE tx_filters \n                SET sequence_number=$1, is_priority=true \n                WHERE tx_hash = $2 AND address=$3 AND token=$4\n                "
   },
-  "2c9a8c6981283cfdf815bc45c20cf3057babd0ac95072a851d5d3b7323e48dac": {
-    "describe": {
-      "columns": [
-        {
-          "name": "count",
-          "ordinal": 0,
-          "type_info": "Int4"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "SELECT count FROM txs_count WHERE address is NULL"
-  },
   "2e92926816053cda2de6d571867a625fab5bb9668840db94bd18c411f96dc39b": {
     "describe": {
       "columns": [
@@ -7035,28 +7017,6 @@
     },
     "query": "DELETE FROM executed_transactions WHERE tx_hash = ANY ($1)"
   },
-  "c35b8cd27b1977a7242cbcd41550f483cc8be96db03b501f1ddb804ba443ce38": {
-    "describe": {
-      "columns": [
-        {
-          "name": "sum",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Bool",
-          "Int4"
-        ]
-      }
-    },
-    "query": "\n                  SELECT\n                    SUM(count)\n                  FROM\n                    txs_count\n                  WHERE address = $1 AND ($2::boolean OR token = $3)\n                "
-  },
   "c3632674ee6614b83e258c75447dc986507481a56fbdd5e05dedd0775f21fb79": {
     "describe": {
       "columns": [
@@ -7975,6 +7935,32 @@
     },
     "query": "DELETE FROM prover_job_queue WHERE first_block > $1"
   },
+  "dcffee5aa023682041487570a86380abb389bda66891c4a602085ef7d4bb436a": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "max",
+          "ordinal": 1,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT COUNT(*), MAX(sequence_number) FROM executed_transactions \n                 WHERE success = true AND sequence_number > $1"
+  },
   "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
     "describe": {
       "columns": [
@@ -8660,6 +8646,32 @@
     },
     "query": "\n                WITH transaction AS (\n                    SELECT\n                        tx_hash,\n                        block_number,\n                        operation,\n                        block_index,\n                        from_account,\n                        to_account,\n                        success\n                    FROM executed_transactions\n                    WHERE block_number BETWEEN $1 AND $2\n                ), priority_op AS (\n                    SELECT\n                        tx_hash,\n                        block_number,\n                        operation,\n                        block_index,\n                        from_account,\n                        to_account,\n                        true as success\n                    FROM executed_priority_operations\n                    WHERE block_number BETWEEN $1 AND $2\n                ),\n                everything AS (\n                    SELECT * FROM transaction\n                    UNION ALL\n                    SELECT * FROM priority_op\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    operation as \"operation!\",\n                    block_index as \"block_index?\",\n                    from_account as \"from_account!\",\n                    to_account as \"to_account?\",\n                    success as \"success!\",\n                    root_hash as \"block_hash!\"\n                FROM everything\n                LEFT JOIN blocks\n                    ON everything.block_number = blocks.number\n                LEFT JOIN aggregate_operations\n                    ON (blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block)\n                    AND aggregate_operations.action_type = 'CommitBlocks'\n                WHERE confirmed = true\n            "
   },
+  "ea5a6eeb9885d56b87a80e65d6965b2c58beaca5e0ee3d29b4ab9c3b4019249b": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "max",
+          "ordinal": 1,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT COUNT(*), MAX(sequence_number) FROM executed_priority_operations WHERE sequence_number > $1"
+  },
   "eab13daa273992f1a4ac94095acdb03a4118f66837fc94694853da8687ae8cc2": {
     "describe": {
       "columns": [],
@@ -9340,6 +9352,27 @@
       }
     },
     "query": "SELECT * FROM mint_nft_updates WHERE block_number <= $1"
+  },
+  "fad158f9dd8512fb44609aebc21c96316a7e2b1b6a7a4d9444996ed5c9e3acf6": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n                  SELECT\n                    count\n                  FROM\n                    txs_count\n                  WHERE address = $1 \n                  AND token = $2\n                "
   },
   "fd16aadbd04d4a48332d59c77290a588f1a33922418b55a08c656a44ff75b8e8": {
     "describe": {

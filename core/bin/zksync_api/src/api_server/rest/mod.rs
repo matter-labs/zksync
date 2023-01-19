@@ -3,7 +3,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
 use zksync_storage::ConnectionPool;
-use zksync_types::{ChainId, H160};
+use zksync_types::{ChainId, SequentialTxId, H160};
 
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
@@ -115,8 +115,8 @@ pub fn start_server_thread_detached(
                 // We want to update the network status, as soon as possible, otherwise we can catch the situation,
                 // when the node is started and receiving the request, but the status is still `null` and
                 // monitoring tools spawn the notification that our node is down, though it's just a default status
-                network_status
-                    .update(&read_only_connection_pool)
+                let last_tx_id = network_status
+                    .update(&read_only_connection_pool, SequentialTxId(0))
                     .await
                     .unwrap();
 
@@ -128,7 +128,7 @@ pub fn start_server_thread_detached(
                     network_status,
                 );
 
-                api_v01.spawn_network_status_updater(panic_sender);
+                api_v01.spawn_network_status_updater(panic_sender, last_tx_id);
 
                 start_server(
                     api_v01,
