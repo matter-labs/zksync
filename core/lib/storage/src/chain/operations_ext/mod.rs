@@ -1432,14 +1432,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             sqlx::query!(
                 r#"
                   SELECT
-                    SUM(count)
+                    count
                   FROM
                     txs_count
-                  WHERE address = $1 AND ($2::boolean OR token = $3)
+                  WHERE address = $1 
+                  AND token = $2
                 "#,
                 address.as_bytes(),
-                token.is_none(),
-                token.unwrap_or_default().0 as i32,
+                token
             )
             .fetch_one(self.0.conn())
             .await?
