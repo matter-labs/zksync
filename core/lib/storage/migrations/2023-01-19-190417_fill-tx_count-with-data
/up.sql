@@ -28,14 +28,13 @@ $$
             ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;
 
             INSERT INTO txs_count (address, token, count)
-            SELECT address,NULL, COUNT(DISTINCT tx_hash)
+            SELECT address, -1, COUNT(DISTINCT tx_hash)
             FROM tx_filters
             WHERE ( a1 IS NULL OR address > a1 ) AND address <= a2
                 GROUP BY (address)
             ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;
             raise info 'from %: to %', a1, a2;
-            COMMIT;
             a1 = a2;
         END LOOP;
-    END;
+    END
 $$
