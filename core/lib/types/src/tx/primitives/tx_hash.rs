@@ -46,7 +46,7 @@ impl AsRef<[u8]> for TxHash {
 
 impl ToString for TxHash {
     fn to_string(&self) -> String {
-        format!("sync-tx:{}", hex::encode(&self.data))
+        format!("sync-tx:{}", hex::encode(self.data))
     }
 }
 
@@ -61,7 +61,7 @@ impl FromStr for TxHash {
         } else {
             return Err(TxHashDecodeError::PrefixError);
         };
-        let bytes = hex::decode(&s)?;
+        let bytes = hex::decode(s)?;
         if bytes.len() != 32 {
             return Err(TxHashDecodeError::IncorrectHashLength);
         }

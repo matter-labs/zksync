@@ -146,7 +146,7 @@ impl Serialize for PackedEthSignature {
         S: Serializer,
     {
         let packed_signature = self.serialize_packed();
-        ZeroPrefixHexSerde::serialize(&packed_signature, serializer)
+        ZeroPrefixHexSerde::serialize(packed_signature, serializer)
     }
 }
 

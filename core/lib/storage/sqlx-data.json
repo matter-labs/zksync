@@ -3101,28 +3101,6 @@
     },
     "query": "\n                WITH tx_hashes AS (\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $1 AND ($2::boolean OR token = $3)\n                    INTERSECT\n                    SELECT DISTINCT tx_hash FROM tx_filters\n                    WHERE address = $4 AND ($2::boolean OR token = $3)\n                )\n                SELECT COUNT(*) as \"count!\" FROM tx_hashes\n                "
   },
-  "521937d610e1cc84b4964a02109d541fb5b321ca951e6c00ee38b44ebf9bee05": {
-    "describe": {
-      "columns": [
-        {
-          "name": "count!",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Bool",
-          "Int4"
-        ]
-      }
-    },
-    "query": "\n                  SELECT\n                    COUNT( DISTINCT tx_hash ) AS \"count!\"\n                  FROM\n                    tx_filters\n                  WHERE address = $1 AND ($2::boolean OR token = $3)\n                "
-  },
   "53eeaa19ee5ffdc8c3f28c142cf9c4f22783c40c5cceff6b8030276e9d29bc9b": {
     "describe": {
       "columns": [],
@@ -9374,6 +9352,27 @@
       }
     },
     "query": "SELECT * FROM mint_nft_updates WHERE block_number <= $1"
+  },
+  "fad158f9dd8512fb44609aebc21c96316a7e2b1b6a7a4d9444996ed5c9e3acf6": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n                  SELECT\n                    count\n                  FROM\n                    txs_count\n                  WHERE address = $1 \n                  AND token = $2\n                "
   },
   "fd16aadbd04d4a48332d59c77290a588f1a33922418b55a08c656a44ff75b8e8": {
     "describe": {

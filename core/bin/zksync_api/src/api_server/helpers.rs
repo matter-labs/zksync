@@ -23,7 +23,7 @@ pub fn try_parse_hash(query: &str) -> Result<H256, hex::FromHexError> {
     let mut slice = [0_u8; HASH_SIZE];
 
     let tx_hex = remove_prefix(query);
-    hex::decode_to_slice(&tx_hex, &mut slice)?;
+    hex::decode_to_slice(tx_hex, &mut slice)?;
 
     Ok(H256::from_slice(&slice))
 }

@@ -244,7 +244,7 @@ impl RpcApp {
                     );
                     Error::internal_error()
                 })?
-                .map(|tx_hash| format!("0x{}", hex::encode(&tx_hash)));
+                .map(|tx_hash| format!("0x{}", hex::encode(tx_hash)));
 
             if let Some(complete_withdrawals_tx_hash) = complete_withdrawals_tx_hash.clone() {
                 self.cache_of_complete_withdrawal_tx_hashes

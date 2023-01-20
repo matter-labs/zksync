@@ -444,10 +444,10 @@ fn test_musig_rescue_signing_verification() {
             assert!(
                 sign_pub_key.0.eq(&pub_key.0),
                 "Signature pub key is wrong, msg: {}",
-                hex::encode(&msg)
+                hex::encode(msg)
             );
         } else {
-            panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
+            panic!("Signature is incorrect, msg: {}", hex::encode(msg));
         }
     }
 }

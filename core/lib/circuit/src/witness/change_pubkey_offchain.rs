@@ -235,8 +235,8 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                 b: Some(b),
                 pub_nonce: Some(change_pubkey_offcahin.nonce),
                 new_pub_key_hash: Some(change_pubkey_offcahin.new_pubkey_hash),
-                valid_from: Some(fr_from(&change_pubkey_offcahin.valid_from)),
-                valid_until: Some(fr_from(&change_pubkey_offcahin.valid_until)),
+                valid_from: Some(fr_from(change_pubkey_offcahin.valid_from)),
+                valid_until: Some(fr_from(change_pubkey_offcahin.valid_until)),
                 ..Default::default()
             },
             before_root: Some(before_root),

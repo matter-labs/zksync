@@ -1222,7 +1222,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
-            .bind(&second_address.as_bytes())
+            .bind(second_address.as_bytes())
             .bind(token.unwrap_or_default().0 as i32)
             .bind(id_from)
             .bind(limit)
@@ -1429,21 +1429,23 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .await?
             .count
         } else {
+            // Postgresql doesn't support unique indexes for nullable fields, so we have to use
+            // artificial token -1 which means no token
             sqlx::query!(
                 r#"
                   SELECT
-                    COUNT( DISTINCT tx_hash ) AS "count!"
+                    count
                   FROM
-                    tx_filters
-                  WHERE address = $1 AND ($2::boolean OR token = $3)
+                    txs_count
+                  WHERE address = $1 
+                  AND token = $2
                 "#,
                 address.as_bytes(),
-                token.is_none(),
-                token.unwrap_or_default().0 as i32,
+                token.map(|a| a.0 as i32).unwrap_or(-1)
             )
             .fetch_one(self.0.conn())
             .await?
-            .count
+            .count as i64
         };
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_count",

@@ -734,8 +734,8 @@ mod test {
         let last_block_ver = u32_to_32bytes(15);
         let last_block_com = u32_to_32bytes(10);
         let mut data = vec![];
-        data.extend(&last_block_com);
-        data.extend(&last_block_ver);
+        data.extend(last_block_com);
+        data.extend(last_block_ver);
         let log = create_log(
             contract_addr,
             reverted_topic,

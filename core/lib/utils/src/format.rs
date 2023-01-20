@@ -72,7 +72,7 @@ mod test {
         ];
 
         for (dec, input, output) in vals {
-            assert_eq!(format_units(&input, dec), output);
+            assert_eq!(format_units(input, dec), output);
         }
     }
 }
