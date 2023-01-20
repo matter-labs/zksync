@@ -3,7 +3,7 @@ $$
     DECLARE
         a1 BYTEA;
         a2 BYTEA;
-        rows BIGINT = 10;
+        rows BIGINT = 10000;
     BEGIN
         LOOP
             SELECT address INTO a2
@@ -33,8 +33,9 @@ $$
             WHERE ( a1 IS NULL OR address > a1 ) AND address <= a2
                 GROUP BY (address)
             ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;
+            raise info 'from %: to %', a1, a2;
+            COMMIT;
             a1 = a2;
-
         END LOOP;
     END;
 $$
