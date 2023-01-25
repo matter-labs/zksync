@@ -1400,6 +1400,85 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(record.map(|record| TxHash::from_slice(&record.tx_hash).unwrap()))
     }
 
+    // TODO Remove it after migration is complete
+    pub async fn get_accounts_range(
+        &mut self,
+        start_account: Option<Address>,
+        limit: u32,
+    ) -> Option<(Address, Address)> {
+        let start_account = match start_account {
+            None => {
+                let address = sqlx::query_scalar!(
+                    r#"
+                    SELECT DISTINCT address
+                    FROM tx_filters
+                    ORDER BY address
+                    LIMIT 1
+                "#,
+                )
+                .fetch_one(self.0.conn())
+                .await
+                .unwrap();
+                Address::from_slice(&address)
+            }
+            Some(account) => account,
+        };
+
+        sqlx::query_scalar!(
+            r#"
+            SELECT * FROM ( 
+                SELECT DISTINCT address
+                FROM tx_filters
+                WHERE address > $1
+                ORDER BY address
+                LIMIT $2
+            ) AS a
+            ORDER BY address DESC LIMIT 1
+        "#,
+            start_account.as_bytes(),
+            limit as i32
+        )
+        .fetch_optional(self.0.conn())
+        .await
+        .unwrap()
+        .map(|account| (start_account, Address::from_slice(&account)))
+    }
+
+    // TODO Remove it after migration is complete
+    pub async fn update_txs_count(&mut self, start_account: Address, finish_account: Address) {
+        sqlx::query!(
+            r#"
+            INSERT INTO txs_count (address, token, count)
+            SELECT address,token, COUNT(DISTINCT tx_hash)
+            FROM tx_filters
+            WHERE  address > $1 AND address <= $2
+                GROUP BY (address, token)
+            ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;
+            "#,
+            start_account.as_bytes(),
+            finish_account.as_bytes(),
+        )
+        .execute(self.0.conn())
+        .await
+        .unwrap();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO txs_count (address, token, count)
+            SELECT address, -1, COUNT(DISTINCT tx_hash)
+            FROM tx_filters
+            WHERE address > $1 AND address <= $2
+                GROUP BY (address)
+            ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;
+            "#,
+            start_account.as_bytes(),
+            finish_account.as_bytes(),
+        )
+        .execute(self.0.conn())
+        .await
+        .unwrap();
+    }
+
     pub async fn get_account_transactions_count(
         &mut self,
         address: Address,

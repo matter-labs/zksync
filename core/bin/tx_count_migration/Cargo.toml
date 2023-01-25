@@ -1,5 +1,5 @@
 [package]
-name = "tree_cache_updater"
+name = "tx_count_migration"
 version = "1.0.0"
 edition = "2018"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]

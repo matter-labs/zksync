@@ -1926,6 +1926,24 @@
     },
     "query": "SELECT * FROM blocks WHERE number = $1"
   },
+  "2ea6ab99824c0c546c099c42d972c2cf36e14147bd22f4c45cae3e0b3ef004d7": {
+    "describe": {
+      "columns": [
+        {
+          "name": "address",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n                    SELECT DISTINCT address\n                    FROM tx_filters\n                    ORDER BY address\n                    LIMIT 1\n                "
+  },
   "2f260906b05f4d37fcc1396ded15aee2ea2f8298682e4b19bb8c234e0a66ad66": {
     "describe": {
       "columns": [
@@ -2051,6 +2069,27 @@
       }
     },
     "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, kind )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4, kind = $5\n            "
+  },
+  "31bcd4f1f90659273976b4200cd2e32a96566b03562e5a7eef6ee2533f5a05b2": {
+    "describe": {
+      "columns": [
+        {
+          "name": "address",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n            SELECT * FROM ( \n                SELECT DISTINCT address\n                FROM tx_filters\n                WHERE address > $1\n                ORDER BY address\n                LIMIT $2\n            ) AS a\n            ORDER BY address DESC LIMIT 1\n        "
   },
   "32534621f625f4eb72d416e0a35e01d32b322a7efe0c1b6f477e545a1ce25f9e": {
     "describe": {
@@ -7443,6 +7482,19 @@
     },
     "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n                VALUES ($1, $2, $3, $4, $5)"
   },
+  "cd6df068718c77ed95513af99496a5248eb8318493beaca056cb7ef002218abc": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bytea"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO txs_count (address, token, count)\n            SELECT address, -1, COUNT(DISTINCT tx_hash)\n            FROM tx_filters\n            WHERE address > $1 AND address <= $2\n                GROUP BY (address)\n            ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;\n            "
+  },
   "ceb8e4656aa76e1918a03707a1f047aed19ffcb3c70dbde61a6353b26b5a2493": {
     "describe": {
       "columns": [],
@@ -9278,6 +9330,19 @@
       }
     },
     "query": "\n                SELECT tx FROM executed_transactions WHERE tx->'type' = '\"MintNFT\"' AND success = true\n                ORDER BY nonce\n            "
+  },
+  "fa843a3e1dcf2b0b4c56effeca90f4b56ab0ffd3ee7bc0e80fe618d292d513c9": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bytea"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO txs_count (address, token, count)\n            SELECT address,token, COUNT(DISTINCT tx_hash)\n            FROM tx_filters\n            WHERE  address > $1 AND address <= $2\n                GROUP BY (address, token)\n            ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;\n            "
   },
   "fabb011dfd474fd56c71b7fb1707bbe586e66f9a45deac15b486845ba5c87979": {
     "describe": {
