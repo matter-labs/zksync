@@ -13,7 +13,7 @@ BEGIN
         UPDATE txs_count
         SET count = txs_count.count - CASE WHEN NOT EXISTS(SELECT 1 FROM tx_filters WHERE address = OLD.address AND tx_hash = OLD.tx_hash)
             THEN 1 ELSE 0 END
-        WHERE address=OLD.address;
+        WHERE address=OLD.address AND token=-1;
 
        UPDATE txs_count
        SET count = txs_count.count - CASE WHEN NOT EXISTS(SELECT 1 FROM tx_filters WHERE address = OLD.address AND tx_hash = OLD.tx_hash AND token = OLD.token)
