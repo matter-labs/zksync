@@ -8,9 +8,7 @@ CREATE TABLE txs_count (
 CREATE OR REPLACE FUNCTION decrease_txs_count_for_address() RETURNS TRIGGER AS $$
 BEGIN
     IF (TG_OP = 'DELETE') THEN
-        INSERT INTO txs_count (address, token, count) VALUES (OLD.address, -1       , 0) ON CONFLICT (address, token) DO NOTHING;
-        INSERT INTO txs_count (address, token, count) VALUES (OLD.address, OLD.token, 0) ON CONFLICT (address, token) DO NOTHING;
-
+        IF EXISTS( SELECT 1 FROM txs_count WHERE address = OLD.address AND token = -1 FOR UPDATE ) THEN /* do nothing */ END IF;
         -- Postgresql doesn't support unique indexes for nullable fields, so we have to use
         -- artificial token which means no token
         UPDATE txs_count SET count = txs_count.count -
@@ -27,18 +25,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION increase_txs_count_for_address() RETURNS TRIGGER AS $$
-DECLARE
-    _dummy bigint;
 BEGIN
-    /*
-    REQUIRED IF DEADLOCK WILL APPEAR
-    SELECT count(*) INTO _dummy
-    FROM txs_count
-    WHERE address = NEW.address AND ( token IS NULL OR token = NEW.token )
-    FOR UPDATE;
-    */
+
 
     IF (TG_OP = 'INSERT') THEN
+        IF EXISTS( SELECT 1 FROM txs_count WHERE address = NEW.address AND token = -1 FOR UPDATE ) THEN /* do nothing */ END IF;
+
         INSERT INTO txs_count (address, token, count) VALUES (NEW.address, -1       , 0) ON CONFLICT (address, token) DO NOTHING;
         INSERT INTO txs_count (address, token, count) VALUES (NEW.address, NEW.token, 0) ON CONFLICT (address, token) DO NOTHING;
 
