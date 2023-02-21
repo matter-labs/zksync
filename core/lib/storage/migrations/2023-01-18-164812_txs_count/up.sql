@@ -12,22 +12,20 @@ BEGIN
         -- Postgresql doesn't support unique indexes for nullable fields, so we have to use
         -- artificial token which means no token
         UPDATE txs_count SET count = txs_count.count -
-                                     CASE WHEN NOT EXISTS(SELECT 1 FROM tx_filters WHERE address = OLD.address AND tx_hash = OLD.tx_hash FOR UPDATE) THEN 1 ELSE 0 END
+                                     CASE WHEN (SELECT count(*) = 1  FROM tx_filters WHERE address = OLD.address AND tx_hash = OLD.tx_hash) THEN 1 ELSE 0 END
         WHERE address=OLD.address AND token = -1;
 
         UPDATE txs_count SET count = txs_count.count -
-                                     CASE WHEN NOT EXISTS(SELECT 1 FROM tx_filters WHERE address = OLD.address AND tx_hash = OLD.tx_hash AND token = OLD.token) THEN 1 ELSE 0 END
+                                     CASE WHEN (SELECT count(*) = 1 FROM tx_filters WHERE address = OLD.address AND tx_hash = OLD.tx_hash AND token = OLD.token) THEN 1 ELSE 0 END
         WHERE address=OLD.address AND token=OLD.token;
 
     END IF;
-    RETURN NULL;
+    RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION increase_txs_count_for_address() RETURNS TRIGGER AS $$
 BEGIN
-
-
     IF (TG_OP = 'INSERT') THEN
         IF EXISTS( SELECT 1 FROM txs_count WHERE address = NEW.address AND token = -1 FOR UPDATE ) THEN /* do nothing */ END IF;
 
@@ -50,5 +48,5 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER increase_txs_count_for_address_tr BEFORE INSERT ON tx_filters
     FOR EACH ROW  EXECUTE FUNCTION increase_txs_count_for_address();
 
-CREATE TRIGGER decrease_txs_count_for_address_tr AFTER DELETE ON tx_filters
+CREATE TRIGGER decrease_txs_count_for_address_tr BEFORE DELETE ON tx_filters
     FOR EACH ROW  EXECUTE FUNCTION decrease_txs_count_for_address();
