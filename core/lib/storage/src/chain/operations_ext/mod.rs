@@ -1445,7 +1445,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     }
 
     // TODO Remove it after migration is complete
-    pub async fn update_txs_count(&mut self, start_account: Address, finish_account: Address) {
+    pub async fn update_txs_count(
+        &mut self,
+        start_account: Address,
+        finish_account: Address,
+    ) -> QueryResult<()> {
         sqlx::query!(
             r#"
             INSERT INTO txs_count (address, token, count)
@@ -1459,8 +1463,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             finish_account.as_bytes(),
         )
         .execute(self.0.conn())
-        .await
-        .unwrap();
+        .await?;
 
         sqlx::query!(
             r#"
@@ -1475,8 +1478,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             finish_account.as_bytes(),
         )
         .execute(self.0.conn())
-        .await
-        .unwrap();
+        .await?;
+        Ok(())
     }
 
     pub async fn get_account_transactions_count(
