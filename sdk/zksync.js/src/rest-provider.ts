@@ -19,12 +19,6 @@ export async function getDefaultRestProvider(
             pollIntervalMilliSecs,
             network
         );
-    } else if (network === 'rinkeby-beta') {
-        return await RestProvider.newProvider(
-            'https://rinkeby-beta-api.zksync.io/api/v0.2',
-            pollIntervalMilliSecs,
-            network
-        );
     } else if (network === 'mainnet') {
         return await RestProvider.newProvider('https://api.zksync.io/api/v0.2', pollIntervalMilliSecs, network);
     } else {

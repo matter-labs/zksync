@@ -60,16 +60,6 @@ export async function getDefaultProvider(
                 network
             );
         }
-    } else if (network === 'rinkeby-beta') {
-        if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://rinkeby-beta-api.zksync.io/jsrpc-ws', network);
-        } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider(
-                'https://rinkeby-beta-api.zksync.io/jsrpc',
-                pollIntervalMilliSecs,
-                network
-            );
-        }
     } else if (network === 'mainnet') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('wss://api.zksync.io/jsrpc-ws', network);
