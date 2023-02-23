@@ -93,7 +93,7 @@ jobs:
         working-directory: helm-infra
         run: |
           UPDATE_REPOS=y helmfile -e ${{ inputs.release-environment }} repos
-          helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS apply --args "--timeout 180s"
+          helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS apply --args "--timeout 600s"
       -
         name: Scale Up
         if: inputs.scaleup
