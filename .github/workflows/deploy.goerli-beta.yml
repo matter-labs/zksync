@@ -30,6 +30,8 @@ jobs:
     -
       name: init
       run: |
+        ci_run git config --global --add safe.directory /usr/src/zksync
+        ci_run git config --global --add safe.directory /usr/src/zksync/sdk/binaryen
         ci_run zk
         ci_run zk run yarn
         ci_run cp etc/tokens/{test,localhost}.json
