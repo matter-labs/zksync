@@ -65,7 +65,7 @@ impl Witness for TransferWitness<Bn256> {
         let transfer_data = TransferData {
             amount: transfer.tx.amount.to_u128().unwrap(),
             fee: transfer.tx.fee.to_u128().unwrap(),
-            token: *transfer.tx.token as u32,
+            token: *transfer.tx.token,
             from_account_address: *transfer.from,
             to_account_address: *transfer.to,
             valid_from: time_range.valid_from,

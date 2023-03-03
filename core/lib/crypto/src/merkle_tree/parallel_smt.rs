@@ -932,7 +932,7 @@ mod tests {
                     (aggregated_hash, hash)
                 };
 
-                aggregated_hash = hasher.compress(&lhs, &rhs, level as usize);
+                aggregated_hash = hasher.compress(&lhs, &rhs, level);
 
                 level += 1;
             }

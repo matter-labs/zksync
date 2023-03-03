@@ -1527,7 +1527,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             )
             .fetch_one(self.0.conn())
             .await?
-            .count as i64
+            .count
         };
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_count",

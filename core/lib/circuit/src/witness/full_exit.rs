@@ -63,7 +63,7 @@ impl Witness for FullExitWitness<Bn256> {
         (full_exit, is_success): &(FullExitOp, bool),
     ) -> Self {
         let full_exit = FullExitData {
-            token: *full_exit.priority_op.token as u32,
+            token: *full_exit.priority_op.token,
             account_address: *full_exit.priority_op.account_id,
             eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
             full_exit_amount: full_exit

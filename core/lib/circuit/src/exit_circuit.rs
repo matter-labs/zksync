@@ -250,28 +250,23 @@ pub fn create_exit_circuit_with_public_input(
     let serial_id_fe = Fr::from_str(&nft_serial_id.to_string()).unwrap();
     let root_hash = account_tree.root_hash();
     let (account_witness, _, balance, _) =
-        apply_leaf_operation(account_tree, *account_id, *token_id as u32, |_| {}, |_| {});
-    let (audit_path, audit_balance_path) = get_audits(account_tree, *account_id, *token_id as u32);
+        apply_leaf_operation(account_tree, *account_id, *token_id, |_| {}, |_| {});
+    let (audit_path, audit_balance_path) = get_audits(account_tree, *account_id, *token_id);
 
     let (special_account_witness, _, special_account_balance, _) = apply_leaf_operation(
         account_tree,
         NFT_STORAGE_ACCOUNT_ID.0,
-        *token_id as u32,
+        *token_id,
         |_| {},
         |_| {},
     );
     let (special_account_audit_path, special_account_audit_balance_path) =
-        get_audits(account_tree, NFT_STORAGE_ACCOUNT_ID.0, *token_id as u32);
+        get_audits(account_tree, NFT_STORAGE_ACCOUNT_ID.0, *token_id);
 
-    let (creator_account_witness, _, creator_account_balance, _) = apply_leaf_operation(
-        account_tree,
-        *nft_creator_id,
-        *token_id as u32,
-        |_| {},
-        |_| {},
-    );
+    let (creator_account_witness, _, creator_account_balance, _) =
+        apply_leaf_operation(account_tree, *nft_creator_id, *token_id, |_| {}, |_| {});
     let (creator_account_audit_path, creator_account_audit_balance_path) =
-        get_audits(account_tree, *nft_creator_id, *token_id as u32);
+        get_audits(account_tree, *nft_creator_id, *token_id);
 
     let mut pubdata_commitment = Vec::new();
     append_be_fixed_width(

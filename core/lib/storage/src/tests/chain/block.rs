@@ -817,7 +817,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         .expect("No pending block");
     assert_eq!(pending_block.number, pending_block_1.number);
     assert_eq!(pending_block.chunks_left, pending_block_1.chunks_left);
-    assert_eq!(pending_block.chunks_left, chunks_left as usize);
+    assert_eq!(pending_block.chunks_left, chunks_left);
     assert_eq!(
         pending_block.unprocessed_priority_op_before,
         pending_block_1.unprocessed_priority_op_before

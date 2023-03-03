@@ -83,7 +83,7 @@ impl ZkSyncState {
                 next_free_id = std::cmp::max(next_free_id, **account.0 + 1);
             }
         }
-        empty.next_free_id = AccountId(next_free_id as u32);
+        empty.next_free_id = AccountId(next_free_id);
 
         for (id, account) in accounts {
             empty.insert_account(id, account);

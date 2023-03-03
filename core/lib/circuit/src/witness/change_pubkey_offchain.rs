@@ -65,7 +65,7 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
             account_id: *change_pubkey_offchain.account_id,
             address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
             new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.as_fr(),
-            fee_token: *change_pubkey_offchain.tx.fee_token as u32,
+            fee_token: *change_pubkey_offchain.tx.fee_token,
             fee: change_pubkey_offchain.tx.fee.to_u128().unwrap(),
             nonce: fr_from(change_pubkey_offchain.tx.nonce),
             valid_from,

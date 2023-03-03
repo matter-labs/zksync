@@ -178,7 +178,7 @@ impl<'a> WitnessBuilder<'a> {
             let (root, acc_witness) = crate::witness::utils::apply_fee(
                 self.account_tree,
                 *self.fee_account_id,
-                **token as u32,
+                **token,
                 amount.to_u128().unwrap(),
             );
             root_after_fee = root;

@@ -1282,7 +1282,7 @@ impl TestSetup {
     }
 
     pub fn get_tokens(&self) -> Vec<Token> {
-        self.tokens.iter().map(|(id, _)| Token(*id)).collect()
+        self.tokens.keys().map(|id| Token(*id)).collect()
     }
 
     pub async fn trigger_exodus_if_needed(&self, eth_account: ETHAccountId) {

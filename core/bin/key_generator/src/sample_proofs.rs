@@ -92,6 +92,6 @@ pub fn make_sample_proofs(config: ChainConfig) -> anyhow::Result<()> {
     };
 
     let serialized = serde_json::to_vec_pretty(&precomputed_proofs)?;
-    std::fs::write(get_precomputed_proofs_path(), &serialized)?;
+    std::fs::write(get_precomputed_proofs_path(), serialized)?;
     Ok(())
 }
