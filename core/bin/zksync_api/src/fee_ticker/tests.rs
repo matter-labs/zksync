@@ -335,6 +335,7 @@ fn test_ticker_subsidy() {
     );
 
     let config = get_test_ticker_config();
+    #[allow(clippy::box_default)]
     let mut ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     // Only CREATE2 is subsidized
@@ -456,6 +457,7 @@ fn test_ticker_formula() {
     );
 
     let config = get_test_ticker_config();
+    #[allow(clippy::box_default)]
     let mut ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
@@ -690,6 +692,7 @@ fn test_zero_price_token_fee() {
     );
 
     let config = get_test_ticker_config();
+    #[allow(clippy::box_default)]
     let ticker = FeeTicker::new(Box::new(MockTickerInfo::default()), config, validator);
 
     let token = TestToken::zero_price();

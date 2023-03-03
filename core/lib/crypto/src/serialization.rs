@@ -223,7 +223,7 @@ impl SingleProofSerde {
         // First, deserialize a string value. It is expected to be a
         // base64 representation of `SingleProof`.
         let deserialized_string = String::deserialize(deserializer)?;
-        let bytes = base64::decode(&deserialized_string).map_err(de::Error::custom)?;
+        let bytes = base64::decode(deserialized_string).map_err(de::Error::custom)?;
 
         // Then, parse hexadecimal string to obtain `SingleProof`.
         OldProof::read(&*bytes).map_err(de::Error::custom)
@@ -258,7 +258,7 @@ impl AggregatedProofSerde {
         // First, deserialize a string value. It is expected to be a
         // base64 representation of `AggregatedProof`.
         let deserialized_string = String::deserialize(deserializer)?;
-        let bytes = base64::decode(&deserialized_string).map_err(de::Error::custom)?;
+        let bytes = base64::decode(deserialized_string).map_err(de::Error::custom)?;
 
         // Then, parse hexadecimal string to obtain `SingleProof`.
         NewProof::read(&*bytes).map_err(de::Error::custom)

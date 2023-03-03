@@ -204,7 +204,7 @@ impl InMemoryStorageInteractor {
 
         let verify_op = Operation {
             action: Action::Verify {
-                proof: Box::new(Default::default()),
+                proof: Box::default(),
             },
             block: block.clone(),
             id: None,

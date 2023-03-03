@@ -55,7 +55,7 @@ impl<'de> Deserialize<'de> for PackedPublicKey {
     {
         use serde::de::Error;
         let string = String::deserialize(deserializer)?;
-        let bytes = hex::decode(&string).map_err(Error::custom)?;
+        let bytes = hex::decode(string).map_err(Error::custom)?;
         Self::deserialize_packed(&bytes).map_err(Error::custom)
     }
 }

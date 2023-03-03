@@ -265,3 +265,52 @@ impl TransactionItem {
         }
     }
 }
+
+/// Helper method for `find_block_by_height_or_hash`. It checks whether
+/// provided string can be interpreted like a hash, and if so, returns the
+/// hexadecimal string without prefix.
+pub(crate) fn decode_hex_with_prefix(query: &str) -> Option<Vec<u8>> {
+    const HASH_STRING_SIZE: usize = 32 * 2; // 32 bytes, 2 symbols per byte.
+
+    let query = if let Some(query) = query.strip_prefix("0x") {
+        query
+    } else if let Some(query) = query.strip_prefix("sync-bl:") {
+        query
+    } else {
+        query
+    };
+
+    if query.len() != HASH_STRING_SIZE {
+        return None;
+    }
+
+    hex::decode(query).ok()
+}
+
+#[cfg(test)]
+mod test {
+    use crate::chain::block::conversion::decode_hex_with_prefix;
+    use zksync_types::{H160, H256};
+
+    fn check_all_prefixes(value: String) -> bool {
+        let string_wit_0x_prefix = format!("0x{}", &value);
+        let string_wit_sync_bl_prefix = format!("sync-bl:{}", &value);
+        decode_hex_with_prefix(&string_wit_0x_prefix).is_some()
+            && decode_hex_with_prefix(&string_wit_sync_bl_prefix).is_some()
+            && decode_hex_with_prefix(&value).is_some()
+    }
+
+    #[test]
+    fn test_decode_hex() {
+        let correct_string = hex::encode(H256::random());
+        assert!(check_all_prefixes(correct_string));
+        let short_string = hex::encode(H160::random());
+        assert!(!check_all_prefixes(short_string));
+        let mut incorrect_string = hex::encode(H256::random());
+        // 'x' is impossible to use in hex string
+        incorrect_string.replace_range(10..11, "x");
+        assert!(!check_all_prefixes(incorrect_string));
+        let incorrect_string2 = "random_string".to_string();
+        assert!(!check_all_prefixes(incorrect_string2));
+    }
+}

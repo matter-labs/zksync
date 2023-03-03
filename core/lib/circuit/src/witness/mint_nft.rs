@@ -70,7 +70,7 @@ impl Witness for MintNFTWitness<Bn256> {
     fn apply_tx(tree: &mut CircuitAccountTree, mint_nft: &MintNFTOp) -> Self {
         let mint_nft_data = MintNFTData {
             fee: mint_nft.tx.fee.to_u128().unwrap(),
-            fee_token: *mint_nft.tx.fee_token as u32,
+            fee_token: *mint_nft.tx.fee_token,
             creator_account_id: *mint_nft.creator_account_id,
             recipient_account_id: *mint_nft.recipient_account_id,
             content_hash: mint_nft.tx.content_hash,
