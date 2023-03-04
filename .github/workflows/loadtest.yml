@@ -24,7 +24,7 @@ jobs:
   loadtest:
     name: Perform loadtest
     runs-on: [self-hosted, ci-runner]
-    container: rust:1.63
+    container: rust:1.67
     env:
       WEB3_URL: ${{ secrets.CI_LOADTEST_WEB3_URL }}
       MASTER_WALLET_PK: ${{ secrets.CI_LOADTEST_MAIN_PRIVKEY }}
