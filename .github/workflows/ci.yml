@@ -16,7 +16,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
 
       - name: setup-env
         run: |
@@ -44,7 +44,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
 
       - name: setup-env
         run: |
@@ -86,7 +86,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
 
       - name: setup-env
         run: |
@@ -145,7 +145,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
 
       - name: prepare
         run: |
@@ -172,7 +172,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
 
       - name: prepare
         run: |
@@ -201,7 +201,7 @@ jobs:
     runs-on: [self-hosted, ci-runner]
 
     steps:
-      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
 
       - name: setup-env
         run: |
