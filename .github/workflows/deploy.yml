@@ -58,7 +58,7 @@ jobs:
     name: Server
     runs-on: [self-hosted, deployer, "${{ inputs.cluster }}"]
     container:
-      image: dysnix/kubectl:v1.21-gcloud
+      image: dysnix/kubectl:v1.26-gcloud
       options: --user root
       volumes:
         - /var/run/secrets/tokens:/var/run/secrets/tokens
