@@ -25,6 +25,16 @@ RUN yarn global add dredd
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
+
+ENV GCLOUD_VERSION=403.0.0
+# Install gloud for gcr login and gcfuze for mounting buckets
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
+    apt-get update -y && apt-get install google-cloud-cli=${GCLOUD_VERSION}-0 --no-install-recommends -y && \
+    gcloud config set core/disable_usage_reporting true && \
+    gcloud config set component_manager/disable_update_check true && \
+    gcloud config set metrics/environment github_docker_image
+
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN cargo install diesel_cli --no-default-features --features postgres
 RUN cargo install --version=0.5.6 sqlx-cli
