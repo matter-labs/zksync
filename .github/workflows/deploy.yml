@@ -35,6 +35,11 @@ on:
         type: string
         required: false
         default: server
+      server-witness-release:
+        description: Name of helm release for prover
+        type: string
+        required: false
+        default: server-witness
       prover-release:
         description: Name of helm release for prover
         type: string
@@ -64,6 +69,7 @@ jobs:
         - /var/run/secrets/tokens:/var/run/secrets/tokens
     env:
       DEPLOY_APPS: -l name=${{ inputs.server-release }} -l name=${{ inputs.prover-release }}
+      DEPLOY_APPS_PROD: -l name=${{ inputs.server-release }} -l name=${{ inputs.prover-release }} -l name=${{ inputs.server-witness-release }}
       IMAGE_TAG: ${{ inputs.image-tag }}
       KUBE_CONTEXT: matterlabs-zksync-${{ inputs.cluster }}
       KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }}
@@ -89,11 +95,19 @@ jobs:
           path: helm-infra
           token: ${{ secrets.github-token }}
       -
+        if: "${{ github.event.inputs.environment != 'mainnet' }}"
         name: Deploy Zksync
         working-directory: helm-infra
         run: |
           UPDATE_REPOS=y helmfile -e ${{ inputs.release-environment }} repos
           helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS apply --args "--timeout 900s"
+      -
+        if: "${{ github.event.inputs.environment == 'mainnet' }}"
+        name: Deploy Zksync Prod
+        working-directory: helm-infra
+        run: |
+          UPDATE_REPOS=y helmfile -e ${{ inputs.release-environment }} repos
+          helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS_PROD apply --args "--timeout 900s"
       -
         name: Scale Up
         if: inputs.scaleup
