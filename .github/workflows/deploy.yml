@@ -95,14 +95,14 @@ jobs:
           path: helm-infra
           token: ${{ secrets.github-token }}
       -
-        if: "${{ github.event.inputs.environment != 'mainnet' }}"
+        if: "${{ inputs.environment != 'mainnet' }}"
         name: Deploy Zksync
         working-directory: helm-infra
         run: |
           UPDATE_REPOS=y helmfile -e ${{ inputs.release-environment }} repos
           helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS apply --args "--timeout 900s"
       -
-        if: "${{ github.event.inputs.environment == 'mainnet' }}"
+        if: "${{ inputs.environment == 'mainnet' }}"
         name: Deploy Zksync Prod
         working-directory: helm-infra
         run: |
