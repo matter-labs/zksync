@@ -1314,7 +1314,6 @@ async fn test_get_block_transactions_hashes(mut storage: StorageProcessor<'_>) -
         .await?;
     let len = setup.blocks[0].block_transactions.len();
     let expected: Vec<Vec<u8>> = (0..len)
-        .into_iter()
         .map(|index| setup.get_tx_hash(0, index).as_ref().to_vec())
         .collect();
     assert_eq!(after_commit, expected);

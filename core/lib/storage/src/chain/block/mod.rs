@@ -832,7 +832,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .await?;
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain.block.load_pending_block", start.elapsed());
+        metrics::histogram!("sql.chain.block.save_pending_block", start.elapsed());
 
         Ok(())
     }
