@@ -356,6 +356,7 @@ impl ZkSyncStateKeeper {
             block_timestamp,
             response_sender,
             executed_txs,
+            chunks_left: self.pending_block.chunks_left,
         });
 
         self.tx_for_mempool

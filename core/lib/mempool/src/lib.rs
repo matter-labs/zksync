@@ -57,18 +57,12 @@ pub fn run_mempool_tx_handler(
 pub fn run_mempool_block_handler(
     db_pool: ConnectionPool,
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,
-    block_chunk_sizes: Vec<usize>,
 ) -> JoinHandle<()> {
     let mempool_state = MempoolState::new(db_pool);
-    let max_block_size_chunks = *block_chunk_sizes
-        .iter()
-        .max()
-        .expect("failed to find max block chunks size");
 
     let blocks_handler = MempoolBlocksHandler {
         mempool_state,
         requests: block_requests,
-        max_block_size_chunks,
     };
 
     tokio::spawn(blocks_handler.run())

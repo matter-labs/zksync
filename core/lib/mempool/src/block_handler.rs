@@ -33,6 +33,7 @@ impl ProposedBlock {
 pub struct GetBlockRequest {
     pub last_priority_op_number: u64,
     pub block_timestamp: u64,
+    pub chunks_left: usize,
     pub executed_txs: Vec<TxHash>,
     pub response_sender: oneshot::Sender<ProposedBlock>,
 }
@@ -46,7 +47,6 @@ pub enum MempoolBlocksRequest {
 pub(crate) struct MempoolBlocksHandler {
     pub mempool_state: MempoolState,
     pub requests: mpsc::Receiver<MempoolBlocksRequest>,
-    pub max_block_size_chunks: usize,
 }
 
 impl MempoolBlocksHandler {
@@ -54,6 +54,7 @@ impl MempoolBlocksHandler {
         &mut self,
         current_unprocessed_priority_op: u64,
         block_timestamp: u64,
+        chunks_left: usize,
         executed_txs: &[TxHash],
     ) -> Result<ProposedBlock, TxAddError> {
         let start = std::time::Instant::now();
@@ -66,7 +67,7 @@ impl MempoolBlocksHandler {
 
         let (txs, priority_ops, chunks_left) = tx_queue
             .select_transactions(
-                self.max_block_size_chunks,
+                chunks_left,
                 current_unprocessed_priority_op,
                 block_timestamp,
                 &self.mempool_state,
@@ -121,6 +122,7 @@ impl MempoolBlocksHandler {
                         .propose_new_block(
                             block.last_priority_op_number,
                             block.block_timestamp,
+                            block.chunks_left,
                             &block.executed_txs,
                         )
                         .await
