@@ -2464,16 +2464,6 @@
     },
     "query": "INSERT INTO data_restore_last_watched_eth_block (block_number) VALUES ($1)"
   },
-  "411ae4152496dfa80c3ba50ad99c5ad72cce7d072d47a9a9a2c88587bf021952": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "LOCK TABLE prover_job_queue IN EXCLUSIVE MODE"
-  },
   "4140bf1837df20c2d8ea67b0316ac4ef30ff7da2a24ccdb522a5ab08a54f91d2": {
     "describe": {
       "columns": [
@@ -5731,19 +5721,6 @@
     },
     "query": "\n            INSERT INTO ticker_price ( token_id, usd_price, last_updated )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT (token_id)\n            DO\n              UPDATE SET usd_price = $2, last_updated = $3\n            "
   },
-  "a331b144edb30078170ca904570563cc379640480347fbd46009a166d51ac76e": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea"
-        ]
-      }
-    },
-    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache_binary)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO UPDATE SET tree_cache_binary = $2\n            "
-  },
   "a35474b8ed25c6265defe4e7621f11eae0deedc08a9cbc9780773c5be5697fcc": {
     "describe": {
       "columns": [],
@@ -7302,6 +7279,80 @@
     },
     "query": "\n                SELECT account_id \n                FROM account_creates WHERE address = $1\n                "
   },
+  "c90a52efbe27a3a9a006602e15bc4cffad0202949b95b455c3a1330c7d58e361": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "job_status",
+          "ordinal": 1,
+          "type_info": "Int4"
+        },
+        {
+          "name": "job_priority",
+          "ordinal": 2,
+          "type_info": "Int4"
+        },
+        {
+          "name": "job_type",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 4,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "updated_by",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "updated_at",
+          "ordinal": 6,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "first_block",
+          "ordinal": 7,
+          "type_info": "Int8"
+        },
+        {
+          "name": "last_block",
+          "ordinal": 8,
+          "type_info": "Int8"
+        },
+        {
+          "name": "job_data",
+          "ordinal": 9,
+          "type_info": "Jsonb"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n                SELECT * FROM prover_job_queue\n                WHERE job_status = $1\n                ORDER BY (job_priority, id, first_block)\n                FOR UPDATE SKIP LOCKED\n                LIMIT 1\n            "
+  },
   "c960728642ca43335a0d8a7560a84ce0db208d946683a45c1abfe1c0b99ef2c8": {
     "describe": {
       "columns": [
@@ -7532,6 +7583,19 @@
       }
     },
     "query": "\n                SELECT min(number), max(number)\n                FROM incomplete_blocks\n            "
+  },
+  "cf01f8cc48db73ecb9cb466d26f36eb81441c614cfb48ddcb468ff8d8256ea3b": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache_binary)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING\n            "
   },
   "d18525d8bf10383d307bf56110fac63276a82dc8b65b358c098fca7c2991579e": {
     "describe": {
@@ -8580,80 +8644,6 @@
       }
     },
     "query": "SELECT * FROM incomplete_blocks WHERE number = $1"
-  },
-  "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int4"
-        },
-        {
-          "name": "job_status",
-          "ordinal": 1,
-          "type_info": "Int4"
-        },
-        {
-          "name": "job_priority",
-          "ordinal": 2,
-          "type_info": "Int4"
-        },
-        {
-          "name": "job_type",
-          "ordinal": 3,
-          "type_info": "Text"
-        },
-        {
-          "name": "created_at",
-          "ordinal": 4,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "updated_by",
-          "ordinal": 5,
-          "type_info": "Text"
-        },
-        {
-          "name": "updated_at",
-          "ordinal": 6,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "first_block",
-          "ordinal": 7,
-          "type_info": "Int8"
-        },
-        {
-          "name": "last_block",
-          "ordinal": 8,
-          "type_info": "Int8"
-        },
-        {
-          "name": "job_data",
-          "ordinal": 9,
-          "type_info": "Jsonb"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      }
-    },
-    "query": "\n                SELECT * FROM prover_job_queue\n                WHERE job_status = $1\n                ORDER BY (job_priority, id, first_block)\n                LIMIT 1\n            "
   },
   "ea214ad7c20dedf468002803100fe6a3d3f93680d4cfaefece7a782fc787100f": {
     "describe": {
