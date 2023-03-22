@@ -399,6 +399,24 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         self.remove_txs(&tx_hashes_to_remove).await?;
 
+        let priority_ops = self.get_confirmed_priority_ops().await?;
+        let mut priority_ops_to_remove = Vec::new();
+        for op in priority_ops {
+            let should_remove = self
+                .0
+                .chain()
+                .operations_schema()
+                .get_executed_priority_operation(op.serial_id as u32)
+                .await?
+                .is_some();
+            if should_remove {
+                priority_ops_to_remove.push(op.serial_id);
+            }
+        }
+
+        self.remove_priority_ops_from_mempool(&priority_ops_to_remove)
+            .await?;
+
         metrics::histogram!("sql.chain.mempool.collect_garbage", start.elapsed());
         Ok(())
     }

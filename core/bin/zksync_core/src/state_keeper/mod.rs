@@ -335,12 +335,21 @@ impl ZkSyncStateKeeper {
         // Keeping in mind that we regularly clean the memmpool from executing txs, it's impossible when
         // tons of rejected txs will be returned from the database.
 
-        let executed_txs = self
+        let mut executed_txs: Vec<TxHash> = self
             .pending_block
             .success_operations
             .iter()
             .filter_map(|op| op.get_executed_tx().map(|tx| tx.signed_tx.hash()))
             .collect();
+
+        executed_txs.append(
+            &mut self
+                .pending_block
+                .failed_txs
+                .iter()
+                .map(|op| op.signed_tx.tx.hash())
+                .collect(),
+        );
 
         let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {
             last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
