@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
 
 // External uses
@@ -12,6 +12,7 @@ use tokio::time;
 // Workspace uses
 use zksync_mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock};
 use zksync_state::state::{OpSuccess, ZkSyncState};
+use zksync_types::tx::TxHash;
 use zksync_types::{
     block::{
         BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx, IncompleteBlock,
@@ -70,6 +71,14 @@ pub struct ZkSyncStateKeeper {
     /// Queue of reverted blocks
     /// They will be executed before the start of the StateKeeper
     reverted_blocks: VecDeque<IncompleteBlock>,
+
+    /// If transaction has a nonce that is too big, we don't want to reject it right away.
+    /// We will try to process it later, when the nonce gap is filled.
+    /// However, we don't want to keep it forever, so we will drop it after some time.
+    postponed_tx_attempts: HashMap<TxHash, usize>,
+
+    /// Maximum attempts to execute a transaction before dropping it.
+    max_attempts_to_execute_tx: usize,
 }
 
 impl ZkSyncStateKeeper {
@@ -147,6 +156,13 @@ impl ZkSyncStateKeeper {
             )
         };
 
+        // We have a default value, but want to keep it configurable just in case.
+        // If set to 0, all transactions would be executed (no attempts to postpone them).
+        let max_attempts_to_execute_tx = std::env::var("SK_MAX_ATTEMPTS_TO_EXECUTE_TX")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(100);
+
         let mut keeper = ZkSyncStateKeeper {
             state: sk_state,
             pending_block,
@@ -158,6 +174,9 @@ impl ZkSyncStateKeeper {
 
             root_hash_queue,
             reverted_blocks: initial_state.reverted_blocks.clone(),
+
+            postponed_tx_attempts: Default::default(),
+            max_attempts_to_execute_tx,
         };
         keeper.initialize(initial_state.pending_block);
 
@@ -403,7 +422,54 @@ impl ZkSyncStateKeeper {
             }
         }
 
-        let mut tx_queue = proposed_block.txs.into_iter().collect::<VecDeque<_>>();
+        // Only try to execute transactions with appropriate nonce.
+        let proposed_txs_len = proposed_block.txs.len();
+        let mut tx_queue = proposed_block
+            .txs
+            .into_iter()
+            .filter(|tx| match tx {
+                SignedTxVariant::Tx(tx) => {
+                    let mut can_execute = self.state.can_execute_tx(tx);
+                    if !can_execute {
+                        // Check if we tried to execute this tx too many times.
+                        let tx_hash = tx.hash();
+                        let attempts = self.postponed_tx_attempts.entry(tx_hash).or_insert(0);
+                        *attempts += 1;
+                        if *attempts > self.max_attempts_to_execute_tx {
+                            vlog::warn!("Transaction with hash {:?} was postponed for too long, it will be executed anyway", tx_hash);
+                            self.postponed_tx_attempts.remove(&tx_hash);
+                            can_execute = true;
+                        }
+                    }
+                    can_execute
+                }
+                SignedTxVariant::Batch(batch) => {
+                    // If there are multiple transactions from a single account in a batch, next ones would have
+                    // higher nonces and obviously can't be executed.
+                    // So instead we check if there is at least one tx that can be executed.
+                    let mut can_execute = batch.txs.iter().any(|tx| self.state.can_execute_tx(tx));
+                    if !can_execute {
+                        // Check if we tried to execute this batch too many times.
+
+                        // Identify the batch by its first tx.
+                        let first_tx_hash = batch.txs.first().unwrap().hash();
+                        let attempts = self.postponed_tx_attempts.entry(first_tx_hash).or_insert(0);
+                        *attempts += 1;
+                        if *attempts > self.max_attempts_to_execute_tx {
+                            vlog::warn!("Batch with the first tx hash {:?} was postponed for too long, it will be executed anyway", first_tx_hash);
+                            self.postponed_tx_attempts.remove(&first_tx_hash);
+                            can_execute = true;
+                        }
+                    }
+
+                    can_execute
+                }
+            })
+            .collect::<VecDeque<_>>();
+        if proposed_txs_len != 0 && tx_queue.is_empty() {
+            vlog::warn!("All the transactions were filtered out");
+        }
+
         while let Some(variant) = tx_queue.pop_front() {
             match &variant {
                 SignedTxVariant::Tx(tx) => {
