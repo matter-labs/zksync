@@ -87,9 +87,6 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let start = Instant::now();
         // Select the block to prove.
         let mut transaction = self.0.start_transaction().await?;
-        sqlx::query!("LOCK TABLE prover_job_queue IN EXCLUSIVE MODE")
-            .execute(transaction.conn())
-            .await?;
 
         let prover_job_queue = sqlx::query_as!(
             StorageProverJobQueue,
@@ -97,6 +94,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                 SELECT * FROM prover_job_queue
                 WHERE job_status = $1
                 ORDER BY (job_priority, id, first_block)
+                FOR UPDATE SKIP LOCKED
                 LIMIT 1
             "#,
             ProverJobStatus::Idle.to_number()
