@@ -444,7 +444,10 @@ impl ZkSyncStateKeeper {
                     can_execute
                 }
                 SignedTxVariant::Batch(batch) => {
-                    let mut can_execute = batch.txs.iter().all(|tx| self.state.can_execute_tx(tx));
+                    // If there are multiple transactions from a single account in a batch, next ones would have
+                    // higher nonces and obviously can't be executed.
+                    // So instead we check if there is at least one tx that can be executed.
+                    let mut can_execute = batch.txs.iter().any(|tx| self.state.can_execute_tx(tx));
                     if !can_execute {
                         // Check if we tried to execute this batch too many times.
 
