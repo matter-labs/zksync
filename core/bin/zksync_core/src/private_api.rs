@@ -97,6 +97,7 @@ pub fn start_private_core_api(
                 })
                 .bind(&config.bind_addr())
                 .expect("failed to bind")
+                .workers(1)
                 .run()
                 .await
             })
