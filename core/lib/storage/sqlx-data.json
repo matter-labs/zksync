@@ -7730,6 +7730,26 @@
     },
     "query": "DELETE FROM account_creates WHERE block_number > $1"
   },
+  "d772f7e5e77b6fcb058335761a3205f1f8a5519df1ad6bf542b1032cf22f9f83": {
+    "describe": {
+      "columns": [
+        {
+          "name": "bool",
+          "ordinal": 0,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "DELETE \n                FROM account_tree_cache \n                WHERE block < $1\n                AND ctid IN\n                (\n                    SELECT ctid\n                    FROM account_tree_cache \n                    WHERE block < $1\n                    LIMIT 2\n                )\n              returning true \n            "
+  },
   "d7d7b3963c9da1762b0a533eeb2f331addbf6b874534f66562b0ca6f3356de67": {
     "describe": {
       "columns": [

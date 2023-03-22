@@ -151,12 +151,28 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
         last_block: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
-        sqlx::query!(
-            "DELETE FROM account_tree_cache WHERE block < $1",
-            *last_block as i64
-        )
-        .execute(self.0.conn())
-        .await?;
+        loop {
+            let res = sqlx::query!(
+                "DELETE 
+                FROM account_tree_cache 
+                WHERE block < $1
+                AND ctid IN
+                (
+                    SELECT ctid
+                    FROM account_tree_cache 
+                    WHERE block < $1
+                    LIMIT 2
+                )
+              returning true 
+            ",
+                *last_block as i64
+            )
+            .fetch_optional(self.0.conn())
+            .await?;
+            if res.is_none() {
+                break;
+            }
+        }
 
         metrics::histogram!(
             "sql.chain.tree_cache.bincode.remove_old_account_tree_cache",
