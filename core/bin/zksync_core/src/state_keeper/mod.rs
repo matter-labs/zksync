@@ -351,6 +351,11 @@ impl ZkSyncStateKeeper {
                 .collect(),
         );
 
+        vlog::debug!(
+            "Requesting new miniblock from mempool. {} txs are excluded from search. {} chunks left",
+            executed_txs.len(),
+            self.pending_block.chunks_left
+        );
         let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {
             last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
             block_timestamp,
@@ -403,6 +408,14 @@ impl ZkSyncStateKeeper {
     }
 
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
+        if !proposed_block.is_empty() {
+            vlog::info!(
+                "Processing new proposed block: {} priority ops, {} l2 txs",
+                proposed_block.priority_ops.len(),
+                proposed_block.txs.len()
+            );
+        }
+
         let start = Instant::now();
         let mut executed_ops = Vec::new();
 
@@ -478,6 +491,12 @@ impl ZkSyncStateKeeper {
         if proposed_txs_len != 0 && tx_queue.is_empty() {
             vlog::warn!("All the transactions were filtered out");
         }
+        vlog::info!(
+            "Txs to process: {}, postponed txs: {}, total {}",
+            tx_queue.len(),
+            proposed_txs_len - tx_queue.len(),
+            proposed_txs_len
+        );
 
         while let Some(variant) = tx_queue.pop_front() {
             match &variant {
