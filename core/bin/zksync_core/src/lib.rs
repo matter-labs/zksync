@@ -168,8 +168,11 @@ pub async fn run_core(
     );
 
     // Start mempool.
-    let mempool_block_handler_task =
-        run_mempool_block_handler(connection_pool.clone(), mempool_block_request_receiver);
+    let mempool_block_handler_task = run_mempool_block_handler(
+        connection_pool.clone(),
+        mempool_block_request_receiver,
+        config.chain.state_keeper.block_chunk_sizes.clone(),
+    );
 
     // Start token handler.
     let token_handler_task = run_token_handler(
