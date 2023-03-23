@@ -7,4 +7,4 @@ mod bincode_schema;
 mod json_schema;
 pub mod records;
 
-pub use self::{bincode_schema::TreeCacheSchemaBincode, json_schema::TreeCacheSchemaJSON};
+pub use {self::bincode_schema::TreeCacheSchemaBincode, self::json_schema::TreeCacheSchemaJSON};

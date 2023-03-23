@@ -167,38 +167,6 @@
     },
     "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        block_index,\n                        success,\n                        fail_reason,\n                        created_at,\n                        batch_id,\n                        sequence_number\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        block_index as \"block_index?\",\n                        true as success,\n                        Null as fail_reason,\n                        created_at,\n                        Null::bigint as batch_id,\n                        sequence_number\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    block_index as \"block_index?\",\n                    success as \"success!\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\",\n                    batch_id as \"batch_id?\"\n                FROM everything\n                ORDER BY sequence_number DESC\n            "
   },
-  "045f0be4b5eeb8fb77dccd65c4972e497b16243268f4c4e81461fc5df2552d89": {
-    "describe": {
-      "columns": [
-        {
-          "name": "block",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "tree_cache",
-          "ordinal": 1,
-          "type_info": "Text"
-        },
-        {
-          "name": "tree_cache_binary",
-          "ordinal": 2,
-          "type_info": "Bytea"
-        }
-      ],
-      "nullable": [
-        false,
-        true,
-        true
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE block = $1 AND tree_cache_binary IS NOT NULL\n            "
-  },
   "052bc740befe43cd3d8d915371cb055187d4ff4ebf019fe12c8dc85b296acc47": {
     "describe": {
       "columns": [
@@ -267,36 +235,6 @@
       }
     },
     "query": "\n            INSERT INTO nft_factory ( creator_id, factory_address, creator_address )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT ( creator_id )\n            DO UPDATE\n            SET factory_address = $2\n            "
-  },
-  "07aeb7c43955ad6739172f6b4131dac25b0ab6392f7157cbeb5c1f6e8c975f67": {
-    "describe": {
-      "columns": [
-        {
-          "name": "block",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "tree_cache",
-          "ordinal": 1,
-          "type_info": "Text"
-        },
-        {
-          "name": "tree_cache_binary",
-          "ordinal": 2,
-          "type_info": "Bytea"
-        }
-      ],
-      "nullable": [
-        false,
-        true,
-        true
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE tree_cache_binary IS NOT NULL\n            ORDER BY block DESC\n            LIMIT 1\n            "
   },
   "088013a67d0b8118980a606386ff38b394a26abfed0f209d17a6a583a297679b": {
     "describe": {
@@ -406,6 +344,18 @@
     },
     "query": "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)"
   },
+  "0c557748396722ece5eba6649e1f1b3c4392ac7c32b88016a548c1b699d6bfc3": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "DELETE FROM account_tree_cache_new WHERE block > $1"
+  },
   "0c9fc29aabfefa38588a298002e7a60c0c6cf578f7a305e8e7f58695651662dc": {
     "describe": {
       "columns": [],
@@ -442,6 +392,19 @@
       }
     },
     "query": "INSERT INTO eth_unprocessed_aggregated_ops (op_id)\n                VALUES ($1)"
+  },
+  "0df7a41083e0c9217c87cc4111ba4b32ab24392a0d49506878232caf2350f7db": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO account_tree_cache_new (block, tree_cache_binary)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING\n            "
   },
   "0e08e4712d3e2b359bde63476ff591939e97e877e7d5bcf1eb65345969c9ff21": {
     "describe": {
@@ -1600,6 +1563,32 @@
     },
     "query": "INSERT INTO events (block_number, event_type, event_data)\n            SELECT $1, $2, u.event_data\n                FROM UNNEST ($3::jsonb[])\n                AS u(event_data)"
   },
+  "260788f280363b7bc8010b4f15c783417f8d5cb23eb4ac9a3f15a7c324c88503": {
+    "describe": {
+      "columns": [
+        {
+          "name": "block",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "tree_cache",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n            SELECT block, tree_cache FROM account_tree_cache\n            WHERE block = $1 AND tree_cache IS NOT NULL\n            "
+  },
   "26204b0d5ff5ce98cc8ee5d483d4b5536724f7d8f17c66e19387bc5acd3e713d": {
     "describe": {
       "columns": [],
@@ -2552,38 +2541,6 @@
     },
     "query": "UPDATE eth_operations \n            SET last_used_gas_price = $1, last_deadline_block = $2\n            WHERE id = $3"
   },
-  "44d729155d6950140ab996c1b8f125be3af67d20847278374e4b0a2762f8ff55": {
-    "describe": {
-      "columns": [
-        {
-          "name": "block",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "tree_cache",
-          "ordinal": 1,
-          "type_info": "Text"
-        },
-        {
-          "name": "tree_cache_binary",
-          "ordinal": 2,
-          "type_info": "Bytea"
-        }
-      ],
-      "nullable": [
-        false,
-        true,
-        true
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE block = $1 AND tree_cache IS NOT NULL\n            "
-  },
   "44e5ba11f839c21a12e1cee81b31e848f0e87e23cc9e16e136a88a6ae7c84303": {
     "describe": {
       "columns": [],
@@ -3197,6 +3154,32 @@
     },
     "query": "\n            SELECT id, address, decimals, kind as \"kind: _\", symbol\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            AND kind = 'ERC20'::token_kind\n            ORDER BY id ASC\n            "
   },
+  "565dbc924bff0126aa6635daec86f2753d49a8de200a5e6207139c657b7169e6": {
+    "describe": {
+      "columns": [
+        {
+          "name": "block",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "tree_cache_binary",
+          "ordinal": 1,
+          "type_info": "Bytea"
+        }
+      ],
+      "nullable": [
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n            SELECT block, tree_cache_binary FROM account_tree_cache\n            WHERE block = $1 AND tree_cache_binary IS NOT NULL\n            "
+  },
   "5807562394c3a4c1066cbab15e425628617c54ee1d9c1ec035593dcd8b14ec6b": {
     "describe": {
       "columns": [],
@@ -3570,6 +3553,30 @@
       }
     },
     "query": "SELECT count(*) as \"count!\" FROM executed_transactions WHERE success = false"
+  },
+  "647048e4576bb586a0220474a5cc65c216c94f34574aaef593cb8315fb568aac": {
+    "describe": {
+      "columns": [
+        {
+          "name": "block",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "tree_cache",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n            SELECT block, tree_cache FROM account_tree_cache\n            WHERE tree_cache IS NOT NULL\n            ORDER BY block DESC\n            LIMIT 1\n            "
   },
   "67e40ef8b22b53739a616867f323f010e715ce3c72c996605177fbe591e7023d": {
     "describe": {
@@ -4139,24 +4146,6 @@
       }
     },
     "query": "\n                    SELECT nft.*, tokens.symbol FROM nft\n                    INNER JOIN tokens\n                    ON tokens.id = nft.token_id\n                    WHERE creator_account_id = $1\n                "
-  },
-  "77eb9c0302c6819f2592a2afcd528cdf161761caa76054306f94e31c30752abe": {
-    "describe": {
-      "columns": [
-        {
-          "name": "max",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "SELECT MAX(block) FROM account_tree_cache WHERE tree_cache_binary IS NOT NULL"
   },
   "790d46519ceaa7fbd152f1edf29b85c97ab491488b7302d8df3f57e5fc3eff55": {
     "describe": {
@@ -5269,36 +5258,6 @@
     },
     "query": "DELETE FROM data_restore_storage_state_update"
   },
-  "961c0d719460ce94790a2fd7b29a645e861e93f22182152ca61f3802e0c25bb8": {
-    "describe": {
-      "columns": [
-        {
-          "name": "block",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "tree_cache",
-          "ordinal": 1,
-          "type_info": "Text"
-        },
-        {
-          "name": "tree_cache_binary",
-          "ordinal": 2,
-          "type_info": "Bytea"
-        }
-      ],
-      "nullable": [
-        false,
-        true,
-        true
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "\n            SELECT * FROM account_tree_cache\n            WHERE tree_cache IS NOT NULL\n            ORDER BY block DESC\n            LIMIT 1\n            "
-  },
   "963cad1979935b50bc5c2bbe174f5d94fbd5c38ea752d304f987229c89e6070a": {
     "describe": {
       "columns": [],
@@ -6264,6 +6223,24 @@
     },
     "query": "\n                WITH transaction AS (\n                    SELECT\n                        tx_hash,\n                        tx as op,\n                        block_number,\n                        block_index,\n                        created_at,\n                        success,\n                        fail_reason,\n                        Null::bytea as eth_hash,\n                        Null::bigint as priority_op_serialid,\n                        batch_id,\n                        eth_sign_data\n                    FROM executed_transactions\n                    WHERE tx_hash = $1\n                ), priority_op AS (\n                    SELECT\n                        tx_hash,\n                        operation as op,\n                        block_number,\n                        block_index,\n                        created_at,\n                        true as success,\n                        Null as fail_reason,\n                        eth_hash,\n                        priority_op_serialid,\n                        Null::bigint as batch_id,\n                        Null::jsonb as eth_sign_data\n                    FROM executed_priority_operations\n                    WHERE tx_hash = $1 OR eth_hash = $1\n                ), mempool_tx AS (\n                    SELECT\n                        decode(tx_hash, 'hex'),\n                        tx as op,\n                        Null::bigint as block_number,\n                        Null::int as block_index,\n                        created_at,\n                        Null::boolean as success,\n                        Null as fail_reason,\n                        Null::bytea as eth_hash,\n                        Null::bigint as priority_op_serialid,\n                        batch_id,\n                        eth_sign_data\n                    FROM mempool_txs\n                    WHERE tx_hash = $2\n                ),\n                everything AS (\n                    SELECT * FROM transaction\n                    UNION ALL\n                    SELECT * FROM priority_op\n                    UNION ALL\n                    SELECT * FROM mempool_tx\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    op as \"op!\",\n                    block_number as \"block_number?\",\n                    block_index as \"block_index?\",\n                    created_at as \"created_at!\",\n                    success as \"success?\",\n                    fail_reason as \"fail_reason?\",\n                    eth_hash as \"eth_hash?\",\n                    priority_op_serialid as \"priority_op_serialid?\",\n                    batch_id as \"batch_id?\",\n                    eth_sign_data as \"eth_sign_data?\"\n                FROM everything\n            "
   },
+  "b5353c25d655b6e984f54c91cd4b36e302f8808b89a0573de6a0b0d15ec6a6c6": {
+    "describe": {
+      "columns": [
+        {
+          "name": "max",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n                SELECT MAX(block) FROM (\n                    SELECT MAX(block) as block FROM account_tree_cache WHERE tree_cache_binary IS NOT NULL\n                    UNION ALL\n                    SELECT MAX(block) as block FROM account_tree_cache_new \n                ) AS max_block\n            "
+  },
   "b5813c95a36cfa99144f92727c342bf0154caa4052c24b20b55b7c3c6ef45d59": {
     "describe": {
       "columns": [
@@ -7187,6 +7164,32 @@
     },
     "query": "\n                    INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )\n                    VALUES ( $1, $2, $3, $4, $5 )\n                    "
   },
+  "c7690ca47c354806eb1aee4d4cbd5157e0c24b157487769b4765291cd914786f": {
+    "describe": {
+      "columns": [
+        {
+          "name": "block",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "tree_cache_binary",
+          "ordinal": 1,
+          "type_info": "Bytea"
+        }
+      ],
+      "nullable": [
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n            SELECT * FROM account_tree_cache_new\n            WHERE block = $1\n            "
+  },
   "c76bdef17043c7f22c968ae7a27b861ef5967d0e30d9e6c298e741c203eadd2e": {
     "describe": {
       "columns": [
@@ -7584,19 +7587,6 @@
     },
     "query": "\n                SELECT min(number), max(number)\n                FROM incomplete_blocks\n            "
   },
-  "cf01f8cc48db73ecb9cb466d26f36eb81441c614cfb48ddcb468ff8d8256ea3b": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea"
-        ]
-      }
-    },
-    "query": "\n            INSERT INTO account_tree_cache (block, tree_cache_binary)\n            VALUES ($1, $2)\n            ON CONFLICT (block)\n            DO NOTHING\n            "
-  },
   "d18525d8bf10383d307bf56110fac63276a82dc8b65b358c098fca7c2991579e": {
     "describe": {
       "columns": [
@@ -7793,26 +7783,6 @@
       }
     },
     "query": "DELETE FROM account_creates WHERE block_number > $1"
-  },
-  "d772f7e5e77b6fcb058335761a3205f1f8a5519df1ad6bf542b1032cf22f9f83": {
-    "describe": {
-      "columns": [
-        {
-          "name": "bool",
-          "ordinal": 0,
-          "type_info": "Bool"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "DELETE \n                FROM account_tree_cache \n                WHERE block < $1\n                AND ctid IN\n                (\n                    SELECT ctid\n                    FROM account_tree_cache \n                    WHERE block < $1\n                    LIMIT 2\n                )\n              returning true \n            "
   },
   "d7d7b3963c9da1762b0a533eeb2f331addbf6b874534f66562b0ca6f3356de67": {
     "describe": {
@@ -9340,6 +9310,26 @@
       }
     },
     "query": "\n                SELECT tx FROM executed_transactions WHERE tx->'type' = '\"MintNFT\"' AND success = true\n                ORDER BY nonce\n            "
+  },
+  "f7e6805092bc54effce3a49651028ca3214a5168c98b98504756940aef257c2f": {
+    "describe": {
+      "columns": [
+        {
+          "name": "bool",
+          "ordinal": 0,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "DELETE \n                FROM account_tree_cache_new\n                WHERE block < $1\n                AND ctid IN\n                (\n                    SELECT ctid\n                    FROM account_tree_cache_new\n                    WHERE block < $1\n                    LIMIT 2\n                )\n              returning true \n            "
   },
   "fa843a3e1dcf2b0b4c56effeca90f4b56ab0ffd3ee7bc0e80fe618d292d513c9": {
     "describe": {
