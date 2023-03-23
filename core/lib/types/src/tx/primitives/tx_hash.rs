@@ -36,6 +36,10 @@ impl TxHash {
         let bytes: Vec<u8> = tx_hashes.iter().flat_map(AsRef::as_ref).cloned().collect();
         TxHash::from_slice(&sha256(&bytes)).unwrap()
     }
+
+    pub fn to_string_without_prefix(&self) -> String {
+        hex::encode(self.data)
+    }
 }
 
 impl AsRef<[u8]> for TxHash {

@@ -44,7 +44,10 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     ) -> QueryResult<VecDeque<SignedTxVariant>> {
         let start = Instant::now();
         // Load the transactions from mempool along with corresponding batch IDs.
-        let excluded_txs: Vec<String> = executed_txs.iter().map(|tx| tx.to_string()).collect();
+        let excluded_txs: Vec<String> = executed_txs
+            .iter()
+            .map(|tx| tx.to_string_without_prefix())
+            .collect();
         let txs: Vec<MempoolTx> = sqlx::query_as!(
             MempoolTx,
             "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (
