@@ -53,8 +53,9 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (
                 SELECT u.hashes FROM UNNEST ($1::text[]) as u(hashes)
             )
-
-            ORDER BY id",
+            ORDER BY id
+            LIMIT 400
+            ",
             &excluded_txs
         )
         .fetch_all(self.0.conn())

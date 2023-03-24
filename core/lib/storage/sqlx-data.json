@@ -2032,6 +2032,68 @@
     },
     "query": "\n            INSERT INTO incomplete_blocks (number, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit,  timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            "
   },
+  "317d9425b02522272d2f3385e5f5e10c30492a1b21431db58db822b8dd6dbc47": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "tx_hash",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "tx",
+          "ordinal": 2,
+          "type_info": "Jsonb"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 3,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "eth_sign_data",
+          "ordinal": 4,
+          "type_info": "Jsonb"
+        },
+        {
+          "name": "batch_id",
+          "ordinal": 5,
+          "type_info": "Int8"
+        },
+        {
+          "name": "next_priority_op_serial_id",
+          "ordinal": 6,
+          "type_info": "Int8"
+        },
+        {
+          "name": "reverted",
+          "ordinal": 7,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "TextArray"
+        ]
+      }
+    },
+    "query": "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (\n                SELECT u.hashes FROM UNNEST ($1::text[]) as u(hashes)\n            )\n            ORDER BY id\n            LIMIT 400\n            "
+  },
   "3186e2d96b7f1e1339ac9f09221ae15aba8dff112083079fc6ef5f3acbfc1553": {
     "describe": {
       "columns": [],
@@ -4613,68 +4675,6 @@
       }
     },
     "query": "UPDATE prover_job_queue SET last_block = $1 WHERE last_block > $1"
-  },
-  "86ae541a53bd5bf92292c220de97a1940aa45aac2b759965b389308de0b36eb6": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "tx_hash",
-          "ordinal": 1,
-          "type_info": "Text"
-        },
-        {
-          "name": "tx",
-          "ordinal": 2,
-          "type_info": "Jsonb"
-        },
-        {
-          "name": "created_at",
-          "ordinal": 3,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "eth_sign_data",
-          "ordinal": 4,
-          "type_info": "Jsonb"
-        },
-        {
-          "name": "batch_id",
-          "ordinal": 5,
-          "type_info": "Int8"
-        },
-        {
-          "name": "next_priority_op_serial_id",
-          "ordinal": 6,
-          "type_info": "Int8"
-        },
-        {
-          "name": "reverted",
-          "ordinal": 7,
-          "type_info": "Bool"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        true,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "TextArray"
-        ]
-      }
-    },
-    "query": "SELECT * FROM mempool_txs WHERE reverted = false AND tx_hash NOT IN (\n                SELECT u.hashes FROM UNNEST ($1::text[]) as u(hashes)\n            )\n\n            ORDER BY id"
   },
   "88106cb99f8c4fa89245f5d4ad5798ced4a32a9005759ca9351e42e44f4d437d": {
     "describe": {
