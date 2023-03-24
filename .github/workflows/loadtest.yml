@@ -30,7 +30,7 @@ jobs:
       MASTER_WALLET_PK: ${{ secrets.CI_LOADTEST_MAIN_PRIVKEY }}
       ACCOUNTS_AMOUNT: 20
       OPERATIONS_PER_ACCOUNT: 20
-      MAIN_TOKEN: "BAT"
+      MAIN_TOKEN: "wBTC"
       ZKSYNC_RPC_ADDR: "https://goerli-api.zksync.io/jsrpc"
       ETH_NETWORK: "goerli"
       ALLOWED_PERCENT: 10
