@@ -414,6 +414,13 @@ where
                 break;
             }
         }
+
+        // Insert the hash of the item to the cache.
+        // We do it here since for the account tree items are trees themselves and by calculating the root hash
+        // we're trying to achieve better rayon threadpool utilization.
+        let item_bits = self.items[&item_index].get_bits_le();
+        let item_hash = self.hasher.hash_bits(item_bits);
+        self.cache.write().unwrap().insert(leaf_index, item_hash);
     }
 
     /// Removes an element with a given index, and returns the removed
@@ -664,10 +671,23 @@ where
         let (hash, mut updates) = {
             if node.depth == self.tree_depth {
                 // leaf node: return item hash
-                let item_index: ItemIndex = (node.index.0 - (1 << self.tree_depth)) as ItemIndex;
 
-                let item_bits = self.items[&item_index].get_bits_le();
-                let item_hash = self.hasher.hash_bits(item_bits);
+                // Old code: we used to calculate the hash of the item here.
+                // In the current version we calculate the hash during the `insert` phase.
+                // It's because the items of the account tree are trees themselves and this way we achieve
+                // better utilization of the rayon threadpool.
+
+                // let item_index: ItemIndex = (node.index.0 - (1 << self.tree_depth)) as ItemIndex;
+                // let item_bits = self.items[&item_index].get_bits_le();
+                // let item_hash = self.hasher.hash_bits(item_bits);
+
+                let item_hash = self
+                    .cache
+                    .read()
+                    .unwrap()
+                    .get(&node.index)
+                    .expect("Item index MUST be present in cache.")
+                    .clone();
 
                 // There are no underlying updates for leaf node.
                 let updates = vec![];
