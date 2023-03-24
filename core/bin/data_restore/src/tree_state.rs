@@ -90,7 +90,6 @@ impl TreeState {
     ) -> Self {
         let mut account_id_by_address = HashMap::with_capacity(account_map.len());
         let mut balance_tree = AccountTree::new(account_tree_depth());
-        balance_tree.enter_recovery_with_cache_mode();
 
         balance_tree.set_internals(
             serde_json::from_value(tree_cache).expect("failed to deserialize tree cache"),
@@ -100,8 +99,6 @@ impl TreeState {
             account_id_by_address.insert(account.address, account_id);
             balance_tree.items.insert(*account_id as u64, account);
         });
-
-        balance_tree.exit_recovery_with_cache_mode();
 
         let state = ZkSyncState::new(balance_tree, account_id_by_address, nfts);
         let last_fee_account_address = state
