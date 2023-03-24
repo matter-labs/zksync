@@ -31,7 +31,7 @@ jobs:
       ACCOUNTS_AMOUNT: 20
       OPERATIONS_PER_ACCOUNT: 20
       MAIN_TOKEN: "BAT"
-      ZKSYNC_RPC_ADDR: "https://goerli-beta-api.zksync.io/jsrpc"
+      ZKSYNC_RPC_ADDR: "https://goerli-api.zksync.io/jsrpc"
       ETH_NETWORK: "goerli"
       ALLOWED_PERCENT: 10
       RUST_LOG: loadnext=debug
