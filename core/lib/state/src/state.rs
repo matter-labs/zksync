@@ -5,7 +5,7 @@ use zksync_crypto::{merkle_tree::TreeMemoryUsage, params, params::NFT_STORAGE_AC
 use zksync_types::{
     helpers::reverse_updates,
     operations::{TransferOp, TransferToNewOp, ZkSyncOp},
-    Account, AccountId, AccountMap, AccountTree, AccountUpdate, AccountUpdates, Address, Nonce,
+    Account, AccountId, AccountMap, AccountTree, AccountUpdate, AccountUpdates, Address,
     SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx, NFT,
 };
 
@@ -72,19 +72,6 @@ impl ZkSyncState {
             next_free_id: AccountId(0),
             nfts: HashMap::new(),
         }
-    }
-
-    pub fn can_execute_tx(&self, tx: &ZkSyncTx) -> bool {
-        let account_nonce = self
-            .get_account_by_address(&tx.account())
-            .map(|(_, account)| account.nonce)
-            .unwrap_or(Nonce(0));
-        let tx_nonce = tx.nonce();
-
-        // We can execute transaction if its nonce is less or equal to the account nonce.
-        // Transactions with lesser nonce would be rejected.
-        // Transactions with greater nonce cannot be executed yet.
-        tx_nonce <= account_nonce
     }
 
     pub fn from_acc_map(accounts: AccountMap) -> Self {
