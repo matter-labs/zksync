@@ -169,6 +169,7 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
         last_block: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
+
         loop {
             let res = sqlx::query!(
                 "DELETE 

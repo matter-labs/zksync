@@ -262,12 +262,13 @@ impl DatabaseInterface for Database {
             .store_account_tree_cache(block, tree_cache)
             .await?;
 
-        connection
-            .chain()
-            .tree_cache_schema_bincode()
-            .remove_old_account_tree_cache(block - NUMBER_OF_STORED_ACCOUNT_TREE_CACHE)
-            .await?;
-
+        if block.0 > NUMBER_OF_STORED_ACCOUNT_TREE_CACHE {
+            connection
+                .chain()
+                .tree_cache_schema_bincode()
+                .remove_old_account_tree_cache(block - NUMBER_OF_STORED_ACCOUNT_TREE_CACHE)
+                .await?;
+        }
         Ok(())
     }
 
