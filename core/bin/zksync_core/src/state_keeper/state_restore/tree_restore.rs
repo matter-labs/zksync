@@ -84,9 +84,11 @@ where
         let committed_state = self.storage.load_committed_state(cache_block).await;
         let cache = self.storage.load_account_tree_cache(cache_block).await;
 
+        self.tree.enter_recovery_with_cache_mode();
         for (id, account) in committed_state {
             self.insert_account(id, account);
         }
+        self.tree.exit_recovery_with_cache_mode();
         self.tree.set_internals(cache);
     }
 

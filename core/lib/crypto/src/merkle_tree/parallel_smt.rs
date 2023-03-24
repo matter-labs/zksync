@@ -85,6 +85,12 @@ where
     /// - Make method `root_hash` immutable (as it's logically immutable).
     /// - Keep the SMT `Sync` (required for the `rayon` parallelism).
     cache: RwLock<FnvHashMap<NodeIndex, Hash>>,
+
+    /// Flag indicating whether we are resoring the tree with cache or not.
+    /// By default, we are recalculating the balance trees on insert, but if we're
+    /// recovering the tree and already have cache for it, we want to skip this step to not
+    /// recalculate all the balance trees.
+    recovery_with_cache_mode: bool,
 }
 
 // Manual implementation of `Clone` is required, since `RwLock` is not `Clone` by default,
@@ -114,6 +120,7 @@ where
             nodes,
             prehashed,
             cache,
+            recovery_with_cache_mode: false,
         }
     }
 }
@@ -207,6 +214,7 @@ where
             nodes,
             cache,
             root: 0,
+            recovery_with_cache_mode: false,
         }
     }
 
@@ -269,6 +277,16 @@ where
     pub fn get(&self, index: u32) -> Option<&T> {
         let index = ItemIndex::from(index);
         self.items.get(&index)
+    }
+
+    /// Enters the "recovery with cache" mode.
+    pub fn enter_recovery_with_cache_mode(&mut self) {
+        self.recovery_with_cache_mode = true;
+    }
+
+    /// Exists the "recovery with cache" mode.
+    pub fn exit_recovery_with_cache_mode(&mut self) {
+        self.recovery_with_cache_mode = false;
     }
 
     /// Inserts an element to the tree.
@@ -415,12 +433,14 @@ where
             }
         }
 
-        // Insert the hash of the item to the cache.
-        // We do it here since for the account tree items are trees themselves and by calculating the root hash
-        // we're trying to achieve better rayon threadpool utilization.
-        let item_bits = self.items[&item_index].get_bits_le();
-        let item_hash = self.hasher.hash_bits(item_bits);
-        self.cache.write().unwrap().insert(leaf_index, item_hash);
+        if !self.recovery_with_cache_mode {
+            // Insert the hash of the item to the cache.
+            // We do it here since for the account tree items are trees themselves and by calculating the root hash
+            // we're trying to achieve better rayon threadpool utilization.
+            let item_bits = self.items[&item_index].get_bits_le();
+            let item_hash = self.hasher.hash_bits(item_bits);
+            self.cache.write().unwrap().insert(leaf_index, item_hash);
+        }
     }
 
     /// Removes an element with a given index, and returns the removed

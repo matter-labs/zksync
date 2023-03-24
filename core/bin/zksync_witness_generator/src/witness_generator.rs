@@ -120,12 +120,14 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 .database
                 .load_committed_state(&mut storage, Some(block))
                 .await?;
+            circuit_account_tree.enter_recovery_with_cache_mode();
             for (id, account) in accounts {
                 circuit_account_tree.insert(*id, account.into());
             }
             circuit_account_tree.set_internals(
                 SparseMerkleTreeSerializableCacheBN256::decode_bincode(&account_tree_cache),
             );
+            circuit_account_tree.exit_recovery_with_cache_mode();
             if block != cached_block {
                 // There is no relevant cache, so we have to use some outdated cache and update the tree.
                 if *block == *cached_block + 1 {
