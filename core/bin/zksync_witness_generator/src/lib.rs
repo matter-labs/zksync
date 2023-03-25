@@ -1,5 +1,5 @@
 // Built-in
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -24,7 +24,6 @@ use self::scaler::ScalerOracle;
 use tokio::task::JoinHandle;
 use zksync_circuit::serialization::ProverData;
 use zksync_config::configs::api::ProverApiConfig;
-use zksync_crypto::merkle_tree::parallel_smt::SparseMerkleTreeSerializableCacheBN256;
 use zksync_prover_utils::api::{
     JobRequestData, JobResultData, ProverInputRequest, ProverInputResponse, ProverOutputRequest,
     WorkingOn,
@@ -423,9 +422,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                 };
 
                 // Start pool maintainer threads.
-                let cache: Arc<
-                    RwLock<HashMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>>,
-                > = Arc::new(RwLock::new(HashMap::default()));
+                let cache = Arc::new(RwLock::new(BTreeMap::default()));
 
                 for offset in 0..witness_generator_opts.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;

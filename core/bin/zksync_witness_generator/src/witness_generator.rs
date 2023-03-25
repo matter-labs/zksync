@@ -1,6 +1,7 @@
 use std::time::Instant;
 // Built-in
-use std::collections::HashMap;
+use std::collections::BTreeMap;
+use std::ops::Bound::{Included, Unbounded};
 use std::sync::Arc;
 use std::{thread, time};
 // External
@@ -32,7 +33,7 @@ pub struct WitnessGenerator<DB: DatabaseInterface> {
     start_block: BlockNumber,
     block_step: BlockNumber,
     start_wait: time::Duration,
-    cached_account_tree: Arc<RwLock<HashMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>>>,
+    cached_account_tree: Arc<RwLock<BTreeMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>>>,
 }
 
 #[derive(Debug)]
@@ -51,7 +52,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         start_block: BlockNumber,
         block_step: BlockNumber,
         cached_account_tree: Arc<
-            RwLock<HashMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>>,
+            RwLock<BTreeMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>>,
         >,
     ) -> Self {
         Self {
@@ -112,41 +113,17 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         Ok(block_info)
     }
 
-    async fn get_reverse_cached_blocks(&self) -> Vec<BlockNumber> {
-        let mut keys = self
-            .cached_account_tree
-            .read()
-            .await
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>();
-        keys.sort();
-        keys.reverse();
-        keys
-    }
-
     async fn load_account_tree_cache(
         &mut self,
         block: BlockNumber,
     ) -> anyhow::Result<Option<(BlockNumber, SparseMerkleTreeSerializableCacheBN256)>> {
-        let mut storage = self.database.acquire_connection().await?;
-        let keys = self.get_reverse_cached_blocks().await;
-        for key in keys {
-            if key <= block {
-                let cache = Ok(Some((
-                    key,
-                    self.cached_account_tree
-                        .write()
-                        .await
-                        .get(&key)
-                        .unwrap()
-                        .clone(),
-                )));
-                metrics::increment_counter!("witness_generator.cache_access", "type" => "hit_in_memory");
-                return cache;
-            }
+        let cache = self.cached_account_tree.read().await;
+        if let Some((block, cache)) = cache.range((Unbounded, Included(block))).next_back() {
+            metrics::increment_counter!("witness_generator.cache_access", "type" => "hit_in_memory");
+            return Ok(Some((*block, cache.clone())));
         }
 
+        let mut storage = self.database.acquire_connection().await?;
         if let Some((block, cache)) = self.database.load_account_tree_cache(&mut storage).await? {
             let cache = SparseMerkleTreeSerializableCacheBN256::decode_bincode(&cache);
             self.cached_account_tree
@@ -277,11 +254,12 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
     /// Remove old account tree cache we want to keep more than step just to make sure that we won't go to the database
     async fn remove_cache(&self, block: BlockNumber) {
         let mut cache = self.cached_account_tree.write().await;
-        let keys = self.get_reverse_cached_blocks().await;
+        let keys: Vec<_> = cache
+            .range((Unbounded, Included(block - 2 * self.block_step.0)))
+            .map(|(key, _)| *key)
+            .collect();
         for key in keys {
-            if key.0 < block.0 - 2 * self.block_step.0 {
-                cache.remove(&key);
-            }
+            cache.remove(&key);
         }
     }
 
