@@ -122,7 +122,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             metrics::increment_counter!("witness_generator.cache_access", "type" => "hit_in_memory");
             return Ok(Some((*block, cache.clone())));
         }
-
+        drop(cache);
         let mut storage = self.database.acquire_connection().await?;
         if let Some((block, cache)) = self.database.load_account_tree_cache(&mut storage).await? {
             let cache = SparseMerkleTreeSerializableCacheBN256::decode_bincode(&cache);
