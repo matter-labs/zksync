@@ -1,4 +1,5 @@
 // Built-in
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -23,6 +24,7 @@ use self::scaler::ScalerOracle;
 use tokio::task::JoinHandle;
 use zksync_circuit::serialization::ProverData;
 use zksync_config::configs::api::ProverApiConfig;
+use zksync_crypto::merkle_tree::parallel_smt::SparseMerkleTreeSerializableCacheBN256;
 use zksync_prover_utils::api::{
     JobRequestData, JobResultData, ProverInputRequest, ProverInputResponse, ProverOutputRequest,
     WorkingOn,
@@ -421,6 +423,10 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                 };
 
                 // Start pool maintainer threads.
+                let cache: Arc<
+                    RwLock<HashMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>>,
+                > = Arc::new(RwLock::new(HashMap::default()));
+
                 for offset in 0..witness_generator_opts.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
                     let block_step = witness_generator_opts.witness_generators as u32;
@@ -429,11 +435,14 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                         start_block,
                         block_step
                     );
+                    let start_wait = witness_generator_opts.prepare_data_interval() * offset as u32;
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         database.clone(),
                         witness_generator_opts.prepare_data_interval(),
+                        start_wait,
                         BlockNumber(start_block),
                         BlockNumber(block_step),
+                        cache.clone(),
                     );
                     pool_maintainer.start(panic_sender.clone());
                 }

@@ -269,6 +269,7 @@ impl DatabaseInterface for Database {
                 .remove_old_account_tree_cache(block - NUMBER_OF_STORED_ACCOUNT_TREE_CACHE)
                 .await?;
         }
+
         Ok(())
     }
 
