@@ -33,7 +33,7 @@ pub struct WitnessGenerator<DB: DatabaseInterface> {
     start_block: BlockNumber,
     block_step: BlockNumber,
     start_wait: time::Duration,
-    cached_account_tree: Arc<RwLock<BTreeMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>>>,
+    cached_account_tree: Arc<RwLock<BTreeMap<BlockNumber, CircuitAccountTree>>>,
 }
 
 #[derive(Debug)]
@@ -51,9 +51,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         start_wait: time::Duration,
         start_block: BlockNumber,
         block_step: BlockNumber,
-        cached_account_tree: Arc<
-            RwLock<BTreeMap<BlockNumber, SparseMerkleTreeSerializableCacheBN256>>,
-        >,
+        cached_account_tree: Arc<RwLock<BTreeMap<BlockNumber, CircuitAccountTree>>>,
     ) -> Self {
         Self {
             database,
@@ -116,7 +114,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
     async fn load_account_tree_cache(
         &mut self,
         block: BlockNumber,
-    ) -> anyhow::Result<Option<(BlockNumber, SparseMerkleTreeSerializableCacheBN256)>> {
+    ) -> anyhow::Result<Option<(BlockNumber, CircuitAccountTree)>> {
         let cache = self.cached_account_tree.read().await;
         if let Some((block, cache)) = cache.range((Unbounded, Included(block))).next_back() {
             metrics::increment_counter!("witness_generator.cache_access", "type" => "hit_in_memory");
@@ -125,12 +123,22 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         drop(cache);
         let mut storage = self.database.acquire_connection().await?;
         if let Some((block, cache)) = self.database.load_account_tree_cache(&mut storage).await? {
+            let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
+
+            let (_, accounts) = self
+                .database
+                .load_committed_state(&mut storage, Some(block))
+                .await?;
+            for (id, account) in accounts {
+                circuit_account_tree.insert(*id, account.into());
+            }
             let cache = SparseMerkleTreeSerializableCacheBN256::decode_bincode(&cache);
+            circuit_account_tree.set_internals(cache);
             self.cached_account_tree
                 .write()
                 .await
-                .insert(block, cache.clone());
-            return Ok(Some((block, cache)));
+                .insert(block, circuit_account_tree.clone());
+            return Ok(Some((block, circuit_account_tree)));
         }
         Ok(None)
     }
@@ -142,19 +150,11 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
 
         let start = Instant::now();
         let cache = self.load_account_tree_cache(block).await?;
-        let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
         metrics::histogram!("witness_generator", start.elapsed(), "stage" => "load_cache");
         let mut storage = self.database.acquire_connection().await?;
         let start = Instant::now();
-        if let Some((cached_block, account_tree_cache)) = cache {
-            let (_, accounts) = self
-                .database
-                .load_committed_state(&mut storage, Some(block))
-                .await?;
-            for (id, account) in accounts {
-                circuit_account_tree.insert(*id, account.into());
-            }
-            circuit_account_tree.set_internals(account_tree_cache);
+
+        let circuit_account_tree = if let Some((cached_block, mut circuit_account_tree)) = cache {
             if block != cached_block {
                 // There is no relevant cache, so we have to use some outdated cache and update the tree.
                 if *block == *cached_block + 1 {
@@ -190,11 +190,11 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 metrics::histogram!("witness_generator", start.elapsed(), "stage" => "recreate_tree_from_cache");
 
                 let start = Instant::now();
-                let internal_cache = circuit_account_tree.get_internals();
                 self.cached_account_tree
                     .write()
                     .await
-                    .insert(block, internal_cache.clone());
+                    .insert(block, circuit_account_tree.clone());
+                let internal_cache = circuit_account_tree.get_internals();
                 let tree_cache = internal_cache.encode_bincode();
                 metrics::histogram!("tree_cache_size", tree_cache.len() as f64);
                 self.database
@@ -206,7 +206,9 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 // There exists a cache for the block we are interested in.
                 metrics::increment_counter!("witness_generator.cache_access", "type" => "hit");
             }
+            circuit_account_tree
         } else {
+            let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
             // There are no caches at all.
             let (_, accounts) = self
                 .database
@@ -217,11 +219,11 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             }
             circuit_account_tree.root_hash();
 
-            let internal_cache = circuit_account_tree.get_internals();
             self.cached_account_tree
                 .write()
                 .await
-                .insert(block, internal_cache.clone());
+                .insert(block, circuit_account_tree.clone());
+            let internal_cache = circuit_account_tree.clone().get_internals();
             let tree_cache = internal_cache.encode_bincode();
             metrics::histogram!("witness_generator", start.elapsed(), "stage" => "recreate_tree_from_scratch");
 
@@ -230,7 +232,8 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 .store_account_tree_cache(&mut storage, block, tree_cache)
                 .await?;
             metrics::histogram!("witness_generator", start.elapsed(), "stage" => "store_cache");
-        }
+            circuit_account_tree
+        };
 
         let start = Instant::now();
         if block != BlockNumber(0) {
