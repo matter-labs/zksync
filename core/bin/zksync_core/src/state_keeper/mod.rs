@@ -333,11 +333,6 @@ impl ZkSyncStateKeeper {
                 .collect(),
         );
 
-        vlog::debug!(
-            "Requesting new miniblock from mempool. {} txs are excluded from search. {} chunks left",
-            executed_txs.len(),
-            self.pending_block.chunks_left
-        );
         let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {
             last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
             block_timestamp,
