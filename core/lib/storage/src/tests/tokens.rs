@@ -183,6 +183,7 @@ async fn test_ticker_price(mut storage: StorageProcessor<'_>) -> QueryResult<()>
 #[db_test]
 async fn test_market_volume(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     const TOKEN_ID: TokenId = TokenId(0);
+    const WRONG_TOKEN_ID: TokenId = TokenId(1);
 
     let market_volume = TokenMarketVolume {
         market_volume: Ratio::new(BigUint::from(2u32), BigUint::from(5u32)),
@@ -191,7 +192,30 @@ async fn test_market_volume(mut storage: StorageProcessor<'_>) -> QueryResult<()
 
     storage
         .tokens_schema()
+        .store_or_update_token(Token {
+            id: WRONG_TOKEN_ID,
+            address: Address::random(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let price = TokenPrice {
+        usd_price: Ratio::new(BigUint::from(4u32), BigUint::from(9u32)),
+        last_updated: chrono::Utc::now(),
+    };
+    storage
+        .tokens_schema()
+        .update_historical_ticker_price(TOKEN_ID, price.clone())
+        .await?;
+
+    storage
+        .tokens_schema()
         .update_token_market_volume(TOKEN_ID, market_volume.clone())
+        .await?;
+
+    storage
+        .tokens_schema()
+        .update_token_market_volume(WRONG_TOKEN_ID, market_volume.clone())
         .await?;
 
     let loaded = storage
@@ -218,6 +242,15 @@ async fn test_market_volume(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await
         .expect("Load tokens by market volume query failed");
     assert_eq!(tokens.len(), 1);
+    storage
+        .tokens_schema()
+        .update_historical_ticker_price(WRONG_TOKEN_ID, price)
+        .await?;
+    let tokens = TokensSchema(&mut storage)
+        .load_tokens_by_market_volume(Ratio::new(BigUint::from(2u32), BigUint::from(5u32)))
+        .await
+        .expect("Load tokens by market volume query failed");
+    assert_eq!(tokens.len(), 2);
 
     Ok(())
 }

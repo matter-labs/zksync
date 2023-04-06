@@ -232,6 +232,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
 
     /// Loads all the stored tokens, which have market_volume (ticker_market_volume table)
     /// not less than parameter (min_market_volume)
+    /// And have not null price in ticker_price
     pub async fn load_tokens_by_market_volume(
         &mut self,
         min_market_volume: Ratio<BigUint>,
@@ -244,7 +245,10 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             FROM tokens
             INNER JOIN ticker_market_volume
             ON tokens.id = ticker_market_volume.token_id
+            INNER JOIN ticker_price 
+            ON tokens.id = ticker_price.token_id
             WHERE ticker_market_volume.market_volume >= $1
+            AND ticker_price.usd_price > 0
             AND kind = 'ERC20'::token_kind
             ORDER BY id ASC
             "#,

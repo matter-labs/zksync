@@ -3161,61 +3161,6 @@
     },
     "query": "DELETE FROM mempool_reverted_txs_meta WHERE block_number = $1"
   },
-  "55f394e48eca655ba989d46093cbb36c40398446fa6d7aa776a4f57a3ecac300": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int4"
-        },
-        {
-          "name": "address",
-          "ordinal": 1,
-          "type_info": "Text"
-        },
-        {
-          "name": "decimals",
-          "ordinal": 2,
-          "type_info": "Int2"
-        },
-        {
-          "name": "kind: _",
-          "ordinal": 3,
-          "type_info": {
-            "Custom": {
-              "kind": {
-                "Enum": [
-                  "ERC20",
-                  "NFT",
-                  "None"
-                ]
-              },
-              "name": "token_kind"
-            }
-          }
-        },
-        {
-          "name": "symbol",
-          "ordinal": 4,
-          "type_info": "Text"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Numeric"
-        ]
-      }
-    },
-    "query": "\n            SELECT id, address, decimals, kind as \"kind: _\", symbol\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            AND kind = 'ERC20'::token_kind\n            ORDER BY id ASC\n            "
-  },
   "565dbc924bff0126aa6635daec86f2753d49a8de200a5e6207139c657b7169e6": {
     "describe": {
       "columns": [
@@ -3951,6 +3896,61 @@
       }
     },
     "query": "\n                INSERT INTO no_2fa_pub_key_hash VALUES ( $1, $2 )\n                ON CONFLICT (account_id) DO UPDATE SET pub_key_hash = $2\n                "
+  },
+  "70cfe7c346c2ff2c8789163d8c9bb42dd460744f98b6f0fb65ce1a09b86a1b11": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "address",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "decimals",
+          "ordinal": 2,
+          "type_info": "Int2"
+        },
+        {
+          "name": "kind: _",
+          "ordinal": 3,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "ERC20",
+                  "NFT",
+                  "None"
+                ]
+              },
+              "name": "token_kind"
+            }
+          }
+        },
+        {
+          "name": "symbol",
+          "ordinal": 4,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Numeric"
+        ]
+      }
+    },
+    "query": "\n            SELECT id, address, decimals, kind as \"kind: _\", symbol\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            INNER JOIN ticker_price \n            ON tokens.id = ticker_price.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            AND ticker_price.usd_price > 0\n            AND kind = 'ERC20'::token_kind\n            ORDER BY id ASC\n            "
   },
   "7102023319626d8894376477c6681184464f79c2b588bdb227d22cf032f3e8b7": {
     "describe": {
