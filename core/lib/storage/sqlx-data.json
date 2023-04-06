@@ -2210,6 +2210,27 @@
     },
     "query": "SELECT blocks.block_num AS \"block_num!\", ops, fee_account as \"fee_account!\",\n            timestamp, previous_block_root_hash, contract_version as \"contract_version!\"\n            FROM data_restore_rollup_blocks AS blocks\n            JOIN (\n                SELECT block_num, array_agg(operation ORDER BY id) as ops\n                FROM data_restore_rollup_block_ops\n                GROUP BY block_num\n            ) ops\n                ON blocks.block_num = ops.block_num\n            JOIN (\n                SELECT DISTINCT block_num, contract_version\n                FROM data_restore_events_state\n            ) events\n                ON blocks.block_num = events.block_num\n            ORDER BY blocks.block_num ASC"
   },
+  "34f5b0e0a0595de0d7a6bef833b262c454294c322adae50cf1939dcd8b4e2787": {
+    "describe": {
+      "columns": [
+        {
+          "name": "token_id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int4Array",
+          "Numeric"
+        ]
+      }
+    },
+    "query": "\n            SELECT ticker_market_volume.token_id\n            FROM ticker_market_volume\n            INNER JOIN ticker_price \n            ON ticker_market_volume.token_id = ticker_price.token_id\n            WHERE ticker_market_volume.token_id = ANY($1) AND market_volume >= $2\n            AND ticker_price.usd_price > 0\n            "
+  },
   "357d6ead6603c088c16ca1257981f85d316a31d6aee3f867f3646f0783f6fb43": {
     "describe": {
       "columns": [],
@@ -2805,38 +2826,6 @@
     },
     "query": "SELECT nonce FROM accounts WHERE id = $1"
   },
-  "4a0bc713a57201aa894b96acdb462c03d3ad63cf4fbc8a14b9ac5e2e02121207": {
-    "describe": {
-      "columns": [
-        {
-          "name": "token_id",
-          "ordinal": 0,
-          "type_info": "Int4"
-        },
-        {
-          "name": "market_volume",
-          "ordinal": 1,
-          "type_info": "Numeric"
-        },
-        {
-          "name": "last_updated",
-          "ordinal": 2,
-          "type_info": "Timestamptz"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      }
-    },
-    "query": "\n            SELECT * FROM ticker_market_volume\n            WHERE token_id = $1\n            LIMIT 1\n            "
-  },
   "4c7dfa70b28b0d2faba94e33de2580c980f4d1159924686a6b72a06f3084fe82": {
     "describe": {
       "columns": [
@@ -3231,27 +3220,6 @@
       }
     },
     "query": "UPDATE aggregate_operations\n                SET confirmed = $1\n                WHERE from_block >= $2 AND to_block <= $3 AND action_type = $4"
-  },
-  "58d4d06fc0d3bc68286c7ec33f5e080a150461479dd08361bfe0e650a0015f0d": {
-    "describe": {
-      "columns": [
-        {
-          "name": "token_id",
-          "ordinal": 0,
-          "type_info": "Int4"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Int4Array",
-          "Numeric"
-        ]
-      }
-    },
-    "query": "\n            SELECT token_id\n            FROM ticker_market_volume\n            WHERE token_id = ANY($1) AND market_volume >= $2\n            "
   },
   "592cd3fa2a50f8f889323fd5b9e1962b009c1abfe2c2b8f504cdf27a3c06a5d4": {
     "describe": {
@@ -5779,6 +5747,38 @@
       }
     },
     "query": "\n            INSERT INTO subsidies ( tx_hash, usd_amount_scale6, full_cost_usd_scale6, token_id, token_amount, full_cost_token, subsidy_type )\n            VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n            "
+  },
+  "a6d05f23f29642fd39741bfaed9d49e5d1ba41b8d4f16de48fdd04da17b19459": {
+    "describe": {
+      "columns": [
+        {
+          "name": "token_id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "market_volume",
+          "ordinal": 1,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "last_updated",
+          "ordinal": 2,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n            SELECT ticker_market_volume.* FROM ticker_market_volume\n            INNER JOIN ticker_price \n            ON ticker_market_volume.token_id = ticker_price.token_id\n            WHERE ticker_market_volume.token_id = $1\n            AND ticker_price.usd_price > 0\n            LIMIT 1\n            "
   },
   "a7281db353eff1024db3fdedeeffe6b5ecbcd09a65e86dcb01998d8bd4425697": {
     "describe": {
