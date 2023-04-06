@@ -279,9 +279,12 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let tokens_to_check: Vec<i32> = tokens_to_check.into_iter().map(|id| *id as i32).collect();
         let tokens = sqlx::query!(
             r#"
-            SELECT token_id
+            SELECT ticker_market_volume.token_id
             FROM ticker_market_volume
-            WHERE token_id = ANY($1) AND market_volume >= $2
+            INNER JOIN ticker_price 
+            ON ticker_market_volume.token_id = ticker_price.token_id
+            WHERE ticker_market_volume.token_id = ANY($1) AND market_volume >= $2
+            AND ticker_price.usd_price > 0
             "#,
             &tokens_to_check,
             ratio_to_big_decimal(min_market_volume, STORED_USD_PRICE_PRECISION)
@@ -469,8 +472,11 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let db_market_volume = sqlx::query_as!(
             DBMarketVolume,
             r#"
-            SELECT * FROM ticker_market_volume
-            WHERE token_id = $1
+            SELECT ticker_market_volume.* FROM ticker_market_volume
+            INNER JOIN ticker_price 
+            ON ticker_market_volume.token_id = ticker_price.token_id
+            WHERE ticker_market_volume.token_id = $1
+            AND ticker_price.usd_price > 0
             LIMIT 1
             "#,
             *token_id as i32
