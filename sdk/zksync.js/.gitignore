@@ -1,6 +1,0 @@
-.idea/
-node_modules/
-build/
-.DS_Store
-yarn-debug.log*
-yarn-error.log*
