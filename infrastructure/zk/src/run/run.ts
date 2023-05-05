@@ -55,7 +55,6 @@ export async function yarn() {
     await utils.spawn('yarn');
     await utils.spawn('yarn crypto build');
     await utils.spawn('yarn reading-tool build');
-    await utils.spawn('yarn zksync prepublish');
 }
 
 export async function deployTestkit(genesisRoot: string, prodContracts: boolean = false) {

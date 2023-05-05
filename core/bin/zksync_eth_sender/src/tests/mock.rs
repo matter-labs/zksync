@@ -21,7 +21,7 @@ use zksync_eth_client::clients::mock::MockEthereum;
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug)]
-pub(in crate) struct MockDatabase {
+pub(crate) struct MockDatabase {
     eth_operations: RwLock<Vec<ETHOperation>>,
     aggregated_operations: RwLock<Vec<(i64, AggregatedOperation)>>,
     unprocessed_operations: RwLock<Vec<(i64, AggregatedOperation)>>,
@@ -358,7 +358,7 @@ impl DatabaseInterface for MockDatabase {
 }
 
 /// Creates a default `ETHParams` for use by mock `ETHSender` .
-pub(in crate) fn default_eth_parameters() -> ETHParams {
+pub(crate) fn default_eth_parameters() -> ETHParams {
     ETHParams {
         id: true,
         nonce: 0,
@@ -372,7 +372,7 @@ pub(in crate) fn default_eth_parameters() -> ETHParams {
 
 /// Creates a default `ETHSender` with mock Ethereum connection/database and no operations in DB.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate) async fn default_eth_sender() -> ETHSender<MockDatabase> {
+pub(crate) async fn default_eth_sender() -> ETHSender<MockDatabase> {
     build_eth_sender(
         1,
         Vec::new(),
@@ -386,7 +386,7 @@ pub(in crate) async fn default_eth_sender() -> ETHSender<MockDatabase> {
 /// Creates an `ETHSender` with mock Ethereum connection/database and no operations in DB
 /// which supports multiple transactions in flight.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate) async fn concurrent_eth_sender(max_txs_in_flight: u64) -> ETHSender<MockDatabase> {
+pub(crate) async fn concurrent_eth_sender(max_txs_in_flight: u64) -> ETHSender<MockDatabase> {
     build_eth_sender(
         max_txs_in_flight,
         Vec::new(),
@@ -399,7 +399,7 @@ pub(in crate) async fn concurrent_eth_sender(max_txs_in_flight: u64) -> ETHSende
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate) async fn restored_eth_sender(
+pub(crate) async fn restored_eth_sender(
     eth_operations: Vec<ETHOperation>,
     aggregated_operations: Vec<(i64, AggregatedOperation)>,
     unprocessed_operations: Vec<(i64, AggregatedOperation)>,
@@ -457,7 +457,7 @@ async fn build_eth_sender(
 /// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
 /// This method should be used to create expected tx copies which won't affect
 /// the internal `ETHSender` state.
-pub(in crate) async fn create_signed_tx(
+pub(crate) async fn create_signed_tx(
     id: i64,
     eth_sender: &ETHSender<MockDatabase>,
     aggregated_operation: (i64, AggregatedOperation),
