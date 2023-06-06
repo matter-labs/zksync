@@ -6,7 +6,10 @@ on:
       environment:
         description: "Environment to deploy."
         required: true
-        default: "goerli"
+        type: choice
+        options:
+        - goerli
+        - mainnet
 
 
 # Disable simultaneous deployments into a single environment
