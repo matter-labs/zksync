@@ -90,11 +90,16 @@ jobs:
         with:
           token: ${{ github.token }}
           environment: ${{ inputs.environment }}
+      - name: Generate output with git tag
+        id: get_partsed_git_tag
+        run: |
+          git_tag="${GITHUB_REF#refs/*/}"
+          echo "::set-output name=id::${git_tag}"
       - name: Match the tag vX.Y.Z-rN pattern
         uses: actions-ecosystem/action-regex-match@9e6c4fb3d5e898f505be7a1fb6e7b0a278f6665b # v2
         id: regex
         with:
-          text: ${{ github.ref }}
+          text: ${{ steps.get_partsed_git_tag.outputs.id }}
           regex: '^(v\d+\.\d+\.\d+)(-r\d+)?$'
       - name: Find the latest config "-rN" tag
         uses: dysnix/find-latest-tag@4138bcb046c9e693926b6e12798fae730a27be85 # v2

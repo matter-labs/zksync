@@ -23,6 +23,7 @@ jobs:
     uses: ./.github/workflows/setup.runtime.yml
     with:
       find-latest-config: true
+      create-deployment: true
       environment: ${{ inputs.environment }}
     secrets:
       github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
@@ -32,12 +33,12 @@ jobs:
     name: "echo vars"
     steps:
       - run:
-          echo "cluster - ${{ needs.setup.outputs.cluster }}"
-          echo "config-tag -${{ needs.setup.outputs.config-tag }}"
-          echo "environment -${{ needs.setup.outputs.environment }}"
-          echo "release-namespace -${{ needs.setup.outputs.release-namespace }}"
-          echo "deployment- id -${{ github.event.deployment.id }}"
-          echo "sha-short -${{ needs.setup.outputs.sha-short }}"
+          echo "cluster - ${{ needs.setup.outputs.cluster }} \n"
+          echo "config-tag - ${{ needs.setup.outputs.config-tag }} \n"
+          echo "environment - ${{ needs.setup.outputs.environment }} \n"
+          echo "release-namespace - ${{ needs.setup.outputs.release-namespace }} \n"
+          echo "deployment- id - ${{ github.event.deployment.id }} \n"
+          echo "sha-short - ${{ needs.setup.outputs.sha-short }} \n"
 
   # update:
   #   name: Update
