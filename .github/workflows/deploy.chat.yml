@@ -37,7 +37,7 @@ jobs:
           echo "config-tag - ${{ needs.setup.outputs.config-tag }} \n"
           echo "environment - ${{ needs.setup.outputs.environment }} \n"
           echo "release-namespace - ${{ needs.setup.outputs.release-namespace }} \n"
-          echo "deployment- id - ${{ github.event.deployment.id }} \n"
+          echo "deployment- id - ${{ needs.setup.outputs.deployment-id }} \n"
           echo "sha-short - ${{ needs.setup.outputs.sha-short }} \n"
 
   # update:
