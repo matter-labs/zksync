@@ -43,8 +43,8 @@ jobs:
   update:
     name: Update
     uses: ./.github/workflows/server.update-config.yml
-    if: ${{ needs.setup.outputs.config-tag }} != ''
     needs: [setup]
+    if: needs.setup.outputs.config-tag != ''
     with:
       ref: ${{ needs.setup.outputs.config-tag }}
       cluster: ${{ needs.setup.outputs.cluster }}
