@@ -40,17 +40,18 @@ jobs:
           echo "deployment- id - ${{ needs.setup.outputs.deployment-id }} \n"
           echo "sha-short - ${{ needs.setup.outputs.sha-short }} \n"
 
-  # update:
-  #   name: Update
-  #   uses: ./.github/workflows/server.update-config.yml
-  #   needs: [setup]
-  #   with:
-  #     ref: ${{ needs.setup.outputs.config-tag }}
-  #     cluster: ${{ needs.setup.outputs.cluster }}
-  #     environment: ${{ needs.setup.outputs.environment }}
-  #     namespace: ${{ needs.setup.outputs.release-namespace }}
-  #   secrets:
-  #     github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
+  update:
+    name: Update
+    uses: ./.github/workflows/server.update-config.yml
+    if: ${{ needs.setup.outputs.config-tag }} != ''
+    needs: [setup]
+    with:
+      ref: ${{ needs.setup.outputs.config-tag }}
+      cluster: ${{ needs.setup.outputs.cluster }}
+      environment: ${{ needs.setup.outputs.environment }}
+      namespace: ${{ needs.setup.outputs.release-namespace }}
+    secrets:
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   # deploy:
   #   name: Deploy
