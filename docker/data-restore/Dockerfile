@@ -1,6 +1,4 @@
-FROM rust@sha256:80b9716cb59872769d49f5185a346e5f859081b02338e4aaaa04a8cc7fb884ae
-# Same as rust:1.67
-
+FROM rust:1.67
 WORKDIR /usr/src/zksync
 
 RUN apt update && apt install wget openssl libssl-dev pkg-config npm curl libpq5 libpq-dev lsb-release -y

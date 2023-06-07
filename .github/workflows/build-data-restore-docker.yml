@@ -20,18 +20,34 @@ jobs:
       id: vars
       run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USER }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: setup-env
+      run: |
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
 
-    - name: Build and push
-      id: docker_build_push
-      uses: docker/build-push-action@v3
-      with:
-        push: true
-        file: ./docker/data-restore/Dockerfile
-        tags: |
-          matterlabs/data-restore:${{ steps.vars.outputs.sha_short }}
-          matterlabs/data-restore:latest
+    - name: start-services
+      run: |
+        docker-compose -f docker-compose-runner.yml down
+        docker-compose -f docker-compose-runner.yml up -d zk postgres
+
+    - name: init
+      run: |
+        ci_run git config --global --add safe.directory /usr/src/zksync
+        ci_run git config --global --add safe.directory /usr/src/zksync/sdk/binaryen
+        ci_run zk
+        ci_run zk run yarn
+        ci_run zk run verify-keys unpack
+        ci_run zk contract build
+        ci_run zk db basic-setup
+
+    - name: update-images
+      run: |
+        ci_run docker login -u ${{ secrets.DOCKERHUB_USER }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+        ci_run gcloud auth configure-docker us-docker.pkg.dev -q
+        ci_run zk docker push data-restore
+
+    - name: docker-down
+      if: always()
+      run: |
+        docker-compose -f docker-compose-runner.yml down
