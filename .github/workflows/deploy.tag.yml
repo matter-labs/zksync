@@ -37,8 +37,10 @@ jobs:
      - name: Validation
        id: validation
        run: |
-        if [ ${{ needs.setup.outputs.config-tag }} == "" ]; then
+        if [ ${{ needs.setup.outputs.config-tag }} = "" ]; then
           echo "::set-output name=skip::true"
+        else
+          echo "::set-output name=skip::false"
         fi
 
   update:
