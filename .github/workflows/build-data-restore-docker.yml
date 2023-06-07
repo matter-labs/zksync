@@ -36,7 +36,7 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         push: true
-        context: ./docker/data-restore
+        file: ./docker/data-restore/Dockerfile
         tags: |
           matterlabs/data-restore:${{ steps.vars.outputs.sha_short }}
           matterlabs/data-restore:latest
