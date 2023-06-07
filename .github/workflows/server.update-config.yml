@@ -23,6 +23,11 @@ on:
         required: false
         type: boolean
         default: false
+      skip-update:
+        description: Skip Config Update.
+        required: false
+        type: boolean
+        default: false
     secrets:
       github-token:
         description: GitHub token
@@ -37,6 +42,7 @@ concurrency: server-update-config-${{ inputs.environment }}
 
 jobs:
   update:
+    if: inputs.skip-update
     name: configMap (server-env-custom)
     runs-on: [self-hosted, deployer, "${{ inputs.cluster }}"]
     container:

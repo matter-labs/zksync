@@ -28,12 +28,25 @@ jobs:
     secrets:
       github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
+  update-config-validation:
+    runs-on: [self-hosted, stage]
+    needs: setup
+    outputs:
+      skip: ${{ steps.validation.outputs.skip }}
+    steps:
+     - name: Validation
+       id: validation
+       run: |
+        if [ ${{ needs.setup.outputs.config-tag }} == "" ]; then
+          echo "::set-output name=skip::true"
+        fi
+
   update:
     name: Update
     uses: ./.github/workflows/server.update-config.yml
-    needs: [setup]
-    if: needs.setup.outputs.config-tag != ''
+    needs: [setup, update-config-validation]
     with:
+      skip-update: ${{ needs.update-config-validation.outputs.skip }}
       ref: ${{ needs.setup.outputs.config-tag }}
       cluster: ${{ needs.setup.outputs.cluster }}
       environment: ${{ needs.setup.outputs.environment }}
