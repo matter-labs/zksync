@@ -27,18 +27,6 @@ jobs:
       environment: ${{ inputs.environment }}
     secrets:
       github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
-  echo-vars:
-    needs: Setup
-    runs-on: [self-hosted, default, infra]
-    name: "echo vars"
-    steps:
-      - run:
-          echo "cluster - ${{ needs.setup.outputs.cluster }} \n"
-          echo "config-tag - ${{ needs.setup.outputs.config-tag }} \n"
-          echo "environment - ${{ needs.setup.outputs.environment }} \n"
-          echo "release-namespace - ${{ needs.setup.outputs.release-namespace }} \n"
-          echo "deployment- id - ${{ needs.setup.outputs.deployment-id }} \n"
-          echo "sha-short - ${{ needs.setup.outputs.sha-short }} \n"
 
   update:
     name: Update
@@ -53,19 +41,19 @@ jobs:
     secrets:
       github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
-  # deploy:
-  #   name: Deploy
-  #   uses: ./.github/workflows/deploy.yml
-  #   needs: [setup, update]
-  #   with:
-  #     cluster: ${{ needs.setup.outputs.cluster }}
-  #     environment: ${{ needs.setup.outputs.environment }}
-  #     release-environment: ${{ needs.setup.outputs.release-environment }}
-  #     release-namespace: ${{ needs.setup.outputs.release-namespace }}
-  #     deployment-id: ${{ github.event.deployment.id }}
-  #     image-tag: ${{ needs.setup.outputs.sha-short }}
-  #   secrets:
-  #     github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
+  deploy:
+    name: Deploy
+    uses: ./.github/workflows/deploy.yml
+    needs: [setup, update]
+    with:
+      cluster: ${{ needs.setup.outputs.cluster }}
+      environment: ${{ needs.setup.outputs.environment }}
+      release-environment: ${{ needs.setup.outputs.release-environment }}
+      release-namespace: ${{ needs.setup.outputs.release-namespace }}
+      deployment-id: ${{ github.event.deployment.id }}
+      image-tag: ${{ needs.setup.outputs.sha-short }}
+    secrets:
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   # notify:
   #   runs-on: ubuntu-latest
