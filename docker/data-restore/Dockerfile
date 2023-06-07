@@ -31,5 +31,6 @@ ENV ZKSYNC_HOME=/usr/src/zksync
 ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
 ENV CONFIG_PATH=/usr/src/configs
 ENV PG_DUMP_PATH=/pg_restore
+USER root
 
 ENTRYPOINT ["data-restore-entry.sh"]
