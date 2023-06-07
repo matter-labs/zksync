@@ -48,7 +48,7 @@ jobs:
     uses: ./.github/workflows/server.update-config.yml
     needs: [setup, update-config-validation]
     with:
-      skip-update: ${{ needs.update-config-validation.outputs.skip }}
+      skip-update: ${{ fromJson(needs.update-config-validation.outputs.skip) }}
       ref: ${{ needs.setup.outputs.config-tag }}
       cluster: ${{ needs.setup.outputs.cluster }}
       environment: ${{ needs.setup.outputs.environment }}
