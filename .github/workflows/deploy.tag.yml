@@ -65,7 +65,7 @@ jobs:
       environment: ${{ needs.setup.outputs.environment }}
       release-environment: ${{ needs.setup.outputs.release-environment }}
       release-namespace: ${{ needs.setup.outputs.release-namespace }}
-      deployment-id: ${{ github.event.deployment.id }}
+      deployment-id: ${{ needs.setup.outputs.deployment-id }}
       image-tag: ${{ needs.setup.outputs.sha-short }}
     secrets:
       github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
