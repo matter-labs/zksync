@@ -76,7 +76,7 @@ then
   reset_db
 
   echo "Applying $PG_DUMP"
-  pg_restore -j 8 -d $DATABASE_URL --clean --if-exists $PG_DUMP_PATH/$PG_DUMP
+  pg_restore -xO -j 8 -d $DATABASE_URL --clean --if-exists $PG_DUMP_PATH/$PG_DUMP
 fi
 
 if [[ -z $CONFIG_PATH ]]
