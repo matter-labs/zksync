@@ -23,6 +23,11 @@ on:
         required: false
         type: boolean
         default: false
+      skip-update:
+        description: Skip Config Update.
+        required: false
+        type: boolean
+        default: false
     secrets:
       github-token:
         description: GitHub token
@@ -57,11 +62,13 @@ jobs:
           token: ${{ secrets.github-token }}
       -
         name: Generate ~/.kube/config
+        if: inputs.skip-update
         working-directory: gh-workflows
         run: scripts/kubeconfig-projected-token
       -
         name: Clone configs
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        if: inputs.skip-update
         with:
           repository: matter-labs/configs
           path: configs
@@ -70,6 +77,7 @@ jobs:
       -
         name: Update Server Config
         working-directory: configs
+        if: inputs.skip-update
         run: |
           sudo apk --no-cache add yarn
           ./bin/config
