@@ -81,7 +81,7 @@ jobs:
               "^goerli$": { "cluster": "testnet" },
               "^mainnet$": { "cluster": "mainnet", "hfEnv": "prod", "namespace": "zksync" }
             }
-      - run: echo "::set-output name=short::$(git rev-parse --short HEAD)"
+      - run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: sha
       - name: Create GitHub Deployment
         uses: chrnorm/deployment-action@releases/v1
@@ -94,7 +94,7 @@ jobs:
         id: get_partsed_git_tag
         run: |
           git_tag="${GITHUB_REF#refs/*/}"
-          echo "::set-output name=id::${git_tag}"
+          echo "id=${git_tag}" >> $GITHUB_OUTPUT
       - name: Match the tag vX.Y.Z-rN pattern
         uses: actions-ecosystem/action-regex-match@9e6c4fb3d5e898f505be7a1fb6e7b0a278f6665b # v2
         id: regex
