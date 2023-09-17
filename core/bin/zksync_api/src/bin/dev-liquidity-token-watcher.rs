@@ -11,7 +11,6 @@ use std::{
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, Result};
 use bigdecimal::BigDecimal;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -19,6 +18,7 @@ use zksync_api::fee_ticker::validator::watcher::{
     GraphqlResponse, GraphqlTokenResponse, TokenResponse,
 };
 use zksync_config::{configs::dev_liquidity_token_watcher::Regime, DevLiquidityTokenWatcherConfig};
+use zksync_utils::regex;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct TokenData {
@@ -103,7 +103,7 @@ async fn handle_graphql(
     params: web::Json<GrqaphqlQuery>,
     volume_storage: web::Data<VolumeStorage>,
 ) -> Result<HttpResponse> {
-    let query_parser = Regex::new(r#"\{token\(id:\s"(?P<address>.*?)"\).*"#).expect("Right regexp");
+    let query_parser = regex!(r#"\{token\(id:\s"(?P<address>.*?)"\).*"#);
     let caps = query_parser.captures(&params.query).unwrap();
     let address = &caps["address"].to_ascii_lowercase();
     let volume = volume_storage.get_volume(address);

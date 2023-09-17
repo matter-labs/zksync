@@ -19,6 +19,14 @@ macro_rules! retry_opt {
     };
 }
 
+#[macro_export]
+macro_rules! regex {
+    ($re:literal $(,)?) => {{
+        static REGEX: once_cell::sync::OnceCell<regex::Regex> = once_cell::sync::OnceCell::new();
+        REGEX.get_or_init(|| regex::Regex::new($re).unwrap())
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use futures::future::Future;
