@@ -85,7 +85,7 @@ This section provides an overview on folders / sub-projects that exist in this r
   - `/env`: `.env` files that contain environment variables for different configuration of zkSync Server / Prover.
   - `/js`: Configuration files for JavaScript applications (such as Explorer).
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
-- `/infrastructure`: Applications that aren't naturally a part of zkSync core, but are related to it.
+- `/infrastructure`: Application that aren't naturally a part of zkSync core, but are related to it.
 - `/keys`: Verification keys for `circuit` module.
 - `/sdk`: Implementation of client libraries for zkSync network in different programming languages.
   - `/zksync-crypto`: zkSync network cryptographic primitives, which can be compiled to WASM.
