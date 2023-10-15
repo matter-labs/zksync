@@ -2318,7 +2318,7 @@ In test vectors we output only first element of the squeezed sponge. Such operat
 ### Bitpacking
 
 Rescue is an algebraic hash that operates over field elements, so any binary data (packed transaction) has first to be
-encode into the series of field elements. For this bit string `x` is encoded as seried of field elements placing `253`
+encode into the series of field elements. For this bit string `x` is encoded as series of field elements placing `253`
 bits into each element starting from the LSB.
 
 ### Transaction signature

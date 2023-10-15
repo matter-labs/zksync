@@ -5,7 +5,7 @@
 ## Deployment
 
 The contract must be deployed specifying the initial ("genesis") state root hash, appointing the **network governor**
-(see the "Governance" section), and linking the exit queue (see the "Cenosorship resistance" section).
+(see the "Governance" section), and linking the exit queue (see the "Censorship resistance" section).
 
 ## Governance
 
@@ -16,9 +16,9 @@ Governance of the network will be excerised from a separate contract registered 
 - Add new tokens (tokens can not be removed after being added).
 - Initiate migration to a new contract (see the "Migration" section).
 
-## Cenosorship resistance
+## Censorship resistance
 
-To enforece censorship-resistance and enable guaranteed retrievability of the funds, ZKSync employs the mechanisms of
+To enforce censorship-resistance and enable guaranteed retrievability of the funds, ZKSync employs the mechanisms of
 **Priority queue** (soft enforcement) and **Exodus mode** (hard enforcement).
 
 ## Deposits
@@ -52,7 +52,7 @@ priority requests** are accrued to the owners' **root-chain balances** to make t
 
 It is a standard withdrawal operation. When a block with `partial_exit` **circuit operation** is committed, **withdraw
 onchain operation** for this withdrawal is created. If the block is verified, funds from the **withdrawal onchain
-operation** are acrued to the users' **root-chain balances**.
+operation** are accrued to the users' **root-chain balances**.
 
 If the block is reverted, this **withdraw onchain operations** are simply discarded.
 
@@ -81,7 +81,7 @@ If the block is reverted, this **withdraw onchain operations** are simply discar
 If ZKSync contract has entered Exodus mode and the block is unverified, this **withdraw onchain operations** and **full
 exit priority requests** are simply discarded.
 
-## Block committment
+## Block commitment
 
 Only a sender from the validator set can commit a block.
 
@@ -116,7 +116,7 @@ it will be stored in the mapping (operation type and expiration block) strictly 
   follows: `expirationBlock = block.number + 250` - about 1 hour for the transaction to expire, `block.number` - current
   Ethereum block number.
 
-When corresponding transactions are found in the commited block, their count must be recorded. If the block is verified,
+When corresponding transactions are found in the committed block, their count must be recorded. If the block is verified,
 this count of the satisfied **priority requests** is removed from mapping.
 
 If the block is reverted via Exodus Mode, the funds held by **Deposit priority requests** from this block are accrued to
@@ -126,7 +126,7 @@ removed from mapping.
 ### Fees for Priority Requests
 
 In order to send priority request, the _user_ MUST pay some extra fee. That fee will be subtracted from the amount of
-Ether that the user sent to Deposit or Full Exit funcitons. That fee will be the payment for the _validator’s_ work to
+Ether that the user sent to Deposit or Full Exit functions. That fee will be the payment for the _validator’s_ work to
 include these transactions in the block. One transaction fee is calculated as follows:
 `fee = FEE_COEFF * (BASE_GAS + gasleft) * gasprice`, where
 

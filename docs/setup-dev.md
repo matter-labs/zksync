@@ -30,7 +30,7 @@ sudo usermod -a -G docker your_user_name
 ```
 
 After that, you should logout and login again (user groups are refreshed after the login). The problem should be
-solvedat this step.
+solved at this step.
 
 If logging out does not help, restarting the computer should.
 
@@ -146,8 +146,8 @@ sudo apt install libssl-dev
 ```
 
 - Install OpenSSL. Here is [the instruction for Ubuntu](https://www.spinup.com/installing-openssl-on-ubuntu/), but
-  thesteps should be similar for the debian-based Linux distros.
-- Add `OPENSSL_DIR` variable to your environment. This would typically be `/usr/local/ssl`. You can do this by addingthe
+  the steps should be similar for the debian-based Linux distros.
+- Add `OPENSSL_DIR` variable to your environment. This would typically be `/usr/local/ssl`. You can do this by adding the
   following line to your shell profile file (e.g. `~/.bash_profile`):
 
 ```bash

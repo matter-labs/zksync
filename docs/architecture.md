@@ -62,7 +62,7 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/zksync_witness_generator`: zkSync server Witness Generator & Prover Server microservice.
   - `/lib`: Dependencies of the binaries above.
     - `/basic_types`: Crate with declaration of the essential zkSync primitives, such as `address`.
-    - `/circuit`: Cryptographic environment enforsing the correctness of executed transactions in the zkSync network.
+    - `/circuit`: Cryptographic environment enforcing the correctness of executed transactions in the zkSync network.
     - `/config`: Utilities to load configuration options of zkSync applications.
     - `/contracts`: Loaders for zkSync contracts interfaces and ABI.
     - `/crypto`: Cryptographical primitives using among zkSync crates.
