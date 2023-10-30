@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-push-image:
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3

@@ -61,7 +61,7 @@ concurrency: deploy-app-${{ inputs.environment }}
 jobs:
   deploy:
     name: Server
-    runs-on: [self-hosted, deployer, "${{ inputs.cluster }}"]
+    runs-on: ["matterlabs-deployer-${{ inputs.cluster }}"]
     container:
       image: dysnix/kubectl:v1.26-gcloud
       options: --user root

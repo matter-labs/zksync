@@ -29,7 +29,7 @@ jobs:
       github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
   update-config-validation:
-    runs-on: [self-hosted, stage]
+    runs-on: [matterlabs-deployer-stage]
     needs: setup
     outputs:
       skip: ${{ steps.validation.outputs.skip }}

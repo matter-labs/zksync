@@ -53,7 +53,7 @@ concurrency: setup-env-${{ inputs.environment }}
 jobs:
   setup:
     name: Runtime
-    runs-on: [self-hosted, stage]
+    runs-on: [matterlabs-deployer-stage]
     outputs:
       hfEnv: ${{ steps.envMap.outputs.hfEnv }}
       namespace: ${{ steps.envMap.outputs.namespace }}

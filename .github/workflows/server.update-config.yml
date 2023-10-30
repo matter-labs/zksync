@@ -43,7 +43,7 @@ concurrency: server-update-config-${{ inputs.environment }}
 jobs:
   update:
     name: configMap (server-env-custom)
-    runs-on: [self-hosted, deployer, "${{ inputs.cluster }}"]
+    runs-on: ["matterlabs-deployer-${{ inputs.cluster }}"]
     container:
       image: dysnix/kubectl:v1.26-gcloud
       options: --user root

@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   lint:
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
@@ -41,7 +41,7 @@ jobs:
           ci_run zk lint --check
 
   unit-tests:
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
@@ -83,7 +83,7 @@ jobs:
         run: ci_run zk test server-rust
 
   integration:
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
@@ -142,7 +142,7 @@ jobs:
           ci_run cat /tmp/sccache_log.txt
 
   circuit-tests:
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
@@ -169,7 +169,7 @@ jobs:
         run: ci_run zk test circuit 20
 
   testkit:
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
@@ -198,7 +198,7 @@ jobs:
         run: ci_run zk test integration testkit --offline
 
   revert-blocks:
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
