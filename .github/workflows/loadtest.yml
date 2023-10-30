@@ -19,7 +19,7 @@ jobs:
 
   loadtest:
     name: Perform loadtest
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
     container: rust:1.59
     env:
       WEB3_URL: ${{ secrets.CI_LOADTEST_WEB3_URL }}

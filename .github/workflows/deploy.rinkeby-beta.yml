@@ -13,7 +13,7 @@ concurrency: deploy.rinkeby-beta
 jobs:
   images:
     name: Build Docker Images
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
     steps:
     - uses: actions/checkout@v2
     -
