@@ -158,6 +158,16 @@ where
         WithdrawNFTBuilder::new(self)
     }
 
+    /// Initializes `Order` builder, notice an order is not a zksync transaction.
+    pub fn start_order(&self) -> OrderBuilder<'_, S, P> {
+        OrderBuilder::new(self)
+    }
+
+    /// Initializes `Swap` transaction sending.
+    pub fn start_swap(&self) -> SwapBuilder<'_, S, P> {
+        SwapBuilder::new(self)
+    }
+
     /// Creates an `EthereumProvider` to interact with the Ethereum network.
     ///
     /// Returns an error if wallet was created without providing an Ethereum private key.

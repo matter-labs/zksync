@@ -10,8 +10,8 @@ use zksync_types::{
         ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature,
         TimeRange, TxEthSignature,
     },
-    AccountId, Address, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, TokenId, Transfer, Withdraw,
-    WithdrawNFT, H256,
+    AccountId, Address, ForcedExit, MintNFT, Nonce, Order, PubKeyHash, Swap, Token, TokenId,
+    Transfer, Withdraw, WithdrawNFT, H256,
 };
 // Local imports
 use crate::WalletCredentials;
@@ -337,5 +337,74 @@ impl<S: EthereumSigner> Signer<S> {
         };
 
         Ok((withdraw_nft, eth_signature))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn sign_order(
+        &self,
+        recipient: Address,
+        nonce: Nonce,
+        token_sell: Token,
+        token_buy: Token,
+        prices: (BigUint, BigUint),
+        amount: BigUint,
+        time_range: TimeRange,
+    ) -> Result<Order, SignerError> {
+        let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
+
+        let order = Order::new_signed(
+            account_id,
+            recipient,
+            nonce,
+            token_sell.id,
+            token_buy.id,
+            prices,
+            amount,
+            time_range,
+            &self.private_key,
+        )
+        .map_err(signing_failed_error)?;
+
+        Ok(order)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn sign_swap(
+        &self,
+        nonce: Nonce,
+        orders: (Order, Order),
+        amounts: (BigUint, BigUint),
+        fee: BigUint,
+        fee_token: Token,
+    ) -> Result<(Swap, Option<PackedEthSignature>), SignerError> {
+        let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
+
+        let swap = Swap::new_signed(
+            account_id,
+            self.address,
+            nonce,
+            orders,
+            amounts,
+            fee,
+            fee_token.id,
+            &self.private_key,
+        )
+        .map_err(signing_failed_error)?;
+
+        let eth_signature = match &self.eth_signer {
+            Some(signer) => {
+                let message = swap.get_ethereum_sign_message(&fee_token.symbol, fee_token.decimals);
+                let signature = signer.sign_message(message.as_bytes()).await?;
+
+                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                    Some(packed_signature)
+                } else {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            }
+            _ => None,
+        };
+
+        Ok((swap, eth_signature))
     }
 }
