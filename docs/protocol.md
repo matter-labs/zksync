@@ -1328,7 +1328,7 @@ Signed bytes: 0xf8010000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb63aa2a0efb97
 # ChangePkOp - Rollup operation described above
 # OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
 
-account = get_account_tree(ChankgePkOp.tx.account_id)
+account = get_account_tree(ChangePkOp.tx.account_id)
 fee_account = get_tree_account(Block.fee_account)
 
 fee = unpack_fee(WithdrawOp.tx.packed_fee)
