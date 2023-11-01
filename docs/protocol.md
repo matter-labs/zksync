@@ -128,7 +128,7 @@ This includes, in particular, the following claims:
 |StateAmount|16|BE integer|State amount is represented as uint128 with a range from 0 to ~3.4 × 10^38. It allows to represent up to 3.4 × 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.|
 |Nonce|4|BE integer|Nonce is the total number of executed transactions of the account. In order to apply the update of this state, it is necessary to indicate the current account nonce in the corresponding transaction, after which it will be automatically incremented. If you specify the wrong nonce, the changes will not occur.|
 |RollupPubkeyHash|20|LE integer|To make a public key hash from a Rollup public key apply [Rescue hash function](#rescue-hash) to the `[x,y]` points of the key and then take the last 20 bytes of the result.|
-|EthAddress|20|LE integer|To make an Ethereum address from the Etherum's public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
+|EthAddress|20|LE integer|To make an Ethereum address from the Ethereum's public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
 |PackedRollupPubkey|32|LE integer|A Rollup public key is the first 32 bytes of a Rollup public key |
 |TxHash|32|LE integer|To get hash for transaction apply [SHA256 function](#sha256) to concatenated bytes of [transaction fields](#zk-sync-operations)|
 |Signature|64|LE integer|Read [transaction signature](#transaction-signature)|
