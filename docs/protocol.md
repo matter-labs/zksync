@@ -464,7 +464,7 @@ def tree_updates():
     from_account.balance[TransferOp.tx.token] -= (amount + fee)
     from_account.nonce += 1
 
-    to_acccount.balance[TransferOp.tx.token] += amount
+    to_account.balance[TransferOp.tx.token] += amount
 
     fee_account.balance[TransferOp.tx.token] += fee
 
